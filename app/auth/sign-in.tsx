@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
-import SocialLoginButton from "../components/SocialLoginButton";
+import SocialLoginButton from "../../components/SocialLoginButton";
 
 export default function Page() {
   return (

@@ -7,6 +7,6 @@ export default function Index() {
   if (isSignedIn) {
     return <Redirect href="/(home)" />;
   } else {
-    return <Redirect href="/(auth)/sign-in" />;
+    return <Redirect href="/auth/sign-in" />;
   }
 }

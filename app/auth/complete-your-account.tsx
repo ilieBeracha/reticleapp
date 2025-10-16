@@ -1,4 +1,4 @@
-import { useUser } from "@clerk/clerk-expo";
+import { useSignUp } from "@clerk/clerk-expo";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -10,11 +10,11 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import RadioButtonInput from "../components/forms/RadioButtonInput";
-import TextInput from "../components/forms/TextInput";
+import RadioButtonInput from "../../components/forms/RadioButtonInput";
+import TextInput from "../../components/forms/TextInput";
 
 const CompleteYourAccountScreen = () => {
-  const { user, isLoaded } = useUser();
+  const { signUp, setActive } = useSignUp();
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -32,26 +32,41 @@ const CompleteYourAccountScreen = () => {
 
     try {
       setIsLoading(true);
-      if (user?.unsafeMetadata?.onboarding_completed === true) {
-        await user?.reload();
-        return router.push("/(home)");
+
+      if (!signUp) {
+        console.error("No signUp object found");
+        return;
       }
-      await user?.update({
+
+      // Update the signup with missing fields
+      await signUp.update({
         username: username,
         firstName: full_name.split(" ")[0],
-        lastName: full_name.split(" ")[1],
+        lastName: full_name.split(" ")[1] || "",
         unsafeMetadata: {
           gender,
           onboarding_completed: true,
         },
       });
 
-      await user?.reload();
+      // After updating, the session should be created
+      const { createdSessionId } = signUp;
 
-      return router.push("/(home)");
+      if (createdSessionId) {
+        await setActive!({ session: createdSessionId });
+        router.replace("/(home)");
+      } else {
+        console.error("Session not created after completing signup");
+      }
     } catch (error: any) {
-      if (error.message === "That username is taken. Please try another.") {
+      console.error("Error completing account:", error);
+
+      if (error.errors?.[0]?.code === "form_identifier_exists") {
         return setError("username", { message: "Username is already taken" });
+      }
+
+      if (error.message?.includes("username")) {
+        return setError("username", { message: error.message });
       }
 
       return setError("full_name", { message: "An error occurred" });
@@ -61,18 +76,18 @@ const CompleteYourAccountScreen = () => {
   };
 
   useEffect(() => {
-    if (!isLoaded) {
+    if (!signUp) {
       return;
     }
 
-    if (!user) {
-      return;
-    }
-
-    setValue("full_name", user?.fullName || "");
-    setValue("username", user?.username || "");
-    setValue("gender", String(user?.unsafeMetadata?.gender) || "");
-  }, [isLoaded, user]);
+    // Pre-fill with data from OAuth provider
+    setValue(
+      "full_name",
+      `${signUp.firstName || ""} ${signUp.lastName || ""}`.trim()
+    );
+    setValue("username", signUp.username || "");
+    setValue("gender", String(signUp.unsafeMetadata?.gender) || "");
+  }, [signUp]);
 
   return (
     <View

@@ -1,4 +1,4 @@
-import { SignOutButton } from "@/app/components/SignOutButton";
+import { SignOutButton } from "@/components/SignOutButton";
 import { SignedIn, useUser } from "@clerk/clerk-expo";
 import { useEffect } from "react";
 import { Text, View } from "react-native";
