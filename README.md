@@ -25,6 +25,35 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Dark/Light Mode Theming
+
+This app includes a complete theming system that follows Expo's best practices for dark and light mode support.
+
+### Features
+
+- ✅ Automatic theme switching based on system preferences
+- ✅ Centralized color definitions in `constants/Colors.ts`
+- ✅ Themed components (`ThemedView`, `ThemedText`)
+- ✅ Custom hook for accessing theme colors (`useThemeColor`)
+- ✅ All UI components properly themed
+
+### Quick Usage
+
+```tsx
+import { ThemedView, ThemedText } from '@/components/Themed';
+
+export default function MyScreen() {
+  return (
+    <ThemedView style={{ flex: 1, padding: 20 }}>
+      <ThemedText type="title">Welcome</ThemedText>
+      <ThemedText>This text adapts to the theme automatically</ThemedText>
+    </ThemedView>
+  );
+}
+```
+
+For detailed documentation, see [THEMING.md](./THEMING.md).
+
 ## Get a fresh project
 
 When you're ready, run:

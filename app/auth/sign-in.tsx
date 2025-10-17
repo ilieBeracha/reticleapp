@@ -1,14 +1,26 @@
+import { useThemeColor } from "@/hooks/useThemeColor";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import SocialLoginButton from "../../components/SocialLoginButton";
 
 export default function Page() {
+  const backgroundColor = useThemeColor({}, "background");
+  const textColor = useThemeColor({}, "text");
+  const descriptionColor = useThemeColor({}, "description");
+
   return (
-    <View style={[styles.container, { paddingTop: 40, paddingBottom: 40 }]}>
+    <View
+      style={[
+        styles.container,
+        { paddingTop: 40, paddingBottom: 40, backgroundColor },
+      ]}
+    >
       <View style={styles.headingContainer}>
-        <Text style={styles.label}>Login on Dev Inteprid</Text>
-        <Text style={styles.description}>
-          Start yo ur journey with thousands of developers around the world.
+        <Text style={[styles.label, { color: textColor }]}>
+          Login on Dev Inteprid
+        </Text>
+        <Text style={[styles.description, { color: descriptionColor }]}>
+          Start your journey with thousands of developers around the world.
         </Text>
       </View>
 
@@ -39,7 +51,6 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 16,
-    color: "gray",
   },
   socialButtonsContainer: {
     width: "100%",

@@ -1,3 +1,4 @@
+import { useThemeColor } from "@/hooks/useThemeColor";
 import { useSignUp } from "@clerk/clerk-expo";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -18,6 +19,10 @@ const CompleteYourAccountScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+
+  const backgroundColor = useThemeColor({}, "background");
+  const textColor = useThemeColor({}, "text");
+  const descriptionColor = useThemeColor({}, "description");
 
   const { control, handleSubmit, setError, setValue } = useForm({
     defaultValues: {
@@ -93,12 +98,18 @@ const CompleteYourAccountScreen = () => {
     <View
       style={[
         styles.container,
-        { paddingTop: insets.top + 40, paddingBottom: insets.bottom },
+        {
+          paddingTop: insets.top + 40,
+          paddingBottom: insets.bottom,
+          backgroundColor,
+        },
       ]}
     >
       <View style={styles.headingContainer}>
-        <Text style={styles.label}>Complete your account</Text>
-        <Text style={styles.description}>
+        <Text style={[styles.label, { color: textColor }]}>
+          Complete your account
+        </Text>
+        <Text style={[styles.description, { color: descriptionColor }]}>
           Complete your account to start your journey with thousands of
           developers around the world.
         </Text>
@@ -158,7 +169,6 @@ export default CompleteYourAccountScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "white",
     padding: 20,
     gap: 20,
   },
@@ -172,7 +182,6 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 16,
-    color: "gray",
   },
   formContainer: {
     width: "100%",
@@ -188,7 +197,7 @@ const styles = StyleSheet.create({
   },
   button: {
     width: "100%",
-    backgroundColor: "blue",
+    backgroundColor: "#3b82f6",
     padding: 10,
     borderRadius: 10,
     alignItems: "center",
@@ -198,5 +207,6 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: "white",
+    fontWeight: "600",
   },
 });

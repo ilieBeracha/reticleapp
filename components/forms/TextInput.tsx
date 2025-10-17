@@ -1,3 +1,4 @@
+import { useThemeColor } from "@/hooks/useThemeColor";
 import { Controller } from "react-hook-form";
 import { TextInput as RNTextInput, StyleSheet, Text, View } from "react-native";
 
@@ -14,6 +15,10 @@ const TextInput = ({
   label: string;
   name: string;
 }) => {
+  const textColor = useThemeColor({}, "buttonText");
+  const borderColor = useThemeColor({}, "border");
+  const placeholderColor = useThemeColor({}, "placeholderText");
+
   return (
     <Controller
       control={control}
@@ -22,21 +27,28 @@ const TextInput = ({
         fieldState: { error },
       }) => (
         <View style={styles.container}>
-          <Text style={styles.label}>
+          <Text style={[styles.label, { color: textColor }]}>
             {label}
 
-            {required && <Text style={{ color: "red" }}>*</Text>}
+            {required && <Text style={{ color: "#ef4444" }}>*</Text>}
           </Text>
           <RNTextInput
             placeholder={placeholder}
+            placeholderTextColor={placeholderColor}
             onBlur={onBlur}
             onChangeText={onChange}
             value={value}
-            style={[styles.textInput, { borderColor: error ? "red" : "gray" }]}
+            style={[
+              styles.textInput,
+              {
+                borderColor: error ? "#ef4444" : borderColor,
+                color: textColor,
+              },
+            ]}
             autoComplete="off"
             autoCapitalize="none"
           />
-          {error && <Text style={{ color: "red" }}>{error.message}</Text>}
+          {error && <Text style={{ color: "#ef4444" }}>{error.message}</Text>}
         </View>
       )}
       name={name}
@@ -53,8 +65,7 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   textInput: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "gray",
+    borderWidth: 1,
     borderRadius: 10,
     padding: 10,
     width: "100%",

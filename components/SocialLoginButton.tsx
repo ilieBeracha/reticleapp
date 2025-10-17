@@ -1,3 +1,4 @@
+import { useThemeColor } from "@/hooks/useThemeColor";
 import { useSSO, useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import * as AuthSession from "expo-auth-session";
@@ -10,6 +11,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  useColorScheme,
 } from "react-native";
 
 const SocialLoginButton = ({
@@ -31,6 +33,12 @@ const SocialLoginButton = ({
   const { startSSOFlow } = useSSO();
   const { user } = useUser();
   const [isLoading, setIsLoading] = useState(false);
+  const colorScheme = useColorScheme();
+
+  // Get themed colors
+  const textColor = useThemeColor({}, "buttonText");
+  const borderColor = useThemeColor({}, "buttonBorder");
+  const iconColor = useThemeColor({}, "text");
 
   const router = useRouter();
   const buttonText = () => {
@@ -49,11 +57,11 @@ const SocialLoginButton = ({
 
   const buttonIcon = () => {
     if (strategy === "facebook") {
-      return <Ionicons name="logo-facebook" size={24} color="#1977F3" />;
+      return <Ionicons name="logo-facebook" size={24} color={iconColor} />;
     } else if (strategy === "google") {
-      return <Ionicons name="logo-google" size={24} color="#DB4437" />;
+      return <Ionicons name="logo-google" size={24} color={iconColor} />;
     } else if (strategy === "apple") {
-      return <Ionicons name="logo-apple" size={24} color="black" />;
+      return <Ionicons name="logo-apple" size={24} color={iconColor} />;
     }
   };
 
@@ -128,16 +136,18 @@ const SocialLoginButton = ({
 
   return (
     <TouchableOpacity
-      style={[styles.container]}
+      style={[styles.container, { borderColor }]}
       onPress={onSocialLoginPress}
       disabled={isLoading}
     >
       {isLoading ? (
-        <ActivityIndicator size="small" color="black" />
+        <ActivityIndicator size="small" color={iconColor} />
       ) : (
         buttonIcon()
       )}
-      <Text style={styles.buttonText}>{buttonText()}</Text>
+      <Text style={[styles.buttonText, { color: textColor }]}>
+        {buttonText()}
+      </Text>
       <View />
     </TouchableOpacity>
   );
@@ -148,8 +158,7 @@ export default SocialLoginButton;
 const styles = StyleSheet.create({
   container: {
     width: "100%",
-    borderColor: "gray",
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     padding: 10,
     borderRadius: 10,
     flexDirection: "row",
@@ -159,6 +168,6 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 15,
-    fontWeight: "medium",
+    fontWeight: "500",
   },
 });

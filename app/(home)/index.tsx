@@ -1,21 +1,19 @@
-import { SignOutButton } from "@/components/SignOutButton";
-import { SignedIn, useUser } from "@clerk/clerk-expo";
-import { useEffect } from "react";
-import { Text, View } from "react-native";
-
-export default function Page() {
-  const { user } = useUser();
-
-  useEffect(() => {
-    console.log("user", user);
-  }, [user]);
-
+import CreateOrg from "@/components/organizations/CreateOrg";
+import { useEnsureActiveOrg } from "@/hooks/organizations/useEnsureActiveOrg";
+import { useOrganization } from "@clerk/clerk-expo";
+import { useState } from "react";
+import { Button, View } from "react-native";
+export default function HomeScreen() {
+  const { isLoaded, organization } = useOrganization();
+  useEnsureActiveOrg();
+  const [createOrgVisible, setCreateOrgVisible] = useState(false);
   return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-      <SignedIn>
-        <Text>Hello {user?.emailAddresses[0].emailAddress}</Text>
-        <SignOutButton />
-      </SignedIn>
+    <View>
+      <Button
+        title="Create Organization"
+        onPress={() => setCreateOrgVisible(true)}
+      />
+      <CreateOrg visible={createOrgVisible} setVisible={setCreateOrgVisible} />
     </View>
   );
 }

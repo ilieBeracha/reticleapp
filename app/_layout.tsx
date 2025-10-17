@@ -1,6 +1,5 @@
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { ClerkLoaded, ClerkProvider } from "@clerk/clerk-expo";
-import { tokenCache } from "@clerk/clerk-expo/token-cache";
 import {
   DarkTheme,
   DefaultTheme,
@@ -8,6 +7,7 @@ import {
 } from "@react-navigation/native";
 import { useFonts } from "expo-font";
 import { Slot } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
@@ -17,7 +17,20 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
-
+  const tokenCache = {
+    async getToken(key: string) {
+      try {
+        return await SecureStore.getItemAsync(key);
+      } catch {
+        return null;
+      }
+    },
+    async saveToken(key: string, value: string) {
+      try {
+        await SecureStore.setItemAsync(key, value);
+      } catch {}
+    },
+  };
   const [loaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
   });
@@ -36,7 +49,7 @@ export default function RootLayout() {
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
       <ClerkLoaded>
         <ThemeProvider
-          value={colorScheme === "dark" ? DefaultTheme : DarkTheme}
+          value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
         >
           <Slot />
           <StatusBar style="auto" />

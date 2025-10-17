@@ -1,11 +1,6 @@
+import { useThemeColor } from "@/hooks/useThemeColor";
 import { Controller } from "react-hook-form";
-import {
-  StyleSheet,
-  TextInput as RNTextInput,
-  View,
-  Text,
-  TouchableOpacity,
-} from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 const RadioButtonInput = ({
   control,
@@ -22,6 +17,10 @@ const RadioButtonInput = ({
   name: string;
   options: { label: string; value: string }[];
 }) => {
+  const textColor = useThemeColor({}, "text");
+  const borderColor = useThemeColor({}, "border");
+  const placeholderColor = useThemeColor({}, "placeholderText");
+
   const Option = ({
     label,
     value,
@@ -37,11 +36,17 @@ const RadioButtonInput = ({
       <TouchableOpacity
         style={[
           styles.option,
-          isSelected && { backgroundColor: "blue", borderColor: "blue" },
+          { borderColor: isSelected ? "#3b82f6" : borderColor },
+          isSelected && { backgroundColor: "#3b82f6" },
         ]}
         onPress={() => onChange(value)}
       >
-        <Text style={[styles.optionText, isSelected && { color: "white" }]}>
+        <Text
+          style={[
+            styles.optionText,
+            { color: isSelected ? "white" : textColor },
+          ]}
+        >
           {label}
         </Text>
       </TouchableOpacity>
@@ -56,13 +61,15 @@ const RadioButtonInput = ({
         fieldState: { error },
       }) => (
         <View style={styles.container}>
-          <Text style={styles.label}>
+          <Text style={[styles.label, { color: textColor }]}>
             {label}
 
-            {required && <Text style={{ color: "red" }}>*</Text>}
+            {required && <Text style={{ color: "#ef4444" }}>*</Text>}
           </Text>
           {placeholder && (
-            <Text style={{ color: "gray", fontSize: 12 }}>{placeholder}</Text>
+            <Text style={{ color: placeholderColor, fontSize: 12 }}>
+              {placeholder}
+            </Text>
           )}
           <View style={styles.optionsContainer}>
             {options.map((option) => (
@@ -75,7 +82,7 @@ const RadioButtonInput = ({
               />
             ))}
           </View>
-          {error && <Text style={{ color: "red" }}>{error.message}</Text>}
+          {error && <Text style={{ color: "#ef4444" }}>{error.message}</Text>}
         </View>
       )}
       name={name}
@@ -101,8 +108,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   option: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "gray",
+    borderWidth: 1,
     borderRadius: 10,
     padding: 7,
     paddingHorizontal: 20,
