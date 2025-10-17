@@ -1,16 +1,8 @@
-import { Ionicons } from "@expo/vector-icons";
-import {
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
-
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { useUser } from "@clerk/clerk-expo";
-import { SignOutButton } from "./SignOutButton";
+import { Modal, Pressable, StyleSheet, View } from "react-native";
+import { MenuList } from "./ProfileDropdown/components/MenuList";
+import { ProfileHeader } from "./ProfileDropdown/components/ProfileHeader";
 
 interface ProfileMenuItem {
   icon: string;
@@ -33,13 +25,16 @@ export default function ProfileDropdown({
   onMenuAction,
 }: ProfileDropdownProps) {
   const cardBackground = useThemeColor({}, "cardBackground");
-  const text = useThemeColor({}, "text");
-  const icon = useThemeColor({}, "icon");
   const border = useThemeColor({}, "border");
   const { user } = useUser();
   const userName = user?.fullName || "User";
   const userEmail =
     user?.primaryEmailAddress?.emailAddress || "user@example.com";
+
+  const handleMenuAction = (action: string) => {
+    onMenuAction(action);
+    onClose();
+  };
 
   return (
     <Modal
@@ -62,54 +57,8 @@ export default function ProfileDropdown({
             accessibilityRole="menu"
             accessibilityLabel="Profile menu"
           >
-            <View style={styles.dropdownHeader}>
-              <View
-                style={[styles.dropdownAvatar, { backgroundColor: border }]}
-              >
-                <Text style={[styles.avatarText, { color: text }]}>
-                  {userEmail?.[0]?.toUpperCase() || "U"}
-                </Text>
-              </View>
-              <View style={styles.dropdownUserInfo}>
-                <Text style={[styles.dropdownName, { color: text }]}>
-                  {userName}
-                </Text>
-                <Text style={[styles.dropdownEmail, { color: icon }]}>
-                  {userEmail || "user@example.com"}
-                </Text>
-              </View>
-            </View>
-            <View
-              style={[styles.dropdownDivider, { backgroundColor: border }]}
-            />
-            {menuItems.map((item, idx) => (
-              <TouchableOpacity
-                key={idx}
-                style={styles.dropdownItem}
-                onPress={() => {
-                  onMenuAction(item.action);
-                  onClose();
-                }}
-                activeOpacity={0.7}
-                accessibilityRole="menuitem"
-                accessibilityLabel={item.label}
-              >
-                <Ionicons
-                  name={item.icon as any}
-                  size={20}
-                  color={item.danger ? "#ef4444" : text}
-                />
-                <Text
-                  style={[
-                    styles.dropdownItemText,
-                    { color: item.danger ? "#ef4444" : text },
-                  ]}
-                >
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-            <SignOutButton />
+            <ProfileHeader userName={userName} userEmail={userEmail} />
+            <MenuList items={menuItems} onMenuAction={handleMenuAction} />
           </View>
         </View>
       </Pressable>
@@ -138,47 +87,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
-  },
-  dropdownHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    gap: 12,
-  },
-  dropdownAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  avatarText: {
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  dropdownUserInfo: {
-    flex: 1,
-  },
-  dropdownName: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 2,
-  },
-  dropdownEmail: {
-    fontSize: 13,
-  },
-  dropdownDivider: {
-    height: 1,
-    marginHorizontal: 16,
-  },
-  dropdownItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    gap: 12,
-  },
-  dropdownItemText: {
-    fontSize: 15,
-    fontWeight: "500",
   },
 });

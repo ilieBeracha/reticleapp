@@ -23,12 +23,12 @@ export const SignOutButton = () => {
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: "#ef4444",
-    padding: 10,
+    backgroundColor: "transparent",
+    padding: 18,
     borderRadius: 5,
   },
   buttonText: {
-    color: "white",
+    color: "red",
     fontWeight: "600",
   },
 });

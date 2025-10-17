@@ -1,10 +1,10 @@
 import { ThemedView } from "@/components/ThemedView";
 import { useThemeColor } from "@/hooks/useThemeColor";
-import { useOrganizationList } from "@clerk/clerk-expo";
-import { Ionicons } from "@expo/vector-icons";
-import { Link, router, usePathname } from "expo-router";
-import React from "react";
-import { StyleSheet, TouchableOpacity } from "react-native";
+import { useOrganization } from "@clerk/clerk-expo";
+import { router, usePathname } from "expo-router";
+import { StyleSheet } from "react-native";
+import { AddButton } from "./BottomNav/components/AddButton";
+import { NavItem } from "./BottomNav/components/NavItem";
 
 type BottomNavProps = {
   onAddPress: () => void;
@@ -12,76 +12,64 @@ type BottomNavProps = {
 
 export default function BottomNav({ onAddPress }: BottomNavProps) {
   const pathname = usePathname();
-  const { userMemberships } = useOrganizationList();
-  const hasOrganization = (userMemberships?.data?.length ?? 0) > 0;
+  const { organization } = useOrganization();
 
   const card = useThemeColor({}, "cardBackground");
   const border = useThemeColor({}, "border");
-  const primary = useThemeColor({}, "tint");
-  const muted = useThemeColor({}, "icon");
-  const background = useThemeColor({}, "background");
-
-  const handleOrganizationPress = () => {
-    const target = hasOrganization
-      ? "/(home)/organization"
-      : "/(home)/create-organization";
-    router.push(target as any);
-  };
 
   const isHome = pathname === "/(home)";
-  const isOrg = pathname?.startsWith("/(home)/organization");
+  const isMembers = pathname?.startsWith("/(home)/members");
   const isSession = pathname?.startsWith("/(home)/session");
+  const isStats = pathname?.startsWith("/(home)/stats");
   const isSettings = pathname?.startsWith("/(home)/settings");
+
+  // Show Members nav only when in an organization
+  const inOrganization = !!organization;
 
   return (
     <ThemedView
       style={[
         styles.container,
-        { backgroundColor: card, borderTopColor: border },
+        {
+          backgroundColor: card,
+          borderTopColor: border,
+          justifyContent: inOrganization ? "space-between" : "space-around",
+        },
       ]}
     >
-      <Link href="/(home)" asChild>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="home" size={24} color={isHome ? primary : muted} />
-        </TouchableOpacity>
-      </Link>
+      {/* Always: Home */}
+      <NavItem icon="home" isActive={isHome} href="/(home)" />
 
-      <TouchableOpacity
-        style={styles.navItem}
-        onPress={handleOrganizationPress}
-      >
-        <Ionicons name="people" size={24} color={isOrg ? primary : muted} />
-      </TouchableOpacity>
+      {/* Personal: Add button is 2nd position */}
+      {!inOrganization && <AddButton onPress={onAddPress} />}
 
-      <TouchableOpacity
-        style={[styles.addButton, { backgroundColor: primary }]}
-        onPress={onAddPress}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="add" size={24} color={background} />
-      </TouchableOpacity>
+      {/* Always: Stats */}
+      <NavItem
+        icon="bar-chart-sharp"
+        isActive={isStats}
+        onPress={() => router.push("/(home)/stats" as any)}
+      />
 
-      <TouchableOpacity
-        style={styles.navItem}
-        onPress={() => router.push("/(home)/session" as any)}
-      >
-        <Ionicons
-          name="calendar"
-          size={24}
-          color={isSession ? primary : muted}
+      {/* Organization: Add button is 3rd position (middle) */}
+      {inOrganization && <AddButton onPress={onAddPress} />}
+
+      {/* Organization only: Members */}
+      {inOrganization ? (
+        <NavItem
+          icon="people"
+          isActive={isMembers}
+          onPress={() => router.push("/(home)/members")}
         />
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.navItem}
-        onPress={() => router.push("/(home)/settings" as any)}
-      >
-        <Ionicons
-          name="settings"
-          size={24}
-          color={isSettings ? primary : muted}
+      ) : (
+        <></>
+      )}
+      {inOrganization && (
+        <NavItem
+          icon="calendar"
+          isActive={isSession}
+          onPress={() => router.push("/(home)/calendar" as any)}
         />
-      </TouchableOpacity>
+      )}
     </ThemedView>
   );
 }
@@ -89,29 +77,10 @@ export default function BottomNav({ onAddPress }: BottomNavProps) {
 const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 16,
     paddingBottom: 34,
     borderTopWidth: 1,
-  },
-  navItem: {
-    width: 48,
-    height: 48,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  addButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
 });
