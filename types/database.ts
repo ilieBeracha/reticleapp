@@ -34,10 +34,6 @@ export interface CreateSessionInput {
   name: string;
   session_type: SessionType;
   day_period: DayPeriod;
-  range_m?: number;
-  env_wind_mps?: number;
-  env_temp_c?: number;
-  env_pressure_hpa?: number;
 }
 
 export interface UpdateSessionInput {

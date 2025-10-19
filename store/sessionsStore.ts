@@ -27,7 +27,7 @@ interface SessionsStore {
     token: string,
     input: CreateSessionInput,
     userId: string,
-    orgId: string
+    orgId: string | null
   ) => Promise<Session | null>;
   updateSession: (
     token: string,
@@ -70,7 +70,7 @@ export const sessionsStore = create<SessionsStore>((set, get) => ({
     token: string,
     input: CreateSessionInput,
     userId: string,
-    orgId: string
+    orgId: string | null
   ) => {
     if (!userId) {
       throw new Error("Not authenticated");
@@ -78,7 +78,7 @@ export const sessionsStore = create<SessionsStore>((set, get) => ({
 
     try {
       const session = await createSessionService(token, input, userId, orgId);
-
+      console.log("session", session);
       // Add new session to the beginning of the list
       set((state) => ({
         sessions: [session, ...state.sessions],

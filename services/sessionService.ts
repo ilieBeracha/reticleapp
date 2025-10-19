@@ -71,7 +71,7 @@ export async function createSessionService(
   token: string,
   input: CreateSessionInput,
   userId: string,
-  orgId: string
+  orgId: string | null
 ): Promise<Session> {
   try {
     const client = getAuthenticatedClient(token);

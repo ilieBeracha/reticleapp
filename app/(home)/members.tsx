@@ -1,4 +1,4 @@
-import { Members } from "@/screens/Members";
+import { Members } from "@/components/screens/Members";
 
 export default function MembersPage() {
   return <Members />;

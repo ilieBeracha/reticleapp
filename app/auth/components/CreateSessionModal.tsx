@@ -34,18 +34,15 @@ export default function CreateSessionModal({
 
   // Form state
   const [name, setName] = useState("");
-  const [selectedTraining, setSelectedTraining] = useState<string>("");
   const [sessionType, setSessionType] = useState<SessionType>("steel");
   const [dayPeriod, setDayPeriod] = useState<DayPeriod>("day");
-  const [range, setRange] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-
+  const [description, setDescription] = useState("");
   const resetForm = () => {
     setName("");
-    setSelectedTraining("");
     setSessionType("steel");
     setDayPeriod("day");
-    setRange("");
+    setDescription("");
   };
 
   const handleClose = () => {
@@ -60,7 +57,7 @@ export default function CreateSessionModal({
       return;
     }
 
-    if (!userId || !orgId) {
+    if (!userId) {
       Alert.alert("Error", "Authentication error");
       return;
     }
@@ -73,20 +70,18 @@ export default function CreateSessionModal({
       if (!token) {
         throw new Error("No auth token available");
       }
-
-      await createSession(
+      console.log("token", token);
+      const session = await createSession(
         token,
         {
-          training_id: selectedTraining || undefined,
           name: name.trim(),
           session_type: sessionType,
           day_period: dayPeriod,
-          range_m: range ? parseInt(range) : undefined,
         },
         userId,
         orgId
       );
-
+      console.log("session", session);
       // Refetch sessions based on current context
       // - If in org: fetches all team sessions
       // - If personal: fetches all user's sessions
@@ -95,6 +90,7 @@ export default function CreateSessionModal({
       Alert.alert("Success", "Session created successfully!");
       handleClose();
     } catch (error: any) {
+      console.log("error", error);
       console.error("Error creating session:", error);
       Alert.alert("Error", error.message || "Failed to create session");
     } finally {
@@ -370,7 +366,7 @@ export default function CreateSessionModal({
           {/* Range (Optional) */}
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.text }]}>
-              Range (meters) <Text style={{ opacity: 0.5 }}>- Optional</Text>
+              Description
             </Text>
             <TextInput
               style={[
@@ -381,11 +377,10 @@ export default function CreateSessionModal({
                   color: colors.text,
                 },
               ]}
-              value={range}
-              onChangeText={setRange}
-              placeholder="e.g. 100"
+              value={description}
+              onChangeText={setDescription}
+              placeholder="e.g. 100m"
               placeholderTextColor={colors.description}
-              keyboardType="number-pad"
               editable={!isSubmitting}
             />
           </View>
