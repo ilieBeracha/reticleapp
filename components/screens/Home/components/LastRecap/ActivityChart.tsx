@@ -8,7 +8,10 @@ interface ActivityChartProps {
   isPersonalMode: boolean;
 }
 
-export function ActivityChart({ sessions, isPersonalMode }: ActivityChartProps) {
+export function ActivityChart({
+  sessions,
+  isPersonalMode,
+}: ActivityChartProps) {
   const colors = useColors();
 
   const today = new Date();
@@ -160,12 +163,12 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   title: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: "600",
     letterSpacing: -0.2,
   },
   subtitle: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "400",
     opacity: 0.7,
   },
@@ -203,11 +206,11 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   barText: {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: "700",
   },
   dayText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "500",
     letterSpacing: 0.2,
   },
@@ -230,7 +233,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   legendText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "500",
     opacity: 0.7,
   },

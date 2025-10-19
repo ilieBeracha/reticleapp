@@ -16,7 +16,7 @@ export function WeeklyStats({
   organizationName,
 }: WeeklyStatsProps) {
   const colors = useColors();
-  
+
   // Add streak calculation
   const weekStreak = totalSessions > 0 ? Math.min(totalSessions, 7) : 0;
 
@@ -134,7 +134,9 @@ export function WeeklyStats({
       )}
 
       {isPersonalMode && totalAllTime > 0 && (
-        <View style={[styles.infoBox, { backgroundColor: colors.border + "20" }]}>
+        <View
+          style={[styles.infoBox, { backgroundColor: colors.border + "20" }]}
+        >
           <Ionicons
             name="information-circle"
             size={16}
@@ -160,7 +162,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   title: {
-    fontSize: 19,
+    fontSize: 21,
     fontWeight: "700",
     letterSpacing: -0.4,
   },
@@ -173,7 +175,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   contextBadgeText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "600",
     letterSpacing: 0.5,
     textTransform: "uppercase",
@@ -213,13 +215,13 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   statNumber: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "700",
     letterSpacing: -0.8,
-    lineHeight: 22,
+    lineHeight: 24,
   },
   statLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "600",
     textTransform: "uppercase",
     letterSpacing: 0.3,
@@ -236,7 +238,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   badgeText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: "700",
     color: "#FFF",
   },
@@ -249,7 +251,7 @@ const styles = StyleSheet.create({
     marginTop: -4,
   },
   infoText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "500",
     flex: 1,
     opacity: 0.8,
@@ -271,7 +273,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   streakText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "600",
     letterSpacing: 0.3,
   },

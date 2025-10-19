@@ -104,11 +104,11 @@ export default function CreateSessionModal({
       onClose={handleClose}
       snapPoints={["75%"]}
       enablePanDownToClose={!isSubmitting}
-      backdropOpacity={0.6}
+      backdropOpacity={0.45}
     >
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { borderColor: colors.border }]}>
           <Text style={[styles.title, { color: colors.text }]}>
             New Session
           </Text>
@@ -431,17 +431,22 @@ export default function CreateSessionModal({
 
 const styles = StyleSheet.create({
   header: {
-    marginBottom: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: -20,
+    marginTop: -20,
+    marginBottom: 20,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "700",
-    letterSpacing: -0.5,
-    marginBottom: 4,
+    letterSpacing: -0.4,
   },
   subtitle: {
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: 13,
+    fontWeight: "400",
   },
   form: {
     gap: 20,
@@ -451,13 +456,13 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   label: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "600",
   },
   input: {
     height: 48,
-    borderWidth: 1.5,
-    borderRadius: 12,
+    borderWidth: 1,
+    borderRadius: 10,
     paddingHorizontal: 16,
     fontSize: 15,
   },
@@ -478,8 +483,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     padding: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
+    borderRadius: 10,
+    borderWidth: 1,
     gap: 12,
   },
   optionText: {
@@ -498,7 +503,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 10,
-    borderWidth: 1.5,
+    borderWidth: 1,
     gap: 10,
   },
   radioText: {
@@ -516,20 +521,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: 14,
+    borderRadius: 10,
     gap: 8,
   },
   cancelButton: {
-    borderWidth: 2,
+    borderWidth: 1,
   },
-  createButton: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
-  },
+  createButton: {},
   buttonDisabled: {
     opacity: 0.5,
   },

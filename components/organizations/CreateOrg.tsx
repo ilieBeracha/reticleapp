@@ -49,14 +49,14 @@ export default function CreateOrg({
       onClose={handleClose}
       snapPoints={["40%"]}
       enablePanDownToClose={true}
-      backdropOpacity={0.5}
+      backdropOpacity={0.45}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.keyboardView}
       >
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { borderColor: borderColor }]}>
           <ThemedText style={[styles.title, { color: textColor }]}>
             Create Organization
           </ThemedText>
@@ -131,54 +131,50 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     gap: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: -20,
+    marginTop: -20,
+    marginBottom: 20,
   },
   title: {
     fontSize: 20,
     fontWeight: "700",
-    letterSpacing: -0.5,
+    letterSpacing: -0.4,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "400",
   },
   form: {
-    paddingTop: 16,
     gap: 16,
   },
   input: {
-    height: 52,
-    borderWidth: 1.5,
-    borderRadius: 12,
+    height: 48,
+    borderWidth: 1,
+    borderRadius: 10,
     paddingHorizontal: 16,
-    fontSize: 16,
+    fontSize: 15,
   },
   buttonRow: {
     flexDirection: "row",
     gap: 12,
+    marginTop: 8,
   },
   button: {
     flex: 1,
-    height: 52,
-    borderRadius: 12,
+    height: 48,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
   },
   cancelButton: {
-    borderWidth: 2,
+    borderWidth: 1,
   },
-  createButton: {
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
-  },
+  createButton: {},
   buttonDisabled: {
     opacity: 0.5,
   },
