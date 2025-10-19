@@ -11,7 +11,7 @@ export function OrganizationBadge({
   organizationName,
   onPress,
 }: OrganizationBadgeProps) {
-  const textColor = useThemeColor({}, "text");
+  const textColor = useThemeColor({}, "description");
   const mutedColor = useThemeColor({}, "icon");
 
   return (
@@ -22,10 +22,12 @@ export function OrganizationBadge({
     >
       {organizationName ? (
         <>
-          <View style={[styles.iconContainer, { backgroundColor: mutedColor }]}>
-            <Ionicons name="business-outline" size={16} color={textColor} />
+          <View
+            style={[styles.iconContainer, { backgroundColor: "background" }]}
+          >
+            <Ionicons name="business-outline" size={16} color={"orange"} />
           </View>
-          <Text style={[styles.title, { color: textColor }]}>
+          <Text style={[styles.title, { color: "orange" }]}>
             {organizationName}
           </Text>
         </>

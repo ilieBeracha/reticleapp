@@ -5,15 +5,13 @@ import { StyleSheet, Text, View } from "react-native";
 interface GreetingSectionProps {
   userName: string;
   organizationName?: string;
-  organizationRole?: string;
-  organizationCount?: number;
+  isPersonalWorkspace?: boolean;
 }
 
 export function GreetingSection({
   userName,
   organizationName,
-  organizationRole,
-  organizationCount = 0,
+  isPersonalWorkspace = false,
 }: GreetingSectionProps) {
   const colors = useColors();
 
@@ -30,145 +28,74 @@ export function GreetingSection({
 
   return (
     <View style={styles.container}>
-      {/* Hero Section */}
-      <View style={styles.hero}>
-        <Text style={[styles.greeting, { color: colors.description }]}>
-          {getGreeting()},
-        </Text>
-        <Text style={[styles.userName, { color: colors.text }]}>
-          {userName}
-        </Text>
-      </View>
+      <Text style={[styles.greeting, { color: colors.description }]}>
+        {getGreeting()},
+      </Text>
+      <Text style={[styles.userName, { color: colors.text }]}>{userName}</Text>
 
-      {/* Overview Section */}
-      <View style={styles.overview}>
-        <Text style={[styles.overviewTitle, { color: colors.description }]}>
-          Overview
-        </Text>
+      {/* Organization Context Badge */}
+      {organizationName && (
+        <View
+          style={[styles.contextBadge, { backgroundColor: colors.tint + "15" }]}
+        >
+          <Ionicons
+            name={isPersonalWorkspace ? "person" : "business"}
+            size={14}
+            color={colors.tint}
+          />
+          <Text style={[styles.contextText, { color: colors.tint }]}>
+            {organizationName}
+          </Text>
+        </View>
+      )}
 
+      {!organizationName && (
         <View
           style={[
-            styles.overviewCard,
-            {
-              backgroundColor: colors.cardBackground,
-              borderColor: colors.border,
-            },
+            styles.contextBadge,
+            { backgroundColor: colors.description + "15" },
           ]}
         >
-          {organizationName ? (
-            <>
-              <View style={styles.overviewItem}>
-                <View style={styles.iconWrapper}>
-                  <Ionicons name="business" size={20} color={colors.tint} />
-                </View>
-                <View style={styles.itemContent}>
-                  <Text
-                    style={[styles.itemLabel, { color: colors.description }]}
-                  >
-                    Organization
-                  </Text>
-                  <Text style={[styles.itemValue, { color: colors.text }]}>
-                    {organizationName}
-                  </Text>
-                </View>
-              </View>
-
-              {organizationRole && (
-                <View style={styles.overviewItem}>
-                  <View style={styles.iconWrapper}>
-                    <Ionicons name="person" size={20} color={colors.tint} />
-                  </View>
-                  <View style={styles.itemContent}>
-                    <Text
-                      style={[styles.itemLabel, { color: colors.description }]}
-                    >
-                      Your Role
-                    </Text>
-                    <Text style={[styles.itemValue, { color: colors.text }]}>
-                      {organizationRole === "org:admin" ? "Admin" : "Member"}
-                    </Text>
-                  </View>
-                </View>
-              )}
-            </>
-          ) : (
-            <View style={styles.overviewItem}>
-              <View style={styles.iconWrapper}>
-                <Ionicons name="briefcase" size={20} color={colors.tint} />
-              </View>
-              <View style={styles.itemContent}>
-                <Text style={[styles.itemLabel, { color: colors.description }]}>
-                  Organizations
-                </Text>
-                <Text style={[styles.itemValue, { color: colors.text }]}>
-                  {organizationCount}{" "}
-                  {organizationCount === 1 ? "workspace" : "workspaces"}
-                </Text>
-              </View>
-            </View>
-          )}
+          <Ionicons name="person" size={14} color={colors.description} />
+          <Text style={[styles.contextText, { color: colors.description }]}>
+            Personal Workspace
+          </Text>
         </View>
-      </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 48,
-    gap: 32,
-  },
-  hero: {
-    gap: 8,
-    paddingVertical: 20,
+    gap: 12,
+    marginBottom: 40,
+    paddingTop: 8,
+    paddingBottom: 12,
   },
   greeting: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "500",
+    opacity: 0.8,
   },
   userName: {
-    fontSize: 36,
-    fontWeight: "700",
-    letterSpacing: -1,
+    fontSize: 32,
+    fontWeight: "800",
+    letterSpacing: -1.2,
+    marginBottom: 8,
   },
-  overview: {
-    gap: 16,
-  },
-  overviewTitle: {
-    fontSize: 13,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  overviewCard: {
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 20,
-  },
-  overviewItem: {
+  contextBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 16,
+    alignSelf: "flex-start",
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    gap: 6,
   },
-  iconWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(62, 207, 142, 0.1)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  itemContent: {
-    flex: 1,
-    gap: 4,
-  },
-  itemLabel: {
+  contextText: {
     fontSize: 13,
-    fontWeight: "500",
-  },
-  itemValue: {
-    fontSize: 17,
-    fontWeight: "600",
+    fontWeight: "700",
+    letterSpacing: 0.3,
   },
 });

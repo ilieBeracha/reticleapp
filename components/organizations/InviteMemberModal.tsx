@@ -1,3 +1,4 @@
+import BaseBottomSheet from "@/components/BaseBottomSheet";
 import { useInviteOrg } from "@/hooks/organizations/useInviteOrg";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { Ionicons } from "@expo/vector-icons";
@@ -5,16 +6,13 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
-  Modal,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ThemedText } from "../ThemedText";
 
 interface InviteMemberModalProps {
@@ -26,7 +24,6 @@ export function InviteMemberModal({
   visible,
   onClose,
 }: InviteMemberModalProps) {
-  const insets = useSafeAreaInsets();
   const {
     emailAddress,
     setEmailAddress,
@@ -68,183 +65,156 @@ export function InviteMemberModal({
 
   const handleClose = () => {
     setEmailAddress("");
-    setSelectedRole("org:member");
+    setSelectedRole("org:soldier");
     onClose();
   };
 
+  const roles = [
+    { value: "org:soldier" as const, label: "Soldier", icon: "person" },
+    {
+      value: "org:squad_commander" as const,
+      label: "Squad Commander",
+      icon: "shield-half",
+    },
+    {
+      value: "org:team_commander" as const,
+      label: "Team Commander",
+      icon: "shield-checkmark",
+    },
+  ];
+
   return (
-    <Modal
+    <BaseBottomSheet
       visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={handleClose}
+      onClose={handleClose}
+      snapPoints={["55%"]}
+      enablePanDownToClose={!isSubmitting}
+      backdropOpacity={0.5}
     >
       <KeyboardAvoidingView
-        style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.keyboardView}
       >
-        <Pressable style={styles.overlay} onPress={handleClose}>
-          <Pressable
+        {/* Header */}
+        <View style={styles.header}>
+          <ThemedText style={[styles.title, { color: textColor }]}>
+            Invite Member
+          </ThemedText>
+          <ThemedText style={[styles.subtitle, { color: mutedColor }]}>
+            Send an invitation to join your organization
+          </ThemedText>
+        </View>
+
+        {/* Form */}
+        <View style={styles.form}>
+          {/* Email Input */}
+          <TextInput
             style={[
-              styles.container,
+              styles.input,
               {
                 backgroundColor,
-                borderTopColor: borderColor,
-                paddingBottom: insets.bottom + 20,
+                borderColor,
+                color: textColor,
               },
             ]}
-            onPress={(e) => e.stopPropagation()}
-          >
-            {/* Handle Bar */}
-            <View style={styles.handleContainer}>
-              <View style={[styles.handle, { backgroundColor: mutedColor }]} />
-            </View>
+            value={emailAddress}
+            onChangeText={setEmailAddress}
+            placeholder="email@example.com"
+            placeholderTextColor={placeholderColor}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={canSubmit ? handleInvite : undefined}
+          />
 
-            {/* Header */}
-            <View style={styles.header}>
-              <ThemedText style={[styles.title, { color: textColor }]}>
-                Invite Member
-              </ThemedText>
-              <ThemedText style={[styles.subtitle, { color: mutedColor }]}>
-                Send an invitation to join your organization
-              </ThemedText>
-            </View>
-
-            {/* Form */}
-            <View style={styles.form}>
-              {/* Email Input */}
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor,
-                    borderColor,
-                    color: textColor,
-                  },
-                ]}
-                value={emailAddress}
-                onChangeText={setEmailAddress}
-                placeholder="email@example.com"
-                placeholderTextColor={placeholderColor}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoFocus
-                returnKeyType="done"
-                onSubmitEditing={canSubmit ? handleInvite : undefined}
-              />
-
-              {/* Role Selection */}
-              <View style={styles.roleContainer}>
-                <Text style={[styles.roleLabel, { color: mutedColor }]}>
-                  Select Role
-                </Text>
-                <View style={styles.roleButtons}>
-                  <TouchableOpacity
-                    style={[
-                      styles.roleButton,
-                      {
-                        backgroundColor:
-                          selectedRole === "org:member"
-                            ? tintColor
-                            : backgroundColor,
-                        borderColor,
-                      },
-                    ]}
-                    onPress={() => setSelectedRole("org:member")}
-                  >
-                    <Ionicons
-                      name="person-outline"
-                      size={18}
-                      color={selectedRole === "org:member" ? "#fff" : textColor}
-                    />
-                    <Text
-                      style={[
-                        styles.roleButtonText,
-                        {
-                          color:
-                            selectedRole === "org:member" ? "#fff" : textColor,
-                        },
-                      ]}
-                    >
-                      Member
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.roleButton,
-                      {
-                        backgroundColor:
-                          selectedRole === "org:admin"
-                            ? tintColor
-                            : backgroundColor,
-                        borderColor,
-                      },
-                    ]}
-                    onPress={() => setSelectedRole("org:admin")}
-                  >
-                    <Ionicons
-                      name="shield-checkmark-outline"
-                      size={18}
-                      color={selectedRole === "org:admin" ? "#fff" : textColor}
-                    />
-                    <Text
-                      style={[
-                        styles.roleButtonText,
-                        {
-                          color:
-                            selectedRole === "org:admin" ? "#fff" : textColor,
-                        },
-                      ]}
-                    >
-                      Admin
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Action Buttons */}
-              <View style={styles.buttonRow}>
+          {/* Role Selection */}
+          <View style={styles.roleContainer}>
+            <Text style={[styles.roleLabel, { color: textColor }]}>
+              Select Rank
+            </Text>
+            <View style={styles.roleButtons}>
+              {roles.map((role) => (
                 <TouchableOpacity
-                  style={[styles.button, styles.cancelButton, { borderColor }]}
-                  onPress={handleClose}
-                  disabled={isSubmitting}
-                >
-                  <Text style={[styles.buttonText, { color: textColor }]}>
-                    Cancel
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
+                  key={role.value}
                   style={[
-                    styles.button,
-                    styles.inviteButton,
+                    styles.roleButton,
                     {
-                      backgroundColor: tintColor,
-                      opacity: canSubmit ? 1 : 0.5,
+                      backgroundColor,
+                      borderColor:
+                        selectedRole === role.value ? tintColor : borderColor,
                     },
                   ]}
-                  onPress={handleInvite}
-                  disabled={!canSubmit}
+                  onPress={() => setSelectedRole(role.value)}
                 >
-                  {isSubmitting && (
-                    <ActivityIndicator
-                      size="small"
-                      color="#fff"
-                      style={{ marginRight: 8 }}
+                  <Ionicons
+                    name={role.icon as any}
+                    size={18}
+                    color={selectedRole === role.value ? tintColor : mutedColor}
+                  />
+                  <Text
+                    style={[
+                      styles.roleButtonText,
+                      {
+                        color:
+                          selectedRole === role.value ? tintColor : textColor,
+                      },
+                    ]}
+                  >
+                    {role.label}
+                  </Text>
+                  {selectedRole === role.value && (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={18}
+                      color={tintColor}
                     />
                   )}
-                  <Text style={styles.inviteButtonText}>
-                    {isSubmitting ? "Sending..." : "Send Invite"}
-                  </Text>
                 </TouchableOpacity>
-              </View>
+              ))}
             </View>
-          </Pressable>
-        </Pressable>
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={[styles.button, styles.cancelButton, { borderColor }]}
+              onPress={handleClose}
+              disabled={isSubmitting}
+            >
+              <Text style={[styles.buttonText, { color: textColor }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.button,
+                styles.inviteButton,
+                {
+                  backgroundColor: tintColor,
+                  opacity: canSubmit ? 1 : 0.5,
+                },
+              ]}
+              onPress={handleInvite}
+              disabled={!canSubmit}
+            >
+              {isSubmitting && (
+                <ActivityIndicator
+                  size="small"
+                  color="#fff"
+                  style={{ marginRight: 8 }}
+                />
+              )}
+              <Text style={styles.inviteButtonText}>
+                {isSubmitting ? "Sending..." : "Send Invite"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </KeyboardAvoidingView>
-    </Modal>
+    </BaseBottomSheet>
   );
 }
 
@@ -252,36 +222,7 @@ const styles = StyleSheet.create({
   keyboardView: {
     flex: 1,
   },
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
-  },
-  container: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderTopWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: -4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  handleContainer: {
-    alignItems: "center",
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-  },
   header: {
-    paddingHorizontal: 20,
     paddingVertical: 12,
     gap: 4,
   },
@@ -295,7 +236,6 @@ const styles = StyleSheet.create({
     fontWeight: "400",
   },
   form: {
-    paddingHorizontal: 20,
     paddingTop: 16,
     gap: 20,
   },
@@ -314,28 +254,29 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   roleButtons: {
-    flexDirection: "row",
+    flexDirection: "column",
     gap: 12,
   },
   roleButton: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+    justifyContent: "flex-start",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 10,
     borderWidth: 1.5,
-    gap: 8,
+    gap: 10,
   },
   roleButtonText: {
+    flex: 1,
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: "500",
   },
   buttonRow: {
     flexDirection: "row",
     gap: 12,
-    marginTop: 4,
+    marginTop: 8,
   },
   button: {
     flex: 1,
@@ -346,17 +287,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
   },
   cancelButton: {
-    borderWidth: 1.5,
+    borderWidth: 2,
   },
   inviteButton: {
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   buttonText: {
     fontSize: 15,

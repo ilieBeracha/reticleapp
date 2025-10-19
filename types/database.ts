@@ -15,7 +15,7 @@ export interface Training {
 
 export interface Session {
   id: string;
-  training_id: string;
+  training_id?: string;
   organization_id: string;
   name: string;
   session_type: SessionType;
@@ -30,7 +30,7 @@ export interface Session {
 }
 
 export interface CreateSessionInput {
-  training_id: string;
+  training_id?: string;
   name: string;
   session_type: SessionType;
   day_period: DayPeriod;

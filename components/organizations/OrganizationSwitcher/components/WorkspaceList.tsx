@@ -121,14 +121,13 @@ export function WorkspaceList({
             QUICK SWITCH
           </Text>
           <View style={styles.grid}>
-            {visibleWorkspaces.map((workspace) => {
+            {visibleWorkspaces.map((w) => {
               const isLoading =
-                switchingToId ===
-                (workspace.id === "personal" ? "personal" : workspace.id);
+                switchingToId === (w.id === "personal" ? "personal" : w.id);
 
               return (
                 <TouchableOpacity
-                  key={workspace.id}
+                  key={w.id}
                   style={[
                     styles.workspaceChip,
                     {
@@ -137,24 +136,20 @@ export function WorkspaceList({
                       opacity: isLoading ? 0.6 : 1,
                     },
                   ]}
-                  onPress={() => handleWorkspacePress(workspace.id)}
+                  onPress={() => handleWorkspacePress(w.id)}
                   disabled={isLoading}
                   activeOpacity={0.7}
                 >
                   <View
                     style={[styles.chipIcon, { backgroundColor: borderColor }]}
                   >
-                    <Ionicons
-                      name={workspace.icon}
-                      size={16}
-                      color={textColor}
-                    />
+                    <Ionicons name={w.icon} size={16} color={textColor} />
                   </View>
                   <Text
                     style={[styles.chipName, { color: textColor }]}
                     numberOfLines={1}
                   >
-                    {workspace.name}
+                    {w.name}
                   </Text>
                   {isLoading && (
                     <ActivityIndicator size="small" color={tintColor} />
@@ -218,7 +213,7 @@ export function WorkspaceList({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 20,
+    // paddingHorizontal: 20,
     paddingVertical: 8,
     gap: 24,
   },
@@ -274,6 +269,7 @@ const styles = StyleSheet.create({
   workspaceChip: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 12,

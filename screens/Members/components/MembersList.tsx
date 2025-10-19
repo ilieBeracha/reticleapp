@@ -1,10 +1,19 @@
 import { ThemedText } from "@/components/ThemedText";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { useOrganization } from "@clerk/clerk-expo";
+import { useMemo } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { MemberItem } from "./MemberItem";
 
-export function MembersList() {
+export interface MembersListProps {
+  searchQuery?: string;
+  roleFilter?: "all" | "admins" | "members";
+}
+
+export function MembersList({
+  searchQuery = "",
+  roleFilter = "all",
+}: MembersListProps) {
   const { memberships } = useOrganization({
     memberships: {
       pageSize: 50,
@@ -12,6 +21,32 @@ export function MembersList() {
   });
   const textColor = useThemeColor({}, "text");
   const mutedColor = useThemeColor({}, "description");
+
+  // Filter members based on search and role
+  const filteredMembers = useMemo(() => {
+    if (!memberships?.data) return [];
+
+    let filtered = memberships.data;
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      filtered = filtered.filter((member) => {
+        const name = member.publicUserData?.firstName?.toLowerCase() || "";
+        const email = member.publicUserData?.identifier?.toLowerCase() || "";
+        const query = searchQuery.toLowerCase();
+        return name.includes(query) || email.includes(query);
+      });
+    }
+
+    // Filter by role
+    if (roleFilter === "admins") {
+      filtered = filtered.filter((member) => member.role === "org:admin");
+    } else if (roleFilter === "members") {
+      filtered = filtered.filter((member) => member.role !== "org:admin");
+    }
+
+    return filtered;
+  }, [memberships?.data, searchQuery, roleFilter]);
 
   if (!memberships) {
     return (
@@ -21,25 +56,34 @@ export function MembersList() {
     );
   }
 
-  const memberCount = memberships?.data?.length ?? 0;
+  const memberCount = filteredMembers.length;
+  const totalCount = memberships?.data?.length ?? 0;
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <ThemedText style={[styles.title, { color: textColor }]}>
-          Members
+          Active Members
         </ThemedText>
         <View style={styles.badge}>
           <ThemedText style={[styles.badgeText, { color: mutedColor }]}>
-            {memberCount}
+            {searchQuery || roleFilter !== "all"
+              ? `${memberCount} of ${totalCount}`
+              : memberCount}
           </ThemedText>
         </View>
       </View>
 
       {memberCount > 0 ? (
-        memberships.data?.map((member) => (
+        filteredMembers.map((member) => (
           <MemberItem key={member.id} member={member} />
         ))
+      ) : searchQuery || roleFilter !== "all" ? (
+        <View style={styles.emptyState}>
+          <ThemedText style={[styles.emptyText, { color: mutedColor }]}>
+            No members match your filters
+          </ThemedText>
+        </View>
       ) : (
         <View style={styles.emptyState}>
           <ThemedText style={[styles.emptyText, { color: mutedColor }]}>

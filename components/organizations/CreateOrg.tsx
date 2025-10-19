@@ -160,24 +160,24 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    height: 48,
+    height: 52,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
   },
   cancelButton: {
-    borderWidth: 1.5,
+    borderWidth: 2,
   },
   createButton: {
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   buttonDisabled: {
     opacity: 0.5,

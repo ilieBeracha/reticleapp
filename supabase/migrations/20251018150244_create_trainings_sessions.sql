@@ -18,46 +18,46 @@ create index if not exists idx_trainings_created_by on public.trainings (created
 
 alter table public.trainings enable row level security;
 
--- RLS: Read trainings within active org
-create policy "trainings_select_by_org"
+-- RLS: Read trainings - users can read trainings they created OR trainings in orgs they belong to
+create policy "trainings_select"
 on public.trainings for select to anon
-using (organization_id = auth.jwt()->>'org_id');
+using (
+  created_by = auth.jwt()->>'sub'
+  or (
+    organization_id = auth.jwt()->>'org_id'
+    and auth.jwt()->>'org_id' is not null
+  )
+);
 
--- RLS: Insert trainings within active org
-create policy "trainings_insert_in_org"
+-- RLS: Insert trainings - users can insert if they're authenticated and match created_by
+create policy "trainings_insert"
 on public.trainings for insert to anon
 with check (
-  organization_id = auth.jwt()->>'org_id'
-  and created_by = auth.jwt()->>'sub'
+  created_by = auth.jwt()->>'sub'
 );
 
--- RLS: Update/delete your own trainings within active org
-create policy "trainings_update_own"
+-- RLS: Update your own trainings
+create policy "trainings_update"
 on public.trainings for update to anon
 using (
-  organization_id = auth.jwt()->>'org_id'
-  and created_by = auth.jwt()->>'sub'
+  created_by = auth.jwt()->>'sub'
 );
 
-create policy "trainings_delete_own"
+-- RLS: Delete your own trainings
+create policy "trainings_delete"
 on public.trainings for delete to anon
 using (
-  organization_id = auth.jwt()->>'org_id'
-  and created_by = auth.jwt()->>'sub'
+  created_by = auth.jwt()->>'sub'
 );
 
 -- Create sessions table
 create table if not exists public.sessions (
   id uuid primary key default gen_random_uuid(),
-  training_id uuid not null references public.trainings(id) on delete cascade,
-  organization_id text not null,           -- Clerk org id (org_*) - denormalized for RLS
+  training_id uuid references public.trainings(id) on delete cascade,
+  organization_id text,           -- Clerk org id (org_*)
   name text not null,
-  session_type session_type not null,
-  range_m integer,                          -- Range in meters
+  session_type session_type not null,           -- Range in meters
   day_period day_period not null,
-  env_wind_mps numeric(5,2),               -- Wind speed in meters per second
-  env_temp_c numeric(5,2),                 -- Temperature in Celsius
-  env_pressure_hpa numeric(7,2),           -- Pressure in hectopascals
   created_by text not null,                -- Clerk user id (user_*)
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -72,33 +72,37 @@ create index if not exists idx_sessions_created_at on public.sessions (created_a
 
 alter table public.sessions enable row level security;
 
--- RLS: Read sessions within active org
-create policy "sessions_select_by_org"
+-- RLS: Read sessions - users can read sessions they created OR sessions in orgs they belong to
+create policy "sessions_select"
 on public.sessions for select to anon
-using (organization_id = auth.jwt()->>'org_id');
+using (
+  created_by = auth.jwt()->>'sub'
+  or (
+    organization_id = auth.jwt()->>'org_id'
+    and auth.jwt()->>'org_id' is not null
+  )
+);
 
--- RLS: Insert sessions within active org
-create policy "sessions_insert_in_org"
+-- RLS: Insert sessions - users can insert if they're authenticated and match created_by
+-- The org_id check is done at insert time with the data being inserted
+create policy "sessions_insert"
 on public.sessions for insert to anon
 with check (
-  organization_id = auth.jwt()->>'org_id'
-  and created_by = auth.jwt()->>'sub'
+  created_by = auth.jwt()->>'sub'
 );
 
--- RLS: Update your own sessions within active org
-create policy "sessions_update_own"
+-- RLS: Update your own sessions
+create policy "sessions_update"
 on public.sessions for update to anon
 using (
-  organization_id = auth.jwt()->>'org_id'
-  and created_by = auth.jwt()->>'sub'
+  created_by = auth.jwt()->>'sub'
 );
 
--- RLS: Delete your own sessions within active org
-create policy "sessions_delete_own"
+-- RLS: Delete your own sessions
+create policy "sessions_delete"
 on public.sessions for delete to anon
 using (
-  organization_id = auth.jwt()->>'org_id'
-  and created_by = auth.jwt()->>'sub'
+  created_by = auth.jwt()->>'sub'
 );
 
 -- Trigger to update updated_at timestamp

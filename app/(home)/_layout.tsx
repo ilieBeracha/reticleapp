@@ -6,6 +6,7 @@ import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { Stack } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
+import CreateSessionModal from "../auth/components/CreateSessionModal"; // ✅ Add this import
 
 const actions: Action[] = [
   {
@@ -33,6 +34,7 @@ const actions: Action[] = [
 
 export default function Layout() {
   const [actionMenuVisible, setActionMenuVisible] = useState(false);
+  const [createSessionVisible, setCreateSessionVisible] = useState(false); // ✅ Add this state
   const { organization } = useOrganization();
 
   const handleActionSelect = (action: string) => {
@@ -43,7 +45,7 @@ export default function Layout() {
         console.log("Navigate to scan target");
         break;
       case "create-session":
-        console.log("Navigate to create session");
+        setCreateSessionVisible(true); // ✅ Open modal instead of just logging
         break;
       case "new-training":
         console.log("Navigate to new training");
@@ -67,6 +69,8 @@ export default function Layout() {
           </Stack>
         </View>
         <BottomNav onAddPress={() => setActionMenuVisible(true)} />
+
+        {/* Action Menu Modal */}
         <ActionMenuModal
           visible={actionMenuVisible}
           onClose={() => setActionMenuVisible(false)}
@@ -74,6 +78,12 @@ export default function Layout() {
           actions={actions}
           onActionSelect={handleActionSelect}
           hasOrganization={!!organization}
+        />
+
+        {/* ✅ Create Session Modal */}
+        <CreateSessionModal
+          visible={createSessionVisible}
+          onClose={() => setCreateSessionVisible(false)}
         />
       </View>
     </BottomSheetModalProvider>

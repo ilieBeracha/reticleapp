@@ -76,6 +76,7 @@ export function OrganizationSwitcherModal({
           );
         }, 100);
       }, 300);
+      
     } catch (error) {
       setSwitchingToId(null);
       Alert.alert("Error", "Failed to switch workspace", [{ text: "OK" }]);
@@ -94,7 +95,7 @@ export function OrganizationSwitcherModal({
       <BaseBottomSheet
         visible={visible}
         onClose={onClose}
-        snapPoints={["60%"]}
+        snapPoints={["70%"]}
         enablePanDownToClose={true}
         backdropOpacity={0.5}
       >

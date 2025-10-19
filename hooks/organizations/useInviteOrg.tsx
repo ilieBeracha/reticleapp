@@ -1,18 +1,24 @@
 import { useOrganization } from "@clerk/clerk-expo";
 import { useCallback, useState } from "react";
 
+export type OrgRole =
+  | "org:admin"
+  | "org:member"
+  | "org:unit_commander"
+  | "org:team_commander"
+  | "org:squad_commander"
+  | "org:soldier";
+
 interface InviteOptions {
   emailAddress: string;
-  role?: "org:admin" | "org:member";
+  role?: OrgRole;
 }
 
 export function useInviteOrg() {
   const { organization } = useOrganization();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [emailAddress, setEmailAddress] = useState("");
-  const [selectedRole, setSelectedRole] = useState<"org:admin" | "org:member">(
-    "org:member"
-  );
+  const [selectedRole, setSelectedRole] = useState<OrgRole>("org:soldier");
 
   const canSubmit = Boolean(
     emailAddress.trim() &&
@@ -48,7 +54,7 @@ export function useInviteOrg() {
 
         // Clear form on success
         setEmailAddress("");
-        setSelectedRole("org:member");
+        setSelectedRole("org:soldier");
 
         return invitation;
       } catch (error: any) {

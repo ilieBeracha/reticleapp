@@ -1,4 +1,5 @@
 import { useThemeColor } from "@/hooks/useThemeColor";
+import { Ionicons } from "@expo/vector-icons";
 import { Controller } from "react-hook-form";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
@@ -20,6 +21,9 @@ const RadioButtonInput = ({
   const textColor = useThemeColor({}, "text");
   const borderColor = useThemeColor({}, "border");
   const placeholderColor = useThemeColor({}, "placeholderText");
+  const tintColor = useThemeColor({}, "tint");
+  const mutedColor = useThemeColor({}, "description");
+  const cardBackground = useThemeColor({}, "cardBackground");
 
   const Option = ({
     label,
@@ -36,19 +40,29 @@ const RadioButtonInput = ({
       <TouchableOpacity
         style={[
           styles.option,
-          { borderColor: isSelected ? "#3b82f6" : borderColor },
-          isSelected && { backgroundColor: "#3b82f6" },
+          {
+            borderColor: isSelected ? tintColor : borderColor,
+            backgroundColor: cardBackground,
+          },
         ]}
         onPress={() => onChange(value)}
       >
+        <Ionicons
+          name={isSelected ? "radio-button-on" : "radio-button-off"}
+          size={20}
+          color={isSelected ? tintColor : mutedColor}
+        />
         <Text
           style={[
             styles.optionText,
-            { color: isSelected ? "white" : textColor },
+            { color: isSelected ? tintColor : textColor },
           ]}
         >
           {label}
         </Text>
+        {isSelected && (
+          <Ionicons name="checkmark-circle" size={18} color={tintColor} />
+        )}
       </TouchableOpacity>
     );
   };
@@ -108,12 +122,19 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   option: {
-    borderWidth: 1,
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    borderWidth: 1.5,
     borderRadius: 10,
-    padding: 7,
-    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    gap: 10,
   },
   optionText: {
-    fontSize: 14,
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "500",
   },
 });

@@ -15,10 +15,12 @@ export function useSessions(trainingId?: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch sessions
+  const contextId = organization?.id || userId;
+  const isPersonal = !organization;
+
   const fetchSessions = useCallback(async () => {
-    if (!organization) {
-      setError("No active organization");
+    if (!userId) {
+      setError("Not authenticated");
       setLoading(false);
       return;
     }
@@ -28,10 +30,12 @@ export function useSessions(trainingId?: string) {
       setError(null);
 
       const client = await getAuthenticatedClient();
-      let query = client.from("sessions").select("*").order("created_at", {
-        ascending: false,
-      });
+      let query = client
+        .from("sessions")
+        .select("*")
+        .order("created_at", { ascending: false });
 
+      // Filter by training if specified
       if (trainingId) {
         query = query.eq("training_id", trainingId);
       }
@@ -44,26 +48,29 @@ export function useSessions(trainingId?: string) {
     } catch (err: any) {
       console.error("Error fetching sessions:", err);
       setError(err.message);
+      setSessions([]);
     } finally {
       setLoading(false);
     }
-  }, [organization, trainingId, getAuthenticatedClient]);
+  }, [userId, contextId, trainingId]); // ✅ Remove getAuthenticatedClient
 
   // Create session
   const createSession = useCallback(
     async (input: CreateSessionInput) => {
-      if (!userId || !organization) {
-        throw new Error("Not authenticated or no active organization");
+      if (!userId) {
+        throw new Error("Not authenticated");
       }
 
       try {
         const client = await getAuthenticatedClient();
-
+        console.log("input", input);
+        console.log("organization.id", organization?.id);
+        console.log("userId", userId);
         const { data, error: insertError } = await client
           .from("sessions")
           .insert({
             ...input,
-            organization_id: organization.id,
+            organization_id: organization?.id,
             created_by: userId,
           })
           .select()
@@ -71,23 +78,21 @@ export function useSessions(trainingId?: string) {
 
         if (insertError) throw insertError;
 
-        // Add to local state
         setSessions((prev) => [data, ...prev]);
-
         return data as Session;
       } catch (err: any) {
         console.error("Error creating session:", err);
         throw err;
       }
     },
-    [userId, organization, getAuthenticatedClient]
+    [userId, organization?.id] // ✅ Only use organization.id, not the whole object
   );
 
   // Update session
   const updateSession = useCallback(
     async (sessionId: string, input: UpdateSessionInput) => {
-      if (!userId || !organization) {
-        throw new Error("Not authenticated or no active organization");
+      if (!userId) {
+        throw new Error("Not authenticated");
       }
 
       try {
@@ -102,7 +107,6 @@ export function useSessions(trainingId?: string) {
 
         if (updateError) throw updateError;
 
-        // Update local state
         setSessions((prev) =>
           prev.map((session) => (session.id === sessionId ? data : session))
         );
@@ -113,14 +117,14 @@ export function useSessions(trainingId?: string) {
         throw err;
       }
     },
-    [userId, organization, getAuthenticatedClient]
+    [userId]
   );
 
   // Delete session
   const deleteSession = useCallback(
     async (sessionId: string) => {
-      if (!userId || !organization) {
-        throw new Error("Not authenticated or no active organization");
+      if (!userId) {
+        throw new Error("Not authenticated");
       }
 
       try {
@@ -133,7 +137,6 @@ export function useSessions(trainingId?: string) {
 
         if (deleteError) throw deleteError;
 
-        // Remove from local state
         setSessions((prev) =>
           prev.filter((session) => session.id !== sessionId)
         );
@@ -142,10 +145,10 @@ export function useSessions(trainingId?: string) {
         throw err;
       }
     },
-    [userId, organization, getAuthenticatedClient]
+    [userId]
   );
 
-  // Fetch sessions on mount or when dependencies change
+  // ✅ Fetch only when contextId or trainingId changes
   useEffect(() => {
     fetchSessions();
   }, [fetchSessions]);
@@ -154,6 +157,8 @@ export function useSessions(trainingId?: string) {
     sessions,
     loading,
     error,
+    isPersonal,
+    canCreateSession: !isPersonal,
     fetchSessions,
     createSession,
     updateSession,
