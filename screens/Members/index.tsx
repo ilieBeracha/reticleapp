@@ -15,6 +15,7 @@ export function Members() {
   const isAdmin = useIsOrgAdmin();
   const mutedColor = useThemeColor({}, "description");
   const tintColor = useThemeColor({}, "tint");
+  const buttonText = useThemeColor({}, "buttonText");
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
 
   // Redirect if no organization
@@ -45,7 +46,7 @@ export function Members() {
               style={[styles.inviteButton, { backgroundColor: tintColor }]}
               onPress={() => setInviteModalVisible(true)}
             >
-              <Ionicons name="person-add" size={20} color="#fff" />
+              <Ionicons name="person-add" size={14} color="#fff" />
               <ThemedText style={styles.inviteButtonText}>Invite</ThemedText>
             </TouchableOpacity>
           )}
@@ -72,8 +73,7 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 32,
+    paddingVertical: 24,
   },
   headerSection: {
     flexDirection: "row",
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderRadius: 12,
     gap: 6,
     shadowColor: "#000",

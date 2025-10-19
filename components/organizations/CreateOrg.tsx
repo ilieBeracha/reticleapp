@@ -1,17 +1,15 @@
+import BaseBottomSheet from "@/components/BaseBottomSheet";
 import useCreateOrg from "@/hooks/organizations/useCreateOrg";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { Ionicons } from "@expo/vector-icons";
 import {
   KeyboardAvoidingView,
-  Modal,
   Platform,
-  Pressable,
   StyleSheet,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ThemedText } from "../ThemedText";
 
 export default function CreateOrg({
@@ -23,7 +21,6 @@ export default function CreateOrg({
 }) {
   const { createOrg, isSubmitting, organizationName, setOrganizationName } =
     useCreateOrg();
-  const insets = useSafeAreaInsets();
 
   // Theme colors
   const backgroundColor = useThemeColor({}, "background");
@@ -47,103 +44,85 @@ export default function CreateOrg({
   };
 
   return (
-    <Modal
+    <BaseBottomSheet
       visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={handleClose}
+      onClose={handleClose}
+      snapPoints={["40%"]}
+      enablePanDownToClose={true}
+      backdropOpacity={0.5}
     >
       <KeyboardAvoidingView
-        style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.keyboardView}
       >
-        <Pressable style={styles.overlay} onPress={handleClose}>
-          <Pressable
+        {/* Header */}
+        <View style={styles.header}>
+          <ThemedText style={[styles.title, { color: textColor }]}>
+            Create Organization
+          </ThemedText>
+          <ThemedText style={[styles.subtitle, { color: mutedColor }]}>
+            Enter a name for your new organization
+          </ThemedText>
+        </View>
+
+        {/* Form */}
+        <View style={styles.form}>
+          <TextInput
             style={[
-              styles.container,
+              styles.input,
               {
                 backgroundColor,
-                borderTopColor: borderColor,
-                paddingBottom: insets.bottom + 20,
+                borderColor,
+                color: textColor,
               },
             ]}
-            onPress={(e) => e.stopPropagation()}
-          >
-            {/* Handle Bar */}
-            <View style={styles.handleContainer}>
-              <View style={[styles.handle, { backgroundColor: mutedColor }]} />
-            </View>
+            value={organizationName}
+            onChangeText={setOrganizationName}
+            placeholder="Organization name"
+            placeholderTextColor={placeholderColor}
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={handleCreate}
+          />
 
-            {/* Header */}
-            <View style={styles.header}>
-              <ThemedText style={[styles.title, { color: textColor }]}>
-                Create Organization
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={[styles.button, styles.cancelButton, { borderColor }]}
+              onPress={handleClose}
+              disabled={isSubmitting}
+            >
+              <ThemedText style={[styles.buttonText, { color: textColor }]}>
+                Cancel
               </ThemedText>
-              <ThemedText style={[styles.subtitle, { color: mutedColor }]}>
-                Enter a name for your new organization
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.button,
+                styles.createButton,
+                { backgroundColor: tintColor },
+                (!organizationName.trim() || isSubmitting) &&
+                  styles.buttonDisabled,
+              ]}
+              onPress={handleCreate}
+              disabled={!organizationName.trim() || isSubmitting}
+            >
+              {isSubmitting && (
+                <Ionicons
+                  name="hourglass-outline"
+                  size={16}
+                  color="#fff"
+                  style={{ marginRight: 8 }}
+                />
+              )}
+              <ThemedText style={styles.createButtonText}>
+                {isSubmitting ? "Creating..." : "Create"}
               </ThemedText>
-            </View>
-
-            {/* Form */}
-            <View style={styles.form}>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor,
-                    borderColor,
-                    color: textColor,
-                  },
-                ]}
-                value={organizationName}
-                onChangeText={setOrganizationName}
-                placeholder="Organization name"
-                placeholderTextColor={placeholderColor}
-                autoFocus
-                returnKeyType="done"
-                onSubmitEditing={handleCreate}
-              />
-
-              <View style={styles.buttonRow}>
-                <TouchableOpacity
-                  style={[styles.button, styles.cancelButton, { borderColor }]}
-                  onPress={handleClose}
-                  disabled={isSubmitting}
-                >
-                  <ThemedText style={[styles.buttonText, { color: textColor }]}>
-                    Cancel
-                  </ThemedText>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.button,
-                    styles.createButton,
-                    { backgroundColor: tintColor },
-                    (!organizationName.trim() || isSubmitting) &&
-                      styles.buttonDisabled,
-                  ]}
-                  onPress={handleCreate}
-                  disabled={!organizationName.trim() || isSubmitting}
-                >
-                  {isSubmitting && (
-                    <Ionicons
-                      name="hourglass-outline"
-                      size={16}
-                      color="#fff"
-                      style={{ marginRight: 8 }}
-                    />
-                  )}
-                  <ThemedText style={styles.createButtonText}>
-                    {isSubmitting ? "Creating..." : "Create"}
-                  </ThemedText>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Pressable>
-        </Pressable>
+            </TouchableOpacity>
+          </View>
+        </View>
       </KeyboardAvoidingView>
-    </Modal>
+    </BaseBottomSheet>
   );
 }
 
@@ -151,36 +130,7 @@ const styles = StyleSheet.create({
   keyboardView: {
     flex: 1,
   },
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
-  },
-  container: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderTopWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: -4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  handleContainer: {
-    alignItems: "center",
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-  },
   header: {
-    paddingHorizontal: 20,
     paddingVertical: 12,
     gap: 4,
   },
@@ -194,7 +144,6 @@ const styles = StyleSheet.create({
     fontWeight: "400",
   },
   form: {
-    paddingHorizontal: 20,
     paddingTop: 16,
     gap: 16,
   },

@@ -1,4 +1,4 @@
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useColors } from "@/hooks/useColors";
 import { Ionicons } from "@expo/vector-icons";
 import { Link, RelativePathString } from "expo-router";
 import { StyleSheet, TouchableOpacity } from "react-native";
@@ -11,23 +11,33 @@ interface NavItemProps {
 }
 
 export function NavItem({ icon, isActive, href, onPress }: NavItemProps) {
-  const primary = useThemeColor({}, "tint");
-  const muted = useThemeColor({}, "icon");
+  const colors = useColors();
 
   const content = (
-    <Ionicons name={icon as any} size={24} color={isActive ? primary : muted} />
+    <Ionicons
+      name={icon as any}
+      size={22}
+      color={isActive ? colors.tint : colors.icon}
+      style={{ opacity: isActive ? 1 : 0.6 }}
+    />
   );
 
   if (href) {
     return (
       <Link href={href as RelativePathString} asChild>
-        <TouchableOpacity style={styles.navItem}>{content}</TouchableOpacity>
+        <TouchableOpacity style={styles.navItem} activeOpacity={0.6}>
+          {content}
+        </TouchableOpacity>
       </Link>
     );
   }
 
   return (
-    <TouchableOpacity style={styles.navItem} onPress={onPress}>
+    <TouchableOpacity
+      style={styles.navItem}
+      onPress={onPress}
+      activeOpacity={0.6}
+    >
       {content}
     </TouchableOpacity>
   );
@@ -35,8 +45,8 @@ export function NavItem({ icon, isActive, href, onPress }: NavItemProps) {
 
 const styles = StyleSheet.create({
   navItem: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     justifyContent: "center",
     alignItems: "center",
   },

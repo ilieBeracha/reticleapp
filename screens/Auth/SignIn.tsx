@@ -1,18 +1,13 @@
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useColors } from "@/hooks/useColors";
 import { StyleSheet, View } from "react-native";
 import { SignInHeader } from "./components/SignInHeader";
 import { SocialButtons } from "./components/SocialButtons";
 
 export function SignIn() {
-  const backgroundColor = useThemeColor({}, "background");
+  const colors = useColors();
 
   return (
-    <View
-      style={[
-        styles.container,
-        { paddingTop: 40, paddingBottom: 40, backgroundColor },
-      ]}
-    >
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <SignInHeader />
       <SocialButtons />
     </View>
@@ -22,8 +17,8 @@ export function SignIn() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    gap: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
     justifyContent: "center",
     alignItems: "center",
   },

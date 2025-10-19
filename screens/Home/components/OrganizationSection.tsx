@@ -1,5 +1,5 @@
 import { ThemedText } from "@/components/ThemedText";
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useColors } from "@/hooks/useColors";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
@@ -11,35 +11,40 @@ interface OrganizationSectionProps {
 export function OrganizationSection({
   organizationName,
 }: OrganizationSectionProps) {
-  const textColor = useThemeColor({}, "text");
-  const mutedColor = useThemeColor({}, "description");
-  const tintColor = useThemeColor({}, "tint");
-  const cardBackground = useThemeColor({}, "cardBackground");
-  const borderColor = useThemeColor({}, "border");
+  const colors = useColors();
 
   return (
     <View style={styles.container}>
-      <ThemedText style={[styles.sectionTitle, { color: textColor }]}>
+      <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
         Current Organization
       </ThemedText>
 
       <TouchableOpacity
         style={[
           styles.orgCard,
-          { backgroundColor: cardBackground, borderColor },
+          {
+            backgroundColor: colors.cardBackground,
+            borderColor: colors.border,
+          },
         ]}
         onPress={() => router.push("/(home)/settings")}
       >
         <View style={styles.orgHeader}>
           <View style={styles.orgInfo}>
-            <Ionicons name="business" size={20} color={tintColor} />
-            <ThemedText style={[styles.orgName, { color: textColor }]}>
+            <Ionicons name="business" size={20} color={colors.tint} />
+            <ThemedText style={[styles.orgName, { color: colors.text }]}>
               {organizationName}
             </ThemedText>
           </View>
-          <Ionicons name="chevron-forward" size={16} color={mutedColor} />
+          <Ionicons
+            name="chevron-forward"
+            size={16}
+            color={colors.description}
+          />
         </View>
-        <ThemedText style={[styles.orgDescription, { color: mutedColor }]}>
+        <ThemedText
+          style={[styles.orgDescription, { color: colors.description }]}
+        >
           Manage your organization settings and team
         </ThemedText>
       </TouchableOpacity>

@@ -1,18 +1,14 @@
 import { ThemedText } from "@/components/ThemedText";
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useColors } from "@/hooks/useColors";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 
 export function QuickActionsSection() {
-  const textColor = useThemeColor({}, "text");
-  const tintColor = useThemeColor({}, "tint");
-  const cardBackground = useThemeColor({}, "cardBackground");
-  const borderColor = useThemeColor({}, "border");
-
+  const colors = useColors();
   return (
     <View style={styles.container}>
-      <ThemedText style={[styles.sectionTitle, { color: textColor }]}>
+      <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
         Quick Actions
       </ThemedText>
 
@@ -20,12 +16,15 @@ export function QuickActionsSection() {
         <TouchableOpacity
           style={[
             styles.actionCard,
-            { backgroundColor: cardBackground, borderColor },
+            {
+              backgroundColor: colors.cardBackground,
+              borderColor: colors.border,
+            },
           ]}
           onPress={() => router.push("/(home)/settings")}
         >
-          <Ionicons name="settings-outline" size={24} color={tintColor} />
-          <ThemedText style={[styles.actionLabel, { color: textColor }]}>
+          <Ionicons name="settings-outline" size={24} color={colors.tint} />
+          <ThemedText style={[styles.actionLabel, { color: colors.text }]}>
             Settings
           </ThemedText>
         </TouchableOpacity>
@@ -33,12 +32,15 @@ export function QuickActionsSection() {
         <TouchableOpacity
           style={[
             styles.actionCard,
-            { backgroundColor: cardBackground, borderColor },
+            {
+              backgroundColor: colors.cardBackground,
+              borderColor: colors.border,
+            },
           ]}
           onPress={() => {}}
         >
-          <Ionicons name="add-circle-outline" size={24} color={tintColor} />
-          <ThemedText style={[styles.actionLabel, { color: textColor }]}>
+          <Ionicons name="add-circle-outline" size={24} color={colors.tint} />
+          <ThemedText style={[styles.actionLabel, { color: colors.text }]}>
             Create New
           </ThemedText>
         </TouchableOpacity>

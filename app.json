@@ -10,12 +10,14 @@
     "newArchEnabled": true,
     "ios": {
       "bundleIdentifier": "com.scopeui.nativeclerk",
+      "buildNumber": "5",
       "supportsTablet": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
+      "versionCode": 5,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -54,6 +56,9 @@
       "eas": {
         "projectId": "fc41f248-671a-43f2-8fda-6a186dd4660a"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
     },
     "owner": "ilieberacha"
   }

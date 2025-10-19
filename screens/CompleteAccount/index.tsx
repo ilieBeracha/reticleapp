@@ -1,4 +1,4 @@
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useColors } from "@/hooks/useColors";
 import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AccountForm } from "./components/AccountForm";
@@ -7,7 +7,7 @@ import { useAccountCompletion } from "./hooks/useAccountCompletion";
 
 export function CompleteAccount() {
   const insets = useSafeAreaInsets();
-  const backgroundColor = useThemeColor({}, "background");
+  const colors = useColors();
 
   const { control, handleSubmit, onSubmit, isLoading } = useAccountCompletion();
 
@@ -18,7 +18,7 @@ export function CompleteAccount() {
         {
           paddingTop: insets.top + 40,
           paddingBottom: insets.bottom,
-          backgroundColor,
+          backgroundColor: colors.background,
         },
       ]}
     >
@@ -35,7 +35,7 @@ export function CompleteAccount() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    gap: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 24,
   },
 });

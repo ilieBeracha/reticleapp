@@ -11,6 +11,7 @@ import * as SecureStore from "expo-secure-store";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -48,12 +49,14 @@ export default function RootLayout() {
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
       <ClerkLoaded>
-        <ThemeProvider
-          value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
-        >
-          <Slot />
-          <StatusBar style="auto" />
-        </ThemeProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <ThemeProvider
+            value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
+          >
+            <Slot />
+            <StatusBar style="auto" />
+          </ThemeProvider>
+        </GestureHandlerRootView>
       </ClerkLoaded>
     </ClerkProvider>
   );

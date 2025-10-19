@@ -1,22 +1,31 @@
 import { ThemedView } from "@/components/ThemedView";
 import { useEnsureActiveOrg } from "@/hooks/organizations/useEnsureActiveOrg";
 import { useThemeColor } from "@/hooks/useThemeColor";
-import { useOrganization, useUser } from "@clerk/clerk-expo";
+import {
+  useOrganization,
+  useOrganizationList,
+  useUser,
+} from "@clerk/clerk-expo";
 import { ScrollView, StyleSheet } from "react-native";
 import { GreetingSection } from "./components/GreetingSection";
-import { OrganizationSection } from "./components/OrganizationSection";
-import { QuickActionsSection } from "./components/QuickActionsSection";
-import { StatsSection } from "./components/StatsSection";
+import { LastRecap } from "./components/LastRecap";
 
 export function Home() {
   useEnsureActiveOrg();
   const { user } = useUser();
-  const { organization } = useOrganization();
+  const { organization, membership } = useOrganization();
+  const { userMemberships } = useOrganizationList({
+    userMemberships: {
+      pageSize: 50,
+    },
+  });
 
   const backgroundColor = useThemeColor({}, "background");
 
   const userName =
     user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] || "User";
+
+  const organizationCount = userMemberships?.data?.length ?? 0;
 
   return (
     <ThemedView style={[styles.container, { backgroundColor }]}>
@@ -24,15 +33,22 @@ export function Home() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <GreetingSection userName={userName} />
+        <GreetingSection
+          userName={userName}
+          organizationName={organization?.name}
+          organizationRole={membership?.role}
+          organizationCount={organizationCount}
+        />
 
-        <StatsSection organizationCount={organization ? 1 : 0} />
+        <LastRecap />
 
-        {organization && (
+        {/* <StatsSection organizationCount={organization ? 1 : 0} /> */}
+
+        {/* {organization && (
           <OrganizationSection organizationName={organization.name} />
-        )}
+        )} */}
 
-        <QuickActionsSection />
+        {/* <QuickActionsSection /> */}
       </ScrollView>
     </ThemedView>
   );
@@ -44,7 +60,6 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 20,
+    paddingVertical: 24,
   },
 });

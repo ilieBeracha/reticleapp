@@ -1,23 +1,50 @@
-// libs/supabase.ts
 import { useAuth } from "@clerk/clerk-expo";
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 
-export function useSupabase() {
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error("Missing Supabase environment variables");
+}
+
+// Create a singleton Supabase client
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: false, // We use Clerk for auth
+    autoRefreshToken: false,
+  },
+});
+
+/**
+ * Hook to get an authenticated Supabase client
+ * This client will automatically include the Clerk JWT in requests
+ */
+export function useSupabaseClient() {
   const { getToken } = useAuth();
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: {
-      fetch: async (input, init = {}) => {
-        const token = await getToken({ template: "supabase" }); // HS256 Clerk template
-        const headers = new Headers(init.headers);
-        if (token) headers.set("Authorization", `Bearer ${token}`);
-        return fetch(input, { ...init, headers });
-      },
-    },
-  });
+  const getAuthenticatedClient = async () => {
+    const token = await getToken({ template: "supabase" });
 
-  return supabase;
+    if (!token) {
+      throw new Error("No auth token available");
+    }
+
+    // Set the auth header with Clerk's JWT
+    const authenticatedClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+
+    return authenticatedClient;
+  };
+
+  return { getAuthenticatedClient, getToken };
 }

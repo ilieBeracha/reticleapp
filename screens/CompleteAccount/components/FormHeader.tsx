@@ -1,16 +1,15 @@
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useColors } from "@/hooks/useColors";
 import { StyleSheet, Text, View } from "react-native";
 
 export function FormHeader() {
-  const textColor = useThemeColor({}, "text");
-  const descriptionColor = useThemeColor({}, "description");
+  const colors = useColors();
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.label, { color: textColor }]}>
+      <Text style={[styles.label, { color: colors.text }]}>
         Complete your account
       </Text>
-      <Text style={[styles.description, { color: descriptionColor }]}>
+      <Text style={[styles.description, { color: colors.description }]}>
         Complete your account to start your journey with thousands of developers
         around the world.
       </Text>

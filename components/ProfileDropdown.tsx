@@ -1,4 +1,4 @@
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useColors } from "@/hooks/useColors";
 import { useUser } from "@clerk/clerk-expo";
 import { Modal, Pressable, StyleSheet, View } from "react-native";
 import { MenuList } from "./ProfileDropdown/components/MenuList";
@@ -24,8 +24,7 @@ export default function ProfileDropdown({
   menuItems,
   onMenuAction,
 }: ProfileDropdownProps) {
-  const cardBackground = useThemeColor({}, "cardBackground");
-  const border = useThemeColor({}, "border");
+  const colors = useColors();
   const { user } = useUser();
   const userName = user?.fullName || "User";
   const userEmail =
@@ -49,8 +48,8 @@ export default function ProfileDropdown({
             style={[
               styles.dropdown,
               {
-                backgroundColor: cardBackground,
-                borderColor: border,
+                backgroundColor: colors.cardBackground,
+                borderColor: colors.border,
                 borderWidth: 1,
               },
             ]}

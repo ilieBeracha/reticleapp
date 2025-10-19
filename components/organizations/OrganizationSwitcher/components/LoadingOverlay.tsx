@@ -15,7 +15,7 @@ export function LoadingOverlay({ visible }: LoadingOverlayProps) {
 
   return (
     <View style={[styles.overlay, { backgroundColor: backgroundColor }]}>
-      <View style={[styles.content, { backgroundColor }]}>
+      <View style={[styles.content]}>
         <ActivityIndicator size="large" color={tintColor} />
         <ThemedText style={[styles.text, { color: textColor }]}>
           Switching workspace...
@@ -35,7 +35,8 @@ const styles = StyleSheet.create({
     backgroundColor: "black",
     justifyContent: "center",
     alignItems: "center",
-    zIndex: 9999,
+    zIndex: 99999,
+    elevation: 99999,
   },
   content: {
     padding: 32,

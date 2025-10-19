@@ -1,5 +1,5 @@
 import { ThemedText } from "@/components/ThemedText";
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useColors } from "@/hooks/useColors";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, View } from "react-native";
 
@@ -8,15 +8,11 @@ interface StatsSectionProps {
 }
 
 export function StatsSection({ organizationCount }: StatsSectionProps) {
-  const textColor = useThemeColor({}, "text");
-  const mutedColor = useThemeColor({}, "description");
-  const tintColor = useThemeColor({}, "tint");
-  const cardBackground = useThemeColor({}, "cardBackground");
-  const borderColor = useThemeColor({}, "border");
+  const colors = useColors();
 
   return (
     <View style={styles.container}>
-      <ThemedText style={[styles.sectionTitle, { color: textColor }]}>
+      <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
         Overview
       </ThemedText>
 
@@ -24,14 +20,17 @@ export function StatsSection({ organizationCount }: StatsSectionProps) {
         <View
           style={[
             styles.statCard,
-            { backgroundColor: cardBackground, borderColor },
+            {
+              backgroundColor: colors.cardBackground,
+              borderColor: colors.border,
+            },
           ]}
         >
-          <Ionicons name="business-outline" size={24} color={tintColor} />
-          <ThemedText style={[styles.statValue, { color: textColor }]}>
+          <Ionicons name="business-outline" size={24} color={colors.tint} />
+          <ThemedText style={[styles.statValue, { color: colors.text }]}>
             {organizationCount}
           </ThemedText>
-          <ThemedText style={[styles.statLabel, { color: mutedColor }]}>
+          <ThemedText style={[styles.statLabel, { color: colors.description }]}>
             Organizations
           </ThemedText>
         </View>
@@ -39,14 +38,17 @@ export function StatsSection({ organizationCount }: StatsSectionProps) {
         <View
           style={[
             styles.statCard,
-            { backgroundColor: cardBackground, borderColor },
+            {
+              backgroundColor: colors.cardBackground,
+              borderColor: colors.border,
+            },
           ]}
         >
-          <Ionicons name="people-outline" size={24} color={tintColor} />
-          <ThemedText style={[styles.statValue, { color: textColor }]}>
+          <Ionicons name="people-outline" size={24} color={colors.tint} />
+          <ThemedText style={[styles.statValue, { color: colors.text }]}>
             12
           </ThemedText>
-          <ThemedText style={[styles.statLabel, { color: mutedColor }]}>
+          <ThemedText style={[styles.statLabel, { color: colors.description }]}>
             Team Members
           </ThemedText>
         </View>
@@ -54,14 +56,17 @@ export function StatsSection({ organizationCount }: StatsSectionProps) {
         <View
           style={[
             styles.statCard,
-            { backgroundColor: cardBackground, borderColor },
+            {
+              backgroundColor: colors.cardBackground,
+              borderColor: colors.border,
+            },
           ]}
         >
-          <Ionicons name="analytics-outline" size={24} color={tintColor} />
-          <ThemedText style={[styles.statValue, { color: textColor }]}>
+          <Ionicons name="analytics-outline" size={24} color={colors.tint} />
+          <ThemedText style={[styles.statValue, { color: colors.text }]}>
             24
           </ThemedText>
-          <ThemedText style={[styles.statLabel, { color: mutedColor }]}>
+          <ThemedText style={[styles.statLabel, { color: colors.description }]}>
             Projects
           </ThemedText>
         </View>

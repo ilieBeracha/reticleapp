@@ -13,6 +13,11 @@ export default function Settings() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 24,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
   },
 });

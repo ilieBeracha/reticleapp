@@ -1,17 +1,9 @@
-import { useThemeColor } from "@/hooks/useThemeColor";
+import BaseBottomSheet from "@/components/BaseBottomSheet";
 import { useAuth, useOrganizationList, useUser } from "@clerk/clerk-expo";
 import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Modal,
-  Pressable,
-  StyleSheet,
-  View,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ActivityIndicator, Alert, StyleSheet, View } from "react-native";
 import CreateOrg from "./CreateOrg";
 import { LoadingOverlay } from "./OrganizationSwitcher/components/LoadingOverlay";
-import { ModalHandle } from "./OrganizationSwitcher/components/ModalHandle";
 import { SwitcherHeader } from "./OrganizationSwitcher/components/SwitcherHeader";
 import { WorkspaceList } from "./OrganizationSwitcher/components/WorkspaceList";
 
@@ -24,7 +16,6 @@ export function OrganizationSwitcherModal({
   visible,
   onClose,
 }: OrganizationSwitcherModalProps) {
-  const insets = useSafeAreaInsets();
   const { user } = useUser();
   const { orgId } = useAuth();
   const { isLoaded, setActive, userMemberships } = useOrganizationList({
@@ -43,9 +34,6 @@ export function OrganizationSwitcherModal({
     }
   }, [visible, isLoaded, userMemberships]);
 
-  const backgroundColor = useThemeColor({}, "cardBackground");
-  const borderColor = useThemeColor({}, "border");
-
   const handleSwitchToPersonal = async () => {
     setSwitchingToId("personal");
     try {
@@ -53,9 +41,18 @@ export function OrganizationSwitcherModal({
       setTimeout(() => {
         onClose();
         setSwitchingToId(null);
+        // Clear confirmation
+        setTimeout(() => {
+          Alert.alert(
+            "Workspace Switched ✓",
+            "You are now in your Personal workspace",
+            [{ text: "OK" }]
+          );
+        }, 100);
       }, 300);
     } catch (error) {
       setSwitchingToId(null);
+      Alert.alert("Error", "Failed to switch workspace", [{ text: "OK" }]);
     }
   };
 
@@ -63,12 +60,25 @@ export function OrganizationSwitcherModal({
     setSwitchingToId(organizationId);
     try {
       await setActive?.({ organization: organizationId });
+      const orgName = userMemberships?.data?.find(
+        (m) => m.organization.id === organizationId
+      )?.organization.name;
+
       setTimeout(() => {
         onClose();
         setSwitchingToId(null);
+        // Clear confirmation
+        setTimeout(() => {
+          Alert.alert(
+            "Workspace Switched ✓",
+            `You are now in ${orgName || "the organization"}`,
+            [{ text: "OK" }]
+          );
+        }, 100);
       }, 300);
     } catch (error) {
       setSwitchingToId(null);
+      Alert.alert("Error", "Failed to switch workspace", [{ text: "OK" }]);
     }
   };
 
@@ -80,73 +90,41 @@ export function OrganizationSwitcherModal({
   const isPersonalActive = !orgId;
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable
-          style={[
-            styles.container,
-            {
-              backgroundColor,
-              paddingBottom: insets.bottom + 20,
-              borderTopColor: borderColor,
-            },
-          ]}
-          onPress={(e) => e.stopPropagation()}
-        >
-          <ModalHandle />
-          <SwitcherHeader />
+    <>
+      <BaseBottomSheet
+        visible={visible}
+        onClose={onClose}
+        snapPoints={["60%"]}
+        enablePanDownToClose={true}
+        backdropOpacity={0.5}
+      >
+        <SwitcherHeader />
 
-          {!isLoaded ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator />
-            </View>
-          ) : (
-            <WorkspaceList
-              userName={userName}
-              isPersonalActive={isPersonalActive}
-              organizations={userMemberships?.data ?? []}
-              activeOrgId={orgId}
-              switchingToId={switchingToId}
-              onSwitchToPersonal={handleSwitchToPersonal}
-              onSwitchToOrg={handleSwitchToOrg}
-              onCreateOrg={handleCreateOrg}
-            />
-          )}
-        </Pressable>
-      </Pressable>
+        {!isLoaded ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator />
+          </View>
+        ) : (
+          <WorkspaceList
+            userName={userName}
+            isPersonalActive={isPersonalActive}
+            organizations={userMemberships?.data ?? []}
+            activeOrgId={orgId}
+            switchingToId={switchingToId}
+            onSwitchToPersonal={handleSwitchToPersonal}
+            onSwitchToOrg={handleSwitchToOrg}
+            onCreateOrg={handleCreateOrg}
+          />
+        )}
+      </BaseBottomSheet>
 
       <LoadingOverlay visible={!!switchingToId} />
       <CreateOrg visible={createOrgVisible} setVisible={setCreateOrgVisible} />
-    </Modal>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
-  },
-  container: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: "75%",
-    minHeight: 400,
-    borderTopWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: -4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 8,
-  },
   loadingContainer: {
     padding: 40,
     alignItems: "center",

@@ -1,4 +1,4 @@
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useColors } from "@/hooks/useColors";
 import { useOrganization } from "@clerk/clerk-expo";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -22,22 +22,20 @@ export default function Header({
   const [profileOpen, setProfileOpen] = useState(false);
   const [orgSwitcherOpen, setOrgSwitcherOpen] = useState(false);
   const insets = useSafeAreaInsets();
-
+  const colors = useColors();
   const handleMenuAction = (action: string) => {
     if (action === "settings") {
       router.push("/(home)/settings");
     }
   };
 
-  const backgroundColor = useThemeColor({}, "background");
-
   return (
     <View
       style={[
         styles.header,
-        { backgroundColor: backgroundColor },
+        { backgroundColor: colors.background },
         {
-          paddingTop: insets.top,
+          paddingTop: insets.top + 8,
         },
       ]}
     >
@@ -78,7 +76,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingHorizontal: 18,
+    paddingBottom: 26,
   },
 });
