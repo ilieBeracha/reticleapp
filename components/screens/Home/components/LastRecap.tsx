@@ -19,10 +19,10 @@ export function LastRecap({
 }: LastRecapProps) {
   const { orgId } = useAuth();
   const { organization } = useOrganization();
-  
+
   // Determine if we're in personal mode (no organization selected)
   const isPersonalMode = !orgId;
-  
+
   const today = new Date();
   const currentDay = today.getDay();
 
@@ -42,19 +42,18 @@ export function LastRecap({
       totalAllTime: sessions.length,
     };
   }, [sessions, currentDay]);
-
+  
+  if (sessions.length === 0) {
+    return <EmptyState type="no-sessions" isPersonalMode={isPersonalMode} />;
+  }
   // Loading state
   if (loading) {
-    return <EmptyState type="loading" />;
+    return <EmptyState type="loading" isPersonalMode={isPersonalMode} />;
   }
 
   // Empty sessions state
   if (sessions.length === 0 && !isPersonalMode && !hasOrganization) {
     return <EmptyState type="no-organization" />;
-  }
-  
-  if (sessions.length === 0) {
-    return <EmptyState type="no-sessions" isPersonalMode={isPersonalMode} />;
   }
 
   return (

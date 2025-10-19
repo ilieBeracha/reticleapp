@@ -10,7 +10,7 @@ interface EmptyStateProps {
 export function EmptyState({ type, isPersonalMode = false }: EmptyStateProps) {
   const colors = useColors();
 
-  if (type === "loading") {
+  if (type === "loading" && isPersonalMode) {
     return (
       <View style={styles.container}>
         <View style={[styles.icon, { backgroundColor: colors.border }]}>
