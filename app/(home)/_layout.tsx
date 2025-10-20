@@ -38,8 +38,6 @@ export default function Layout() {
   const { organization } = useOrganization();
 
   const handleActionSelect = (action: string) => {
-    console.log("Action selected:", action);
-
     switch (action) {
       case "scan":
         console.log("Navigate to scan target");
