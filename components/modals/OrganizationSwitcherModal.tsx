@@ -1,17 +1,18 @@
+import BaseBottomSheet from "@/components/BaseBottomSheet";
+import { LoadingOverlay } from "@/components/organizations/OrganizationSwitcher/components/LoadingOverlay";
+import { SwitcherHeader } from "@/components/organizations/OrganizationSwitcher/components/SwitcherHeader";
+import { useAuth, useOrganizationList, useUser } from "@clerk/clerk-expo";
+import { BottomSheetView } from "@gorhom/bottom-sheet";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  FlatList,
+  Image,
   StyleSheet,
-  View,
   Text,
   TouchableOpacity,
-  Image,
-  FlatList,
+  View,
 } from "react-native";
-import { useAuth, useOrganizationList, useUser } from "@clerk/clerk-expo";
-import BaseBottomSheet from "@/components/BaseBottomSheet";
-import { LoadingOverlay } from "./OrganizationSwitcher/components/LoadingOverlay";
-import { SwitcherHeader } from "./OrganizationSwitcher/components/SwitcherHeader";
 import CreateOrg from "./CreateOrg";
 
 interface OrganizationSwitcherModalProps {
@@ -71,63 +72,66 @@ export function OrganizationSwitcherModal({
       <BaseBottomSheet
         visible={visible}
         onClose={onClose}
-        snapPoints={["65%"]}
+        keyboardBehavior="interactive"
+        snapPoints={["50%", "60%"]}
         enablePanDownToClose
         backdropOpacity={0.45}
       >
-        <SwitcherHeader />
-        {!isLoaded ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#888" />
-          </View>
-        ) : (
-          <FlatList
-            data={[
-              {
-                id: "personal",
-                name: `${userName} (Personal)`,
-                active: isPersonalActive,
-                imageUrl: user?.imageUrl,
-              },
-              ...(userMemberships?.data ?? []).map((m) => ({
-                id: m.organization.id,
-                name: m.organization.name,
-                active: orgId === m.organization.id,
-                imageUrl: m.organization.imageUrl,
-              })),
-            ]}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[styles.orgRow, item.active && styles.activeOrgRow]}
-                activeOpacity={0.7}
-                onPress={() =>
-                  handleSwitch(item.id === "personal" ? null : item.id)
-                }
-              >
-                {item.imageUrl ? (
-                  <Image
-                    source={{ uri: item.imageUrl }}
-                    style={styles.avatar}
-                  />
-                ) : (
-                  <View style={styles.placeholderAvatar} />
-                )}
-                <Text style={styles.orgName}>{item.name}</Text>
-                {item.active && <View style={styles.activeDot} />}
-              </TouchableOpacity>
-            )}
-            ListFooterComponent={
-              <TouchableOpacity
-                style={styles.addOrgButton}
-                onPress={handleCreateOrg}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.addOrgText}>+ Create organization</Text>
-              </TouchableOpacity>
-            }
-          />
-        )}
+        <BottomSheetView style={styles.sheetBackground}>
+          <SwitcherHeader />
+          {!isLoaded ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color="#888" />
+            </View>
+          ) : (
+            <FlatList
+              data={[
+                {
+                  id: "personal",
+                  name: `${userName} (Personal)`,
+                  active: isPersonalActive,
+                  imageUrl: user?.imageUrl,
+                },
+                ...(userMemberships?.data ?? []).map((m) => ({
+                  id: m.organization.id,
+                  name: m.organization.name,
+                  active: orgId === m.organization.id,
+                  imageUrl: m.organization.imageUrl,
+                })),
+              ]}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.orgRow, item.active && styles.activeOrgRow]}
+                  activeOpacity={0.7}
+                  onPress={() =>
+                    handleSwitch(item.id === "personal" ? null : item.id)
+                  }
+                >
+                  {item.imageUrl ? (
+                    <Image
+                      source={{ uri: item.imageUrl }}
+                      style={styles.avatar}
+                    />
+                  ) : (
+                    <View style={styles.placeholderAvatar} />
+                  )}
+                  <Text style={styles.orgName}>{item.name}</Text>
+                  {item.active && <View style={styles.activeDot} />}
+                </TouchableOpacity>
+              )}
+              ListFooterComponent={
+                <TouchableOpacity
+                  style={styles.addOrgButton}
+                  onPress={handleCreateOrg}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.addOrgText}>+ Create organization</Text>
+                </TouchableOpacity>
+              }
+            />
+          )}
+        </BottomSheetView>
       </BaseBottomSheet>
 
       <LoadingOverlay visible={!!switchingToId} />
@@ -192,6 +196,8 @@ const styles = StyleSheet.create({
   addOrgButton: {
     paddingVertical: 18,
     alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderColor: "rgba(255,255,255,0.08)",
   },

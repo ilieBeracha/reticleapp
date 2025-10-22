@@ -6,7 +6,7 @@ import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { HeaderActions } from "./Header/components/HeaderActions";
 import { OrganizationBadge } from "./Header/components/OrganizationBadge";
-import { OrganizationSwitcherModal } from "./organizations/OrganizationSwitcherModal";
+import { OrganizationSwitcherModal } from "./modals/OrganizationSwitcherModal";
 import ProfileDropdown from "./ProfileDropdown";
 
 interface HeaderProps {

@@ -12,6 +12,7 @@
       "bundleIdentifier": "com.scopeui.nativeclerk",
       "buildNumber": "5",
       "supportsTablet": true,
+      "icon": "./assets/images/icon-1760977067249.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }

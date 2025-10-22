@@ -8,7 +8,6 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -102,24 +101,12 @@ export default function CreateSessionModal({
     <BaseBottomSheet
       visible={visible}
       onClose={handleClose}
-      snapPoints={["75%"]}
+      snapPoints={["60%", "75%"]}
       enablePanDownToClose={!isSubmitting}
       backdropOpacity={0.45}
     >
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={[styles.header, { borderColor: colors.border }]}>
-          <Text style={[styles.title, { color: colors.text }]}>
-            New Session
-          </Text>
-          <Text style={[styles.subtitle, { color: colors.description }]}>
-            Create a new training session
-          </Text>
-        </View>
-
-        {/* Form */}
+      <View style={styles.container}>
         <View style={styles.form}>
-          {/* Session Name */}
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.text }]}>
               Session Name
@@ -424,12 +411,15 @@ export default function CreateSessionModal({
             )}
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </View>
     </BaseBottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   header: {
     paddingHorizontal: 20,
     paddingVertical: 16,

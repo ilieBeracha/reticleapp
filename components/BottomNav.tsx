@@ -4,8 +4,8 @@ import { BlurView } from "expo-blur";
 import { router, usePathname } from "expo-router";
 import { Platform, StyleSheet, useColorScheme, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AddButton } from "./BottomNav/components/AddButton";
-import { NavItem } from "./BottomNav/components/NavItem";
+import { AddButton } from "./BottomNav/AddButton";
+import { NavItem } from "./BottomNav/NavItem";
 
 type BottomNavProps = {
   onAddPress: () => void;
@@ -73,7 +73,7 @@ export default function BottomNav({ onAddPress }: BottomNavProps) {
     >
       {Platform.OS === "ios" ? (
         <BlurView
-          intensity={80}
+          intensity={90}
           tint={colorScheme === "dark" ? "dark" : "light"}
           style={[
             styles.container,
@@ -124,14 +124,6 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 0.5,
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 12,
-    },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 16,
   },
   androidGlass: {
     // Fallback for Android (no BlurView)

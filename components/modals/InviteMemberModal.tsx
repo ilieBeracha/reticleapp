@@ -5,8 +5,6 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -87,133 +85,129 @@ export function InviteMemberModal({
     <BaseBottomSheet
       visible={visible}
       onClose={handleClose}
-      snapPoints={["55%"]}
+      snapPoints={["60%", "88%"]}
+      keyboardBehavior="interactive"
       enablePanDownToClose={!isSubmitting}
       backdropOpacity={0.5}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.keyboardView}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <ThemedText style={[styles.title, { color: textColor }]}>
-            Invite Member
-          </ThemedText>
-          <ThemedText style={[styles.subtitle, { color: mutedColor }]}>
-            Send an invitation to join your organization
-          </ThemedText>
-        </View>
+      {/* Header */}
+      <View style={styles.header}>
+        <ThemedText style={[styles.title, { color: textColor }]}>
+          Invite Member
+        </ThemedText>
+        <ThemedText style={[styles.subtitle, { color: mutedColor }]}>
+          Send an invitation to join your organization
+        </ThemedText>
+      </View>
 
-        {/* Form */}
-        <View style={styles.form}>
-          {/* Email Input */}
-          <TextInput
-            style={[
-              styles.input,
-              {
-                backgroundColor,
-                borderColor,
-                color: textColor,
-              },
-            ]}
-            value={emailAddress}
-            onChangeText={setEmailAddress}
-            placeholder="email@example.com"
-            placeholderTextColor={placeholderColor}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoFocus
-            returnKeyType="done"
-            onSubmitEditing={canSubmit ? handleInvite : undefined}
-          />
+      {/* Form */}
+      <View style={styles.form}>
+        {/* Email Input */}
+        <TextInput
+          style={[
+            styles.input,
+            {
+              backgroundColor,
+              borderColor,
+              color: textColor,
+            },
+          ]}
+          value={emailAddress}
+          onChangeText={setEmailAddress}
+          placeholder="email@example.com"
+          placeholderTextColor={placeholderColor}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoFocus
+          returnKeyType="done"
+          onSubmitEditing={canSubmit ? handleInvite : undefined}
+        />
 
-          {/* Role Selection */}
-          <View style={styles.roleContainer}>
-            <Text style={[styles.roleLabel, { color: textColor }]}>
-              Select Rank
-            </Text>
-            <View style={styles.roleButtons}>
-              {roles.map((role) => (
-                <TouchableOpacity
-                  key={role.value}
+        {/* Role Selection */}
+        <View style={styles.roleContainer}>
+          <Text style={[styles.roleLabel, { color: textColor }]}>
+            Select Rank
+          </Text>
+          <View style={styles.roleButtons}>
+            {roles.map((role) => (
+              <TouchableOpacity
+                key={role.value}
+                style={[
+                  styles.roleButton,
+                  {
+                    backgroundColor,
+                    borderColor:
+                      selectedRole === role.value ? tintColor : borderColor,
+                  },
+                ]}
+                onPress={() => setSelectedRole(role.value)}
+              >
+                <Ionicons
+                  name={role.icon as any}
+                  size={18}
+                  color={selectedRole === role.value ? tintColor : mutedColor}
+                />
+                <Text
                   style={[
-                    styles.roleButton,
+                    styles.roleButtonText,
                     {
-                      backgroundColor,
-                      borderColor:
-                        selectedRole === role.value ? tintColor : borderColor,
+                      color:
+                        selectedRole === role.value ? tintColor : textColor,
                     },
                   ]}
-                  onPress={() => setSelectedRole(role.value)}
                 >
+                  {role.label}
+                </Text>
+                {selectedRole === role.value && (
                   <Ionicons
-                    name={role.icon as any}
+                    name="checkmark-circle"
                     size={18}
-                    color={selectedRole === role.value ? tintColor : mutedColor}
+                    color={tintColor}
                   />
-                  <Text
-                    style={[
-                      styles.roleButtonText,
-                      {
-                        color:
-                          selectedRole === role.value ? tintColor : textColor,
-                      },
-                    ]}
-                  >
-                    {role.label}
-                  </Text>
-                  {selectedRole === role.value && (
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={18}
-                      color={tintColor}
-                    />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Action Buttons */}
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton, { borderColor }]}
-              onPress={handleClose}
-              disabled={isSubmitting}
-            >
-              <Text style={[styles.buttonText, { color: textColor }]}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.button,
-                styles.inviteButton,
-                {
-                  backgroundColor: tintColor,
-                  opacity: canSubmit ? 1 : 0.5,
-                },
-              ]}
-              onPress={handleInvite}
-              disabled={!canSubmit}
-            >
-              {isSubmitting && (
-                <ActivityIndicator
-                  size="small"
-                  color="#fff"
-                  style={{ marginRight: 8 }}
-                />
-              )}
-              <Text style={styles.inviteButtonText}>
-                {isSubmitting ? "Sending..." : "Send Invite"}
-              </Text>
-            </TouchableOpacity>
+                )}
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
-      </KeyboardAvoidingView>
+
+        {/* Action Buttons */}
+        <View style={styles.buttonRow}>
+          <TouchableOpacity
+            style={[styles.button, styles.cancelButton, { borderColor }]}
+            onPress={handleClose}
+            disabled={isSubmitting}
+          >
+            <Text style={[styles.buttonText, { color: textColor }]}>
+              Cancel
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.button,
+              styles.inviteButton,
+              {
+                backgroundColor: tintColor,
+                opacity: canSubmit ? 1 : 0.5,
+              },
+            ]}
+            onPress={handleInvite}
+            disabled={!canSubmit}
+          >
+            {isSubmitting && (
+              <ActivityIndicator
+                size="small"
+                color="#fff"
+                style={{ marginRight: 8 }}
+              />
+            )}
+            <Text style={styles.inviteButtonText}>
+              {isSubmitting ? "Sending..." : "Send Invite"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </BaseBottomSheet>
   );
 }

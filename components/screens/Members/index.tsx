@@ -1,4 +1,4 @@
-import { InviteMemberModal } from "@/components/organizations/InviteMemberModal";
+import { InviteMemberModal } from "@/components/modals/InviteMemberModal";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useIsOrgAdmin } from "@/hooks/organizations/useIsOrgAdmin";

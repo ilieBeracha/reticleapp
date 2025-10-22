@@ -1,12 +1,14 @@
-import ActionMenuModal, { type Action } from "@/components/ActionMenuModal";
 import BottomNav from "@/components/BottomNav";
 import Header from "@/components/Header";
+import ActionMenuModal, {
+  type Action,
+} from "@/components/modals/ActionMenuModal";
+import CreateSessionModal from "@/components/modals/CreateSessionModal";
 import { useOrganization } from "@clerk/clerk-expo";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { Stack } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
-import CreateSessionModal from "../auth/components/CreateSessionModal"; // ✅ Add this import
 
 const actions: Action[] = [
   {
@@ -43,7 +45,7 @@ export default function Layout() {
         console.log("Navigate to scan target");
         break;
       case "create-session":
-        setCreateSessionVisible(true); // ✅ Open modal instead of just logging
+        setCreateSessionVisible(true);
         break;
       case "new-training":
         console.log("Navigate to new training");
@@ -77,8 +79,6 @@ export default function Layout() {
           onActionSelect={handleActionSelect}
           hasOrganization={!!organization}
         />
-
-        {/* ✅ Create Session Modal */}
         <CreateSessionModal
           visible={createSessionVisible}
           onClose={() => setCreateSessionVisible(false)}

@@ -6,7 +6,13 @@ import {
   type BottomSheetBackdropProps,
 } from "@gorhom/bottom-sheet";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { StyleSheet, View, useColorScheme } from "react-native";
+import {
+  Keyboard,
+  Platform,
+  StyleSheet,
+  useColorScheme,
+  View,
+} from "react-native";
 
 export interface BaseBottomSheetProps {
   visible: boolean;
@@ -15,6 +21,13 @@ export interface BaseBottomSheetProps {
   enablePanDownToClose?: boolean;
   backdropOpacity?: number;
   children: React.ReactNode;
+  keyboardBehavior?: "interactive" | "extend" | "fillParent";
+  /** Enable dynamic sizing based on content */
+  enableDynamicSizing?: boolean;
+  /** Index to snap to when keyboard opens (-1 for last) */
+  keyboardSnapPoint?: number;
+  /** Enable automatic snap to highest point when keyboard opens and back when it closes */
+  enableKeyboardAutoSnap?: boolean;
 }
 
 export default function BaseBottomSheet({
@@ -24,6 +37,10 @@ export default function BaseBottomSheet({
   enablePanDownToClose = true,
   backdropOpacity = 0.6,
   children,
+  keyboardBehavior = "interactive",
+  enableDynamicSizing = false,
+  keyboardSnapPoint,
+  enableKeyboardAutoSnap = true,
 }: BaseBottomSheetProps) {
   const bottomSheetRef = useRef<BottomSheetModal>(null);
   const colorScheme = useColorScheme();
@@ -38,10 +55,10 @@ export default function BaseBottomSheet({
       : cardBackground;
 
   // Default snap points if not provided
-  const snapPoints = useMemo(
-    () => customSnapPoints || ["50%"],
-    [customSnapPoints]
-  );
+  const snapPoints = useMemo(() => {
+    if (enableDynamicSizing) return undefined;
+    return customSnapPoints || ["50%"];
+  }, [customSnapPoints, enableDynamicSizing]);
 
   // Open/close bottom sheet based on visible prop
   useEffect(() => {
@@ -51,6 +68,38 @@ export default function BaseBottomSheet({
       bottomSheetRef.current?.dismiss();
     }
   }, [visible]);
+
+  // Handle keyboard show/hide to adjust snap points
+  useEffect(() => {
+    if (
+      !visible ||
+      !enableKeyboardAutoSnap ||
+      !customSnapPoints ||
+      customSnapPoints.length <= 1
+    )
+      return;
+
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      () => {
+        // Snap to the last (highest) snap point when keyboard opens
+        bottomSheetRef.current?.snapToIndex(customSnapPoints.length - 1);
+      }
+    );
+
+    const keyboardWillHide = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => {
+        // Snap back to the first (lowest) snap point when keyboard closes
+        bottomSheetRef.current?.snapToIndex(0);
+      }
+    );
+
+    return () => {
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
+    };
+  }, [visible, enableKeyboardAutoSnap, customSnapPoints]);
 
   // Render backdrop
   const renderBackdrop = useCallback(
@@ -70,6 +119,7 @@ export default function BaseBottomSheet({
     <BottomSheetModal
       ref={bottomSheetRef}
       snapPoints={snapPoints}
+      enableDynamicSizing={enableDynamicSizing}
       enablePanDownToClose={enablePanDownToClose}
       enableContentPanningGesture={true}
       enableHandlePanningGesture={true}
@@ -82,6 +132,9 @@ export default function BaseBottomSheet({
         width: 40,
         height: 4,
       }}
+      keyboardBehavior={keyboardBehavior}
+      keyboardBlurBehavior="restore"
+      android_keyboardInputMode="adjustResize"
     >
       <BottomSheetView style={styles.container}>
         <View style={styles.content}>{children}</View>
