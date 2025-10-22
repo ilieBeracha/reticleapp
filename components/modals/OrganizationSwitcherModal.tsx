@@ -47,21 +47,6 @@ export function OrganizationSwitcherModal({
     }
   }, [visible]);
 
-  const handleSwitch = async (organizationId: string | null) => {
-    setSwitchingToId(organizationId ?? "personal");
-    try {
-      await setActive?.({ organization: organizationId });
-      // Reset after a short delay to show the loading state
-      setTimeout(() => {
-        setSwitchingToId(null);
-        onClose();
-      }, 500);
-    } catch (err) {
-      console.error(err);
-      setSwitchingToId(null);
-    }
-  };
-
   const handleCreateOrg = () => setCreateOrgVisible(true);
 
   const handleCreateOrgSuccess = () => {
@@ -78,7 +63,8 @@ export function OrganizationSwitcherModal({
         visible={visible}
         onClose={onClose}
         keyboardBehavior="interactive"
-        snapPoints={["50%", "60%"]}
+        snapPoints={["90%"]}
+        keyboardSnapPoint={0}
         enablePanDownToClose
         backdropOpacity={0.45}
       >
@@ -109,9 +95,6 @@ export function OrganizationSwitcherModal({
                 <TouchableOpacity
                   style={[styles.orgRow, item.active && styles.activeOrgRow]}
                   activeOpacity={0.7}
-                  onPress={() =>
-                    handleSwitch(item.id === "personal" ? null : item.id)
-                  }
                 >
                   {item.imageUrl ? (
                     <Image

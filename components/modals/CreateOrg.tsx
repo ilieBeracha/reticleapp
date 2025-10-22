@@ -47,7 +47,7 @@ export function CreateOrgModal({
       visible={visible}
       onClose={handleClose}
       keyboardBehavior="interactive"
-      snapPoints={["50%"]}
+      snapPoints={["30%", "40%"]}
       enablePanDownToClose={true}
       backdropOpacity={0.45}
     >
