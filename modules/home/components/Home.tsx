@@ -6,8 +6,8 @@ import { useAuth, useOrganization, useUser } from "@clerk/clerk-expo";
 import { useEffect } from "react";
 import { ScrollView, StyleSheet } from "react-native";
 import { useStore } from "zustand";
-import { GreetingSection } from "./components/GreetingSection";
-import { LastRecap } from "./components/LastRecap";
+import { GreetingSection } from "./GreetingSection";
+import { LastRecap } from "./LastRecap";
 
 export function Home() {
   useEnsureActiveOrg();

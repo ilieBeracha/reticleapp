@@ -1,7 +1,7 @@
 import { useColors } from "@/hooks/useColors";
 import { StyleSheet, View } from "react-native";
-import { SignInHeader } from "./components/SignInHeader";
-import { SocialButtons } from "./components/SocialButtons";
+import { SignInHeader } from "./SignInHeader";
+import { SocialButtons } from "./SocialButtons";
 
 export function SignIn() {
   const colors = useColors();

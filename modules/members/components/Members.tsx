@@ -18,7 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { MembersList } from "./components/MembersList";
+import { MembersList } from "./MembersList";
 
 type RoleFilter = "all" | "admins" | "members";
 

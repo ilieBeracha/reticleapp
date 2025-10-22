@@ -1,0 +1,24 @@
+{
+  "enabled": false,
+  "name": "Code Quality Analyzer",
+  "description": "Monitors source code files for changes and analyzes them for potential improvements including code smells, design patterns, and best practices. Provides suggestions for enhancing readability, maintainability, and performance while preserving functionality.",
+  "version": "1",
+  "when": {
+    "type": "userTriggered",
+    "patterns": [
+      "app/**/*.tsx",
+      "app/**/*.ts",
+      "components/**/*.tsx",
+      "components/**/*.ts",
+      "hooks/**/*.ts",
+      "services/**/*.ts",
+      "store/**/*.ts",
+      "lib/**/*.ts",
+      "types/**/*.ts"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Analyze the modified code files for potential improvements. Focus on:\n\n1. **Code Smells**: Identify long functions, duplicate code, complex conditionals, and other maintainability issues\n2. **Design Patterns**: Suggest appropriate React/React Native patterns, hooks usage, and component composition\n3. **Best Practices**: Review TypeScript usage, error handling, performance optimizations, and accessibility\n4. **Architecture**: Evaluate component structure, separation of concerns, and adherence to project conventions\n5. **Performance**: Look for unnecessary re-renders, memory leaks, and optimization opportunities\n\nFor each issue found, provide:\n- Clear description of the problem\n- Specific code location (file and line if possible)\n- Concrete improvement suggestion with example code when helpful\n- Explanation of why the change improves code quality\n\nMaintain the existing functionality while suggesting improvements for readability, maintainability, and performance."
+  }
+}

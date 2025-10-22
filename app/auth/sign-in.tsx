@@ -1,4 +1,4 @@
-import { SignIn } from "@/components/screens/Auth/SignIn";
+import { SignIn } from "@/modules/auth/components/SignIn";
 
 export default function SignInPage() {
   return <SignIn />;

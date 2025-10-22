@@ -43,7 +43,7 @@ export default function ActionMenu({
     <BaseBottomSheet
       visible={visible}
       onClose={onClose}
-      snapPoints={["45%", "75%"]}
+      snapPoints={["40%", "75%"]}
       enablePanDownToClose={true}
       backdropOpacity={0.45}
     >

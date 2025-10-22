@@ -42,7 +42,7 @@ export function LastRecap({
       totalAllTime: sessions.length,
     };
   }, [sessions, currentDay]);
-  
+
   if (sessions.length === 0) {
     return <EmptyState type="no-sessions" isPersonalMode={isPersonalMode} />;
   }
