@@ -54,6 +54,21 @@ export function OrganizationSwitcherModal({
     // The organization list will be refreshed automatically by the useCreateOrg hook
   };
 
+  const handleSwitch = async (organizationId: string | null) => {
+    setSwitchingToId(organizationId ?? "personal");
+    try {
+      await setActive?.({ organization: organizationId });
+      // Reset after a short delay to show the loading state
+      setTimeout(() => {
+        setSwitchingToId(null);
+        onClose();
+      }, 500);
+    } catch (err) {
+      console.error(err);
+      setSwitchingToId(null);
+    }
+  };
+
   const userName = user?.fullName || user?.firstName || "Personal";
   const isPersonalActive = !orgId;
 
@@ -95,6 +110,9 @@ export function OrganizationSwitcherModal({
                 <TouchableOpacity
                   style={[styles.orgRow, item.active && styles.activeOrgRow]}
                   activeOpacity={0.7}
+                  onPress={() =>
+                    handleSwitch(item.id === "personal" ? null : item.id)
+                  }
                 >
                   {item.imageUrl ? (
                     <Image
