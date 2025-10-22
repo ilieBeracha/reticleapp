@@ -2,16 +2,21 @@ import BaseBottomSheet from "@/components/BaseBottomSheet";
 import useCreateOrg from "@/hooks/organizations/useCreateOrg";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { Ionicons } from "@expo/vector-icons";
-import { StyleSheet, TextInput, TouchableOpacity, View } from "react-native";
+import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { ThemedText } from "../ThemedText";
 
-export default function CreateOrg({
-  visible,
-  setVisible,
-}: {
+interface CreateOrgModalProps {
   visible: boolean;
-  setVisible: (visible: boolean) => void;
-}) {
+  onClose: () => void;
+  onSuccess?: () => void;
+}
+
+export function CreateOrgModal({
+  visible,
+  onClose,
+  onSuccess,
+}: CreateOrgModalProps) {
   const { createOrg, isSubmitting, organizationName, setOrganizationName } =
     useCreateOrg();
 
@@ -27,13 +32,14 @@ export default function CreateOrg({
     const result = await createOrg();
     if (result) {
       setOrganizationName("");
-      setVisible(false);
+      onClose();
+      onSuccess?.();
     }
   };
 
   const handleClose = () => {
     setOrganizationName("");
-    setVisible(false);
+    onClose();
   };
 
   return (
@@ -41,7 +47,7 @@ export default function CreateOrg({
       visible={visible}
       onClose={handleClose}
       keyboardBehavior="interactive"
-      snapPoints={["30%", "70%"]}
+      snapPoints={["50%"]}
       enablePanDownToClose={true}
       backdropOpacity={0.45}
     >
@@ -57,7 +63,7 @@ export default function CreateOrg({
 
       {/* Form */}
       <View style={styles.form}>
-        <TextInput
+        <BottomSheetTextInput
           style={[
             styles.input,
             {
@@ -114,6 +120,9 @@ export default function CreateOrg({
     </BaseBottomSheet>
   );
 }
+
+// Keep the default export for backward compatibility
+export default CreateOrgModal;
 
 const styles = StyleSheet.create({
   container: {

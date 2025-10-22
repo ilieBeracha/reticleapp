@@ -13,7 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import CreateOrg from "./CreateOrg";
+import { CreateOrgModal } from "./CreateOrg";
 
 interface OrganizationSwitcherModalProps {
   visible: boolean;
@@ -63,6 +63,11 @@ export function OrganizationSwitcherModal({
   };
 
   const handleCreateOrg = () => setCreateOrgVisible(true);
+
+  const handleCreateOrgSuccess = () => {
+    // Organization creation was successful, the modal will close automatically
+    // The organization list will be refreshed automatically by the useCreateOrg hook
+  };
 
   const userName = user?.fullName || user?.firstName || "Personal";
   const isPersonalActive = !orgId;
@@ -135,7 +140,11 @@ export function OrganizationSwitcherModal({
       </BaseBottomSheet>
 
       <LoadingOverlay visible={!!switchingToId} />
-      <CreateOrg visible={createOrgVisible} setVisible={setCreateOrgVisible} />
+      <CreateOrgModal
+        visible={createOrgVisible}
+        onClose={() => setCreateOrgVisible(false)}
+        onSuccess={handleCreateOrgSuccess}
+      />
     </>
   );
 }
