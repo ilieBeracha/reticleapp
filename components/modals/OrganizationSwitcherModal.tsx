@@ -1,6 +1,6 @@
 import BaseBottomSheet from "@/components/BaseBottomSheet";
-import { LoadingOverlay } from "@/components/organizations/OrganizationSwitcher/components/LoadingOverlay";
 import { SwitcherHeader } from "@/components/organizations/OrganizationSwitcher/components/SwitcherHeader";
+import { useOrganizationSwitch } from "@/hooks/organizations/useOrganizationSwitch";
 import { useAuth, useOrganizationList, useUser } from "@clerk/clerk-expo";
 import { BottomSheetView } from "@gorhom/bottom-sheet";
 import { useEffect, useState } from "react";
@@ -26,12 +26,12 @@ export function OrganizationSwitcherModal({
 }: OrganizationSwitcherModalProps) {
   const { user } = useUser();
   const { orgId } = useAuth();
-  const { isLoaded, setActive, userMemberships } = useOrganizationList({
+  const { isLoaded, userMemberships } = useOrganizationList({
     userMemberships: { pageSize: 50 },
   });
+  const { switchOrganization } = useOrganizationSwitch();
 
   const [createOrgVisible, setCreateOrgVisible] = useState(false);
-  const [switchingToId, setSwitchingToId] = useState<string | null>(null);
 
   // Refetch organizations when modal opens
   useEffect(() => {
@@ -40,13 +40,6 @@ export function OrganizationSwitcherModal({
     }
   }, [visible, isLoaded, userMemberships]);
 
-  // Reset switching state when modal closes
-  useEffect(() => {
-    if (!visible) {
-      setSwitchingToId(null);
-    }
-  }, [visible]);
-
   const handleCreateOrg = () => setCreateOrgVisible(true);
 
   const handleCreateOrgSuccess = () => {
@@ -54,19 +47,15 @@ export function OrganizationSwitcherModal({
     // The organization list will be refreshed automatically by the useCreateOrg hook
   };
 
-  const handleSwitch = async (organizationId: string | null) => {
-    setSwitchingToId(organizationId ?? "personal");
-    try {
-      await setActive?.({ organization: organizationId });
-      // Reset after a short delay to show the loading state
-      setTimeout(() => {
-        setSwitchingToId(null);
-        onClose();
-      }, 500);
-    } catch (err) {
-      console.error(err);
-      setSwitchingToId(null);
-    }
+  const handleSwitch = async (
+    organizationId: string | null,
+    organizationName: string
+  ) => {
+    // Close modal immediately when switch is initiated
+    onClose();
+
+    // Trigger the organization switch using the context
+    await switchOrganization(organizationId, organizationName);
   };
 
   const userName = user?.fullName || user?.firstName || "Personal";
@@ -111,7 +100,10 @@ export function OrganizationSwitcherModal({
                   style={[styles.orgRow, item.active && styles.activeOrgRow]}
                   activeOpacity={0.7}
                   onPress={() =>
-                    handleSwitch(item.id === "personal" ? null : item.id)
+                    handleSwitch(
+                      item.id === "personal" ? null : item.id,
+                      item.name
+                    )
                   }
                 >
                   {item.imageUrl ? (
@@ -140,7 +132,6 @@ export function OrganizationSwitcherModal({
         </BottomSheetView>
       </BaseBottomSheet>
 
-      <LoadingOverlay visible={!!switchingToId} />
       <CreateOrgModal
         visible={createOrgVisible}
         onClose={() => setCreateOrgVisible(false)}

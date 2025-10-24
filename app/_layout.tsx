@@ -1,3 +1,8 @@
+import { OrganizationSwitchOverlay } from "@/components/OrganizationSwitchOverlay";
+import {
+  OrganizationSwitchProvider,
+  useOrganizationSwitch,
+} from "@/hooks/organizations/useOrganizationSwitch";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { ClerkLoaded, ClerkProvider } from "@clerk/clerk-expo";
 import {
@@ -53,11 +58,25 @@ export default function RootLayout() {
           <ThemeProvider
             value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
           >
-            <Slot />
-            <StatusBar style="auto" />
+            <OrganizationSwitchProvider>
+              <Slot />
+              <StatusBar style="auto" />
+              <AppOverlay />
+            </OrganizationSwitchProvider>
           </ThemeProvider>
         </GestureHandlerRootView>
       </ClerkLoaded>
     </ClerkProvider>
+  );
+}
+
+function AppOverlay() {
+  const { isSwitching, targetOrganization } = useOrganizationSwitch();
+
+  return (
+    <OrganizationSwitchOverlay
+      visible={isSwitching}
+      organizationName={targetOrganization}
+    />
   );
 }

@@ -23,6 +23,13 @@ export default function Header({
   const [orgSwitcherOpen, setOrgSwitcherOpen] = useState(false);
   const insets = useSafeAreaInsets();
   const colors = useColors();
+
+  const handleOrgSwitcherPress = () => {
+    // Prevent multiple rapid clicks
+    if (orgSwitcherOpen) return;
+    setOrgSwitcherOpen(true);
+  };
+
   const handleMenuAction = (action: string) => {
     if (action === "settings") {
       router.push("/(home)/settings");
@@ -41,7 +48,7 @@ export default function Header({
     >
       <OrganizationBadge
         organizationName={organization?.name}
-        onPress={() => setOrgSwitcherOpen(true)}
+        onPress={handleOrgSwitcherPress}
       />
 
       <HeaderActions
