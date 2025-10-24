@@ -8,8 +8,6 @@ import { useEffect, useRef } from "react";
 import { Animated, ScrollView, StyleSheet } from "react-native";
 import { useStore } from "zustand";
 import { GreetingSection } from "./GreetingSection";
-import { LastRecap } from "./LastRecap";
-
 export function Home() {
   useEnsureActiveOrg();
   const { user } = useUser();
@@ -140,12 +138,6 @@ export function Home() {
             userName={userName}
             organizationName={organization?.name}
             isPersonalWorkspace={!organization}
-          />
-
-          <LastRecap
-            sessions={sessions}
-            loading={loading}
-            hasOrganization={!!organization}
           />
         </ScrollView>
       </Animated.View>

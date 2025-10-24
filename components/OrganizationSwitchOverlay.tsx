@@ -12,7 +12,7 @@ interface OrganizationSwitchOverlayProps {
 
 // Optimized timing for smooth, premium feel
 const FADE_IN_DURATION = 200;
-const FADE_OUT_DURATION = 300;
+const FADE_OUT_DURATION = 20000;
 
 // Fine-tuned easing curves for premium animation feel
 const EASE_IN_EMPHASIZED = Easing.bezier(0.05, 0.7, 0.1, 1.0);
@@ -70,7 +70,7 @@ export function OrganizationSwitchOverlay({
       Animated.loop(
         Animated.timing(spinAnim, {
           toValue: 1,
-          duration: 3000, // Slower rotation
+          duration: 10000, // Slower rotation
           easing: Easing.linear,
           useNativeDriver: true,
         })
@@ -362,81 +362,81 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   spinnerContainer: {
-    width: 160,
-    height: 160,
+    width: 240,
+    height: 240,
     justifyContent: "center",
     alignItems: "center",
     position: "relative",
   },
   outerRing: {
     position: "absolute",
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 2.5, // Thinner for gentler look
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    borderWidth: 3,
   },
   middleRing: {
     position: "absolute",
-    width: 95,
-    height: 95,
-    borderRadius: 47.5,
-    borderWidth: 2, // Thinner
+    width: 145,
+    height: 145,
+    borderRadius: 72.5,
+    borderWidth: 2.5,
   },
   innerRing: {
     position: "absolute",
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    borderWidth: 1.5, // Thinner
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 2,
   },
   dot: {
     position: "absolute",
-    width: 8, // Smaller dots
-    height: 8,
-    borderRadius: 4,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6, // Softer shadow
-    shadowRadius: 4,
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
     elevation: 3,
   },
   dot1: {
-    top: 15,
+    top: 20,
     left: "50%",
-    marginLeft: -4,
+    marginLeft: -6,
   },
   dot2: {
-    bottom: 15,
+    bottom: 20,
     left: "50%",
-    marginLeft: -4,
+    marginLeft: -6,
   },
   dot3: {
     top: "50%",
-    right: 15,
-    marginTop: -4,
+    right: 20,
+    marginTop: -6,
   },
   centerIcon: {
-    width: 36, // Smaller center
-    height: 36,
-    borderRadius: 18,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: "rgba(62, 207, 142, 0.08)",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1.5,
+    borderWidth: 2,
   },
   centerIconInner: {
-    width: 16, // Smaller inner
-    height: 16,
-    borderRadius: 8,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.7, // Softer glow
-    shadowRadius: 6,
+    shadowOpacity: 0.7,
+    shadowRadius: 8,
     elevation: 5,
   },
   text: {
-    marginTop: 40,
-    fontSize: 16, // Slightly smaller
-    fontWeight: "500", // Less bold
+    marginTop: 48,
+    fontSize: 18,
+    fontWeight: "500",
     textAlign: "center",
-    letterSpacing: 0.2,
+    letterSpacing: 0.3,
   },
 });
