@@ -11,8 +11,10 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useColorScheme,
   View,
 } from "react-native";
+import { Colors } from "../Themed";
 import { CreateOrgModal } from "./CreateOrg";
 
 interface OrganizationSwitcherModalProps {
@@ -31,6 +33,11 @@ export function OrganizationSwitcherModal({
   });
   const { switchOrganization } = useOrganizationSwitch();
 
+  const colorScheme = useColorScheme();
+  const descriptionColor =
+    colorScheme === "dark" ? Colors.dark.description : Colors.light.description;
+  const backgroundColor =
+    colorScheme === "dark" ? Colors.dark.background : Colors.light.background;
   const [createOrgVisible, setCreateOrgVisible] = useState(false);
 
   // Refetch organizations when modal opens
@@ -97,7 +104,7 @@ export function OrganizationSwitcherModal({
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={[styles.orgRow, item.active && styles.activeOrgRow]}
+                  style={[styles.orgRow]}
                   activeOpacity={0.7}
                   onPress={() =>
                     handleSwitch(
@@ -114,7 +121,9 @@ export function OrganizationSwitcherModal({
                   ) : (
                     <View style={styles.placeholderAvatar} />
                   )}
-                  <Text style={styles.orgName}>{item.name}</Text>
+                  <Text style={[styles.orgName, { color: descriptionColor }]}>
+                    {item.name}
+                  </Text>
                   {item.active && <View style={styles.activeDot} />}
                 </TouchableOpacity>
               )}
@@ -143,7 +152,6 @@ export function OrganizationSwitcherModal({
 
 const styles = StyleSheet.create({
   sheetBackground: {
-    backgroundColor: "#111",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
@@ -151,7 +159,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255,255,255,0.08)",
   },
   loadingContainer: {
     padding: 40,
@@ -164,10 +171,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 20,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  activeOrgRow: {
-    backgroundColor: "rgba(255,255,255,0.04)",
   },
   avatar: {
     width: 36,
@@ -180,7 +183,6 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 8,
     marginRight: 14,
-    backgroundColor: "rgba(255,255,255,0.1)",
   },
   orgName: {
     color: "#fff",
