@@ -55,3 +55,11 @@ export interface UpdateTrainingInput {
   name?: string;
   description?: string;
 }
+
+export interface Detection {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+}

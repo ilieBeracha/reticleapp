@@ -6,7 +6,7 @@ import ActionMenuModal, {
 import CreateSessionModal from "@/components/modals/CreateSessionModal";
 import { useOrganization } from "@clerk/clerk-expo";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
-import { Stack } from "expo-router";
+import { router, Stack, usePathname } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
 
@@ -38,11 +38,15 @@ export default function Layout() {
   const [actionMenuVisible, setActionMenuVisible] = useState(false);
   const [createSessionVisible, setCreateSessionVisible] = useState(false); // ✅ Add this state
   const { organization } = useOrganization();
+  const pathname = usePathname();
+
+  // Check if current route is camera-detect for full-screen display
+  const isCameraScreen = pathname === "/camera-detect";
 
   const handleActionSelect = (action: string) => {
     switch (action) {
       case "scan":
-        console.log("Navigate to scan target");
+        router.push("/(home)/camera-detect");
         break;
       case "create-session":
         setCreateSessionVisible(true);
@@ -59,6 +63,7 @@ export default function Layout() {
     <BottomSheetModalProvider>
       <View style={{ flex: 1 }}>
         <Header onNotificationPress={() => {}} />
+
         <View style={{ flex: 1 }}>
           <Stack screenOptions={{ headerShown: false, animation: "none" }}>
             <Stack.Screen name="index" options={{ animation: "none" }} />
@@ -66,23 +71,38 @@ export default function Layout() {
             <Stack.Screen name="members" options={{ animation: "none" }} />
             <Stack.Screen name="stats" options={{ animation: "none" }} />
             <Stack.Screen name="calendar" options={{ animation: "none" }} />
+            <Stack.Screen
+              name="camera-detect"
+              options={{
+                animation: "slide_from_bottom",
+                presentation: "modal",
+              }}
+            />
           </Stack>
         </View>
-        <BottomNav onAddPress={() => setActionMenuVisible(true)} />
 
-        {/* Action Menu Modal */}
-        <ActionMenuModal
-          visible={actionMenuVisible}
-          onClose={() => setActionMenuVisible(false)}
-          title="Quick Actions"
-          actions={actions}
-          onActionSelect={handleActionSelect}
-          hasOrganization={!!organization}
-        />
-        <CreateSessionModal
-          visible={createSessionVisible}
-          onClose={() => setCreateSessionVisible(false)}
-        />
+        {!isCameraScreen && (
+          <BottomNav onAddPress={() => setActionMenuVisible(true)} />
+        )}
+
+        {!isCameraScreen && (
+          <ActionMenuModal
+            visible={actionMenuVisible}
+            onClose={() => setActionMenuVisible(false)}
+            title="Quick Actions"
+            actions={actions}
+            onActionSelect={handleActionSelect}
+            hasOrganization={!!organization}
+          />
+        )}
+
+        {/* Create Session Modal - only show when not on camera screen */}
+        {!isCameraScreen && (
+          <CreateSessionModal
+            visible={createSessionVisible}
+            onClose={() => setCreateSessionVisible(false)}
+          />
+        )}
       </View>
     </BottomSheetModalProvider>
   );
