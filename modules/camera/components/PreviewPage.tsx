@@ -102,6 +102,8 @@ export function PreviewPage({
       />
 
       <ScrollView
+        keyboardDismissMode="on-drag"
+        automaticallyAdjustKeyboardInsets={true}
         contentContainerStyle={styles.pagePad}
         showsVerticalScrollIndicator={false}
       >

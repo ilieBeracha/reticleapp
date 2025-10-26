@@ -2,16 +2,16 @@
 import { useColors } from "@/hooks/useColors";
 import { Detection } from "@/store/detectionStore";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useRef, useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
   Modal,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { StyleSheet } from "react-native";
 
 const styles = StyleSheet.create({
   loadingContainer: {
@@ -147,7 +147,6 @@ const styles = StyleSheet.create({
   },
 });
 
-
 interface BulletDetectionEditorProps {
   photoUri: string;
   annotatedImageBase64?: string | null;
@@ -237,13 +236,20 @@ export function BulletDetectionEditor({
         animationType="slide"
         presentationStyle="pageSheet"
       >
-        <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <View
+          style={[
+            styles.loadingContainer,
+            { backgroundColor: colors.background },
+          ]}
+        >
           <View style={styles.loadingContent}>
             <ActivityIndicator size="large" color={colors.tint} />
             <Text style={[styles.loadingText, { color: colors.text }]}>
               Analyzing image...
             </Text>
-            <Text style={[styles.loadingSubtext, { color: colors.description }]}>
+            <Text
+              style={[styles.loadingSubtext, { color: colors.description }]}
+            >
               This may take a few seconds
             </Text>
           </View>
@@ -272,7 +278,12 @@ export function BulletDetectionEditor({
 
         {/* Image with Detection Overlay */}
         <View style={styles.imageContainer}>
-          <View style={[styles.imageCard, { backgroundColor: colors.cardBackground }]}>
+          <View
+            style={[
+              styles.imageCard,
+              { backgroundColor: colors.cardBackground },
+            ]}
+          >
             <TouchableOpacity
               ref={imageRef}
               onLayout={handleImageLayout}
@@ -304,7 +315,12 @@ export function BulletDetectionEditor({
                     },
                   ]}
                 >
-                  <View style={[styles.detectionDot, { backgroundColor: colors.tint }]}>
+                  <View
+                    style={[
+                      styles.detectionDot,
+                      { backgroundColor: colors.tint },
+                    ]}
+                  >
                     <Text style={styles.detectionNumber}>{index + 1}</Text>
                   </View>
                 </View>
@@ -319,7 +335,9 @@ export function BulletDetectionEditor({
             style={[
               styles.actionButton,
               {
-                backgroundColor: isAddingMode ? colors.tint : colors.cardBackground,
+                backgroundColor: isAddingMode
+                  ? colors.tint
+                  : colors.cardBackground,
                 borderColor: colors.border,
               },
             ]}
@@ -359,7 +377,12 @@ export function BulletDetectionEditor({
 
         {/* Instructions */}
         {isAddingMode && (
-          <View style={[styles.instructions, { backgroundColor: colors.cardBackground }]}>
+          <View
+            style={[
+              styles.instructions,
+              { backgroundColor: colors.cardBackground },
+            ]}
+          >
             <Text style={[styles.instructionText, { color: colors.text }]}>
               Tap anywhere on the image to add a bullet detection
             </Text>
@@ -369,7 +392,8 @@ export function BulletDetectionEditor({
         {/* Simple Summary */}
         <View style={styles.summary}>
           <Text style={[styles.summaryText, { color: colors.description }]}>
-            {detections.length} bullet{detections.length !== 1 ? "s" : ""} detected
+            {detections.length} bullet{detections.length !== 1 ? "s" : ""}{" "}
+            detected
           </Text>
         </View>
       </View>

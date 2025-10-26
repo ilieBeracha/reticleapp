@@ -17,10 +17,10 @@ export const makePreviewStyles = (colors: ThemeColors) => {
   return StyleSheet.create({
     // Generic
     page: { flex: 1 },
-    pagePad: { padding: spacing, paddingBottom: spacing * 1.5, gap: spacing },
+    pagePad: { paddingBottom: spacing * 1.5 },
     imageCard: {
       borderRadius: radius,
-      padding: spacing,
+      //   padding: spacing,
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.1,
@@ -49,9 +49,9 @@ export const makePreviewStyles = (colors: ThemeColors) => {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      paddingHorizontal: spacing,
-      paddingTop: spacing,
-      paddingBottom: spacing / 2,
+      //   paddingHorizontal: spacing,
+      //   paddingTop: spacing,
+      //   paddingBottom: spacing / 2,
     },
     iconButton: {
       width: 40, // Reduced from 44
@@ -71,7 +71,7 @@ export const makePreviewStyles = (colors: ThemeColors) => {
     // Preview - Match ResultsPage styling
     previewImage: {
       width: "100%",
-      height: 400, // Match ResultsPage height
+      height: 500, // Match ResultsPage height
       borderRadius: radius,
       backgroundColor: "#111",
     },

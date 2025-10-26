@@ -26,8 +26,8 @@ export const makeResultsStyles = (colors: ThemeColors) => {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      paddingHorizontal: spacing,
-      paddingVertical: spacing,
+      //   paddingHorizontal: spacing,
+      //   paddingVertical: spacing,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
@@ -48,7 +48,7 @@ export const makeResultsStyles = (colors: ThemeColors) => {
     },
     imageCard: {
       borderRadius: radius,
-      padding: spacing,
+      //   padding: spacing,
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.1,
@@ -62,6 +62,7 @@ export const makeResultsStyles = (colors: ThemeColors) => {
     },
     imageOverlay: {
       maxHeight: 500,
+      width: "100%",
       position: "absolute",
       top: spacing + 8,
       right: spacing + 8,

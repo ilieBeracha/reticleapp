@@ -180,6 +180,7 @@ function QuadrantStatsSection({
       icon: "arrow-down-right",
     },
   ];
+  console.log("🎯 Quadrant stats:", quadrantStats);
 
   return (
     <View
