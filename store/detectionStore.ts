@@ -1,5 +1,9 @@
 import { uploadForDetection } from "@/services/detectionService";
-import { AnalyzeResponse, Detection as ApiDetection } from "@/types/api";
+import {
+  AnalyzeResponse,
+  Detection as ApiDetection,
+  QuadrantStats,
+} from "@/types/api";
 import { create } from "zustand";
 
 export interface Detection {
@@ -21,6 +25,7 @@ interface DetectionStoreState {
   // State
   detections: Detection[];
   annotatedImageBase64: string | null;
+  quadrantStatsMm: QuadrantStats | null;
   bulletCount: number;
   isDetecting: boolean;
   error: string | null;
@@ -33,6 +38,12 @@ interface DetectionStoreState {
   clearError: () => void;
   clearDetections: () => void;
   setUserSelectedImage: (userSelectedImage: string) => void;
+
+  // Editing actions
+  addDetection: (detection: Detection) => void;
+  removeDetection: (detectionId: string) => void;
+  mergeDetections: (detectionIds: string[]) => void;
+  separateDetection: (detectionId: string, count: number) => void;
 }
 
 function transformApiDetection(
@@ -58,6 +69,7 @@ export const useDetectionStore = create<DetectionStoreState>((set) => ({
   // Initial state
   detections: [],
   annotatedImageBase64: null,
+  quadrantStatsMm: null,
   bulletCount: 5, // Default to 5 bullets
   isDetecting: false,
   error: null,
@@ -73,7 +85,12 @@ export const useDetectionStore = create<DetectionStoreState>((set) => ({
 
     try {
       console.log("📸 Detection store: Processing image:", imageUri);
-      const response: AnalyzeResponse = await uploadForDetection(imageUri);
+      const { bulletCount } = useDetectionStore.getState();
+      console.log("🎯 Detection store: Expected bullets:", bulletCount);
+      const response: AnalyzeResponse = await uploadForDetection(
+        imageUri,
+        bulletCount
+      );
 
       console.log("📡 Detection store: Received AnalyzeResponse:", response);
 
@@ -96,6 +113,7 @@ export const useDetectionStore = create<DetectionStoreState>((set) => ({
       set({
         detections: transformedDetections,
         annotatedImageBase64: response.annotated_image_base64,
+        quadrantStatsMm: response.quadrant_stats_mm,
         isDetecting: false,
         error: null,
       });
@@ -108,6 +126,7 @@ export const useDetectionStore = create<DetectionStoreState>((set) => ({
         error: errorMessage,
         detections: [], // Clear previous results on error
         annotatedImageBase64: null,
+        quadrantStatsMm: null,
       });
     }
   },
@@ -115,5 +134,95 @@ export const useDetectionStore = create<DetectionStoreState>((set) => ({
   clearError: () => set({ error: null }),
 
   clearDetections: () =>
-    set({ detections: [], annotatedImageBase64: null, error: null }),
+    set({
+      detections: [],
+      annotatedImageBase64: null,
+      quadrantStatsMm: null,
+      error: null,
+    }),
+
+  // Editing actions implementation
+  addDetection: (detection: Detection) =>
+    set((state) => ({ detections: [...state.detections, detection] })),
+
+  removeDetection: (detectionId: string) =>
+    set((state) => ({
+      detections: state.detections.filter((d) => d.id !== detectionId),
+    })),
+
+  mergeDetections: (detectionIds: string[]) =>
+    set((state) => {
+      const detectionsToMerge = state.detections.filter((d) =>
+        detectionIds.includes(d.id)
+      );
+      const remainingDetections = state.detections.filter(
+        (d) => !detectionIds.includes(d.id)
+      );
+
+      if (detectionsToMerge.length < 2) return state;
+
+      // Calculate center point
+      const centerX =
+        detectionsToMerge.reduce(
+          (sum, d) => sum + d.boundingBox.x + d.boundingBox.width / 2,
+          0
+        ) / detectionsToMerge.length;
+      const centerY =
+        detectionsToMerge.reduce(
+          (sum, d) => sum + d.boundingBox.y + d.boundingBox.height / 2,
+          0
+        ) / detectionsToMerge.length;
+
+      const mergedDetection: Detection = {
+        id: `merged_${Date.now()}`,
+        name: "Bullet Hole",
+        confidence: Math.max(...detectionsToMerge.map((d) => d.confidence)),
+        boundingBox: {
+          x: centerX - 2,
+          y: centerY - 2,
+          width: 4,
+          height: 4,
+        },
+        timestamp: new Date().toISOString(),
+      };
+
+      return {
+        detections: [...remainingDetections, mergedDetection],
+      };
+    }),
+
+  separateDetection: (detectionId: string, count: number) =>
+    set((state) => {
+      const detection = state.detections.find((d) => d.id === detectionId);
+      if (!detection) return state;
+
+      const remainingDetections = state.detections.filter(
+        (d) => d.id !== detectionId
+      );
+      const separatedDetections: Detection[] = [];
+
+      for (let i = 0; i < count; i++) {
+        const angle = (i / count) * 2 * Math.PI;
+        const radius = 3;
+        const offsetX = Math.cos(angle) * radius;
+        const offsetY = Math.sin(angle) * radius;
+
+        separatedDetections.push({
+          id: `separated_${Date.now()}_${i}`,
+          name: "Bullet Hole",
+          confidence: detection.confidence * 0.9,
+          boundingBox: {
+            x: detection.boundingBox.x + offsetX,
+            y: detection.boundingBox.y + offsetY,
+            width: detection.boundingBox.width,
+            height: detection.boundingBox.height,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      return {
+        detections: [...remainingDetections, ...separatedDetections],
+      };
+    }),
 }));

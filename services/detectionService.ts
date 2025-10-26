@@ -7,10 +7,12 @@ if (!API_URL) {
 }
 
 export async function uploadForDetection(
-  imageUri: string
+  imageUri: string,
+  expectedBullets: number
 ): Promise<AnalyzeResponse> {
   console.log("🚀 Detection service: Starting upload to", API_URL);
   console.log("📁 Detection service: Image URI:", imageUri);
+  console.log("🎯 Detection service: Expected bullets:", expectedBullets);
 
   const formData = new FormData();
   formData.append("file", {
@@ -21,6 +23,8 @@ export async function uploadForDetection(
 
   formData.append("min_confidence", "0.2");
   formData.append("clustering_distance", "120.0");
+  formData.append("enhance_closeup", "true");
+  formData.append("expected_bullets", expectedBullets.toString());
 
   try {
     console.log("📤 Detection service: Sending request to API...");

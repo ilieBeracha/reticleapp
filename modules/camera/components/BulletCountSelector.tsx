@@ -1,19 +1,17 @@
+// BulletCountSelector.tsx - Simplified with additional questions
 import BaseBottomSheet from "@/components/BaseBottomSheet";
 import { useColors } from "@/hooks/useColors";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect } from "react";
+import React, { useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from "react-native-reanimated";
 
 interface BulletCountSelectorProps {
   bulletCount: number;
   onBulletCountChange: (count: number) => void;
-  onConfirm: () => void;
+  onConfirm: (data: { bulletCount: number; shooterCount: number; targetSize: string }) => void;
   visible: boolean;
+  initialShooterCount?: number;
+  initialTargetSize?: "full" | "1/2" | "1/3" | "1/4";
 }
 
 export function BulletCountSelector({
@@ -21,269 +19,333 @@ export function BulletCountSelector({
   onBulletCountChange,
   onConfirm,
   visible,
+  initialShooterCount = 1,
+  initialTargetSize = "full",
 }: BulletCountSelectorProps) {
   const colors = useColors();
-  const bulletHeight = useSharedValue(getPercentage(bulletCount));
+  const [shooterCount, setShooterCount] = useState(initialShooterCount);
+  const [targetSize, setTargetSize] = useState<"full" | "1/2" | "1/3" | "1/4">(initialTargetSize);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    height: `${bulletHeight.value}%`,
-  }));
-
-  useEffect(() => {
-    bulletHeight.value = withSpring(getPercentage(bulletCount), {
-      damping: 15,
-      stiffness: 150,
-    });
-  }, [bulletCount]);
-
-  const adjustCount = (delta: number) => {
-    const newCount = Math.min(10, Math.max(1, bulletCount + delta));
+  const adjustBulletCount = (delta: number) => {
+    const newCount = Math.min(25, Math.max(1, bulletCount + delta));
     if (newCount !== bulletCount) {
       onBulletCountChange(newCount);
-      bulletHeight.value = withSpring(getPercentage(newCount));
+    }
+  };
+
+  const adjustShooterCount = (delta: number) => {
+    const newCount = Math.min(10, Math.max(1, shooterCount + delta));
+    if (newCount !== shooterCount) {
+      setShooterCount(newCount);
     }
   };
 
   const handlePreset = (count: number) => {
     onBulletCountChange(count);
-    bulletHeight.value = withSpring(getPercentage(count));
   };
 
+  const targetSizeOptions: Array<"full" | "1/2" | "1/3" | "1/4"> = ["full", "1/2", "1/3", "1/4"];
+
   return (
-    <BaseBottomSheet visible={visible} onClose={() => {}} snapPoints={["55%"]}>
+    <BaseBottomSheet visible={visible} onClose={() => {}} snapPoints={["70%"]}>
       <View style={styles.container}>
         <Text style={[styles.title, { color: colors.text }]}>
-          How many bullets did you shoot?
+          Shooting Session Details
         </Text>
 
-        {/* Counter Section */}
-        <View style={styles.selectorContainer}>
-          <RoundButton
-            icon="remove"
-            disabled={bulletCount <= 1}
-            onPress={() => adjustCount(-1)}
-            colors={colors}
-          />
-
-          <View style={styles.bulletBarWrapper}>
-            <View style={[styles.bulletBar, { borderColor: colors.border }]}>
-              {/* Background grid */}
-              {Array.from({ length: 5 }).map((_, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.gridLine,
-                    { backgroundColor: colors.description },
-                  ]}
-                />
-              ))}
-              {/* Animated Fill */}
-              <Animated.View
-                style={[animatedStyle, { backgroundColor: colors.tint }]}
+        {/* Bullets Question */}
+        <View style={styles.section}>
+          <Text style={[styles.question, { color: colors.text }]}>
+            How many bullets did you shoot?
+          </Text>
+          <View style={styles.counterContainer}>
+            <TouchableOpacity
+              style={[
+                styles.adjustButton,
+                {
+                  backgroundColor: bulletCount <= 1 ? colors.border : colors.tint,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={() => adjustBulletCount(-1)}
+              disabled={bulletCount <= 1}
+            >
+              <Ionicons
+                name="remove"
+                size={16}
+                color={bulletCount <= 1 ? colors.description : "white"}
               />
+            </TouchableOpacity>
+
+            <View style={[styles.countDisplay, { borderColor: colors.border }]}>
+              <Text style={[styles.countText, { color: colors.text }]}>
+                {bulletCount}
+              </Text>
+              <Text style={[styles.countLabel, { color: colors.description }]}>
+                {bulletCount === 1 ? "bullet" : "bullets"}
+              </Text>
             </View>
 
-            <Text style={[styles.countText, { color: colors.text }]}>
-              {bulletCount} bullet{bulletCount > 1 ? "s" : ""}
-            </Text>
+            <TouchableOpacity
+              style={[
+                styles.adjustButton,
+                {
+                  backgroundColor: bulletCount >= 25 ? colors.border : colors.tint,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={() => adjustBulletCount(1)}
+              disabled={bulletCount >= 25}
+            >
+              <Ionicons
+                name="add"
+                size={16}
+                color={bulletCount >= 25 ? colors.description : "white"}
+              />
+            </TouchableOpacity>
           </View>
 
-          <RoundButton
-            icon="add"
-            disabled={bulletCount >= 10}
-            onPress={() => adjustCount(1)}
-            colors={colors}
-          />
+          <View style={styles.presetContainer}>
+            {[5, 10, 15, 20, 25].map((count) => (
+              <TouchableOpacity
+                key={count}
+                style={[
+                  styles.presetChip,
+                  {
+                    backgroundColor: bulletCount === count ? colors.tint : colors.cardBackground,
+                    borderColor: bulletCount === count ? colors.tint : colors.border,
+                  },
+                ]}
+                onPress={() => handlePreset(count)}
+              >
+                <Text
+                  style={[
+                    styles.presetText,
+                    { color: bulletCount === count ? "white" : colors.text },
+                  ]}
+                >
+                  {count}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
-        {/* Preset Buttons */}
-        <View style={styles.presetContainer}>
-          {[3, 5, 10].map((count) => (
-            <PresetButton
-              key={count}
-              count={count}
-              onPress={() => handlePreset(count)}
-              colors={colors}
-              isSelected={bulletCount === count}
-            />
-          ))}
+        {/* Shooters Question */}
+        <View style={styles.section}>
+          <View style={styles.questionHeader}>
+            <Ionicons name="people" size={20} color={colors.tint} />
+            <Text style={[styles.question, { color: colors.text }]}>
+              How many shooters?
+            </Text>
+          </View>
+          <View style={styles.counterContainer}>
+            <TouchableOpacity
+              style={[
+                styles.adjustButton,
+                {
+                  backgroundColor: shooterCount <= 1 ? colors.border : colors.tint,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={() => adjustShooterCount(-1)}
+              disabled={shooterCount <= 1}
+            >
+              <Ionicons
+                name="remove"
+                size={16}
+                color={shooterCount <= 1 ? colors.description : "white"}
+              />
+            </TouchableOpacity>
+
+            <View style={[styles.countDisplay, { borderColor: colors.border }]}>
+              <Text style={[styles.countText, { color: colors.text }]}>
+                {shooterCount}
+              </Text>
+              <Text style={[styles.countLabel, { color: colors.description }]}>
+                {shooterCount === 1 ? "shooter" : "shooters"}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.adjustButton,
+                {
+                  backgroundColor: shooterCount >= 10 ? colors.border : colors.tint,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={() => adjustShooterCount(1)}
+              disabled={shooterCount >= 10}
+            >
+              <Ionicons
+                name="add"
+                size={16}
+                color={shooterCount >= 10 ? colors.description : "white"}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Target Size Question */}
+        <View style={styles.section}>
+          <View style={styles.questionHeader}>
+            <Ionicons name="resize" size={20} color={colors.tint} />
+            <Text style={[styles.question, { color: colors.text }]}>
+              Target size?
+            </Text>
+          </View>
+          <View style={styles.targetSizeContainer}>
+            {targetSizeOptions.map((size) => (
+              <TouchableOpacity
+                key={size}
+                style={[
+                  styles.sizeChip,
+                  {
+                    backgroundColor: targetSize === size ? colors.tint : colors.cardBackground,
+                    borderColor: targetSize === size ? colors.tint : colors.border,
+                  },
+                ]}
+                onPress={() => setTargetSize(size)}
+              >
+                <Text
+                  style={[
+                    styles.sizeText,
+                    { color: targetSize === size ? "white" : colors.text },
+                  ]}
+                >
+                  {size} page
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         {/* Continue Button */}
         <TouchableOpacity
           style={[styles.continueButton, { backgroundColor: colors.tint }]}
-          onPress={onConfirm}
-          activeOpacity={0.85}
+          onPress={() => onConfirm({
+            bulletCount,
+            shooterCount,
+            targetSize,
+          })}
         >
-          <Text style={styles.continueButtonText}>Continue</Text>
+          <Text style={styles.continueButtonText}>Start Analysis</Text>
         </TouchableOpacity>
       </View>
     </BaseBottomSheet>
   );
 }
 
-/** Utility */
-function getPercentage(count: number) {
-  return ((count - 1) / 9) * 80 + 20;
-}
-
-/** Round icon button */
-function RoundButton({
-  icon,
-  disabled,
-  onPress,
-  colors,
-}: {
-  icon: "add" | "remove";
-  disabled: boolean;
-  onPress: () => void;
-  colors: any;
-}) {
-  return (
-    <TouchableOpacity
-      style={[
-        styles.button,
-        {
-          backgroundColor: disabled ? colors.surface : colors.tint,
-          borderColor: colors.border,
-        },
-      ]}
-      onPress={onPress}
-      disabled={disabled}
-      activeOpacity={0.8}
-    >
-      <Ionicons
-        name={icon}
-        size={22}
-        color={disabled ? colors.description : colors.text}
-      />
-    </TouchableOpacity>
-  );
-}
-
-/** Preset button */
-function PresetButton({
-  count,
-  onPress,
-  colors,
-  isSelected,
-}: {
-  count: number;
-  onPress: () => void;
-  colors: any;
-  isSelected: boolean;
-}) {
-  return (
-    <TouchableOpacity
-      style={[
-        styles.presetButton,
-        {
-          backgroundColor: isSelected ? colors.tint : colors.background,
-          borderColor: isSelected ? colors.tint : colors.border,
-        },
-      ]}
-      onPress={onPress}
-      activeOpacity={0.85}
-    >
-      <Ionicons
-        name="ellipse"
-        size={14}
-        color={isSelected ? colors.background : colors.tint}
-      />
-      <Text
-        style={[
-          styles.presetText,
-          { color: isSelected ? colors.background : colors.text },
-        ]}
-      >
-        {count}
-      </Text>
-    </TouchableOpacity>
-  );
-}
-
-/** Styles */
 const styles = StyleSheet.create({
-  container: { paddingHorizontal: 24, paddingTop: 20, zIndex: 10000 },
+  container: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 20,
+  },
   title: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "600",
     textAlign: "center",
-    marginBottom: 28,
+    marginBottom: 24,
   },
-  selectorContainer: {
+  section: {
+    marginBottom: 24,
+  },
+  question: {
+    fontSize: 16,
+    fontWeight: "500",
+    marginBottom: 12,
+  },
+  questionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  counterContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 24,
-    marginBottom: 28,
+    gap: 12,
+    marginBottom: 12,
   },
-  button: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 2,
+  adjustButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    elevation: 3,
   },
-  bulletBarWrapper: {
+  countDisplay: {
+    minWidth: 80,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
     alignItems: "center",
-    flex: 1,
-    maxWidth: 80,
-  },
-  bulletBar: {
-    width: 32,
-    height: 200,
-    borderRadius: 16,
-    overflow: "hidden",
-    position: "relative",
-    justifyContent: "flex-end",
-    borderWidth: 2,
-  },
-  gridLine: {
-    position: "absolute",
-    width: "100%",
-    height: 1,
-    opacity: 0.3,
+    backgroundColor: "transparent",
   },
   countText: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: "700",
-    marginTop: 14,
-    textAlign: "center",
+    lineHeight: 28,
+  },
+  countLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+    marginTop: 2,
   },
   presetContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 12,
-    marginBottom: 24,
+    gap: 8,
   },
-  presetButton: {
+  presetChip: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 14,
-    borderWidth: 2,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 56,
+    minHeight: 36,
   },
-  presetText: { fontSize: 16, fontWeight: "600", marginTop: 6 },
+  presetText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  targetSizeContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  sizeChip: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 40,
+  },
+  sizeText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
   continueButton: {
     width: "100%",
     paddingVertical: 16,
-    borderRadius: 16,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    marginTop: 8,
   },
   continueButtonText: {
     color: "white",
-    fontSize: 18,
-    fontWeight: "700",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
