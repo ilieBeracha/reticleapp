@@ -7,6 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
   Dimensions,
   Image,
   ScrollView,
@@ -30,6 +31,7 @@ export function CameraDetect() {
   const [isOpeningMediaLibrary, setIsOpeningMediaLibrary] = useState(false);
   const [currentPage, setCurrentPage] = useState<Page>("camera");
   const cameraRef = useRef<CameraView>(null);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
   const {
     detect,
     detections,
@@ -42,7 +44,25 @@ export function CameraDetect() {
   } = useDetectionStore();
   const colors = useColors();
 
-  // Note: Media library permissions are now requested on-demand when user taps the button
+  // Pulse animation for capture button
+  useEffect(() => {
+    const pulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.15,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulseAnimation.start();
+    return () => pulseAnimation.stop();
+  }, []);
 
   useEffect(() => {
     console.log("Detections:", detections);
@@ -59,27 +79,79 @@ export function CameraDetect() {
 
   if (!permission) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading camera...</Text>
+      <View
+        style={[
+          styles.loadingContainer,
+          { backgroundColor: colors.background },
+        ]}
+      >
+        <LinearGradient
+          colors={[colors.tint + "20", colors.background]}
+          style={styles.loadingGradient}
+        >
+          <View
+            style={[
+              styles.loadingCard,
+              { backgroundColor: colors.cardBackground },
+            ]}
+          >
+            <Ionicons name="camera" size={64} color={colors.tint} />
+            <Text style={[styles.loadingText, { color: colors.text }]}>
+              Loading camera...
+            </Text>
+          </View>
+        </LinearGradient>
       </View>
     );
   }
 
   if (!permission.granted) {
     return (
-      <View style={styles.permissionContainer}>
-        <View style={styles.permissionContent}>
-          <Text style={styles.permissionTitle}>Camera Access Required</Text>
-          <Text style={styles.permissionMessage}>
-            We need access to your camera to take photos and detect objects
-          </Text>
-          <TouchableOpacity
-            style={styles.permissionButton}
-            onPress={requestPermission}
+      <View
+        style={[
+          styles.permissionContainer,
+          { backgroundColor: colors.background },
+        ]}
+      >
+        <LinearGradient
+          colors={[colors.tint + "15", colors.background]}
+          style={styles.permissionGradient}
+        >
+          <View
+            style={[
+              styles.permissionContent,
+              { backgroundColor: colors.cardBackground },
+            ]}
           >
-            <Text style={styles.permissionButtonText}>Grant Permission</Text>
-          </TouchableOpacity>
-        </View>
+            <View
+              style={[
+                styles.permissionIconContainer,
+                { backgroundColor: colors.tint + "20" },
+              ]}
+            >
+              <Ionicons name="camera-outline" size={64} color={colors.tint} />
+            </View>
+            <Text style={[styles.permissionTitle, { color: colors.text }]}>
+              Camera Access Required
+            </Text>
+            <Text
+              style={[styles.permissionMessage, { color: colors.description }]}
+            >
+              We need access to your camera to take photos and detect bullet
+              holes on your targets
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.permissionButton,
+                { backgroundColor: colors.tint },
+              ]}
+              onPress={requestPermission}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.permissionButtonText}>Grant Permission</Text>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
       </View>
     );
   }
@@ -96,7 +168,7 @@ export function CameraDetect() {
         });
 
         setCapturedPhoto(photo.uri);
-        setCurrentPage("preview"); // Go to preview page
+        setCurrentPage("preview");
         console.log("Photo captured:", photo.uri);
       } catch (error) {
         console.error("Error taking picture:", error);
@@ -112,7 +184,7 @@ export function CameraDetect() {
       clearError();
       try {
         await detect(capturedPhoto);
-        setCurrentPage("results"); // Go to results page after detection
+        setCurrentPage("results");
       } catch (err) {
         console.error("Detection failed:", err);
         Alert.alert(
@@ -125,7 +197,7 @@ export function CameraDetect() {
 
   function handleRetryPhoto() {
     setCapturedPhoto(null);
-    setCurrentPage("camera"); // Go back to camera
+    setCurrentPage("camera");
     useDetectionStore.getState().clearDetections();
   }
 
@@ -134,11 +206,10 @@ export function CameraDetect() {
   }
 
   async function pickImageFromLibrary() {
-    if (isOpeningMediaLibrary) return; // Prevent multiple calls
+    if (isOpeningMediaLibrary) return;
 
     setIsOpeningMediaLibrary(true);
     try {
-      // Check permissions first
       const { status } = await ImagePicker.getMediaLibraryPermissionsAsync();
       if (status !== "granted") {
         const { status: newStatus } =
@@ -154,16 +225,16 @@ export function CameraDetect() {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false, // Disable editing for faster performance
-        quality: 0.7, // Reduce quality for faster processing
-        exif: false, // Disable EXIF data to speed up
-        base64: false, // Don't include base64 data
-        allowsMultipleSelection: false, // Single selection only
+        allowsEditing: false,
+        quality: 0.7,
+        exif: false,
+        base64: false,
+        allowsMultipleSelection: false,
       });
 
       if (!result.canceled && result.assets[0]) {
         setCapturedPhoto(result.assets[0].uri);
-        setCurrentPage("preview"); // Go to preview page
+        setCurrentPage("preview");
       }
     } catch (error) {
       console.error("Error picking image:", error);
@@ -176,59 +247,109 @@ export function CameraDetect() {
   // PAGE 2: Preview with Bullet Input
   if (currentPage === "preview" && capturedPhoto) {
     return (
-      <View style={[styles.pageContainer, { backgroundColor: colors.background }]}>
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <View
+        style={[styles.pageContainer, { backgroundColor: colors.background }]}
+      >
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor="transparent"
+          translucent
+        />
 
         {/* Header with back button */}
         <View style={styles.header}>
           <TouchableOpacity
-            style={[styles.backButton, { backgroundColor: colors.cardBackground }]}
+            style={[
+              styles.iconButton,
+              { backgroundColor: colors.cardBackground },
+            ]}
             onPress={handleRetryPhoto}
             activeOpacity={0.7}
           >
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Target Preview</Text>
-          <View style={styles.backButton} />
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            Preview Target
+          </Text>
+          <View style={styles.iconButton} />
         </View>
 
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.previewScrollContent}>
-          {/* Beautiful Image Display */}
-          <View style={[styles.imageCard, { backgroundColor: colors.cardBackground }]}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.previewScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Image Display */}
+          <View
+            style={[
+              styles.imageCard,
+              { backgroundColor: colors.cardBackground },
+            ]}
+          >
             <Image
               source={{ uri: capturedPhoto }}
               style={styles.previewImageLarge}
               resizeMode="cover"
             />
-            <View style={styles.imageOverlay}>
-              <View style={[styles.imageBadge, { backgroundColor: colors.tint }]}>
-                <Ionicons name="camera" size={16} color="white" />
+            <LinearGradient
+              colors={["transparent", "rgba(0,0,0,0.6)"]}
+              style={styles.imageGradient}
+            >
+              <View
+                style={[styles.imageBadge, { backgroundColor: colors.tint }]}
+              >
+                <Ionicons name="checkmark-circle" size={20} color="white" />
                 <Text style={styles.imageBadgeText}>Target Captured</Text>
               </View>
-            </View>
+            </LinearGradient>
           </View>
 
-          {/* Beautiful Bullet Selector */}
-          <View style={[styles.selectorCard, { backgroundColor: colors.cardBackground }]}>
+          {/* Bullet Selector */}
+          <View
+            style={[
+              styles.selectorCard,
+              { backgroundColor: colors.cardBackground },
+            ]}
+          >
             <View style={styles.selectorHeader}>
-              <Ionicons name="radio-button-on" size={28} color={colors.tint} />
-              <Text style={[styles.selectorTitle, { color: colors.text }]}>
-                Bullets Fired
-              </Text>
+              <View
+                style={[
+                  styles.iconCircle,
+                  { backgroundColor: colors.tint + "20" },
+                ]}
+              >
+                <Ionicons
+                  name="radio-button-on"
+                  size={28}
+                  color={colors.tint}
+                />
+              </View>
+              <View style={styles.selectorHeaderText}>
+                <Text style={[styles.selectorTitle, { color: colors.text }]}>
+                  Bullets Fired
+                </Text>
+                <Text
+                  style={[
+                    styles.selectorSubtitle,
+                    { color: colors.description },
+                  ]}
+                >
+                  How many rounds did you fire?
+                </Text>
+              </View>
             </View>
 
-            <Text style={[styles.selectorSubtitle, { color: colors.description }]}>
-              How many rounds did you fire at this target?
-            </Text>
-
-            {/* Gorgeous Bullet Counter */}
+            {/* Bullet Counter */}
             <View style={styles.counterSection}>
               <TouchableOpacity
                 style={[
                   styles.counterButton,
                   {
-                    backgroundColor: bulletCount <= 1 ? colors.cardBackground : colors.tint,
-                    borderColor: colors.border,
+                    backgroundColor:
+                      bulletCount <= 1
+                        ? colors.cardBackground
+                        : colors.tint + "20",
+                    borderColor: bulletCount <= 1 ? colors.border : colors.tint,
                   },
                 ]}
                 onPress={() => {
@@ -239,17 +360,23 @@ export function CameraDetect() {
               >
                 <Ionicons
                   name="remove"
-                  size={28}
-                  color={bulletCount <= 1 ? colors.description : "white"}
+                  size={24}
+                  color={bulletCount <= 1 ? colors.description : colors.tint}
                 />
               </TouchableOpacity>
 
-              {/* Animated Count Display */}
-              <View style={[styles.countDisplay, { backgroundColor: colors.cardBackground }]}>
+              <View
+                style={[
+                  styles.countDisplay,
+                  { backgroundColor: colors.tint + "10" },
+                ]}
+              >
                 <Text style={[styles.countNumber, { color: colors.tint }]}>
                   {bulletCount}
                 </Text>
-                <Text style={[styles.countLabel, { color: colors.description }]}>
+                <Text
+                  style={[styles.countLabel, { color: colors.description }]}
+                >
                   {bulletCount === 1 ? "bullet" : "bullets"}
                 </Text>
               </View>
@@ -258,8 +385,12 @@ export function CameraDetect() {
                 style={[
                   styles.counterButton,
                   {
-                    backgroundColor: bulletCount >= 10 ? colors.cardBackground : colors.tint,
-                    borderColor: colors.border,
+                    backgroundColor:
+                      bulletCount >= 10
+                        ? colors.cardBackground
+                        : colors.tint + "20",
+                    borderColor:
+                      bulletCount >= 10 ? colors.border : colors.tint,
                   },
                 ]}
                 onPress={() => {
@@ -270,16 +401,18 @@ export function CameraDetect() {
               >
                 <Ionicons
                   name="add"
-                  size={28}
-                  color={bulletCount >= 10 ? colors.description : "white"}
+                  size={24}
+                  color={bulletCount >= 10 ? colors.description : colors.tint}
                 />
               </TouchableOpacity>
             </View>
 
             {/* Quick Presets */}
             <View style={styles.presetsSection}>
-              <Text style={[styles.presetsLabel, { color: colors.description }]}>
-                Quick Select:
+              <Text
+                style={[styles.presetsLabel, { color: colors.description }]}
+              >
+                Quick Select
               </Text>
               <View style={styles.presetsRow}>
                 {[3, 5, 10].map((count) => (
@@ -288,8 +421,12 @@ export function CameraDetect() {
                     style={[
                       styles.presetChip,
                       {
-                        backgroundColor: bulletCount === count ? colors.tint : colors.cardBackground,
-                        borderColor: bulletCount === count ? colors.tint : colors.border,
+                        backgroundColor:
+                          bulletCount === count
+                            ? colors.tint
+                            : colors.background,
+                        borderColor:
+                          bulletCount === count ? colors.tint : colors.border,
                       },
                     ]}
                     onPress={() => setBulletCount(count)}
@@ -298,7 +435,9 @@ export function CameraDetect() {
                     <Text
                       style={[
                         styles.presetChipText,
-                        { color: bulletCount === count ? "white" : colors.text },
+                        {
+                          color: bulletCount === count ? "white" : colors.text,
+                        },
                       ]}
                     >
                       {count}
@@ -310,11 +449,24 @@ export function CameraDetect() {
           </View>
 
           {/* Info Card */}
-          <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
-            <Ionicons name="information-circle" size={24} color={colors.tint} />
+          <View
+            style={[styles.infoCard, { backgroundColor: colors.tint + "10" }]}
+          >
+            <View
+              style={[
+                styles.infoIconContainer,
+                { backgroundColor: colors.tint + "20" },
+              ]}
+            >
+              <Ionicons
+                name="information-circle"
+                size={28}
+                color={colors.tint}
+              />
+            </View>
             <Text style={[styles.infoText, { color: colors.description }]}>
-              Our AI will analyze your target and detect bullet holes with precision.
-              Accurate bullet count helps improve detection accuracy.
+              Our AI will analyze your target and detect bullet holes with
+              precision. Accurate bullet count helps improve detection accuracy.
             </Text>
           </View>
 
@@ -325,16 +477,22 @@ export function CameraDetect() {
             disabled={isDetecting}
             activeOpacity={0.8}
           >
-            {isDetecting ? (
-              <>
-                <Text style={styles.analyzeButtonText}>Analyzing...</Text>
-              </>
-            ) : (
-              <>
-                <Ionicons name="analytics" size={24} color="white" />
-                <Text style={styles.analyzeButtonText}>Analyze Target</Text>
-              </>
-            )}
+            <LinearGradient
+              colors={[colors.tint, colors.tint + "DD"]}
+              style={styles.analyzeButtonGradient}
+            >
+              {isDetecting ? (
+                <>
+                  <Ionicons name="hourglass-outline" size={24} color="white" />
+                  <Text style={styles.analyzeButtonText}>Analyzing...</Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons name="scan" size={24} color="white" />
+                  <Text style={styles.analyzeButtonText}>Analyze Target</Text>
+                </>
+              )}
+            </LinearGradient>
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -344,40 +502,68 @@ export function CameraDetect() {
   // PAGE 3: Results
   if (currentPage === "results" && capturedPhoto) {
     return (
-      <View style={[styles.pageContainer, { backgroundColor: colors.background }]}>
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <View
+        style={[styles.pageContainer, { backgroundColor: colors.background }]}
+      >
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor="transparent"
+          translucent
+        />
 
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
-            style={[styles.backButton, { backgroundColor: colors.cardBackground }]}
+            style={[
+              styles.iconButton,
+              { backgroundColor: colors.cardBackground },
+            ]}
             onPress={handleBackToPreview}
             activeOpacity={0.7}
           >
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Analysis Results</Text>
-          <View style={styles.backButton} />
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            Results
+          </Text>
+          <View style={styles.iconButton} />
         </View>
 
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.resultsScrollContent}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.resultsScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Results Header */}
-          <View style={[styles.resultsHeader, { backgroundColor: colors.tint }]}>
-            <Ionicons name="checkmark-circle" size={64} color="white" />
+          <LinearGradient
+            colors={[colors.tint, colors.tint + "DD"]}
+            style={styles.resultsHeader}
+          >
+            <View style={styles.successIconContainer}>
+              <Ionicons name="checkmark-circle" size={64} color="white" />
+            </View>
             <Text style={styles.resultsHeaderTitle}>Analysis Complete!</Text>
             <Text style={styles.resultsHeaderSubtitle}>
-              Found {detections.length} bullet hole{detections.length !== 1 ? "s" : ""}
+              Found {detections.length} bullet hole
+              {detections.length !== 1 ? "s" : ""}
             </Text>
-          </View>
+          </LinearGradient>
 
           {/* Annotated Image */}
-          <View style={[styles.resultsImageCard, { backgroundColor: colors.cardBackground }]}>
+          <View
+            style={[
+              styles.resultsImageCard,
+              { backgroundColor: colors.cardBackground },
+            ]}
+          >
             <Text style={[styles.resultsImageTitle, { color: colors.text }]}>
-              Annotated Target
+              Detected Target
             </Text>
             {annotatedImageBase64 ? (
               <Image
-                source={{ uri: `data:image/jpeg;base64,${annotatedImageBase64}` }}
+                source={{
+                  uri: `data:image/jpeg;base64,${annotatedImageBase64}`,
+                }}
                 style={styles.resultsImage}
                 resizeMode="contain"
               />
@@ -392,29 +578,89 @@ export function CameraDetect() {
 
           {/* Stats Cards */}
           <View style={styles.statsGrid}>
-            <View style={[styles.statCard, { backgroundColor: colors.cardBackground }]}>
-              <Ionicons name="flash" size={32} color={colors.tint} />
-              <Text style={[styles.statValue, { color: colors.text }]}>{bulletCount}</Text>
-              <Text style={[styles.statLabel, { color: colors.description }]}>Bullets Fired</Text>
+            <View
+              style={[
+                styles.statCard,
+                { backgroundColor: colors.cardBackground },
+              ]}
+            >
+              <View
+                style={[
+                  styles.statIconContainer,
+                  { backgroundColor: colors.tint + "20" },
+                ]}
+              >
+                <Ionicons name="flash" size={32} color={colors.tint} />
+              </View>
+              <Text style={[styles.statValue, { color: colors.text }]}>
+                {bulletCount}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.description }]}>
+                Bullets Fired
+              </Text>
             </View>
 
-            <View style={[styles.statCard, { backgroundColor: colors.cardBackground }]}>
-              <Ionicons name="radio-button-on" size={32} color={colors.tint} />
-              <Text style={[styles.statValue, { color: colors.text }]}>{detections.length}</Text>
-              <Text style={[styles.statLabel, { color: colors.description }]}>Hits Detected</Text>
+            <View
+              style={[
+                styles.statCard,
+                { backgroundColor: colors.cardBackground },
+              ]}
+            >
+              <View
+                style={[
+                  styles.statIconContainer,
+                  { backgroundColor: colors.tint + "20" },
+                ]}
+              >
+                <Ionicons
+                  name="radio-button-on"
+                  size={32}
+                  color={colors.tint}
+                />
+              </View>
+              <Text style={[styles.statValue, { color: colors.text }]}>
+                {detections.length}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.description }]}>
+                Hits Detected
+              </Text>
             </View>
           </View>
 
           {/* Accuracy Card */}
-          <View style={[styles.accuracyCard, { backgroundColor: colors.cardBackground }]}>
+          <View
+            style={[
+              styles.accuracyCard,
+              { backgroundColor: colors.cardBackground },
+            ]}
+          >
             <View style={styles.accuracyHeader}>
-              <Ionicons name="analytics" size={24} color={colors.tint} />
-              <Text style={[styles.accuracyTitle, { color: colors.text }]}>Accuracy</Text>
+              <View
+                style={[
+                  styles.iconCircle,
+                  { backgroundColor: colors.tint + "20" },
+                ]}
+              >
+                <Ionicons name="trophy" size={24} color={colors.tint} />
+              </View>
+              <Text style={[styles.accuracyTitle, { color: colors.text }]}>
+                Accuracy
+              </Text>
             </View>
-            <Text style={[styles.accuracyPercentage, { color: colors.tint }]}>
-              {bulletCount > 0 ? Math.round((detections.length / bulletCount) * 100) : 0}%
-            </Text>
-            <Text style={[styles.accuracyDescription, { color: colors.description }]}>
+            <View style={styles.accuracyPercentageContainer}>
+              <Text style={[styles.accuracyPercentage, { color: colors.tint }]}>
+                {bulletCount > 0
+                  ? Math.round((detections.length / bulletCount) * 100)
+                  : 0}
+                %
+              </Text>
+            </View>
+            <Text
+              style={[
+                styles.accuracyDescription,
+                { color: colors.description },
+              ]}
+            >
               {detections.length === bulletCount
                 ? "Perfect! All shots detected."
                 : detections.length > bulletCount
@@ -426,12 +672,22 @@ export function CameraDetect() {
           {/* Action Buttons */}
           <View style={styles.resultsActions}>
             <TouchableOpacity
-              style={[styles.secondaryButton, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}
+              style={[
+                styles.secondaryButton,
+                {
+                  backgroundColor: colors.cardBackground,
+                  borderColor: colors.border,
+                },
+              ]}
               onPress={handleBackToPreview}
               activeOpacity={0.8}
             >
-              <Ionicons name="create" size={20} color={colors.text} />
-              <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Edit Count</Text>
+              <Ionicons name="create-outline" size={20} color={colors.text} />
+              <Text
+                style={[styles.secondaryButtonText, { color: colors.text }]}
+              >
+                Edit Count
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -439,8 +695,13 @@ export function CameraDetect() {
               onPress={handleRetryPhoto}
               activeOpacity={0.8}
             >
-              <Ionicons name="camera" size={20} color="white" />
-              <Text style={styles.primaryButtonText}>New Scan</Text>
+              <LinearGradient
+                colors={[colors.tint, colors.tint + "DD"]}
+                style={styles.primaryButtonGradient}
+              >
+                <Ionicons name="camera" size={20} color="white" />
+                <Text style={styles.primaryButtonText}>New Scan</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -464,6 +725,11 @@ export function CameraDetect() {
         mode="picture"
       />
 
+      {/* Overlay with guide lines */}
+      <View style={styles.cameraOverlay}>
+        <View style={styles.frameGuide} />
+      </View>
+
       {/* Capture Controls */}
       <View style={styles.captureContainer}>
         {/* Media Library Button */}
@@ -482,8 +748,8 @@ export function CameraDetect() {
           <LinearGradient
             colors={
               isCapturing || isOpeningMediaLibrary
-                ? ["rgba(0, 0, 0, 0.3)", "rgba(0, 0, 0, 0.1)"]
-                : ["rgba(0, 0, 0, 0.6)", "rgba(0, 0, 0, 0.3)"]
+                ? ["rgba(255, 255, 255, 0.15)", "rgba(255, 255, 255, 0.05)"]
+                : ["rgba(255, 255, 255, 0.25)", "rgba(255, 255, 255, 0.15)"]
             }
             style={styles.mediaLibraryButtonGradient}
           >
@@ -498,21 +764,47 @@ export function CameraDetect() {
         </TouchableOpacity>
 
         {/* Capture Button */}
-        <TouchableOpacity
+        <Animated.View
           style={[
-            styles.captureButton,
-            isCapturing && styles.captureButtonActive,
+            styles.captureButtonContainer,
+            { transform: [{ scale: pulseAnim }] },
           ]}
-          onPress={takePicture}
-          disabled={isCapturing}
         >
-          <View style={styles.captureButtonInner}>
-            <View style={styles.captureButtonCore} />
-          </View>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.captureButton,
+              isCapturing && styles.captureButtonActive,
+            ]}
+            onPress={takePicture}
+            disabled={isCapturing}
+            activeOpacity={0.9}
+          >
+            <LinearGradient
+              colors={
+                isCapturing
+                  ? ["rgba(255, 255, 255, 0.3)", "rgba(255, 255, 255, 0.2)"]
+                  : ["rgba(255, 255, 255, 0.4)", "rgba(255, 255, 255, 0.3)"]
+              }
+              style={styles.captureButtonGradient}
+            >
+              <View style={styles.captureButtonInner}>
+                <View style={styles.captureButtonCore} />
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
 
-        {/* Placeholder for symmetry */}
-        <View style={styles.placeholderButton} />
+        {/* Instructions Button */}
+        <TouchableOpacity style={styles.placeholderButton}>
+          <View style={styles.instructionDot} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Instructions Banner */}
+      <View style={styles.instructionBanner}>
+        <Text style={styles.instructionText}>
+          Tap the camera to capture your target
+        </Text>
       </View>
     </View>
   );
@@ -529,6 +821,23 @@ const styles = StyleSheet.create({
     width: width,
     height: height,
   },
+  cameraOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  frameGuide: {
+    width: width * 0.8,
+    height: height * 0.5,
+    borderWidth: 2,
+    borderColor: "rgba(255, 255, 255, 0.5)",
+    borderStyle: "dashed",
+    borderRadius: 20,
+  },
 
   // Common
   pageContainer: {
@@ -539,10 +848,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 16,
+    paddingTop: 50,
+    paddingBottom: 12,
   },
-  backButton: {
+  iconButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -550,73 +859,173 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerTitle: {
+    flex: 1,
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: "600",
+    textAlign: "center",
   },
   scrollView: {
     flex: 1,
   },
+  loadingContainer: {
+    flex: 1,
+  },
+  loadingGradient: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 40,
+  },
+  loadingCard: {
+    width: "100%",
+    padding: 48,
+    borderRadius: 32,
+    alignItems: "center",
+    gap: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  loadingText: {
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  permissionContainer: {
+    flex: 1,
+  },
+  permissionGradient: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 32,
+  },
+  permissionContent: {
+    width: "100%",
+    padding: 40,
+    borderRadius: 32,
+    alignItems: "center",
+    gap: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  permissionIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  permissionTitle: {
+    fontSize: 28,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  permissionMessage: {
+    fontSize: 16,
+    textAlign: "center",
+    lineHeight: 24,
+  },
+  permissionButton: {
+    paddingHorizontal: 40,
+    paddingVertical: 18,
+    borderRadius: 28,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  permissionButtonText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "700",
+  },
 
   // PAGE 2: Preview & Bullet Input
   previewScrollContent: {
-    padding: 20,
+    padding: 16,
     paddingBottom: 40,
   },
   imageCard: {
-    borderRadius: 24,
+    borderRadius: 20,
     overflow: "hidden",
-    marginBottom: 24,
-    elevation: 8,
+    marginBottom: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.15,
     shadowRadius: 8,
+    elevation: 6,
   },
   previewImageLarge: {
     width: "100%",
     height: 300,
   },
-  imageOverlay: {
+  imageGradient: {
     position: "absolute",
-    top: 16,
-    right: 16,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: "50%",
+    justifyContent: "flex-end",
+    padding: 20,
   },
   imageBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+    alignSelf: "flex-start",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   imageBadgeText: {
     color: "white",
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: 16,
+    fontWeight: "700",
   },
   selectorCard: {
-    borderRadius: 24,
-    padding: 24,
-    marginBottom: 20,
-    elevation: 4,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 4,
   },
   selectorHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    marginBottom: 12,
+    marginBottom: 16,
+  },
+  iconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  selectorHeaderText: {
+    flex: 1,
   },
   selectorTitle: {
-    fontSize: 24,
-    fontWeight: "800",
+    fontSize: 20,
+    fontWeight: "600",
+    marginBottom: 2,
   },
   selectorSubtitle: {
     fontSize: 15,
-    marginBottom: 28,
     lineHeight: 22,
   },
   counterSection: {
@@ -624,19 +1033,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 20,
-    marginBottom: 28,
+    marginBottom: 20,
   },
   counterButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: "center",
     justifyContent: "center",
-    elevation: 6,
+    borderWidth: 2,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   countDisplay: {
     paddingHorizontal: 40,
@@ -644,28 +1054,29 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     minWidth: 140,
+    borderWidth: 2,
+    borderStyle: "dashed",
   },
   countNumber: {
     fontSize: 56,
-    fontWeight: "900",
+    fontWeight: "700",
     lineHeight: 64,
   },
   countLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginTop: 4,
+    fontSize: 14,
+    fontWeight: "700",
     textTransform: "uppercase",
-    letterSpacing: 1,
+    letterSpacing: 1.5,
   },
   presetsSection: {
     marginTop: 8,
   },
   presetsLabel: {
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: 13,
+    fontWeight: "700",
     marginBottom: 12,
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
   presetsRow: {
     flexDirection: "row",
@@ -673,44 +1084,54 @@ const styles = StyleSheet.create({
   },
   presetChip: {
     flex: 1,
-    paddingVertical: 16,
-    borderRadius: 16,
+    paddingVertical: 18,
+    borderRadius: 20,
     alignItems: "center",
     borderWidth: 2,
-    elevation: 2,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 4,
+    elevation: 2,
   },
   presetChipText: {
-    fontSize: 18,
-    fontWeight: "700",
+    fontSize: 20,
+    fontWeight: "800",
   },
   infoCard: {
     flexDirection: "row",
-    gap: 16,
-    padding: 20,
+    gap: 12,
+    padding: 16,
     borderRadius: 16,
-    marginBottom: 20,
+    marginBottom: 16,
+  },
+  infoIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
   },
   infoText: {
     flex: 1,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 22,
   },
   analyzeButton: {
+    borderRadius: 16,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  analyzeButtonGradient: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 12,
-    paddingVertical: 20,
-    borderRadius: 20,
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    gap: 10,
+    paddingVertical: 18,
   },
   analyzeButtonText: {
     color: "white",
@@ -723,80 +1144,96 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   resultsHeader: {
-    padding: 40,
+    padding: 32,
     alignItems: "center",
     gap: 16,
   },
+  successIconContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
   resultsHeaderTitle: {
     color: "white",
-    fontSize: 28,
-    fontWeight: "900",
+    fontSize: 24,
+    fontWeight: "700",
   },
   resultsHeaderSubtitle: {
     color: "white",
     fontSize: 18,
     fontWeight: "600",
-    opacity: 0.9,
+    opacity: 0.95,
   },
   resultsImageCard: {
-    margin: 20,
-    padding: 20,
-    borderRadius: 24,
-    elevation: 6,
+    margin: 16,
+    padding: 16,
+    borderRadius: 20,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
     shadowRadius: 6,
+    elevation: 4,
   },
   resultsImageTitle: {
     fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 16,
+    fontWeight: "600",
+    marginBottom: 12,
   },
   resultsImage: {
     width: "100%",
-    height: 350,
+    height: 300,
     borderRadius: 16,
   },
   statsGrid: {
     flexDirection: "row",
-    gap: 16,
-    paddingHorizontal: 20,
-    marginBottom: 20,
+    gap: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
   },
   statCard: {
     flex: 1,
-    padding: 24,
-    borderRadius: 20,
+    padding: 20,
+    borderRadius: 16,
     alignItems: "center",
-    gap: 12,
-    elevation: 4,
+    gap: 8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  statIconContainer: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
   },
   statValue: {
-    fontSize: 36,
-    fontWeight: "900",
+    fontSize: 32,
+    fontWeight: "700",
   },
   statLabel: {
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: 13,
+    fontWeight: "700",
     textAlign: "center",
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   accuracyCard: {
-    marginHorizontal: 20,
-    padding: 28,
-    borderRadius: 24,
-    marginBottom: 24,
-    elevation: 6,
+    marginHorizontal: 16,
+    padding: 20,
+    borderRadius: 20,
+    marginBottom: 16,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
     shadowRadius: 6,
+    elevation: 4,
   },
   accuracyHeader: {
     flexDirection: "row",
@@ -805,22 +1242,27 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   accuracyTitle: {
-    fontSize: 20,
-    fontWeight: "800",
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  accuracyPercentageContainer: {
+    width: "100%",
+    alignItems: "center",
+    marginBottom: 16,
   },
   accuracyPercentage: {
-    fontSize: 64,
-    fontWeight: "900",
-    marginBottom: 12,
+    fontSize: 56,
+    fontWeight: "700",
   },
   accuracyDescription: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 24,
+    textAlign: "center",
   },
   resultsActions: {
     flexDirection: "row",
     gap: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
   secondaryButton: {
     flex: 1,
@@ -828,9 +1270,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    paddingVertical: 18,
-    borderRadius: 16,
+    paddingVertical: 20,
+    borderRadius: 20,
     borderWidth: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   secondaryButtonText: {
     fontSize: 16,
@@ -838,71 +1285,25 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     flex: 1,
+    borderRadius: 20,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  primaryButtonGradient: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    paddingVertical: 18,
-    borderRadius: 16,
-    elevation: 6,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
+    paddingVertical: 20,
   },
   primaryButtonText: {
     color: "white",
     fontSize: 16,
     fontWeight: "700",
-  },
-
-  // Loading and Permission States
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: "black",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  permissionContainer: {
-    flex: 1,
-    backgroundColor: "black",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 40,
-  },
-  permissionContent: {
-    alignItems: "center",
-  },
-  permissionTitle: {
-    color: "white",
-    fontSize: 24,
-    fontWeight: "bold",
-    marginTop: 20,
-    marginBottom: 10,
-    textAlign: "center",
-  },
-  permissionMessage: {
-    color: "#ccc",
-    fontSize: 16,
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: 30,
-  },
-  permissionButton: {
-    backgroundColor: "#007AFF",
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 25,
-  },
-  permissionButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "600",
   },
 
   // Capture Container
@@ -919,65 +1320,67 @@ const styles = StyleSheet.create({
   },
 
   // Capture Button
+  captureButtonContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
   captureButton: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 4,
-    borderColor: "white",
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
+    shadowRadius: 8,
+    elevation: 12,
+  },
+  captureButtonGradient: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 50,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 5,
+    borderColor: "rgba(255, 255, 255, 0.3)",
   },
   captureButtonActive: {
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
     transform: [{ scale: 0.95 }],
-    borderColor: "rgba(255, 255, 255, 0.7)",
   },
   captureButtonInner: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 75,
+    height: 75,
+    borderRadius: 37.5,
     backgroundColor: "white",
     justifyContent: "center",
     alignItems: "center",
   },
   captureButtonCore: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 65,
+    height: 65,
+    borderRadius: 32.5,
     backgroundColor: "white",
   },
 
   // Media Library Button
   mediaLibraryButton: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     borderWidth: 3,
-    borderColor: "rgba(255, 255, 255, 0.8)",
+    borderColor: "rgba(255, 255, 255, 0.9)",
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
     overflow: "hidden",
   },
   mediaLibraryButtonGradient: {
     width: "100%",
     height: "100%",
-    borderRadius: 32,
+    borderRadius: 33,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -989,9 +1392,33 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.95 }],
   },
 
-  // Placeholder Button (for symmetry)
+  // Placeholder and instructions
   placeholderButton: {
-    width: 70,
-    height: 70,
+    width: 72,
+    height: 72,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  instructionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.6)",
+  },
+  instructionBanner: {
+    position: "absolute",
+    top: 100,
+    left: 20,
+    right: 20,
+    padding: 16,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderRadius: 16,
+    alignItems: "center",
+    zIndex: 5,
+  },
+  instructionText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
