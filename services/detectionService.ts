@@ -1,24 +1,14 @@
+import { AnalyzeResponse, isAnalyzeResponse } from "@/types/api";
+
 const API_URL = process.env.EXPO_PUBLIC_DETECT_BASE_URL || ""; // your FastAPI endpoint
 
 if (!API_URL) {
   throw new Error("EXPO_PUBLIC_DETECT_BASE_URL is not defined");
 }
 
-export interface DetectionResult {
-  class?: string; // Made optional since API might not provide class names
-  confidence: number;
-  bbox?: [number, number, number, number];
-}
-
-export interface DetectionServiceResponse {
-  detections: DetectionResult[];
-  processingTime?: number;
-  imageMetadata?: any;
-}
-
 export async function uploadForDetection(
   imageUri: string
-): Promise<DetectionServiceResponse> {
+): Promise<AnalyzeResponse> {
   console.log("🚀 Detection service: Starting upload to", API_URL);
   console.log("📁 Detection service: Image URI:", imageUri);
 
@@ -52,15 +42,18 @@ export async function uploadForDetection(
     }
 
     const result = await response.json();
-    // Ensure we return the expected structure
-    const formattedResponse = {
-      detections: result.detections || result || [],
-      processingTime: result.processingTime,
-      imageMetadata: result.imageMetadata,
-    };
 
-    console.log("📋 Detection service: Formatted response:", formattedResponse);
-    return formattedResponse;
+    // Validate response structure
+    if (!isAnalyzeResponse(result)) {
+      console.error(
+        "❌ Detection service: Invalid response structure:",
+        result
+      );
+      throw new Error("Invalid response structure from API");
+    }
+
+    console.log("📋 Detection service: Valid AnalyzeResponse received");
+    return result;
   } catch (err) {
     console.error("❌ Detection service: Error uploading for detection:", err);
     throw err;
