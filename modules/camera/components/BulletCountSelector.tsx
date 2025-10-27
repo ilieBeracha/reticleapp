@@ -8,7 +8,11 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 interface BulletCountSelectorProps {
   bulletCount: number;
   onBulletCountChange: (count: number) => void;
-  onConfirm: (data: { bulletCount: number; shooterCount: number; targetSize: string }) => void;
+  onConfirm: (data: {
+    bulletCount: number;
+    shooterCount: number;
+    targetSize: string;
+  }) => void;
   visible: boolean;
   initialShooterCount?: number;
   initialTargetSize?: "full" | "1/2" | "1/3" | "1/4";
@@ -24,7 +28,9 @@ export function BulletCountSelector({
 }: BulletCountSelectorProps) {
   const colors = useColors();
   const [shooterCount, setShooterCount] = useState(initialShooterCount);
-  const [targetSize, setTargetSize] = useState<"full" | "1/2" | "1/3" | "1/4">(initialTargetSize);
+  const [targetSize, setTargetSize] = useState<"full" | "1/2" | "1/3" | "1/4">(
+    initialTargetSize
+  );
 
   const adjustBulletCount = (delta: number) => {
     const newCount = Math.min(25, Math.max(1, bulletCount + delta));
@@ -44,7 +50,12 @@ export function BulletCountSelector({
     onBulletCountChange(count);
   };
 
-  const targetSizeOptions: Array<"full" | "1/2" | "1/3" | "1/4"> = ["full", "1/2", "1/3", "1/4"];
+  const targetSizeOptions: Array<"full" | "1/2" | "1/3" | "1/4"> = [
+    "full",
+    "1/2",
+    "1/3",
+    "1/4",
+  ];
 
   return (
     <BaseBottomSheet visible={visible} onClose={() => {}} snapPoints={["70%"]}>
@@ -63,7 +74,8 @@ export function BulletCountSelector({
               style={[
                 styles.adjustButton,
                 {
-                  backgroundColor: bulletCount <= 1 ? colors.border : colors.tint,
+                  backgroundColor:
+                    bulletCount <= 1 ? colors.border : colors.tint,
                   borderColor: colors.border,
                 },
               ]}
@@ -90,7 +102,8 @@ export function BulletCountSelector({
               style={[
                 styles.adjustButton,
                 {
-                  backgroundColor: bulletCount >= 25 ? colors.border : colors.tint,
+                  backgroundColor:
+                    bulletCount >= 25 ? colors.border : colors.tint,
                   borderColor: colors.border,
                 },
               ]}
@@ -112,8 +125,12 @@ export function BulletCountSelector({
                 style={[
                   styles.presetChip,
                   {
-                    backgroundColor: bulletCount === count ? colors.tint : colors.cardBackground,
-                    borderColor: bulletCount === count ? colors.tint : colors.border,
+                    backgroundColor:
+                      bulletCount === count
+                        ? colors.tint
+                        : colors.cardBackground,
+                    borderColor:
+                      bulletCount === count ? colors.tint : colors.border,
                   },
                 ]}
                 onPress={() => handlePreset(count)}
@@ -144,7 +161,8 @@ export function BulletCountSelector({
               style={[
                 styles.adjustButton,
                 {
-                  backgroundColor: shooterCount <= 1 ? colors.border : colors.tint,
+                  backgroundColor:
+                    shooterCount <= 1 ? colors.border : colors.tint,
                   borderColor: colors.border,
                 },
               ]}
@@ -171,7 +189,8 @@ export function BulletCountSelector({
               style={[
                 styles.adjustButton,
                 {
-                  backgroundColor: shooterCount >= 10 ? colors.border : colors.tint,
+                  backgroundColor:
+                    shooterCount >= 10 ? colors.border : colors.tint,
                   borderColor: colors.border,
                 },
               ]}
@@ -187,48 +206,16 @@ export function BulletCountSelector({
           </View>
         </View>
 
-        {/* Target Size Question */}
-        <View style={styles.section}>
-          <View style={styles.questionHeader}>
-            <Ionicons name="resize" size={20} color={colors.tint} />
-            <Text style={[styles.question, { color: colors.text }]}>
-              Target size?
-            </Text>
-          </View>
-          <View style={styles.targetSizeContainer}>
-            {targetSizeOptions.map((size) => (
-              <TouchableOpacity
-                key={size}
-                style={[
-                  styles.sizeChip,
-                  {
-                    backgroundColor: targetSize === size ? colors.tint : colors.cardBackground,
-                    borderColor: targetSize === size ? colors.tint : colors.border,
-                  },
-                ]}
-                onPress={() => setTargetSize(size)}
-              >
-                <Text
-                  style={[
-                    styles.sizeText,
-                    { color: targetSize === size ? "white" : colors.text },
-                  ]}
-                >
-                  {size} page
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
         {/* Continue Button */}
         <TouchableOpacity
           style={[styles.continueButton, { backgroundColor: colors.tint }]}
-          onPress={() => onConfirm({
-            bulletCount,
-            shooterCount,
-            targetSize,
-          })}
+          onPress={() =>
+            onConfirm({
+              bulletCount,
+              shooterCount,
+              targetSize,
+            })
+          }
         >
           <Text style={styles.continueButtonText}>Start Analysis</Text>
         </TouchableOpacity>

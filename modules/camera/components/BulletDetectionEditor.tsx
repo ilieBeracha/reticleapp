@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const styles = StyleSheet.create({
   loadingContainer: {
@@ -264,10 +265,17 @@ export function BulletDetectionEditor({
       animationType="slide"
       presentationStyle="pageSheet"
     >
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: colors.background }]}
+      >
         {/* Simple Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.closeButton}
+            accessibilityRole="button"
+            accessibilityLabel="Close editor"
+          >
             <Ionicons name="close" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
@@ -290,6 +298,8 @@ export function BulletDetectionEditor({
               onPress={handleImagePress}
               style={styles.imageTouchable}
               activeOpacity={isAddingMode ? 0.7 : 1}
+              accessibilityRole="imagebutton"
+              accessibilityLabel="Target image, tap to add bullet"
             >
               <Image
                 source={{
@@ -342,6 +352,10 @@ export function BulletDetectionEditor({
               },
             ]}
             onPress={() => setIsAddingMode(!isAddingMode)}
+            accessibilityRole="button"
+            accessibilityLabel={
+              isAddingMode ? "Cancel add bullet" : "Add bullet"
+            }
           >
             <Ionicons
               name="add-circle"
@@ -367,6 +381,8 @@ export function BulletDetectionEditor({
               },
             ]}
             onPress={clearAllDetections}
+            accessibilityRole="button"
+            accessibilityLabel="Clear all bullets"
           >
             <Ionicons name="trash" size={20} color={colors.text} />
             <Text style={[styles.actionButtonText, { color: colors.text }]}>
@@ -396,7 +412,7 @@ export function BulletDetectionEditor({
             detected
           </Text>
         </View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }

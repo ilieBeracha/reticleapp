@@ -33,6 +33,8 @@ export default function Header({
   const handleMenuAction = (action: string) => {
     if (action === "settings") {
       router.push("/(home)/settings");
+    } else if (action === "loadout") {
+      router.push("/(home)/loadout");
     }
   };
 
@@ -61,6 +63,11 @@ export default function Header({
         onClose={() => setProfileOpen(false)}
         visible={profileOpen}
         menuItems={[
+          {
+            icon: "telescope-outline",
+            label: "loadout",
+            action: "loadout",
+          },
           {
             icon: "settings-outline",
             label: "settings",

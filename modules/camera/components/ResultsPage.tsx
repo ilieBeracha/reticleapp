@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { BulletDetectionEditor } from "./BulletDetectionEditor";
 import {
   makeResultsStyles,
@@ -43,7 +44,7 @@ export function ResultsPage({
   const accuracy = bulletCount > 0 ? Math.round((hits / bulletCount) * 100) : 0;
 
   return (
-    <View style={[styles.page, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.page, { backgroundColor: colors.background }]}>
       <Header
         title="Analysis Results"
         colors={colors}
@@ -52,87 +53,137 @@ export function ResultsPage({
       />
 
       <ScrollView
-        contentContainerStyle={styles.pagePad}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Main Image - Takes up most of the screen */}
-        <View style={styles.imageContainer}>
+        {/* Hero image */}
+        <View
+          style={styles.hero}
+          accessibilityRole="image"
+          accessibilityLabel="Analysis image hero"
+        >
+          <Image
+            source={
+              annotatedImageBase64
+                ? { uri: `data:image/jpeg;base64,${annotatedImageBase64}` }
+                : { uri: photoUri }
+            }
+            style={styles.heroImage}
+            resizeMode="cover"
+          />
+        </View>
+
+        {/* Content Padding */}
+        <View style={styles.pagePad}>
+          {/* Stats Section */}
           <View
             style={[
-              styles.imageCard,
+              styles.statsSection,
               { backgroundColor: colors.cardBackground },
             ]}
           >
-            {annotatedImageBase64 ? (
-              <Image
-                source={{
-                  uri: `data:image/jpeg;base64,${annotatedImageBase64}`,
-                }}
-                style={styles.mainImage}
-                resizeMode="contain"
-              />
-            ) : (
-              <Image
-                source={{ uri: photoUri }}
-                style={styles.mainImage}
-                resizeMode="contain"
-              />
-            )}
-
-            {/* Image overlay with basic stats */}
-            <View style={styles.imageOverlay}>
-              <View style={styles.overlayStats}>
-                <Text style={[styles.overlayStatValue, { color: colors.tint }]}>
-                  {hits}
+            <View style={styles.statsHeader}>
+              <View
+                style={[
+                  styles.sectionIconWrapper,
+                  { backgroundColor: colors.tint + "15" },
+                ]}
+              >
+                <Ionicons name="stats-chart" size={24} color={colors.tint} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text
+                  style={[styles.sectionTitleLarge, { color: colors.text }]}
+                >
+                  Performance Summary
                 </Text>
-                <Text style={[styles.overlayStatLabel, { color: colors.text }]}>
-                  Hits
+                <Text
+                  style={[
+                    styles.sectionSubtitle,
+                    { color: colors.description },
+                  ]}
+                >
+                  Overview of your shooting session
                 </Text>
               </View>
-              <View style={styles.overlayStats}>
-                <Text style={[styles.overlayStatValue, { color: colors.tint }]}>
+            </View>
+            <View style={styles.statsGrid}>
+              <View
+                style={[styles.statCardBelow, { borderColor: colors.border }]}
+              >
+                <Ionicons
+                  name="radio-button-on"
+                  size={24}
+                  color={colors.tint}
+                />
+                <Text style={[styles.statValueBelow, { color: colors.text }]}>
+                  {hits}
+                </Text>
+                <Text
+                  style={[styles.statLabelBelow, { color: colors.description }]}
+                >
+                  Hits Detected
+                </Text>
+              </View>
+              <View
+                style={[styles.statCardBelow, { borderColor: colors.border }]}
+              >
+                <Ionicons
+                  name="checkmark-circle"
+                  size={24}
+                  color={colors.tint}
+                />
+                <Text style={[styles.statValueBelow, { color: colors.text }]}>
                   {accuracy}%
                 </Text>
-                <Text style={[styles.overlayStatLabel, { color: colors.text }]}>
+                <Text
+                  style={[styles.statLabelBelow, { color: colors.description }]}
+                >
                   Accuracy
+                </Text>
+              </View>
+              <View
+                style={[styles.statCardBelow, { borderColor: colors.border }]}
+              >
+                <Ionicons name="ellipse" size={24} color={colors.tint} />
+                <Text style={[styles.statValueBelow, { color: colors.text }]}>
+                  {bulletCount}
+                </Text>
+                <Text
+                  style={[styles.statLabelBelow, { color: colors.description }]}
+                >
+                  Total Bullets
                 </Text>
               </View>
             </View>
           </View>
-        </View>
 
-        {/* Quadrant Stats - If available */}
-        {quadrantStatsMm && (
-          <QuadrantStatsSection
-            quadrantStats={quadrantStatsMm}
-            colors={colors}
-            styles={styles}
-          />
-        )}
+          {/* Quadrant Stats - If available */}
+          {quadrantStatsMm && (
+            <QuadrantStatsSection
+              quadrantStats={quadrantStatsMm}
+              colors={colors}
+              styles={styles}
+            />
+          )}
 
-        {/* Action Buttons */}
-        <View style={styles.actionButtons}>
-          <SecondaryButton
-            colors={colors}
-            styles={styles}
-            label="Edit Count"
-            icon="create-outline"
-            onPress={onEditCount}
-          />
-          <SecondaryButton
-            colors={colors}
-            styles={styles}
-            label="Edit Bullets"
-            icon="create-outline"
-            onPress={() => setIsEditingDetections(true)}
-          />
-          <PrimaryButton
-            colors={colors}
-            styles={styles}
-            label="New Scan"
-            icon="camera"
-            onPress={onNewScan}
-          />
+          {/* Action Buttons */}
+          <View style={styles.actionButtonsContainer}>
+            <PrimaryButton
+              colors={colors}
+              styles={styles}
+              label="New Scan"
+              icon="camera"
+              onPress={onNewScan}
+            />
+            <SecondaryButton
+              colors={colors}
+              styles={styles}
+              label="Edit Bullets"
+              icon="create-outline"
+              onPress={() => setIsEditingDetections(true)}
+            />
+          </View>
         </View>
       </ScrollView>
 
@@ -146,7 +197,7 @@ export function ResultsPage({
         onClose={() => setIsEditingDetections(false)}
         isLoading={isLoading}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -189,9 +240,24 @@ function QuadrantStatsSection({
         { backgroundColor: colors.cardBackground },
       ]}
     >
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>
-        Quadrant Analysis (mm)
-      </Text>
+      <View style={styles.sectionHeader}>
+        <View
+          style={[
+            styles.sectionIconWrapper,
+            { backgroundColor: colors.tint + "15" },
+          ]}
+        >
+          <Ionicons name="grid" size={24} color={colors.tint} />
+        </View>
+        <View style={{ flex: 1, marginLeft: 12 }}>
+          <Text style={[styles.sectionTitleLarge, { color: colors.text }]}>
+            Quadrant Analysis
+          </Text>
+          <Text style={[styles.sectionSubtitle, { color: colors.description }]}>
+            Detailed breakdown by region
+          </Text>
+        </View>
+      </View>
 
       <View style={styles.quadrantGrid}>
         {quadrants.map((quadrant) => {
@@ -199,20 +265,30 @@ function QuadrantStatsSection({
           const maxDistance = stats.max_pair.distance_mm;
 
           return (
-            <View key={quadrant.key} style={styles.quadrantCard}>
+            <View
+              key={quadrant.key}
+              style={[styles.quadrantCard, { borderColor: colors.border }]}
+            >
               <View style={styles.quadrantHeader}>
-                <Ionicons
-                  name={quadrant.icon as any}
-                  size={16}
-                  color={colors.tint}
-                />
+                <View
+                  style={[
+                    styles.quadrantIconWrapper,
+                    { backgroundColor: colors.tint + "15" },
+                  ]}
+                >
+                  <Ionicons
+                    name={quadrant.icon as any}
+                    size={18}
+                    color={colors.tint}
+                  />
+                </View>
                 <Text style={[styles.quadrantLabel, { color: colors.text }]}>
                   {quadrant.label}
                 </Text>
               </View>
 
-              <View style={styles.quadrantStats}>
-                <View style={styles.quadrantStat}>
+              <View style={styles.quadrantStatsContainer}>
+                <View style={styles.quadrantStatItem}>
                   <Text
                     style={[styles.quadrantStatValue, { color: colors.tint }]}
                   >
@@ -229,7 +305,7 @@ function QuadrantStatsSection({
                 </View>
 
                 {maxDistance && (
-                  <View style={styles.quadrantStat}>
+                  <View style={styles.quadrantStatItem}>
                     <Text
                       style={[styles.quadrantStatValue, { color: colors.tint }]}
                     >
@@ -268,6 +344,8 @@ function Header({
           style={styles.iconButton}
           onPress={onBack}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
         >
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
@@ -296,6 +374,8 @@ function PrimaryButton({
       activeOpacity={0.85}
       onPress={onPress}
       style={styles.primaryButton}
+      accessibilityRole="button"
+      accessibilityLabel={label}
     >
       <LinearGradient
         colors={[colors.tint, colors.tint + "DD"]}
@@ -327,6 +407,8 @@ function SecondaryButton({
         styles.secondaryButton,
         { borderColor: colors.border, backgroundColor: colors.cardBackground },
       ]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
     >
       {icon ? <Ionicons name={icon} size={20} color={colors.text} /> : null}
       <Text style={[styles.secondaryButtonText, { color: colors.text }]}>

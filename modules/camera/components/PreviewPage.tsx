@@ -1,16 +1,18 @@
 // PreviewPage.tsx
 import { useColors } from "@/hooks/useColors";
 import { Ionicons } from "@expo/vector-icons";
+import BottomSheet, {
+  BottomSheetScrollView,
+  BottomSheetTextInput,
+} from "@gorhom/bottom-sheet";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useState } from "react";
+import { Image, Text, TouchableOpacity, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
-  Image,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import {
   makePreviewStyles,
   type PreviewStyles,
@@ -26,8 +28,12 @@ interface PreviewPageProps {
   isDetecting: boolean;
   onAnalyze: (data: {
     bulletCount: number;
-    shooterCount: number;
-    targetSize: string;
+    sessionName: string;
+    sessionDetails: string;
+  }) => void;
+  onSessionDetailsChange: (data: {
+    sessionName: string;
+    sessionDetails: string;
   }) => void;
   onBack: () => void;
 }
@@ -42,25 +48,21 @@ export function PreviewPage({
 }: PreviewPageProps) {
   const colors = useColors();
   const styles = makePreviewStyles(colors);
+  const [sheetIndex, setSheetIndex] = useState(1);
+  const snapPoints = ["28%", "50%", "85%"] as const;
+  const [isConfirmed, setIsConfirmed] = useState(false);
+  const insets = useSafeAreaInsets();
 
-  const [shooterCount, setShooterCount] = useState(1);
-  const [targetSize, setTargetSize] = useState<"full" | "1/2" | "1/3" | "1/4">(
-    "full"
-  );
+  const [sessionName, setSessionName] = useState("");
+  const [sessionDetails, setSessionDetails] = useState("");
+
   const [bulletInput, setBulletInput] = useState(
     bulletCount === 0 ? "" : bulletCount.toString()
   );
 
-  const targetSizeOptions: Array<"full" | "1/2" | "1/3" | "1/4"> = [
-    "full",
-    "1/2",
-    "1/3",
-    "1/4",
-  ];
-
   // Sync bulletInput when bulletCount prop changes
   useEffect(() => {
-    setBulletInput(bulletCount === 0 ? "" : bulletCount.toString());
+    setBulletInput(bulletCount > 0 ? bulletCount.toString() : "0");
   }, [bulletCount]);
 
   const handleBulletInputChange = (text: string) => {
@@ -84,8 +86,8 @@ export function PreviewPage({
     const bulletNum = parseInt(bulletInput) || bulletCount;
     onAnalyze({
       bulletCount: bulletNum, // Can be 0 (null)
-      shooterCount,
-      targetSize,
+      sessionName,
+      sessionDetails,
     });
   };
 
@@ -93,200 +95,245 @@ export function PreviewPage({
   const displayBulletInput = bulletCount === 0 ? "" : bulletInput;
 
   return (
-    <View style={[styles.page, { backgroundColor: colors.background }]}>
-      <Header
-        title="Preview Target"
-        onBack={onBack}
-        colors={colors}
-        styles={styles}
-      />
-
-      <ScrollView
-        keyboardDismissMode="on-drag"
-        automaticallyAdjustKeyboardInsets={true}
-        contentContainerStyle={styles.pagePad}
-        showsVerticalScrollIndicator={false}
-      >
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={[styles.page, { backgroundColor: "black" }]}>
+        {/* Full-bleed image background */}
         <View
-          style={[styles.imageCard, { backgroundColor: colors.cardBackground }]}
+          style={styles.imageFull}
+          pointerEvents="none"
+          accessibilityRole="image"
+          accessibilityLabel="Target preview image"
         >
           <Image
             source={{ uri: photoUri }}
-            style={styles.previewImage}
-            resizeMode="contain"
+            style={styles.previewImageFull}
+            resizeMode="cover"
           />
-          <View style={styles.badge}>
-            <Ionicons name="checkmark-circle" size={18} color="white" />
-            <Text style={styles.badgeText}>Target captured</Text>
-          </View>
         </View>
 
-        {/* Session Details */}
-        <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
-          <View style={styles.rowCenter}>
-            <View
-              style={[styles.circleMd, { backgroundColor: colors.tint + "20" }]}
-            >
-              <Ionicons name="document-text" size={24} color={colors.tint} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.titleMd, { color: colors.text }]}>
-                Shooting Session Details
-              </Text>
-              <Text style={[styles.caption, { color: colors.description }]}>
-                Enter your shooting session information
-              </Text>
-            </View>
-          </View>
+        {/* Top header overlay - Fixed Position */}
+        <View style={styles.headerContainer}>
+          <SafeAreaView>
+            <Header
+              title="Preview Photo"
+              onBack={onBack}
+              colors={colors}
+              styles={styles}
+            />
+          </SafeAreaView>
+        </View>
 
-          {/* Bullet Count */}
-          <View style={styles.inputRow}>
-            <View style={styles.inputContainer}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>
-                Bullets fired
-              </Text>
-              <View style={styles.inputWithButton}>
-                <TextInput
-                  style={[
-                    styles.inputField,
-                    {
-                      borderColor: colors.border,
-                      color: colors.text,
-                      flex: 1,
-                      borderTopRightRadius: 0,
-                      borderBottomRightRadius: 0,
-                      borderRightWidth: 0,
-                    },
-                  ]}
-                  value={displayBulletInput}
-                  onChangeText={handleBulletInputChange}
-                  keyboardType="numeric"
-                  maxLength={2}
-                  placeholder="1-25 bullets"
-                  placeholderTextColor={colors.description}
-                  editable={true}
-                />
-                <TouchableOpacity
-                  style={[
-                    styles.clearButton,
-                    {
-                      backgroundColor: isBulletInputValid
-                        ? colors.tint
-                        : colors.border,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={clearBulletInput}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name="close"
-                    size={16}
-                    color={isBulletInputValid ? "white" : colors.description}
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-
-          {/* Shooter Count */}
-          <View style={styles.inputRow}>
-            <View style={styles.inputContainer}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>
-                Number of shooters
-              </Text>
-              <TextInput
-                style={[
-                  styles.inputField,
-                  {
-                    borderColor: colors.border,
-                    color: colors.text,
-                    backgroundColor: "transparent",
-                  },
-                ]}
-                value={shooterCount.toString()}
-                onChangeText={(text) => {
-                  const num = parseInt(text) || 1;
-                  if (num >= 1 && num <= 10) {
-                    setShooterCount(num);
-                  }
-                }}
-                keyboardType="numeric"
-                maxLength={2}
-                placeholder="1-10"
-                placeholderTextColor={colors.description}
-                editable={true}
+        {/* Photo Verification Overlay - Fixed Position */}
+        {!isConfirmed && (
+          <>
+            {/* Bottom action buttons - Fixed Position */}
+            <View style={styles.bottomActionsWrapper}>
+              <LinearGradient
+                colors={["transparent", "rgba(0,0,0,0.9)", "rgba(0,0,0,0.95)"]}
+                style={styles.bottomGradient}
               />
-            </View>
-          </View>
-
-          {/* Target Size */}
-          <View style={styles.inputRow}>
-            <View style={styles.inputContainer}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>
-                Target size
-              </Text>
-              <View style={styles.targetSizeRow}>
-                {targetSizeOptions.map((size) => (
+              <SafeAreaView>
+                <View style={styles.actionButtonsRow}>
                   <TouchableOpacity
-                    key={size}
                     style={[
-                      styles.sizeButton,
-                      {
-                        backgroundColor:
-                          targetSize === size ? colors.tint : "transparent",
-                        borderColor:
-                          targetSize === size ? colors.tint : colors.border,
-                      },
+                      styles.actionButton,
+                      styles.retakeButton,
+                      { borderColor: colors.border },
                     ]}
-                    onPress={() => setTargetSize(size)}
+                    onPress={onBack}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityLabel="Retake photo"
                   >
+                    <Ionicons
+                      name="camera-outline"
+                      size={22}
+                      color={colors.text}
+                    />
                     <Text
-                      style={[
-                        styles.sizeButtonText,
-                        {
-                          color: targetSize === size ? "white" : colors.text,
-                        },
-                      ]}
+                      style={[styles.actionButtonText, { color: colors.text }]}
                     >
-                      {size} page
+                      Retake
                     </Text>
                   </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          </View>
-        </View>
 
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={handleAnalyze}
-          disabled={isDetecting || !isBulletInputValid}
-          style={[
-            styles.primaryButton,
-            (isDetecting || !isBulletInputValid) && { opacity: 0.7 },
-          ]}
-        >
-          <LinearGradient
-            colors={[colors.tint, colors.tint + "DD"]}
-            style={styles.primaryButtonGradient}
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.confirmButton]}
+                    onPress={() => setIsConfirmed(true)}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityLabel="Confirm photo"
+                  >
+                    <LinearGradient
+                      colors={[colors.tint, colors.tint + "DD"]}
+                      style={styles.confirmButtonGradient}
+                    >
+                      <Ionicons name="checkmark" size={22} color="white" />
+                      <Text style={styles.confirmButtonText}>Continue</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              </SafeAreaView>
+            </View>
+          </>
+        )}
+
+        {/* Draggable Bottom Sheet Form (after confirmation) */}
+        {isConfirmed && (
+          <BottomSheet
+            index={1}
+            snapPoints={["50%", "60%"] as unknown as string[]}
+            onChange={setSheetIndex}
+            enablePanDownToClose={false}
+            handleIndicatorStyle={{ backgroundColor: colors.border }}
+            backgroundStyle={{
+              backgroundColor: colors.cardBackground,
+              borderRadius: 16,
+            }}
           >
-            <Ionicons
-              name={isDetecting ? "hourglass-outline" : "scan"}
-              size={20}
-              color="white"
-            />
-            <Text style={styles.primaryButtonText}>
-              {isDetecting
-                ? "Analyzing…"
-                : !isBulletInputValid
-                ? "Add bullets to continue"
-                : "Start Analysis"}
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
+            <BottomSheetScrollView
+              contentContainerStyle={{
+                padding: 16,
+                paddingBottom: 24 + insets.bottom,
+              }}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Section Title */}
+              <Text style={[styles.formTitle, { color: colors.text }]}>
+                Session Details
+              </Text>
+
+              {/* Session Name Field */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>
+                  Session Name
+                </Text>
+                <Text
+                  style={[styles.inputSubtext, { color: colors.description }]}
+                >
+                  Optional
+                </Text>
+                <BottomSheetTextInput
+                  style={[
+                    styles.modernInput,
+                    {
+                      borderColor: sessionName ? colors.tint : colors.border,
+                      color: colors.text,
+                      backgroundColor: colors.background,
+                    },
+                  ]}
+                  value={sessionName}
+                  onChangeText={setSessionName}
+                  placeholder="e.g., Practice Session"
+                  placeholderTextColor={colors.description}
+                  editable={true}
+                  accessibilityLabel="Session name input"
+                />
+              </View>
+
+              {/* Bullet Count Field */}
+              <View style={styles.inputGroup}>
+                <View style={styles.labelRow}>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>
+                    Bullets Fired
+                  </Text>
+                  <View
+                    style={[
+                      styles.requiredDot,
+                      { backgroundColor: colors.tint },
+                    ]}
+                  />
+                </View>
+                <Text
+                  style={[styles.inputSubtext, { color: colors.description }]}
+                >
+                  Enter the number of bullets you fired (1-25)
+                </Text>
+                <View style={styles.bulletRow}>
+                  <BottomSheetTextInput
+                    style={[
+                      styles.bulletInputModern,
+                      {
+                        borderColor: isBulletInputValid
+                          ? colors.tint
+                          : colors.border,
+                        color: colors.text,
+                        backgroundColor: colors.background,
+                      },
+                    ]}
+                    value={displayBulletInput}
+                    onChangeText={handleBulletInputChange}
+                    keyboardType="numeric"
+                    returnKeyType="done"
+                    maxLength={2}
+                    placeholder="0"
+                    placeholderTextColor={colors.description}
+                    editable={true}
+                    accessibilityLabel="Bullets fired input"
+                  />
+                  {isBulletInputValid && (
+                    <TouchableOpacity
+                      style={[
+                        styles.clearBtn,
+                        { backgroundColor: colors.background },
+                      ]}
+                      onPress={clearBulletInput}
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityLabel="Clear bullets"
+                    >
+                      <Ionicons name="close" size={18} color={colors.tint} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              {/* Analyze Button */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={handleAnalyze}
+                disabled={isDetecting || !isBulletInputValid}
+                style={[
+                  styles.analyzeBtn,
+                  (isDetecting || !isBulletInputValid) &&
+                    styles.analyzeBtnDisabled,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  isDetecting
+                    ? "Analyzing image"
+                    : !isBulletInputValid
+                    ? "Add bullets to continue"
+                    : "Start analysis"
+                }
+              >
+                <LinearGradient
+                  colors={
+                    isDetecting || !isBulletInputValid
+                      ? [colors.border, colors.border]
+                      : [colors.tint, colors.tint + "DD"]
+                  }
+                  style={styles.analyzeBtnGradient}
+                >
+                  <Ionicons
+                    name={isDetecting ? "hourglass-outline" : "scan-outline"}
+                    size={20}
+                    color="white"
+                  />
+                  <Text style={styles.analyzeBtnText}>
+                    {isDetecting
+                      ? "Analyzing…"
+                      : !isBulletInputValid
+                      ? "Enter Bullet Count"
+                      : "Start Analysis"}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </BottomSheetScrollView>
+          </BottomSheet>
+        )}
+      </View>
+    </GestureHandlerRootView>
   );
 }
 
@@ -296,7 +343,10 @@ function Header({
   onBack,
   colors,
   styles,
-}: { title: string; onBack?: () => void } & ColorProps) {
+}: {
+  title: string;
+  onBack?: () => void;
+} & ColorProps) {
   return (
     <View style={styles.header}>
       {onBack ? (
@@ -304,6 +354,8 @@ function Header({
           style={styles.iconButton}
           onPress={onBack}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
         >
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>

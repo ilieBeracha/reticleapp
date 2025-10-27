@@ -63,3 +63,54 @@ export interface Detection {
   createdAt: string;
   updatedAt: string;
 }
+
+// Weather conditions stored as JSONB
+export interface WeatherConditions {
+  wind_mps?: number;
+  wind_direction?: string;
+  temp_c?: number;
+  pressure_hpa?: number;
+  visibility?: string;
+  humidity?: number;
+  [key: string]: any; // Allow additional weather fields
+}
+
+export interface SessionStats {
+  id: string;
+  training_id?: string | null;
+  organization_id?: string | null;
+  name?: string | null;
+  started_at: string;
+  ended_at?: string | null;
+  range_location?: string | null;
+  weather?: WeatherConditions | null;
+  day_period?: DayPeriod | null;
+  is_squad: boolean;
+  comments?: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateSessionStatsInput {
+  training_id?: string | null;
+  name?: string;
+  started_at?: string;
+  ended_at?: string | null;
+  range_location?: string;
+  weather?: WeatherConditions;
+  day_period?: DayPeriod;
+  is_squad?: boolean;
+  comments?: string;
+}
+
+export interface UpdateSessionStatsInput {
+  name?: string;
+  started_at?: string;
+  ended_at?: string | null;
+  range_location?: string;
+  weather?: WeatherConditions;
+  day_period?: DayPeriod;
+  is_squad?: boolean;
+  comments?: string;
+}

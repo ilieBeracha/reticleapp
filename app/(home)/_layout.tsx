@@ -67,6 +67,7 @@ export default function Layout() {
         <View style={{ flex: 1 }}>
           <Stack screenOptions={{ headerShown: false, animation: "none" }}>
             <Stack.Screen name="index" options={{ animation: "none" }} />
+            <Stack.Screen name="loadout" options={{ animation: "none" }} />
             <Stack.Screen name="settings" options={{ animation: "none" }} />
             <Stack.Screen name="members" options={{ animation: "none" }} />
             <Stack.Screen name="stats" options={{ animation: "none" }} />

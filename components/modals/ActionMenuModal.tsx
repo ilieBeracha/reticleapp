@@ -48,88 +48,94 @@ export default function ActionMenu({
       backdropOpacity={0.45}
     >
       {/* Header */}
-      <View style={[styles.header, { borderColor: colors.border }]}>
-        <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-        <Text style={[styles.subtitle, { color: colors.description }]}>
-          Choose an action to continue
-        </Text>
+      <View style={styles.headerContainer}>
+        <View style={styles.headerContent}>
+          <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+          <Text style={[styles.subtitle, { color: colors.description }]}>
+            Choose an action
+          </Text>
+        </View>
+      </View>
 
-        {/* Actions */}
-        <BottomSheetFlatList
-          data={actions}
-          keyExtractor={(item: Action, idx: number) => `${item.action}-${idx}`}
-          renderItem={({ item: action }: { item: Action }) => {
-            const isDisabled =
-              action.isOnlyOrganizationMember && !hasOrganization;
+      {/* Actions */}
+      <BottomSheetFlatList
+        data={actions}
+        keyExtractor={(item: Action, idx: number) => `${item.action}-${idx}`}
+        contentContainerStyle={styles.listContent}
+        renderItem={({ item: action }: { item: Action }) => {
+          const isDisabled =
+            action.isOnlyOrganizationMember && !hasOrganization;
 
-            return (
-              <TouchableOpacity
-                disabled={isDisabled}
+          return (
+            <TouchableOpacity
+              disabled={isDisabled}
+              style={[
+                styles.actionItem,
+                { borderColor: colors.border },
+                isDisabled && styles.disabledItem,
+              ]}
+              onPress={() => handleActionPress(action.action)}
+              activeOpacity={0.7}
+            >
+              <View
                 style={[
-                  styles.actionItem,
-                  { borderColor: colors.border },
-                  isDisabled && styles.disabledItem,
+                  styles.actionIconContainer,
+                  {
+                    backgroundColor: isDisabled
+                      ? colors.border
+                      : colors.tint + "20",
+                  },
                 ]}
-                onPress={() => handleActionPress(action.action)}
-                activeOpacity={0.7}
               >
-                <View
+                <Ionicons
+                  name={action.icon as any}
+                  size={22}
+                  color={isDisabled ? colors.description : colors.tint}
+                />
+              </View>
+              <View style={styles.actionText}>
+                <Text style={[styles.actionTitle, { color: colors.text }]}>
+                  {action.title}
+                </Text>
+                <Text
                   style={[
-                    styles.actionIconContainer,
-                    {
-                      backgroundColor: isDisabled
-                        ? colors.border
-                        : colors.tint + "20",
-                    },
+                    styles.actionDescription,
+                    { color: colors.description },
                   ]}
                 >
-                  <Ionicons
-                    name={action.icon as any}
-                    size={22}
-                    color={isDisabled ? colors.description : colors.tint}
-                  />
-                </View>
-                <View style={styles.actionText}>
-                  <Text style={[styles.actionTitle, { color: colors.text }]}>
-                    {action.title}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.actionDescription,
-                      { color: colors.description },
-                    ]}
-                  >
-                    {action.description}
-                  </Text>
-                </View>
-                {isDisabled ? (
-                  <Ionicons
-                    name="lock-closed"
-                    size={16}
-                    color={colors.description}
-                    style={styles.lockIcon}
-                  />
-                ) : (
-                  <Ionicons
-                    name="chevron-forward"
-                    size={18}
-                    color={colors.description}
-                  />
-                )}
-              </TouchableOpacity>
-            );
-          }}
-        />
-      </View>
+                  {action.description}
+                </Text>
+              </View>
+              {isDisabled ? (
+                <Ionicons
+                  name="lock-closed"
+                  size={16}
+                  color={colors.description}
+                  style={styles.lockIcon}
+                />
+              ) : (
+                <Ionicons
+                  name="chevron-forward"
+                  size={18}
+                  color={colors.description}
+                />
+              )}
+            </TouchableOpacity>
+          );
+        }}
+      />
     </BaseBottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    paddingBottom: 16,
+  headerContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 20,
+  },
+  headerContent: {
     gap: 4,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   title: {
     fontSize: 20,
@@ -140,11 +146,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "400",
   },
+  listContent: {
+    paddingHorizontal: 0,
+    paddingBottom: 20,
+  },
   actionItem: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 14,
   },

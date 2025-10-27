@@ -52,21 +52,19 @@ export default function RootLayout() {
   }
 
   return (
-    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      <ClerkLoaded>
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <ThemeProvider
-            value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
-          >
+    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+      <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+        <ClerkLoaded>
+          <GestureHandlerRootView style={{ flex: 1 }}>
             <OrganizationSwitchProvider>
               <Slot />
               <StatusBar style="auto" />
               <AppOverlay />
             </OrganizationSwitchProvider>
-          </ThemeProvider>
-        </GestureHandlerRootView>
-      </ClerkLoaded>
-    </ClerkProvider>
+          </GestureHandlerRootView>
+        </ClerkLoaded>
+      </ClerkProvider>
+    </ThemeProvider>
   );
 }
 

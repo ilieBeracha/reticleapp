@@ -18,33 +18,88 @@ export const makeResultsStyles = (colors: ThemeColors) => {
     page: {
       flex: 1,
     },
+    scrollContent: {
+      flexGrow: 1,
+    },
     pagePad: {
-      padding: spacing,
+      paddingHorizontal: spacing,
       paddingBottom: spacing * 2,
+    },
+    hero: {
+      position: "relative",
+      borderRadius: 0,
+      overflow: "hidden",
+      marginBottom: spacing * 1.5,
+    },
+    heroImage: {
+      width: "100%",
+      aspectRatio: 3 / 4,
+      minHeight: 300,
+    },
+    statsSection: {
+      borderRadius: radius,
+      padding: spacing * 1.25,
+      marginBottom: spacing * 1.5,
+      backgroundColor: colors.cardBackground,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    statsHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: spacing,
+    },
+    statsGrid: {
+      flexDirection: "row",
+      gap: spacing * 0.875,
+    },
+    statCardBelow: {
+      flex: 1,
+      padding: spacing,
+      borderRadius: 10,
+      alignItems: "center",
+      gap: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.background,
+    },
+    statValueBelow: {
+      fontSize: 26,
+      fontWeight: "700",
+    },
+    statLabelBelow: {
+      fontSize: 12,
+      fontWeight: "500",
+      textAlign: "center",
+    },
+    actionButtonsContainer: {
+      flexDirection: "row",
+      gap: spacing,
+      marginTop: spacing * 1.5,
     },
     header: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      //   paddingHorizontal: spacing,
-      //   paddingVertical: spacing,
+      paddingHorizontal: spacing,
+      paddingVertical: spacing,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
     iconButton: {
-      width: 44,
-      height: 44,
+      width: 40,
+      height: 40,
       alignItems: "center",
       justifyContent: "center",
     },
     headerTitle: {
-      fontSize: 18,
+      fontSize: 16,
       fontWeight: "600",
     },
 
     // Main Image Section - Takes up most of the screen
     imageContainer: {
-      marginBottom: 32, // Match BulletDetectionEditor
+      marginBottom: spacing * 2, // Match BulletDetectionEditor
     },
     imageCard: {
       borderRadius: radius,
@@ -77,7 +132,7 @@ export const makeResultsStyles = (colors: ThemeColors) => {
       borderRadius: 8,
     },
     overlayStatValue: {
-      fontSize: 18,
+      fontSize: 16,
       fontWeight: "700",
     },
     overlayStatLabel: {
@@ -89,30 +144,42 @@ export const makeResultsStyles = (colors: ThemeColors) => {
     // Quadrant Stats Section
     quadrantSection: {
       borderRadius: radius,
-      padding: spacing,
-      marginBottom: spacing * 2,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
+      padding: spacing * 1.25,
+      backgroundColor: colors.cardBackground,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
-    sectionTitle: {
-      fontSize: 18,
-      fontWeight: "600",
+    sectionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
       marginBottom: spacing,
-      textAlign: "center",
+    },
+    sectionIconWrapper: {
+      width: 44,
+      height: 44,
+      borderRadius: 10,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    sectionTitleLarge: {
+      fontSize: 17,
+      fontWeight: "600",
+      marginBottom: 2,
+    },
+    sectionSubtitle: {
+      fontSize: 13,
+      fontWeight: "400",
     },
     quadrantGrid: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: spacing,
+      gap: spacing * 0.875,
     },
     quadrantCard: {
       flex: 1,
       minWidth: "45%",
       backgroundColor: colors.background,
-      borderRadius: radius,
+      borderRadius: 10,
       padding: spacing,
       borderWidth: 1,
       borderColor: colors.border,
@@ -120,28 +187,40 @@ export const makeResultsStyles = (colors: ThemeColors) => {
     quadrantHeader: {
       flexDirection: "row",
       alignItems: "center",
-      marginBottom: spacing / 2,
-      gap: 8,
+      marginBottom: spacing * 0.75,
+      gap: 10,
+    },
+    quadrantIconWrapper: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      alignItems: "center",
+      justifyContent: "center",
     },
     quadrantLabel: {
       fontSize: 14,
       fontWeight: "600",
     },
-    quadrantStats: {
+    quadrantStatsContainer: {
       flexDirection: "row",
       justifyContent: "space-between",
+      gap: spacing * 0.625,
     },
-    quadrantStat: {
+    quadrantStatItem: {
+      flex: 1,
       alignItems: "center",
+      padding: spacing * 0.625,
+      borderRadius: 8,
+      backgroundColor: colors.cardBackground,
     },
     quadrantStatValue: {
       fontSize: 16,
       fontWeight: "700",
+      marginBottom: 2,
     },
     quadrantStatLabel: {
       fontSize: 11,
       fontWeight: "500",
-      marginTop: 2,
     },
 
     // Action Buttons
@@ -149,6 +228,7 @@ export const makeResultsStyles = (colors: ThemeColors) => {
       gap: spacing,
     },
     primaryButton: {
+      flex: 1,
       borderRadius: radius,
       overflow: "hidden",
     },
@@ -156,27 +236,30 @@ export const makeResultsStyles = (colors: ThemeColors) => {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      paddingVertical: spacing,
-      paddingHorizontal: spacing * 2,
+      paddingVertical: 14,
+      paddingHorizontal: spacing * 1.25,
       gap: 8,
     },
     primaryButtonText: {
       color: "white",
-      fontSize: 16,
+      fontSize: 15,
       fontWeight: "600",
     },
     secondaryButton: {
+      flex: 1,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      paddingVertical: spacing,
-      paddingHorizontal: spacing * 2,
+      paddingVertical: 14,
+      paddingHorizontal: spacing * 1.25,
       borderRadius: radius,
       borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.cardBackground,
       gap: 8,
     },
     secondaryButtonText: {
-      fontSize: 16,
+      fontSize: 15,
       fontWeight: "600",
     },
   });

@@ -128,9 +128,10 @@ export default function BaseBottomSheet({
       backgroundStyle={{ backgroundColor }}
       handleIndicatorStyle={{
         backgroundColor: mutedForeground,
-        opacity: 0.3,
-        width: 40,
-        height: 4,
+        opacity: 0.6,
+        width: 56,
+        height: 6,
+        borderRadius: 3,
       }}
       keyboardBehavior={keyboardBehavior}
       keyboardBlurBehavior="restore"

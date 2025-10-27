@@ -5,6 +5,7 @@ import { CameraType, CameraView } from "expo-camera";
 import { LinearGradient } from "expo-linear-gradient";
 import { RefObject, useEffect, useRef } from "react";
 import { Animated, Text, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   makeCameraStyles,
   type CameraStyles,
@@ -32,6 +33,7 @@ export function CameraPage({
 }: CameraPageProps) {
   const colors = useColors();
   const styles = makeCameraStyles(colors);
+  const insets = useSafeAreaInsets();
 
   // Gentle pulse on the shutter
   const pulse = useRef(new Animated.Value(1)).current;
@@ -69,7 +71,12 @@ export function CameraPage({
       </View>
 
       {/* Capture bar */}
-      <View style={styles.captureBar}>
+      <View
+        style={[
+          styles.captureBar,
+          { bottom: Math.max(20, insets.bottom + 24) },
+        ]}
+      >
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={onPickFromLibrary}
@@ -78,6 +85,12 @@ export function CameraPage({
             styles.galleryBtn,
             (isCapturing || isOpeningMediaLibrary) && { opacity: 0.6 },
           ]}
+          accessibilityRole="button"
+          accessibilityLabel={
+            isOpeningMediaLibrary
+              ? "Opening photo library"
+              : "Open photo library"
+          }
         >
           <Ionicons
             name={
@@ -97,6 +110,10 @@ export function CameraPage({
               styles.shutterBtn,
               isCapturing && { transform: [{ scale: 0.96 }] },
             ]}
+            accessibilityRole="button"
+            accessibilityLabel={
+              isCapturing ? "Capturing photo" : "Capture photo"
+            }
           >
             <View style={styles.shutterInner} />
           </TouchableOpacity>
@@ -108,7 +125,7 @@ export function CameraPage({
       </View>
 
       {/* Subtle banner */}
-      <View style={styles.infoBanner}>
+      <View style={[styles.infoBanner, { top: Math.max(60, insets.top + 12) }]}>
         <Text style={styles.infoBannerText}>
           Align the target inside the frame and tap capture
         </Text>
@@ -167,6 +184,8 @@ export function PermissionView({
             activeOpacity={0.85}
             onPress={onGrant}
             style={styles.primaryButton}
+            accessibilityRole="button"
+            accessibilityLabel="Grant camera permission"
           >
             <LinearGradient
               colors={[colors.tint, colors.tint + "DD"]}

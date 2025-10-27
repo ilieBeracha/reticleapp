@@ -8,13 +8,13 @@ import { useEffect, useRef } from "react";
 import { Animated, ScrollView, StyleSheet } from "react-native";
 import { useStore } from "zustand";
 import { GreetingSection } from "./GreetingSection";
+import { RecentSessions } from "./RecentSessions";
+import { Stats } from "./Stats";
 export function Home() {
   useEnsureActiveOrg();
   const { user } = useUser();
   const { organization } = useOrganization();
   const { userId, orgId, getToken } = useAuth();
-
-  // Use Zustand stores
   const { sessions, loading, fetchSessions } = useStore(sessionsStore);
   const { isSwitching } = useOrganizationSwitchStore();
 
@@ -29,7 +29,9 @@ export function Home() {
   const previousOrgId = useRef<string | null | undefined>(orgId);
   const previousIsSwitching = useRef<boolean>(isSwitching);
 
-  // Unified effect to handle switch lifecycle
+  /**
+   * Handle organization switch lifecycle
+   */
   useEffect(() => {
     const switchStarted = isSwitching && previousIsSwitching.current === false;
     const switchCompleted =
@@ -76,32 +78,22 @@ export function Home() {
       if (userId) {
         const token = await getToken({ template: "supabase" });
         if (token) {
-          /**
-           * Context-based fetching:
-           * - Personal (no orgId): Fetch ALL user's sessions across all orgs
-           * - Organization (has orgId): Fetch ALL team sessions from this org
-           */
           console.log("Fetching sessions for orgId:", orgId);
           fetchSessions(token, userId, orgId);
         }
       }
     };
     loadSessions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, orgId, isSwitching]); // Include isSwitching to refetch when switch completes
+  }, [userId, orgId, isSwitching]);
 
-  // Track orgId changes for animation (non-switch scenarios)
   useEffect(() => {
-    const orgIdChanged =
+    if (
       previousOrgId.current !== undefined &&
       previousOrgId.current !== orgId &&
-      !isSwitching;
-
-    if (orgIdChanged) {
-      console.log("OrgId changed without switch overlay - animating");
+      !isSwitching
+    ) {
       fadeAnim.setValue(0);
       slideAnim.setValue(20);
-
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -139,6 +131,10 @@ export function Home() {
             organizationName={organization?.name}
             isPersonalWorkspace={!organization}
           />
+
+          <Stats sessionsCount={sessions.length} />
+
+          <RecentSessions sessions={sessions} loading={loading} />
         </ScrollView>
       </Animated.View>
     </ThemedView>

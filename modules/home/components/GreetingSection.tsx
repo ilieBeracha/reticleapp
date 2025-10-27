@@ -69,7 +69,6 @@ export function GreetingSection({
 const styles = StyleSheet.create({
   container: {
     gap: 12,
-    marginBottom: 40,
     paddingTop: 8,
     paddingBottom: 12,
   },

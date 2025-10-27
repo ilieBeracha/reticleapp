@@ -2,19 +2,19 @@ const tintColor = "#3ECF8E"; // Premium mint-green accent
 
 export const Colors = {
   light: {
-    text: "#111418", // Deep gray-black for modern contrast
-    background: "#F5F6F7", // Subtle gray-white, softer on eyes
+    text: "#1C1C1E", // Apple's system dark gray
+    background: "#F5F5F7", // Apple's subtle off-white
     tint: tintColor,
-    icon: "#6B7280", // Medium neutral gray
-    tabIconDefault: "#9CA3AF",
-    tabIconSelected: tintColor + "33", // translucent accent
-    border: "#E2E4E7", // gentle, minimal border tone
-    cardBackground: "#FFFFFF", // elevated card white
-    buttonText: "#111418",
-    buttonBorder: "#DADDE0",
-    placeholderText: "#9CA3AF",
-    description: "#70737A", // muted descriptive text
-    overlay: "rgba(0,0,0,0.04)", // subtle hover/press feedback
+    icon: "#8E8E93", // Apple's icon gray
+    tabIconDefault: "#8E8E93",
+    tabIconSelected: tintColor + "20", // Subtle accent
+    border: "#D1D1D6", // Apple's border gray
+    cardBackground: "#FFFFFF", // Pure white
+    buttonText: "#1C1C1E",
+    buttonBorder: "#C7C7CC",
+    placeholderText: "#8E8E93",
+    description: "#636366", // Muted gray
+    overlay: "rgba(0,0,0,0.04)", // Apple's subtle feedback
   },
   dark: {
     text: "#E6E8EB", // calm white-gray (not pure white)

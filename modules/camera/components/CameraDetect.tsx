@@ -3,6 +3,7 @@ import { useColors } from "@/hooks/useColors";
 import { useDetectionStore } from "@/store/detectionStore";
 import { CameraType, CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
 import { RefObject, useEffect, useRef, useState } from "react";
 import { Alert, StatusBar } from "react-native";
 
@@ -106,8 +107,8 @@ export function CameraDetect() {
 
   const analyzePhoto = async (sessionData: {
     bulletCount: number;
-    shooterCount: number;
-    targetSize: string;
+    sessionName: string;
+    sessionDetails: string;
   }) => {
     if (!capturedPhoto || isDetecting) return;
     clearError();
@@ -132,6 +133,10 @@ export function CameraDetect() {
     setCapturedPhoto(null);
     setCurrentPage("camera");
     useDetectionStore.getState().clearDetections();
+  };
+
+  const handleClose = () => {
+    router.back();
   };
 
   // --- Render branches
@@ -185,8 +190,9 @@ export function CameraDetect() {
           bulletCount={bulletCount}
           onBulletCountChange={setBulletCount}
           isDetecting={isDetecting}
-          onAnalyze={analyzePhoto}
+          onAnalyze={(data) => analyzePhoto(data)}
           onBack={resetToCamera}
+          onSessionDetailsChange={() => {}}
         />
       )}
 
