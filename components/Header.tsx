@@ -4,9 +4,10 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { HeaderActions } from "./Header/components/HeaderActions";
-import { OrganizationBadge } from "./Header/components/OrganizationBadge";
-import { OrganizationSwitcherModal } from "./modals/OrganizationSwitcherModal";
+
+import { HeaderActions } from "./HeaderActions";
+import { OrganizationBadge } from "./OrganizationBadge";
+import { OrganizationSwitcherModal } from "./OrganizationSwitcherModal";
 import ProfileDropdown from "./ProfileDropdown";
 
 interface HeaderProps {

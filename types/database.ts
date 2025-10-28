@@ -114,3 +114,17 @@ export interface UpdateSessionStatsInput {
   is_squad?: boolean;
   comments?: string;
 }
+
+export interface WeaponModel {
+  name: string;
+  weapon_name: string;
+  manufacturer: string;
+  weapon_type: string;
+  caliber: string;
+  cartridge_raw: string;
+  origin: string;
+  year: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}

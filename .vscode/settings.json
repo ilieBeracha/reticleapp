@@ -6,6 +6,11 @@
   },
   "cSpell.words": [
     "Pressable",
-    "scopeuinativeclerk"
-  ]
+    "scopeuinativeclerk",
+    "timestamptz",
+    "loadouts"
+  ],
+  "files.associations": {
+    "*.cursorrules": "markdown"
+  }
 }

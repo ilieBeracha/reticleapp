@@ -1,3 +1,4 @@
+import { ServiceError } from "@/lib/authenticatedClient";
 import { uploadForDetection } from "@/services/detectionService";
 import {
   AnalyzeResponse,
@@ -118,8 +119,15 @@ export const useDetectionStore = create<DetectionStoreState>((set) => ({
         error: null,
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error occurred";
+      // Use consistent error handling with ServiceError types
+      let errorMessage = "Unknown error occurred";
+
+      if (error instanceof ServiceError) {
+        errorMessage = error.message;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
       console.error("❌ Detection store: Detection failed:", errorMessage);
       set({
         isDetecting: false,

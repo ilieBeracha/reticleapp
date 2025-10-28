@@ -16,35 +16,31 @@ interface SessionsStore {
   loading: boolean;
   error: string | null;
 
-  // Actions
+  // Actions - simplified without token parameters
   fetchSessions: (
-    token: string,
     userId: string,
     orgId?: string | null,
     trainingId?: string
   ) => Promise<void>;
   createSession: (
-    token: string,
     input: CreateSessionInput,
     userId: string,
     orgId: string | null
   ) => Promise<Session | null>;
   updateSession: (
-    token: string,
     sessionId: string,
     input: UpdateSessionInput
   ) => Promise<Session | null>;
-  deleteSession: (token: string, sessionId: string) => Promise<void>;
+  deleteSession: (sessionId: string) => Promise<void>;
   resetSessions: () => void;
 }
 
-export const sessionsStore = create<SessionsStore>((set, get) => ({
+export const sessionsStore = create<SessionsStore>((set) => ({
   sessions: [],
   loading: false,
   error: null,
 
   fetchSessions: async (
-    token: string,
     userId: string,
     orgId?: string | null,
     trainingId?: string
@@ -52,12 +48,7 @@ export const sessionsStore = create<SessionsStore>((set, get) => ({
     try {
       set({ loading: true, error: null });
 
-      const sessions = await getSessionsService(
-        token,
-        userId,
-        orgId,
-        trainingId
-      );
+      const sessions = await getSessionsService(userId, orgId, trainingId);
 
       set({ sessions, loading: false });
     } catch (err: any) {
@@ -67,7 +58,6 @@ export const sessionsStore = create<SessionsStore>((set, get) => ({
   },
 
   createSession: async (
-    token: string,
     input: CreateSessionInput,
     userId: string,
     orgId: string | null
@@ -77,7 +67,7 @@ export const sessionsStore = create<SessionsStore>((set, get) => ({
     }
 
     try {
-      const session = await createSessionService(token, input, userId, orgId);
+      const session = await createSessionService(input, userId, orgId);
       console.log("session", session);
       // Add new session to the beginning of the list
       set((state) => ({
@@ -91,13 +81,9 @@ export const sessionsStore = create<SessionsStore>((set, get) => ({
     }
   },
 
-  updateSession: async (
-    token: string,
-    sessionId: string,
-    input: UpdateSessionInput
-  ) => {
+  updateSession: async (sessionId: string, input: UpdateSessionInput) => {
     try {
-      const session = await updateSessionService(token, sessionId, input);
+      const session = await updateSessionService(sessionId, input);
 
       // Update session in the list
       set((state) => ({
@@ -111,9 +97,9 @@ export const sessionsStore = create<SessionsStore>((set, get) => ({
     }
   },
 
-  deleteSession: async (token: string, sessionId: string) => {
+  deleteSession: async (sessionId: string) => {
     try {
-      await deleteSessionService(token, sessionId);
+      await deleteSessionService(sessionId);
 
       // Remove session from the list
       set((state) => ({

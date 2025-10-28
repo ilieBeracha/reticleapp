@@ -1,6 +1,5 @@
 import BaseBottomSheet from "@/components/BaseBottomSheet";
-import { SwitcherHeader } from "@/components/organizations/OrganizationSwitcher/components/SwitcherHeader";
-import { useOrganizationSwitch } from "@/hooks/organizations/useOrganizationSwitch";
+import { useOrganizationSwitch } from "@/hooks/useOrganizationSwitch";
 import { useAuth, useOrganizationList, useUser } from "@clerk/clerk-expo";
 import { BottomSheetView } from "@gorhom/bottom-sheet";
 import { useEffect, useState } from "react";
@@ -14,8 +13,9 @@ import {
   useColorScheme,
   View,
 } from "react-native";
-import { Colors } from "../Themed";
 import { CreateOrgModal } from "./CreateOrg";
+import { SwitcherHeader } from "./SwitcherHeader";
+import { Colors } from "./Themed";
 
 interface OrganizationSwitcherModalProps {
   visible: boolean;

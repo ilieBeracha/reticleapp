@@ -1,5 +1,6 @@
 import BaseBottomSheet from "@/components/BaseBottomSheet";
-import { useInviteOrg } from "@/hooks/organizations/useInviteOrg";
+import { useInviteOrg } from "@/hooks/useInviteOrg";
+
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -11,7 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { ThemedText } from "../ThemedText";
+import { ThemedText } from "./ThemedText";
 
 interface InviteMemberModalProps {
   visible: boolean;

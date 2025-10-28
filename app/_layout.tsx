@@ -1,9 +1,11 @@
 import { OrganizationSwitchOverlay } from "@/components/OrganizationSwitchOverlay";
+
+import { useColorScheme } from "@/hooks/useColorScheme";
+import { EnhancedAuthProvider } from "@/hooks/useEnhancedAuth";
 import {
   OrganizationSwitchProvider,
   useOrganizationSwitch,
-} from "@/hooks/organizations/useOrganizationSwitch";
-import { useColorScheme } from "@/hooks/useColorScheme";
+} from "@/hooks/useOrganizationSwitch";
 import { ClerkLoaded, ClerkProvider } from "@clerk/clerk-expo";
 import {
   DarkTheme,
@@ -55,13 +57,15 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
       <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
         <ClerkLoaded>
-          <GestureHandlerRootView style={{ flex: 1 }}>
-            <OrganizationSwitchProvider>
-              <Slot />
-              <StatusBar style="auto" />
-              <AppOverlay />
-            </OrganizationSwitchProvider>
-          </GestureHandlerRootView>
+          <EnhancedAuthProvider>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+              <OrganizationSwitchProvider>
+                <Slot />
+                <StatusBar style="auto" />
+                <AppOverlay />
+              </OrganizationSwitchProvider>
+            </GestureHandlerRootView>
+          </EnhancedAuthProvider>
         </ClerkLoaded>
       </ClerkProvider>
     </ThemeProvider>

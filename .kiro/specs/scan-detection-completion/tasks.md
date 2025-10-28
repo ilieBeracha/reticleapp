@@ -5,7 +5,7 @@
   - Fix the network request issue in detectionService.ts
   - Update detection store to handle loading states properly
   - Ensure API call completes and returns data to store
-  - Test that detection results are properly stored and logged
+  - Test that detection results are properly stored and l2ogged
   - _Requirements: 1.1, 1.2, 1.4_
 
 - [ ] 2. Fix UI - Add loading states and result display

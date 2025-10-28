@@ -1,10 +1,10 @@
 import BaseBottomSheet from "@/components/BaseBottomSheet";
-import useCreateOrg from "@/hooks/organizations/useCreateOrg";
+import useCreateOrg from "@/hooks/useCreateOrg";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
-import { ThemedText } from "../ThemedText";
+import { ThemedText } from "./ThemedText";
 
 interface CreateOrgModalProps {
   visible: boolean;

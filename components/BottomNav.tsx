@@ -4,8 +4,8 @@ import { BlurView } from "expo-blur";
 import { router, usePathname } from "expo-router";
 import { Platform, StyleSheet, useColorScheme, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AddButton } from "./BottomNav/AddButton";
-import { NavItem } from "./BottomNav/NavItem";
+import { AddButton } from "./AddButton";
+import { NavItem } from "./NavItem";
 
 type BottomNavProps = {
   onAddPress: () => void;

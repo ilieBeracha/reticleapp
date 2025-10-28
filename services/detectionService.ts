@@ -1,3 +1,8 @@
+import {
+  NetworkError,
+  ValidationError,
+  handleServiceError,
+} from "@/lib/errors";
 import { AnalyzeResponse, isAnalyzeResponse } from "@/types/api";
 
 const API_URL = process.env.EXPO_PUBLIC_DETECT_BASE_URL || ""; // your FastAPI endpoint
@@ -13,6 +18,14 @@ export async function uploadForDetection(
   console.log("🚀 Detection service: Starting upload to", API_URL);
   console.log("📁 Detection service: Image URI:", imageUri);
   console.log("🎯 Detection service: Expected bullets:", expectedBullets);
+
+  // Validate input parameters
+  if (!imageUri) {
+    throw new ValidationError("Image URI is required");
+  }
+  if (expectedBullets < 0) {
+    throw new ValidationError("Expected bullets must be a non-negative number");
+  }
 
   const formData = new FormData();
   formData.append("file", {
@@ -42,7 +55,19 @@ export async function uploadForDetection(
     if (!response.ok) {
       const errorText = await response.text();
       console.error("❌ Detection service: Server error response:", errorText);
-      throw new Error(`Server error: ${response.status} - ${errorText}`);
+
+      // Handle different HTTP status codes appropriately
+      if (response.status >= 400 && response.status < 500) {
+        throw new ValidationError(
+          `Client error: ${response.status} - ${errorText}`
+        );
+      } else if (response.status >= 500) {
+        throw new NetworkError(
+          `Server error: ${response.status} - ${errorText}`
+        );
+      } else {
+        throw new NetworkError(`HTTP error: ${response.status} - ${errorText}`);
+      }
     }
 
     const result = await response.json();
@@ -53,13 +78,25 @@ export async function uploadForDetection(
         "❌ Detection service: Invalid response structure:",
         result
       );
-      throw new Error("Invalid response structure from API");
+      throw new ValidationError(
+        "Invalid response structure from detection API"
+      );
     }
 
     console.log("📋 Detection service: Valid AnalyzeResponse received");
     return result;
-  } catch (err) {
-    console.error("❌ Detection service: Error uploading for detection:", err);
-    throw err;
+  } catch (err: any) {
+    // If it's already a ServiceError, re-throw it
+    if (err.name === "ValidationError" || err.name === "NetworkError") {
+      throw err;
+    }
+
+    // Handle network/fetch errors
+    if (err.name === "TypeError" && err.message?.includes("fetch")) {
+      throw new NetworkError("Failed to connect to detection service");
+    }
+
+    // Use consistent error handling
+    handleServiceError(err, "Failed to upload image for detection");
   }
 }

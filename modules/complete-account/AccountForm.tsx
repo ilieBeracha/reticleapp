@@ -1,5 +1,5 @@
-import RadioButtonInput from "@/components/forms/RadioButtonInput";
-import TextInput from "@/components/forms/TextInput";
+import RadioButtonInput from "@/components/RadioButtonInput";
+import TextInput from "@/components/TextInput";
 import { Control } from "react-hook-form";
 import {
   ActivityIndicator,

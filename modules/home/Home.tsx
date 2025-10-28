@@ -1,5 +1,5 @@
 import { ThemedView } from "@/components/ThemedView";
-import { useEnsureActiveOrg } from "@/hooks/organizations/useEnsureActiveOrg";
+import { useEnsureActiveOrg } from "@/hooks/useEnsureActiveOrg";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { useOrganizationSwitchStore } from "@/store/organizationSwitchStore";
 import { sessionsStore } from "@/store/sessionsStore";
@@ -14,7 +14,7 @@ export function Home() {
   useEnsureActiveOrg();
   const { user } = useUser();
   const { organization } = useOrganization();
-  const { userId, orgId, getToken } = useAuth();
+  const { userId, orgId } = useAuth();
   const { sessions, loading, fetchSessions } = useStore(sessionsStore);
   const { isSwitching } = useOrganizationSwitchStore();
 
@@ -76,11 +76,8 @@ export function Home() {
       }
 
       if (userId) {
-        const token = await getToken({ template: "supabase" });
-        if (token) {
-          console.log("Fetching sessions for orgId:", orgId);
-          fetchSessions(token, userId, orgId);
-        }
+        console.log("Fetching sessions for orgId:", orgId);
+        fetchSessions(userId, orgId);
       }
     };
     loadSessions();

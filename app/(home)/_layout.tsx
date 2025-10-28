@@ -1,9 +1,7 @@
+import ActionMenuModal, { type Action } from "@/components/ActionMenuModal";
 import BottomNav from "@/components/BottomNav";
+import CreateSessionModal from "@/components/CreateSessionModal";
 import Header from "@/components/Header";
-import ActionMenuModal, {
-  type Action,
-} from "@/components/modals/ActionMenuModal";
-import CreateSessionModal from "@/components/modals/CreateSessionModal";
 import { useOrganization } from "@clerk/clerk-expo";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { router, Stack, usePathname } from "expo-router";

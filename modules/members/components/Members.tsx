@@ -1,8 +1,9 @@
-import { InviteMemberModal } from "@/components/modals/InviteMemberModal";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import { useIsOrgAdmin } from "@/hooks/organizations/useIsOrgAdmin";
-import { useOrgInvitations } from "@/hooks/organizations/useOrgInvitations";
+
+import { InviteMemberModal } from "@/components/InviteMemberModal";
+import { useIsOrgAdmin } from "@/hooks/useIsOrgAdmin";
+import { useOrgInvitations } from "@/hooks/useOrgInvitations";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { useOrganization } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
@@ -239,7 +240,7 @@ export function Members() {
               </View>
             ) : pendingInvitations.length > 0 ? (
               <View style={styles.invitationsList}>
-                {pendingInvitations.map((invitation) => (
+                {pendingInvitations.map((invitation: any) => (
                   <View
                     key={invitation.id}
                     style={[

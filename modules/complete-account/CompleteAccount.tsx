@@ -1,9 +1,9 @@
 import { useColors } from "@/hooks/useColors";
 import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useAccountCompletion } from "../hooks/useAccountCompletion";
 import { AccountForm } from "./AccountForm";
 import { FormHeader } from "./FormHeader";
+import { useAccountCompletion } from "./useAccountCompletion";
 
 export function CompleteAccount() {
   const insets = useSafeAreaInsets();

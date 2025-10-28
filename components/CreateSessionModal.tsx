@@ -26,7 +26,7 @@ export default function CreateSessionModal({
   onClose,
 }: CreateSessionModalProps) {
   const colors = useColors();
-  const { userId, orgId, getToken } = useAuth();
+  const { userId, orgId } = useAuth();
 
   // Use Zustand store directly
   const { createSession, fetchSessions } = useStore(sessionsStore);
@@ -64,14 +64,7 @@ export default function CreateSessionModal({
     try {
       setIsSubmitting(true);
 
-      // Get auth token
-      const token = await getToken({ template: "supabase" });
-      if (!token) {
-        throw new Error("No auth token available");
-      }
-      console.log("token", token);
       const session = await createSession(
-        token,
         {
           name: name.trim(),
           session_type: sessionType,
@@ -84,7 +77,7 @@ export default function CreateSessionModal({
       // Refetch sessions based on current context
       // - If in org: fetches all team sessions
       // - If personal: fetches all user's sessions
-      await fetchSessions(token, userId, orgId);
+      await fetchSessions(userId, orgId);
 
       Alert.alert("Success", "Session created successfully!");
       handleClose();
