@@ -1,6 +1,6 @@
+import { ThemedText } from "@/components/ThemedText";
 import React, { useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
-import { ThemedText } from "../ThemedText";
 import { CreateOrgModal } from "./CreateOrg";
 import { OrganizationSwitcherModal } from "./OrganizationSwitcherModal";
 
@@ -82,8 +82,3 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
-
-
-
-
-

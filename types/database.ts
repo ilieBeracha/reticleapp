@@ -116,15 +116,96 @@ export interface UpdateSessionStatsInput {
 }
 
 export interface WeaponModel {
+  id: string;
   name: string;
-  weapon_name: string;
-  manufacturer: string;
-  weapon_type: string;
-  caliber: string;
-  cartridge_raw: string;
-  origin: string;
-  year: number;
+  weapon_name?: string;
+  manufacturer?: string;
+  weapon_type?: string;
+  caliber?: string;
+  cartridge_raw?: string;
+  effective_range_m?: number;
+  barrel_length_cm?: number;
+  twist_rate?: string;
+  origin?: string;
+  year?: number;
+  metadata?: Record<string, any>;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface SightModel {
+  id: string;
+  name: string;
+  manufacturer?: string;
+  kind: string; // scope, optic, thermal
+  mount_type?: string;
+  metadata?: Record<string, any>;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Weapon {
+  id: string;
+  weapon_model_id: string;
+  serial_number: string;
+  organization_id: string;
+  last_maintenance_date?: string;
+  round_count?: number;
+  condition?: string;
+  notes?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Sight {
+  id: string;
+  sight_model_id: string;
+  serial_number: string;
+  organization_id: string;
+  last_calibration_date?: string;
+  condition?: string;
+  notes?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserLoadout {
+  id: string;
+  user_id: string;
+  organization_id?: string;
+  name: string;
+  weapon_id?: string;
+  sight_id?: string;
+  zero_distance_m?: number;
+  zero_conditions?: Record<string, any>;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateLoadoutInput {
+  name: string;
+  weapon_id?: string;
+  sight_id?: string;
+  zero_distance_m?: number;
+  zero_conditions?: Record<string, any>;
+}
+
+export interface UpdateLoadoutInput {
+  name?: string;
+  weapon_id?: string;
+  sight_id?: string;
+  zero_distance_m?: number;
+  zero_conditions?: Record<string, any>;
+  is_active?: boolean;
+}
+
+// Enriched loadout with joined data
+export interface LoadoutWithDetails extends UserLoadout {
+  weapon?: Weapon & { model?: WeaponModel };
+  sight?: Sight & { model?: SightModel };
 }

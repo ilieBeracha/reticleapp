@@ -2,9 +2,9 @@ import { Session } from "@/types/database";
 import { useAuth, useOrganization } from "@clerk/clerk-expo";
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
-import { ActivityChart } from "./LastRecap/ActivityChart";
-import { EmptyState } from "./LastRecap/EmptyState";
-import { WeeklyStats } from "./LastRecap/WeeklyStats";
+import { ActivityChart } from "./ActivityChart";
+import { EmptyState } from "./EmptyState";
+import { WeeklyStats } from "./WeeklyStats";
 
 interface LastRecapProps {
   sessions: Session[];

@@ -1,8 +1,8 @@
-import { Text } from '@/components/ui/text';
-import { View } from '@/components/ui/view';
-import { useColor } from '@/hooks/useColor';
-import { CORNERS, FONT_SIZE } from '@/theme/globals';
-import React, { useEffect, useState } from 'react';
+import { Text } from "@/components/text";
+import { View } from "@/components/view";
+import { useColor } from "@/hooks/useColor";
+import { CORNERS, FONT_SIZE } from "@/theme/globals";
+import React, { useEffect, useState } from "react";
 import {
   ActionSheetIOS,
   Dimensions,
@@ -13,7 +13,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ViewStyle,
-} from 'react-native';
+} from "react-native";
 import Animated, {
   Easing,
   interpolate,
@@ -21,7 +21,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
-} from 'react-native-reanimated';
+} from "react-native-reanimated";
 
 export interface ActionSheetOption {
   title: string;
@@ -47,11 +47,11 @@ export function ActionSheet({
   title,
   message,
   options,
-  cancelButtonTitle = 'Cancel',
+  cancelButtonTitle = "Cancel",
   style,
 }: ActionSheetProps) {
   // Use iOS native ActionSheet on iOS
-  if (Platform.OS === 'ios') {
+  if (Platform.OS === "ios") {
     useEffect(() => {
       if (visible) {
         const optionTitles = options.map((option) => option.title);
@@ -119,13 +119,13 @@ function AndroidActionSheet({
 }: ActionSheetProps) {
   const [isSheetVisible, setIsSheetVisible] = useState(visible);
   const progress = useSharedValue(0);
-  const screenHeight = Dimensions.get('window').height;
+  const screenHeight = Dimensions.get("window").height;
 
-  const cardColor = useColor('card');
-  const textColor = useColor('text');
-  const mutedColor = useColor('textMuted');
-  const borderColor = useColor('border');
-  const destructiveColor = useColor('red');
+  const cardColor = useColor("card");
+  const textColor = useColor("text");
+  const mutedColor = useColor("textMuted");
+  const borderColor = useColor("border");
+  const destructiveColor = useColor("red");
 
   useEffect(() => {
     if (visible) {
@@ -181,7 +181,7 @@ function AndroidActionSheet({
     <Modal
       transparent
       visible={isSheetVisible}
-      animationType='none'
+      animationType="none"
       statusBarTranslucent
       onRequestClose={onClose}
     >
@@ -288,11 +288,11 @@ function AndroidActionSheet({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   backdropPressable: {
     flex: 1,
@@ -301,9 +301,9 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: CORNERS,
     borderTopRightRadius: CORNERS,
     paddingBottom: 34, // Safe area bottom padding
-    maxHeight: '80%',
+    maxHeight: "80%",
     elevation: 10,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: -2,
@@ -315,17 +315,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 16,
-    alignItems: 'center',
+    alignItems: "center",
   },
   title: {
     fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
+    fontWeight: "600",
+    textAlign: "center",
     marginBottom: 4,
   },
   message: {
     fontSize: FONT_SIZE - 1,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 20,
   },
   optionsContainer: {
@@ -343,19 +343,19 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   optionContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   optionIcon: {
     marginRight: 12,
     width: 24,
     height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   optionText: {
     fontSize: FONT_SIZE,
-    fontWeight: '500',
+    fontWeight: "500",
     flex: 1,
   },
   cancelContainer: {
@@ -365,11 +365,11 @@ const styles = StyleSheet.create({
   cancelButton: {
     paddingHorizontal: 20,
     paddingVertical: 16,
-    alignItems: 'center',
+    alignItems: "center",
   },
   cancelText: {
     fontSize: FONT_SIZE,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });
 
@@ -377,13 +377,13 @@ const styles = StyleSheet.create({
 export function useActionSheet() {
   const [isVisible, setIsVisible] = React.useState(false);
   const [config, setConfig] = React.useState<
-    Omit<ActionSheetProps, 'visible' | 'onClose'>
+    Omit<ActionSheetProps, "visible" | "onClose">
   >({
     options: [],
   });
 
   const show = React.useCallback(
-    (actionSheetConfig: Omit<ActionSheetProps, 'visible' | 'onClose'>) => {
+    (actionSheetConfig: Omit<ActionSheetProps, "visible" | "onClose">) => {
       setConfig(actionSheetConfig);
       setIsVisible(true);
     },

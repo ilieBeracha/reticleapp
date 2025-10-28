@@ -1,4 +1,4 @@
-import { Loadout } from "@/modules/loadout/components/Loadout";
+import { Loadout } from "@/modules/loadout/Loadout";
 
 export default function LoadoutPage() {
   return <Loadout />;
