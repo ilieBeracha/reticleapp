@@ -121,11 +121,11 @@ function AndroidActionSheet({
   const progress = useSharedValue(0);
   const screenHeight = Dimensions.get("window").height;
 
-  const cardColor = useColor("card");
-  const textColor = useColor("text");
-  const mutedColor = useColor("textMuted");
-  const borderColor = useColor("border");
-  const destructiveColor = useColor("red");
+  const cardColor = useColor({}, "card");
+  const textColor = useColor({}, "text");
+  const mutedColor = useColor({}, "textMuted");
+  const borderColor = useColor({}, "border");
+  const destructiveColor = useColor({}, "red");
 
   useEffect(() => {
     if (visible) {
@@ -252,8 +252,8 @@ function AndroidActionSheet({
                         color: option.destructive
                           ? destructiveColor
                           : option.disabled
-                          ? mutedColor
-                          : textColor,
+                            ? mutedColor
+                            : textColor,
                       },
                     ]}
                     numberOfLines={1}

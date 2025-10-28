@@ -1,7 +1,7 @@
 import ActionMenuModal, { type Action } from "@/components/ActionMenuModal";
 import BottomNav from "@/components/BottomNav";
 import CreateSessionModal from "@/components/CreateSessionModal";
-import Header from "@/components/Header";
+import CustomHeader from "@/components/custom-header";
 import { useOrganization } from "@clerk/clerk-expo";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { router, Stack, usePathname } from "expo-router";
@@ -60,7 +60,13 @@ export default function Layout() {
   return (
     <BottomSheetModalProvider>
       <View style={{ flex: 1 }}>
-        <Header onNotificationPress={() => {}} />
+        {!isCameraScreen && (
+          <CustomHeader
+            title="Dashboard"
+            onNotificationPress={() => {}}
+            notificationCount={0}
+          />
+        )}
 
         <View style={{ flex: 1 }}>
           <Stack screenOptions={{ headerShown: false, animation: "none" }}>

@@ -8,13 +8,14 @@
       ]
     }
   },
- "include": [
+  "include": [
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
-    "docs/contents/audio-waveform.mdx"],
-
+    "docs/contents/audio-waveform.mdx",
+    "nativewind-env.d.ts"
+  ],
   "exclude": [
     "node_modules",
     "supabase/functions",

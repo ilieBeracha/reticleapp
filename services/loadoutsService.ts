@@ -1,10 +1,10 @@
 import { AuthenticatedClient } from "@/lib/authenticatedClient";
 import { handleServiceError } from "@/lib/errors";
 import {
-  CreateLoadoutInput,
-  LoadoutWithDetails,
-  UpdateLoadoutInput,
-  UserLoadout,
+    CreateLoadoutInput,
+    LoadoutWithDetails,
+    UpdateLoadoutInput,
+    UserLoadout,
 } from "@/types/database";
 
 /**

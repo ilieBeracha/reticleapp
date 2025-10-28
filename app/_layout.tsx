@@ -1,5 +1,6 @@
 import { OrganizationSwitchOverlay } from "@/components/OrganizationSwitchOverlay";
 
+import { GluestackUIProvider } from "@/components/ui/gluestack-ui-provider";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { EnhancedAuthProvider } from "@/hooks/useEnhancedAuth";
 import {
@@ -7,11 +8,6 @@ import {
   useOrganizationSwitch,
 } from "@/hooks/useOrganizationSwitch";
 import { ClerkLoaded, ClerkProvider } from "@clerk/clerk-expo";
-import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
-} from "@react-navigation/native";
 import { useFonts } from "expo-font";
 import { Slot } from "expo-router";
 import * as SecureStore from "expo-secure-store";
@@ -19,7 +15,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-
+import "../global.css";
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -54,7 +50,7 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+    <GluestackUIProvider mode={colorScheme === "dark" ? "dark" : "light"}>
       <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
         <ClerkLoaded>
           <EnhancedAuthProvider>
@@ -68,7 +64,7 @@ export default function RootLayout() {
           </EnhancedAuthProvider>
         </ClerkLoaded>
       </ClerkProvider>
-    </ThemeProvider>
+    </GluestackUIProvider>
   );
 }
 
