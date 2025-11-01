@@ -7,6 +7,11 @@
     "icon": "./assets/images/icon.png",
     "scheme": "scopeuinativeclerk",
     "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/brand.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "newArchEnabled": true,
     "ios": {
       "bundleIdentifier": "com.scopeui.nativeclerk",
@@ -38,7 +43,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/brand.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
