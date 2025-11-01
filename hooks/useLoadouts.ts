@@ -1,6 +1,6 @@
 import { getLoadoutsService } from "@/services/loadoutsService";
 import { LoadoutWithDetails } from "@/types/database";
-import { useAuth, useOrganization } from "@clerk/clerk-expo";
+import { useAuth, useOrganization } from "@clerk/clerk-react-native";
 import { useCallback, useEffect, useState } from "react";
 
 /**

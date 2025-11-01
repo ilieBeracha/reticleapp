@@ -1,5 +1,5 @@
+import { View } from "@/components/ui/view";
 import { useColors } from "@/hooks/useColors";
-import { View } from "react-native";
 import { Weapons } from "../weapons/Weapons";
 export function Loadout() {
   const colors = useColors();
