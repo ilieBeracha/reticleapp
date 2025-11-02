@@ -28,48 +28,26 @@ export function GreetingSection({
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.greeting, { color: colors.description }]}>
+      <Text style={[styles.greeting, { color: colors.textMuted }]}>
         {getGreeting()},
       </Text>
       <Text style={[styles.userName, { color: colors.text }]}>{userName}</Text>
 
-      {/* Organization Context Badge */}
       {organizationName && (
         <View
           style={[
             styles.contextBadge,
-            {
-              backgroundColor: colors.orange + "15",
-              borderWidth: 1.5,
-              borderColor: colors.orange + "40",
-            },
+            { backgroundColor: colors.indigo + "10" },
           ]}
         >
           <Ionicons
             name={isPersonalWorkspace ? "person" : "business"}
-            size={14}
-            color={colors.orange}
+            size={13}
+            color={colors.indigo}
+            style={{ opacity: 0.7 }}
           />
-          <Text style={[styles.contextText, { color: colors.orange }]}>
-            {organizationName}
-          </Text>
-        </View>
-      )}
-
-      {!organizationName && (
-        <View
-          style={[
-            styles.contextBadge,
-            {
-              backgroundColor: colors.indigo + "15",
-              borderWidth: 1.5,
-              borderColor: colors.indigo + "40",
-            },
-          ]}
-        >
-          <Ionicons name="person" size={14} color={colors.indigo} />
           <Text style={[styles.contextText, { color: colors.indigo }]}>
-            Personal Workspace
+            {organizationName}
           </Text>
         </View>
       )}
@@ -79,34 +57,33 @@ export function GreetingSection({
 
 const styles = StyleSheet.create({
   container: {
-    gap: 8,
-    paddingTop: 4,
-    paddingBottom: 16,
+    gap: 6,
+    paddingTop: 8,
+    paddingBottom: 24,
   },
   greeting: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "500",
-    opacity: 0.7,
+    opacity: 0.5,
   },
   userName: {
-    fontSize: 34,
-    fontWeight: "700",
-    letterSpacing: -0.5,
-    marginBottom: 4,
+    fontSize: 32,
+    fontWeight: "600",
+    letterSpacing: -1,
+    marginBottom: 8,
   },
   contextBadge: {
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 6,
-    marginTop: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    gap: 5,
   },
   contextText: {
-    fontSize: 13,
-    fontWeight: "600",
-    letterSpacing: 0.2,
+    fontSize: 12,
+    fontWeight: "500",
+    opacity: 0.75,
   },
 });

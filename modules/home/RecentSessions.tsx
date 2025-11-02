@@ -18,7 +18,7 @@ export function RecentSessions({ sessions, loading }: RecentSessionsProps) {
           Recent Sessions
         </Text>
         {sessions.length > 0 && (
-          <Text style={[styles.viewAll, { color: colors.indigo }]}>
+          <Text style={[styles.viewAll, { color: colors.textMuted }]}>
             View All
           </Text>
         )}
@@ -31,9 +31,9 @@ export function RecentSessions({ sessions, loading }: RecentSessionsProps) {
         <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
           <Ionicons
             name="calendar-outline"
-            size={32}
+            size={28}
             color={colors.textMuted}
-            style={{ opacity: 0.4 }}
+            style={{ opacity: 0.3 }}
           />
           <Text style={[styles.emptyText, { color: colors.textMuted }]}>
             No sessions yet
@@ -41,42 +41,49 @@ export function RecentSessions({ sessions, loading }: RecentSessionsProps) {
         </View>
       ) : (
         <View style={styles.sessionsList}>
-          {sessions.map((session, index) => (
-            <View
-              key={session.id}
-              style={[
-                styles.sessionItem,
-                {
-                  backgroundColor: colors.card,
-                  borderLeftColor: colors.blue,
-                },
-              ]}
-            >
+          {sessions.map((session, index) => {
+            // Subtle color rotation for elegance
+            const accentColor = index % 3 === 0 ? colors.blue : index % 3 === 1 ? colors.purple : colors.green;
+
+            return (
               <View
+                key={session.id}
                 style={[
-                  styles.sessionIcon,
-                  { backgroundColor: colors.blue + "15" },
+                  styles.sessionItem,
+                  {
+                    backgroundColor: colors.card,
+                    borderLeftWidth: 2,
+                    borderLeftColor: accentColor + "25",
+                  },
                 ]}
               >
-                <Ionicons name="play-circle" size={20} color={colors.blue} />
-              </View>
-              <View style={styles.sessionContent}>
-                <Text style={[styles.sessionTitle, { color: colors.text }]}>
-                  {session.name}
-                </Text>
-                <Text
-                  style={[styles.sessionDate, { color: colors.textMuted }]}
+                <View
+                  style={[
+                    styles.sessionIcon,
+                    { backgroundColor: accentColor + "10" },
+                  ]}
                 >
-                  {new Date(session.created_at).toLocaleDateString()}
-                </Text>
+                  <Ionicons name="play-circle" size={17} color={accentColor} style={{ opacity: 0.7 }} />
+                </View>
+                <View style={styles.sessionContent}>
+                  <Text style={[styles.sessionTitle, { color: colors.text }]}>
+                    {session.name}
+                  </Text>
+                  <Text
+                    style={[styles.sessionDate, { color: colors.textMuted }]}
+                  >
+                    {new Date(session.created_at).toLocaleDateString()}
+                  </Text>
+                </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={accentColor}
+                  style={{ opacity: 0.3 }}
+                />
               </View>
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color={colors.textMuted}
-              />
-            </View>
-          ))}
+            );
+          })}
         </View>
       )}
     </View>
@@ -91,59 +98,61 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 14,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: "700",
+    fontSize: 18,
+    fontWeight: "600",
     letterSpacing: -0.3,
   },
   viewAll: {
-    fontSize: 15,
-    fontWeight: "600",
+    fontSize: 14,
+    fontWeight: "500",
+    opacity: 0.6,
   },
   sessionsList: {
-    gap: 12,
+    gap: 8,
   },
   sessionItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
     borderRadius: 12,
-    borderLeftWidth: 4,
     gap: 12,
   },
   sessionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
   },
   sessionContent: {
     flex: 1,
-    gap: 4,
+    gap: 3,
   },
   sessionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 15,
+    fontWeight: "500",
     letterSpacing: -0.2,
   },
   sessionDate: {
-    fontSize: 13,
-    fontWeight: "500",
+    fontSize: 12,
+    fontWeight: "400",
+    opacity: 0.5,
   },
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 40,
+    paddingVertical: 36,
     paddingHorizontal: 20,
     borderRadius: 12,
-    gap: 12,
+    gap: 10,
   },
   emptyText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "500",
+    opacity: 0.5,
   },
 });

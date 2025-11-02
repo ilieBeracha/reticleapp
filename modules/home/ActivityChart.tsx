@@ -62,8 +62,8 @@ export function ActivityChart({
           Weekly Activity
         </Text>
         {isPersonalMode && (
-          <Text style={[styles.subtitle, { color: colors.description }]}>
-            Combined from all workspaces
+          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+            All workspaces
           </Text>
         )}
       </View>
@@ -71,7 +71,7 @@ export function ActivityChart({
       <View style={styles.chart}>
         {weekActivity.map((item, idx) => {
           const height =
-            item.sessions === 0 ? 4 : (item.sessions / maxSessions) * 80 + 20;
+            item.sessions === 0 ? 4 : (item.sessions / maxSessions) * 70 + 16;
 
           return (
             <View key={idx} style={styles.chartColumn}>
@@ -82,12 +82,11 @@ export function ActivityChart({
                     {
                       height,
                       backgroundColor: item.isToday
-                        ? colors.tint
+                        ? colors.indigo
                         : item.sessions > 0
-                        ? isPersonalMode
-                          ? colors.tint + "50"
-                          : colors.tint + "35"
+                        ? colors.blue
                         : colors.border,
+                      opacity: item.sessions === 0 ? 0.2 : item.isToday ? 0.85 : 0.4,
                     },
                   ]}
                 >
@@ -95,28 +94,21 @@ export function ActivityChart({
                     <Text
                       style={[
                         styles.barText,
-                        { color: item.isToday ? "#FFF" : colors.text },
+                        { color: item.isToday ? colors.background : colors.textMuted },
                       ]}
                     >
                       {item.sessions}
                     </Text>
                   )}
                 </View>
-                {item.isToday && (
-                  <View
-                    style={[
-                      styles.todayIndicator,
-                      { backgroundColor: colors.tint },
-                    ]}
-                  />
-                )}
               </View>
               <Text
                 style={[
                   styles.dayText,
                   {
-                    color: item.isToday ? colors.tint : colors.description,
-                    fontWeight: item.isToday ? "700" : "500",
+                    color: item.isToday ? colors.indigo : colors.textMuted,
+                    opacity: item.isToday ? 0.85 : 0.45,
+                    fontWeight: item.isToday ? "600" : "500",
                   },
                 ]}
               >
@@ -126,58 +118,33 @@ export function ActivityChart({
           );
         })}
       </View>
-
-      {/* Legend for Personal Mode */}
-      {isPersonalMode && sessions.length > 0 && (
-        <View style={[styles.legend, { borderColor: colors.border }]}>
-          <View style={styles.legendItem}>
-            <View
-              style={[
-                styles.legendDot,
-                { backgroundColor: colors.tint + "50" },
-              ]}
-            />
-            <Text style={[styles.legendText, { color: colors.description }]}>
-              Personal Sessions
-            </Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View
-              style={[styles.legendDot, { backgroundColor: colors.tint }]}
-            />
-            <Text style={[styles.legendText, { color: colors.description }]}>
-              Today
-            </Text>
-          </View>
-        </View>
-      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    gap: 10,
+    gap: 8,
   },
   header: {
     gap: 2,
   },
   title: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: "600",
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
   },
   subtitle: {
-    fontSize: 12,
-    fontWeight: "400",
-    opacity: 0.7,
+    fontSize: 11,
+    fontWeight: "500",
+    opacity: 0.4,
   },
   chart: {
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
-    height: 120,
-    paddingTop: 20,
+    height: 100,
+    paddingTop: 16,
     paddingHorizontal: 2,
   },
   chartColumn: {
@@ -192,49 +159,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   bar: {
-    width: "70%",
-    borderRadius: 6,
+    width: "65%",
+    borderRadius: 5,
     justifyContent: "center",
     alignItems: "center",
     minHeight: 4,
   },
-  todayIndicator: {
-    position: "absolute",
-    bottom: -2,
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-  },
   barText: {
-    fontSize: 11,
-    fontWeight: "700",
+    fontSize: 10,
+    fontWeight: "600",
   },
   dayText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "500",
-    letterSpacing: 0.2,
-  },
-  legend: {
-    flexDirection: "row",
-    gap: 16,
-    paddingTop: 8,
-    paddingHorizontal: 4,
-    borderTopWidth: 1,
-    marginTop: 4,
-  },
-  legendItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  legendText: {
-    fontSize: 11,
-    fontWeight: "500",
-    opacity: 0.7,
   },
 });

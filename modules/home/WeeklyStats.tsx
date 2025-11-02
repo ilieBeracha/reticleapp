@@ -1,6 +1,6 @@
 import { useColors } from "@/hooks/useColors";
 import { Ionicons } from "@expo/vector-icons";
-import { Platform, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 interface WeeklyStatsProps {
   totalSessions: number;
@@ -27,24 +27,19 @@ export function WeeklyStats({
         <View
           style={[
             styles.contextBadge,
-            {
-              backgroundColor: isPersonalMode
-                ? colors.border
-                : colors.tint + "15",
-            },
+            { backgroundColor: colors.purple + "08" },
           ]}
         >
           <Ionicons
             name={isPersonalMode ? "person" : "people"}
-            size={14}
-            color={isPersonalMode ? colors.description : colors.tint}
+            size={12}
+            color={colors.purple}
+            style={{ opacity: 0.7 }}
           />
           <Text
             style={[
               styles.contextBadgeText,
-              {
-                color: isPersonalMode ? colors.description : colors.tint,
-              },
+              { color: colors.purple },
             ]}
           >
             {isPersonalMode ? "Personal" : organizationName || "Team"}
@@ -53,63 +48,40 @@ export function WeeklyStats({
       </View>
 
       <View style={styles.statsRow}>
-        {/* This Week Card */}
-        <View
-          style={[
-            styles.statCard,
-            {
-              backgroundColor: colors.tint + "10",
-              borderColor: colors.tint + "30",
-            },
-          ]}
-        >
-          <View style={[styles.statIcon, { backgroundColor: colors.tint }]}>
-            <Ionicons name="calendar" size={20} color="#FFF" />
+        <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+          <View style={[styles.statIcon, { backgroundColor: colors.blue + "12" }]}>
+            <Ionicons name="calendar" size={17} color={colors.blue} style={{ opacity: 0.8 }} />
           </View>
           <View style={styles.statContent}>
             <Text style={[styles.statNumber, { color: colors.text }]}>
               {totalSessions}
             </Text>
-            <Text style={[styles.statLabel, { color: colors.description }]}>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>
               This Week
             </Text>
           </View>
-          {totalSessions > 0 && (
-            <View style={[styles.badge, { backgroundColor: colors.tint }]}>
-              <Text style={styles.badgeText}>+{totalSessions}</Text>
-            </View>
-          )}
         </View>
 
-        {/* All Time Card */}
-        <View
-          style={[
-            styles.statCard,
-            {
-              backgroundColor: colors.cardBackground,
-              borderColor: colors.border,
-            },
-          ]}
-        >
-          <View style={[styles.statIcon, { backgroundColor: colors.border }]}>
+        <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+          <View style={[styles.statIcon, { backgroundColor: colors.green + "12" }]}>
             <Ionicons
               name={isPersonalMode ? "trophy" : "people"}
-              size={20}
-              color={colors.text}
+              size={17}
+              color={colors.green}
+              style={{ opacity: 0.8 }}
             />
           </View>
           <View style={styles.statContent}>
             <Text style={[styles.statNumber, { color: colors.text }]}>
               {totalAllTime}
             </Text>
-            <Text style={[styles.statLabel, { color: colors.description }]}>
-              {isPersonalMode ? "All Personal" : "All Team"}
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+              All Time
             </Text>
           </View>
         </View>
       </View>
 
-      {/* Streak Indicator */}
       {weekStreak > 0 && (
         <View style={styles.streakContainer}>
           <View style={styles.streakDots}>
@@ -119,31 +91,15 @@ export function WeeklyStats({
                 style={[
                   styles.streakDot,
                   {
-                    backgroundColor:
-                      i < weekStreak ? colors.tint : colors.border,
-                    opacity: i < weekStreak ? 1 : 0.3,
+                    backgroundColor: i < weekStreak ? colors.orange : colors.border,
+                    opacity: i < weekStreak ? 0.7 : 0.25,
                   },
                 ]}
               />
             ))}
           </View>
-          <Text style={[styles.streakText, { color: colors.description }]}>
-            {weekStreak === 7 ? "Perfect week!" : `${weekStreak} day streak`}
-          </Text>
-        </View>
-      )}
-
-      {isPersonalMode && totalAllTime > 0 && (
-        <View
-          style={[styles.infoBox, { backgroundColor: colors.border + "20" }]}
-        >
-          <Ionicons
-            name="information-circle"
-            size={16}
-            color={colors.description}
-          />
-          <Text style={[styles.infoText, { color: colors.description }]}>
-            Showing sessions from all your organizations
+          <Text style={[styles.streakText, { color: colors.textMuted }]}>
+            {weekStreak === 7 ? "Perfect week" : `${weekStreak} day streak`}
           </Text>
         </View>
       )}
@@ -159,26 +115,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 4,
+    marginBottom: 8,
   },
   title: {
-    fontSize: 21,
-    fontWeight: "700",
-    letterSpacing: -0.4,
+    fontSize: 18,
+    fontWeight: "600",
+    letterSpacing: -0.3,
   },
   contextBadge: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 10,
+    borderRadius: 8,
     gap: 4,
   },
   contextBadgeText: {
-    fontSize: 11,
-    fontWeight: "600",
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
+    fontSize: 10,
+    fontWeight: "500",
+    opacity: 0.75,
   },
   statsRow: {
     flexDirection: "row",
@@ -189,25 +144,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     padding: 14,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    gap: 12,
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
+    borderRadius: 12,
+    gap: 10,
   },
   statIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -215,66 +158,35 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   statNumber: {
-    fontSize: 24,
-    fontWeight: "700",
-    letterSpacing: -0.8,
-    lineHeight: 24,
+    fontSize: 20,
+    fontWeight: "600",
+    letterSpacing: -0.5,
+    lineHeight: 22,
   },
   statLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
-    opacity: 0.7,
-  },
-  badge: {
-    position: "absolute",
-    top: -4,
-    right: -4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    minWidth: 24,
-    alignItems: "center",
-  },
-  badgeText: {
     fontSize: 10,
-    fontWeight: "700",
-    color: "#FFF",
-  },
-  infoBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 10,
-    borderRadius: 10,
-    gap: 6,
-    marginTop: -4,
-  },
-  infoText: {
-    fontSize: 12,
     fontWeight: "500",
-    flex: 1,
-    opacity: 0.8,
+    opacity: 0.5,
   },
   streakContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    paddingVertical: 8,
+    gap: 6,
+    paddingVertical: 6,
   },
   streakDots: {
     flexDirection: "row",
-    gap: 4,
+    gap: 3,
   },
   streakDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
   },
   streakText: {
-    fontSize: 12,
-    fontWeight: "600",
-    letterSpacing: 0.3,
+    fontSize: 11,
+    fontWeight: "500",
+    opacity: 0.5,
   },
 });

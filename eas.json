@@ -11,6 +11,13 @@
       "developmentClient": true,
       "distribution": "internal"
     },
+    "staging": {
+      "ios": {
+        "simulator": false
+      },
+       "developmentClient": true,
+      "distribution": "internal"
+    },
     "preview": {
       "distribution": "internal"
     },
