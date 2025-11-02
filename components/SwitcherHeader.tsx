@@ -1,28 +1,33 @@
-import { ThemedText } from "@/components/ThemedText";
-import { useThemeColor } from "@/hooks/useThemeColor";
-import { StyleSheet, View } from "react-native";
+import { useColors } from "@/hooks/useColors";
+import { StyleSheet, Text, View } from "react-native";
 
 export function SwitcherHeader() {
-  const textColor = useThemeColor({}, "text");
+  const colors = useColors();
 
   return (
     <View style={styles.header}>
-      <ThemedText style={[styles.title, { color: textColor }]}>
-        Workspaces
-      </ThemedText>
+      <Text style={[styles.title, { color: colors.text }]}>Workspaces</Text>
+      <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+        Switch between your personal and organization accounts
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 16,
+    paddingBottom: 20,
+    gap: 4,
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "700",
-    letterSpacing: -0.6,
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize: 13,
+    fontWeight: "400",
+    letterSpacing: -0.1,
+    opacity: 0.8,
   },
 });

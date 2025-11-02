@@ -39,7 +39,7 @@ export default function BaseBottomSheet({
   backdropOpacity = 0.6,
   children,
   keyboardBehavior = "interactive",
-  enableDynamicSizing = false,
+  enableDynamicSizing = true,
   keyboardSnapPoint,
   enableKeyboardAutoSnap = true,
 }: BaseBottomSheetProps) {

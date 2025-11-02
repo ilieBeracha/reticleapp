@@ -1,76 +1,48 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { Appearance, ColorSchemeName } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { Appearance } from "react-native";
 
 type ThemeMode = "light" | "dark";
 
 interface ThemeContextType {
   theme: ThemeMode;
-  toggleTheme: () => void;
-  setTheme: (theme: ThemeMode) => void;
   isDark: boolean;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
-
 const THEME_STORAGE_KEY = "@app_theme";
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<ThemeMode>("dark");
-  const [isLoaded, setIsLoaded] = useState(false);
+  // Initialize with current device color scheme
+  const [theme, setThemeState] = useState<ThemeMode>(() => {
+    const initialScheme = Appearance.getColorScheme();
+    return initialScheme === "dark" ? "dark" : "light";
+  });
 
-  // Load saved theme on mount
+  // Listen to device theme changes
   useEffect(() => {
-    loadTheme();
+    // Clear any old cached theme preference (migrate to automatic mode)
+    AsyncStorage.removeItem(THEME_STORAGE_KEY).catch(() => {});
+
+    // Set initial theme
+    const currentScheme = Appearance.getColorScheme();
+    if (currentScheme) {
+      setThemeState(currentScheme === "dark" ? "dark" : "light");
+    }
+
+    // Listen for changes
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      console.log("Theme changed to:", colorScheme);
+      setThemeState(colorScheme === "dark" ? "dark" : "light");
+    });
+
+    return () => subscription.remove();
   }, []);
 
-  // Apply theme to system
-  useEffect(() => {
-    if (isLoaded) {
-      Appearance.setColorScheme(theme);
-    }
-  }, [theme, isLoaded]);
-
-  const loadTheme = async () => {
-    try {
-      const savedTheme = await AsyncStorage.getItem(THEME_STORAGE_KEY);
-      if (savedTheme === "light" || savedTheme === "dark") {
-        setThemeState(savedTheme);
-      } else {
-        // Default to dark mode
-        setThemeState("dark");
-        await AsyncStorage.setItem(THEME_STORAGE_KEY, "dark");
-      }
-    } catch (error) {
-      console.error("Failed to load theme:", error);
-      setThemeState("dark");
-    } finally {
-      setIsLoaded(true);
-    }
-  };
-
-  const setTheme = async (newTheme: ThemeMode) => {
-    try {
-      setThemeState(newTheme);
-      await AsyncStorage.setItem(THEME_STORAGE_KEY, newTheme);
-    } catch (error) {
-      console.error("Failed to save theme:", error);
-    }
-  };
-
-  const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light";
-    setTheme(newTheme);
-  };
-
-  // Always render children, even during initial load
-  // This ensures ClerkProvider and other providers are available immediately
   return (
     <ThemeContext.Provider
       value={{
         theme,
-        toggleTheme,
-        setTheme,
         isDark: theme === "dark",
       }}
     >

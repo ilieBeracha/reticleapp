@@ -1,5 +1,6 @@
 import RadioButtonInput from "@/components/RadioButtonInput";
 import TextInput from "@/components/TextInput";
+import { useColors } from "@/hooks/useColors";
 import { Control } from "react-hook-form";
 import {
   ActivityIndicator,
@@ -22,6 +23,8 @@ export function AccountForm({
   isLoading,
   showUsername = true,
 }: AccountFormProps) {
+  const colors = useColors();
+
   return (
     <View style={styles.container}>
       <TextInput
@@ -55,18 +58,23 @@ export function AccountForm({
         ]}
       />
 
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={[styles.button, { opacity: isLoading ? 0.7 : 1 }]}
-          onPress={onSubmit}
-          disabled={isLoading}
-        >
-          {isLoading && <ActivityIndicator size="small" color="white" />}
-          <Text style={styles.buttonText}>
-            {isLoading ? "Loading..." : "Complete Account"}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity
+        style={[
+          styles.button,
+          {
+            backgroundColor: colors.indigo,
+            opacity: isLoading ? 0.7 : 1,
+          },
+        ]}
+        onPress={onSubmit}
+        disabled={isLoading}
+        activeOpacity={0.8}
+      >
+        {isLoading && <ActivityIndicator size="small" color="white" />}
+        <Text style={styles.buttonText}>
+          {isLoading ? "Completing..." : "Complete Account"}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -74,24 +82,22 @@ export function AccountForm({
 const styles = StyleSheet.create({
   container: {
     width: "100%",
-    marginTop: 20,
     gap: 20,
-  },
-  buttonContainer: {
-    marginTop: 20,
   },
   button: {
     width: "100%",
-    backgroundColor: "#3b82f6",
-    padding: 10,
-    borderRadius: 10,
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 10,
+    marginTop: 8,
   },
   buttonText: {
     color: "white",
+    fontSize: 16,
     fontWeight: "600",
+    letterSpacing: -0.2,
   },
 });

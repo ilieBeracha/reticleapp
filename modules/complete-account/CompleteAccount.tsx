@@ -1,5 +1,5 @@
 import { useColors } from "@/hooks/useColors";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUser } from "@clerk/clerk-expo";
 import { AccountForm } from "./AccountForm";
@@ -17,31 +17,46 @@ export function CompleteAccount() {
   const showUsername = !user;
 
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          paddingTop: insets.top + 40,
-          paddingBottom: insets.bottom,
-          backgroundColor: colors.background,
-        },
-      ]}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={[styles.container, { backgroundColor: colors.background }]}
     >
-      <FormHeader />
-      <AccountForm
-        control={control}
-        onSubmit={handleSubmit(onSubmit)}
-        isLoading={isLoading}
-        showUsername={showUsername}
-      />
-    </View>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingTop: insets.top + 60,
+            paddingBottom: insets.bottom + 40,
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.content}>
+          <FormHeader />
+          <AccountForm
+            control={control}
+            onSubmit={handleSubmit(onSubmit)}
+            isLoading={isLoading}
+            showUsername={showUsername}
+          />
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 24,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+  },
+  content: {
+    width: "100%",
+    maxWidth: 400,
+    alignSelf: "center",
   },
 });

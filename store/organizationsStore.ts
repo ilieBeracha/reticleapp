@@ -50,10 +50,11 @@ interface OrganizationsStore {
 
   updateOrg: (
     orgId: string,
-    updates: { name?: string; org_type?: string; description?: string }
+    updates: { name?: string; org_type?: string; description?: string },
+    userId: string
   ) => Promise<Organization | null>;
 
-  deleteOrg: (orgId: string) => Promise<void>;
+  deleteOrg: (orgId: string, userId: string) => Promise<void>;
 
   addMember: (input: {
     orgId: string;
@@ -189,12 +190,12 @@ export const useOrganizationsStore = create<OrganizationsStore>((set, get) => ({
   },
 
   // Update organization
-  updateOrg: async (orgId, updates) => {
+  updateOrg: async (orgId, updates, userId) => {
     try {
       const org = await OrganizationsService.updateOrg(
         orgId,
         updates,
-        get().getUserId()
+        userId
       );
 
       // Update in local state
@@ -219,9 +220,9 @@ export const useOrganizationsStore = create<OrganizationsStore>((set, get) => ({
   },
 
   // Delete organization
-  deleteOrg: async (orgId) => {
+  deleteOrg: async (orgId, userId) => {
     try {
-      await OrganizationsService.deleteOrg(orgId, get().getUserId());
+      await OrganizationsService.deleteOrg(orgId, userId);
 
       // Remove from local state
       set((state) => ({

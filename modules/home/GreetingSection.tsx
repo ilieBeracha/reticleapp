@@ -1,6 +1,7 @@
 import { useColors } from "@/hooks/useColors";
+import { useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
-import { StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
 
 interface GreetingSectionProps {
   userName: string;
@@ -14,74 +15,59 @@ export function GreetingSection({
   isPersonalWorkspace = false,
 }: GreetingSectionProps) {
   const colors = useColors();
-
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 5) return "Burning the midnight oil";
-    if (hour < 7) return "You're up early";
-    if (hour < 12) return "Good morning";
-    if (hour < 14) return "Good afternoon";
-    if (hour < 18) return "Good afternoon";
-    if (hour < 21) return "Good evening";
-    return "Good evening";
-  };
+  const { user } = useUser();
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.greeting, { color: colors.textMuted }]}>
-        {getGreeting()},
-      </Text>
-      <Text style={[styles.userName, { color: colors.text }]}>{userName}</Text>
-
-      {organizationName && (
+      {/* Profile Picture */}
+      {user?.imageUrl ? (
+        <Image source={{ uri: user.imageUrl }} style={styles.profileImage} />
+      ) : (
         <View
           style={[
-            styles.contextBadge,
-            { backgroundColor: colors.indigo + "18" },
+            styles.profilePlaceholder,
+            { backgroundColor: colors.indigo + "20" },
           ]}
         >
-          <Ionicons
-            name={isPersonalWorkspace ? "person" : "business"}
-            size={13}
-            color={colors.indigo}
-          />
-          <Text style={[styles.contextText, { color: colors.indigo }]}>
-            {organizationName}
-          </Text>
+          <Ionicons name="person" size={24} color={colors.indigo} />
         </View>
       )}
+
+      {/* Greeting Text */}
+      <Text style={[styles.greeting, { color: colors.text }]}>Welcome</Text>
+      <Text style={[styles.userName, { color: colors.text }]}>{userName}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    gap: 6,
+    gap: 8,
     paddingTop: 8,
-    paddingBottom: 24,
+    paddingBottom: 20,
   },
-  greeting: {
-    fontSize: 15,
-    fontWeight: "500",
-    opacity: 0.5,
-  },
-  userName: {
-    fontSize: 32,
-    fontWeight: "600",
-    letterSpacing: -1,
+  profileImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     marginBottom: 8,
   },
-  contextBadge: {
-    flexDirection: "row",
+  profilePlaceholder: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: "center",
     alignItems: "center",
-    alignSelf: "flex-start",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    gap: 5,
+    marginBottom: 8,
   },
-  contextText: {
-    fontSize: 12,
-    fontWeight: "600",
+  greeting: {
+    fontSize: 24,
+    fontWeight: "400",
+    letterSpacing: -0.5,
+  },
+  userName: {
+    fontSize: 28,
+    fontWeight: "700",
+    letterSpacing: -0.6,
   },
 });

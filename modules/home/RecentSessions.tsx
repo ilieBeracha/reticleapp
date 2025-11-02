@@ -13,77 +13,65 @@ export function RecentSessions({ sessions, loading }: RecentSessionsProps) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          Recent Sessions
-        </Text>
-        {sessions.length > 0 && (
-          <Text style={[styles.viewAll, { color: colors.textMuted }]}>
-            View All
-          </Text>
-        )}
-      </View>
       {loading ? (
-        <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-          Loading...
-        </Text>
-      ) : sessions.length === 0 ? (
-        <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
-          <Ionicons
-            name="calendar-outline"
-            size={28}
-            color={colors.textMuted}
-            style={{ opacity: 0.3 }}
-          />
+        <View style={[styles.widgetCard, { backgroundColor: colors.card }]}>
           <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-            No sessions yet
+            Loading...
           </Text>
         </View>
+      ) : sessions.length === 0 ? (
+        <View style={[styles.widgetCard, { backgroundColor: colors.card }]}>
+          <View style={styles.iconWrapper}>
+            <Ionicons
+              name="calendar"
+              size={20}
+              color={colors.blue}
+            />
+          </View>
+          <View style={styles.cardContent}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>
+              Calendar
+            </Text>
+            <Text style={[styles.cardSubtitle, { color: colors.textMuted }]}>
+              No upcoming sessions
+            </Text>
+          </View>
+        </View>
       ) : (
-        <View style={styles.sessionsList}>
-          {sessions.map((session, index) => {
-            // Subtle color rotation for elegance
-            const accentColor = index % 3 === 0 ? colors.blue : index % 3 === 1 ? colors.purple : colors.green;
+        <View style={[styles.widgetCard, { backgroundColor: colors.card }]}>
+          <View style={styles.cardHeader}>
+            <View style={styles.iconWrapper}>
+              <Ionicons
+                name="calendar"
+                size={20}
+                color={colors.blue}
+              />
+            </View>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>
+              Calendar
+            </Text>
+          </View>
+          <View style={styles.sessionsList}>
+            {sessions.slice(0, 3).map((session, index) => {
+              const time = new Date(session.created_at).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+              });
 
-            return (
-              <View
-                key={session.id}
-                style={[
-                  styles.sessionItem,
-                  {
-                    backgroundColor: colors.card,
-                    borderLeftWidth: 2,
-                    borderLeftColor: accentColor + "35",
-                  },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.sessionIcon,
-                    { backgroundColor: accentColor + "15" },
-                  ]}
-                >
-                  <Ionicons name="play-circle" size={17} color={accentColor} />
-                </View>
-                <View style={styles.sessionContent}>
+              return (
+                <View key={session.id} style={styles.sessionRow}>
+                  <Text style={[styles.sessionTime, { color: colors.text }]}>
+                    {time}
+                  </Text>
+                  <View style={styles.sessionDot} />
                   <Text style={[styles.sessionTitle, { color: colors.text }]}>
                     {session.name}
                   </Text>
-                  <Text
-                    style={[styles.sessionDate, { color: colors.textMuted }]}
-                  >
-                    {new Date(session.created_at).toLocaleDateString()}
-                  </Text>
                 </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={16}
-                  color={accentColor}
-                  style={{ opacity: 0.3 }}
-                />
-              </View>
-            );
-          })}
+              );
+            })}
+          </View>
         </View>
       )}
     </View>
@@ -92,67 +80,69 @@ export function RecentSessions({ sessions, loading }: RecentSessionsProps) {
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 32,
+    marginBottom: 20,
   },
-  sectionHeader: {
+  widgetCard: {
+    borderRadius: 20,
+    padding: 16,
+    gap: 12,
+  },
+  cardHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 14,
+    gap: 8,
+    marginBottom: 8,
   },
-  sectionTitle: {
-    fontSize: 18,
+  iconWrapper: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: "#3b82f620",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cardContent: {
+    gap: 4,
+  },
+  cardTitle: {
+    fontSize: 15,
     fontWeight: "600",
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
   },
-  viewAll: {
-    fontSize: 14,
+  cardSubtitle: {
+    fontSize: 13,
     fontWeight: "500",
     opacity: 0.6,
   },
   sessionsList: {
-    gap: 8,
+    gap: 16,
   },
-  sessionItem: {
+  sessionRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: 12,
     gap: 12,
   },
-  sessionIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
+  sessionTime: {
+    fontSize: 15,
+    fontWeight: "600",
+    width: 40,
   },
-  sessionContent: {
-    flex: 1,
-    gap: 3,
+  sessionDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#000",
+    opacity: 0.3,
   },
   sessionTitle: {
+    flex: 1,
     fontSize: 15,
     fontWeight: "500",
-    letterSpacing: -0.2,
-  },
-  sessionDate: {
-    fontSize: 12,
-    fontWeight: "400",
-    opacity: 0.5,
-  },
-  emptyState: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 36,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    gap: 10,
   },
   emptyText: {
     fontSize: 14,
     fontWeight: "500",
-    opacity: 0.5,
+    opacity: 0.6,
+    textAlign: "center",
   },
 });

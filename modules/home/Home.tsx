@@ -142,13 +142,13 @@ export function Home() {
         ]}
       >
         <ScrollView
-          contentContainerStyle={[styles.content, styles.bottomPadding]}
+          contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
           <GreetingSection
             userName={userName}
-            organizationName={organizationName} // ✅ From hierarchy
-            isPersonalWorkspace={isPersonalWorkspace} // ✅ Based on selectedOrgId
+            organizationName={organizationName}
+            isPersonalWorkspace={isPersonalWorkspace}
           />
 
           <Stats sessionsCount={sessions.length} />

@@ -1,6 +1,6 @@
 import { ThemedView } from "@/components/ThemedView";
 import { useColors } from "@/hooks/useColors";
-import { useTheme } from "@/contexts/ThemeContext";
+import { useColorScheme } from "@/hooks/useColorScheme";
 import { Ionicons } from "@expo/vector-icons";
 import {
   StyleSheet,
@@ -8,12 +8,13 @@ import {
   View,
   ScrollView,
   Pressable,
-  Switch,
+  Linking,
 } from "react-native";
 
 export default function Settings() {
   const colors = useColors();
-  const { toggleTheme, isDark } = useTheme();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
 
   return (
     <ThemedView
@@ -28,7 +29,11 @@ export default function Settings() {
             APPEARANCE
           </Text>
           <View style={[styles.settingCard, { backgroundColor: colors.card }]}>
-            <View style={styles.settingRow}>
+            <Pressable
+              style={styles.settingRow}
+              onPress={() => Linking.openSettings()}
+              android_ripple={{ color: colors.border }}
+            >
               <View style={styles.settingLeft}>
                 <View
                   style={[
@@ -44,7 +49,7 @@ export default function Settings() {
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={[styles.settingLabel, { color: colors.text }]}>
-                    Dark Mode
+                    Theme
                   </Text>
                   <Text
                     style={[
@@ -52,21 +57,16 @@ export default function Settings() {
                       { color: colors.textMuted },
                     ]}
                   >
-                    {isDark ? "Enabled" : "Disabled"}
+                    Follows system settings • {isDark ? "Dark" : "Light"}
                   </Text>
                 </View>
               </View>
-              <Switch
-                value={isDark}
-                onValueChange={toggleTheme}
-                trackColor={{
-                  false: colors.border,
-                  true: colors.indigo,
-                }}
-                thumbColor={colors.card}
-                ios_backgroundColor={colors.border}
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={colors.textMuted}
               />
-            </View>
+            </Pressable>
           </View>
         </View>
 

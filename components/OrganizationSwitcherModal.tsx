@@ -1,22 +1,21 @@
 // components/OrganizationSwitcherModal.tsx
 import BaseBottomSheet from "@/components/BaseBottomSheet";
+import { useColors } from "@/hooks/useColors";
 import { useOrganizationSwitch } from "@/hooks/useOrganizationSwitch";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { useAuth, useUser } from "@clerk/clerk-expo";
+import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetView } from "@gorhom/bottom-sheet";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  FlatList,
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 import { CreateOrgModal } from "./CreateOrg";
 import { SwitcherHeader } from "./SwitcherHeader";
-import { Colors } from "./Themed";
 
 interface OrganizationSwitcherModalProps {
   visible: boolean;
@@ -30,14 +29,20 @@ export function OrganizationSwitcherModal({
   const { user } = useUser();
   const { userId } = useAuth();
 
-  const { userOrgs, selectedOrgId, loading, fetchUserOrgs } =
-    useOrganizationsStore();
+  const {
+    userOrgs,
+    selectedOrgId,
+    allOrgs,
+    orgChildren,
+    loading,
+    fetchUserOrgs,
+    fetchAllOrgs,
+    fetchOrgChildren,
+  } = useOrganizationsStore();
 
   const { switchOrganization } = useOrganizationSwitch();
 
-  const colorScheme = useColorScheme();
-  const descriptionColor =
-    colorScheme === "dark" ? Colors.dark.description : Colors.light.description;
+  const colors = useColors();
   const [createOrgVisible, setCreateOrgVisible] = useState(false);
 
   useEffect(() => {
@@ -90,79 +95,131 @@ export function OrganizationSwitcherModal({
         visible={visible}
         onClose={onClose}
         keyboardBehavior="interactive"
-        snapPoints={["60%"]} // ✅ Smaller since showing fewer orgs
-        keyboardSnapPoint={0}
+        enableDynamicSizing={true}
         enablePanDownToClose
-        backdropOpacity={0.45}
+        backdropOpacity={0.5}
       >
         <BottomSheetView style={styles.sheetBackground}>
           <SwitcherHeader />
           {loading && rootOrgs.length === 0 ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#888" />
+              <ActivityIndicator size="small" color={colors.indigo} />
             </View>
           ) : (
-            <FlatList
-              data={orgList}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.orgRow}
-                  activeOpacity={0.7}
-                  onPress={() =>
-                    handleSwitch(
-                      item.id === "personal" ? null : item.id,
-                      item.name
-                    )
-                  }
-                >
-                  <View style={styles.orgContent}>
-                    <View style={styles.orgInfo}>
-                      <View style={styles.orgNameRow}>
-                        <Text
-                          style={[
-                            styles.orgName,
-                            { color: descriptionColor },
-                            item.active && styles.activeOrgName,
-                          ]}
-                        >
-                          {item.name}
-                        </Text>
-
-                        {/* Role badge */}
-                        {item.role && (
-                          <View
-                            style={[
-                              styles.roleBadge,
-                              item.role === "commander" &&
-                                styles.commanderBadge,
-                            ]}
-                          >
-                            <Text style={styles.roleText}>
-                              {item.role.toUpperCase()}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
+            <>
+              <View style={styles.listContainer}>
+                {orgList.map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[
+                      styles.orgCard,
+                      {
+                        backgroundColor: item.active
+                          ? colors.indigo + "15"
+                          : colors.card,
+                        borderColor: item.active
+                          ? colors.indigo
+                          : colors.border,
+                      },
+                    ]}
+                    activeOpacity={0.7}
+                    onPress={() =>
+                      handleSwitch(
+                        item.id === "personal" ? null : item.id,
+                        item.name
+                      )
+                    }
+                  >
+                    {/* Icon */}
+                    <View
+                      style={[
+                        styles.iconContainer,
+                        {
+                          backgroundColor: item.active
+                            ? colors.indigo + "20"
+                            : colors.background,
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name={item.id === "personal" ? "person" : "business"}
+                        size={20}
+                        color={item.active ? colors.indigo : colors.textMuted}
+                      />
                     </View>
 
-                    {/* Active indicator */}
-                    {item.active && <View style={styles.activeDot} />}
-                  </View>
-                </TouchableOpacity>
-              )}
-              ListFooterComponent={
-                <TouchableOpacity
-                  style={styles.addOrgButton}
-                  onPress={handleCreateOrg}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.addOrgText}>
-                    + Create root organization
-                  </Text>
-                </TouchableOpacity>
-              }
-            />
+                    {/* Content */}
+                    <View style={styles.orgInfo}>
+                      <Text
+                        style={[
+                          styles.orgName,
+                          {
+                            color: item.active ? colors.text : colors.text,
+                            fontWeight: item.active ? "600" : "500",
+                          },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {item.name}
+                      </Text>
+
+                      {/* Role badge */}
+                      {item.role && (
+                        <View
+                          style={[
+                            styles.roleBadge,
+                            {
+                              backgroundColor:
+                                item.role === "commander"
+                                  ? "#f59e0b20"
+                                  : colors.indigo + "20",
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.roleText,
+                              {
+                                color:
+                                  item.role === "commander"
+                                    ? "#f59e0b"
+                                    : colors.indigo,
+                              },
+                            ]}
+                          >
+                            {item.role.toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Active checkmark */}
+                    {item.active && (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={22}
+                        color={colors.indigo}
+                      />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Create Organization Button */}
+              <TouchableOpacity
+                style={[
+                  styles.createButton,
+                  {
+                    backgroundColor: colors.indigo,
+                  },
+                ]}
+                onPress={handleCreateOrg}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="add-circle-outline" size={20} color="#fff" />
+                <Text style={styles.createButtonText}>Create Organization</Text>
+              </TouchableOpacity>
+            </>
           )}
         </BottomSheetView>
       </BaseBottomSheet>
@@ -179,6 +236,7 @@ export function OrganizationSwitcherModal({
 const styles = StyleSheet.create({
   sheetBackground: {
     borderTopLeftRadius: 20,
+    paddingHorizontal: 20,
     borderTopRightRadius: 20,
   },
   loadingContainer: {
@@ -186,62 +244,58 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  orgRow: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(255,255,255,0.08)",
+  listContainer: {
+    gap: 10,
+    paddingBottom: 16,
   },
-  orgContent: {
+  orgCard: {
     flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    gap: 12,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    justifyContent: "center",
     alignItems: "center",
   },
   orgInfo: {
     flex: 1,
-  },
-  orgNameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+    gap: 6,
   },
   orgName: {
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  activeOrgName: {
-    fontWeight: "600",
+    fontSize: 15,
+    letterSpacing: -0.2,
   },
   roleBadge: {
-    backgroundColor: "rgba(59, 130, 246, 0.2)",
+    alignSelf: "flex-start",
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 4,
-  },
-  commanderBadge: {
-    backgroundColor: "rgba(251, 191, 36, 0.2)",
+    borderRadius: 6,
   },
   roleText: {
     fontSize: 10,
-    fontWeight: "600",
-    color: "#60a5fa",
+    fontWeight: "700",
+    letterSpacing: 0.5,
   },
-  activeDot: {
-    marginLeft: 12,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#4ade80",
-  },
-  addOrgButton: {
-    paddingVertical: 18,
+  createButton: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255,255,255,0.08)",
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+    marginTop: 8,
   },
-  addOrgText: {
-    color: "#4da3ff",
+  createButtonText: {
+    color: "#fff",
     fontSize: 15,
-    fontWeight: "500",
+    fontWeight: "600",
+    letterSpacing: -0.2,
   },
 });

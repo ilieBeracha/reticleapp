@@ -1,11 +1,7 @@
-import { useTheme } from "@/contexts/ThemeContext";
+import { useColorScheme as useRNColorScheme } from "react-native";
 
 export function useColorScheme() {
-  try {
-    const { theme } = useTheme();
-    return theme;
-  } catch {
-    // Fallback if ThemeProvider is not available
-    return "dark";
-  }
+  const colorScheme = useRNColorScheme();
+  // Return device color scheme, defaulting to 'dark' if null
+  return colorScheme ?? "dark";
 }

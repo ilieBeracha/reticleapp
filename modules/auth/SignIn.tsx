@@ -1,15 +1,30 @@
 import { useColors } from "@/hooks/useColors";
-import { StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SignInHeader } from "./SignInHeader";
 import { SocialButtons } from "./SocialButtons";
 
 export function SignIn() {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <SignInHeader />
-      <SocialButtons />
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingTop: insets.top + 60,
+            paddingBottom: insets.bottom + 40,
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.content}>
+          <SignInHeader />
+          <SocialButtons />
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -17,9 +32,15 @@ export function SignIn() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingVertical: 24,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: "center",
-    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+  content: {
+    width: "100%",
+    maxWidth: 400,
+    alignSelf: "center",
   },
 });

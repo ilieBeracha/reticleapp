@@ -4,9 +4,9 @@ import { StyleSheet, View } from "react-native";
 export function SocialButtons() {
   return (
     <View style={styles.container}>
-      <SocialLoginButton strategy="facebook" />
       <SocialLoginButton strategy="google" />
       <SocialLoginButton strategy="apple" />
+      <SocialLoginButton strategy="facebook" />
     </View>
   );
 }
@@ -14,7 +14,6 @@ export function SocialButtons() {
 const styles = StyleSheet.create({
   container: {
     width: "100%",
-    marginTop: 20,
-    gap: 10,
+    gap: 12,
   },
 });

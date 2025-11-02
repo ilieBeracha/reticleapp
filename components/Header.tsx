@@ -99,6 +99,7 @@ export default function Header({
               styles.notificationButton,
               {
                 backgroundColor: colors.red,
+                boxShadow: `0 0 10px 0 ${colors.red}`,
                 borderColor: colors.red + "40",
               },
             ]}

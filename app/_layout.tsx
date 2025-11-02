@@ -7,7 +7,6 @@ import {
   OrganizationSwitchProvider,
   useOrganizationSwitch,
 } from "@/hooks/useOrganizationSwitch";
-import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ClerkProvider } from "@clerk/clerk-expo";
 import { useFonts } from "expo-font";
 import { Slot } from "expo-router";
@@ -50,11 +49,7 @@ export default function RootLayout() {
     throw new Error("Add EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY to your .env file");
   }
 
-  return (
-    <ThemeProvider>
-      <RootLayoutInner publishableKey={publishableKey} tokenCache={tokenCache} />
-    </ThemeProvider>
-  );
+  return <RootLayoutInner publishableKey={publishableKey} tokenCache={tokenCache} />;
 }
 
 function RootLayoutInner({
