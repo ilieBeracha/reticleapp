@@ -1,0 +1,244 @@
+import { ThemedView } from "@/components/ThemedView";
+import { useColors } from "@/hooks/useColors";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Ionicons } from "@expo/vector-icons";
+import {
+  StyleSheet,
+  Text,
+  View,
+  ScrollView,
+  Pressable,
+  Switch,
+} from "react-native";
+
+export default function Settings() {
+  const colors = useColors();
+  const { toggleTheme, isDark } = useTheme();
+
+  return (
+    <ThemedView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
+            APPEARANCE
+          </Text>
+          <View style={[styles.settingCard, { backgroundColor: colors.card }]}>
+            <View style={styles.settingRow}>
+              <View style={styles.settingLeft}>
+                <View
+                  style={[
+                    styles.iconContainer,
+                    { backgroundColor: colors.indigo + "15" },
+                  ]}
+                >
+                  <Ionicons
+                    name={isDark ? "moon" : "sunny"}
+                    size={20}
+                    color={colors.indigo}
+                  />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={[styles.settingLabel, { color: colors.text }]}>
+                    Dark Mode
+                  </Text>
+                  <Text
+                    style={[
+                      styles.settingDescription,
+                      { color: colors.textMuted },
+                    ]}
+                  >
+                    {isDark ? "Enabled" : "Disabled"}
+                  </Text>
+                </View>
+              </View>
+              <Switch
+                value={isDark}
+                onValueChange={toggleTheme}
+                trackColor={{
+                  false: colors.border,
+                  true: colors.indigo,
+                }}
+                thumbColor={colors.card}
+                ios_backgroundColor={colors.border}
+              />
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
+            ACCOUNT
+          </Text>
+          <View style={[styles.settingCard, { backgroundColor: colors.card }]}>
+            <Pressable
+              style={styles.settingRow}
+              onPress={() => {}}
+              android_ripple={{ color: colors.border }}
+            >
+              <View style={styles.settingLeft}>
+                <View
+                  style={[
+                    styles.iconContainer,
+                    { backgroundColor: colors.blue + "15" },
+                  ]}
+                >
+                  <Ionicons
+                    name="person-outline"
+                    size={20}
+                    color={colors.blue}
+                  />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={[styles.settingLabel, { color: colors.text }]}>
+                    Profile
+                  </Text>
+                </View>
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={colors.textMuted}
+              />
+            </Pressable>
+
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+            <Pressable
+              style={styles.settingRow}
+              onPress={() => {}}
+              android_ripple={{ color: colors.border }}
+            >
+              <View style={styles.settingLeft}>
+                <View
+                  style={[
+                    styles.iconContainer,
+                    { backgroundColor: colors.green + "15" },
+                  ]}
+                >
+                  <Ionicons
+                    name="notifications-outline"
+                    size={20}
+                    color={colors.green}
+                  />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={[styles.settingLabel, { color: colors.text }]}>
+                    Notifications
+                  </Text>
+                </View>
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={colors.textMuted}
+              />
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
+            ABOUT
+          </Text>
+          <View style={[styles.settingCard, { backgroundColor: colors.card }]}>
+            <Pressable
+              style={styles.settingRow}
+              onPress={() => {}}
+              android_ripple={{ color: colors.border }}
+            >
+              <View style={styles.settingLeft}>
+                <View
+                  style={[
+                    styles.iconContainer,
+                    { backgroundColor: colors.purple + "15" },
+                  ]}
+                >
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={20}
+                    color={colors.purple}
+                  />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={[styles.settingLabel, { color: colors.text }]}>
+                    About
+                  </Text>
+                </View>
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={colors.textMuted}
+              />
+            </Pressable>
+          </View>
+        </View>
+      </ScrollView>
+    </ThemedView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 100,
+  },
+  section: {
+    marginBottom: 32,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    marginBottom: 12,
+    marginLeft: 4,
+  },
+  settingCard: {
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  settingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  settingLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  settingInfo: {
+    flex: 1,
+  },
+  settingLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  settingDescription: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  divider: {
+    height: 1,
+    marginLeft: 68,
+  },
+});

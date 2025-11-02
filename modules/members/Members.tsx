@@ -2,10 +2,10 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 
 import { InviteMemberModal } from "@/components/InviteMemberModal";
-import { useIsOrgAdmin } from "@/hooks/useIsOrgAdmin";
+import { useIsOrganizationCommander } from "@/hooks/useIsOrgAdmin";
 import { useOrgInvitations } from "@/hooks/useOrgInvitations";
 import { useThemeColor } from "@/hooks/useThemeColor";
-import { useOrganization } from "@clerk/clerk-expo";
+import { useOrganizationsStore } from "@/store/organizationsStore";
 import { Ionicons } from "@expo/vector-icons";
 import { Redirect } from "expo-router";
 import { useState } from "react";
@@ -24,8 +24,8 @@ import { MembersList } from "./MembersList";
 type RoleFilter = "all" | "admins" | "members";
 
 export function Members() {
-  const { organization } = useOrganization();
-  const isAdmin = useIsOrgAdmin();
+  const { selectedOrgId } = useOrganizationsStore();
+  const isAdmin = useIsOrganizationCommander();
   const {
     pendingInvitations,
     loading: loadingInvitations,
@@ -74,8 +74,8 @@ export function Members() {
   };
 
   // Redirect if no organization
-  if (!organization) {
-    return <Redirect href="/(home)" />;
+  if (!selectedOrgId) {
+    return <Redirect href="/(protected)/(tabs)" />;
   }
 
   return (

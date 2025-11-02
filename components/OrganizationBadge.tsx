@@ -1,4 +1,4 @@
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useColors } from "@/hooks/useColors";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
@@ -11,8 +11,7 @@ export function OrganizationBadge({
   organizationName,
   onPress,
 }: OrganizationBadgeProps) {
-  const textColor = useThemeColor({}, "description");
-  const mutedColor = useThemeColor({}, "icon");
+  const colors = useColors();
 
   return (
     <TouchableOpacity
@@ -20,24 +19,42 @@ export function OrganizationBadge({
       onPress={onPress}
       activeOpacity={0.7}
     >
-      {organizationName ? (
+      {organizationName !== "Personal" ? (
         <>
           <View
-            style={[styles.iconContainer, { backgroundColor: "background" }]}
+            style={[
+              styles.iconContainer,
+              {
+                backgroundColor: colors.orange + "20",
+                borderWidth: 1.5,
+                borderColor: colors.orange + "50",
+              },
+            ]}
           >
-            <Ionicons name="business-outline" size={16} color={"orange"} />
+            <Ionicons name="business" size={16} color={colors.orange} />
           </View>
-          <Text style={[styles.title, { color: "orange" }]}>
+          <Text style={[styles.title, { color: colors.text }]}>
             {organizationName}
           </Text>
         </>
       ) : (
         <>
-          <Ionicons name="person-circle-outline" size={24} color={textColor} />
-          <Text style={[styles.title, { color: textColor }]}>Personal</Text>
+          <View
+            style={[
+              styles.iconContainer,
+              {
+                backgroundColor: colors.indigo + "20",
+                borderWidth: 1.5,
+                borderColor: colors.indigo + "50",
+              },
+            ]}
+          >
+            <Ionicons name="person" size={16} color={colors.indigo} />
+          </View>
+          <Text style={[styles.title, { color: colors.text }]}>Personal</Text>
         </>
       )}
-      <Ionicons name="chevron-down" size={16} color={mutedColor} />
+      <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
     </TouchableOpacity>
   );
 }

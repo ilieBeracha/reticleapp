@@ -1,4 +1,4 @@
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useColors } from "@/hooks/useColors";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
@@ -13,21 +13,39 @@ export function HeaderActions({
   onNotificationPress,
   onProfilePress,
 }: HeaderActionsProps) {
-  const textColor = useThemeColor({}, "text");
+  const colors = useColors();
 
   return (
     <View style={styles.container}>
       {notificationCount > 0 && (
         <TouchableOpacity
-          style={styles.notificationButton}
+          style={[
+            styles.notificationButton,
+            {
+              backgroundColor: colors.red,
+              borderWidth: 2,
+              borderColor: colors.red + "40",
+            },
+          ]}
           onPress={onNotificationPress}
           activeOpacity={0.7}
         >
           <Text style={styles.notificationText}>{notificationCount}</Text>
         </TouchableOpacity>
       )}
-      <TouchableOpacity onPress={onProfilePress}>
-        <Ionicons name="person-outline" size={20} color={textColor} />
+      <TouchableOpacity
+        onPress={onProfilePress}
+        style={[
+          styles.profileButton,
+          {
+            backgroundColor: colors.indigo + "20",
+            borderWidth: 1.5,
+            borderColor: colors.indigo + "50",
+          },
+        ]}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="person" size={18} color={colors.indigo} />
       </TouchableOpacity>
     </View>
   );
@@ -43,13 +61,19 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: "#FF6B6B",
     justifyContent: "center",
     alignItems: "center",
   },
   notificationText: {
     fontSize: 11,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#FFFFFF",
+  },
+  profileButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

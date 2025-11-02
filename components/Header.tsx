@@ -1,10 +1,10 @@
 import { useColors } from "@/hooks/useColors";
-import { useOrganization } from "@clerk/clerk-expo";
 import { router } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useOrganizationsStore } from "@/store/organizationsStore";
 import { HeaderActions } from "./HeaderActions";
 import { OrganizationBadge } from "./OrganizationBadge";
 import { OrganizationSwitcherModal } from "./OrganizationSwitcherModal";
@@ -19,7 +19,9 @@ export default function Header({
   onNotificationPress,
   notificationCount = 0,
 }: HeaderProps) {
-  const { organization } = useOrganization();
+  const { userOrgs, selectedOrgId } = useOrganizationsStore();
+  const selectedOrg = userOrgs.find((org) => org.org_id === selectedOrgId);
+  console.log("selectedOrg", selectedOrg);
   const [profileOpen, setProfileOpen] = useState(false);
   const [orgSwitcherOpen, setOrgSwitcherOpen] = useState(false);
   const insets = useSafeAreaInsets();
@@ -33,9 +35,9 @@ export default function Header({
 
   const handleMenuAction = (action: string) => {
     if (action === "settings") {
-      router.push("/(home)/settings");
+      router.push("/(protected)/(tabs)/settings");
     } else if (action === "loadout") {
-      router.push("/(home)/loadout");
+      router.push("/(protected)/(tabs)/loadout");
     }
   };
 
@@ -43,14 +45,15 @@ export default function Header({
     <View
       style={[
         styles.header,
-        { backgroundColor: colors.background },
         {
+          backgroundColor: colors.background,
+          borderBottomColor: colors.border,
           paddingTop: insets.top + 8,
         },
       ]}
     >
       <OrganizationBadge
-        organizationName={organization?.name}
+        organizationName={selectedOrg?.org_name || "Personal"}
         onPress={handleOrgSwitcherPress}
       />
 
@@ -91,7 +94,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 18,
-    paddingBottom: 26,
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    borderBottomWidth: 0.5,
   },
 });

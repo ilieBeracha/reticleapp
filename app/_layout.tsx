@@ -7,7 +7,8 @@ import {
   OrganizationSwitchProvider,
   useOrganizationSwitch,
 } from "@/hooks/useOrganizationSwitch";
-import { ClerkLoaded, ClerkProvider } from "@clerk/clerk-expo";
+import { ThemeProvider } from "@/contexts/ThemeContext";
+import { ClerkProvider } from "@clerk/clerk-expo";
 import { useFonts } from "expo-font";
 import { Slot } from "expo-router";
 import * as SecureStore from "expo-secure-store";
@@ -15,11 +16,11 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import "../global.css";
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
   const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
   const tokenCache = {
     async getToken(key: string) {
@@ -50,19 +51,35 @@ export default function RootLayout() {
   }
 
   return (
+    <ThemeProvider>
+      <RootLayoutInner publishableKey={publishableKey} tokenCache={tokenCache} />
+    </ThemeProvider>
+  );
+}
+
+function RootLayoutInner({
+  publishableKey,
+  tokenCache,
+}: {
+  publishableKey: string;
+  tokenCache: any;
+}) {
+  const colorScheme = useColorScheme();
+
+  return (
     <GluestackUIProvider mode={colorScheme === "dark" ? "dark" : "light"}>
       <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-        <ClerkLoaded>
-          <EnhancedAuthProvider>
-            <GestureHandlerRootView style={{ flex: 1 }}>
+        <EnhancedAuthProvider>
+          <GestureHandlerRootView style={{ flex: 1 }}>
+            <BottomSheetModalProvider>
               <OrganizationSwitchProvider>
                 <Slot />
                 <StatusBar style="auto" />
                 <AppOverlay />
               </OrganizationSwitchProvider>
-            </GestureHandlerRootView>
-          </EnhancedAuthProvider>
-        </ClerkLoaded>
+            </BottomSheetModalProvider>
+          </GestureHandlerRootView>
+        </EnhancedAuthProvider>
       </ClerkProvider>
     </GluestackUIProvider>
   );

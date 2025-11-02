@@ -89,7 +89,7 @@ const SocialLoginButton = ({
         await setActive!({
           session: createdSessionId,
         });
-        router.replace("/(home)");
+        router.replace("/(protected)/(tabs)");
         return;
       }
 
@@ -111,7 +111,7 @@ const SocialLoginButton = ({
         // If signup is complete, set the session
         if (signUp.createdSessionId) {
           await setActive!({ session: signUp.createdSessionId });
-          router.replace("/(home)");
+          router.replace("/(protected)/(tabs)");
           return;
         }
       }
@@ -121,7 +121,7 @@ const SocialLoginButton = ({
         console.log("🔐 Existing user sign-in");
         if (signIn.createdSessionId) {
           await setActive!({ session: signIn.createdSessionId });
-          router.replace("/(home)");
+          router.replace("/(protected)/(tabs)");
           return;
         }
       }

@@ -13,12 +13,14 @@ interface AccountFormProps {
   control: Control<any>;
   onSubmit: () => void;
   isLoading: boolean;
+  showUsername?: boolean;
 }
 
 export function AccountForm({
   control,
   onSubmit,
   isLoading,
+  showUsername = true,
 }: AccountFormProps) {
   return (
     <View style={styles.container}>
@@ -30,13 +32,15 @@ export function AccountForm({
         name="full_name"
       />
 
-      <TextInput
-        placeholder="Enter your username"
-        control={control}
-        label="Username"
-        required
-        name="username"
-      />
+      {showUsername && (
+        <TextInput
+          placeholder="Enter your username"
+          control={control}
+          label="Username"
+          required
+          name="username"
+        />
+      )}
 
       <RadioButtonInput
         control={control}

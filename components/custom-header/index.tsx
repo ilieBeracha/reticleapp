@@ -5,12 +5,12 @@ import { Icon } from "@/components/ui/icon";
 import { Input, InputField, InputIcon, InputSlot } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 import { VStack } from "@/components/ui/vstack";
-import { useOrganization } from "@clerk/clerk-expo";
+import { useOrganizationsStore } from "@/store/organizationsStore";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { Bell, Building2, Menu, Mic, Search, User } from "lucide-react-native";
 import { useState } from "react";
-import { Pressable } from "react-native";
+import { ColorValue, Pressable, useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { OrganizationSwitcherModal } from "../OrganizationSwitcherModal";
 import ProfileDropdown from "../ProfileDropdown";
@@ -30,7 +30,8 @@ const CustomHeader = ({
   onNotificationPress,
   notificationCount = 0,
 }: CustomHeaderProps) => {
-  const { organization } = useOrganization();
+  const { userOrgs, selectedOrgId } = useOrganizationsStore();
+  const selectedOrg = userOrgs.find((org) => org.org_id === selectedOrgId);
   const [profileOpen, setProfileOpen] = useState(false);
   const [orgSwitcherOpen, setOrgSwitcherOpen] = useState(false);
   const insets = useSafeAreaInsets();
@@ -42,16 +43,44 @@ const CustomHeader = ({
 
   const handleMenuAction = (action: string) => {
     if (action === "settings") {
-      router.push("/(home)/settings");
+      router.push("/settings");
     } else if (action === "loadout") {
-      router.push("/(home)/loadout");
+      router.push("/loadout");
     }
+  };
+
+  const headerColors = {
+    isDark: useColorScheme() === "dark",
+    general:
+      useColorScheme() === "dark"
+        ? (["#111827", "#111118", "#111827"] as readonly [
+            ColorValue,
+            ColorValue,
+            ...ColorValue[],
+          ])
+        : (["#111118", "#111118", "#111118"] as readonly [
+            ColorValue,
+            ColorValue,
+            ...ColorValue[],
+          ]),
+    search:
+      useColorScheme() === "dark"
+        ? (["#111827", "#111118", "#111827"] as readonly [
+            ColorValue,
+            ColorValue,
+            ...ColorValue[],
+          ])
+        : (["#E6F4FE", "#E6F4FE", "#E6F4FE"] as readonly [
+            ColorValue,
+            ColorValue,
+            ...ColorValue[],
+          ]),
   };
 
   return (
     <Box className="overflow-hidden ">
       <LinearGradient
-        colors={["#111827", "#111118", "#111827"]}
+        colors={headerColors.general}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={{
@@ -74,13 +103,13 @@ const CustomHeader = ({
               className="border-0 p-0 bg-transparent"
             >
               <Icon
-                as={organization ? Building2 : User}
+                as={selectedOrg ? Building2 : User}
                 size="lg"
                 className="text-white"
               />
             </Badge>
             <Text className="text-white font-semibold">
-              {organization?.name || "Personal"}
+              {selectedOrg?.org_name || "Personal"}
             </Text>
           </Pressable>
 

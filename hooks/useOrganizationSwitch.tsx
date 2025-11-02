@@ -1,10 +1,12 @@
+// contexts/OrganizationSwitchProvider.tsx
 import {
   MAXIMUM_SWITCH_TIMEOUT,
   MINIMUM_SWITCH_DURATION,
   useOrganizationSwitchStore,
   waitForMinimumDuration,
 } from "@/store/organizationSwitchStore";
-import { useAuth, useOrganizationList } from "@clerk/clerk-expo";
+import { useOrganizationsStore } from "@/store/organizationsStore";
+import { useAuth } from "@clerk/clerk-expo";
 import { useRouter } from "expo-router";
 import React, { createContext, ReactNode, useContext, useEffect } from "react";
 import { Alert, AppState, AppStateStatus } from "react-native";
@@ -29,14 +31,17 @@ export function OrganizationSwitchProvider({
   children,
 }: OrganizationSwitchProviderProps) {
   const router = useRouter();
-  const { orgId } = useAuth();
-  const { setActive } = useOrganizationList();
+  const { userId } = useAuth();
+
+  // ✅ Use hierarchy store instead of Clerk
+  const { selectedOrgId, setSelectedOrg, fetchUserOrgs } =
+    useOrganizationsStore();
 
   const {
     isSwitching,
     targetOrganizationName,
     switchStartTime,
-    startSwitch,
+    startSwitch,  
     completeSwitch,
     cancelSwitch,
   } = useOrganizationSwitchStore();
@@ -77,7 +82,7 @@ export function OrganizationSwitchProvider({
     }
 
     // Skip transition if switching to current organization
-    if (organizationId === orgId) {
+    if (organizationId === selectedOrgId) {
       console.log("Already in target organization, skipping switch");
       return;
     }
@@ -94,21 +99,23 @@ export function OrganizationSwitchProvider({
         );
       });
 
-      // Perform the Clerk organization switch
+      // ✅ Perform the hierarchy organization switch
       const switchPromise = (async () => {
-        if (!setActive) {
-          throw new Error("Clerk setActive not available");
-        }
-
         console.log(
           `Switching to organization: ${organizationName} (${
             organizationId || "personal"
           })`
         );
 
-        await setActive({ organization: organizationId });
+        // ✅ Update selected org in hierarchy store
+        setSelectedOrg(organizationId);
 
-        console.log("Clerk organization switch successful");
+        // ✅ Optionally refresh user orgs to ensure fresh data
+        if (userId) {
+          await fetchUserOrgs(userId);
+        }
+
+        console.log("Organization switch successful");
       })();
 
       // Wait for either the switch to complete or timeout
@@ -116,7 +123,7 @@ export function OrganizationSwitchProvider({
 
       // Navigate to home page (reset navigation stack)
       console.log("Navigating to home page");
-      router.replace("/(home)");
+      router.replace("/");
 
       // Wait for minimum duration to ensure smooth UX
       console.log(

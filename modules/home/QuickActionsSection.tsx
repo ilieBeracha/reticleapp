@@ -21,7 +21,7 @@ export function QuickActionsSection() {
               borderColor: colors.border,
             },
           ]}
-          onPress={() => router.push("/(home)/settings")}
+          onPress={() => router.push("/(protected)/(tabs)/settings")}
         >
           <Ionicons name="settings-outline" size={24} color={colors.tint} />
           <ThemedText style={[styles.actionLabel, { color: colors.text }]}>

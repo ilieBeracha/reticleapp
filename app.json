@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "scope-ui-native-clerk",
-    "slug": "scope-ui-native-clerk",
+    "name": "clerk-scope-ui",
+    "slug": "clerk-scope-ui",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "scopeuinativeclerk",
+    "scheme": "clerkscopeui",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/images/brand.png",
@@ -14,8 +14,7 @@
     },
     "newArchEnabled": true,
     "ios": {
-      "bundleIdentifier": "com.scopeui.nativeclerk",
-      "buildNumber": "5",
+      "bundleIdentifier": "com.clerk.scopeui",
       "supportsTablet": true,
       "icon": "./assets/images/icon-1760977067249.png",
       "infoPlist": {
@@ -32,7 +31,11 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.scopeui.nativeclerk"
+      "package": "com.clerk.scopeui",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -68,7 +71,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "fc41f248-671a-43f2-8fda-6a186dd4660a"
+        "projectId": "e25d242b-1bfa-4545-9e54-8b306affb0b3"
       }
     },
     "runtimeVersion": {

@@ -1,9 +1,10 @@
+// components/CreateOrg.tsx
 import BaseBottomSheet from "@/components/BaseBottomSheet";
 import useCreateOrg from "@/hooks/useCreateOrg";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { Alert, StyleSheet, TouchableOpacity, View } from "react-native";
 import { ThemedText } from "./ThemedText";
 
 interface CreateOrgModalProps {
@@ -17,8 +18,16 @@ export function CreateOrgModal({
   onClose,
   onSuccess,
 }: CreateOrgModalProps) {
-  const { createOrg, isSubmitting, organizationName, setOrganizationName } =
-    useCreateOrg();
+  const {
+    createOrg,
+    isSubmitting,
+    organizationName,
+    setOrganizationName,
+    organizationType,
+    setOrganizationType,
+    description,
+    setDescription,
+  } = useCreateOrg();
 
   // Theme colors
   const backgroundColor = useThemeColor({}, "background");
@@ -29,16 +38,24 @@ export function CreateOrgModal({
   const placeholderColor = useThemeColor({}, "placeholderText");
 
   const handleCreate = async () => {
-    const result = await createOrg();
-    if (result) {
-      setOrganizationName("");
-      onClose();
-      onSuccess?.();
+    try {
+      const result = await createOrg();
+      if (result) {
+        onSuccess?.();
+        onClose();
+      }
+    } catch (error: any) {
+      Alert.alert(
+        "Error",
+        error.message || "Failed to create organization. Please try again."
+      );
     }
   };
 
   const handleClose = () => {
     setOrganizationName("");
+    setOrganizationType("Organization");
+    setDescription("");
     onClose();
   };
 
@@ -47,8 +64,8 @@ export function CreateOrgModal({
       visible={visible}
       onClose={handleClose}
       keyboardBehavior="interactive"
-      snapPoints={["30%", "40%"]}
-      enablePanDownToClose={true}
+      snapPoints={["50%", "70%"]} // ✅ Larger for additional fields
+      enablePanDownToClose={!isSubmitting}
       backdropOpacity={0.45}
     >
       {/* Header */}
@@ -57,12 +74,13 @@ export function CreateOrgModal({
           Create Organization
         </ThemedText>
         <ThemedText style={[styles.subtitle, { color: mutedColor }]}>
-          Enter a name for your new organization
+          Create a new root organization
         </ThemedText>
       </View>
 
       {/* Form */}
       <View style={styles.form}>
+        {/* Organization Name */}
         <BottomSheetTextInput
           style={[
             styles.input,
@@ -77,17 +95,64 @@ export function CreateOrgModal({
           placeholder="Organization name"
           placeholderTextColor={placeholderColor}
           autoFocus
-          returnKeyType="done"
-          onSubmitEditing={handleCreate}
+          returnKeyType="next"
+          editable={!isSubmitting}
         />
 
+        {/* Organization Type */}
+        <BottomSheetTextInput
+          style={[
+            styles.input,
+            {
+              backgroundColor,
+              borderColor,
+              color: textColor,
+            },
+          ]}
+          value={organizationType}
+          onChangeText={setOrganizationType}
+          placeholder="Type (e.g., Battalion, Company, Unit)"
+          placeholderTextColor={placeholderColor}
+          returnKeyType="next"
+          editable={!isSubmitting}
+        />
+
+        {/* Description */}
+        <BottomSheetTextInput
+          style={[
+            styles.input,
+            styles.textArea,
+            {
+              backgroundColor,
+              borderColor,
+              color: textColor,
+            },
+          ]}
+          value={description}
+          onChangeText={setDescription}
+          placeholder="Description (optional)"
+          placeholderTextColor={placeholderColor}
+          multiline
+          numberOfLines={3}
+          returnKeyType="done"
+          onSubmitEditing={handleCreate}
+          editable={!isSubmitting}
+        />
+
+        {/* Buttons */}
         <View style={styles.buttonRow}>
           <TouchableOpacity
             style={[styles.button, styles.cancelButton, { borderColor }]}
             onPress={handleClose}
             disabled={isSubmitting}
           >
-            <ThemedText style={[styles.buttonText, { color: textColor }]}>
+            <ThemedText
+              style={[
+                styles.buttonText,
+                { color: textColor },
+                isSubmitting && { opacity: 0.5 },
+              ]}
+            >
               Cancel
             </ThemedText>
           </TouchableOpacity>
@@ -121,7 +186,6 @@ export function CreateOrgModal({
   );
 }
 
-// Keep the default export for backward compatibility
 export default CreateOrgModal;
 
 const styles = StyleSheet.create({
@@ -152,6 +216,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 16,
     fontSize: 15,
+  },
+  textArea: {
+    height: 80,
+    paddingTop: 12,
+    textAlignVertical: "top",
   },
   buttonRow: {
     flexDirection: "row",

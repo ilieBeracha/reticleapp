@@ -36,14 +36,21 @@ export function GreetingSection({
       {/* Organization Context Badge */}
       {organizationName && (
         <View
-          style={[styles.contextBadge, { backgroundColor: colors.tint + "15" }]}
+          style={[
+            styles.contextBadge,
+            {
+              backgroundColor: colors.orange + "15",
+              borderWidth: 1.5,
+              borderColor: colors.orange + "40",
+            },
+          ]}
         >
           <Ionicons
             name={isPersonalWorkspace ? "person" : "business"}
             size={14}
-            color={colors.tint}
+            color={colors.orange}
           />
-          <Text style={[styles.contextText, { color: colors.tint }]}>
+          <Text style={[styles.contextText, { color: colors.orange }]}>
             {organizationName}
           </Text>
         </View>
@@ -53,11 +60,15 @@ export function GreetingSection({
         <View
           style={[
             styles.contextBadge,
-            { backgroundColor: colors.description + "15" },
+            {
+              backgroundColor: colors.indigo + "15",
+              borderWidth: 1.5,
+              borderColor: colors.indigo + "40",
+            },
           ]}
         >
-          <Ionicons name="person" size={14} color={colors.description} />
-          <Text style={[styles.contextText, { color: colors.description }]}>
+          <Ionicons name="person" size={14} color={colors.indigo} />
+          <Text style={[styles.contextText, { color: colors.indigo }]}>
             Personal Workspace
           </Text>
         </View>
@@ -68,33 +79,34 @@ export function GreetingSection({
 
 const styles = StyleSheet.create({
   container: {
-    gap: 12,
-    paddingTop: 8,
-    paddingBottom: 12,
+    gap: 8,
+    paddingTop: 4,
+    paddingBottom: 16,
   },
   greeting: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "500",
-    opacity: 0.8,
+    opacity: 0.7,
   },
   userName: {
-    fontSize: 32,
-    fontWeight: "800",
-    letterSpacing: -1.2,
-    marginBottom: 8,
+    fontSize: 34,
+    fontWeight: "700",
+    letterSpacing: -0.5,
+    marginBottom: 4,
   },
   contextBadge: {
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 20,
     gap: 6,
+    marginTop: 4,
   },
   contextText: {
     fontSize: 13,
-    fontWeight: "700",
-    letterSpacing: 0.3,
+    fontWeight: "600",
+    letterSpacing: 0.2,
   },
 });

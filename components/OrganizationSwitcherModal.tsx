@@ -1,12 +1,13 @@
+// components/OrganizationSwitcherModal.tsx
 import BaseBottomSheet from "@/components/BaseBottomSheet";
 import { useOrganizationSwitch } from "@/hooks/useOrganizationSwitch";
-import { useAuth, useOrganizationList, useUser } from "@clerk/clerk-expo";
+import { useOrganizationsStore } from "@/store/organizationsStore";
+import { useAuth, useUser } from "@clerk/clerk-expo";
 import { BottomSheetView } from "@gorhom/bottom-sheet";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -27,46 +28,61 @@ export function OrganizationSwitcherModal({
   onClose,
 }: OrganizationSwitcherModalProps) {
   const { user } = useUser();
-  const { orgId } = useAuth();
-  const { isLoaded, userMemberships } = useOrganizationList({
-    userMemberships: { pageSize: 50 },
-  });
+  const { userId } = useAuth();
+
+  const { userOrgs, selectedOrgId, loading, fetchUserOrgs } =
+    useOrganizationsStore();
+
   const { switchOrganization } = useOrganizationSwitch();
 
   const colorScheme = useColorScheme();
   const descriptionColor =
     colorScheme === "dark" ? Colors.dark.description : Colors.light.description;
-  const backgroundColor =
-    colorScheme === "dark" ? Colors.dark.background : Colors.light.background;
   const [createOrgVisible, setCreateOrgVisible] = useState(false);
 
-  // Refetch organizations when modal opens
   useEffect(() => {
-    if (visible && isLoaded && userMemberships?.revalidate) {
-      userMemberships.revalidate();
+    if (visible && userId) {
+      fetchUserOrgs(userId);
     }
-  }, [visible, isLoaded, userMemberships]);
+  }, [visible, userId]);
 
   const handleCreateOrg = () => setCreateOrgVisible(true);
 
   const handleCreateOrgSuccess = () => {
-    // Organization creation was successful, the modal will close automatically
-    // The organization list will be refreshed automatically by the useCreateOrg hook
+    if (userId) {
+      fetchUserOrgs(userId);
+    }
   };
 
   const handleSwitch = async (
     organizationId: string | null,
     organizationName: string
   ) => {
-    // Close modal immediately when switch is initiated
     onClose();
-
-    // Trigger the organization switch using the context
     await switchOrganization(organizationId, organizationName);
   };
 
   const userName = user?.fullName || user?.firstName || "Personal";
-  const isPersonalActive = !orgId;
+  const isPersonalActive = !selectedOrgId;
+
+  // ✅ Filter to show ONLY root organizations (depth = 0)
+  const rootOrgs = userOrgs.filter((org) => org.depth === 0);
+
+  // ✅ Build list with personal + root orgs only
+  const orgList = [
+    {
+      id: "personal",
+      name: `${userName} (Personal)`,
+      active: isPersonalActive,
+      role: null,
+    },
+    ...rootOrgs.map((org) => ({
+      id: org.org_id,
+      name: org.org_name,
+      active: selectedOrgId === org.org_id,
+      role: org.role,
+    })),
+  ];
 
   return (
     <>
@@ -74,37 +90,24 @@ export function OrganizationSwitcherModal({
         visible={visible}
         onClose={onClose}
         keyboardBehavior="interactive"
-        snapPoints={["90%"]}
+        snapPoints={["60%"]} // ✅ Smaller since showing fewer orgs
         keyboardSnapPoint={0}
         enablePanDownToClose
         backdropOpacity={0.45}
       >
         <BottomSheetView style={styles.sheetBackground}>
           <SwitcherHeader />
-          {!isLoaded ? (
+          {loading && rootOrgs.length === 0 ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color="#888" />
             </View>
           ) : (
             <FlatList
-              data={[
-                {
-                  id: "personal",
-                  name: `${userName} (Personal)`,
-                  active: isPersonalActive,
-                  imageUrl: user?.imageUrl,
-                },
-                ...(userMemberships?.data ?? []).map((m) => ({
-                  id: m.organization.id,
-                  name: m.organization.name,
-                  active: orgId === m.organization.id,
-                  imageUrl: m.organization.imageUrl,
-                })),
-              ]}
+              data={orgList}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={[styles.orgRow]}
+                  style={styles.orgRow}
                   activeOpacity={0.7}
                   onPress={() =>
                     handleSwitch(
@@ -113,18 +116,39 @@ export function OrganizationSwitcherModal({
                     )
                   }
                 >
-                  {item.imageUrl ? (
-                    <Image
-                      source={{ uri: item.imageUrl }}
-                      style={styles.avatar}
-                    />
-                  ) : (
-                    <View style={styles.placeholderAvatar} />
-                  )}
-                  <Text style={[styles.orgName, { color: descriptionColor }]}>
-                    {item.name}
-                  </Text>
-                  {item.active && <View style={styles.activeDot} />}
+                  <View style={styles.orgContent}>
+                    <View style={styles.orgInfo}>
+                      <View style={styles.orgNameRow}>
+                        <Text
+                          style={[
+                            styles.orgName,
+                            { color: descriptionColor },
+                            item.active && styles.activeOrgName,
+                          ]}
+                        >
+                          {item.name}
+                        </Text>
+
+                        {/* Role badge */}
+                        {item.role && (
+                          <View
+                            style={[
+                              styles.roleBadge,
+                              item.role === "commander" &&
+                                styles.commanderBadge,
+                            ]}
+                          >
+                            <Text style={styles.roleText}>
+                              {item.role.toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+
+                    {/* Active indicator */}
+                    {item.active && <View style={styles.activeDot} />}
+                  </View>
                 </TouchableOpacity>
               )}
               ListFooterComponent={
@@ -133,7 +157,9 @@ export function OrganizationSwitcherModal({
                   onPress={handleCreateOrg}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.addOrgText}>+ Create organization</Text>
+                  <Text style={styles.addOrgText}>
+                    + Create root organization
+                  </Text>
                 </TouchableOpacity>
               }
             />
@@ -155,42 +181,52 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
-  header: {
-    paddingHorizontal: 20,
-    paddingBottom: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
   loadingContainer: {
     padding: 40,
     alignItems: "center",
     justifyContent: "center",
   },
   orgRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 14,
+    paddingVertical: 16,
     paddingHorizontal: 20,
     borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(255,255,255,0.08)",
   },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    marginRight: 14,
+  orgContent: {
+    flexDirection: "row",
+    alignItems: "center",
   },
-  placeholderAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    marginRight: 14,
+  orgInfo: {
+    flex: 1,
+  },
+  orgNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   orgName: {
-    color: "#fff",
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "500",
   },
+  activeOrgName: {
+    fontWeight: "600",
+  },
+  roleBadge: {
+    backgroundColor: "rgba(59, 130, 246, 0.2)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  commanderBadge: {
+    backgroundColor: "rgba(251, 191, 36, 0.2)",
+  },
+  roleText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#60a5fa",
+  },
   activeDot: {
-    marginLeft: "auto",
+    marginLeft: 12,
     width: 8,
     height: 8,
     borderRadius: 4,
@@ -200,7 +236,6 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     alignItems: "center",
     justifyContent: "center",
-    flex: 1,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderColor: "rgba(255,255,255,0.08)",
   },

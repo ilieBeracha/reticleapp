@@ -27,7 +27,7 @@ export function OrganizationSection({
             borderColor: colors.border,
           },
         ]}
-        onPress={() => router.push("/(home)/settings")}
+        onPress={() => router.push("/(protected)/(tabs)/settings")}
       >
         <View style={styles.orgHeader}>
           <View style={styles.orgInfo}>

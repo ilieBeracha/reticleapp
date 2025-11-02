@@ -209,3 +209,4 @@ export interface LoadoutWithDetails extends UserLoadout {
   weapon?: Weapon & { model?: WeaponModel };
   sight?: Sight & { model?: SightModel };
 }
+

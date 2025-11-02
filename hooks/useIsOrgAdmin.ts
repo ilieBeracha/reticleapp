@@ -1,17 +1,20 @@
-import { useOrganization } from "@clerk/clerk-expo";
+// hooks/useIsOrganizationCommander.ts
+import { useOrganizationsStore } from "@/store/organizationsStore";
+import { useAuth } from "@clerk/clerk-expo";
+import { useMemo } from "react";
 
 /**
- * Hook to check if the current user is an admin of the active organization
- * @returns boolean - true if user is an admin, false otherwise
+ * Check if current user is commander of the SELECTED organization
+ * Returns false if in a child org where user is only a member
  */
-export function useIsOrgAdmin() {
-  const { organization, membership } = useOrganization();
+export function useIsOrganizationCommander(): boolean {
+  const { userId } = useAuth();
+  const { selectedOrgId, userOrgs } = useOrganizationsStore();
 
-  // No organization = not an admin
-  if (!organization) {
-    return false;
-  }
+  return useMemo(() => {
+    if (!userId || !selectedOrgId) return false;
 
-  // Check if user has admin role
-  return membership?.role === "org:admin";
+    const membership = userOrgs.find((org) => org.org_id === selectedOrgId);
+    return membership?.role === "commander";
+  }, [userId, selectedOrgId, userOrgs]);
 }
