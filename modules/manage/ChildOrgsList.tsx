@@ -1,7 +1,7 @@
 import { CreateOrgModal } from "@/components/CreateOrg";
 import { useColors } from "@/hooks/useColors";
-import { useOrganizationSwitch } from "@/hooks/useOrganizationSwitch";
 import { useThemeColor } from "@/hooks/useThemeColor";
+import { OrgChild } from "@/types/organizations";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@clerk/clerk-expo";
@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { ChildOrgDetailModal } from "./ChildOrgDetailModal";
 import { DeleteOrgModal } from "./DeleteOrgModal";
 
 export function ChildOrgsList() {
@@ -27,7 +28,6 @@ export function ChildOrgsList() {
     fetchAllOrgs,
     allOrgs,
   } = useOrganizationsStore();
-  const { switchOrganization } = useOrganizationSwitch();
 
   const cardBackground = useThemeColor({}, "cardBackground");
   const textColor = useThemeColor({}, "text");
@@ -38,6 +38,8 @@ export function ChildOrgsList() {
   const [loading, setLoading] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [selectedChild, setSelectedChild] = useState<OrgChild | null>(null);
   const [orgToDelete, setOrgToDelete] = useState<{
     id: string;
     name: string;
@@ -50,8 +52,18 @@ export function ChildOrgsList() {
     }
   }, [selectedOrgId]);
 
-  const handleNavigateToChild = async (childId: string, childName: string) => {
-    await switchOrganization(childId, childName);
+  const handleViewChild = (child: OrgChild) => {
+    setSelectedChild(child);
+    setDetailModalVisible(true);
+  };
+
+  const handleDetailModalClose = () => {
+    setDetailModalVisible(false);
+    setSelectedChild(null);
+    // Refresh children list in case anything changed
+    if (selectedOrgId) {
+      fetchOrgChildren(selectedOrgId);
+    }
   };
 
   const handleCreateSuccess = () => {
@@ -129,11 +141,8 @@ export function ChildOrgsList() {
                   { backgroundColor: cardBackground, borderColor },
                 ]}
               >
-                <TouchableOpacity
-                  style={styles.childContent}
-                  onPress={() => handleNavigateToChild(child.id, child.name)}
-                  activeOpacity={0.7}
-                >
+                {/* Org Info Section */}
+                <View style={styles.childHeader}>
                   <View
                     style={[
                       styles.childIcon,
@@ -171,26 +180,46 @@ export function ChildOrgsList() {
                           color={mutedColor}
                         />
                         <Text style={[styles.membersText, { color: mutedColor }]}>
-                          {child.member_count}
+                          {child.member_count} members
                         </Text>
                       </View>
                     </View>
                   </View>
+                </View>
 
-                  <Ionicons
-                    name="chevron-forward"
-                    size={20}
-                    color={mutedColor}
-                  />
-                </TouchableOpacity>
+                {/* Action Buttons Row */}
+                <View style={styles.childActions}>
+                  <TouchableOpacity
+                    style={[
+                      styles.actionButton,
+                      styles.viewButton,
+                      { borderColor, backgroundColor: tintColor + "10" },
+                    ]}
+                    onPress={() => handleViewChild(child)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="eye-outline" size={16} color={tintColor} />
+                    <Text style={[styles.actionButtonText, { color: tintColor }]}>
+                      View Details
+                    </Text>
+                  </TouchableOpacity>
 
-                {/* Delete Button */}
-                <TouchableOpacity
-                  style={[styles.deleteButton, { borderColor: "#ef4444" }]}
-                  onPress={() => handleDeleteClick(child.id, child.name)}
-                >
-                  <Ionicons name="trash-outline" size={16} color="#ef4444" />
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.actionButton,
+                      styles.deleteActionButton,
+                      { borderColor: "#ef4444", backgroundColor: "#ef444410" },
+                    ]}
+                    onPress={() => handleDeleteClick(child.id, child.name)}
+                  >
+                    <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                    <Text
+                      style={[styles.actionButtonText, { color: "#ef4444" }]}
+                    >
+                      Delete
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ))}
           </View>
@@ -202,6 +231,8 @@ export function ChildOrgsList() {
         visible={createModalVisible}
         onClose={() => setCreateModalVisible(false)}
         onSuccess={handleCreateSuccess}
+        parentId={selectedOrgId || undefined}
+        autoSwitch={false}
       />
 
       {orgToDelete && (
@@ -213,6 +244,12 @@ export function ChildOrgsList() {
           organizationName={orgToDelete.name}
         />
       )}
+
+      <ChildOrgDetailModal
+        visible={detailModalVisible}
+        onClose={handleDetailModalClose}
+        childOrg={selectedChild}
+      />
     </>
   );
 }
@@ -258,18 +295,15 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   childrenList: {
-    gap: 10,
-  },
-  childCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 12,
-    borderWidth: 1.5,
-    padding: 12,
     gap: 12,
   },
-  childContent: {
-    flex: 1,
+  childCard: {
+    borderRadius: 12,
+    borderWidth: 1.5,
+    padding: 14,
+    gap: 12,
+  },
+  childHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -315,12 +349,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
   },
-  deleteButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    borderWidth: 1.5,
+  childActions: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 4,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    gap: 6,
+  },
+  viewButton: {
+    // Styling applied inline with theme colors
+  },
+  deleteActionButton: {
+    // Styling applied inline
+  },
+  actionButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
   },
 });

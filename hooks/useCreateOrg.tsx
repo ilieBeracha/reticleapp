@@ -4,9 +4,16 @@ import { useOrganizationsStore } from "@/store/organizationsStore";
 import { useAuth } from "@clerk/clerk-expo";
 import { useCallback, useState } from "react";
 
-export default function useCreateOrg() {
+interface UseCreateOrgOptions {
+  parentId?: string;
+  autoSwitch?: boolean;
+}
+
+export default function useCreateOrg(options: UseCreateOrgOptions = {}) {
+  const { parentId, autoSwitch = !parentId } = options;
   const { userId } = useAuth();
-  const { createRootOrg, fetchUserOrgs } = useOrganizationsStore();
+  const { createRootOrg, createChildOrg, fetchUserOrgs } =
+    useOrganizationsStore();
   const { switchOrganization } = useOrganizationSwitch();
 
   const [organizationName, setOrganizationName] = useState("");
@@ -29,15 +36,30 @@ export default function useCreateOrg() {
     setIsSubmitting(true);
 
     try {
-      // Create root organization in hierarchy
-      const result = await createRootOrg(
-        {
-          name: organizationName.trim(),
-          orgType: organizationType.trim() || "Organization",
-          description: description.trim() || undefined,
-        },
-        userId
-      );
+      let result;
+
+      if (parentId) {
+        // Create child organization under parent
+        result = await createChildOrg(
+          {
+            name: organizationName.trim(),
+            orgType: organizationType.trim() || "Organization",
+            parentId,
+            description: description.trim() || undefined,
+          },
+          userId
+        );
+      } else {
+        // Create root organization
+        result = await createRootOrg(
+          {
+            name: organizationName.trim(),
+            orgType: organizationType.trim() || "Organization",
+            description: description.trim() || undefined,
+          },
+          userId
+        );
+      }
 
       if (!result) {
         throw new Error("Failed to create organization");
@@ -46,8 +68,10 @@ export default function useCreateOrg() {
       // Refresh user's org list
       await fetchUserOrgs(userId);
 
-      // Automatically switch to the new organization
-      await switchOrganization(result.id, result.name);
+      // Conditionally switch to the new organization
+      if (autoSwitch) {
+        await switchOrganization(result.id, result.name);
+      }
 
       // Clear form
       setOrganizationName("");
@@ -66,7 +90,10 @@ export default function useCreateOrg() {
     organizationType,
     description,
     userId,
+    parentId,
+    autoSwitch,
     createRootOrg,
+    createChildOrg,
     fetchUserOrgs,
     switchOrganization,
   ]);

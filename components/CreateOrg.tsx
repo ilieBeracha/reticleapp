@@ -11,12 +11,16 @@ interface CreateOrgModalProps {
   visible: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  parentId?: string; // If provided, creates a child org instead of root
+  autoSwitch?: boolean; // If true, switches to new org after creation (default: true for root, false for child)
 }
 
 export function CreateOrgModal({
   visible,
   onClose,
   onSuccess,
+  parentId,
+  autoSwitch = !parentId, // Default: auto-switch for root orgs, don't auto-switch for child orgs
 }: CreateOrgModalProps) {
   const {
     createOrg,
@@ -27,7 +31,7 @@ export function CreateOrgModal({
     setOrganizationType,
     description,
     setDescription,
-  } = useCreateOrg();
+  } = useCreateOrg({ parentId, autoSwitch });
 
   // Theme colors
   const backgroundColor = useThemeColor({}, "background");
@@ -74,7 +78,9 @@ export function CreateOrgModal({
           Create Organization
         </ThemedText>
         <ThemedText style={[styles.subtitle, { color: mutedColor }]}>
-          Create a new root organization
+          {parentId
+            ? "Create a new child organization"
+            : "Create a new root organization"}
         </ThemedText>
       </View>
 
