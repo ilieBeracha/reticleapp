@@ -1,5 +1,6 @@
+import { useOrganizationsStore } from "@/store/organizationsStore";
 import { Session } from "@/types/database";
-import { useAuth, useOrganization } from "@clerk/clerk-expo";
+import { useAuth } from "@clerk/clerk-expo";
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { ActivityChart } from "./ActivityChart";
@@ -18,10 +19,10 @@ export function LastRecap({
   hasOrganization,
 }: LastRecapProps) {
   const { orgId } = useAuth();
-  const { organization } = useOrganization();
+  const { selectedOrgId, allOrgs } = useOrganizationsStore();
 
   // Determine if we're in personal mode (no organization selected)
-  const isPersonalMode = !orgId;
+  const isPersonalMode = !selectedOrgId;
 
   const today = new Date();
   const currentDay = today.getDay();
@@ -63,7 +64,7 @@ export function LastRecap({
         totalSessions={weekStats.totalSessions}
         totalAllTime={weekStats.totalAllTime}
         isPersonalMode={isPersonalMode}
-        organizationName={organization?.name}
+        organizationName={allOrgs.find((org) => org.id === selectedOrgId)?.name}
       />
 
       {/* Activity Chart */}

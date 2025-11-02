@@ -86,7 +86,7 @@ export function ActivityChart({
                         : item.sessions > 0
                         ? colors.blue
                         : colors.border,
-                      opacity: item.sessions === 0 ? 0.2 : item.isToday ? 0.85 : 0.4,
+                      opacity: item.sessions === 0 ? 0.25 : item.isToday ? 1 : 0.5,
                     },
                   ]}
                 >
@@ -94,7 +94,10 @@ export function ActivityChart({
                     <Text
                       style={[
                         styles.barText,
-                        { color: item.isToday ? colors.background : colors.textMuted },
+                        {
+                          color: item.isToday ? "#FFFFFF" : colors.text,
+                          fontWeight: item.isToday ? "700" : "600",
+                        },
                       ]}
                     >
                       {item.sessions}
@@ -107,7 +110,6 @@ export function ActivityChart({
                   styles.dayText,
                   {
                     color: item.isToday ? colors.indigo : colors.textMuted,
-                    opacity: item.isToday ? 0.85 : 0.45,
                     fontWeight: item.isToday ? "600" : "500",
                   },
                 ]}

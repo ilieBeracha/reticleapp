@@ -1,5 +1,4 @@
-// app/(protected)/(tabs)/_layout.tsx
-import CustomHeader from "@/components/Header";
+import Header from "@/components/Header";
 import { useColors } from "@/hooks/useColors";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,9 +8,8 @@ import React from "react";
 
 export default function TabLayout() {
   const colors = useColors();
-
   const { selectedOrgId } = useOrganizationsStore();
-  const hasOrganization = selectedOrgId !== null;
+  const isPersonalMode = selectedOrgId == null || selectedOrgId == undefined;
 
   return (
     <>
@@ -19,7 +17,8 @@ export default function TabLayout() {
         translucent={false}
         style={colors.background === "#0f172a" ? "dark" : "light"}
       />
-      <CustomHeader onNotificationPress={() => {}} />
+      <Header onNotificationPress={() => {}} />
+
       <Tabs
         screenOptions={{
           headerShown: false,
@@ -33,16 +32,16 @@ export default function TabLayout() {
           tabBarInactiveTintColor: colors.textMuted,
           tabBarStyle: {
             backgroundColor: colors.background,
+            justifyContent: "center",
             borderTopWidth: 1,
             borderTopColor: colors.border,
-            height: 68,
             paddingHorizontal: 10,
-            paddingBottom: 8,
-            paddingTop: 8,
+            paddingBottom: 12,
+            paddingTop: 12,
           },
         }}
       >
-        {/* Home - Always in the middle */}
+        {/* Home - Always shown */}
         <Tabs.Screen
           name="index"
           options={{
@@ -56,12 +55,13 @@ export default function TabLayout() {
             ),
           }}
         />
+
         {/* Calendar - Only shown if user has organization */}
         <Tabs.Screen
           name="calendar"
           options={{
             title: "Calendar",
-            href: hasOrganization ? "/(protected)/(tabs)/calendar" : null,
+            href: isPersonalMode ? null : "/(protected)/(tabs)/calendar",
             tabBarIcon: ({ color, focused }) => (
               <Ionicons
                 name={focused ? "calendar" : "calendar-outline"}
@@ -92,7 +92,7 @@ export default function TabLayout() {
           name="members"
           options={{
             title: "Members",
-            href: hasOrganization ? "/(protected)/(tabs)/members" : null,
+            href: isPersonalMode ? null : "/(protected)/(tabs)/members",
             tabBarIcon: ({ color, focused }) => (
               <Ionicons
                 name={focused ? "people" : "people-outline"}
@@ -102,6 +102,7 @@ export default function TabLayout() {
             ),
           }}
         />
+
         {/* AI - Always shown */}
         <Tabs.Screen
           name="ai"

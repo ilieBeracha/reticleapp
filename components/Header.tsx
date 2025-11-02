@@ -1,12 +1,12 @@
 import { useColors } from "@/hooks/useColors";
+import { useUser } from "@clerk/clerk-expo";
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useOrganizationsStore } from "@/store/organizationsStore";
-import { HeaderActions } from "./HeaderActions";
-import { OrganizationBadge } from "./OrganizationBadge";
 import { OrganizationSwitcherModal } from "./OrganizationSwitcherModal";
 import ProfileDropdown from "./ProfileDropdown";
 
@@ -19,13 +19,19 @@ export default function Header({
   onNotificationPress,
   notificationCount = 0,
 }: HeaderProps) {
+  const { user } = useUser();
   const { userOrgs, selectedOrgId } = useOrganizationsStore();
   const selectedOrg = userOrgs.find((org) => org.org_id === selectedOrgId);
-  console.log("selectedOrg", selectedOrg);
   const [profileOpen, setProfileOpen] = useState(false);
   const [orgSwitcherOpen, setOrgSwitcherOpen] = useState(false);
   const insets = useSafeAreaInsets();
   const colors = useColors();
+
+  const userName =
+    user?.firstName ||
+    user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] ||
+    "User";
+  const isPersonalMode = !selectedOrg;
 
   const handleOrgSwitcherPress = () => {
     // Prevent multiple rapid clicks
@@ -47,21 +53,69 @@ export default function Header({
         styles.header,
         {
           backgroundColor: colors.background,
-          borderBottomColor: colors.border,
+        },
+        {
           paddingTop: insets.top + 8,
         },
       ]}
     >
-      <OrganizationBadge
-        organizationName={selectedOrg?.org_name || "Personal"}
+      {/* User Info Section - Opens Org Switcher */}
+      <TouchableOpacity
+        style={styles.userSection}
         onPress={handleOrgSwitcherPress}
-      />
+        activeOpacity={0.7}
+      >
+        <View
+          style={[
+            styles.avatar,
+            {
+              backgroundColor: isPersonalMode
+                ? colors.indigo + "20"
+                : colors.orange + "20",
+            },
+          ]}
+        >
+          <Ionicons
+            name="person"
+            size={24}
+            color={isPersonalMode ? colors.indigo : colors.orange}
+          />
+        </View>
+        <View style={styles.userDetails}>
+          <Text style={[styles.userName, { color: colors.text }]}>
+            {userName}
+          </Text>
+          <Text style={[styles.userBadge, { color: colors.textMuted }]}>
+            {isPersonalMode ? "Personal Account" : selectedOrg?.org_name}
+          </Text>
+        </View>
+      </TouchableOpacity>
 
-      <HeaderActions
-        notificationCount={notificationCount}
-        onNotificationPress={onNotificationPress}
-        onProfilePress={() => setProfileOpen(true)}
-      />
+      {/* Right Side Actions */}
+      <View style={styles.actions}>
+        {notificationCount > 0 && (
+          <TouchableOpacity
+            style={[
+              styles.notificationButton,
+              {
+                backgroundColor: colors.red,
+                borderColor: colors.red + "40",
+              },
+            ]}
+            onPress={onNotificationPress}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.notificationText}>{notificationCount}</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={[styles.menuButton, { backgroundColor: colors.card }]}
+          onPress={() => setProfileOpen(true)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="settings-outline" size={20} color={colors.text} />
+        </TouchableOpacity>
+      </View>
 
       <ProfileDropdown
         onClose={() => setProfileOpen(false)}
@@ -96,6 +150,56 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingBottom: 12,
-    borderBottomWidth: 0.5,
+  },
+  userSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  userDetails: {
+    gap: 2,
+    flex: 1,
+  },
+  userName: {
+    fontSize: 17,
+    fontWeight: "600",
+  },
+  userBadge: {
+    fontSize: 13,
+    fontWeight: "500",
+    opacity: 0.6,
+  },
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  notificationButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+  },
+  notificationText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  menuButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

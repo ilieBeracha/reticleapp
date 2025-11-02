@@ -53,17 +53,17 @@ export function RecentSessions({ sessions, loading }: RecentSessionsProps) {
                   {
                     backgroundColor: colors.card,
                     borderLeftWidth: 2,
-                    borderLeftColor: accentColor + "25",
+                    borderLeftColor: accentColor + "35",
                   },
                 ]}
               >
                 <View
                   style={[
                     styles.sessionIcon,
-                    { backgroundColor: accentColor + "10" },
+                    { backgroundColor: accentColor + "15" },
                   ]}
                 >
-                  <Ionicons name="play-circle" size={17} color={accentColor} style={{ opacity: 0.7 }} />
+                  <Ionicons name="play-circle" size={17} color={accentColor} />
                 </View>
                 <View style={styles.sessionContent}>
                   <Text style={[styles.sessionTitle, { color: colors.text }]}>

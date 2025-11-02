@@ -7,6 +7,16 @@ import type {
 } from "@/types/organizations";
 
 export class OrganizationsService {
+  // Get memberships of an organization
+  static async getMemberships(orgId: string): Promise<OrgMembership[]> {
+    const client = await AuthenticatedClient.getClient();
+    const { data, error } = await client
+      .from("org_memberships")
+      .select("*")
+      .eq("org_id", orgId);
+    if (error) throw new Error(`Failed to get memberships: ${error.message}`);
+    return data || [];
+  }
   // Get current user's organizations
   static async getUserOrgs(userId: string): Promise<UserOrg[]> {
     const client = await AuthenticatedClient.getClient();

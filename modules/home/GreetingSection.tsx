@@ -37,14 +37,13 @@ export function GreetingSection({
         <View
           style={[
             styles.contextBadge,
-            { backgroundColor: colors.indigo + "10" },
+            { backgroundColor: colors.indigo + "18" },
           ]}
         >
           <Ionicons
             name={isPersonalWorkspace ? "person" : "business"}
             size={13}
             color={colors.indigo}
-            style={{ opacity: 0.7 }}
           />
           <Text style={[styles.contextText, { color: colors.indigo }]}>
             {organizationName}
@@ -83,7 +82,6 @@ const styles = StyleSheet.create({
   },
   contextText: {
     fontSize: 12,
-    fontWeight: "500",
-    opacity: 0.75,
+    fontWeight: "600",
   },
 });

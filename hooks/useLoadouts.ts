@@ -1,6 +1,7 @@
 import { getLoadoutsService } from "@/services/loadoutsService";
+import { useOrganizationsStore } from "@/store/organizationsStore";
 import { LoadoutWithDetails } from "@/types/database";
-import { useAuth, useOrganization } from "@clerk/clerk-react-native";
+import { useAuth } from "@clerk/clerk-expo";
 import { useCallback, useEffect, useState } from "react";
 
 /**
@@ -10,7 +11,7 @@ import { useCallback, useEffect, useState } from "react";
  */
 export function useLoadouts() {
   const { userId } = useAuth();
-  const { organization } = useOrganization();
+  const { selectedOrgId } = useOrganizationsStore();
 
   const [loadouts, setLoadouts] = useState<LoadoutWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,8 +28,7 @@ export function useLoadouts() {
       setLoading(true);
       setError(null);
 
-      const data = await getLoadoutsService(userId, organization?.id || null);
-
+      const data = await getLoadoutsService(userId, selectedOrgId);
       setLoadouts(data);
     } catch (err: any) {
       console.error("Error fetching loadouts:", err);
@@ -37,7 +37,7 @@ export function useLoadouts() {
     } finally {
       setLoading(false);
     }
-  }, [userId, organization?.id]);
+  }, [userId, selectedOrgId]);
 
   useEffect(() => {
     fetchLoadouts();

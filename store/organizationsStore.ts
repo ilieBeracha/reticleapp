@@ -3,6 +3,7 @@ import { OrganizationsService } from "@/services/organizationsService";
 import type {
   Organization,
   OrgChild,
+  OrgMembership,
   OrgSubtree,
   OrgTreeNode,
   UserOrg,
@@ -20,6 +21,7 @@ interface OrganizationsStore {
   orgTree: OrgTreeNode[];
   loading: boolean;
   error: string | null;
+  memberships: OrgMembership[] | null;
 
   // Actions
   fetchUserOrgs: (userId: string) => Promise<void>;
@@ -43,6 +45,8 @@ interface OrganizationsStore {
     },
     userId: string
   ) => Promise<Organization | null>;
+
+  fetchMemberships: (orgId: string) => Promise<OrgMembership[] | null>;
 
   updateOrg: (
     orgId: string,
@@ -71,6 +75,7 @@ export const useOrganizationsStore = create<OrganizationsStore>((set, get) => ({
   orgChildren: [],
   orgSubtree: [],
   orgTree: [],
+  memberships: null,
   loading: false,
   error: null,
   getUserId: () => {
@@ -134,6 +139,18 @@ export const useOrganizationsStore = create<OrganizationsStore>((set, get) => ({
     } catch (err: any) {
       console.error("Error fetching org tree:", err);
       set({ error: err.message, orgTree: [], loading: false });
+    }
+  },
+
+  fetchMemberships: async (orgId: string) => {
+    try {
+      const memberships = await OrganizationsService.getMemberships(orgId);
+      set({ memberships, loading: false });
+      return memberships || null;
+    } catch (err: any) {
+      console.error("Error fetching memberships:", err);
+      set({ error: err.message, memberships: [], loading: false });
+      return null;
     }
   },
 
@@ -268,6 +285,7 @@ export const useOrganizationsStore = create<OrganizationsStore>((set, get) => ({
       orgTree: [],
       loading: false,
       error: null,
+      memberships: null,
     });
   },
 }));

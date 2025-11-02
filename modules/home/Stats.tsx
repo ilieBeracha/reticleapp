@@ -35,10 +35,10 @@ function StatItem({ icon, value, label, color }: StatItemConfig) {
       <View
         style={[
           styles.iconContainer,
-          { backgroundColor: color + "12" },
+          { backgroundColor: color + "15" },
         ]}
       >
-        <Ionicons name={icon} size={19} color={color} style={{ opacity: 0.8 }} />
+        <Ionicons name={icon} size={19} color={color} />
       </View>
       <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
       <Text style={[styles.statLabel, { color: colors.textMuted }]}>

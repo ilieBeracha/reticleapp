@@ -27,14 +27,13 @@ export function WeeklyStats({
         <View
           style={[
             styles.contextBadge,
-            { backgroundColor: colors.purple + "08" },
+            { backgroundColor: colors.purple + "15" },
           ]}
         >
           <Ionicons
             name={isPersonalMode ? "person" : "people"}
             size={12}
             color={colors.purple}
-            style={{ opacity: 0.7 }}
           />
           <Text
             style={[
@@ -49,8 +48,8 @@ export function WeeklyStats({
 
       <View style={styles.statsRow}>
         <View style={[styles.statCard, { backgroundColor: colors.card }]}>
-          <View style={[styles.statIcon, { backgroundColor: colors.blue + "12" }]}>
-            <Ionicons name="calendar" size={17} color={colors.blue} style={{ opacity: 0.8 }} />
+          <View style={[styles.statIcon, { backgroundColor: colors.blue + "15" }]}>
+            <Ionicons name="calendar" size={17} color={colors.blue} />
           </View>
           <View style={styles.statContent}>
             <Text style={[styles.statNumber, { color: colors.text }]}>
@@ -63,12 +62,11 @@ export function WeeklyStats({
         </View>
 
         <View style={[styles.statCard, { backgroundColor: colors.card }]}>
-          <View style={[styles.statIcon, { backgroundColor: colors.green + "12" }]}>
+          <View style={[styles.statIcon, { backgroundColor: colors.green + "15" }]}>
             <Ionicons
               name={isPersonalMode ? "trophy" : "people"}
               size={17}
               color={colors.green}
-              style={{ opacity: 0.8 }}
             />
           </View>
           <View style={styles.statContent}>
@@ -92,7 +90,7 @@ export function WeeklyStats({
                   styles.streakDot,
                   {
                     backgroundColor: i < weekStreak ? colors.orange : colors.border,
-                    opacity: i < weekStreak ? 0.7 : 0.25,
+                    opacity: i < weekStreak ? 0.85 : 0.3,
                   },
                 ]}
               />
@@ -132,8 +130,7 @@ const styles = StyleSheet.create({
   },
   contextBadgeText: {
     fontSize: 10,
-    fontWeight: "500",
-    opacity: 0.75,
+    fontWeight: "600",
   },
   statsRow: {
     flexDirection: "row",
