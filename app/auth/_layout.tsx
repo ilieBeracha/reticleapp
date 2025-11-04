@@ -1,22 +1,32 @@
 import { useAuth, useSignUp, useUser } from "@clerk/clerk-expo";
-import { Redirect, Stack, usePathname } from "expo-router";
+import * as Linking from 'expo-linking';
+import {
+  Redirect,
+  RelativePathString,
+  Stack,
+  useLocalSearchParams,
+  usePathname,
+} from "expo-router";
 
 export default function AuthRoutesLayout() {
   const { user, isLoaded: userLoaded } = useUser();
   const { signUp } = useSignUp();
   const pathName = usePathname();
   const { isSignedIn, isLoaded: authLoaded } = useAuth();
+  const token = useLocalSearchParams<{ token: string }>();
+  const link = Linking.createURL('accept-invitation', { queryParams: { token: token.token } });
 
-  console.log("authLoaded", authLoaded);
-  console.log("userLoaded", userLoaded);
-  console.log("isSignedIn", isSignedIn);
-  console.log("signUp", signUp);
-  console.log("pathName", pathName);
+  console.log("token", token);
+  console.log("link", link);
 
   // Wait for Clerk to load before making routing decisions
   if (!authLoaded || !userLoaded) {
     return null;
   }
+
+  if (token) {
+    return <Redirect href={link as RelativePathString} />;
+  } 
 
   // Handle incomplete signup (no session yet, but signUp exists)
   if (!isSignedIn && signUp && signUp.status === "missing_requirements") {
@@ -36,6 +46,8 @@ export default function AuthRoutesLayout() {
   if (isSignedIn && user?.unsafeMetadata?.onboarding_completed === true) {
     return <Redirect href="/(protected)/(tabs)" />;
   }
+
+
 
   return <Stack screenOptions={{ headerShown: false }} />;
 }

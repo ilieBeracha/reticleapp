@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { useOrganizationsStore } from "@/store/organizationsStore";
+import { useAuth } from "@clerk/clerk-expo";
 import { useCallback, useState } from "react";
   
 export type OrgRole =
@@ -14,7 +15,8 @@ interface InviteOptions {
 }
 
 export function useInviteOrg() {
-  const { selectedOrgId } = useOrganizationsStore();
+  const { selectedOrgId, allOrgs } = useOrganizationsStore();
+  const { userId } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [emailAddress, setEmailAddress] = useState("");
   const [selectedRole, setSelectedRole] = useState<OrgRole>("soldier");
@@ -39,17 +41,33 @@ export function useInviteOrg() {
         throw new Error("No active organization");
       }
 
+      if (!userId) {
+        throw new Error("User not authenticated");
+      }
+
       // Validate email format
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         throw new Error("Invalid email format");
       }
 
+      // Get organization name
+      const currentOrg = allOrgs.find(org => org.id === selectedOrgId);
+      if (!currentOrg) {
+        throw new Error("Organization not found");
+      }
+
+      // Map role to database role (soldier -> member)
+      const dbRole = role === "soldier" ? "member" : role;
+
       setIsSubmitting(true);
       try {
         const { data, error } = await supabase.functions.invoke("resend", {
           body: {
-            to: email,
+            email: email,
             organizationId: selectedOrgId,
+            organizationName: currentOrg.name,
+            role: dbRole,
+            invitedBy: userId,
           },
         });
         if (error) throw new Error(error.message);
@@ -61,7 +79,7 @@ export function useInviteOrg() {
         setIsSubmitting(false);
       }
     },
-    [emailAddress, selectedRole, selectedOrgId]
+    [emailAddress, selectedRole, selectedOrgId, userId, allOrgs]
   );
 
   return {
