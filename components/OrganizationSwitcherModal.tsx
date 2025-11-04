@@ -238,9 +238,10 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     paddingHorizontal: 20,
     borderTopRightRadius: 20,
+    paddingBottom: 20,
   },
   loadingContainer: {
-    padding: 40,
+    // padding: 40,
     alignItems: "center",
     justifyContent: "center",
   },

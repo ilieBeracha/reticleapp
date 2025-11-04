@@ -17,7 +17,7 @@ export function OrgHierarchyBreadcrumb({
   if (!selectedOrgId) {
     return (
       <View style={styles.container}>
-        <Ionicons name="person" size={16} color={colors.textMuted} />
+        <Ionicons name="person" size={14} color={colors.textMuted} />
         <Text style={[styles.currentText, { color: colors.text }]}>
           Personal Workspace
         </Text>
@@ -42,7 +42,7 @@ export function OrgHierarchyBreadcrumb({
 
   return (
     <View style={styles.container}>
-      <Ionicons name="business" size={16} color={colors.textMuted} />
+      <Ionicons name="business" size={14} color={colors.textMuted} />
 
       <View style={styles.breadcrumbRow}>
         {hierarchyPath.map((item, index) => {
@@ -78,7 +78,7 @@ export function OrgHierarchyBreadcrumb({
               {!isLast && (
                 <Ionicons
                   name="chevron-forward"
-                  size={14}
+                  size={12}
                   color={colors.textMuted}
                   style={styles.separator}
                 />
@@ -95,38 +95,38 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 10,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
   breadcrumbRow: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     flexWrap: "wrap",
-    gap: 4,
+    gap: 3,
   },
   breadcrumbItem: {
     flexDirection: "row",
     alignItems: "center",
-    maxWidth: 150,
+    maxWidth: 140,
   },
   breadcrumbText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "500",
   },
   breadcrumbLink: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "600",
     textDecorationLine: "underline",
   },
   currentText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
   },
   separator: {
-    marginHorizontal: 4,
+    marginHorizontal: 3,
   },
 });

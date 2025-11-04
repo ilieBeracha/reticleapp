@@ -1,4 +1,5 @@
 {
+  
   "editor.codeActionsOnSave": {
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit",
@@ -12,5 +13,7 @@
   ],
   "files.associations": {
     "*.cursorrules": "markdown"
-  }
+  },
+  "deno.enablePaths": ["./supabase/functions"],
+  "deno.importMap": "./supabase/functions/import_map.json"
 }

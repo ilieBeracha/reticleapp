@@ -1,21 +1,26 @@
 import { ThemedView } from "@/components/ThemedView";
 import { useColors } from "@/hooks/useColors";
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { useEnhancedAuth } from "@/hooks/useEnhancedAuth";
 import { Ionicons } from "@expo/vector-icons";
 import {
+  Linking,
+  Pressable,
+  ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
-  ScrollView,
-  Pressable,
-  Linking,
 } from "react-native";
 
 export default function Settings() {
   const colors = useColors();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
-
+  const { userId } = useEnhancedAuth();
+  if (!userId) {
+    return null;
+  }
   return (
     <ThemedView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -75,10 +80,9 @@ export default function Settings() {
             ACCOUNT
           </Text>
           <View style={[styles.settingCard, { backgroundColor: colors.card }]}>
-            <Pressable
+            <TouchableOpacity
               style={styles.settingRow}
               onPress={() => {}}
-              android_ripple={{ color: colors.border }}
             >
               <View style={styles.settingLeft}>
                 <View
@@ -93,19 +97,16 @@ export default function Settings() {
                     color={colors.blue}
                   />
                 </View>
-                <View style={styles.settingInfo}>
-                  <Text style={[styles.settingLabel, { color: colors.text }]}>
-                    Profile
-                  </Text>
-                </View>
+                <Text style={[styles.settingLabel, { color: colors.text }]}>
+                  Profile
+                </Text>
               </View>
-              <Ionicons
+            <Ionicons
                 name="chevron-forward"
                 size={20}
                 color={colors.textMuted}
               />
-            </Pressable>
-
+            </TouchableOpacity>
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
             <Pressable

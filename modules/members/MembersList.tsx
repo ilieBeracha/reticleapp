@@ -1,7 +1,7 @@
 import { ThemedText } from "@/components/ThemedText";
 import { useThemeColor } from "@/hooks/useThemeColor";
-import { useOrganization } from "@clerk/clerk-expo";
-import { useMemo } from "react";
+import { useOrganizationsStore } from "@/store/organizationsStore";
+import { useEffect, useMemo } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { MemberItem } from "./MemberItem";
 
@@ -14,25 +14,29 @@ export function MembersList({
   searchQuery = "",
   roleFilter = "all",
 }: MembersListProps) {
-  const { memberships } = useOrganization({
-    memberships: {
-      pageSize: 50,
-    },
-  });
+  const { selectedOrgId, memberships, fetchMemberships, loading } =
+    useOrganizationsStore();
+  
+  useEffect(() => {
+    if (selectedOrgId) {
+      fetchMemberships(selectedOrgId);
+    }
+  }, [selectedOrgId, fetchMemberships]);
   const textColor = useThemeColor({}, "text");
   const mutedColor = useThemeColor({}, "description");
 
   // Filter members based on search and role
   const filteredMembers = useMemo(() => {
-    if (!memberships?.data) return [];
+    if (!memberships || memberships.length === 0) return [];
 
-    let filtered = memberships.data;
+    let filtered = memberships;
 
     // Filter by search query
     if (searchQuery.trim()) {
       filtered = filtered.filter((member) => {
-        const name = member.publicUserData?.firstName?.toLowerCase() || "";
-        const email = member.publicUserData?.identifier?.toLowerCase() || "";
+        // If you have a users mirror table, replace below accordingly
+        const name = member.user_id || "";
+        const email = member.user_id || "";
         const query = searchQuery.toLowerCase();
         return name.includes(query) || email.includes(query);
       });
@@ -40,15 +44,15 @@ export function MembersList({
 
     // Filter by role
     if (roleFilter === "admins") {
-      filtered = filtered.filter((member) => member.role === "org:admin");
+      filtered = filtered.filter((member) => member.role === "commander");
     } else if (roleFilter === "members") {
-      filtered = filtered.filter((member) => member.role !== "org:admin");
+      filtered = filtered.filter((member) => member.role !== "commander");
     }
 
     return filtered;
-  }, [memberships?.data, searchQuery, roleFilter]);
+  }, [memberships, searchQuery, roleFilter]);
 
-  if (!memberships) {
+  if (!memberships || loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator />
@@ -57,7 +61,7 @@ export function MembersList({
   }
 
   const memberCount = filteredMembers.length;
-  const totalCount = memberships?.data?.length ?? 0;
+  const totalCount = memberships?.length ?? 0;
 
   return (
     <View style={styles.container}>

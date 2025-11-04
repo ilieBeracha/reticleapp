@@ -1,6 +1,7 @@
 import { getSessionsService } from "@/services/sessionService";
+import { useOrganizationsStore } from "@/store/organizationsStore";
 import { Session } from "@/types/database";
-import { useAuth, useOrganization } from "@clerk/clerk-expo";
+import { useAuth } from "@clerk/clerk-expo";
 import { useCallback, useEffect, useState } from "react";
 
 /**
@@ -35,7 +36,7 @@ import { useCallback, useEffect, useState } from "react";
  */
 export function useSessionsQuery(trainingId?: string) {
   const { userId } = useAuth();
-  const { organization } = useOrganization();
+  const { selectedOrgId } = useOrganizationsStore();
 
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,7 +56,7 @@ export function useSessionsQuery(trainingId?: string) {
       // Direct service call - no token passing needed
       const data = await getSessionsService(
         userId,
-        organization?.id || null,
+        selectedOrgId || null,
         trainingId
       );
 
@@ -67,7 +68,7 @@ export function useSessionsQuery(trainingId?: string) {
     } finally {
       setLoading(false);
     }
-  }, [userId, organization?.id, trainingId]);
+  }, [userId, selectedOrgId, trainingId]);
 
   // Auto-fetch on mount and when dependencies change
   useEffect(() => {

@@ -1,11 +1,11 @@
 import { ThemedText } from "@/components/ThemedText";
 import { useThemeColor } from "@/hooks/useThemeColor";
-import { OrganizationMembershipResource } from "@clerk/types";
+import type { OrgMembership } from "@/types/organizations";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 
 interface MemberItemProps {
-  member: OrganizationMembershipResource;
+  member: OrgMembership;
 }
 
 export function MemberItem({ member }: MemberItemProps) {
@@ -15,12 +15,9 @@ export function MemberItem({ member }: MemberItemProps) {
   const borderColor = useThemeColor({}, "border");
   const cardBackground = useThemeColor({}, "cardBackground");
 
-  const isAdmin = member.role === "org:admin";
-  const userName =
-    member.publicUserData?.firstName ||
-    member.publicUserData?.identifier ||
-    "Unknown User";
-  const userEmail = member.publicUserData?.identifier || "";
+  const isAdmin = member.role === "commander";
+  const userName = member.user_id || "Member";
+  const userEmail = "";
 
   return (
     <View

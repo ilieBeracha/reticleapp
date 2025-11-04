@@ -1,6 +1,7 @@
 import { getTrainingsService } from "@/services/trainingService";
+import { useOrganizationsStore } from "@/store/organizationsStore";
 import { Training } from "@/types/database";
-import { useAuth, useOrganization } from "@clerk/clerk-expo";
+import { useAuth } from "@clerk/clerk-expo";
 import { useCallback, useEffect, useState } from "react";
 
 /**
@@ -34,7 +35,7 @@ import { useCallback, useEffect, useState } from "react";
  */
 export function useTrainings() {
   const { userId } = useAuth();
-  const { organization } = useOrganization();
+  const { selectedOrgId } = useOrganizationsStore();
 
   const [trainings, setTrainings] = useState<Training[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +53,7 @@ export function useTrainings() {
       setError(null);
 
       // Direct service call - no token passing needed
-      const data = await getTrainingsService(userId, organization?.id || null);
+      const data = await getTrainingsService(userId, selectedOrgId || null);
 
       setTrainings(data);
     } catch (err: any) {
@@ -62,7 +63,7 @@ export function useTrainings() {
     } finally {
       setLoading(false);
     }
-  }, [userId, organization?.id]);
+  }, [userId, selectedOrgId]);
 
   // Auto-fetch on mount and when dependencies change
   useEffect(() => {

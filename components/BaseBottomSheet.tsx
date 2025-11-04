@@ -72,19 +72,33 @@ export default function BaseBottomSheet({
 
   // Handle keyboard show/hide to adjust snap points
   useEffect(() => {
+    // Skip keyboard auto-snap if:
+    // - Not visible
+    // - Feature is disabled
+    // - Using dynamic sizing (snapPoints is undefined)
+    // - No snap points defined or only one snap point
     if (
       !visible ||
       !enableKeyboardAutoSnap ||
-      !customSnapPoints ||
-      customSnapPoints.length <= 1
+      enableDynamicSizing || // Dynamic sizing doesn't use snap points
+      !snapPoints ||
+      !Array.isArray(snapPoints) ||
+      snapPoints.length <= 1
     )
       return;
 
     const keyboardWillShow = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
       () => {
-        // Snap to the last (highest) snap point when keyboard opens
-        bottomSheetRef.current?.snapToIndex(customSnapPoints.length - 1);
+        // Use keyboardSnapPoint if provided, otherwise snap to the last (highest) snap point
+        const targetIndex = keyboardSnapPoint !== undefined 
+          ? keyboardSnapPoint 
+          : snapPoints.length - 1;
+        
+        // Ensure the index is within valid range (0 to length - 1)
+        if (targetIndex >= 0 && targetIndex < snapPoints.length) {
+          bottomSheetRef.current?.snapToIndex(targetIndex);
+        }
       }
     );
 
@@ -100,7 +114,7 @@ export default function BaseBottomSheet({
       keyboardWillShow.remove();
       keyboardWillHide.remove();
     };
-  }, [visible, enableKeyboardAutoSnap, customSnapPoints]);
+  }, [visible, enableKeyboardAutoSnap, enableDynamicSizing, snapPoints, keyboardSnapPoint]);
 
   // Render backdrop
   const renderBackdrop = useCallback(

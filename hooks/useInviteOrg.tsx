@@ -1,13 +1,12 @@
-import { useOrganization } from "@clerk/clerk-expo";
+import { supabase } from "@/lib/supabase";
+import { useOrganizationsStore } from "@/store/organizationsStore";
 import { useCallback, useState } from "react";
-
+  
 export type OrgRole =
-  | "org:admin"
-  | "org:member"
-  | "org:unit_commander"
-  | "org:team_commander"
-  | "org:squad_commander"
-  | "org:soldier";
+  | "commander"
+  | "member"
+  | "viewer";
+  
 
 interface InviteOptions {
   emailAddress: string;
@@ -15,14 +14,14 @@ interface InviteOptions {
 }
 
 export function useInviteOrg() {
-  const { organization } = useOrganization();
+  const { selectedOrgId } = useOrganizationsStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [emailAddress, setEmailAddress] = useState("");
-  const [selectedRole, setSelectedRole] = useState<OrgRole>("org:soldier");
+  const [selectedRole, setSelectedRole] = useState<OrgRole>("member");
 
   const canSubmit = Boolean(
     emailAddress.trim() &&
-      organization &&
+    selectedOrgId &&
       !isSubmitting &&
       /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddress) // Basic email validation
   );
@@ -36,7 +35,7 @@ export function useInviteOrg() {
         throw new Error("Email address is required");
       }
 
-      if (!organization) {
+      if (!selectedOrgId) {
         throw new Error("No active organization");
       }
 
@@ -47,16 +46,14 @@ export function useInviteOrg() {
 
       setIsSubmitting(true);
       try {
-        const invitation = await organization.inviteMember({
-          emailAddress: email.trim(),
-          role,
+        const { data, error } = await supabase.functions.invoke("resend", {
+          body: {
+            to: email,
+            organizationId: selectedOrgId,
+          },
         });
-
-        // Clear form on success
-        setEmailAddress("");
-        setSelectedRole("org:soldier");
-
-        return invitation;
+        if (error) throw new Error(error.message);
+        return data;
       } catch (error: any) {
         console.error("Error inviting member:", error);
         throw error;
@@ -64,7 +61,7 @@ export function useInviteOrg() {
         setIsSubmitting(false);
       }
     },
-    [emailAddress, selectedRole, organization]
+    [emailAddress, selectedRole, selectedOrgId]
   );
 
   return {
@@ -75,6 +72,5 @@ export function useInviteOrg() {
     isSubmitting,
     canSubmit,
     inviteMember,
-    organization,
   };
 }

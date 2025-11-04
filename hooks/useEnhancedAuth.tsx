@@ -2,7 +2,8 @@ import {
   AuthenticatedClient,
   AuthenticationError,
 } from "@/lib/authenticatedClient";
-import { useAuth, useOrganization, useUser } from "@clerk/clerk-expo";
+import { useOrganizationsStore } from "@/store/organizationsStore";
+import { useAuth, useUser } from "@clerk/clerk-expo";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { useRouter } from "expo-router";
 import React, {
@@ -24,8 +25,8 @@ export interface EnhancedAuthContextType {
   isSignedIn: boolean;
   userId: string | null;
 
-  // Organization context
-  organization: any | null;
+  // Organization context (from hierarchy store)
+  organizationId: string | null;
 
   // Enhanced client access
   getClient: () => Promise<SupabaseClient>;
@@ -52,7 +53,7 @@ export function EnhancedAuthProvider({ children }: { children: ReactNode }) {
     signOut: clerkSignOut,
   } = useAuth();
   const { user } = useUser();
-  const { organization } = useOrganization();
+  const { selectedOrgId } = useOrganizationsStore();
   const router = useRouter();
 
   // Initialize AuthenticatedClient when user is authenticated
@@ -147,7 +148,7 @@ export function EnhancedAuthProvider({ children }: { children: ReactNode }) {
     userId: userId ?? null,
 
     // Organization context
-    organization,
+    organizationId: selectedOrgId ?? null,
 
     // Enhanced methods
     getClient,

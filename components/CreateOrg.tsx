@@ -70,6 +70,7 @@ export function CreateOrgModal({
       keyboardBehavior="interactive"
       snapPoints={["50%", "70%"]} // ✅ Larger for additional fields
       enablePanDownToClose={!isSubmitting}
+      enableDynamicSizing={true}
       backdropOpacity={0.45}
     >
       {/* Header */}

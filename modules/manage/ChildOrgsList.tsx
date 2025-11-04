@@ -107,7 +107,7 @@ export function ChildOrgsList() {
         <TouchableOpacity
           style={[
             styles.createButton,
-            { backgroundColor: colors.green, borderColor: colors.green },
+            { backgroundColor: tintColor, borderColor: tintColor },
           ]}
           onPress={() => setCreateModalVisible(true)}
         >

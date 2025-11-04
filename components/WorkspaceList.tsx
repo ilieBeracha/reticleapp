@@ -1,19 +1,18 @@
 import { useThemeColor } from "@/hooks/useThemeColor";
-import { OrganizationMembershipResource } from "@clerk/types";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 interface WorkspaceListProps {
   userName: string;
   isPersonalActive: boolean;
-  organizations: OrganizationMembershipResource[];
+  organizations: { id: string; name: string }[];
   activeOrgId?: string | null;
   switchingToId: string | null;
   onSwitchToPersonal: () => void;
@@ -44,8 +43,8 @@ export function WorkspaceList({
     ? { name: userName, icon: "person-circle", isPersonal: true }
     : {
         name:
-          organizations.find((m) => m.organization.id === activeOrgId)
-            ?.organization.name || "Organization",
+          organizations.find((m) => m.id === activeOrgId)?.name ||
+          "Organization",
         icon: "business",
         isPersonal: false,
       };
@@ -56,12 +55,8 @@ export function WorkspaceList({
       ? []
       : [{ id: "personal", name: userName, icon: "person-circle" as const }]),
     ...organizations
-      .filter((m) => m.organization.id !== activeOrgId)
-      .map((m) => ({
-        id: m.organization.id,
-        name: m.organization.name,
-        icon: "business" as const,
-      })),
+      .filter((m) => m.id !== activeOrgId)
+      .map((m) => ({ id: m.id, name: m.name, icon: "business" as const })),
   ];
 
   const maxVisible = 6;
