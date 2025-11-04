@@ -1,5 +1,5 @@
 import BaseBottomSheet from "@/components/BaseBottomSheet";
-import { useInviteOrg } from "@/hooks/useInviteOrg";
+import { OrgRole, useInviteOrg } from "@/hooks/useInviteOrg";
 
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { Ionicons } from "@expo/vector-icons";
@@ -64,19 +64,19 @@ export function InviteMemberModal({
 
   const handleClose = () => {
     setEmailAddress("");
-    setSelectedRole("org:soldier");
+    setSelectedRole('soldier');
     onClose();
   };
 
   const roles = [
-    { value: "org:soldier" as const, label: "Soldier", icon: "person" },
+    { value: "soldier" as const, label: "Soldier", icon: "person" },
     {
-      value: "org:squad_commander" as const,
+      value: "squad_commander" as const,
       label: "Squad Commander",
       icon: "shield-half",
     },
     {
-      value: "org:team_commander" as const,
+      value: "team_commander" as const,
       label: "Team Commander",
       icon: "shield-checkmark",
     },
@@ -142,7 +142,7 @@ export function InviteMemberModal({
                       selectedRole === role.value ? tintColor : borderColor,
                   },
                 ]}
-                onPress={() => setSelectedRole(role.value)}
+                onPress={() => setSelectedRole(role.value as OrgRole)}
               >
                 <Ionicons
                   name={role.icon as any}

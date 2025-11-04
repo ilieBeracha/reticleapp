@@ -7,8 +7,8 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useOrganizationsStore } from "@/store/organizationsStore";
-import { OrganizationSwitcherModal } from "./OrganizationSwitcherModal";
 import ProfileDropdown from "./ProfileDropdown";
+import { OrganizationSwitcherModal } from "./organization-switcher";
 
 interface HeaderProps {
   onNotificationPress: () => void;

@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
   
 export type OrgRole =
   | "commander"
-  | "member"
+  | "soldier"
   | "viewer";
   
 
@@ -17,7 +17,7 @@ export function useInviteOrg() {
   const { selectedOrgId } = useOrganizationsStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [emailAddress, setEmailAddress] = useState("");
-  const [selectedRole, setSelectedRole] = useState<OrgRole>("member");
+  const [selectedRole, setSelectedRole] = useState<OrgRole>("soldier");
 
   const canSubmit = Boolean(
     emailAddress.trim() &&
