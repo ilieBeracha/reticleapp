@@ -20,23 +20,28 @@ export function ParentNavigationCard({
       style={[
         styles.container,
         {
-          backgroundColor: colors.card,
-          borderColor: colors.border,
+          backgroundColor: `${colors.indigo}08`,
+          borderColor: `${colors.indigo}25`,
         },
       ]}
       onPress={onPress}
-      activeOpacity={0.7}
+      activeOpacity={0.65}
     >
-      <Ionicons name="arrow-up-circle" size={28} color={colors.indigo} />
+      <View style={[styles.iconBox, { backgroundColor: `${colors.indigo}20` }]}>
+        <Ionicons name="arrow-up" size={20} color={colors.indigo} />
+      </View>
       <View style={styles.info}>
         <Text style={[styles.label, { color: colors.textMuted }]}>
-          Go up to parent
+          Parent Organization
         </Text>
         <Text style={[styles.name, { color: colors.text }]}>{parentName}</Text>
       </View>
       {isCommander && (
-        <Ionicons name="shield-checkmark" size={20} color="#f59e0b" />
+        <View style={styles.badge}>
+          <Ionicons name="shield-checkmark" size={16} color="#f59e0b" />
+        </View>
       )}
+      <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
     </TouchableOpacity>
   );
 }
@@ -45,24 +50,39 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
+    padding: 14,
     borderRadius: 14,
-    borderWidth: 1.5,
-    gap: 14,
-    marginBottom: 8,
+    borderWidth: 1,
+    gap: 12,
+    marginBottom: 12,
+  },
+  iconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
   info: {
     flex: 1,
-    gap: 4,
+    gap: 3,
   },
   label: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   name: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: "700",
+    letterSpacing: -0.2,
+  },
+  badge: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: "#f59e0b15",
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

@@ -22,15 +22,17 @@ export function CurrentLocationCard({
       style={[
         styles.container,
         {
-          backgroundColor: colors.indigo + "15",
-          borderColor: colors.indigo,
+          backgroundColor: colors.indigo + "12",
+          borderColor: colors.indigo + "30",
         },
       ]}
     >
       <View style={styles.header}>
-        <Ionicons name="location" size={24} color={colors.indigo} />
-        <Text style={[styles.label, { color: colors.indigo }]}>
-          YOU ARE HERE
+        <View style={[styles.iconBox, { backgroundColor: colors.indigo }]}>
+          <Ionicons name="location-sharp" size={18} color="#FFFFFF" />
+        </View>
+        <Text style={[styles.label, { color: colors.text }]}>
+          Current Location
         </Text>
       </View>
       <Text style={[styles.name, { color: colors.text }]}>{name}</Text>
@@ -41,13 +43,13 @@ export function CurrentLocationCard({
               styles.metaBadge,
               {
                 backgroundColor:
-                  role === "commander" ? "#f59e0b25" : colors.indigo + "25",
+                  role === "commander" ? "#f59e0b20" : colors.indigo + "20",
               },
             ]}
           >
             <Ionicons
-              name={role === "commander" ? "shield-checkmark" : "person"}
-              size={14}
+              name={role === "commander" ? "shield-checkmark" : "person-outline"}
+              size={13}
               color={role === "commander" ? "#f59e0b" : colors.indigo}
             />
             <Text
@@ -58,7 +60,7 @@ export function CurrentLocationCard({
                 },
               ]}
             >
-              {role.toUpperCase()}
+              {role.charAt(0).toUpperCase() + role.slice(1)}
             </Text>
           </View>
         )}
@@ -69,7 +71,7 @@ export function CurrentLocationCard({
               { backgroundColor: colors.indigo + "20" },
             ]}
           >
-            <Ionicons name="layers" size={14} color={colors.indigo} />
+            <Ionicons name="layers-outline" size={13} color={colors.indigo} />
             <Text style={[styles.metaText, { color: colors.indigo }]}>
               Level {depth + 1}
             </Text>
@@ -82,26 +84,34 @@ export function CurrentLocationCard({
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
+    padding: 18,
     borderRadius: 16,
-    borderWidth: 2,
-    gap: 12,
-    marginBottom: 8,
+    borderWidth: 1.5,
+    gap: 10,
+    marginBottom: 16,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 10,
+  },
+  iconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
   label: {
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 1,
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.3,
   },
   name: {
-    fontSize: 24,
-    fontWeight: "800",
-    letterSpacing: -0.5,
+    fontSize: 20,
+    fontWeight: "700",
+    letterSpacing: -0.3,
+    lineHeight: 26,
   },
   meta: {
     flexDirection: "row",
@@ -112,13 +122,14 @@ const styles = StyleSheet.create({
   metaBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
   },
   metaText: {
-    fontSize: 12,
-    fontWeight: "700",
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0.2,
   },
 });

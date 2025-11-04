@@ -1,6 +1,5 @@
 // components/Home.tsx
 import { ThemedView } from "@/components/ThemedView";
-import { useColors } from "@/hooks/useColors";
 import { useEnsureActiveOrg } from "@/hooks/useEnsureActiveOrg";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { useOrganizationSwitchStore } from "@/store/organizationSwitchStore";
@@ -10,9 +9,9 @@ import { useAuth, useUser } from "@clerk/clerk-expo"; // ❌ Removed useOrganiza
 import { useEffect, useRef } from "react";
 import { Animated, ScrollView, StyleSheet } from "react-native";
 import { useStore } from "zustand";
-import { MetricCards } from "../stats/MetricCards";
 import { GreetingSection } from "./GreetingSection";
 import { RecentSessions } from "./RecentSessions";
+import { Stats } from "./Stats";
 
 export function Home() {
   useEnsureActiveOrg();
@@ -27,7 +26,7 @@ export function Home() {
   const { isSwitching } = useStore(useOrganizationSwitchStore);
 
   const backgroundColor = useThemeColor({}, "background");
-  const colors = useColors();
+
   const userName =
     user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] || "User";
 
@@ -151,32 +150,9 @@ export function Home() {
             organizationName={organizationName}
             isPersonalWorkspace={isPersonalWorkspace}
           />
-          <MetricCards metrics={[
-            {
-              icon: "stats-chart",
-              label: "Total Sessions",
-              value: sessions.length,
-              change: 12,
-              unit: "sessions",
-              color: colors.indigo,
-            },
-            {
-              icon: "flame",
-              label: "Avg Accuracy",
-              value: 95,
-              change: 5,
-              unit: "%",
-              color: colors.blue,
-            },
-            {
-              icon: "time",
-              label: "Avg Time",
-              value: "24m",
-              change: 8,
-              unit: "m",
-              color: colors.orange,
-            },
-          ]} />
+
+          <Stats sessionsCount={sessions.length} />
+
           <RecentSessions sessions={sessions} loading={loading} />
         </ScrollView>
       </Animated.View>

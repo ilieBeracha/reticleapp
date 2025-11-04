@@ -20,9 +20,12 @@ export function ChildOrganizationsList({
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-        Go down to child ({childOrgs.length})
-      </Text>
+      <View style={styles.header}>
+        <Ionicons name="arrow-down-circle-outline" size={16} color={colors.indigo} />
+        <Text style={[styles.sectionLabel, { color: colors.text }]}>
+          Child Organizations ({childOrgs.length})
+        </Text>
+      </View>
       {childOrgs.map((child) => {
         const membership = userMemberships.find(
           (m) => m.org_id === child.id
@@ -73,14 +76,18 @@ export function ChildOrganizationsList({
 const styles = StyleSheet.create({
   container: {
     gap: 10,
+    marginBottom: 16,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
   },
   sectionLabel: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-    marginTop: 4,
-    marginBottom: 4,
+    letterSpacing: 0.3,
   },
   childCard: {
     flexDirection: "row",

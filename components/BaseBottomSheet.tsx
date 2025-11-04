@@ -3,6 +3,7 @@ import { useThemeColor } from "@/hooks/useThemeColor";
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
+  BottomSheetScrollView,
   BottomSheetView,
   type BottomSheetBackdropProps,
 } from "@gorhom/bottom-sheet";
@@ -29,6 +30,8 @@ export interface BaseBottomSheetProps {
   keyboardSnapPoint?: number;
   /** Enable automatic snap to highest point when keyboard opens and back when it closes */
   enableKeyboardAutoSnap?: boolean;
+  /** Use BottomSheetScrollView for scrollable content (better gesture handling) */
+  scrollable?: boolean;
 }
 
 export default function BaseBottomSheet({
@@ -42,6 +45,7 @@ export default function BaseBottomSheet({
   enableDynamicSizing = true,
   keyboardSnapPoint,
   enableKeyboardAutoSnap = true,
+  scrollable = false,
 }: BaseBottomSheetProps) {
   const bottomSheetRef = useRef<BottomSheetModal>(null);
   const colorScheme = useColorScheme();
@@ -152,9 +156,19 @@ export default function BaseBottomSheet({
       keyboardBlurBehavior="restore"
       android_keyboardInputMode="adjustResize"
     >
-      <BottomSheetView style={styles.container}>
-        <View style={styles.content}>{children}</View>
-      </BottomSheetView>
+      {scrollable ? (
+        <BottomSheetScrollView
+          style={styles.container}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {children}
+        </BottomSheetScrollView>
+      ) : (
+        <BottomSheetView style={styles.container}>
+          <View style={styles.content}>{children}</View>
+        </BottomSheetView>
+      )}
     </BottomSheetModal>
   );
 }
@@ -165,6 +179,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+  },
+  scrollContent: {
     paddingHorizontal: 16,
     paddingBottom: 40,
   },
