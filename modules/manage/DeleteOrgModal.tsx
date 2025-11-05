@@ -1,6 +1,6 @@
 import BaseBottomSheet from "@/components/BaseBottomSheet";
 import { ThemedText } from "@/components/ThemedText";
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useThemeColor } from "@/hooks/ui/useThemeColor";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { Ionicons } from "@expo/vector-icons";

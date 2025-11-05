@@ -3,21 +3,20 @@ import { ThemedView } from "@/components/ThemedView";
 
 import { InviteMemberModal } from "@/components/InviteMemberModal";
 import { useIsOrganizationCommander } from "@/hooks/useIsOrgAdmin";
-import { useOrgInvitations } from "@/hooks/useOrgInvitations";
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useOrgInvites } from "@/hooks/useOrgInvites";
+import { useThemeColor } from "@/hooks/ui/useThemeColor";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { Ionicons } from "@expo/vector-icons";
-import { Redirect } from "expo-router";
+import { router } from "expo-router";
 import { useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { MembersList } from "./MembersList";
 
@@ -26,12 +25,7 @@ type RoleFilter = "all" | "admins" | "members";
 export function Members() {
   const { selectedOrgId } = useOrganizationsStore();
   const isAdmin = useIsOrganizationCommander();
-  const {
-    pendingInvitations,
-    loading: loadingInvitations,
-    revokeInvitation,
-    refetch,
-  } = useOrgInvitations();
+  const { createInvite, shareInvite, loading } = useOrgInvites()
   const textColor = useThemeColor({}, "text");
   const mutedColor = useThemeColor({}, "description");
   const tintColor = useThemeColor({}, "tint");
@@ -57,26 +51,21 @@ export function Members() {
           style: "destructive",
           onPress: async () => {
             try {
-              await revokeInvitation(invitationId);
-              Alert.alert("Success", "Invitation revoked successfully");
+              await createInvite(selectedOrgId ?? '', 'member');
+              router.push(`/(protected)/invite`);
             } catch (error) {
               Alert.alert("Error", "Failed to revoke invitation");
             }
-          },
-        },
+          }
+        }
       ]
     );
   };
 
   const handleInviteSuccess = () => {
     setInviteModalVisible(false);
-    refetch();
+    router.push(`/(protected)/invite`);
   };
-
-  // Redirect if no organization
-  if (!selectedOrgId) {
-    return <Redirect href="/(protected)/(tabs)" />;
-  }
 
   return (
     <ThemedView style={styles.container}>
@@ -216,8 +205,8 @@ export function Members() {
           </TouchableOpacity>
         </View>
 
-        {/* Pending Invitations (Admin Only) */}
-        {isAdmin && (
+
+        {/* {isAdmin && (
           <View style={styles.pendingSection}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: textColor }]}>
@@ -293,8 +282,8 @@ export function Members() {
                 No pending invitations
               </Text>
             )}
-          </View>
-        )}
+          </View> */}
+        {/* )} */}
 
         {/* Active Members List */}
         <MembersList searchQuery={searchQuery} roleFilter={roleFilter} />

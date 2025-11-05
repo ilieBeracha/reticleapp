@@ -1,4 +1,4 @@
-import { useColors } from "@/hooks/useColors";
+import { useColors } from "@/hooks/ui/useColors";
 import { StyleSheet, Text, View } from "react-native";
 
 export function FormHeader() {

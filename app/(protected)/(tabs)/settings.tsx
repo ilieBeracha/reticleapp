@@ -1,7 +1,7 @@
 import { ThemedView } from "@/components/ThemedView";
 import { useAuth } from "@/contexts/AuthContext";
-import { useColors } from "@/hooks/useColors";
-import { useColorScheme } from "@/hooks/useColorScheme";
+import { useColors } from "@/hooks/ui/useColors";
+import { useColorScheme } from "@/hooks/ui/useColorScheme";
 import { Ionicons } from "@expo/vector-icons";
 import {
   Linking,

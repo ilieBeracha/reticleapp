@@ -1,4 +1,4 @@
-import { useColors } from "@/hooks/useColors";
+import { useColors } from "@/hooks/ui/useColors";
 import { Session } from "@/types/database";
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";

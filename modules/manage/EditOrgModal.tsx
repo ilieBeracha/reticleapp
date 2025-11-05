@@ -1,6 +1,6 @@
 import BaseBottomSheet from "@/components/BaseBottomSheet";
 import { ThemedText } from "@/components/ThemedText";
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useThemeColor } from "@/hooks/ui/useThemeColor";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { Organization } from "@/types/organizations";
 import { useAuth } from "@/contexts/AuthContext";

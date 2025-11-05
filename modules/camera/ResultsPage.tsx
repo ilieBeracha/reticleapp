@@ -1,5 +1,5 @@
 // ResultsPage.tsx - Completely Refactored for Image Focus
-import { useColors } from "@/hooks/useColors";
+import { useColors } from "@/hooks/ui/useColors";
 import { useDetectionStore } from "@/store/detectionStore";
 import { QuadrantStats } from "@/types/api";
 import { Ionicons } from "@expo/vector-icons";

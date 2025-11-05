@@ -1,5 +1,5 @@
 // CameraPage.tsx
-import { useColors } from "@/hooks/useColors";
+import { useColors } from "@/hooks/ui/useColors";
 import { Ionicons } from "@expo/vector-icons";
 import { CameraType, CameraView } from "expo-camera";
 import { LinearGradient } from "expo-linear-gradient";

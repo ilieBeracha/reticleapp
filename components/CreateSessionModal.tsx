@@ -1,6 +1,6 @@
 import BaseBottomSheet from "@/components/BaseBottomSheet";
 import { useAuth } from "@/contexts/AuthContext";
-import { useColors } from "@/hooks/useColors";
+import { useColors } from "@/hooks/ui/useColors";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { sessionsStore } from "@/store/sessionsStore";
 import { DayPeriod, SessionType } from "@/types/database";

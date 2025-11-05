@@ -1,4 +1,4 @@
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useThemeColor } from "@/hooks/ui/useThemeColor";
 import { Controller } from "react-hook-form";
 import { TextInput as RNTextInput, StyleSheet, Text, View } from "react-native";
 

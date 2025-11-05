@@ -40,6 +40,7 @@ export interface OrgChild {
   org_type: string;
   depth: number;
   member_count: number;
+  description: string | null;
 }
 
 export interface OrgSubtree {
@@ -49,6 +50,7 @@ export interface OrgSubtree {
   depth: number;
   parent_id: string | null;
   full_path: string;
+  member_count: number;
 }
 
 export interface OrgTreeNode {
@@ -58,4 +60,5 @@ export interface OrgTreeNode {
   depth: number;
   parent_id: string | null;
   path: string;
+  member_count: number;
 }

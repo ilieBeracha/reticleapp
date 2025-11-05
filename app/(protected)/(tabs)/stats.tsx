@@ -1,7 +1,7 @@
 import FilterModal from "@/components/FilterModal";
 import { ThemedView } from "@/components/ThemedView";
 import { useAuth } from "@/contexts/AuthContext";
-import { useColors } from "@/hooks/useColors";
+import { useColors } from "@/hooks/ui/useColors";
 import { CircularProgress } from "@/modules/stats/CircularProgress";
 import { GoalsCard } from "@/modules/stats/GoalsCard";
 import { MemberComparison } from "@/modules/stats/MemberComparison";

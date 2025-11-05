@@ -1,6 +1,6 @@
 import { CreateOrgModal } from "@/components/CreateOrg";
-import { useColors } from "@/hooks/useColors";
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useColors } from "@/hooks/ui/useColors";
+import { useThemeColor } from "@/hooks/ui/useThemeColor";
 import { OrgChild } from "@/types/organizations";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { useAuth } from "@/contexts/AuthContext";

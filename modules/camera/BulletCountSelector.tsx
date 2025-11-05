@@ -1,6 +1,6 @@
 // BulletCountSelector.tsx - Simplified with additional questions
 import BaseBottomSheet from "@/components/BaseBottomSheet";
-import { useColors } from "@/hooks/useColors";
+import { useColors } from "@/hooks/ui/useColors";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";

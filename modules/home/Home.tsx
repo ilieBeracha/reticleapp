@@ -2,7 +2,7 @@
 import { ThemedView } from "@/components/ThemedView";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEnsureActiveOrg } from "@/hooks/useEnsureActiveOrg";
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useThemeColor } from "@/hooks/ui/useThemeColor";
 import { useOrganizationSwitchStore } from "@/store/organizationSwitchStore";
 import { useOrganizationsStore } from "@/store/organizationsStore"; // ✅ New import
 import { sessionsStore } from "@/store/sessionsStore";

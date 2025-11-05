@@ -1,5 +1,5 @@
 // CameraDetect.tsx
-import { useColors } from "@/hooks/useColors";
+import { useColors } from "@/hooks/ui/useColors";
 import { useDetectionStore } from "@/store/detectionStore";
 import { CameraType, CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";

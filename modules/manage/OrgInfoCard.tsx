@@ -1,5 +1,5 @@
-import { useColors } from "@/hooks/useColors";
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useColors } from "@/hooks/ui/useColors";
+import { useThemeColor } from "@/hooks/ui/useThemeColor";
 import { Organization } from "@/types/organizations";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";

@@ -1,6 +1,6 @@
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
-import { useColors } from "@/hooks/useColors";
+import { useColors } from "@/hooks/ui/useColors";
 import { StyleSheet, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 

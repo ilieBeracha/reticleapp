@@ -1,7 +1,7 @@
 import BaseBottomSheet from "@/components/BaseBottomSheet";
 import { OrgRole, useInviteOrg } from "@/hooks/useInviteOrg";
 
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useThemeColor } from "@/hooks/ui/useThemeColor";
 import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,

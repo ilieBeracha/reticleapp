@@ -1,7 +1,7 @@
 // components/CreateOrg.tsx
 import BaseBottomSheet from "@/components/BaseBottomSheet";
 import useCreateOrg from "@/hooks/useCreateOrg";
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useThemeColor } from "@/hooks/ui/useThemeColor";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import { Alert, StyleSheet, TouchableOpacity, View } from "react-native";

@@ -2,7 +2,7 @@ import { OrganizationSwitchOverlay } from "@/components/OrganizationSwitchOverla
 
 import { GluestackUIProvider } from "@/components/ui/gluestack-ui-provider";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { useColorScheme } from "@/hooks/useColorScheme";
+import { useColorScheme } from "@/hooks/ui/useColorScheme";
 import {
   OrganizationSwitchProvider,
   useOrganizationSwitch,

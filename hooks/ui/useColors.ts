@@ -1,4 +1,4 @@
-import { useThemeColor } from "./useThemeColor";
+import { useThemeColor } from "@/hooks/ui/useThemeColor";
 
 export function useColors() {
   const text = useThemeColor({}, "text");

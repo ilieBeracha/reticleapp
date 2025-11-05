@@ -1,6 +1,6 @@
 import RadioButtonInput from "@/components/RadioButtonInput";
 import TextInput from "@/components/TextInput";
-import { useColors } from "@/hooks/useColors";
+import { useColors } from "@/hooks/ui/useColors";
 import { Control } from "react-hook-form";
 import {
   StyleSheet,
