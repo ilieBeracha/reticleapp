@@ -146,8 +146,6 @@ export function Home() {
           showsVerticalScrollIndicator={false}
         >
           <GreetingSection
-            userName={userName}
-            organizationName={organizationName}
             isPersonalWorkspace={isPersonalWorkspace}
           />
 

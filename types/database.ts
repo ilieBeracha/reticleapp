@@ -3,6 +3,27 @@
 export type SessionType = "steel" | "paper";
 export type DayPeriod = "day" | "night";
 
+export interface InvitationWithDetails {
+  id: string;
+  email: string;
+  role: string;
+  invited_by: string;
+  created_at: string;
+}
+
+export interface Invitation {
+  id: string;
+  email: string;
+  organization_id: string;
+  role: string;
+  status: "pending" | "accepted" | "cancelled" | "expired";
+  invited_by: string;
+  accepted_at?: string;
+  expires_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Training {
   id: string;
   organization_id: string;

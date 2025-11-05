@@ -12,10 +12,11 @@ export class OrganizationsService {
     const client = await AuthenticatedClient.getClient();
     const { data, error } = await client
       .from("org_memberships")
-      .select("*")
+      .select("*, users(*)")
       .eq("org_id", orgId);
     if (error) throw new Error(`Failed to get memberships: ${error.message}`);
-    return data || [];
+    console.log(data)
+    return data as OrgMembership[];
   }
   // Get current user's organizations
   static async getUserOrgs(userId: string): Promise<UserOrg[]> {

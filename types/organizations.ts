@@ -19,7 +19,14 @@ export interface OrgMembership {
   org_id: string;
   role: "commander" | "member" | "viewer";
   created_at: string;
-}
+  users: {
+    full_name: string;
+    created_at: string;
+    avatar_url: string;
+    email: string;
+    id: string;
+  };
+  }
 
 export interface UserOrg {
   org_id: string;

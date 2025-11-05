@@ -1,7 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { UserOrg } from "@/types/organizations";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useIsRootCommander } from "./useIsRootCommander";
 
 /**
@@ -21,6 +21,12 @@ export function useOrgPermissions(): {
   const { user } = useAuth();
   const { selectedOrgId, userOrgs } = useOrganizationsStore();
   const isRootCommander = useIsRootCommander();
+  const [role, setRole] = useState<string | null>(null);
+  useEffect(() => {
+    const membership = userOrgs.find((org: UserOrg) => org.org_id === selectedOrgId);
+    setRole(membership?.role || null);
+  }, [userOrgs, selectedOrgId]);
+
 
   return useMemo(() => {
     // Personal mode - can do everything for self
@@ -135,4 +141,6 @@ export function useOrgPermissions(): {
       isRootCommander: false,
     };
   }, [user?.id, selectedOrgId, userOrgs, isRootCommander]);
+
+
 }

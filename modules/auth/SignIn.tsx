@@ -1,22 +1,26 @@
 import { useColors } from "@/hooks/ui/useColors";
-import { useLocalSearchParams } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SignInHeader } from "./SignInHeader";
 import { SocialButtons } from "./SocialButtons";
 
-export function SignIn() {
+interface SignInProps {
+  inviteCode?: string;
+}
+
+export function SignIn({ inviteCode }: SignInProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
 
-  const token = useLocalSearchParams<{ token: string }>();
-
   useEffect(() => {
-    if (token) {
-      console.log('token', token);
+    // Store invite code to use after successful authentication
+    if (inviteCode) {
+      console.log("Storing invite code for post-auth:", inviteCode);
+      AsyncStorage.setItem("pending_invite_code", inviteCode);
     }
-  }, [token]);
+  }, [inviteCode]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -31,6 +35,13 @@ export function SignIn() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.content}>
+          {inviteCode && (
+            <View style={[styles.inviteBanner, { backgroundColor: colors.tint + "15" }]}>
+              <Text style={[styles.inviteText, { color: colors.tint }]}>
+                You've been invited to join an organization
+              </Text>
+            </View>
+          )}
           <SignInHeader />
           <SocialButtons />
         </View>
@@ -52,5 +63,16 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 400,
     alignSelf: "center",
+  },
+  inviteBanner: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 24,
+    alignItems: "center",
+  },
+  inviteText: {
+    fontSize: 14,
+    fontWeight: "600",
+    textAlign: "center",
   },
 });

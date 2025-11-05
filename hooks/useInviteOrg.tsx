@@ -21,6 +21,7 @@ export function useInviteOrg() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [emailAddress, setEmailAddress] = useState("");
   const [selectedRole, setSelectedRole] = useState<OrgRole>("soldier");
+  
 
   const canSubmit = Boolean(
     emailAddress.trim() &&

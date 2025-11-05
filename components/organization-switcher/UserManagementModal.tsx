@@ -29,7 +29,7 @@ export function UserManagementModal({
 }: UserManagementModalProps) {
   const { user } = useAuth();
   const colors = useColors();
-  const { canInviteMembers, canManageRoles } = useOrgPermissions();
+  const { canInviteMembers, isRootCommander } = useOrgPermissions();
   const { selectedOrgId, allOrgs, fetchMemberships, memberships } =
     useOrganizationsStore();
 
@@ -119,9 +119,9 @@ export function UserManagementModal({
   const filteredMembers = members.filter((member) => {
     const matchesSearch =
       searchQuery === "" ||
-      member.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.last_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.email?.toLowerCase().includes(searchQuery.toLowerCase());
+      member.users?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      member.users?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      member.users?.id?.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesRole =
       roleFilter === "all" || member.role === roleFilter;
@@ -347,9 +347,9 @@ export function UserManagementModal({
                     <View style={styles.memberInfo}>
                       <View style={styles.memberNameRow}>
                         <Text style={[styles.memberName, { color: colors.text }]}>
-                          {member.first_name && member.last_name
-                            ? `${member.first_name} ${member.last_name}`
-                            : member.email || "Unknown User"}
+                          {member.users?.full_name
+                            ? `${member.users?.full_name}`
+                            : member.users?.email || "Unknown User"}
                         </Text>
                         {isCurrentUser && (
                           <View
@@ -375,18 +375,18 @@ export function UserManagementModal({
                             {member.role}
                           </Text>
                         </View>
-                        {member.email && (
+                        {member.users?.email && (
                           <Text
                             style={[styles.memberEmail, { color: colors.description }]}
                           >
-                            {member.email}
+                            {member.users?.email}
                           </Text>
                         )}
                       </View>
                     </View>
 
                     {/* Actions */}
-                    {!isCurrentUser && canManageRoles && (
+                    {!isCurrentUser && isRootCommander && (
                       <View style={styles.memberActions}>
                         <TouchableOpacity
                           style={[
@@ -397,7 +397,7 @@ export function UserManagementModal({
                             handleRoleChange(
                               member.id,
                               member.role,
-                              member.first_name || member.email || "User"
+                              member.users?.full_name || member.users?.email || "User"
                             )
                           }
                         >
@@ -415,7 +415,7 @@ export function UserManagementModal({
                           onPress={() =>
                             handleRemoveMember(
                               member.id,
-                              member.first_name || member.email || "User"
+                              member.users?.full_name || member.users?.email || "User"
                             )
                           }
                         >

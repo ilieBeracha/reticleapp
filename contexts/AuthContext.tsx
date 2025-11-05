@@ -39,11 +39,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log('🔵 Auth state changed:', _event, session?.user?.email || 'none')
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
+
+      // Check for pending invite code after successful sign in
+      if (_event === 'SIGNED_IN' && session?.user) {
+        const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage')
+        const pendingInviteCode = await AsyncStorage.getItem('pending_invite_code')
+        
+        if (pendingInviteCode) {
+          console.log('✅ Found pending invite code, redirecting...')
+          // Clear the stored code
+          await AsyncStorage.removeItem('pending_invite_code')
+          
+          // Redirect will be handled by app/index.tsx
+          // The index.tsx will detect the user is authenticated
+          // and check for invite code in the URL
+        }
+      }
     })
 
   
