@@ -12,7 +12,8 @@ export default function AuthRoutesLayout() {
     if (user) {
       router.replace("/(protected)/(tabs)");
     }
-  }, [user, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

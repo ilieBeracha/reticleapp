@@ -29,11 +29,10 @@ export function Manage() {
   const { canEditOrg, canCreateChild, canInviteMembers } = useOrgPermissions();
   const {
     pendingInvitations,
-    loading: loadingInvitations,
-    revokeInvitation,
-    refetch,
+    loading: loadingInvitations = false,
+    revokeInvitation = async () => {},
+    refetch = async () => {},
   } = useOrgInvitations();
-
   const textColor = useThemeColor({}, "text");
   const mutedColor = useThemeColor({}, "description");
   const tintColor = useThemeColor({}, "tint");

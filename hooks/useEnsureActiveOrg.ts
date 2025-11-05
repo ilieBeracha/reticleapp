@@ -12,6 +12,7 @@ export function useEnsureActiveOrg() {
 
     fetchUserOrgs(user?.id);
   }, [user?.id, loading, fetchUserOrgs]);
+  
   useEffect(() => {
     if (selectedOrgId) {
       fetchOrgChildren(selectedOrgId);
