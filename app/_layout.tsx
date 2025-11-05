@@ -1,15 +1,13 @@
 import { OrganizationSwitchOverlay } from "@/components/OrganizationSwitchOverlay";
+
+import { GluestackUIProvider } from "@/components/ui/gluestack-ui-provider";
+import { useColorScheme } from "@/hooks/useColorScheme";
+import { EnhancedAuthProvider } from "@/hooks/useEnhancedAuth";
 import {
   OrganizationSwitchProvider,
   useOrganizationSwitch,
-} from "@/hooks/organizations/useOrganizationSwitch";
-import { useColorScheme } from "@/hooks/useColorScheme";
-import { ClerkLoaded, ClerkProvider } from "@clerk/clerk-expo";
-import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
-} from "@react-navigation/native";
+} from "@/hooks/useOrganizationSwitch";
+import { ClerkProvider } from "@clerk/clerk-expo";
 import { useFonts } from "expo-font";
 import { Slot } from "expo-router";
 import * as SecureStore from "expo-secure-store";
@@ -17,11 +15,11 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
+import "../global.css";
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
   const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
   const tokenCache = {
     async getToken(key: string) {
@@ -51,22 +49,34 @@ export default function RootLayout() {
     throw new Error("Add EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY to your .env file");
   }
 
+  return <RootLayoutInner publishableKey={publishableKey} tokenCache={tokenCache} />;
+}
+
+function RootLayoutInner({
+  publishableKey,
+  tokenCache,
+}: {
+  publishableKey: string;
+  tokenCache: any;
+}) {
+  const colorScheme = useColorScheme();
+
   return (
-    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      <ClerkLoaded>
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <ThemeProvider
-            value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
-          >
-            <OrganizationSwitchProvider>
-              <Slot />
-              <StatusBar style="auto" />
-              <AppOverlay />
-            </OrganizationSwitchProvider>
-          </ThemeProvider>
-        </GestureHandlerRootView>
-      </ClerkLoaded>
-    </ClerkProvider>
+    <GluestackUIProvider mode={colorScheme === "dark" ? "dark" : "light"}>
+      <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+        <EnhancedAuthProvider>
+          <GestureHandlerRootView style={{ flex: 1 }}>
+            <BottomSheetModalProvider>
+              <OrganizationSwitchProvider>
+                <Slot />
+                <StatusBar style="auto" />
+                <AppOverlay />
+              </OrganizationSwitchProvider>
+            </BottomSheetModalProvider>
+          </GestureHandlerRootView>
+        </EnhancedAuthProvider>
+      </ClerkProvider>
+    </GluestackUIProvider>
   );
 }
 

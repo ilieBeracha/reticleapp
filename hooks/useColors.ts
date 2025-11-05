@@ -13,6 +13,17 @@ export function useColors() {
   const buttonBorder = useThemeColor({}, "buttonBorder");
   const placeholderText = useThemeColor({}, "placeholderText");
   const description = useThemeColor({}, "description");
+  const textMuted = useThemeColor({}, "textMuted");
+  const card = useThemeColor({}, "card");
+  const blue = useThemeColor({}, "blue");
+  const green = useThemeColor({}, "green");
+  const red = useThemeColor({}, "red");
+  const orange = useThemeColor({}, "orange");
+  const yellow = useThemeColor({}, "yellow");
+  const purple = useThemeColor({}, "purple");
+  const pink = useThemeColor({}, "pink");
+  const teal = useThemeColor({}, "teal");
+  const indigo = useThemeColor({}, "indigo");
 
   return {
     text,
@@ -27,5 +38,16 @@ export function useColors() {
     buttonBorder,
     placeholderText,
     description,
+    textMuted,
+    card,
+    blue,
+    green,
+    red,
+    orange,
+    yellow,
+    purple,
+    pink,
+    teal,
+    indigo,
   };
 }

@@ -1,4 +1,5 @@
 {
+  
   "editor.codeActionsOnSave": {
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit",
@@ -6,6 +7,13 @@
   },
   "cSpell.words": [
     "Pressable",
-    "scopeuinativeclerk"
-  ]
+    "scopeuinativeclerk",
+    "timestamptz",
+    "loadouts"
+  ],
+  "files.associations": {
+    "*.cursorrules": "markdown"
+  },
+  "deno.enablePaths": ["./supabase/functions"],
+  "deno.importMap": "./supabase/functions/import_map.json"
 }

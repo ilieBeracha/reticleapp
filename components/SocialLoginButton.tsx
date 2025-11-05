@@ -1,4 +1,4 @@
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useColors } from "@/hooks/useColors";
 import { useSSO, useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import * as AuthSession from "expo-auth-session";
@@ -10,8 +10,6 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
-  useColorScheme,
 } from "react-native";
 
 const SocialLoginButton = ({
@@ -33,37 +31,34 @@ const SocialLoginButton = ({
   const { startSSOFlow } = useSSO();
   const { user } = useUser();
   const [isLoading, setIsLoading] = useState(false);
-  const colorScheme = useColorScheme();
-
-  // Get themed colors
-  const textColor = useThemeColor({}, "buttonText");
-  const borderColor = useThemeColor({}, "buttonBorder");
-  const iconColor = useThemeColor({}, "text");
-
+  const colors = useColors();
   const router = useRouter();
-  const buttonText = () => {
-    if (isLoading) {
-      return "Loading...";
-    }
 
-    if (strategy === "facebook") {
-      return "Continue with Facebook";
-    } else if (strategy === "google") {
-      return "Continue with Google";
-    } else if (strategy === "apple") {
-      return "Continue with Apple";
-    }
+  const getButtonConfig = () => {
+    const configs = {
+      facebook: {
+        text: "Continue with Facebook",
+        icon: "logo-facebook" as const,
+        color: "#1877F2",
+        backgroundColor: "#1877F215",
+      },
+      google: {
+        text: "Continue with Google",
+        icon: "logo-google" as const,
+        color: "#DB4437",
+        backgroundColor: "#DB443715",
+      },
+      apple: {
+        text: "Continue with Apple",
+        icon: "logo-apple" as const,
+        color: colors.text,
+        backgroundColor: colors.card,
+      },
+    };
+    return configs[strategy];
   };
 
-  const buttonIcon = () => {
-    if (strategy === "facebook") {
-      return <Ionicons name="logo-facebook" size={24} color={iconColor} />;
-    } else if (strategy === "google") {
-      return <Ionicons name="logo-google" size={24} color={iconColor} />;
-    } else if (strategy === "apple") {
-      return <Ionicons name="logo-apple" size={24} color={iconColor} />;
-    }
-  };
+  const config = getButtonConfig();
 
   const onSocialLoginPress = React.useCallback(async () => {
     try {
@@ -89,7 +84,7 @@ const SocialLoginButton = ({
         await setActive!({
           session: createdSessionId,
         });
-        router.replace("/(home)");
+        router.replace("/(protected)/(tabs)");
         return;
       }
 
@@ -111,7 +106,7 @@ const SocialLoginButton = ({
         // If signup is complete, set the session
         if (signUp.createdSessionId) {
           await setActive!({ session: signUp.createdSessionId });
-          router.replace("/(home)");
+          router.replace("/(protected)/(tabs)");
           return;
         }
       }
@@ -121,7 +116,7 @@ const SocialLoginButton = ({
         console.log("🔐 Existing user sign-in");
         if (signIn.createdSessionId) {
           await setActive!({ session: signIn.createdSessionId });
-          router.replace("/(home)");
+          router.replace("/(protected)/(tabs)");
           return;
         }
       }
@@ -136,19 +131,25 @@ const SocialLoginButton = ({
 
   return (
     <TouchableOpacity
-      style={[styles.container, { borderColor }]}
+      style={[
+        styles.container,
+        {
+          backgroundColor: config.backgroundColor,
+          borderColor: colors.border,
+        },
+      ]}
       onPress={onSocialLoginPress}
       disabled={isLoading}
+      activeOpacity={0.7}
     >
       {isLoading ? (
-        <ActivityIndicator size="small" color={iconColor} />
+        <ActivityIndicator size="small" color={config.color} />
       ) : (
-        buttonIcon()
+        <Ionicons name={config.icon} size={22} color={config.color} />
       )}
-      <Text style={[styles.buttonText, { color: textColor }]}>
-        {buttonText()}
+      <Text style={[styles.buttonText, { color: colors.text }]}>
+        {config.text}
       </Text>
-      <View />
     </TouchableOpacity>
   );
 };
@@ -159,15 +160,16 @@ const styles = StyleSheet.create({
   container: {
     width: "100%",
     borderWidth: 1,
-    padding: 10,
-    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
     flexDirection: "row",
-    gap: 10,
-    justifyContent: "space-between",
+    gap: 12,
     alignItems: "center",
   },
   buttonText: {
     fontSize: 15,
-    fontWeight: "500",
+    fontWeight: "600",
+    letterSpacing: -0.2,
   },
 });

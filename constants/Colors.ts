@@ -1,34 +1,60 @@
-const tintColor = "#3ECF8E"; // Premium mint-green accent
+const tintColor = "#6366f1"; // Vibrant indigo accent
 
 export const Colors = {
   light: {
-    text: "#111418", // Deep gray-black for modern contrast
-    background: "#F5F6F7", // Subtle gray-white, softer on eyes
+    text: "#0f172a",
+    background: "#f8fafc",
     tint: tintColor,
-    icon: "#6B7280", // Medium neutral gray
-    tabIconDefault: "#9CA3AF",
-    tabIconSelected: tintColor + "33", // translucent accent
-    border: "#E2E4E7", // gentle, minimal border tone
-    cardBackground: "#FFFFFF", // elevated card white
-    buttonText: "#111418",
-    buttonBorder: "#DADDE0",
-    placeholderText: "#9CA3AF",
-    description: "#70737A", // muted descriptive text
-    overlay: "rgba(0,0,0,0.04)", // subtle hover/press feedback
+    icon: "#64748b",
+    tabIconDefault: "#94a3b8",
+    tabIconSelected: tintColor,
+    border: "#e2e8f0",
+    cardBackground: "#ffffff",
+    card: "#ffffff",
+    buttonText: "#0f172a",
+    buttonBorder: "#cbd5e1",
+    placeholderText: "#94a3b8",
+    description: "#64748b",
+    overlay: "rgba(0,0,0,0.04)",
+    textMuted: "#64748b",
+
+    // Vibrant theme colors
+    blue: "#3b82f6",
+    green: "#10b981",
+    red: "#ef4444",
+    orange: "#f97316",
+    yellow: "#eab308",
+    pink: "#ec4899",
+    purple: "#a855f7",
+    teal: "#14b8a6",
+    indigo: "#6366f1",
   },
   dark: {
-    text: "#E6E8EB", // calm white-gray (not pure white)
-    background: "#0E1012", // rich near-black with depth
+    text: "#f1f5f9",
+    background: "#000000",
     tint: tintColor,
-    icon: "#9CA3AF",
-    tabIconDefault: "#6B7280",
-    tabIconSelected: tintColor + "33",
-    border: "#1E242A", // faint border tone
-    cardBackground: "#14171A", // lifted dark surface
-    buttonText: "#E6E8EB",
-    buttonBorder: "#2A2F34",
-    placeholderText: "#9CA3AF",
-    description: "#9CA3AF",
-    overlay: "rgba(255,255,255,0.05)", // for active states
+    icon: "#94a3b8",
+    tabIconDefault: "#64748b",
+    tabIconSelected: tintColor,
+    border: "#1a1a1a",
+    cardBackground: "#0f0f0f",
+    card: "#0f0f0f",
+    buttonText: "#f1f5f9",
+    buttonBorder: "#262626",
+    placeholderText: "#64748b",
+    description: "#94a3b8",
+    overlay: "rgba(255,255,255,0.05)",
+    textMuted: "#94a3b8",
+
+    // Vibrant theme colors
+    blue: "#60a5fa",
+    green: "#34d399",
+    red: "#f87171",
+    orange: "#fb923c",
+    yellow: "#facc15",
+    pink: "#f472b6",
+    purple: "#c084fc",
+    teal: "#2dd4bf",
+    indigo: "#818cf8",
   },
 };

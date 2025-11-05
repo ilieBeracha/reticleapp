@@ -1,11 +1,11 @@
 import { useColors } from "@/hooks/useColors";
-import { useOrganization } from "@clerk/clerk-expo";
+import { useOrganizationsStore } from "@/store/organizationsStore";
 import { BlurView } from "expo-blur";
 import { router, usePathname } from "expo-router";
 import { Platform, StyleSheet, useColorScheme, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AddButton } from "./BottomNav/AddButton";
-import { NavItem } from "./BottomNav/NavItem";
+import { AddButton } from "./AddButton";
+import { NavItem } from "./NavItem";
 
 type BottomNavProps = {
   onAddPress: () => void;
@@ -13,49 +13,47 @@ type BottomNavProps = {
 
 export default function BottomNav({ onAddPress }: BottomNavProps) {
   const pathname = usePathname();
-  const { organization } = useOrganization();
+  const { selectedOrgId } = useOrganizationsStore();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const colors = useColors();
-  const isHome = pathname === "/(home)";
-  const isMembers = pathname?.startsWith("/(home)/members");
-  const isSession = pathname?.startsWith("/(home)/session");
-  const isStats = pathname?.startsWith("/(home)/stats");
-
-  const inOrganization = !!organization;
+  const isHome = pathname === "/(protected)/(tabs)";
+  const isMembers = pathname?.startsWith("/(protected)/(tabs)/members");
+  const isSession = pathname?.startsWith("/(protected)/(tabs)/session");
+  const isStats = pathname?.startsWith("/(protected)/(tabs)/stats");
 
   const navContent = (
     <>
       {/* Always: Home */}
-      <NavItem icon="home" isActive={isHome} href="/(home)" />
+      <NavItem icon="home" isActive={isHome} href="/(protected)/(tabs)" />
 
       {/* Personal: Add button is 2nd position */}
-      {!inOrganization && <AddButton onPress={onAddPress} />}
+      {!selectedOrgId && <AddButton onPress={onAddPress} />}
 
       {/* Always: Stats */}
       <NavItem
         icon="bar-chart-sharp"
         isActive={isStats}
-        onPress={() => router.push("/(home)/stats" as any)}
+        onPress={() => router.push("/(protected)/(tabs)/stats" as any)}
       />
 
       {/* Organization: Add button is 3rd position (middle) */}
-      {inOrganization && <AddButton onPress={onAddPress} />}
+      {selectedOrgId && <AddButton onPress={onAddPress} />}
 
-      {inOrganization && (
+      {selectedOrgId && (
         <NavItem
           icon="calendar"
           isActive={isSession}
-          onPress={() => router.push("/(home)/calendar" as any)}
+          onPress={() => router.push("/(protected)/(tabs)/calendar" as any)}
         />
       )}
 
       {/* Organization only: Members */}
-      {inOrganization && (
+      {selectedOrgId && (
         <NavItem
           icon="people"
           isActive={isMembers}
-          onPress={() => router.push("/(home)/members")}
+          onPress={() => router.push("/(protected)/(tabs)/members")}
         />
       )}
     </>
@@ -79,7 +77,7 @@ export default function BottomNav({ onAddPress }: BottomNavProps) {
             styles.container,
             {
               borderColor: colors.border,
-              justifyContent: inOrganization ? "space-between" : "space-around",
+              justifyContent: selectedOrgId ? "space-between" : "space-around",
             },
           ]}
         >
@@ -96,7 +94,7 @@ export default function BottomNav({ onAddPress }: BottomNavProps) {
                 colorScheme === "dark"
                   ? "rgba(17, 19, 23, 0.85)"
                   : "rgba(255, 255, 255, 0.85)",
-              justifyContent: inOrganization ? "space-between" : "space-around",
+              justifyContent: selectedOrgId ? "space-between" : "space-around",
             },
           ]}
         >

@@ -2,10 +2,21 @@ import { useAuth, useSignUp, useUser } from "@clerk/clerk-expo";
 import { Redirect, Stack, usePathname } from "expo-router";
 
 export default function AuthRoutesLayout() {
-  const { user } = useUser();
+  const { user, isLoaded: userLoaded } = useUser();
   const { signUp } = useSignUp();
   const pathName = usePathname();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, isLoaded: authLoaded } = useAuth();
+
+  console.log("authLoaded", authLoaded);
+  console.log("userLoaded", userLoaded);
+  console.log("isSignedIn", isSignedIn);
+  console.log("signUp", signUp);
+  console.log("pathName", pathName);
+
+  // Wait for Clerk to load before making routing decisions
+  if (!authLoaded || !userLoaded) {
+    return null;
+  }
 
   // Handle incomplete signup (no session yet, but signUp exists)
   if (!isSignedIn && signUp && signUp.status === "missing_requirements") {
@@ -23,7 +34,7 @@ export default function AuthRoutesLayout() {
 
   // User is signed in and has completed onboarding
   if (isSignedIn && user?.unsafeMetadata?.onboarding_completed === true) {
-    return <Redirect href="/(home)" />;
+    return <Redirect href="/(protected)/(tabs)" />;
   }
 
   return <Stack screenOptions={{ headerShown: false }} />;
