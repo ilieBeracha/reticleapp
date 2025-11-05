@@ -1,4 +1,5 @@
 // contexts/AuthContext.tsx
+import { AuthenticatedClient } from '@/lib/authenticatedClient'
 import { supabase } from '@/lib/supabase'
 import { Session, User } from '@supabase/supabase-js'
 import * as Linking from 'expo-linking'
@@ -43,6 +44,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
 
     return () => subscription.unsubscribe()
+  }, [])
+
+  // Initialize AuthenticatedClient with token provider
+  useEffect(() => {
+    AuthenticatedClient.initialize(async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      return session?.access_token ?? ''
+    })
   }, [])
 
   // Handle OAuth deep links
@@ -122,46 +131,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error
   }
 
-  const signInWithOAuth = async (provider: 'google' | 'apple') => {
-    try {
-      console.log('🔵 Starting OAuth with', provider)
-      
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: 'reticle://auth/callback',
-          skipBrowserRedirect: true,
-        },
-      })
-      
-      if (error) {
-        console.error('❌ OAuth error:', error)
-        throw error
-      }
-      
-      if (!data?.url) {
-        throw new Error('No OAuth URL returned')
-      }
+const signInWithOAuth = async (provider: 'google' | 'apple') => {
+  try {
+    console.log('🔵 Starting OAuth with', provider)
+    
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: 'reticle://auth/callback',
+        skipBrowserRedirect: true,
+      },
+    })
+    
+    if (error) throw error
+    if (!data?.url) throw new Error('No OAuth URL returned')
 
-      console.log('🔵 Opening browser...')
-      const result = await WebBrowser.openAuthSessionAsync(
-        data.url,
-        'reticle://auth/callback'
-      )
+    console.log('🔵 Opening browser...')
+    const result = await WebBrowser.openAuthSessionAsync(
+      data.url,
+      'reticle://auth/callback'
+    )
+    
+    console.log('🔵 Browser result type:', result.type)
+    
+    if (result.type === 'success' && result.url) {
+      console.log('✅ OAuth success! Callback URL:', result.url)
       
-      console.log('🔵 Browser result:', result.type)
+      // Extract tokens from URL hash
+      const url = new URL(result.url)
+      const hash = url.hash.substring(1) // Remove #
+      const params = new URLSearchParams(hash)
       
-      if (result.type === 'success' && result.url) {
-        console.log('🔵 OAuth successful, processing callback...')
-        // Deep link handler will catch this
-      } else if (result.type === 'cancel') {
-        console.log('⚠️ User cancelled OAuth')
+      const accessToken = params.get('access_token')
+      const refreshToken = params.get('refresh_token')
+      
+      console.log('🔵 Extracted tokens:', { 
+        hasAccess: !!accessToken, 
+        hasRefresh: !!refreshToken 
+      })
+
+      if (accessToken && refreshToken) {
+        console.log('🔵 Setting session...')
+        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        })
+        
+        if (sessionError) {
+          console.error('❌ Session error:', sessionError)
+          throw sessionError
+        }
+        
+        console.log('✅ Session set! User:', sessionData.user?.email)
+      } else {
+        throw new Error('No tokens in OAuth callback')
       }
-    } catch (err) {
-      console.error('❌ OAuth error:', err)
-      throw err
+    } else if (result.type === 'cancel') {
+      console.log('⚠️ User cancelled OAuth')
     }
+  } catch (err) {
+    console.error('❌ OAuth error:', err)
+    throw err
   }
+}
 
   const signOut = async () => {
     const { error } = await supabase.auth.signOut()

@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganizationsStore } from "@/store/organizationsStore";
+import { UserOrg } from "@/types/organizations";
 import ProfileDropdown from "./ProfileDropdown";
 import { OrganizationSwitcherModal } from "./organization-switcher";
 
@@ -21,7 +22,7 @@ export default function Header({
 }: HeaderProps) {
   const { user } = useAuth();
   const { userOrgs, selectedOrgId } = useOrganizationsStore();
-  const selectedOrg = userOrgs.find((org) => org.org_id === selectedOrgId);
+  const selectedOrg = userOrgs.find((org: UserOrg) => org.org_id === selectedOrgId);
   const [profileOpen, setProfileOpen] = useState(false);
   const [orgSwitcherOpen, setOrgSwitcherOpen] = useState(false);
   const insets = useSafeAreaInsets();

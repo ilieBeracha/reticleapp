@@ -32,6 +32,7 @@ export default function CreateSessionModal({
   const selectedOrg = allOrgs.find((o) => o.id === selectedOrgId);
   // Use Zustand store directly
   const { createSession, fetchSessions } = useStore(sessionsStore);
+  
 
   // Form state
   const [name, setName] = useState("");

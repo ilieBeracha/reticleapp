@@ -1,6 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { useOrganizationsStore } from "@/store/organizationsStore";
+import { Organization } from "@/types/organizations";
 import { useCallback, useState } from "react";
   
 export type OrgRole =
@@ -51,7 +52,7 @@ export function useInviteOrg() {
       }
 
       // Get organization name
-      const currentOrg = allOrgs.find(org => org.id === selectedOrgId);
+      const currentOrg = allOrgs.find((org: Organization) => org.id === selectedOrgId);
       if (!currentOrg) {
         throw new Error("Organization not found");
       }

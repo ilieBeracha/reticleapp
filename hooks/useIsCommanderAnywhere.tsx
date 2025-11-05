@@ -1,6 +1,7 @@
 // hooks/useIsCommanderAnywhere.ts
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganizationsStore } from "@/store/organizationsStore";
+import { UserOrg } from "@/types/organizations";
 import { useMemo } from "react";
 
 /**
@@ -13,6 +14,6 @@ export function useIsCommanderAnywhere(): boolean {
 
   return useMemo(() => {
     if (!user?.id) return false;
-    return userOrgs.some((org) => org.role === "commander");
+    return userOrgs.some((org: UserOrg) => org.role === "commander");
   }, [user?.id, userOrgs]);
 }

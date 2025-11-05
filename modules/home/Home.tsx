@@ -6,6 +6,7 @@ import { useThemeColor } from "@/hooks/useThemeColor";
 import { useOrganizationSwitchStore } from "@/store/organizationSwitchStore";
 import { useOrganizationsStore } from "@/store/organizationsStore"; // ✅ New import
 import { sessionsStore } from "@/store/sessionsStore";
+import { Organization } from "@/types/organizations";
 import { useEffect, useRef } from "react";
 import { Animated, ScrollView, StyleSheet } from "react-native";
 import { useStore } from "zustand";
@@ -30,7 +31,7 @@ export function Home() {
     user?.user_metadata?.full_name?.split(" ")[0] || "User";
 
   // ✅ Get selected organization from hierarchy
-  const selectedOrg = allOrgs.find((o) => o.id === selectedOrgId);
+  const selectedOrg = allOrgs.find((o: Organization) => o.id === selectedOrgId);
   const organizationName = selectedOrg?.name;
   const isPersonalWorkspace = !selectedOrgId;
 
@@ -101,7 +102,7 @@ export function Home() {
       }
     };
     loadSessions();
-  }, [user?.id, selectedOrgId, isSwitching]); // ✅ Track selectedOrgId instead of orgId
+  }, [user?.id]);
 
   // ✅ Animate when switching orgs
   useEffect(() => {

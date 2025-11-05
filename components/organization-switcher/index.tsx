@@ -1,18 +1,19 @@
 import BaseBottomSheet from "@/components/BaseBottomSheet";
 import { CreateOrgModal } from "@/components/CreateOrg";
-import { SwitcherHeader } from "@/components/SwitcherHeader";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { useOrganizationSwitch } from "@/hooks/useOrganizationSwitch";
 import { useOrgPermissions } from "@/hooks/useOrgPermissions";
 import { useOrganizationsStore } from "@/store/organizationsStore";
+import { Organization, UserOrg } from "@/types/organizations";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
   Text,
-  View,
+  View
 } from "react-native";
+import { SwitcherHeader } from "../SwitcherHeader";
 import { ChildOrganizationsList } from "./ChildOrganizationsList";
 import { CreateOrgButton } from "./CreateOrgButton";
 import { CurrentLocationCard } from "./CurrentLocationCard";
@@ -54,24 +55,23 @@ export function OrganizationSwitcherModal({
 
   // Get current org
   const currentOrg = selectedOrgId
-    ? allOrgs.find((org) => org.id === selectedOrgId)
+    ? allOrgs.find((org: Organization) => org.id === selectedOrgId)
     : null;
 
   const currentMembership = selectedOrgId
-    ? userOrgs.find((org) => org.org_id === selectedOrgId)
+    ? userOrgs.find((org: UserOrg) => org.org_id === selectedOrgId)
     : null;
 
   // Get immediate parent
   const immediateParent =
     currentOrg && currentOrg.parent_id
-      ? allOrgs.find((o) => o.id === currentOrg.parent_id)
+      ? allOrgs.find((o: Organization) => o.id === currentOrg.parent_id)
       : null;
-
   const parentMembership = immediateParent
-    ? userOrgs.find((uo) => uo.org_id === immediateParent.id)
+    ? userOrgs.find((org: UserOrg) => org.org_id === immediateParent.id)
     : null;
-
   useEffect(() => {
+    console.log("visible", visible);
     if (visible && user?.id) {
       fetchUserOrgs(user?.id);
       fetchAllOrgs(user?.id);
@@ -79,6 +79,7 @@ export function OrganizationSwitcherModal({
         fetchOrgChildren(selectedOrgId);
       }
     }
+    // Zustand actions are stable, so we don't need them in deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, user?.id, selectedOrgId]);
 
@@ -101,7 +102,7 @@ export function OrganizationSwitcherModal({
       role: null,
       depth: -1,
     },
-    ...userOrgs.map((org) => ({
+    ...userOrgs.map((org: UserOrg) => ({
       id: org.org_id,
       name: org.org_name,
       active: selectedOrgId === org.org_id,
@@ -132,7 +133,7 @@ export function OrganizationSwitcherModal({
 
     // Build path from root to current
     const buildPath = (orgId: string): void => {
-      const org = allOrgs.find((o) => o.id === orgId);
+      const org = allOrgs.find((o: Organization) => o.id === orgId);
       if (!org) return;
 
       if (org.parent_id) {

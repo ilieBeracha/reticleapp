@@ -1,5 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganizationsStore } from "@/store/organizationsStore";
+import { UserOrg } from "@/types/organizations";
 import { useMemo } from "react";
 import { useIsRootCommander } from "./useIsRootCommander";
 
@@ -44,7 +45,7 @@ export function useOrgPermissions(): {
       };
     }
 
-    const membership = userOrgs.find((org) => org.org_id === selectedOrgId);
+    const membership = userOrgs.find((org: UserOrg) => org.org_id === selectedOrgId);
     const role = membership?.role || null;
     const isLocalCommander = role === "commander";
 

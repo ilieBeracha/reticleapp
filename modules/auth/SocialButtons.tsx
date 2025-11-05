@@ -63,17 +63,40 @@ export function SocialButtons() {
       console.log('🔵 WebBrowser full result:', JSON.stringify(result, null, 2));
 
       if (result.type === 'success' && 'url' in result) {
-        console.log('✅ OAuth success! Callback URL:', result.url);
-        
-        // Check if session was established
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
+        console.log('✅ OAuth success! Callback URL:', (result as any).url);
+
+        // Manually parse tokens from the deep-link in case the auth listener hasn't fired yet
+        try {
+          const urlStr = (result as any).url as string;
+          const parsed = new URL(urlStr);
+          const hash = parsed.hash?.startsWith('#') ? parsed.hash.substring(1) : parsed.hash;
+          const params = new URLSearchParams(hash);
+          const access_token = params.get('access_token') || undefined;
+          const refresh_token = params.get('refresh_token') || undefined;
+          console.log('🔎 Parsed tokens — access:', !!access_token, 'refresh:', !!refresh_token);
+
+        if (access_token && refresh_token) {
+            const { error: setErr } = await supabase.auth.setSession({
+              access_token,
+              refresh_token,
+            });
+            if (setErr) {
+              console.log('❌ setSession error:', setErr);
+            } else {
+              console.log('✅ setSession successful');
+            }
+          }
+        } catch (e) {
+          console.log('⚠️ Failed to parse callback URL:', e);
+        }
+
+        // Verify session
+        const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-          console.log('✅ Session found after OAuth!');
+          console.log('✅ Session established via Supabase');
           Alert.alert('Success', 'Signed in successfully!');
         } else {
-          console.log('⚠️ No session found after OAuth');
-          console.log('Session error:', sessionError);
+          console.log('⚠️ Still no session after parsing tokens');
         }
       } else if (result.type === 'cancel') {
         console.log('⚠️ User cancelled OAuth');

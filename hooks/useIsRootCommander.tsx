@@ -1,6 +1,7 @@
 // hooks/useIsRootCommander.ts
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganizationsStore } from '@/store/organizationsStore';
+import { UserOrg } from '@/types/organizations';
 import { useMemo } from 'react';
 
 /**
@@ -16,11 +17,11 @@ export function useIsRootCommander(): boolean {
     if (!user?.id || !selectedOrgId) return false;
 
     // Find the selected org
-    const selectedOrg = userOrgs.find(org => org.org_id === selectedOrgId);
+    const selectedOrg = userOrgs.find((org: UserOrg) => org.org_id === selectedOrgId);
     if (!selectedOrg) return false;
 
     // Find the root org of the selected org
-    const rootOrg = userOrgs.find(org => org.org_id === selectedOrg.root_id);
+    const rootOrg = userOrgs.find((org: UserOrg) => org.org_id === selectedOrg.root_id);
     
     // Check if user is commander of the ROOT
     return rootOrg?.role === 'commander';

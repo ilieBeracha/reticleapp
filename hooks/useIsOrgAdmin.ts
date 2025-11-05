@@ -1,5 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganizationsStore } from "@/store/organizationsStore";
+import { UserOrg } from "@/types/organizations";
 import { useMemo } from "react";
 
 /**
@@ -13,7 +14,7 @@ export function useIsOrganizationCommander(): boolean {
   return useMemo(() => {
     if (!user?.id || !selectedOrgId) return false;
 
-    const membership = userOrgs.find((org) => org.org_id === selectedOrgId);
+    const membership = userOrgs.find((org: UserOrg) => org.org_id === selectedOrgId);
     return membership?.role === "commander";
   }, [user?.id, selectedOrgId, userOrgs]);
 }

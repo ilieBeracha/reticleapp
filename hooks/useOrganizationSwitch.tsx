@@ -32,7 +32,6 @@ export function OrganizationSwitchProvider({
 }: OrganizationSwitchProviderProps) {
   const router = useRouter();
   const { user } = useAuth();
-  console.log("user", user);
   // ✅ Use hierarchy store instead of Clerk
   const { selectedOrgId, setSelectedOrg, fetchUserOrgs } =
     useOrganizationsStore();
