@@ -1,5 +1,5 @@
 export { Colors } from "@/constants/Colors";
-export { useThemeColor } from "@/hooks/useThemeColor";
+export { useThemeColor } from "@/hooks/ui/useThemeColor";
 export { ThemedText } from "./ThemedText";
 export { ThemedView } from "./ThemedView";
 

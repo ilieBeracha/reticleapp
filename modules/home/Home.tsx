@@ -1,11 +1,12 @@
 // components/Home.tsx
 import { ThemedView } from "@/components/ThemedView";
+import { useAuth } from "@/contexts/AuthContext";
 import { useEnsureActiveOrg } from "@/hooks/useEnsureActiveOrg";
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useThemeColor } from "@/hooks/ui/useThemeColor";
 import { useOrganizationSwitchStore } from "@/store/organizationSwitchStore";
 import { useOrganizationsStore } from "@/store/organizationsStore"; // ✅ New import
 import { sessionsStore } from "@/store/sessionsStore";
-import { useAuth, useUser } from "@clerk/clerk-expo"; // ❌ Removed useOrganization
+import { Organization } from "@/types/organizations";
 import { useEffect, useRef } from "react";
 import { Animated, ScrollView, StyleSheet } from "react-native";
 import { useStore } from "zustand";
@@ -15,8 +16,7 @@ import { Stats } from "./Stats";
 
 export function Home() {
   useEnsureActiveOrg();
-  const { user } = useUser();
-  const { userId } = useAuth(); // ❌ Removed orgId
+  const { user } = useAuth();
 
   // ✅ Use new organizations store instead of Clerk
   const { selectedOrgId, allOrgs, fetchUserOrgs, fetchAllOrgs } =
@@ -28,10 +28,10 @@ export function Home() {
   const backgroundColor = useThemeColor({}, "background");
 
   const userName =
-    user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] || "User";
+    user?.user_metadata?.full_name?.split(" ")[0] || "User";
 
   // ✅ Get selected organization from hierarchy
-  const selectedOrg = allOrgs.find((o) => o.id === selectedOrgId);
+  const selectedOrg = allOrgs.find((o: Organization) => o.id === selectedOrgId);
   const organizationName = selectedOrg?.name;
   const isPersonalWorkspace = !selectedOrgId;
 
@@ -43,11 +43,11 @@ export function Home() {
 
   // ✅ Fetch organizations on mount
   useEffect(() => {
-    if (userId) {
-      fetchUserOrgs(userId);
-      fetchAllOrgs(userId);
+    if (user?.id) {
+      fetchUserOrgs(user?.id);
+      fetchAllOrgs(user?.id);
     }
-  }, [userId]);
+  }, [user?.id]);
 
   /**
    * Handle organization switch lifecycle
@@ -96,13 +96,13 @@ export function Home() {
         return;
       }
 
-      if (userId) {
+      if (user?.id) {
         console.log("Fetching sessions for orgId:", selectedOrgId); // ✅ Use hierarchy org
-        fetchSessions(userId, selectedOrgId); // ✅ Pass hierarchy org ID
+        fetchSessions(user?.id, selectedOrgId); // ✅ Pass hierarchy org ID
       }
     };
     loadSessions();
-  }, [userId, selectedOrgId, isSwitching]); // ✅ Track selectedOrgId instead of orgId
+  }, [user?.id]);
 
   // ✅ Animate when switching orgs
   useEffect(() => {

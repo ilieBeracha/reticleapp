@@ -1,4 +1,5 @@
 // contexts/OrganizationSwitchProvider.tsx
+import { useAuth } from "@/contexts/AuthContext";
 import {
   MAXIMUM_SWITCH_TIMEOUT,
   MINIMUM_SWITCH_DURATION,
@@ -6,7 +7,6 @@ import {
   waitForMinimumDuration,
 } from "@/store/organizationSwitchStore";
 import { useOrganizationsStore } from "@/store/organizationsStore";
-import { useAuth } from "@clerk/clerk-expo";
 import { useRouter } from "expo-router";
 import React, { createContext, ReactNode, useContext, useEffect } from "react";
 import { Alert, AppState, AppStateStatus } from "react-native";
@@ -31,8 +31,7 @@ export function OrganizationSwitchProvider({
   children,
 }: OrganizationSwitchProviderProps) {
   const router = useRouter();
-  const { userId } = useAuth();
-
+  const { user } = useAuth();
   // ✅ Use hierarchy store instead of Clerk
   const { selectedOrgId, setSelectedOrg, fetchUserOrgs } =
     useOrganizationsStore();
@@ -111,8 +110,8 @@ export function OrganizationSwitchProvider({
         setSelectedOrg(organizationId);
 
         // ✅ Optionally refresh user orgs to ensure fresh data
-        if (userId) {
-          await fetchUserOrgs(userId);
+        if (user?.id) {
+          await fetchUserOrgs(user?.id);
         }
 
         console.log("Organization switch successful");

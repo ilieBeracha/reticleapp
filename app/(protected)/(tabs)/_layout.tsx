@@ -1,7 +1,6 @@
 import Header from "@/components/Header";
 import QuickActionsFloatingButton from "@/components/QuickActionsFloatingButton";
-import { useColors } from "@/hooks/useColors";
-import { useIsOrganizationCommander } from "@/hooks/useIsOrgAdmin";
+import { useColors } from "@/hooks/ui/useColors";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { Ionicons } from "@expo/vector-icons";
 import { router, Tabs } from "expo-router";
@@ -13,7 +12,6 @@ export default function TabLayout() {
   const colors = useColors();
   const { selectedOrgId } = useOrganizationsStore();
   const isPersonalMode = selectedOrgId == null || selectedOrgId == undefined;
-  const isCommander = useIsOrganizationCommander();
 
   const handleQuickActionsPress = (action: "scan" | "session" | "training") => {
     switch (action) {
@@ -75,12 +73,11 @@ export default function TabLayout() {
             }}
           />
 
-          {/* Calendar - Only shown if user has organization */}
+          {/* Training Calendar - Always shown */}
           <Tabs.Screen
             name="calendar"
             options={{
-              title: "Calendar",
-              href: isPersonalMode ? null : "/(protected)/(tabs)/calendar",
+              title: "Training",
               tabBarIcon: ({ color, focused }) => (
                 <Ionicons
                   name={focused ? "calendar" : "calendar-outline"}
@@ -105,25 +102,7 @@ export default function TabLayout() {
               ),
             }}
           />
-
-          {/* Manage - Only shown if user is commander */}
-          <Tabs.Screen
-            name="manage"
-            options={{
-              title: "Manage",
-              href:
-                !isPersonalMode && isCommander
-                  ? "/(protected)/(tabs)/manage"
-                  : null,
-              tabBarIcon: ({ color, focused }) => (
-                <Ionicons
-                  name={focused ? "shield-checkmark" : "shield-checkmark-outline"}
-                  size={20}
-                  color={color}
-                />
-              ),
-            }}
-          />
+          
 
           {/* AI - Always shown */}
           <Tabs.Screen
@@ -141,13 +120,8 @@ export default function TabLayout() {
           />
 
           {/* ===== HIDDEN SCREENS ===== */}
+      
 
-          <Tabs.Screen
-            name="members"
-            options={{
-              href: null,
-            }}
-          />
           <Tabs.Screen
             name="profile"
             options={{

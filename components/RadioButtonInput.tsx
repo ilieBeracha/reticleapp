@@ -1,4 +1,4 @@
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useThemeColor } from "@/hooks/ui/useThemeColor";
 import { Ionicons } from "@expo/vector-icons";
 import { Controller } from "react-hook-form";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";

@@ -1,5 +1,5 @@
 // BulletDetectionEditor.tsx
-import { useColors } from "@/hooks/useColors";
+import { useColors } from "@/hooks/ui/useColors";
 import { Detection } from "@/store/detectionStore";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";

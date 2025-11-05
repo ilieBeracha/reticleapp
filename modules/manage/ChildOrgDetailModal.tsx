@@ -1,9 +1,8 @@
 import BaseBottomSheet from "@/components/BaseBottomSheet";
-import { ThemedText } from "@/components/ThemedText";
-import { useColors } from "@/hooks/useColors";
+import { useColors } from "@/hooks/ui/useColors";
+import { useThemeColor } from "@/hooks/ui/useThemeColor";
 import { useOrganizationSwitch } from "@/hooks/useOrganizationSwitch";
-import { useThemeColor } from "@/hooks/useThemeColor";
-import { OrganizationsService } from "@/services/organizationsService";
+import { useOrganizationsStore } from "@/store/organizationsStore";
 import { OrgChild } from "@/types/organizations";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
@@ -38,6 +37,7 @@ export function ChildOrgDetailModal({
 }: ChildOrgDetailModalProps) {
   const colors = useColors();
   const { switchOrganization } = useOrganizationSwitch();
+  const { fetchMemberships, fetchOrgChildren, memberships, orgChildren } = useOrganizationsStore();
 
   const cardBackground = useThemeColor({}, "cardBackground");
   const textColor = useThemeColor({}, "text");
@@ -45,8 +45,6 @@ export function ChildOrgDetailModal({
   const borderColor = useThemeColor({}, "border");
   const tintColor = useThemeColor({}, "tint");
 
-  const [members, setMembers] = useState<OrgMember[]>([]);
-  const [subChildren, setSubChildren] = useState<OrgChild[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -60,23 +58,21 @@ export function ChildOrgDetailModal({
 
     setLoading(true);
     try {
-      // Fetch members
-      const membersData = await OrganizationsService.getMemberships(
-        childOrg.id
-      );
-      setMembers(membersData);
-
-      // Fetch sub-children
-      const childrenData = await OrganizationsService.getOrgChildren(
-        childOrg.id
-      );
-      setSubChildren(childrenData);
+      // Fetch members and children using store
+      await Promise.all([
+        fetchMemberships(childOrg.id),
+        fetchOrgChildren(childOrg.id),
+      ]);
     } catch (error) {
       console.error("Error fetching org details:", error);
     } finally {
       setLoading(false);
     }
   };
+
+  // Use store state directly
+  const members = (memberships || []) as OrgMember[];
+  const subChildren = orgChildren || [];
 
   const handleSwitchTo = async () => {
     if (!childOrg) return;
@@ -104,7 +100,7 @@ export function ChildOrgDetailModal({
       case "member":
         return colors.blue;
       case "viewer":
-        return colors.gray;
+        return colors.textMuted;
       default:
         return mutedColor;
     }
@@ -112,14 +108,6 @@ export function ChildOrgDetailModal({
 
   if (!childOrg) return null;
 
-  const createdDate = new Date(childOrg.created_at).toLocaleDateString(
-    "en-US",
-    {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    }
-  );
 
   return (
     <BaseBottomSheet
@@ -186,14 +174,7 @@ export function ChildOrgDetailModal({
                     size={16}
                     color={mutedColor}
                   />
-                  <View>
-                    <Text style={[styles.metadataLabel, { color: mutedColor }]}>
-                      Created
-                    </Text>
-                    <Text style={[styles.metadataValue, { color: textColor }]}>
-                      {createdDate}
-                    </Text>
-                  </View>
+                  
                 </View>
 
                 <View style={styles.metadataItem}>
@@ -238,7 +219,7 @@ export function ChildOrgDetailModal({
                 </View>
               </View>
 
-              {members.length > 0 ? (
+              {members && members.length > 0 ? (
                 <View style={styles.membersList}>
                   {members.map((member) => (
                     <View

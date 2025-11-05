@@ -1,5 +1,5 @@
 // PreviewPage.tsx
-import { useColors } from "@/hooks/useColors";
+import { useColors } from "@/hooks/ui/useColors";
 import { Ionicons } from "@expo/vector-icons";
 import BottomSheet, {
   BottomSheetScrollView,

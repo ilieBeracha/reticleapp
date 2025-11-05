@@ -2,11 +2,11 @@ import { AddButton } from "@/components/AddButton";
 import BaseBottomSheet from "@/components/BaseBottomSheet";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import { useColors } from "@/hooks/useColors";
-import { useWeaponModels } from "@/hooks/useWeaponModels";
+import { useColors } from "@/hooks/ui/useColors";
+import { weaponModelsStore } from "@/store/weaponModelsStore";
 import { WeaponModel } from "@/types/database";
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -14,6 +14,7 @@ import {
   StyleSheet,
   View,
 } from "react-native";
+import { useStore } from "zustand";
 
 interface WeaponsModelsModalProps {
   visible: boolean;
@@ -24,9 +25,16 @@ export default function WeaponsModelsModal({
   visible,
   onClose,
 }: WeaponsModelsModalProps) {
-  const { weaponModels, loading, error, refetch } = useWeaponModels();
+  const { weaponModels, loading, fetchWeaponModels } = useStore(weaponModelsStore);
   const colors = useColors();
   const [isAdding, setIsAdding] = useState(false);
+
+  // Fetch weapon models when modal opens
+  useEffect(() => {
+    if (visible) {
+      fetchWeaponModels();
+    }
+  }, [visible, fetchWeaponModels]);
 
   return (
     <BaseBottomSheet visible={visible} onClose={onClose} snapPoints={["90%"]}>
@@ -68,7 +76,7 @@ export default function WeaponsModelsModal({
               refreshControl={
                 <RefreshControl
                   refreshing={loading}
-                  onRefresh={refetch}
+                  onRefresh={fetchWeaponModels}
                   tintColor={colors.tint}
                 />
               }

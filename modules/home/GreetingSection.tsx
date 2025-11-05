@@ -1,5 +1,5 @@
-import { useColors } from "@/hooks/useColors";
-import { useUser } from "@clerk/clerk-expo";
+import { useAuth } from "@/contexts/AuthContext";
+import { useColors } from "@/hooks/ui/useColors";
 import { Ionicons } from "@expo/vector-icons";
 import { Image, StyleSheet, Text, View } from "react-native";
 
@@ -15,13 +15,13 @@ export function GreetingSection({
   isPersonalWorkspace = false,
 }: GreetingSectionProps) {
   const colors = useColors();
-  const { user } = useUser();
+  const { user } = useAuth();
 
   return (
     <View style={styles.container}>
       {/* Profile Picture */}
-      {user?.imageUrl ? (
-        <Image source={{ uri: user.imageUrl }} style={styles.profileImage} />
+      {user?.user_metadata?.avatar_url ? (
+        <Image source={{ uri: user.user_metadata.avatar_url }} style={styles.profileImage} />
       ) : (
         <View
           style={[

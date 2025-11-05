@@ -1,6 +1,6 @@
-// hooks/useIsOrganizationCommander.ts
+import { useAuth } from "@/contexts/AuthContext";
 import { useOrganizationsStore } from "@/store/organizationsStore";
-import { useAuth } from "@clerk/clerk-expo";
+import { UserOrg } from "@/types/organizations";
 import { useMemo } from "react";
 
 /**
@@ -8,13 +8,13 @@ import { useMemo } from "react";
  * Returns false if in a child org where user is only a member
  */
 export function useIsOrganizationCommander(): boolean {
-  const { userId } = useAuth();
+  const { user } = useAuth();
   const { selectedOrgId, userOrgs } = useOrganizationsStore();
 
   return useMemo(() => {
-    if (!userId || !selectedOrgId) return false;
+    if (!user?.id || !selectedOrgId) return false;
 
-    const membership = userOrgs.find((org) => org.org_id === selectedOrgId);
+    const membership = userOrgs.find((org: UserOrg) => org.org_id === selectedOrgId);
     return membership?.role === "commander";
-  }, [userId, selectedOrgId, userOrgs]);
+  }, [user?.id, selectedOrgId, userOrgs]);
 }

@@ -1,9 +1,9 @@
 import BaseBottomSheet from "@/components/BaseBottomSheet";
 import { ThemedText } from "@/components/ThemedText";
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { useThemeColor } from "@/hooks/ui/useThemeColor";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { Organization } from "@/types/organizations";
-import { useAuth } from "@clerk/clerk-expo";
+import { useAuth } from "@/contexts/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import { useState } from "react";
@@ -20,7 +20,8 @@ export function EditOrgModal({
   onClose,
   organization,
 }: EditOrgModalProps) {
-  const { userId } = useAuth();
+  const { user } = useAuth();
+  const userId = user?.id;
   const { updateOrg, fetchAllOrgs } = useOrganizationsStore();
 
   const [organizationName, setOrganizationName] = useState(organization.name);

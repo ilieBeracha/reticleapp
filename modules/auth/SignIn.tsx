@@ -1,4 +1,6 @@
-import { useColors } from "@/hooks/useColors";
+import { useColors } from "@/hooks/ui/useColors";
+import { useLocalSearchParams } from "expo-router";
+import { useEffect } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SignInHeader } from "./SignInHeader";
@@ -7,6 +9,14 @@ import { SocialButtons } from "./SocialButtons";
 export function SignIn() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+
+  const token = useLocalSearchParams<{ token: string }>();
+
+  useEffect(() => {
+    if (token) {
+      console.log('token', token);
+    }
+  }, [token]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

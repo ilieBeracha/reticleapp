@@ -1,4 +1,4 @@
-import { useColors } from "@/hooks/useColors";
+import { useColors } from "@/hooks/ui/useColors";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";

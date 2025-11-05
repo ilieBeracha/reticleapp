@@ -1,5 +1,6 @@
+import { useAuth } from "@/contexts/AuthContext";
 import { useOrganizationsStore } from "@/store/organizationsStore";
-import { useAuth } from "@clerk/clerk-expo";
+import { UserOrg } from "@/types/organizations";
 import { useMemo } from "react";
 import { useIsRootCommander } from "./useIsRootCommander";
 
@@ -17,13 +18,13 @@ export function useOrgPermissions(): {
   canRemoveMembers: boolean;
   canEditMembers: boolean;
 } {
-  const { userId } = useAuth();
+  const { user } = useAuth();
   const { selectedOrgId, userOrgs } = useOrganizationsStore();
   const isRootCommander = useIsRootCommander();
 
   return useMemo(() => {
     // Personal mode - can do everything for self
-    if (!userId || !selectedOrgId) {
+    if (!user?.id || !selectedOrgId) {
       return {
         canViewOrg: false,
         canEditOrg: false,
@@ -44,7 +45,7 @@ export function useOrgPermissions(): {
       };
     }
 
-    const membership = userOrgs.find((org) => org.org_id === selectedOrgId);
+    const membership = userOrgs.find((org: UserOrg) => org.org_id === selectedOrgId);
     const role = membership?.role || null;
     const isLocalCommander = role === "commander";
 
@@ -133,5 +134,5 @@ export function useOrgPermissions(): {
       role: null,
       isRootCommander: false,
     };
-  }, [userId, selectedOrgId, userOrgs, isRootCommander]);
+  }, [user?.id, selectedOrgId, userOrgs, isRootCommander]);
 }

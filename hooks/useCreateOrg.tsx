@@ -1,7 +1,7 @@
 // hooks/useCreateOrg.ts
+import { useAuth } from "@/contexts/AuthContext";
 import { useOrganizationSwitch } from "@/hooks/useOrganizationSwitch";
 import { useOrganizationsStore } from "@/store/organizationsStore";
-import { useAuth } from "@clerk/clerk-expo";
 import { useCallback, useState } from "react";
 
 interface UseCreateOrgOptions {
@@ -11,7 +11,7 @@ interface UseCreateOrgOptions {
 
 export default function useCreateOrg(options: UseCreateOrgOptions = {}) {
   const { parentId, autoSwitch = !parentId } = options;
-  const { userId } = useAuth();
+  const { user } = useAuth();
   const { createRootOrg, createChildOrg, fetchUserOrgs } =
     useOrganizationsStore();
   const { switchOrganization } = useOrganizationSwitch();
@@ -21,7 +21,7 @@ export default function useCreateOrg(options: UseCreateOrgOptions = {}) {
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const isLoaded = !!userId;
+  const isLoaded = !!user?.id;
   const canSubmit =
     Boolean(organizationName.trim()) && isLoaded && !isSubmitting;
 
@@ -29,7 +29,7 @@ export default function useCreateOrg(options: UseCreateOrgOptions = {}) {
     if (!organizationName.trim()) {
       throw new Error("Organization name cannot be empty.");
     }
-    if (!userId) {
+    if (!user?.id) {
       throw new Error("User not authenticated.");
     }
 
@@ -47,7 +47,7 @@ export default function useCreateOrg(options: UseCreateOrgOptions = {}) {
             parentId,
             description: description.trim() || undefined,
           },
-          userId
+          user?.id
         );
       } else {
         // Create root organization
@@ -57,7 +57,7 @@ export default function useCreateOrg(options: UseCreateOrgOptions = {}) {
             orgType: organizationType.trim() || "Organization",
             description: description.trim() || undefined,
           },
-          userId
+          user?.id
         );
       }
 
@@ -66,7 +66,7 @@ export default function useCreateOrg(options: UseCreateOrgOptions = {}) {
       }
 
       // Refresh user's org list
-      await fetchUserOrgs(userId);
+      await fetchUserOrgs(user?.id);
 
       // Conditionally switch to the new organization
       if (autoSwitch) {
@@ -89,25 +89,26 @@ export default function useCreateOrg(options: UseCreateOrgOptions = {}) {
     organizationName,
     organizationType,
     description,
-    userId,
-    parentId,
-    autoSwitch,
-    createRootOrg,
-    createChildOrg,
-    fetchUserOrgs,
-    switchOrganization,
-  ]);
+      user?.id,
+      parentId,
+      autoSwitch,
+      createRootOrg,
+      createChildOrg,
+      fetchUserOrgs,
+      switchOrganization,
+    ]);
 
-  return {
-    organizationName,
-    setOrganizationName,
-    organizationType,
-    setOrganizationType,
-    description,
-    setDescription,
-    isLoaded,
-    isSubmitting,
-    canSubmit,
-    createOrg,
-  };
-}
+    return {
+      organizationName,
+      setOrganizationName,
+      organizationType,
+      setOrganizationType,
+      description,
+      setDescription,
+      isLoaded,
+      isSubmitting,
+      canSubmit,
+      createOrg,
+    };
+  };  
+

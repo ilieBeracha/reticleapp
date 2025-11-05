@@ -1,7 +1,8 @@
 // hooks/useIsRootCommander.ts
-import { useMemo } from 'react';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@/contexts/AuthContext';
 import { useOrganizationsStore } from '@/store/organizationsStore';
+import { UserOrg } from '@/types/organizations';
+import { useMemo } from 'react';
 
 /**
  * Check if current user is commander of the ROOT organization
@@ -9,20 +10,20 @@ import { useOrganizationsStore } from '@/store/organizationsStore';
  * Use this for "overall admin" checks
  */
 export function useIsRootCommander(): boolean {
-  const { userId } = useAuth();
+  const { user } = useAuth();
   const { selectedOrgId, userOrgs } = useOrganizationsStore();
 
   return useMemo(() => {
-    if (!userId || !selectedOrgId) return false;
+    if (!user?.id || !selectedOrgId) return false;
 
     // Find the selected org
-    const selectedOrg = userOrgs.find(org => org.org_id === selectedOrgId);
+    const selectedOrg = userOrgs.find((org: UserOrg) => org.org_id === selectedOrgId);
     if (!selectedOrg) return false;
 
     // Find the root org of the selected org
-    const rootOrg = userOrgs.find(org => org.org_id === selectedOrg.root_id);
+    const rootOrg = userOrgs.find((org: UserOrg) => org.org_id === selectedOrg.root_id);
     
     // Check if user is commander of the ROOT
     return rootOrg?.role === 'commander';
-  }, [userId, selectedOrgId, userOrgs]);
+    }, [user?.id, selectedOrgId, userOrgs]);
 }

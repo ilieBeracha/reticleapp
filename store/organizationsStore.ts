@@ -8,7 +8,6 @@ import type {
   OrgTreeNode,
   UserOrg,
 } from "@/types/organizations";
-import { useAuth } from "@clerk/clerk-expo";
 import { create } from "zustand";
 
 interface OrganizationsStore {
@@ -24,12 +23,11 @@ interface OrganizationsStore {
   memberships: OrgMembership[] | null;
 
   // Actions
-  fetchUserOrgs: (userId: string) => Promise<void>;
-  fetchAllOrgs: (userId: string) => Promise<void>;
-  fetchOrgChildren: (orgId: string) => Promise<void>;
-  fetchOrgSubtree: (orgId: string) => Promise<void>;
-  fetchOrgTree: (rootId: string) => Promise<void>;
-  getUserId: () => string;
+  fetchUserOrgs: (userId: string, options?: { silent?: boolean }) => Promise<void>;
+  fetchAllOrgs: (userId: string, options?: { silent?: boolean }) => Promise<void>;
+  fetchOrgChildren: (orgId: string, options?: { silent?: boolean }) => Promise<void>;
+  fetchOrgSubtree: (orgId: string, options?: { silent?: boolean }) => Promise<void>;
+  fetchOrgTree: (rootId: string, options?: { silent?: boolean }) => Promise<void>;
 
   createRootOrg: (
     input: { name: string; orgType: string; description?: string },
@@ -79,15 +77,11 @@ export const useOrganizationsStore = create<OrganizationsStore>((set, get) => ({
   memberships: null,
   loading: false,
   error: null,
-  getUserId: () => {
-    const { userId } = useAuth();
-    if (!userId) throw new Error("Not authenticated");
-    return userId;
-  },
+  
   // Fetch user's organizations (memberships)
-  fetchUserOrgs: async (userId: string) => {
+  fetchUserOrgs: async (userId: string, options?: { silent?: boolean }) => {
     try {
-      set({ loading: true, error: null });
+      if (!options?.silent) set({ loading: true, error: null });
       const userOrgs = await OrganizationsService.getUserOrgs(userId);
       set({ userOrgs, loading: false });
     } catch (err: any) {
@@ -96,9 +90,9 @@ export const useOrganizationsStore = create<OrganizationsStore>((set, get) => ({
     }
   },
 
-  fetchAllOrgs: async (userId: string) => {
+  fetchAllOrgs: async (userId: string, options?: { silent?: boolean }) => {
     try {
-      set({ loading: true, error: null });
+      if (!options?.silent) set({ loading: true, error: null });
       const allOrgs = await OrganizationsService.getAllOrgs(userId);
       set({ allOrgs, loading: false });
     } catch (err: any) {
@@ -108,9 +102,9 @@ export const useOrganizationsStore = create<OrganizationsStore>((set, get) => ({
   },
 
   // Fetch children of an org
-  fetchOrgChildren: async (orgId: string) => {
+  fetchOrgChildren: async (orgId: string, options?: { silent?: boolean }) => {
     try {
-      set({ loading: true, error: null });
+      if (!options?.silent) set({ loading: true, error: null });
       const orgChildren = await OrganizationsService.getOrgChildren(orgId);
       set({ orgChildren, loading: false });
     } catch (err: any) {
@@ -120,9 +114,9 @@ export const useOrganizationsStore = create<OrganizationsStore>((set, get) => ({
   },
 
   // Fetch subtree of an org
-  fetchOrgSubtree: async (orgId: string) => {
+  fetchOrgSubtree: async (orgId: string, options?: { silent?: boolean }) => {
     try {
-      set({ loading: true, error: null });
+      if (!options?.silent) set({ loading: true, error: null });
       const orgSubtree = await OrganizationsService.getOrgSubtree(orgId);
       set({ orgSubtree, loading: false });
     } catch (err: any) {
@@ -132,9 +126,9 @@ export const useOrganizationsStore = create<OrganizationsStore>((set, get) => ({
   },
 
   // Fetch full tree
-  fetchOrgTree: async (rootId: string) => {
+  fetchOrgTree: async (rootId: string, options?: { silent?: boolean }) => {
     try {
-      set({ loading: true, error: null });
+      if (!options?.silent) set({ loading: true, error: null });
       const orgTree = await OrganizationsService.getOrgTree(rootId);
       set({ orgTree, loading: false });
     } catch (err: any) {
@@ -271,7 +265,8 @@ export const useOrganizationsStore = create<OrganizationsStore>((set, get) => ({
   setSelectedOrg: (orgId) => {
     set({ selectedOrgId: orgId });
     if (orgId) {
-      get().fetchOrgChildren(orgId);
+      // Silent fetch to avoid UI flicker while switching
+      get().fetchOrgChildren(orgId, { silent: true });
     }
   },
 
