@@ -73,12 +73,11 @@ export default function TabLayout() {
             }}
           />
 
-          {/* Calendar - Only shown if user has organization */}
+          {/* Training Calendar - Always shown */}
           <Tabs.Screen
             name="calendar"
             options={{
-              title: "Calendar",
-              href: isPersonalMode ? null : "/(protected)/(tabs)/calendar",
+              title: "Training",
               tabBarIcon: ({ color, focused }) => (
                 <Ionicons
                   name={focused ? "calendar" : "calendar-outline"}
