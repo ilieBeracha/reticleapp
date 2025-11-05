@@ -1,6 +1,5 @@
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { Session } from "@/types/database";
-import { useAuth } from "@clerk/clerk-expo";
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { ActivityChart } from "./ActivityChart";
@@ -18,7 +17,6 @@ export function LastRecap({
   loading,
   hasOrganization,
 }: LastRecapProps) {
-  const { orgId } = useAuth();
   const { selectedOrgId, allOrgs } = useOrganizationsStore();
 
   // Determine if we're in personal mode (no organization selected)

@@ -1,11 +1,11 @@
 import { useColors } from "@/hooks/useColors";
-import { useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useAuth } from "@/contexts/AuthContext";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import ProfileDropdown from "./ProfileDropdown";
 import { OrganizationSwitcherModal } from "./organization-switcher";
@@ -19,7 +19,7 @@ export default function Header({
   onNotificationPress,
   notificationCount = 0,
 }: HeaderProps) {
-  const { user } = useUser();
+  const { user } = useAuth();
   const { userOrgs, selectedOrgId } = useOrganizationsStore();
   const selectedOrg = userOrgs.find((org) => org.org_id === selectedOrgId);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -28,8 +28,8 @@ export default function Header({
   const colors = useColors();
 
   const userName =
-    user?.firstName ||
-    user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] ||
+    user?.user_metadata?.full_name ||
+    user?.email ||
     "User";
   const isPersonalMode = !selectedOrg;
 

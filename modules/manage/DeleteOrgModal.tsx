@@ -2,7 +2,7 @@ import BaseBottomSheet from "@/components/BaseBottomSheet";
 import { ThemedText } from "@/components/ThemedText";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { useOrganizationsStore } from "@/store/organizationsStore";
-import { useAuth } from "@clerk/clerk-expo";
+import { useAuth } from "@/contexts/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { Alert, StyleSheet, TouchableOpacity, View } from "react-native";
@@ -22,7 +22,8 @@ export function DeleteOrgModal({
   organizationId,
   organizationName,
 }: DeleteOrgModalProps) {
-  const { userId } = useAuth();
+  const { user } = useAuth();
+  const userId = user?.id;
   const { deleteOrg } = useOrganizationsStore();
 
   const [isDeleting, setIsDeleting] = useState(false);

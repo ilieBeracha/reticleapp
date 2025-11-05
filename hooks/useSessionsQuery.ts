@@ -1,7 +1,7 @@
+import { useAuth } from "@/contexts/AuthContext";
 import { getSessionsService } from "@/services/sessionService";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { Session } from "@/types/database";
-import { useAuth } from "@clerk/clerk-expo";
 import { useCallback, useEffect, useState } from "react";
 
 /**
@@ -35,7 +35,7 @@ import { useCallback, useEffect, useState } from "react";
  * ```
  */
 export function useSessionsQuery(trainingId?: string) {
-  const { userId } = useAuth();
+  const { user } = useAuth();
   const { selectedOrgId } = useOrganizationsStore();
 
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -43,7 +43,7 @@ export function useSessionsQuery(trainingId?: string) {
   const [error, setError] = useState<string | null>(null);
 
   const fetchSessions = useCallback(async () => {
-    if (!userId) {
+    if (!user?.id) {
       setError("Not authenticated");
       setLoading(false);
       return;
@@ -55,7 +55,7 @@ export function useSessionsQuery(trainingId?: string) {
 
       // Direct service call - no token passing needed
       const data = await getSessionsService(
-        userId,
+        user?.id,
         selectedOrgId || null,
         trainingId
       );
@@ -68,7 +68,7 @@ export function useSessionsQuery(trainingId?: string) {
     } finally {
       setLoading(false);
     }
-  }, [userId, selectedOrgId, trainingId]);
+    }, [user?.id, selectedOrgId, trainingId]);
 
   // Auto-fetch on mount and when dependencies change
   useEffect(() => {

@@ -1,7 +1,6 @@
 import { SignOutButton } from "@/components/SignOutButton";
 import { useColors } from "@/hooks/useColors";
 import { useThemeColor } from "@/hooks/useThemeColor";
-import { useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import {
   Modal,
@@ -11,6 +10,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ProfileMenuItem {
   icon: string;
@@ -92,11 +93,11 @@ export default function ProfileDropdown({
   onMenuAction,
 }: ProfileDropdownProps) {
   const colors = useColors();
-  const { user } = useUser();
+  const { user } = useAuth();
 
-  const userName = user?.fullName || "User";
+  const userName = user?.user_metadata?.full_name || "User";
   const userEmail =
-    user?.primaryEmailAddress?.emailAddress || "user@example.com";
+    user?.email || "user@example.com";
 
   const handleMenuAction = (action: string) => {
     onMenuAction(action);

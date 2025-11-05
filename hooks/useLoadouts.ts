@@ -1,7 +1,8 @@
+import { useAuth } from "@/contexts/AuthContext";
 import { getLoadoutsService } from "@/services/loadoutsService";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { LoadoutWithDetails } from "@/types/database";
-import { useAuth } from "@clerk/clerk-expo";
+
 import { useCallback, useEffect, useState } from "react";
 
 /**
@@ -10,7 +11,7 @@ import { useCallback, useEffect, useState } from "react";
  * @returns Loadouts data, loading state, error state, and refetch function
  */
 export function useLoadouts() {
-  const { userId } = useAuth();
+  const { user } = useAuth();
   const { selectedOrgId } = useOrganizationsStore();
 
   const [loadouts, setLoadouts] = useState<LoadoutWithDetails[]>([]);
@@ -18,7 +19,7 @@ export function useLoadouts() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchLoadouts = useCallback(async () => {
-    if (!userId) {
+    if (!user?.id) {
       setError("Not authenticated");
       setLoading(false);
       return;
@@ -28,7 +29,7 @@ export function useLoadouts() {
       setLoading(true);
       setError(null);
 
-      const data = await getLoadoutsService(userId, selectedOrgId);
+      const data = await getLoadoutsService(user?.id, selectedOrgId);
       setLoadouts(data);
     } catch (err: any) {
       console.error("Error fetching loadouts:", err);
@@ -37,7 +38,7 @@ export function useLoadouts() {
     } finally {
       setLoading(false);
     }
-  }, [userId, selectedOrgId]);
+  }, [user?.id, selectedOrgId]);
 
   useEffect(() => {
     fetchLoadouts();

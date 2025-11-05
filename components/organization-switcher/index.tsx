@@ -1,11 +1,11 @@
 import BaseBottomSheet from "@/components/BaseBottomSheet";
 import { CreateOrgModal } from "@/components/CreateOrg";
 import { SwitcherHeader } from "@/components/SwitcherHeader";
+import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { useOrganizationSwitch } from "@/hooks/useOrganizationSwitch";
 import { useOrgPermissions } from "@/hooks/useOrgPermissions";
 import { useOrganizationsStore } from "@/store/organizationsStore";
-import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -31,8 +31,7 @@ export function OrganizationSwitcherModal({
   visible,
   onClose,
 }: OrganizationSwitcherModalProps) {
-  const { user } = useUser();
-  const { userId } = useAuth();
+  const { user } = useAuth();
 
   const {
     userOrgs,
@@ -73,15 +72,15 @@ export function OrganizationSwitcherModal({
     : null;
 
   useEffect(() => {
-    if (visible && userId) {
-      fetchUserOrgs(userId);
-      fetchAllOrgs(userId);
+    if (visible && user?.id) {
+      fetchUserOrgs(user?.id);
+      fetchAllOrgs(user?.id);
       if (selectedOrgId) {
         fetchOrgChildren(selectedOrgId);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, userId, selectedOrgId]);
+  }, [visible, user?.id, selectedOrgId]);
 
   const handleSwitch = async (
     organizationId: string | null,
@@ -91,7 +90,7 @@ export function OrganizationSwitcherModal({
     await switchOrganization(organizationId, organizationName);
   };
 
-  const userName = user?.fullName || user?.firstName || "Personal";
+  const userName = user?.user_metadata?.full_name || "Personal";
 
   // All orgs for search/list
   const allUserOrgs = [
@@ -307,9 +306,9 @@ export function OrganizationSwitcherModal({
         visible={createOrgVisible}
         onClose={() => setCreateOrgVisible(false)}
         onSuccess={() => {
-          if (userId) {
-            fetchUserOrgs(userId);
-            fetchAllOrgs(userId);
+          if (user?.id) {
+            fetchUserOrgs(user?.id);
+            fetchAllOrgs(user?.id);
             if (selectedOrgId) fetchOrgChildren(selectedOrgId);
           }
         }}

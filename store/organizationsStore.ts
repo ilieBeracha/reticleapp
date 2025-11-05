@@ -8,7 +8,6 @@ import type {
   OrgTreeNode,
   UserOrg,
 } from "@/types/organizations";
-import { useAuth } from "@clerk/clerk-expo";
 import { create } from "zustand";
 
 interface OrganizationsStore {
@@ -29,7 +28,6 @@ interface OrganizationsStore {
   fetchOrgChildren: (orgId: string) => Promise<void>;
   fetchOrgSubtree: (orgId: string) => Promise<void>;
   fetchOrgTree: (rootId: string) => Promise<void>;
-  getUserId: () => string;
 
   createRootOrg: (
     input: { name: string; orgType: string; description?: string },
@@ -79,11 +77,7 @@ export const useOrganizationsStore = create<OrganizationsStore>((set, get) => ({
   memberships: null,
   loading: false,
   error: null,
-  getUserId: () => {
-    const { userId } = useAuth();
-    if (!userId) throw new Error("Not authenticated");
-    return userId;
-  },
+  
   // Fetch user's organizations (memberships)
   fetchUserOrgs: async (userId: string) => {
     try {

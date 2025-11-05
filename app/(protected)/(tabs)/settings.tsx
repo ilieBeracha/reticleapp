@@ -1,7 +1,7 @@
 import { ThemedView } from "@/components/ThemedView";
+import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { useColorScheme } from "@/hooks/useColorScheme";
-import { useEnhancedAuth } from "@/hooks/useEnhancedAuth";
 import { Ionicons } from "@expo/vector-icons";
 import {
   Linking,
@@ -17,8 +17,8 @@ export default function Settings() {
   const colors = useColors();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
-  const { userId } = useEnhancedAuth();
-  if (!userId) {
+  const { user } = useAuth();
+  if (!user?.id || !user?.user_metadata?.avatar_url) {
     return null;
   }
   return (

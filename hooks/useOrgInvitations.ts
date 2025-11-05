@@ -1,5 +1,6 @@
-import { useOrganization } from "@clerk/clerk-expo";
-
+import { useAuth } from "@/contexts/AuthContext";
+import { useOrganizationsStore } from "@/store/organizationsStore";
+import { OrgMembership } from "@/types/organizations";
 export interface OrganizationInvitation {
   id: string;
   emailAddress: string;
@@ -10,44 +11,8 @@ export interface OrganizationInvitation {
 }
 
 export function useOrgInvitations() {
-  const { invitations, isLoaded } = useOrganization({
-    invitations: {
-      pageSize: 50,
-      keepPreviousData: true,
-    },
-  });
+  const { user } = useAuth();
+  const memberships =  useOrganizationsStore.getState().fetchMemberships(user?.id ?? "");
 
-  const pendingInvitations =
-    invitations?.data?.filter((inv) => inv.status === "pending") || [];
-
-  const refetch = async () => {
-    if (invitations?.revalidate) {
-      await invitations.revalidate();
-    }
-  };
-
-  const revokeInvitation = async (invitationId: string) => {
-    try {
-      // Find the invitation to revoke
-      const invitation = invitations?.data?.find(
-        (inv) => inv.id === invitationId
-      );
-      if (invitation?.revoke) {
-        await invitation.revoke();
-        await refetch();
-      } else {
-        throw new Error("Cannot revoke invitation");
-      }
-    } catch (error) {
-      console.error("Error revoking invitation:", error);
-      throw error;
-    }
-  };
-
-  return {
-    pendingInvitations,
-    loading: !isLoaded,
-    refetch,
-    revokeInvitation,
-  };
+  return memberships?.then((memberships: OrgMembership[] | null) => memberships?.filter((membership: OrgMembership) => membership.role === "member") || []);
 }

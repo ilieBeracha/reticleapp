@@ -1,23 +1,19 @@
 // hooks/useEnsureActiveOrg.ts
+import { useAuth } from "@/contexts/AuthContext";
 import { useOrganizationsStore } from "@/store/organizationsStore";
-import { useAuth } from "@clerk/clerk-expo";
-import { useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
 
 export function useEnsureActiveOrg() {
-  const { userId, isLoaded: authLoaded } = useAuth();
-  const { userOrgs, selectedOrgId, fetchUserOrgs, setSelectedOrg } =
-    useOrganizationsStore();
-  const router = useRouter();
-  const segments = useSegments();
+  const { user, loading } = useAuth();
+  const { userOrgs, selectedOrgId, fetchUserOrgs } = useOrganizationsStore();
 
   useEffect(() => {
-    if (!authLoaded || !userId) return;
+    if (!user?.id || loading) return;
 
     const checkOrg = async () => {
       // Fetch user's organizations if not loaded
       if (userOrgs.length === 0) {
-        await fetchUserOrgs(userId);
+        await fetchUserOrgs(user?.id);
       }
 
       // Optional: Redirect to org selection if user has no orgs
@@ -27,5 +23,5 @@ export function useEnsureActiveOrg() {
     };
 
     checkOrg();
-  }, [authLoaded, userId, selectedOrgId, userOrgs.length]);
+  }, [user?.id, loading, userOrgs, fetchUserOrgs]);
 }

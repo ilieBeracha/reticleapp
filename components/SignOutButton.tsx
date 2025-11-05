@@ -1,34 +1,28 @@
-import { useClerk } from "@clerk/clerk-expo";
-import * as Linking from "expo-linking";
+
+import { supabase } from "@/lib/supabase";
+import { router } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity } from "react-native";
 
 export const SignOutButton = () => {
-  const { signOut } = useClerk();
-
   const handleSignOut = async () => {
     try {
-      await signOut();
-      Linking.openURL(Linking.createURL("/auth/sign-in"));
+      await supabase.auth.signOut();  
+      router.replace("/auth/sign-in");
     } catch (err) {
-      console.error(JSON.stringify(err, null, 2));
-    }
-  };
+    console.error(JSON.stringify(err, null, 2));
+  }
+};
 
-  return (
-    <TouchableOpacity onPress={handleSignOut} style={styles.button}>
-      <Text style={styles.buttonText}>Sign out</Text>
-    </TouchableOpacity>
-  );
+return (
+  <TouchableOpacity onPress={handleSignOut}>
+    <Text style={styles.text}>Sign out</Text>
+  </TouchableOpacity>
+);
 };
 
 const styles = StyleSheet.create({
-  button: {
-    backgroundColor: "transparent",
-    padding: 18,
-    borderRadius: 5,
-  },
-  buttonText: {
+  text: {
     color: "red",
     fontWeight: "600",
   },
-});
+  });

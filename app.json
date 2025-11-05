@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "clerk-scope-ui",
-    "slug": "clerk-scope-ui",
+    "name": "Reticle",
+    "slug": "reticle",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "clerkscopeui",
+    "scheme": "reticle",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/images/brand.png",
@@ -14,7 +14,7 @@
     },
     "newArchEnabled": true,
     "ios": {
-      "bundleIdentifier": "com.clerk.scopeui",
+      "bundleIdentifier": "com.reticle.app",
       "supportsTablet": true,
       "icon": "./assets/images/icon-1760977067249.png",
       "infoPlist": {
@@ -31,7 +31,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.clerk.scopeui",
+      "package": "com.reticle.app",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
@@ -70,9 +70,7 @@
     },
     "extra": {
       "router": {},
-      "eas": {
-        "projectId": "e25d242b-1bfa-4545-9e54-8b306affb0b3"
-      }
+      
     },
     "runtimeVersion": {
       "policy": "appVersion"

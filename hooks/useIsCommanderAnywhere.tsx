@@ -1,6 +1,6 @@
 // hooks/useIsCommanderAnywhere.ts
+import { useAuth } from "@/contexts/AuthContext";
 import { useOrganizationsStore } from "@/store/organizationsStore";
-import { useAuth } from "@clerk/clerk-expo";
 import { useMemo } from "react";
 
 /**
@@ -8,11 +8,11 @@ import { useMemo } from "react";
  * Useful for showing "admin features" globally
  */
 export function useIsCommanderAnywhere(): boolean {
-  const { userId } = useAuth();
+  const { user } = useAuth();
   const { userOrgs } = useOrganizationsStore();
 
   return useMemo(() => {
-    if (!userId) return false;
+    if (!user?.id) return false;
     return userOrgs.some((org) => org.role === "commander");
-  }, [userId, userOrgs]);
+  }, [user?.id, userOrgs]);
 }

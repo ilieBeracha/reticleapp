@@ -1,8 +1,9 @@
 import BaseBottomSheet from "@/components/BaseBottomSheet";
+import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { useOrganizationsStore } from "@/store/organizationsStore";
 import { sessionsStore } from "@/store/sessionsStore";
 import { DayPeriod, SessionType } from "@/types/database";
-import { useAuth } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import {
@@ -26,8 +27,9 @@ export default function CreateSessionModal({
   onClose,
 }: CreateSessionModalProps) {
   const colors = useColors();
-  const { userId, orgId } = useAuth();
-
+  const { user } = useAuth();
+  const { selectedOrgId, allOrgs } = useOrganizationsStore();  
+  const selectedOrg = allOrgs.find((o) => o.id === selectedOrgId);
   // Use Zustand store directly
   const { createSession, fetchSessions } = useStore(sessionsStore);
 
@@ -56,7 +58,7 @@ export default function CreateSessionModal({
       return;
     }
 
-    if (!userId) {
+    if (!user?.id) {
       Alert.alert("Error", "Authentication error");
       return;
     }
@@ -70,14 +72,14 @@ export default function CreateSessionModal({
           session_type: sessionType,
           day_period: dayPeriod,
         },
-        userId,
-        orgId
+        user?.id,
+        selectedOrgId
       );
       console.log("session", session);
       // Refetch sessions based on current context
       // - If in org: fetches all team sessions
       // - If personal: fetches all user's sessions
-      await fetchSessions(userId, orgId);
+      await fetchSessions(user?.id, selectedOrgId);
 
       Alert.alert("Success", "Session created successfully!");
       handleClose();

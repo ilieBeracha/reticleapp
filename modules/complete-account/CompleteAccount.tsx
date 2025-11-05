@@ -1,20 +1,19 @@
 import { useColors } from "@/hooks/useColors";
-import { StyleSheet, View, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
+import { useForm } from "react-hook-form";
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useUser } from "@clerk/clerk-expo";
 import { AccountForm } from "./AccountForm";
 import { FormHeader } from "./FormHeader";
-import { useAccountCompletion } from "./useAccountCompletion";
 
 export function CompleteAccount() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
-  const { user } = useUser();
 
-  const { control, handleSubmit, onSubmit, isLoading } = useAccountCompletion();
+  const { control, handleSubmit } = useForm();
 
-  // For OAuth users (already signed in), don't show username field
-  const showUsername = !user;
+  const onSubmit = async (data: any) => {
+    console.log(data);
+  };
 
   return (
     <KeyboardAvoidingView
@@ -36,9 +35,7 @@ export function CompleteAccount() {
           <FormHeader />
           <AccountForm
             control={control}
-            onSubmit={handleSubmit(onSubmit)}
-            isLoading={isLoading}
-            showUsername={showUsername}
+            onSubmit={() => handleSubmit(onSubmit)}
           />
         </View>
       </ScrollView>

@@ -1,38 +1,23 @@
 import { useColors } from "@/hooks/useColors";
-import { useSSO, useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
-import * as AuthSession from "expo-auth-session";
-import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Platform,
   StyleSheet,
   Text,
-  TouchableOpacity,
+  TouchableOpacity
 } from "react-native";
 
 const SocialLoginButton = ({
   strategy,
+  onPress,
 }: {
   strategy: "facebook" | "google" | "apple";
+  onPress: () => void | Promise<void>;
 }) => {
-  const getStrategy = () => {
-    if (strategy === "facebook") {
-      return "oauth_facebook";
-    } else if (strategy === "google") {
-      return "oauth_google";
-    } else if (strategy === "apple") {
-      return "oauth_apple";
-    }
-    return "oauth_facebook";
-  };
 
-  const { startSSOFlow } = useSSO();
-  const { user } = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const colors = useColors();
-  const router = useRouter();
 
   const getButtonConfig = () => {
     const configs = {
@@ -59,75 +44,17 @@ const SocialLoginButton = ({
   };
 
   const config = getButtonConfig();
-
-  const onSocialLoginPress = React.useCallback(async () => {
+  
+  const handlePress = async () => {
     try {
       setIsLoading(true);
-      const redirectUrl =
-        Platform.OS === "web"
-          ? window.location.origin
-          : AuthSession.makeRedirectUri({ scheme: "scopeuinativeclerk" });
-
-      const { createdSessionId, signIn, signUp, setActive } =
-        await startSSOFlow({
-          strategy: getStrategy(),
-          redirectUrl,
-        });
-
-      console.log("createdSessionId", createdSessionId);
-      console.log("signIn", signIn);
-      console.log("signUp", signUp);
-      console.log("setActive", setActive);
-
-      // Existing user with complete profile
-      if (createdSessionId) {
-        await setActive!({
-          session: createdSessionId,
-        });
-        router.replace("/(protected)/(tabs)");
-        return;
-      }
-
-      // New user signup - needs to complete profile
-      if (signUp) {
-        console.log("🆕 New user via Google OAuth");
-
-        // Check if signup has missing requirements
-        if (
-          signUp.status === "missing_requirements" ||
-          signUp.missingFields?.length > 0
-        ) {
-          console.log("Missing fields:", signUp.missingFields);
-          // Redirect to complete account page where user will provide username
-          router.replace("/auth/complete-your-account");
-          return;
-        }
-
-        // If signup is complete, set the session
-        if (signUp.createdSessionId) {
-          await setActive!({ session: signUp.createdSessionId });
-          router.replace("/(protected)/(tabs)");
-          return;
-        }
-      }
-
-      // Existing user trying to sign in
-      if (signIn) {
-        console.log("🔐 Existing user sign-in");
-        if (signIn.createdSessionId) {
-          await setActive!({ session: signIn.createdSessionId });
-          router.replace("/(protected)/(tabs)");
-          return;
-        }
-      }
-
-      console.warn("Unexpected OAuth flow state");
-    } catch (err) {
-      console.error(JSON.stringify(err, null, 2));
+      await onPress();
+    } catch (error: any) {
+      console.error('Social login button error:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [startSSOFlow]);
+  };
 
   return (
     <TouchableOpacity
@@ -138,7 +65,7 @@ const SocialLoginButton = ({
           borderColor: colors.border,
         },
       ]}
-      onPress={onSocialLoginPress}
+      onPress={handlePress}
       disabled={isLoading}
       activeOpacity={0.7}
     >

@@ -1,5 +1,5 @@
+import { useAuth } from "@/contexts/AuthContext";
 import { useOrganizationsStore } from "@/store/organizationsStore";
-import { useAuth } from "@clerk/clerk-expo";
 import { useMemo } from "react";
 import { useIsRootCommander } from "./useIsRootCommander";
 
@@ -17,13 +17,13 @@ export function useOrgPermissions(): {
   canRemoveMembers: boolean;
   canEditMembers: boolean;
 } {
-  const { userId } = useAuth();
+  const { user } = useAuth();
   const { selectedOrgId, userOrgs } = useOrganizationsStore();
   const isRootCommander = useIsRootCommander();
 
   return useMemo(() => {
     // Personal mode - can do everything for self
-    if (!userId || !selectedOrgId) {
+    if (!user?.id || !selectedOrgId) {
       return {
         canViewOrg: false,
         canEditOrg: false,
@@ -133,5 +133,5 @@ export function useOrgPermissions(): {
       role: null,
       isRootCommander: false,
     };
-  }, [userId, selectedOrgId, userOrgs, isRootCommander]);
+  }, [user?.id, selectedOrgId, userOrgs, isRootCommander]);
 }

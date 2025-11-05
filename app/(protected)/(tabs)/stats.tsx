@@ -1,5 +1,6 @@
 import FilterModal from "@/components/FilterModal";
 import { ThemedView } from "@/components/ThemedView";
+import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { CircularProgress } from "@/modules/stats/CircularProgress";
 import { GoalsCard } from "@/modules/stats/GoalsCard";
@@ -9,15 +10,13 @@ import { StatsHeader } from "@/modules/stats/StatsHeader";
 import { TimeAnalysis } from "@/modules/stats/TimeAnalysis";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { sessionsStore } from "@/store/sessionsStore";
-import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useStore } from "zustand";
 
 export default function Stats() {
   const colors = useColors();
-  const { userId } = useAuth();
-  const { user } = useUser();
+  const { user } = useAuth();
   const { selectedOrgId, allOrgs } = useOrganizationsStore();
   const { sessions, fetchSessions } = useStore(sessionsStore);
   const [filterVisible, setFilterVisible] = useState(false);
@@ -26,8 +25,8 @@ export default function Stats() {
   const isPersonalMode = selectedOrgId === null;
   const selectedOrg = allOrgs.find((o) => o.id === selectedOrgId);
   const userName =
-    user?.firstName ||
-    user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] ||
+    user?.user_metadata?.full_name ||
+    user?.email ||
     "User";
 
   const handleOpenFilters = () => {
@@ -41,10 +40,10 @@ export default function Stats() {
 
   // Fetch sessions on mount and when org changes
   useEffect(() => {
-    if (userId) {
-      fetchSessions(userId, selectedOrgId);
+    if (user?.id) {
+      fetchSessions(user?.id, selectedOrgId);
     }
-  }, [userId, selectedOrgId, fetchSessions]);
+  }, [user?.id, selectedOrgId, fetchSessions]);
 
   // Calculate metrics from sessions
   const totalSessions = sessions.length;
@@ -134,7 +133,7 @@ export default function Stats() {
 
           {/* Member Comparison (Org only) */}
           {!isPersonalMode && (
-            <MemberComparison currentUserId={userId || undefined} />
+            <MemberComparison currentUserId={user?.id || undefined} />
           )}
         </ScrollView>
       </ThemedView>

@@ -1,7 +1,7 @@
+import { useAuth } from "@/contexts/AuthContext";
 import { getTrainingsService } from "@/services/trainingService";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { Training } from "@/types/database";
-import { useAuth } from "@clerk/clerk-expo";
 import { useCallback, useEffect, useState } from "react";
 
 /**
@@ -34,7 +34,7 @@ import { useCallback, useEffect, useState } from "react";
  * ```
  */
 export function useTrainings() {
-  const { userId } = useAuth();
+  const { user } = useAuth();
   const { selectedOrgId } = useOrganizationsStore();
 
   const [trainings, setTrainings] = useState<Training[]>([]);
@@ -42,7 +42,7 @@ export function useTrainings() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchTrainings = useCallback(async () => {
-    if (!userId) {
+    if (!user?.id) {
       setError("Not authenticated");
       setLoading(false);
       return;
@@ -53,7 +53,7 @@ export function useTrainings() {
       setError(null);
 
       // Direct service call - no token passing needed
-      const data = await getTrainingsService(userId, selectedOrgId || null);
+      const data = await getTrainingsService(user?.id, selectedOrgId || null);
 
       setTrainings(data);
     } catch (err: any) {
@@ -63,7 +63,7 @@ export function useTrainings() {
     } finally {
       setLoading(false);
     }
-  }, [userId, selectedOrgId]);
+  }, [user?.id, selectedOrgId]);
 
   // Auto-fetch on mount and when dependencies change
   useEffect(() => {

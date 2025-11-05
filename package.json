@@ -1,5 +1,5 @@
 {
-  "name": "scope-ui-native-clerk",
+  "name": "reticle",
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
@@ -11,8 +11,6 @@
     "lint": "expo lint"
   },
   "dependencies": {
-    "@clerk/clerk-expo": "^2.16.3",
-    "@clerk/themes": "^2.4.27",
     "@expo/vector-icons": "^15.0.2",
     "@gluestack-ui/core": "^3.0.10",
     "@gorhom/bottom-sheet": "^5.2.6",
@@ -25,13 +23,13 @@
     "@react-aria/radio": "^3.12.2",
     "@react-aria/utils": "^3.31.0",
     "@react-aria/visually-hidden": "^3.8.28",
-    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-native-async-storage/async-storage": "^1.24.0",
     "@react-native-picker/picker": "2.11.1",
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/drawer": "^7.5.0",
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
-    "@supabase/supabase-js": "^2.75.0",
+    "@supabase/supabase-js": "^2.79.0",
     "expo": "54.0.20",
     "expo-auth-session": "~7.0.8",
     "expo-blur": "~15.0.7",

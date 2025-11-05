@@ -1,6 +1,6 @@
+import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { useOrganizationsStore } from "@/store/organizationsStore";
-import { useAuth } from "@clerk/clerk-expo";
 import { useCallback, useState } from "react";
   
 export type OrgRole =
@@ -16,7 +16,7 @@ interface InviteOptions {
 
 export function useInviteOrg() {
   const { selectedOrgId, allOrgs } = useOrganizationsStore();
-  const { userId } = useAuth();
+  const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [emailAddress, setEmailAddress] = useState("");
   const [selectedRole, setSelectedRole] = useState<OrgRole>("soldier");
@@ -41,7 +41,7 @@ export function useInviteOrg() {
         throw new Error("No active organization");
       }
 
-      if (!userId) {
+      if (!user?.id) {
         throw new Error("User not authenticated");
       }
 
@@ -67,7 +67,7 @@ export function useInviteOrg() {
             organizationId: selectedOrgId,
             organizationName: currentOrg.name,
             role: dbRole,
-            invitedBy: userId,
+            invitedBy: user?.id,
           },
         });
         if (error) throw new Error(error.message);
@@ -79,7 +79,7 @@ export function useInviteOrg() {
         setIsSubmitting(false);
       }
     },
-    [emailAddress, selectedRole, selectedOrgId, userId, allOrgs]
+    [emailAddress, selectedRole, selectedOrgId, user?.id, allOrgs]
   );
 
   return {

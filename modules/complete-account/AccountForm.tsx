@@ -3,25 +3,20 @@ import TextInput from "@/components/TextInput";
 import { useColors } from "@/hooks/useColors";
 import { Control } from "react-hook-form";
 import {
-  ActivityIndicator,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 
 interface AccountFormProps {
   control: Control<any>;
   onSubmit: () => void;
-  isLoading: boolean;
-  showUsername?: boolean;
 }
 
 export function AccountForm({
   control,
   onSubmit,
-  isLoading,
-  showUsername = true,
 }: AccountFormProps) {
   const colors = useColors();
 
@@ -34,16 +29,6 @@ export function AccountForm({
         required
         name="full_name"
       />
-
-      {showUsername && (
-        <TextInput
-          placeholder="Enter your username"
-          control={control}
-          label="Username"
-          required
-          name="username"
-        />
-      )}
 
       <RadioButtonInput
         control={control}
@@ -63,16 +48,13 @@ export function AccountForm({
           styles.button,
           {
             backgroundColor: colors.indigo,
-            opacity: isLoading ? 0.7 : 1,
           },
         ]}
         onPress={onSubmit}
-        disabled={isLoading}
         activeOpacity={0.8}
       >
-        {isLoading && <ActivityIndicator size="small" color="white" />}
         <Text style={styles.buttonText}>
-          {isLoading ? "Completing..." : "Complete Account"}
+          Complete Account
         </Text>
       </TouchableOpacity>
     </View>
