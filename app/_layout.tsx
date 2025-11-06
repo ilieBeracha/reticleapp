@@ -27,8 +27,6 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [loaded]);
-
-  
  
 
   return <RootLayoutInner />;

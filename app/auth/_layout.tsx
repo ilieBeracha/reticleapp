@@ -8,12 +8,13 @@ export default function AuthRoutesLayout() {
 
   // If already authenticated, send user to the app
   useEffect(() => {
-    if (loading) return;
     if (user) {
       router.replace("/(protected)/(tabs)");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  if (loading) return null;
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
