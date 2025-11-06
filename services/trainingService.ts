@@ -30,7 +30,7 @@ export async function getTrainingsService(
     // Context-based filtering
     if (orgId) {
       // IN ORGANIZATION: Get all team trainings from this org
-      query = query.eq("organization_id", orgId);
+      query = query.eq("org_id", orgId);
     } else {
       // IN PERSONAL: Get all MY trainings across all orgs
       query = query.eq("created_by", userId);
@@ -66,7 +66,7 @@ export async function createTrainingService(
       .from("trainings")
       .insert({
         ...input,
-        organization_id: orgId,
+        org_id: orgId,
         created_by: userId,
       })
       .select()

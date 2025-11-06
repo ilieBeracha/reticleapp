@@ -181,14 +181,18 @@ export function PreviewPage({
         {/* Draggable Bottom Sheet Form (after confirmation) */}
         {isConfirmed && (
           <BottomSheet
-            index={1}
-            snapPoints={["50%", "60%"] as unknown as string[]}
+            index={0}
+            snapPoints={["90%"]}
             onChange={setSheetIndex}
-            enablePanDownToClose={false}
+            enablePanDownToClose={true}
             handleIndicatorStyle={{ backgroundColor: colors.border }}
             backgroundStyle={{
               backgroundColor: colors.cardBackground,
               borderRadius: 16,
+            }}
+            style={{
+              zIndex: 9999,
+              elevation: 9999,
             }}
           >
             <BottomSheetScrollView

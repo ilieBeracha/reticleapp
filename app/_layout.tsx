@@ -28,6 +28,7 @@ export default function RootLayout() {
     }
   }, [loaded]);
 
+  
  
 
   return <RootLayoutInner />;

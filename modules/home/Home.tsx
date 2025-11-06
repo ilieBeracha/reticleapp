@@ -1,11 +1,12 @@
 // components/Home.tsx
 import { ThemedView } from "@/components/ThemedView";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEnsureActiveOrg } from "@/hooks/useEnsureActiveOrg";
+import { useColors } from "@/hooks/ui/useColors";
 import { useThemeColor } from "@/hooks/ui/useThemeColor";
+import { useEnsureActiveOrg } from "@/hooks/useEnsureActiveOrg";
 import { useOrganizationSwitchStore } from "@/store/organizationSwitchStore";
 import { useOrganizationsStore } from "@/store/organizationsStore"; // ✅ New import
-import { sessionsStore } from "@/store/sessionsStore";
+import { sessionStatsStore } from "@/store/sessionsStore";
 import { Organization } from "@/types/organizations";
 import { useEffect, useRef } from "react";
 import { Animated, ScrollView, StyleSheet } from "react-native";
@@ -17,12 +18,13 @@ import { Stats } from "./Stats";
 export function Home() {
   useEnsureActiveOrg();
   const { user } = useAuth();
+  const colors = useColors();
 
   // ✅ Use new organizations store instead of Clerk
   const { selectedOrgId, allOrgs, fetchUserOrgs, fetchAllOrgs } =
     useOrganizationsStore();
 
-  const { sessions, loading, fetchSessions } = useStore(sessionsStore);
+  const { sessions, loading } = useStore(sessionStatsStore);
   const { isSwitching } = useStore(useOrganizationSwitchStore);
 
   const backgroundColor = useThemeColor({}, "background");
@@ -61,7 +63,7 @@ export function Home() {
       console.log("Switch started - hiding content and clearing sessions");
       fadeAnim.setValue(0);
       slideAnim.setValue(20);
-      sessionsStore.getState().resetSessions();
+      sessionStatsStore.getState().resetSessions();
     }
 
     /**
@@ -98,7 +100,7 @@ export function Home() {
 
       if (user?.id) {
         console.log("Fetching sessions for orgId:", selectedOrgId); // ✅ Use hierarchy org
-        fetchSessions(user?.id, selectedOrgId); // ✅ Pass hierarchy org ID
+        sessionStatsStore.getState().fetchSessions(user?.id, selectedOrgId); // ✅ Pass hierarchy org ID
       }
     };
     loadSessions();
@@ -147,6 +149,8 @@ export function Home() {
         >
           <GreetingSection
             isPersonalWorkspace={isPersonalWorkspace}
+            userName={userName}
+            organizationName={organizationName}
           />
 
           <Stats sessionsCount={sessions.length} />

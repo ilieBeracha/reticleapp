@@ -7,7 +7,7 @@ import { SignInHeader } from "./SignInHeader";
 import { SocialButtons } from "./SocialButtons";
 
 interface SignInProps {
-  inviteCode?: string;
+  inviteCode: string | undefined;
 }
 
 export function SignIn({ inviteCode }: SignInProps) {
@@ -15,9 +15,7 @@ export function SignIn({ inviteCode }: SignInProps) {
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    // Store invite code to use after successful authentication
     if (inviteCode) {
-      console.log("Storing invite code for post-auth:", inviteCode);
       AsyncStorage.setItem("pending_invite_code", inviteCode);
     }
   }, [inviteCode]);

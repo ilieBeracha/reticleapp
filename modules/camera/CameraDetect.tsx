@@ -7,11 +7,12 @@ import { router } from "expo-router";
 import { RefObject, useEffect, useRef, useState } from "react";
 import { Alert, StatusBar } from "react-native";
 
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { CameraPage, LoadingView, PermissionView } from "./CameraPage";
 import { PreviewPage } from "./PreviewPage";
-import { ResultsPage } from "./ResultsPage";
+import { ResultsBottomSheet } from "./ResultsBottomSheet";
 
-type Page = "camera" | "preview" | "results";
+type Page = "camera" | "preview";
 
 export function CameraDetect() {
   // --- Theme
@@ -27,6 +28,7 @@ export function CameraDetect() {
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [isOpeningMediaLibrary, setIsOpeningMediaLibrary] = useState(false);
+  const [showResults, setShowResults] = useState(false);
 
   // --- Detection store
   const {
@@ -120,7 +122,7 @@ export function CameraDetect() {
         setBulletCount(sessionData.bulletCount);
       }
       await detect(capturedPhoto);
-      setCurrentPage("results");
+      setShowResults(true);
     } catch {
       Alert.alert(
         "Detection Failed",
@@ -132,7 +134,17 @@ export function CameraDetect() {
   const resetToCamera = () => {
     setCapturedPhoto(null);
     setCurrentPage("camera");
+    setShowResults(false);
     useDetectionStore.getState().clearDetections();
+  };
+
+  const handleCloseResults = () => {
+    setShowResults(false);
+  };
+
+  const handleEditCount = () => {
+    setShowResults(false);
+    // Stay on preview page
   };
 
   const handleClose = () => {
@@ -167,7 +179,7 @@ export function CameraDetect() {
   }
 
   return (
-    <>
+    <GestureHandlerRootView style={{ flex: 1, width: "100%", height: "100%" }}>
       <StatusBar
         barStyle="light-content"
         translucent
@@ -196,17 +208,20 @@ export function CameraDetect() {
         />
       )}
 
-      {currentPage === "results" && capturedPhoto && (
-        <ResultsPage
+      {/* Results Bottom Sheet - Shows over camera/preview */}
+      {capturedPhoto && (
+        <ResultsBottomSheet
+          visible={showResults}
           photoUri={capturedPhoto}
           annotatedImageBase64={annotatedImageBase64}
           hits={detections.length}
           bulletCount={bulletCount}
-          onEditCount={() => setCurrentPage("preview")}
+          onEditCount={handleEditCount}
           onNewScan={resetToCamera}
+          onClose={handleCloseResults}
           isLoading={isDetecting}
         />
       )}
-    </>
+    </GestureHandlerRootView>
   );
 }

@@ -17,22 +17,29 @@ export function CurrentLocationCard({
 }: CurrentLocationCardProps) {
   const colors = useColors();
 
+  // Use different colors for personal vs organization
+  const locationColor = isPersonal ? colors.teal : colors.indigo;
+
   return (
     <View
       style={[
         styles.container,
         {
-          backgroundColor: colors.indigo + "12",
-          borderColor: colors.indigo + "30",
+          backgroundColor: locationColor + "12",
+          borderColor: locationColor + "30",
         },
       ]}
     >
       <View style={styles.header}>
-        <View style={[styles.iconBox, { backgroundColor: colors.indigo }]}>
-          <Ionicons name="location-sharp" size={18} color="#FFFFFF" />
+        <View style={[styles.iconBox, { backgroundColor: locationColor }]}>
+          <Ionicons 
+            name={isPersonal ? "person" : "location-sharp"} 
+            size={18} 
+            color="#FFFFFF" 
+          />
         </View>
         <Text style={[styles.label, { color: colors.text }]}>
-          Current Location
+          {isPersonal ? "Personal Workspace" : "Current Location"}
         </Text>
       </View>
       <Text style={[styles.name, { color: colors.text }]}>{name}</Text>
@@ -43,20 +50,20 @@ export function CurrentLocationCard({
               styles.metaBadge,
               {
                 backgroundColor:
-                  role === "commander" ? "#f59e0b20" : colors.indigo + "20",
+                  role === "commander" ? colors.purple + "20" : locationColor + "20",
               },
             ]}
           >
             <Ionicons
               name={role === "commander" ? "shield-checkmark" : "person-outline"}
               size={13}
-              color={role === "commander" ? "#f59e0b" : colors.indigo}
+              color={role === "commander" ? colors.purple : locationColor}
             />
             <Text
               style={[
                 styles.metaText,
                 {
-                  color: role === "commander" ? "#f59e0b" : colors.indigo,
+                  color: role === "commander" ? colors.purple : locationColor,
                 },
               ]}
             >
@@ -68,11 +75,11 @@ export function CurrentLocationCard({
           <View
             style={[
               styles.metaBadge,
-              { backgroundColor: colors.indigo + "20" },
+              { backgroundColor: locationColor + "20" },
             ]}
           >
-            <Ionicons name="layers-outline" size={13} color={colors.indigo} />
-            <Text style={[styles.metaText, { color: colors.indigo }]}>
+            <Ionicons name="layers-outline" size={13} color={locationColor} />
+            <Text style={[styles.metaText, { color: locationColor }]}>
               Level {depth + 1}
             </Text>
           </View>

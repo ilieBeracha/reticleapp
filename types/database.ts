@@ -26,18 +26,19 @@ export interface Invitation {
 
 export interface Training {
   id: string;
-  organization_id: string;
+  org_id: string;
   name: string;
   description?: string;
+  scheduled_date?: string;
+  location?: string;
   created_by: string;
   created_at: string;
-  updated_at: string;
 }
 
 export interface Session {
   id: string;
   training_id?: string;
-  organization_id: string;
+  organization_id?: string | null;
   name: string;
   session_type: SessionType;
   range_m?: number;
@@ -70,11 +71,15 @@ export interface UpdateSessionInput {
 export interface CreateTrainingInput {
   name: string;
   description?: string;
+  scheduled_date?: string;
+  location?: string;
 }
 
 export interface UpdateTrainingInput {
   name?: string;
   description?: string;
+  scheduled_date?: string;
+  location?: string;
 }
 
 export interface Detection {

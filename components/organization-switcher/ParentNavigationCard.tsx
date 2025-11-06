@@ -37,8 +37,8 @@ export function ParentNavigationCard({
         <Text style={[styles.name, { color: colors.text }]}>{parentName}</Text>
       </View>
       {isCommander && (
-        <View style={styles.badge}>
-          <Ionicons name="shield-checkmark" size={16} color="#f59e0b" />
+        <View style={[styles.badge, { backgroundColor: colors.purple + "15" }]}>
+          <Ionicons name="shield-checkmark" size={16} color={colors.purple} />
         </View>
       )}
       <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
@@ -81,7 +81,6 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 8,
-    backgroundColor: "#f59e0b15",
     alignItems: "center",
     justifyContent: "center",
   },

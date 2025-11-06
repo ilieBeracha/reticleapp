@@ -10,6 +10,8 @@ export interface Action {
   icon: string;
   action: string;
   isOnlyOrganizationMember?: boolean;
+  color?: string;
+  badge?: string;
 }
 
 export interface ActionMenuProps {
@@ -83,20 +85,29 @@ export default function ActionMenu({
                   {
                     backgroundColor: isDisabled
                       ? colors.border
-                      : colors.tint + "20",
+                      : (action.color || colors.tint) + "20",
                   },
                 ]}
               >
                 <Ionicons
                   name={action.icon as any}
                   size={22}
-                  color={isDisabled ? colors.description : colors.tint}
+                  color={isDisabled ? colors.description : (action.color || colors.tint)}
                 />
               </View>
               <View style={styles.actionText}>
-                <Text style={[styles.actionTitle, { color: colors.text }]}>
-                  {action.title}
-                </Text>
+                <View style={styles.titleRow}>
+                  <Text style={[styles.actionTitle, { color: colors.text }]}>
+                    {action.title}
+                  </Text>
+                  {action.badge && (
+                    <View style={[styles.badge, { backgroundColor: (action.color || colors.tint) + "15" }]}>
+                      <Text style={[styles.badgeText, { color: action.color || colors.tint }]}>
+                        {action.badge}
+                      </Text>
+                    </View>
+                  )}
+                </View>
                 <Text
                   style={[
                     styles.actionDescription,
@@ -170,12 +181,27 @@ const styles = StyleSheet.create({
   },
   actionText: {
     flex: 1,
-    gap: 2,
+    gap: 4,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   actionTitle: {
     fontSize: 15,
     fontWeight: "600",
     letterSpacing: -0.2,
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: "700",
+    textTransform: "uppercase",
   },
   actionDescription: {
     fontSize: 12,

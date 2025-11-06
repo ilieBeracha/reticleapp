@@ -1,8 +1,8 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/ui/useColors";
+import { SessionStats } from "@/services/sessionService";
 import { useOrganizationsStore } from "@/store/organizationsStore";
-import { sessionsStore } from "@/store/sessionsStore";
-import { Session } from "@/types/database";
+import { sessionStatsStore } from "@/store/sessionsStore";
 import { Ionicons } from "@expo/vector-icons";
 import { Image, StyleSheet, Text, View } from "react-native";
 import { useStore } from "zustand";
@@ -19,7 +19,7 @@ export function GreetingSection({
   const colors = useColors();
   const { user } = useAuth();
   const { selectedOrgId, allOrgs, memberships } = useOrganizationsStore();
-  const { sessions } = useStore(sessionsStore);
+  const { sessions } = useStore(sessionStatsStore);
 
   const currentHour = new Date().getHours();
   let greeting = "Good Morning";
@@ -38,7 +38,7 @@ export function GreetingSection({
 
   // Calculate meaningful stats
   const now = new Date();
-  const thisMonth = sessions.filter((s: Session) => {
+  const thisMonth = sessions.filter((s: SessionStats) => {
     const sessionDate = new Date(s.created_at);
     return (
       sessionDate.getMonth() === now.getMonth() &&
@@ -47,7 +47,7 @@ export function GreetingSection({
     );
   }).length;
 
-  const lastWeek = sessions.filter((s: Session) => {
+  const lastWeek = sessions.filter((s: SessionStats) => {
     const sessionDate = new Date(s.created_at);
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     return sessionDate >= weekAgo && s.organization_id === selectedOrgId;
@@ -58,7 +58,7 @@ export function GreetingSection({
 
   // Last session info
   const lastSession = sessions
-    .filter((s: Session) => s.organization_id === selectedOrgId)
+    .filter((s: SessionStats) => s.organization_id === selectedOrgId)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
 
   const lastSessionDaysAgo = lastSession

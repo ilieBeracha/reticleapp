@@ -1,10 +1,10 @@
 import { useColors } from "@/hooks/ui/useColors";
-import { Session } from "@/types/database";
+import { SessionStats } from "@/services/sessionService";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 
 interface RecentSessionsProps {
-  sessions: Session[];
+  sessions: SessionStats[];
   loading: boolean;
 }
 

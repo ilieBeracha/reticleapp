@@ -1,28 +1,33 @@
+import CreateSessionBottomSheet from "@/components/CreateSessionBottomSheet";
+import CreateTrainingModal from "@/components/CreateTrainingModal";
 import Header from "@/components/Header";
 import QuickActionsFloatingButton from "@/components/QuickActionsFloatingButton";
 import { useColors } from "@/hooks/ui/useColors";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { Ionicons } from "@expo/vector-icons";
-import { router, Tabs } from "expo-router";
+import { router, Tabs, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React from "react";
+import React, { useState } from "react";
 import { View } from "react-native";
 
 export default function TabLayout() {
   const colors = useColors();
   const { selectedOrgId } = useOrganizationsStore();
   const isPersonalMode = selectedOrgId == null || selectedOrgId == undefined;
-
+  const [isCreateSessionModalVisible, setIsCreateSessionModalVisible] = useState(false);
+  const [isCreateTrainingModalVisible, setIsCreateTrainingModalVisible] = useState(false); 
+  const pathname = usePathname();
+  const isCameraPath = pathname.includes("/camera");
   const handleQuickActionsPress = (action: "scan" | "session" | "training") => {
     switch (action) {
       case "scan":
-        router.push("/camera-detect");
+        router.push("/(protected)/(tabs)/camera");
         break;
       case "session":
-        router.push("/");
+        setIsCreateSessionModalVisible(true);
         break;
       case "training":
-        router.push("/loadout");
+        setIsCreateTrainingModalVisible(true);
         break;
     }
   };
@@ -30,10 +35,10 @@ export default function TabLayout() {
   return (
     <>
       <StatusBar
-        translucent={false}
-        style={colors.background === "#0f172a" ? "dark" : "light"}
+        translucent={isCameraPath}
+        style={isCameraPath ? "light" : (colors.background === "#0f172a" ? "dark" : "light")}
       />
-      <Header onNotificationPress={() => {}} />
+      {!isCameraPath && <Header onNotificationPress={() => {}} />}
 
       <View style={{ flex: 1 }}>
         <Tabs
@@ -47,7 +52,9 @@ export default function TabLayout() {
             },
             tabBarActiveTintColor: colors.indigo,
             tabBarInactiveTintColor: colors.textMuted,
-            tabBarStyle: {
+            tabBarStyle: isCameraPath ? {
+              display: 'none'
+            } : {
               backgroundColor: colors.background,
               justifyContent: "center",
               borderTopWidth: 1,
@@ -73,11 +80,28 @@ export default function TabLayout() {
             }}
           />
 
-          {/* Training Calendar - Always shown */}
+          {/* Training Programs - Only in org mode */}
+          <Tabs.Screen
+            name="programs"
+            options={{
+              title: "Programs",
+              href: isPersonalMode ? null : "/(protected)/(tabs)/programs",
+              tabBarIcon: ({ color, focused }) => (
+                <Ionicons
+                  name={focused ? "folder" : "folder-outline"}
+                  size={20}
+                  color={color}
+                />
+              ),
+            }}
+          />
+
+          {/* Training Calendar - Only in org mode */}
           <Tabs.Screen
             name="calendar"
             options={{
-              title: "Training",
+              title: "Calendar",
+              href: isPersonalMode ? null : "/(protected)/(tabs)/calendar",
               tabBarIcon: ({ color, focused }) => (
                 <Ionicons
                   name={focused ? "calendar" : "calendar-outline"}
@@ -102,34 +126,14 @@ export default function TabLayout() {
               ),
             }}
           />
-          
 
-          {/* AI - Always shown */}
-          <Tabs.Screen
-            name="ai"
-            options={{
-              title: "AI",
-              tabBarIcon: ({ color, focused }) => (
-                <Ionicons
-                  name={focused ? "sparkles" : "sparkles-outline"}
-                  size={20}
-                  color={color}
-                />
-              ),
-            }}
-          />
+        
 
           {/* ===== HIDDEN SCREENS ===== */}
-      
+
 
           <Tabs.Screen
-            name="profile"
-            options={{
-              href: null,
-            }}
-          />
-          <Tabs.Screen
-            name="camera-detect"
+            name="camera"
             options={{
               href: null,
             }}
@@ -152,9 +156,25 @@ export default function TabLayout() {
               href: null,
             }}
           />
+          <Tabs.Screen
+            name="manage"
+            options={{
+              href: null,
+            }}
+          />
         </Tabs>
-        <QuickActionsFloatingButton onPress={(action: "scan" | "session" | "training") => handleQuickActionsPress(action)} />
+        {!isCameraPath && <QuickActionsFloatingButton onPress={(action: "scan" | "session" | "training") => handleQuickActionsPress(action)} />}
       </View>
+
+      {/* Modals */}
+      <CreateSessionBottomSheet
+        visible={isCreateSessionModalVisible}
+        onClose={() => setIsCreateSessionModalVisible(false)}
+      />
+      <CreateTrainingModal
+        visible={isCreateTrainingModalVisible}
+        onClose={() => setIsCreateTrainingModalVisible(false)}
+      />
     </>
   );
 }

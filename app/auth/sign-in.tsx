@@ -1,8 +1,6 @@
 import { SignIn } from "@/modules/auth/SignIn";
-import { useLocalSearchParams } from "expo-router";
 
-export default function SignInPage() {
-  const { inviteCode } = useLocalSearchParams<{ inviteCode?: string }>();
+export default function SignInPage( { inviteCode }: { inviteCode: string } ) {
   
-  return <SignIn inviteCode={inviteCode} />;
+  return <SignIn inviteCode={inviteCode ?? undefined as string | undefined} />;
 }

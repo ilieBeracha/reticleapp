@@ -9,7 +9,7 @@ import { MetricCards } from "@/modules/stats/MetricCards";
 import { StatsHeader } from "@/modules/stats/StatsHeader";
 import { TimeAnalysis } from "@/modules/stats/TimeAnalysis";
 import { useOrganizationsStore } from "@/store/organizationsStore";
-import { sessionsStore } from "@/store/sessionsStore";
+import { sessionStatsStore } from "@/store/sessionsStore";
 import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useStore } from "zustand";
@@ -18,7 +18,7 @@ export default function Stats() {
   const colors = useColors();
   const { user } = useAuth();
   const { selectedOrgId, allOrgs } = useOrganizationsStore();
-  const { sessions, fetchSessions } = useStore(sessionsStore);
+  const { sessions, loading: sessionsLoading, fetchSessions } = useStore(sessionStatsStore);
   const [filterVisible, setFilterVisible] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState("All");
 
@@ -46,7 +46,7 @@ export default function Stats() {
   }, [user?.id, selectedOrgId, fetchSessions]);
 
   // Calculate metrics from sessions
-  const totalSessions = sessions.length;
+  const totalSessions = sessions?.length || 0 as number;
   const targetSessions = 100;
   const avgAccuracy = totalSessions > 0 ? 87 : 0;
 

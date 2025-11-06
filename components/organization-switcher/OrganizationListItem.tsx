@@ -21,13 +21,16 @@ export function OrganizationListItem({
 }: OrganizationListItemProps) {
   const colors = useColors();
 
+  // Use different colors for personal vs organization
+  const activeColor = isPersonal ? colors.teal : colors.indigo;
+
   return (
     <TouchableOpacity
       style={[
         styles.container,
         {
-          backgroundColor: isActive ? colors.indigo + "10" : colors.card,
-          borderColor: isActive ? colors.indigo : colors.border,
+          backgroundColor: isActive ? activeColor + "10" : colors.card,
+          borderColor: isActive ? activeColor : colors.border,
         },
       ]}
       onPress={onPress}
@@ -36,7 +39,7 @@ export function OrganizationListItem({
       <Ionicons
         name={isPersonal ? "person" : "business"}
         size={22}
-        color={isActive ? colors.indigo : colors.textMuted}
+        color={isActive ? activeColor : colors.textMuted}
       />
       <View style={styles.info}>
         <Text
@@ -57,7 +60,7 @@ export function OrganizationListItem({
         )}
       </View>
       {isActive && (
-        <Ionicons name="checkmark-circle" size={22} color={colors.indigo} />
+        <Ionicons name="checkmark-circle" size={22} color={activeColor} />
       )}
     </TouchableOpacity>
   );

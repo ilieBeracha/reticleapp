@@ -1,54 +1,44 @@
+// store/sessionStatsStore.ts
 import {
-  createSessionService,
-  deleteSessionService,
-  getSessionsService,
-  updateSessionService,
+  createSessionStats,
+  CreateSessionStatsInput,
+  deleteSessionStats,
+  getSessionStats,
+  SessionStats,
+  updateSessionStats,
+  UpdateSessionStatsInput,
 } from "@/services/sessionService";
-import {
-  CreateSessionInput,
-  Session,
-  UpdateSessionInput,
-} from "@/types/database";
 import { create } from "zustand";
 
-interface SessionsStore {
-  sessions: Session[];
+interface SessionStatsStore {
+  sessions: SessionStats[];
   loading: boolean;
   error: string | null;
 
-  // Actions - simplified without token parameters
-  fetchSessions: (
-    userId: string,
-    orgId?: string | null,
-    trainingId?: string
-  ) => Promise<void>;
+  // Actions
+  fetchSessions: (userId: string, orgId?: string | null) => Promise<void>;
   createSession: (
-    input: CreateSessionInput,
-    userId: string,
-    orgId: string | null
-  ) => Promise<Session | null>;
+    input: CreateSessionStatsInput,
+    userId: string
+  ) => Promise<SessionStats>;
   updateSession: (
     sessionId: string,
-    input: UpdateSessionInput
-  ) => Promise<Session | null>;
+    input: UpdateSessionStatsInput
+  ) => Promise<SessionStats>;
   deleteSession: (sessionId: string) => Promise<void>;
   resetSessions: () => void;
 }
 
-export const sessionsStore = create<SessionsStore>((set) => ({
+export const sessionStatsStore = create<SessionStatsStore>((set) => ({
   sessions: [],
   loading: false,
   error: null,
 
-  fetchSessions: async (
-    userId: string,
-    orgId?: string | null,
-    trainingId?: string
-  ) => {
+  fetchSessions: async (userId: string, orgId?: string | null) => {
     try {
       set({ loading: true, error: null });
 
-      const sessions = await getSessionsService(userId, orgId, trainingId);
+      const sessions = await getSessionStats(userId, orgId);
 
       set({ sessions, loading: false });
     } catch (err: any) {
@@ -57,18 +47,15 @@ export const sessionsStore = create<SessionsStore>((set) => ({
     }
   },
 
-  createSession: async (
-    input: CreateSessionInput,
-    userId: string,
-    orgId: string | null
-  ) => {
+  createSession: async (input: CreateSessionStatsInput, userId: string) => {
     if (!userId) {
       throw new Error("Not authenticated");
     }
 
     try {
-      const session = await createSessionService(input, userId, orgId);
-      console.log("session", session);
+      const session = await createSessionStats(input, userId);
+      console.log("Created session:", session);
+
       // Add new session to the beginning of the list
       set((state) => ({
         sessions: [session, ...state.sessions],
@@ -77,13 +64,14 @@ export const sessionsStore = create<SessionsStore>((set) => ({
       return session;
     } catch (err: any) {
       console.error("Error creating session:", err);
+      set({ error: err.message });
       throw err;
     }
   },
 
-  updateSession: async (sessionId: string, input: UpdateSessionInput) => {
+  updateSession: async (sessionId: string, input: UpdateSessionStatsInput) => {
     try {
-      const session = await updateSessionService(sessionId, input);
+      const session = await updateSessionStats(sessionId, input);
 
       // Update session in the list
       set((state) => ({
@@ -93,20 +81,22 @@ export const sessionsStore = create<SessionsStore>((set) => ({
       return session;
     } catch (err: any) {
       console.error("Error updating session:", err);
+      set({ error: err.message });
       throw err;
     }
   },
 
   deleteSession: async (sessionId: string) => {
     try {
-      await deleteSessionService(sessionId);
+      await deleteSessionStats(sessionId);
 
       // Remove session from the list
       set((state) => ({
-        sessions: state.sessions.filter((session) => session.id !== sessionId),
+        sessions: state.sessions.filter((s) => s.id !== sessionId),
       }));
     } catch (err: any) {
       console.error("Error deleting session:", err);
+      set({ error: err.message });
       throw err;
     }
   },

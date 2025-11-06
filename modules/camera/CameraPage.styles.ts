@@ -65,9 +65,27 @@ export const makeCameraStyles = (colors: ThemeColors) => {
       textAlign: "center",
     },
 
-    // Camera - More compact
-    cameraRoot: { flex: 1, backgroundColor: "black" },
-    camera: { flex: 1, width, height },
+    // Camera - Full height, positioned above all
+    cameraRoot: { 
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      width: "100%",
+      height: "100%",
+      backgroundColor: "black",
+      zIndex: 1,
+    },
+    camera: { 
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      width: "100%",
+      height: "100%",
+    },
     cameraOverlay: {
       position: "absolute",
       top: 0,
@@ -76,6 +94,7 @@ export const makeCameraStyles = (colors: ThemeColors) => {
       bottom: 0,
       justifyContent: "center",
       alignItems: "center",
+      zIndex: 2,
     },
     frameGuide: {
       width: width * 0.82,
@@ -100,6 +119,7 @@ export const makeCameraStyles = (colors: ThemeColors) => {
       justifyContent: "space-around",
       alignItems: "center",
       paddingHorizontal: spacing * 1.5,
+      zIndex: 10,
     },
     galleryBtn: {
       width: 60,
@@ -172,6 +192,7 @@ export const makeCameraStyles = (colors: ThemeColors) => {
       shadowOpacity: 0.3,
       shadowRadius: 4,
       elevation: 4,
+      zIndex: 10,
     },
     infoBannerText: {
       color: "white",

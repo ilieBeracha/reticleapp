@@ -1,233 +1,206 @@
-import { AuthenticatedClient } from "@/lib/authenticatedClient";
-import { handleServiceError } from "@/lib/errors";
-import {
-  CreateSessionInput,
-  Session,
-  UpdateSessionInput,
-} from "@/types/database";
+// services/sessionStatsService.ts
+import { supabase } from "@/lib/supabase";
 
-/**
- * Get sessions based on context:
- * - If in Personal Workspace (no orgId): Get ALL user's sessions across all orgs
- * - If in Organization (has orgId): Get ALL team sessions from that org
- */
-// New signature (recommended)
-export async function getSessionsService(
+export interface WeatherConditions {
+  temperature?: number;
+  humidity?: number;
+  wind_speed?: number;
+  wind_direction?: string;
+  conditions?: string; // sunny, cloudy, rainy, etc.
+}
+
+export type DayPeriod = "morning" | "afternoon" | "evening" | "night";
+
+export interface SessionStats {
+  id: string;
+  training_id?: string | null;
+  organization_id?: string | null;
+  name?: string | null;
+  started_at: string;
+  ended_at?: string | null;
+  range_location?: string | null;
+  weather?: WeatherConditions | null;
+  day_period?: DayPeriod | null;
+  is_squad: boolean;
+  comments?: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateSessionStatsInput {
+  training_id?: string | null;
+  organization_id?: string | null;
+  name?: string;
+  started_at: string;
+  ended_at?: string | null;
+  range_location?: string;
+  weather?: WeatherConditions | null;
+  day_period?: DayPeriod | null;
+  is_squad?: boolean;
+  comments?: string;
+}
+
+export interface UpdateSessionStatsInput {
+  training_id?: string | null;
+  name?: string;
+  started_at?: string;
+  ended_at?: string | null;
+  range_location?: string;
+  weather?: WeatherConditions | null;
+  day_period?: DayPeriod | null;
+  is_squad?: boolean;
+  comments?: string;
+}
+
+// Get all sessions (personal or org)
+export async function getSessionStats(
   userId: string,
-  orgId?: string | null,
-  trainingId?: string
-): Promise<Session[]>;
-// Legacy signature for backward compatibility
-export async function getSessionsService(
-  token: string,
-  userId: string,
-  orgId?: string | null,
-  trainingId?: string
-): Promise<Session[]>;
-export async function getSessionsService(
-  userIdOrToken: string,
-  orgIdOrUserId?: string | null,
-  trainingIdOrOrgId?: string | null,
-  legacyTrainingId?: string
-): Promise<Session[]> {
+  orgId?: string | null
+): Promise<SessionStats[]> {
   try {
-    const client = await AuthenticatedClient.getClient();
-
-    // Determine if this is legacy call (4 params) or new call (3 params)
-    const isLegacyCall =
-      arguments.length === 4 ||
-      (arguments.length === 3 &&
-        typeof trainingIdOrOrgId === "string" &&
-        legacyTrainingId === undefined);
-
-    let userId: string;
-    let orgId: string | null | undefined;
-    let trainingId: string | undefined;
-
-    if (isLegacyCall && arguments.length === 4) {
-      // Legacy: getSessionsService(token, userId, orgId, trainingId)
-      userId = orgIdOrUserId as string;
-      orgId = trainingIdOrOrgId;
-      trainingId = legacyTrainingId;
-    } else {
-      // New: getSessionsService(userId, orgId, trainingId)
-      userId = userIdOrToken;
-      orgId = orgIdOrUserId;
-      trainingId = trainingIdOrOrgId as string | undefined;
-    }
-
-    let query = client
-      .from("sessions")
+    let query = supabase
+      .from("session_stats")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("started_at", { ascending: false });
 
-    // Context-based filtering
     if (orgId) {
-      // IN ORGANIZATION: Get all team sessions from this org
+      // Get org sessions
       query = query.eq("organization_id", orgId);
     } else {
-      // IN PERSONAL: Get all MY sessions across all orgs
-      query = query.eq("created_by", userId);
-    }
-
-    // Optional: Filter by specific training
-    if (trainingId) {
-      query = query.eq("training_id", trainingId);
+      // Get personal sessions
+      query = query.eq("created_by", userId).is("organization_id", null);
     }
 
     const { data, error } = await query;
 
     if (error) throw error;
-
     return data || [];
-  } catch (err: any) {
-    handleServiceError(err, "Failed to fetch sessions");
+  } catch (error: any) {
+    console.error("Error fetching sessions:", error);
+    throw new Error(error.message || "Failed to fetch sessions");
   }
 }
 
-// New signature (recommended)
-export async function createSessionService(
-  input: CreateSessionInput,
-  userId: string,
-  orgId: string | null
-): Promise<Session>;
-// Legacy signature for backward compatibility
-export async function createSessionService(
-  token: string,
-  input: CreateSessionInput,
-  userId: string,
-  orgId: string | null
-): Promise<Session>;
-export async function createSessionService(
-  inputOrToken: CreateSessionInput | string,
-  userIdOrInput: string | CreateSessionInput,
-  orgIdOrUserId: string | null,
-  legacyOrgId?: string | null
-): Promise<Session> {
+// Get single session
+export async function getSessionStat(sessionId: string): Promise<SessionStats | null> {
   try {
-    const client = await AuthenticatedClient.getClient();
+    const { data, error } = await supabase
+      .from("session_stats")
+      .select("*")
+      .eq("id", sessionId)
+      .single();
 
-    // Determine if this is legacy call (4 params) or new call (3 params)
-    const isLegacyCall = arguments.length === 4;
+    if (error) throw error;
+    return data;
+  } catch (error: any) {
+    console.error("Error fetching session:", error);
+    throw new Error(error.message || "Failed to fetch session");
+  }
+}
 
-    let input: CreateSessionInput;
-    let userId: string;
-    let orgId: string | null;
-
-    if (isLegacyCall) {
-      // Legacy: createSessionService(token, input, userId, orgId)
-      input = userIdOrInput as CreateSessionInput;
-      userId = orgIdOrUserId as string;
-      orgId = legacyOrgId as string | null;
-    } else {
-      // New: createSessionService(input, userId, orgId)
-      input = inputOrToken as CreateSessionInput;
-      userId = userIdOrInput as string;
-      orgId = orgIdOrUserId;
-    }
-
-    const { data, error } = await client
-      .from("sessions")
+// Create session
+export async function createSessionStats(
+  input: CreateSessionStatsInput,
+  userId: string
+): Promise<SessionStats> {
+  try {
+    const { data, error } = await supabase
+      .from("session_stats")
       .insert({
         ...input,
-        organization_id: orgId,
         created_by: userId,
+        is_squad: input.is_squad ?? false,
       })
       .select()
       .single();
 
     if (error) throw error;
-
-    return data as Session;
-  } catch (err: any) {
-    handleServiceError(err, "Failed to create session");
+    return data;
+  } catch (error: any) {
+    console.error("Error creating session:", error);
+    throw new Error(error.message || "Failed to create session");
   }
 }
 
-// New signature (recommended)
-export async function updateSessionService(
+// Update session
+export async function updateSessionStats(
   sessionId: string,
-  input: UpdateSessionInput
-): Promise<Session>;
-// Legacy signature for backward compatibility
-export async function updateSessionService(
-  token: string,
-  sessionId: string,
-  input: UpdateSessionInput
-): Promise<Session>;
-export async function updateSessionService(
-  sessionIdOrToken: string,
-  inputOrSessionId: UpdateSessionInput | string,
-  legacyInput?: UpdateSessionInput
-): Promise<Session> {
+  input: UpdateSessionStatsInput
+): Promise<SessionStats> {
   try {
-    const client = await AuthenticatedClient.getClient();
-
-    // Determine if this is legacy call (3 params) or new call (2 params)
-    const isLegacyCall = arguments.length === 3;
-
-    let sessionId: string;
-    let input: UpdateSessionInput;
-
-    if (isLegacyCall) {
-      // Legacy: updateSessionService(token, sessionId, input)
-      sessionId = inputOrSessionId as string;
-      input = legacyInput as UpdateSessionInput;
-    } else {
-      // New: updateSessionService(sessionId, input)
-      sessionId = sessionIdOrToken;
-      input = inputOrSessionId as UpdateSessionInput;
-    }
-
-    const { data, error } = await client
-      .from("sessions")
+    const { data, error } = await supabase
+      .from("session_stats")
       .update(input)
       .eq("id", sessionId)
       .select()
       .single();
 
     if (error) throw error;
-
-    return data as Session;
-  } catch (err: any) {
-    handleServiceError(err, "Failed to update session");
+    return data;
+  } catch (error: any) {
+    console.error("Error updating session:", error);
+    throw new Error(error.message || "Failed to update session");
   }
 }
 
-// New signature (recommended)
-export async function deleteSessionService(sessionId: string): Promise<void>;
-// Legacy signature for backward compatibility
-export async function deleteSessionService(
-  token: string,
-  sessionId: string
-): Promise<void>;
-export async function deleteSessionService(
-  sessionIdOrToken: string,
-  legacySessionId?: string
-): Promise<void> {
+// Delete session
+export async function deleteSessionStats(sessionId: string): Promise<void> {
   try {
-    const client = await AuthenticatedClient.getClient();
-
-    // Determine if this is legacy call (2 params) or new call (1 param)
-    const isLegacyCall = arguments.length === 2;
-
-    let sessionId: string;
-
-    if (isLegacyCall) {
-      // Legacy: deleteSessionService(token, sessionId)
-      sessionId = legacySessionId as string;
-    } else {
-      // New: deleteSessionService(sessionId)
-      sessionId = sessionIdOrToken;
-    }
-
-    const { error } = await client
-      .from("sessions")
+    const { error } = await supabase
+      .from("session_stats")
       .delete()
       .eq("id", sessionId);
 
     if (error) throw error;
-  } catch (err: any) {
-    handleServiceError(err, "Failed to delete session");
+  } catch (error: any) {
+    console.error("Error deleting session:", error);
+    throw new Error(error.message || "Failed to delete session");
+  }
+}
+
+// End active session
+export async function endSessionStats(sessionId: string): Promise<SessionStats> {
+  try {
+    const { data, error } = await supabase
+      .from("session_stats")
+      .update({ ended_at: new Date().toISOString() })
+      .eq("id", sessionId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error: any) {
+    console.error("Error ending session:", error);
+    throw new Error(error.message || "Failed to end session");
+  }
+}
+
+// Get active sessions (no ended_at)
+export async function getActiveSessions(
+  userId: string,
+  orgId?: string | null
+): Promise<SessionStats[]> {
+  try {
+    let query = supabase
+      .from("session_stats")
+      .select("*")
+      .is("ended_at", null)
+      .order("started_at", { ascending: false });
+
+    if (orgId) {
+      query = query.eq("organization_id", orgId);
+    } else {
+      query = query.eq("created_by", userId).is("organization_id", null);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+    return data || [];
+  } catch (error: any) {
+    console.error("Error fetching active sessions:", error);
+    throw new Error(error.message || "Failed to fetch active sessions");
   }
 }

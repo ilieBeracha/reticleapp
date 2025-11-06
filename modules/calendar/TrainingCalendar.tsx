@@ -1,20 +1,20 @@
 import { ThemedView } from "@/components/ThemedView";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/ui/useColors";
+import { SessionStats } from "@/services/sessionService";
 import { useOrganizationsStore } from "@/store/organizationsStore";
-import { sessionsStore } from "@/store/sessionsStore";
+import { sessionStatsStore } from "@/store/sessionsStore";
 import { trainingsStore } from "@/store/trainingsStore";
-import { Session } from "@/types/database";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Dimensions,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useStore } from "zustand";
 
@@ -25,14 +25,14 @@ interface CalendarDay {
   isCurrentMonth: boolean;
   isToday: boolean;
   hasEvents: boolean;
-  sessions: Session[];
+  sessions: SessionStats[];
 }
 
 export function TrainingCalendar() {
   const colors = useColors();
   const { user } = useAuth();
   const { selectedOrgId } = useOrganizationsStore();
-  const { sessions, loading: sessionsLoading, fetchSessions } = useStore(sessionsStore);
+  const { sessions, loading: sessionsLoading, fetchSessions } = useStore(sessionStatsStore);
   const { trainings, fetchTrainings } = useStore(trainingsStore);
 
   const [currentDate, setCurrentDate] = useState(new Date());

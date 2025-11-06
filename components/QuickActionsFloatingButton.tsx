@@ -62,7 +62,7 @@ export default function QuickActionsFloatingButton({
             id: "training",
             title: "Create Training",
             icon: "fitness" as keyof typeof Ionicons.glyphMap,
-            color: "#f59e0b",
+            color: colors.orange,
             onPress: () => {
               setIsModalVisible(false);
               onPress("training");

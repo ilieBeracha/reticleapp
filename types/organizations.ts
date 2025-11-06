@@ -48,6 +48,9 @@ export interface OrgChild {
   depth: number;
   member_count: number;
   description: string | null;
+  child_count: number;
+  parent_id: string;
+  created_at: string;
 }
 
 export interface OrgSubtree {
