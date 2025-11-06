@@ -14,7 +14,7 @@ export default function AuthRoutesLayout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  if (loading) return null;
+  if (loading) return ;
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

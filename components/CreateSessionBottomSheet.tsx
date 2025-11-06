@@ -7,14 +7,14 @@ import { sessionStatsStore } from "@/store/sessionsStore";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useStore } from "zustand";
 
@@ -32,7 +32,7 @@ export default function CreateSessionBottomSheet({
   const { selectedOrgId } = useOrganizationsStore();
 
   const { createSession, fetchSessions } = useStore(sessionStatsStore);
-
+  const isPersonalWorkspace = selectedOrgId == null || selectedOrgId == undefined;
   // Form state
   const [name, setName] = useState("");
   const [rangeLocation, setRangeLocation] = useState("");
@@ -59,7 +59,7 @@ export default function CreateSessionBottomSheet({
       Alert.alert("Error", "Authentication error");
       return;
     }
-
+    
     try {
       setIsSubmitting(true);
 
@@ -215,6 +215,7 @@ export default function CreateSessionBottomSheet({
             </View>
           </View>
 
+              {!isPersonalWorkspace && (<>
           {/* Squad Training Toggle */}
           <View style={styles.field}>
             <TouchableOpacity
@@ -258,7 +259,8 @@ export default function CreateSessionBottomSheet({
               </View>
             </TouchableOpacity>
           </View>
-
+          </>
+          )}
           {/* Comments */}
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.text }]}>

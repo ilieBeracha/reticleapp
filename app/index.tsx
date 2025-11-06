@@ -8,11 +8,11 @@ export default function Index() {
   
   if (Linking.useLinkingURL()?.includes('invite/')) {
     const token = Linking.useLinkingURL()?.split('invite/')[1].split('?')[0]
-    return <Redirect href={`/(protected)/invite?token=${token}`} />;
+    return <Redirect href={`/invite?token=${token}`} />;
 }
 
   if (user && user.id) {
-    return <Redirect href="/(protected)/(tabs)/stats" />;
+    return <Redirect href="/(protected)/(tabs)" />;
   } else {
     return <Redirect href="/auth/sign-in" />;
   }

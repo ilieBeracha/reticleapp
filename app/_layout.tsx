@@ -37,17 +37,17 @@ function RootLayoutInner() {
 
   return (
     <GluestackUIProvider mode={colorScheme === "dark" ? "dark" : "light"}>
-          <GestureHandlerRootView style={{ flex: 1 }}>
-            <AuthProvider>
-            <BottomSheetModalProvider>
-              <OrganizationSwitchProvider>
-                <Slot />
-                <StatusBar style="auto" />
-                <AppOverlay />
-              </OrganizationSwitchProvider>
-            </BottomSheetModalProvider>
-            </AuthProvider>
-          </GestureHandlerRootView>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <AuthProvider>
+        <BottomSheetModalProvider>
+          <OrganizationSwitchProvider>
+            <Slot />
+            <StatusBar style="auto" />
+            <AppOverlay />
+          </OrganizationSwitchProvider>
+        </BottomSheetModalProvider>
+        </AuthProvider>
+      </GestureHandlerRootView>
     </GluestackUIProvider>
   );
 }

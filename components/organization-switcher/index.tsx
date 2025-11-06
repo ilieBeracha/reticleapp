@@ -1,9 +1,10 @@
 import BaseBottomSheet from "@/components/BaseBottomSheet";
-import { CreateOrgModal } from "@/components/CreateOrg";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/ui/useColors";
 import { useOrganizationSwitch } from "@/hooks/useOrganizationSwitch";
 import { useOrgPermissions } from "@/hooks/useOrgPermissions";
+import { CreateChildOrgModal } from "@/modules/manage/CreateChildOrgModal";
+import { CreateRootOrgModal } from "@/modules/manage/CreateRootOrgModal";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { OrgChild, Organization, UserOrg } from "@/types/organizations";
 import { Ionicons } from "@expo/vector-icons";
@@ -78,8 +79,6 @@ export function OrganizationSwitcherModal({
     const parent = allOrgs.find((o: Organization) => o.id === org.parent_id);
     return findRootOrg(parent);
   };
-
-  const rootOrg = findRootOrg(currentOrg);
   
   // Calculate relative depth from root (0 = root, 1 = first child, etc.)
   const getRelativeDepth = (org: Organization | null | undefined): number => {
@@ -529,20 +528,34 @@ export function OrganizationSwitcherModal({
       {/* Nested Modals - Only render when parent is visible */}
       {visible && (
         <>
-          <CreateOrgModal
-            visible={createOrgVisible}
-            onClose={() => setCreateOrgVisible(false)}
-            parentId={canCreateChild && selectedOrgId ? selectedOrgId : undefined}
-            autoSwitch={!selectedOrgId}
-            onSuccess={() => {
-              setCreateOrgVisible(false);
-              if (user?.id) {
-                fetchUserOrgs(user?.id);
-                fetchAllOrgs(user?.id);
-                if (selectedOrgId) fetchOrgChildren(selectedOrgId);
-              }
-            }}
-          />
+          {canCreateChild && selectedOrgId && currentOrg ? (
+            <CreateChildOrgModal
+              visible={createOrgVisible}
+              onClose={() => setCreateOrgVisible(false)}
+              parentId={selectedOrgId}
+              parentName={currentOrg.name}
+              onSuccess={() => {
+                setCreateOrgVisible(false);
+                if (user?.id) {
+                  fetchUserOrgs(user?.id);
+                  fetchAllOrgs(user?.id);
+                  if (selectedOrgId) fetchOrgChildren(selectedOrgId);
+                }
+              }}
+            />
+          ) : (
+            <CreateRootOrgModal
+              visible={createOrgVisible}
+              onClose={() => setCreateOrgVisible(false)}
+              onSuccess={() => {
+                setCreateOrgVisible(false);
+                if (user?.id) {
+                  fetchUserOrgs(user?.id);
+                  fetchAllOrgs(user?.id);
+                }
+              }}
+            />
+          )}
 
           <UserManagementModal
             visible={userManagementVisible}
