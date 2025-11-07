@@ -14,6 +14,8 @@ interface OrgInfoViewProps {
   onViewMembers: () => void;
   onEditSettings: () => void;
   onSwitchOrg: () => void;
+  childOrgs?: FlatOrganization[];
+  onNavigateToChild?: (orgId: string) => void;
 }
 
 export function OrgInfoView({
@@ -24,6 +26,8 @@ export function OrgInfoView({
   onViewMembers,
   onEditSettings,
   onSwitchOrg,
+  childOrgs = [],
+  onNavigateToChild,
 }: OrgInfoViewProps) {
   const colors = useColors();
 
@@ -150,6 +154,53 @@ export function OrgInfoView({
           </View>
         )}
       </View>
+
+      {/* Drill-Down Navigation for Commanders */}
+      {childOrgs.length > 0 && onNavigateToChild && (
+        <View style={[styles.drillDownSection, { backgroundColor: colors.green + '10', borderColor: colors.green }]}>
+          <View style={styles.drillDownHeader}>
+            <Ionicons name="arrow-down-circle" size={20} color={colors.green} />
+            <Text style={[styles.drillDownTitle, { color: colors.green }]}>
+              YOUR UNITS ({childOrgs.length})
+            </Text>
+          </View>
+          <Text style={[styles.drillDownSubtitle, { color: colors.textMuted }]}>
+            Tap to focus on a specific unit
+          </Text>
+          
+          <View style={styles.unitsList}>
+            {childOrgs.map((childOrg) => (
+              <TouchableOpacity
+                key={childOrg.id}
+                style={[styles.unitItem, { backgroundColor: colors.cardBackground }]}
+                onPress={() => onNavigateToChild(childOrg.id)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.unitLeft}>
+                  <Ionicons 
+                    name={
+                      childOrg.depth === 1 ? 'people' :  // Company/Team
+                      childOrg.depth === 2 ? 'shield' :  // Platoon/Squad
+                      'business'
+                    }
+                    size={22} 
+                    color={colors.green} 
+                  />
+                  <View style={styles.unitInfo}>
+                    <Text style={[styles.unitName, { color: colors.text }]}>
+                      {childOrg.name}
+                    </Text>
+                    <Text style={[styles.unitLevel, { color: colors.textMuted }]}>
+                      {childOrg.depth === 1 ? 'Company' : childOrg.depth === 2 ? 'Platoon' : `Level ${childOrg.depth}`}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
 
       {/* Actions */}
       <View style={styles.actions}>
@@ -316,6 +367,55 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     letterSpacing: -0.3,
+  },
+  drillDownSection: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+  },
+  drillDownHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
+  },
+  drillDownTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  drillDownSubtitle: {
+    fontSize: 13,
+    marginBottom: 12,
+  },
+  unitsList: {
+    gap: 8,
+  },
+  unitItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 14,
+    borderRadius: 10,
+  },
+  unitLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  unitInfo: {
+    flex: 1,
+  },
+  unitName: {
+    fontSize: 16,
+    fontWeight: "600",
+    letterSpacing: -0.3,
+  },
+  unitLevel: {
+    fontSize: 12,
+    marginTop: 2,
   },
 });
 

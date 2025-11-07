@@ -1,23 +1,13 @@
-// components/organizations/OrgListView.tsx
-// List view for switching between organizations
-
-import { OrgListItem } from "@/components/organizations/OrgListItem";
-import { OrgTreeItem } from "@/components/organizations/OrgTreeItem";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/ui/useColors";
-import { useOrganizationPreferencesStore } from "@/store/organizationPreferencesStore";
 import { useOrganizationsStore } from "@/store/organizationsStore";
-import { groupOrgsByParent, getRootOrgs } from "@/utils/organizationHelpers";
-import type { FlatOrganization } from "@/types/organizations";
 import { Ionicons } from "@expo/vector-icons";
-import { useState, useEffect } from "react";
 import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 interface OrgListViewProps {
@@ -38,53 +28,14 @@ export function OrgListView({
   const colors = useColors();
   const { user } = useAuth();
   const { selectedOrgId, switchOrganization, accessibleOrgs, loading } = useOrganizationsStore();
-  const { trackOrgSwitch, favoriteOrgIds, toggleFavorite } = useOrganizationPreferencesStore();
 
-  const [filteredOrgs, setFilteredOrgs] = useState<FlatOrganization[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [expandedOrgs, setExpandedOrgs] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    if (searchQuery) {
-      const filtered = accessibleOrgs.filter(
-        (org) =>
-          org.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          org.breadcrumb.join(" ").toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredOrgs(filtered);
-    } else {
-      setFilteredOrgs(accessibleOrgs);
-    }
-  }, [searchQuery, accessibleOrgs]);
-
-  useEffect(() => {
-    // Expand roots by default
-    const rootOrgIds = accessibleOrgs.filter((o) => o.isRoot).map((o) => o.id);
-    setExpandedOrgs(new Set(rootOrgIds));
-  }, [accessibleOrgs]);
-
-  const handleSwitch = async (orgId: string | null, orgName?: string) => {
-    if (orgId) {
-      trackOrgSwitch(orgId, orgName || "");
-    }
+  const handleSwitch = async (orgId: string | null) => {
     await switchOrganization(orgId);
     onBack(); // Go back to info view after switching
   };
 
-  const toggleExpand = (orgId: string) => {
-    setExpandedOrgs((prev) => {
-      const next = new Set(prev);
-      if (next.has(orgId)) {
-        next.delete(orgId);
-      } else {
-        next.add(orgId);
-      }
-      return next;
-    });
-  };
-
-  const rootOrgs = getRootOrgs(filteredOrgs);
-  const childOrgsByParent = groupOrgsByParent(filteredOrgs);
+  // Get user's actual organizations (not context-only) - should be 1-3 max
+  const userOrgs = accessibleOrgs.filter((org) => !org.isContextOnly);
   const currentOrg = accessibleOrgs.find((o) => o.id === selectedOrgId);
 
   return (
@@ -106,18 +57,6 @@ export function OrgListView({
         >
           <Ionicons name="close" size={24} color={colors.text} />
         </TouchableOpacity>
-      </View>
-
-      {/* Search */}
-      <View style={[styles.searchContainer, { backgroundColor: colors.background }]}>
-        <Ionicons name="search" size={20} color={colors.textMuted} />
-        <TextInput
-          style={[styles.searchInput, { color: colors.text }]}
-          placeholder="Search organizations..."
-          placeholderTextColor={colors.textMuted}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
       </View>
 
       {/* Content */}
@@ -145,51 +84,101 @@ export function OrgListView({
             )}
           </TouchableOpacity>
 
-          {/* Favorites */}
-          {favoriteOrgIds.length > 0 && (
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-                FAVORITES
-              </Text>
-              {favoriteOrgIds.map((favId) => {
-                const org = accessibleOrgs.find((o) => o.id === favId);
-                if (!org) return null;
-                return (
-                  <OrgListItem
-                    key={org.id}
-                    org={org}
-                    isSelected={selectedOrgId === org.id}
-                    isFavorite={true}
-                    onPress={() => handleSwitch(org.id, org.name)}
-                    onToggleFavorite={() => toggleFavorite(org.id)}
-                    depth={org.depth}
-                    isContextOnly={org.isContextOnly}
-                  />
-                );
-              })}
-            </View>
-          )}
-
-          {/* All Organizations */}
+          {/* Organizations List - Simple (1-3 orgs max) */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-              ALL ORGANIZATIONS
+              MY ORGANIZATIONS ({userOrgs.length})
             </Text>
 
-            {rootOrgs.map((rootOrg) => (
-              <OrgTreeItem
-                key={rootOrg.id}
-                org={rootOrg}
-                childOrgsByParent={childOrgsByParent}
-                selectedOrgId={selectedOrgId}
-                favoriteOrgIds={favoriteOrgIds}
-                expandedOrgs={expandedOrgs}
-                handleSwitch={handleSwitch}
-                toggleFavorite={toggleFavorite}
-                toggleExpand={toggleExpand}
-                depth={0}
-              />
-            ))}
+            {userOrgs.map((org) => {
+              const isSelected = selectedOrgId === org.id;
+
+              return (
+                <TouchableOpacity
+                  key={org.id}
+                  style={[
+                    styles.orgItem,
+                    { backgroundColor: colors.cardBackground },
+                    isSelected && { borderColor: colors.tint, borderWidth: 2 },
+                  ]}
+                  onPress={() => handleSwitch(org.id)}
+                >
+                  <Ionicons
+                    name={
+                      org.depth === 0 ? 'business' :  // Battalion
+                      org.depth === 1 ? 'people' :    // Company
+                      'shield'                        // Platoon
+                    }
+                    size={24}
+                    color={isSelected ? colors.tint : colors.icon}
+                  />
+                  <View style={styles.orgInfo}>
+                    <View style={styles.orgNameRow}>
+                      <Text style={[styles.orgName, { color: colors.text }]}>
+                        {org.name}
+                      </Text>
+                      <View style={[styles.typeBadge, { backgroundColor: colors.border }]}>
+                        <Text style={[styles.typeBadgeText, { color: colors.textMuted }]}>
+                          {org.org_type}
+                        </Text>
+                      </View>
+                    </View>
+                    {org.depth > 0 && (
+                      <Text style={[styles.orgContext, { color: colors.textMuted }]}>
+                        in {org.breadcrumb[0]}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={[styles.roleBadge, { 
+                    backgroundColor: org.role === 'commander' ? colors.blue + '20' : colors.border 
+                  }]}>
+                    <Text style={[styles.roleBadgeText, { 
+                      color: org.role === 'commander' ? colors.blue : colors.textMuted 
+                    }]}>
+                      {org.role === 'commander' ? 'ADMIN' : 'MEMBER'}
+                    </Text>
+                  </View>
+                  {isSelected && (
+                    <Ionicons name="checkmark-circle" size={20} color={colors.tint} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+
+            {/* Empty State */}
+            {userOrgs.length === 0 && (
+              <View style={styles.emptyState}>
+                <Ionicons name="business-outline" size={48} color={colors.border} />
+                <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+                  No organizations yet
+                </Text>
+                <Text style={[styles.emptyHint, { color: colors.textMuted }]}>
+                  Create one to get started
+                </Text>
+                <TouchableOpacity
+                  style={[styles.createButton, { backgroundColor: colors.tint }]}
+                  onPress={onCreateRoot}
+                >
+                  <Ionicons name="add-circle" size={20} color="#fff" />
+                  <Text style={styles.createButtonText}>
+                    Create Organization
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Create Button (when orgs exist) */}
+            {userOrgs.length > 0 && (
+              <TouchableOpacity
+                style={[styles.addOrgButton, { borderColor: colors.tint, backgroundColor: colors.tint + '10' }]}
+                onPress={onCreateRoot}
+              >
+                <Ionicons name="add-circle" size={20} color={colors.tint} />
+                <Text style={[styles.addOrgButtonText, { color: colors.tint }]}>
+                  Create New Organization
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </>
       )}
@@ -244,28 +233,101 @@ const styles = StyleSheet.create({
   orgItem: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     marginHorizontal: 0,
-    marginBottom: 4,
-    borderRadius: 10,
-    gap: 10,
+    marginBottom: 8,
+    borderRadius: 12,
+    gap: 12,
   },
   selectedItem: {
-    borderWidth: 1,
-    borderColor: "#10b981",
+    borderWidth: 2,
+    borderColor: "#6366f1",
   },
   orgItemLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
     flex: 1,
+  },
+  orgInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  orgNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   orgName: {
     fontSize: 16,
     fontWeight: "600",
     letterSpacing: -0.3,
+    flex: 1,
+  },
+  typeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  typeBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
+    textTransform: "capitalize",
+  },
+  orgContext: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  roleBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  roleBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: 40,
+    gap: 12,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  emptyHint: {
+    fontSize: 14,
+    marginBottom: 12,
+  },
+  createButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  createButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  addOrgButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 2,
+    marginTop: 16,
+  },
+  addOrgButtonText: {
+    fontSize: 15,
+    fontWeight: "600",
   },
 });
 

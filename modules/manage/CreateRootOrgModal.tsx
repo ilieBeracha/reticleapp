@@ -30,7 +30,7 @@ export function CreateRootOrgModal({
   const { createRootOrg, setSelectedOrg } = useOrganizationsStore();
 
   const [name, setName] = useState("");
-  const [orgType, setOrgType] = useState("Organization");
+  const [orgType, setOrgType] = useState("Unit");  // Better default
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -62,7 +62,7 @@ export function CreateRootOrgModal({
 
   const handleClose = () => {
     setName("");
-    setOrgType("Organization");
+    setOrgType("Unit");
     setDescription("");
     onClose();
   };
@@ -88,6 +88,19 @@ export function CreateRootOrgModal({
           </Text>
         </View>
 
+        {/* Recommended Structure Hint */}
+        <View style={[styles.hintBox, { backgroundColor: colors.green + '08', borderColor: colors.green + '30' }]}>
+          <Ionicons name="bulb" size={18} color={colors.green} />
+          <View style={styles.hintContent}>
+            <Text style={[styles.hintTitle, { color: colors.green }]}>
+              Recommended Structure
+            </Text>
+            <Text style={[styles.hintText, { color: colors.textMuted }]}>
+              Unit → Team → Squad (3 levels max)
+            </Text>
+          </View>
+        </View>
+
         {/* Form */}
         <View style={styles.form}>
           <View style={styles.field}>
@@ -108,7 +121,15 @@ export function CreateRootOrgModal({
           </View>
 
           <View style={styles.field}>
-            <Text style={[styles.label, { color: colors.text }]}>Type</Text>
+            <View style={styles.labelRow}>
+              <Text style={[styles.label, { color: colors.text }]}>Type</Text>
+              <View style={[styles.recommendedBadge, { backgroundColor: colors.green + '15' }]}>
+                <Ionicons name="star" size={12} color={colors.green} />
+                <Text style={[styles.recommendedText, { color: colors.green }]}>
+                  Unit recommended
+                </Text>
+              </View>
+            </View>
             <TextInput
               style={[
                 styles.input,
@@ -116,7 +137,7 @@ export function CreateRootOrgModal({
               ]}
               value={orgType}
               onChangeText={setOrgType}
-              placeholder="Organization"
+              placeholder="Unit"
               placeholderTextColor={colors.description}
             />
           </View>
@@ -210,9 +231,49 @@ const styles = StyleSheet.create({
   field: {
     gap: 8,
   },
+  labelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
   label: {
     fontSize: 14,
     fontWeight: "600",
+  },
+  recommendedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  recommendedText: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  hintBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 20,
+    borderWidth: 1,
+  },
+  hintContent: {
+    flex: 1,
+    gap: 2,
+  },
+  hintTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  hintText: {
+    fontSize: 12,
+    lineHeight: 16,
   },
   input: {
     paddingHorizontal: 14,

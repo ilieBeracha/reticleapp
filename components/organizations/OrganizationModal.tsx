@@ -18,7 +18,7 @@ interface OrganizationModalProps {
 
 export function OrganizationModal({ visible, onClose }: OrganizationModalProps) {
   const { user } = useAuth();
-  const { selectedOrgId, accessibleOrgs, fetchAccessibleOrgs } = useOrganizationsStore();
+  const { selectedOrgId, switchOrganization, accessibleOrgs, fetchAccessibleOrgs } = useOrganizationsStore();
   
   const [viewMode, setViewMode] = useState<"info" | "list">("info");
   const [showCreateRoot, setShowCreateRoot] = useState(false);
@@ -42,10 +42,37 @@ export function OrganizationModal({ visible, onClose }: OrganizationModalProps) 
   const currentOrg = accessibleOrgs.find(o => o.id === selectedOrgId) || null;
   const isPersonalMode = !selectedOrgId;
 
+  // Get child organizations for drill-down navigation
+  const childOrgs = currentOrg
+    ? accessibleOrgs.filter(org => {
+        // Exclude self and context-only
+        if (org.id === currentOrg.id || org.isContextOnly) return false;
+        
+        // FIX: breadcrumb might be ["Rrere → Child"] instead of ["Rrere", "Child"]
+        // Extract root name by splitting if contains arrow
+        let rootName = org.breadcrumb[0];
+        if (rootName && rootName.includes(' → ')) {
+          rootName = rootName.split(' → ')[0];
+        }
+        
+        // Match against current org name
+        return rootName === currentOrg.name;
+      }).sort((a, b) => {
+        // Sort by depth then name
+        if (a.depth !== b.depth) return a.depth - b.depth;
+        return a.name.localeCompare(b.name);
+      })
+    : [];
+
   const handleRefresh = async () => {
     if (user) {
       await fetchAccessibleOrgs(user.id);
     }
+  };
+
+  const handleNavigateToChild = async (orgId: string) => {
+    await switchOrganization(orgId);
+    await handleRefresh();
   };
 
   return (
@@ -77,6 +104,8 @@ export function OrganizationModal({ visible, onClose }: OrganizationModalProps) 
               // TODO: Navigate to settings screen
             }}
             onSwitchOrg={() => setViewMode("list")}
+            childOrgs={childOrgs}
+            onNavigateToChild={handleNavigateToChild}
           />
         ) : (
           /* Show List View */

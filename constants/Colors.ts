@@ -2,33 +2,34 @@ const tintColor = "#6366f1"; // Vibrant indigo accent
 
 export const Colors = {
   light: {
-    text: "#0f172a",
-    background: "#f8fafc",
-    tint: tintColor,
-    icon: "#64748b",
-    tabIconDefault: "#94a3b8",
-    tabIconSelected: tintColor,
-    border: "#e2e8f0",
-    cardBackground: "#ffffff",
-    card: "#ffffff",
-    buttonText: "#0f172a",
-    buttonBorder: "#cbd5e1",
-    placeholderText: "#94a3b8",
-    description: "#64748b",
-    overlay: "rgba(0,0,0,0.04)",
-    textMuted: "#64748b",
-
-    // Vibrant theme colors
-    blue: "#3b82f6",
-    green: "#10b981",
-    red: "#ef4444",
-    orange: "#f97316",
-    yellow: "#eab308",
-    pink: "#ec4899",
-    purple: "#a855f7",
-    teal: "#14b8a6",
-    indigo: "#6366f1",
+    text: "#0E1116",                  // Deep graphite — crisp and legible on off-white
+    background: "#F6F7FB",            // Slightly blue-tinted white, less sterile
+    tint: "#2563EB",                  // Refined cobalt blue for primary actions
+    icon: "#475569",                  // Muted slate for icons
+    tabIconDefault: "#94A3B8",        // Desaturated gray-blue
+    tabIconSelected: "#2563EB",       // Matches tint
+    border: "#D4D8E2",                // Soft neutral border with enough contrast
+    cardBackground: "#FFFFFF",        // Clean white for cards
+    card: "#FFFFFF",
+    buttonText: "#0E1116",
+    buttonBorder: "#CBD2E0",
+    placeholderText: "#94A3B8",
+    description: "#5B6473",           // Subtle contrast from main text
+    overlay: "rgba(15, 17, 26, 0.04)",
+    textMuted: "#6B7280",             // Gentle muted gray-blue for secondary text
+  
+    // Refined accent palette — vivid but balanced
+    blue: "#2563EB",                  // Vibrant yet professional blue
+    green: "#0E9F6E",                 // Deep emerald (not neon)
+    red: "#DC2626",                   // Rich crimson for alerts
+    orange: "#EA580C",                // Muted, warm orange
+    yellow: "#CA8A04",                // Golden amber for highlights
+    pink: "#DB2777",                  // Elegant rose-magenta
+    purple: "#7C3AED",                // Royal violet with strong contrast
+    teal: "#0D9488",                  // Cool deep teal
+    indigo: "#4338CA",                // Mature indigo accent
   },
+  
   dark: {
     text: "#f1f5f9",
     background: "#000000",

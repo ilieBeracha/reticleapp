@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/ui/useColors";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -31,19 +31,71 @@ export function CreateChildOrgModal({
 }: CreateChildOrgModalProps) {
   const colors = useColors();
   const { user } = useAuth();
-  const { createChildOrg } = useOrganizationsStore();
+  const { createChildOrg, accessibleOrgs } = useOrganizationsStore();
+
+  // Get parent org to determine depth
+  const parentOrg = accessibleOrgs.find(o => o.id === parentId);
+  const parentDepth = parentOrg?.depth ?? 0;
+
+  // Hierarchy order (top to bottom)
+  const typeHierarchy = ['Unit', 'Team', 'Squad'];
+  
+  // Get parent's type to determine what children can be created
+  const parentType = parentOrg?.org_type || 'Unit';
+  const parentHierarchyIndex = typeHierarchy.indexOf(parentType);
+
+  // Smart type suggestion based on parent type
+  const getSmartType = (parentType: string) => {
+    const parentIndex = typeHierarchy.indexOf(parentType);
+    // Suggest next level down in hierarchy
+    if (parentIndex >= 0 && parentIndex < typeHierarchy.length - 1) {
+      return typeHierarchy[parentIndex + 1];
+    }
+    return 'Squad';  // Fallback to bottom of hierarchy
+  };
+
+  const smartType = getSmartType(parentType);
 
   const [name, setName] = useState("");
-  const [orgType, setOrgType] = useState("Team");
+  const [orgType, setOrgType] = useState(smartType);
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Type options - only show types at or below parent in hierarchy
   const orgTypes = [
-    { value: "Team", icon: "people", color: colors.blue },
-    { value: "Squad", icon: "shield", color: colors.purple },
-    { value: "Unit", icon: "git-network", color: colors.teal },
-    { value: "Division", icon: "layers", color: colors.indigo },
-  ];
+    { 
+      value: "Unit", 
+      icon: "business", 
+      color: colors.teal,
+      hierarchyIndex: 0,
+      recommended: smartType === 'Unit',
+      disabled: parentHierarchyIndex >= 0,  // Can't create Unit if parent is Unit/Team/Squad
+    },
+    { 
+      value: "Team", 
+      icon: "people", 
+      color: colors.blue,
+      hierarchyIndex: 1,
+      recommended: smartType === 'Team',
+      disabled: parentHierarchyIndex >= 1,  // Can't create Team if parent is Team/Squad
+    },
+    { 
+      value: "Squad", 
+      icon: "shield", 
+      color: colors.purple,
+      hierarchyIndex: 2,
+      recommended: smartType === 'Squad',
+      disabled: parentHierarchyIndex >= 2,  // Can't create Squad if parent is Squad
+    },
+    { 
+      value: "Group", 
+      icon: "git-network", 
+      color: colors.indigo,
+      hierarchyIndex: 99,  // Not in hierarchy, always available
+      recommended: false,
+      disabled: false,
+    },
+  ].filter(type => !type.disabled);  // Remove disabled types entirely
 
   const handleCreate = async () => {
     if (!user?.id || !name.trim()) return;
@@ -75,10 +127,17 @@ export function CreateChildOrgModal({
 
   const handleClose = () => {
     setName("");
-    setOrgType("Team");
+    setOrgType(smartType);  // Reset to smart default
     setDescription("");
     onClose();
   };
+
+  // Reset to smart default when modal opens
+  useEffect(() => {
+    if (visible) {
+      setOrgType(smartType);
+    }
+  }, [visible, smartType]);
 
   return (
     <BaseBottomSheet
@@ -129,7 +188,15 @@ export function CreateChildOrgModal({
 
           {/* Type Selection - Visual Pills */}
           <View style={styles.field}>
-            <Text style={[styles.label, { color: colors.text }]}>Type</Text>
+            <View style={styles.labelRow}>
+              <Text style={[styles.label, { color: colors.text }]}>Type</Text>
+              <View style={[styles.recommendedBadge, { backgroundColor: colors.green + '15' }]}>
+                <Ionicons name="star" size={12} color={colors.green} />
+                <Text style={[styles.recommendedText, { color: colors.green }]}>
+                  {smartType} recommended
+                </Text>
+              </View>
+            </View>
             <View style={styles.typeGrid}>
               {orgTypes.map((type) => (
                 <TouchableOpacity
@@ -143,6 +210,7 @@ export function CreateChildOrgModal({
                           : colors.cardBackground,
                       borderColor:
                         orgType === type.value ? type.color : colors.border,
+                      borderWidth: type.recommended ? 2 : 1.5,
                     },
                   ]}
                   onPress={() => setOrgType(type.value)}
@@ -162,6 +230,9 @@ export function CreateChildOrgModal({
                   >
                     {type.value}
                   </Text>
+                  {type.recommended && orgType !== type.value && (
+                    <Ionicons name="star-outline" size={16} color={type.color} />
+                  )}
                   {orgType === type.value && (
                     <Ionicons name="checkmark-circle" size={18} color={type.color} />
                   )}
@@ -192,12 +263,19 @@ export function CreateChildOrgModal({
           </View>
         </View>
 
-        {/* Info */}
-        <View style={[styles.infoBox, { backgroundColor: colors.purple + "08" }]}>
-          <Ionicons name="information-circle" size={16} color={colors.purple} />
-          <Text style={[styles.infoText, { color: colors.description }]}>
-            This organization will inherit from {parentName}
-          </Text>
+        {/* Info - Smart Hierarchy Guide */}
+        <View style={[styles.infoBox, { backgroundColor: colors.green + "08", borderColor: colors.green + '30' }]}>
+          <Ionicons name="information-circle" size={16} color={colors.green} />
+          <View style={styles.infoContent}>
+            <Text style={[styles.infoText, { color: colors.text }]}>
+              {parentType === 'Unit' && 'Unit → Team → Squad (recommended)'}
+              {parentType === 'Team' && 'Team → Squad (recommended)'}
+              {parentType === 'Squad' && 'Maximum depth reached'}
+            </Text>
+            <Text style={[styles.infoSubtext, { color: colors.textMuted }]}>
+              Under {parentName} ({parentType})
+            </Text>
+          </View>
         </View>
 
         {/* Actions */}
@@ -281,9 +359,28 @@ const styles = StyleSheet.create({
   field: {
     gap: 8,
   },
+  labelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
   label: {
     fontSize: 14,
     fontWeight: "600",
+  },
+  recommendedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  recommendedText: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.5,
   },
   input: {
     paddingHorizontal: 14,
@@ -319,16 +416,25 @@ const styles = StyleSheet.create({
   },
   infoBox: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 10,
-    padding: 12,
-    borderRadius: 8,
+    padding: 14,
+    borderRadius: 10,
     marginTop: 8,
+    borderWidth: 1,
+  },
+  infoContent: {
+    flex: 1,
+    gap: 4,
   },
   infoText: {
-    flex: 1,
     fontSize: 13,
+    fontWeight: "600",
     lineHeight: 18,
+  },
+  infoSubtext: {
+    fontSize: 12,
+    lineHeight: 16,
   },
   actions: {
     flexDirection: "row",
