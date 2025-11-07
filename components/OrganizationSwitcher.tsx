@@ -1,4 +1,5 @@
 // components/OrganizationSwitcher.tsx
+import { InviteMemberModal } from "@/components/InviteMemberModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/ui/useColors";
 import { CreateChildOrgModal } from "@/modules/manage/CreateChildOrgModal";
@@ -51,6 +52,7 @@ export function OrganizationSwitcher({ visible, onClose }: OrganizationSwitcherP
   const [expandedOrgs, setExpandedOrgs] = useState<Set<string>>(new Set());
   const [showCreateRoot, setShowCreateRoot] = useState(false);
   const [showCreateChild, setShowCreateChild] = useState(false);
+  const [showInviteMember, setShowInviteMember] = useState(false);
 
   useEffect(() => {
     if (visible && user) {
@@ -252,22 +254,42 @@ export function OrganizationSwitcher({ visible, onClose }: OrganizationSwitcherP
             {selectedOrgId && (() => {
               const currentOrg = allOrgs.find((o) => o.id === selectedOrgId);
               return currentOrg && currentOrg.hasFullPermission ? (
-                <TouchableOpacity
-                  style={[
-                    styles.createButton,
-                    styles.secondaryButton,
-                    { backgroundColor: colors.cardBackground, borderColor: colors.tint },
-                  ]}
-                  onPress={() => {
-                    onClose();
-                    setShowCreateChild(true);
-                  }}
-                >
-                  <Ionicons name="git-branch" size={20} color={colors.tint} />
-                  <Text style={[styles.createButtonText, { color: colors.tint }]}>
-                    Create Child Organization
-                  </Text>
-                </TouchableOpacity>
+                <>
+                  <TouchableOpacity
+                    style={[
+                      styles.createButton,
+                      styles.secondaryButton,
+                      { backgroundColor: colors.cardBackground, borderColor: colors.tint },
+                    ]}
+                    onPress={() => {
+                      onClose();
+                      setShowCreateChild(true);
+                    }}
+                  >
+                    <Ionicons name="git-branch" size={20} color={colors.tint} />
+                    <Text style={[styles.createButtonText, { color: colors.tint }]}>
+                      Create Child Organization
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Invite Member - Only commanders */}
+                  <TouchableOpacity
+                    style={[
+                      styles.createButton,
+                      styles.secondaryButton,
+                      { backgroundColor: colors.cardBackground, borderColor: colors.green },
+                    ]}
+                    onPress={() => {
+                      onClose();
+                      setShowInviteMember(true);
+                    }}
+                  >
+                    <Ionicons name="person-add" size={20} color={colors.green} />
+                    <Text style={[styles.createButtonText, { color: colors.green }]}>
+                      Invite Members
+                    </Text>
+                  </TouchableOpacity>
+                </>
               ) : null;
             })()}
           </View>
@@ -297,6 +319,12 @@ export function OrganizationSwitcher({ visible, onClose }: OrganizationSwitcherP
           }}
         />
       )}
+
+      {/* Invite Member Modal */}
+      <InviteMemberModal
+        visible={showInviteMember}
+        onClose={() => setShowInviteMember(false)}
+      />
     </>
   );
 }

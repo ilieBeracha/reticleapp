@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { Session, User } from '@supabase/supabase-js'
 import * as Linking from 'expo-linking'
 import * as WebBrowser from 'expo-web-browser'
+import { router } from 'expo-router'
 import React, { createContext, useContext, useEffect, useState } from 'react'
 
 // Warm up the browser for faster OAuth
@@ -49,15 +50,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (_event === 'SIGNED_IN' && session?.user) {
         const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage')
         const pendingInviteCode = await AsyncStorage.getItem('pending_invite_code')
-        
+
         if (pendingInviteCode) {
-          console.log('✅ Found pending invite code, redirecting...')
+          console.log('✅ Found pending invite code, redirecting to accept invite...')
           // Clear the stored code
           await AsyncStorage.removeItem('pending_invite_code')
-          
-          // Redirect will be handled by app/index.tsx
-          // The index.tsx will detect the user is authenticated
-          // and check for invite code in the URL
+
+          // Redirect to protected invite page to accept
+          setTimeout(() => {
+            router.replace(`/(protected)/invite?token=${pendingInviteCode}`)
+          }, 500)
         }
       }
     })
