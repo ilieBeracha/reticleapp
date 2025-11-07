@@ -119,6 +119,19 @@ export class OrganizationsService {
       return siblings.map((s: any) => s.id).filter((id: string) => id !== orgId);
     };
 
+    // Helper: Get all ancestors (parent path) of an org
+    const getAncestors = (orgId: string): string[] => {
+      const ancestors: string[] = [];
+      let current = orgMap.get(orgId);
+
+      while (current && current.parent_id) {
+        ancestors.push(current.parent_id);
+        current = orgMap.get(current.parent_id);
+      }
+
+      return ancestors;
+    };
+
     // Build visible orgs with permissions
     const visibleOrgs = new Map<string, {
       org: any;
@@ -185,7 +198,7 @@ export class OrganizationsService {
           }
         }
       } else {
-        // MEMBER/VIEWER: See only their org + root for context
+        // MEMBER/VIEWER: See their org + all ancestors (full path to root) for context
         visibleOrgs.set(orgId, {
           org: orgMap.get(orgId),
           role,
@@ -194,16 +207,18 @@ export class OrganizationsService {
           userOrgData: userOrg,
         });
 
-        // Add root for context (if not already root)
+        // Add ALL ancestors for context (to show complete hierarchy path)
         if (!isRoot) {
-          const rootId = getRootId(orgId);
-          if (!visibleOrgs.has(rootId) || visibleOrgs.get(rootId)!.isContextOnly) {
-            visibleOrgs.set(rootId, {
-              org: orgMap.get(rootId),
-              role: "viewer",
-              hasFullPermission: false,
-              isContextOnly: true,
-            });
+          const ancestors = getAncestors(orgId);
+          for (const ancestorId of ancestors) {
+            if (!visibleOrgs.has(ancestorId) || visibleOrgs.get(ancestorId)!.isContextOnly) {
+              visibleOrgs.set(ancestorId, {
+                org: orgMap.get(ancestorId),
+                role: "viewer",
+                hasFullPermission: false,
+                isContextOnly: true,
+              });
+            }
           }
         }
       }

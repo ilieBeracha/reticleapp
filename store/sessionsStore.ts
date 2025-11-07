@@ -16,7 +16,7 @@ interface SessionStatsStore {
   error: string | null;
 
   // Actions
-  fetchSessions: (userId: string, orgId?: string | null) => Promise<void>;
+  fetchSessions: (userId: string, orgId?: string | null, userOrgIds?: string[]) => Promise<void>;
   createSession: (
     input: CreateSessionStatsInput,
     userId: string
@@ -34,11 +34,11 @@ export const sessionStatsStore = create<SessionStatsStore>((set) => ({
   loading: false,
   error: null,
 
-  fetchSessions: async (userId: string, orgId?: string | null) => {
+  fetchSessions: async (userId: string, orgId?: string | null, userOrgIds?: string[]) => {
     try {
       set({ loading: true, error: null });
 
-      const sessions = await getSessionStats(userId, orgId);
+      const sessions = await getSessionStats(userId, orgId, userOrgIds);
 
       set({ sessions, loading: false });
     } catch (err: any) {

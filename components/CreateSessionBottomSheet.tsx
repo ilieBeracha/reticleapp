@@ -129,6 +129,7 @@ export function CreateSessionBottomSheet({
       enableDynamicSizing={false}
       enablePanDownToClose={!isSubmitting}
       backdropOpacity={0.45}
+      scrollable={true}
     >
       <View style={styles.container}>
         {/* Header */}
@@ -414,8 +415,6 @@ export function CreateSessionBottomSheet({
               numberOfLines={3}
               textAlignVertical="top"
             />
-          </View>
-        </ScrollView>
 
         {/* Actions */}
         <View style={styles.actions}>
@@ -455,6 +454,8 @@ export function CreateSessionBottomSheet({
             )}
           </TouchableOpacity>
         </View>
+          </View>
+        </ScrollView>
       </View>
     </BaseBottomSheet>
   );

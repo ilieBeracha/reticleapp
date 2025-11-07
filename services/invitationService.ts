@@ -98,10 +98,10 @@ export async function getInvitationByCodeService(
 
 /**
  * Accept an invitation by invite code
- * Finds invitation by code, creates org membership, and updates invitation status
+ * Uses RPC to bypass RLS policies and handle all logic server-side
  *
  * @param inviteCode - 6-character invite code
- * @param userId - User ID accepting the invitation
+ * @param userId - User ID accepting the invitation (not used, JWT determines user)
  * @returns Accepted invitation with org details
  */
 export async function acceptInvitationService(
@@ -111,53 +111,44 @@ export async function acceptInvitationService(
   try {
     const client = await AuthenticatedClient.getClient();
 
-    // 1. Find invitation by code
-    const invitation = await getInvitationByCodeService(inviteCode);
-    if (!invitation) {
-      throw new DatabaseError("Invalid or expired invitation code");
+    console.log('🔵 Calling accept_org_invite RPC with token:', inviteCode.toUpperCase());
+
+    // Call the RPC function which handles all the logic server-side
+    // This bypasses RLS policies since RPCs run with elevated permissions
+    const { data, error } = await client.rpc("accept_org_invite", {
+      p_token: inviteCode.toUpperCase(),
+    });
+
+    console.log('🔵 RPC response:', { data, error });
+
+    if (error) {
+      console.error('❌ RPC error:', error);
+      
+      // Parse error messages from RPC
+      if (error.message?.includes("not found") || error.message?.includes("expired")) {
+        throw new DatabaseError("Invalid or expired invitation code");
+      } else if (error.message?.includes("already a member")) {
+        throw new DatabaseError("You are already a member of this organization");
+      }
+      
+      throw new DatabaseError(error.message || "Failed to accept invitation");
     }
 
-    // 2. Check if already a member
-    const { data: existingMembership } = await client
-      .from("org_memberships")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("org_id", invitation.organization_id)
-      .single();
-
-    if (existingMembership) {
-      throw new DatabaseError("You are already a member of this organization");
+    if (!data) {
+      throw new DatabaseError("No data returned from invitation acceptance");
     }
 
-    // 3. Create org membership
-    const { error: membershipError } = await client
-      .from("org_memberships")
-      .insert({
-        user_id: userId,
-        org_id: invitation.organization_id,
-        role: invitation.role,
-      });
+    console.log('✅ Invitation accepted successfully:', data);
 
-    if (membershipError) throw new DatabaseError(membershipError.message);
-
-    // 4. Update invitation status
-    const { data, error } = await client
-      .from("invitations")
-      .update({ 
-        status: "accepted", 
-        accepted_at: new Date().toISOString() 
-      })
-      .eq("id", invitation.id)
-      .select("*, organizations(*)")
-      .single();
-
-    if (error) throw new DatabaseError(error.message);
+    // Parse the JSONB response from the RPC
+    const result = typeof data === 'string' ? JSON.parse(data) : data;
 
     return {
-      invitation: data as Invitation,
-      orgName: (data as any).organizations?.name || "Organization",
+      invitation: result.invitation as Invitation,
+      orgName: result.org_name || result.invitation?.organizations?.name || "Organization",
     };
   } catch (err: any) {
+    console.error('❌ Error in acceptInvitationService:', err);
     handleServiceError(err, "Failed to accept invitation");
   }
 }

@@ -42,9 +42,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log('🔵 Auth state changed:', _event, session?.user?.email || 'none')
+      
+      // Update state first
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
+
+      // Handle sign out events - redirect to auth
+      if (_event === 'SIGNED_OUT') {
+        console.log('🔴 SIGNED_OUT event received, redirecting to sign in...')
+        router.replace('/auth/sign-in')
+      }
+
+      // Handle token refresh failures - treat as sign out
+      if (_event === 'TOKEN_REFRESHED' && !session) {
+        console.log('🔴 Token refresh failed, user signed out')
+        router.replace('/auth/sign-in')
+      }
+      
+      // Handle when session is null unexpectedly
+      if (!session && _event === 'INITIAL_SESSION') {
+        console.log('🔴 No initial session found')
+      }
 
       // Check for pending invite code after successful sign in
       if (_event === 'SIGNED_IN' && session?.user) {
@@ -219,8 +238,64 @@ const signInWithOAuth = async (provider: 'google' | 'apple') => {
 }
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) throw error
+    console.log('🔴 Sign out initiated')
+    
+    // Helper to clear all auth storage
+    const clearAuthStorage = async () => {
+      try {
+        const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage')
+        const allKeys = await AsyncStorage.getAllKeys()
+        console.log('🔍 All AsyncStorage keys:', allKeys)
+        const supabaseKeys = allKeys.filter(key => key.includes('supabase') || key.startsWith('sb-'))
+        console.log('🔍 Found Supabase keys to clear:', supabaseKeys)
+        
+        if (supabaseKeys.length > 0) {
+          await AsyncStorage.multiRemove(supabaseKeys)
+          console.log('🧹 Successfully cleared auth keys:', supabaseKeys)
+        } else {
+          console.log('⚠️ No Supabase keys found in storage')
+        }
+      } catch (storageError) {
+        console.error('❌ Error clearing storage:', storageError)
+      }
+    }
+    
+    try {
+      // Attempt to sign out through Supabase
+      const { error } = await supabase.auth.signOut()
+      
+      // Handle session missing error - not a real error
+      if (error?.name === 'AuthSessionMissingError') {
+        console.log('⚠️ Session already missing')
+        // Clear storage manually since Supabase didn't do it
+        await clearAuthStorage()
+        setUser(null)
+        setSession(null)
+        return
+      }
+      
+      // If there's a different error, throw it
+      if (error) {
+        throw error
+      }
+      
+      // Success - but still ensure storage is cleared
+      console.log('✅ Supabase sign out successful')
+      await clearAuthStorage()
+      setUser(null)
+      setSession(null)
+      console.log('🔴 Sign out complete - state cleared')
+      
+    } catch (error: any) {
+      // For ANY error during sign out, clear everything anyway
+      console.error('❌ Error during sign out:', error)
+      await clearAuthStorage()
+      setUser(null)
+      setSession(null)
+      
+      // Don't re-throw - sign out should always succeed from user's perspective
+      console.log('🔴 Forced sign out completed despite error')
+    }
   }
 
   return (

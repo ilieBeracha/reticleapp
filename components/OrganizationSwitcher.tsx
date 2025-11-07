@@ -76,8 +76,10 @@ export function OrganizationSwitcher({ visible, onClose }: OrganizationSwitcherP
   const loadOrganizations = async () => {
     try {
       setLoading(true);
+      console.log("🔄 OrganizationSwitcher: Loading organizations for user:", user!.id);
       const orgs = await OrganizationsService.getAllAccessibleOrganizations(user!.id);
 
+      console.log(`✅ OrganizationSwitcher: Loaded ${orgs.length} organizations:`, orgs.map(o => ({ id: o.id, name: o.name, role: o.role })));
 
       setAllOrgs(orgs);
       setFilteredOrgs(orgs);
@@ -86,7 +88,7 @@ export function OrganizationSwitcher({ visible, onClose }: OrganizationSwitcherP
       const rootOrgIds = orgs.filter((o) => o.isRoot).map((o) => o.id);
       setExpandedOrgs(new Set(rootOrgIds));
     } catch (error) {
-      console.error("Error loading organizations:", error);
+      console.error("❌ OrganizationSwitcher: Error loading organizations:", error);
     } finally {
       setLoading(false);
     }

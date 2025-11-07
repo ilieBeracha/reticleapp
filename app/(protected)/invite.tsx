@@ -2,6 +2,7 @@ import { ThemedView } from "@/components/ThemedView";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/ui/useColors";
 import { invitationStore } from "@/store/invitationStore";
+import { useOrganizationsStore } from "@/store/organizationsStore";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
@@ -13,9 +14,11 @@ export default function InviteScreen() {
   const { user } = useAuth();
   const colors = useColors();
   const { acceptInvitation } = useStore(invitationStore);
+  const { fetchAllOrgs, switchOrganization } = useStore(useOrganizationsStore);
   
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [message, setMessage] = useState("");
+  const [newOrgId, setNewOrgId] = useState<string | null>(null);
 
   useEffect(() => {
     if (token && user?.id) {
@@ -40,12 +43,30 @@ export default function InviteScreen() {
       
       console.log("✅ Successfully joined:", result);
       
+      // Extract org ID from the result
+      const joinedOrgId = result.invitation?.organization_id || (result as any).org_id;
+      setNewOrgId(joinedOrgId);
+      
       setStatus("success");
       setMessage(`Welcome to ${result.orgName}!`);
       
+      // Refresh organization list to include newly joined org
+      console.log("🔄 Refreshing organization list...");
+      await fetchAllOrgs(user.id);
+      console.log("✅ Organization list refreshed");
+      
+      // Switch to the newly joined organization
+      if (joinedOrgId) {
+        console.log("🔄 Switching to newly joined org:", joinedOrgId);
+        await switchOrganization(joinedOrgId);
+        console.log("✅ Switched to new organization");
+      }
+      
+      // Wait a bit longer to ensure everything syncs
       setTimeout(() => {
+        console.log("🏠 Redirecting to home with new org active");
         router.replace("/(protected)/(tabs)");
-      }, 1500);
+      }, 2000);
     } catch (error: any) {
       console.error("Error accepting invitation:", error);
       setStatus("error");

@@ -100,11 +100,15 @@ export function Home() {
 
       if (user?.id) {
         console.log("Fetching sessions for orgId:", selectedOrgId); // ✅ Use hierarchy org
-        sessionStatsStore.getState().fetchSessions(user?.id, selectedOrgId); // ✅ Pass hierarchy org ID
+
+        // Get all org IDs the user is a member of (for personal mode)
+        const userOrgIds = allOrgs.map((org) => org.id);
+
+        sessionStatsStore.getState().fetchSessions(user?.id, selectedOrgId, userOrgIds); // ✅ Pass hierarchy org ID + all org IDs
       }
     };
     loadSessions();
-  }, [user?.id]);
+  }, [user?.id, selectedOrgId, allOrgs]);
 
   // ✅ Animate when switching orgs
   useEffect(() => {

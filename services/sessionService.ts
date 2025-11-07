@@ -56,7 +56,8 @@ export interface UpdateSessionStatsInput {
 // Get all sessions (personal or org)
 export async function getSessionStats(
   userId: string,
-  orgId?: string | null
+  orgId?: string | null,
+  userOrgIds?: string[]
 ): Promise<SessionStats[]> {
   const client = await AuthenticatedClient.getClient();
 
@@ -66,11 +67,17 @@ export async function getSessionStats(
     .order("started_at", { ascending: false });
 
   if (orgId) {
-    // Get org sessions
+    // Org mode: Get only sessions from selected organization
     query = query.eq("organization_id", orgId);
   } else {
-    // Get personal sessions
-    query = query.eq("created_by", userId).is("organization_id", null);
+    // Personal mode: Get sessions from all orgs user belongs to + personal sessions
+    if (userOrgIds && userOrgIds.length > 0) {
+      // Get sessions where org_id is in user's orgs OR where org_id is null (personal) and created by user
+      query = query.or(`organization_id.in.(${userOrgIds.join(',')}),and(organization_id.is.null,created_by.eq.${userId})`);
+    } else {
+      // Fallback: just personal sessions
+      query = query.eq("created_by", userId).is("organization_id", null);
+    }
   }
 
   const { data, error } = await query;
