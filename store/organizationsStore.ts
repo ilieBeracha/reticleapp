@@ -1,6 +1,7 @@
 // stores/organizationsStore.ts
 import { OrganizationsService } from "@/services/organizationsService";
 import type {
+  FlatOrganization,
   Organization,
   OrgChild,
   OrgMembership,
@@ -24,6 +25,7 @@ interface OrganizationsStore {
   // State
   userOrgs: UserOrg[];
   allOrgs: Organization[];
+  accessibleOrgs: FlatOrganization[]; // ✅ NEW: Flattened orgs for switcher
   selectedOrgId: string | null;
   orgChildren: OrgChild[];
   orgSubtree: OrgSubtree[];
@@ -37,6 +39,7 @@ interface OrganizationsStore {
   // Actions
   fetchUserOrgs: (userId: string, options?: { silent?: boolean }) => Promise<void>;
   fetchAllOrgs: (userId: string, options?: { silent?: boolean }) => Promise<void>;
+  fetchAccessibleOrgs: (userId: string, options?: { silent?: boolean }) => Promise<void>; // ✅ NEW
   fetchOrgChildren: (orgId: string, options?: { silent?: boolean }) => Promise<void>;
   fetchOrgSubtree: (orgId: string, options?: { silent?: boolean }) => Promise<void>;
   fetchOrgTree: (rootId: string, options?: { silent?: boolean }) => Promise<void>;
@@ -84,6 +87,7 @@ export const useOrganizationsStore = create<OrganizationsStore>((set, get) => ({
   // Initial state
   userOrgs: [],
   allOrgs: [],
+  accessibleOrgs: [], // ✅ NEW: For organization switcher
   selectedOrgId: null,
   orgChildren: [],
   orgSubtree: [],
@@ -114,6 +118,18 @@ export const useOrganizationsStore = create<OrganizationsStore>((set, get) => ({
     } catch (err: any) {
       console.error("Error fetching all orgs:", err);
       set({ error: err.message, allOrgs: [], loading: false });
+    }
+  },
+
+  // ✅ NEW: Fetch accessible orgs with permissions (for org switcher)
+  fetchAccessibleOrgs: async (userId: string, options?: { silent?: boolean }) => {
+    try {
+      if (!options?.silent) set({ loading: true, error: null });
+      const accessibleOrgs = await OrganizationsService.getAllAccessibleOrganizations(userId);
+      set({ accessibleOrgs, loading: false });
+    } catch (err: any) {
+      console.error("Error fetching accessible orgs:", err);
+      set({ error: err.message, accessibleOrgs: [], loading: false });
     }
   },
 
@@ -170,9 +186,10 @@ export const useOrganizationsStore = create<OrganizationsStore>((set, get) => ({
     try {
       const org = await OrganizationsService.createRootOrg(input, userId);
 
-      // Refresh data
+      // Refresh data (cache auto-invalidated in service)
       await get().fetchUserOrgs(userId);
       await get().fetchAllOrgs(userId);
+      await get().fetchAccessibleOrgs(userId, { silent: true }); // ✅ NEW: Refresh switcher data
 
       return org;
     } catch (err: any) {
@@ -186,8 +203,9 @@ export const useOrganizationsStore = create<OrganizationsStore>((set, get) => ({
     try {
       const org = await OrganizationsService.createChildOrg(input, userId);
 
-      // Refresh data
+      // Refresh data (cache auto-invalidated in service)
       await get().fetchAllOrgs(userId);
+      await get().fetchAccessibleOrgs(userId, { silent: true }); // ✅ NEW: Refresh switcher data
       if (get().selectedOrgId) {
         await get().fetchOrgChildren(get().selectedOrgId!);
       }
@@ -334,6 +352,7 @@ export const useOrganizationsStore = create<OrganizationsStore>((set, get) => ({
     set({
       userOrgs: [],
       allOrgs: [],
+      accessibleOrgs: [], // ✅ NEW
       selectedOrgId: null,
       orgChildren: [],
       orgSubtree: [],

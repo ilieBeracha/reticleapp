@@ -100,12 +100,12 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     gap: 10,
   },
   personalText: {
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: "600",
     letterSpacing: -0.3,
   },
@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   crumbText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "500",
     letterSpacing: -0.2,
   },

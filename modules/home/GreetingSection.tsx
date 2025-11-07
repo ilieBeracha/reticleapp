@@ -102,68 +102,6 @@ export function GreetingSection({
       <Text style={[styles.userName, { color: colors.text }]}>
         {user?.user_metadata?.full_name || "User"}
       </Text>
-
-      {/* Organization Context - Minimal */}
-      {!isPersonalWorkspace && currentOrg && (
-        <View style={styles.orgSection}>
-          {/* Org Title Line */}
-          <View style={styles.orgTitleRow}>
-            <Text style={[styles.orgName, { color: colors.text }]}>
-              {currentOrg.name}
-            </Text>
-            {userMembership && (
-              <Text style={[styles.roleText, { color: colors.textMuted }]}>
-                {userMembership.role}
-              </Text>
-            )}
-          </View>
-
-          {/* Subtle Divider */}
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-          {/* Clean Story Insights */}
-          <View style={styles.insights}>
-            {/* Team Composition */}
-            <Text style={[styles.insightText, { color: colors.description }]}>
-              {totalMembers === 1
-                ? "Solo training workspace"
-                : commanders > 1
-                ? `Leading ${totalMembers - commanders} members with ${
-                    commanders - 1
-                  } other ${commanders === 2 ? "commander" : "commanders"}`
-                : `Training with ${totalMembers - 1} ${
-                    totalMembers === 2 ? "teammate" : "teammates"
-                  }`}
-            </Text>
-
-            {/* Recent Activity */}
-            {lastSession && lastSessionDaysAgo !== null && (
-              <Text style={[styles.insightText, { color: colors.description }]}>
-                {lastSessionDaysAgo === 0
-                  ? "Active today"
-                  : lastSessionDaysAgo === 1
-                  ? "Last active yesterday"
-                  : lastSessionDaysAgo <= 3
-                  ? `Last active ${lastSessionDaysAgo} days ago`
-                  : lastSessionDaysAgo <= 7
-                  ? `${lastSessionDaysAgo} days since last session`
-                  : "It's been a while since your last session"}
-              </Text>
-            )}
-
-            {/* Monthly Progress */}
-            {thisMonth > 0 && (
-              <Text style={[styles.insightText, { color: colors.description }]}>
-                {thisMonth === 1
-                  ? "1 session this month"
-                  : thisMonth < 5
-                  ? `${thisMonth} sessions this month`
-                  : `${thisMonth} sessions this month — on track`}
-              </Text>
-            )}
-          </View>
-        </View>
-      )}
     </View>
   );
 }

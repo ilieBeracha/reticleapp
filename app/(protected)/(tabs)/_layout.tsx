@@ -1,8 +1,8 @@
 import { CreateSessionBottomSheet } from "@/components/CreateSessionBottomSheet";
 import CreateTrainingModal from "@/components/CreateTrainingModal";
 import Header from "@/components/Header";
-import { OrgBreadcrumb } from "@/components/OrgBreadcrumb";
-import { OrgSwitchIndicator } from "@/components/OrgSwitchIndicator";
+import { OrgBreadcrumb } from "@/components/organizations/OrgBreadcrumb";
+import { OrgSwitchIndicator } from "@/components/organizations/OrgSwitchIndicator";
 import QuickActionsFloatingButton from "@/components/QuickActionsFloatingButton";
 import { useColors } from "@/hooks/ui/useColors";
 import { useOrganizationsStore } from "@/store/organizationsStore";
