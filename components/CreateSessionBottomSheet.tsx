@@ -1,11 +1,13 @@
 import BaseBottomSheet from "@/components/BaseBottomSheet";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/ui/useColors";
+import { OrganizationsService } from "@/services/organizationsService";
 import { DayPeriod } from "@/services/sessionService";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { sessionStatsStore } from "@/store/sessionsStore";
+import type { FlatOrganization } from "@/types/organizations";
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -23,7 +25,7 @@ interface CreateSessionBottomSheetProps {
   onClose: () => void;
 }
 
-export default function CreateSessionBottomSheet({
+export function CreateSessionBottomSheet({
   visible,
   onClose,
 }: CreateSessionBottomSheetProps) {
@@ -32,7 +34,7 @@ export default function CreateSessionBottomSheet({
   const { selectedOrgId } = useOrganizationsStore();
 
   const { createSession, fetchSessions } = useStore(sessionStatsStore);
-  const isPersonalWorkspace = selectedOrgId == null || selectedOrgId == undefined;
+
   // Form state
   const [name, setName] = useState("");
   const [rangeLocation, setRangeLocation] = useState("");
@@ -41,12 +43,36 @@ export default function CreateSessionBottomSheet({
   const [comments, setComments] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Org picker state
+  const [destinationOrgId, setDestinationOrgId] = useState<string | null>(selectedOrgId);
+  const [showOrgPicker, setShowOrgPicker] = useState(false);
+  const [accessibleOrgs, setAccessibleOrgs] = useState<FlatOrganization[]>([]);
+
+  useEffect(() => {
+    if (visible) {
+      setDestinationOrgId(selectedOrgId);
+      loadAccessibleOrgs();
+    }
+  }, [visible, selectedOrgId]);
+
+  const loadAccessibleOrgs = async () => {
+    if (!user) return;
+    try {
+      const orgs = await OrganizationsService.getAllAccessibleOrganizations(user.id);
+      // Only show orgs where user can create (commander or member)
+      setAccessibleOrgs(orgs.filter((o) => o.role !== "viewer"));
+    } catch (error) {
+      console.error("Error loading orgs:", error);
+    }
+  };
+
   const resetForm = () => {
     setName("");
     setRangeLocation("");
     setDayPeriod("morning");
     setIsSquad(false);
     setComments("");
+    setShowOrgPicker(false);
   };
 
   const handleClose = () => {
@@ -59,7 +85,7 @@ export default function CreateSessionBottomSheet({
       Alert.alert("Error", "Authentication error");
       return;
     }
-    
+
     try {
       setIsSubmitting(true);
 
@@ -71,23 +97,29 @@ export default function CreateSessionBottomSheet({
           day_period: dayPeriod,
           is_squad: isSquad,
           comments: comments.trim() || undefined,
-          organization_id: selectedOrgId || null,
+          organization_id: destinationOrgId || null,
         },
         user.id
       );
 
-      // Refetch sessions
+      // Refetch sessions for current view
       await fetchSessions(user.id, selectedOrgId);
 
       Alert.alert("Success", "Session started successfully!");
       handleClose();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error creating session:", error);
-      Alert.alert("Error", error.message || "Failed to create session");
+      const errorMessage = error instanceof Error ? error.message : "Failed to create session";
+      Alert.alert("Error", errorMessage);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const destinationOrg = accessibleOrgs.find((o) => o.id === destinationOrgId);
+  const destinationLabel = destinationOrgId
+    ? destinationOrg?.name || "Unknown Org"
+    : "Personal Workspace";
 
   return (
     <BaseBottomSheet
@@ -145,6 +177,105 @@ export default function CreateSessionBottomSheet({
               placeholderTextColor={colors.description}
               editable={!isSubmitting}
             />
+          </View>
+
+          {/* Save To Destination */}
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.text }]}>Save To</Text>
+            <TouchableOpacity
+              style={[
+                styles.orgPicker,
+                {
+                  backgroundColor: colors.cardBackground,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={() => setShowOrgPicker(!showOrgPicker)}
+              disabled={isSubmitting}
+            >
+              <View style={styles.orgPickerLeft}>
+                <Ionicons
+                  name={destinationOrgId ? "business" : "person"}
+                  size={18}
+                  color={destinationOrgId ? colors.tint : colors.blue}
+                />
+                <Text style={[styles.orgPickerText, { color: colors.text }]}>
+                  {destinationLabel}
+                </Text>
+              </View>
+              <Ionicons
+                name={showOrgPicker ? "chevron-up" : "chevron-down"}
+                size={18}
+                color={colors.textMuted}
+              />
+            </TouchableOpacity>
+
+            {/* Org Picker Dropdown */}
+            {showOrgPicker && (
+              <View style={[styles.orgPickerDropdown, { backgroundColor: colors.card }]}>
+                {/* Personal */}
+                <TouchableOpacity
+                  style={[
+                    styles.orgOption,
+                    !destinationOrgId && styles.orgOptionSelected,
+                    { backgroundColor: colors.cardBackground },
+                  ]}
+                  onPress={() => {
+                    setDestinationOrgId(null);
+                    setShowOrgPicker(false);
+                  }}
+                >
+                  <Ionicons name="person" size={16} color={colors.blue} />
+                  <Text style={[styles.orgOptionText, { color: colors.text }]}>
+                    Personal Workspace
+                  </Text>
+                  {!destinationOrgId && (
+                    <Ionicons name="checkmark" size={16} color={colors.green} />
+                  )}
+                </TouchableOpacity>
+
+                {/* Organizations */}
+                {accessibleOrgs.map((org) => (
+                  <TouchableOpacity
+                    key={org.id}
+                    style={[
+                      styles.orgOption,
+                      destinationOrgId === org.id && styles.orgOptionSelected,
+                      { backgroundColor: colors.cardBackground },
+                    ]}
+                    onPress={() => {
+                      setDestinationOrgId(org.id);
+                      setShowOrgPicker(false);
+                    }}
+                  >
+                    <Ionicons name="business" size={16} color={colors.tint} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.orgOptionText, { color: colors.text }]}>
+                        {org.name}
+                      </Text>
+                      {org.breadcrumb.length > 1 && (
+                        <Text style={[styles.orgOptionPath, { color: colors.textMuted }]}>
+                          {org.breadcrumb.join(" → ")}
+                        </Text>
+                      )}
+                    </View>
+                    {destinationOrgId === org.id && (
+                      <Ionicons name="checkmark" size={16} color={colors.green} />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {/* Info Message */}
+            <View style={styles.infoBox}>
+              <Ionicons name="information-circle" size={16} color={colors.blue} />
+              <Text style={[styles.infoText, { color: colors.textMuted }]}>
+                {destinationOrgId
+                  ? `Visible to all members of ${destinationLabel}`
+                  : "Only visible to you"}
+              </Text>
+            </View>
           </View>
 
           {/* Range Location */}
@@ -215,7 +346,6 @@ export default function CreateSessionBottomSheet({
             </View>
           </View>
 
-              {!isPersonalWorkspace && (<>
           {/* Squad Training Toggle */}
           <View style={styles.field}>
             <TouchableOpacity
@@ -259,8 +389,7 @@ export default function CreateSessionBottomSheet({
               </View>
             </TouchableOpacity>
           </View>
-          </>
-          )}
+
           {/* Comments */}
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.text }]}>
@@ -395,6 +524,61 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 16,
     fontSize: 15,
+  },
+  orgPicker: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    height: 48,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+  },
+  orgPickerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  orgPickerText: {
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  orgPickerDropdown: {
+    marginTop: 8,
+    borderRadius: 10,
+    padding: 8,
+    gap: 6,
+    maxHeight: 280,
+  },
+  orgOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 12,
+    borderRadius: 8,
+  },
+  orgOptionSelected: {
+    opacity: 0.7,
+  },
+  orgOptionText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  orgOptionPath: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  infoBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
+  infoText: {
+    fontSize: 12,
+    flex: 1,
   },
   textArea: {
     height: 80,

@@ -72,3 +72,19 @@ export interface OrgTreeNode {
   path: string;
   member_count: number;
 }
+
+export interface FlatOrganization {
+  id: string;
+  name: string;
+  org_type: string;
+  parent_id: string | null;
+  depth: number;
+  role: "commander" | "member" | "viewer";
+  isRoot: boolean;
+  breadcrumb: string[];
+  childCount: number;
+  created_at: string;
+  // Permission flags
+  hasFullPermission: boolean;  // Can edit, delete, create children
+  isContextOnly: boolean;      // Visible for context but read-only
+}

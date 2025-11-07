@@ -8,8 +8,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { UserOrg } from "@/types/organizations";
+import { OrganizationSwitcher } from "./OrganizationSwitcher";
 import ProfileDropdown from "./ProfileDropdown";
-import { OrganizationSwitcherModal } from "./organization-switcher";
 
 interface HeaderProps {
   onNotificationPress: () => void;
@@ -137,7 +137,7 @@ export default function Header({
         onMenuAction={handleMenuAction}
       />
 
-      <OrganizationSwitcherModal
+      <OrganizationSwitcher
         visible={orgSwitcherOpen}
         onClose={() => setOrgSwitcherOpen(false)}
       />

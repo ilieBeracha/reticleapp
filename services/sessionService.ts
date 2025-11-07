@@ -1,5 +1,5 @@
 // services/sessionStatsService.ts
-import { supabase } from "@/lib/supabase";
+import { AuthenticatedClient, DatabaseError, NotFoundError } from "@/lib/authenticatedClient";
 
 export interface WeatherConditions {
   temperature?: number;
@@ -58,45 +58,39 @@ export async function getSessionStats(
   userId: string,
   orgId?: string | null
 ): Promise<SessionStats[]> {
-  try {
-    let query = supabase
-      .from("session_stats")
-      .select("*")
-      .order("started_at", { ascending: false });
+  const client = await AuthenticatedClient.getClient();
 
-    if (orgId) {
-      // Get org sessions
-      query = query.eq("organization_id", orgId);
-    } else {
-      // Get personal sessions
-      query = query.eq("created_by", userId).is("organization_id", null);
-    }
+  let query = client
+    .from("session_stats")
+    .select("*")
+    .order("started_at", { ascending: false });
 
-    const { data, error } = await query;
-
-    if (error) throw error;
-    return data || [];
-  } catch (error: any) {
-    console.error("Error fetching sessions:", error);
-    throw new Error(error.message || "Failed to fetch sessions");
+  if (orgId) {
+    // Get org sessions
+    query = query.eq("organization_id", orgId);
+  } else {
+    // Get personal sessions
+    query = query.eq("created_by", userId).is("organization_id", null);
   }
+
+  const { data, error } = await query;
+
+  if (error) throw new DatabaseError(error.message);
+  return data || [];
 }
 
 // Get single session
-export async function getSessionStat(sessionId: string): Promise<SessionStats | null> {
-  try {
-    const { data, error } = await supabase
-      .from("session_stats")
-      .select("*")
-      .eq("id", sessionId)
-      .single();
+export async function getSessionStat(sessionId: string): Promise<SessionStats> {
+  const client = await AuthenticatedClient.getClient();
 
-    if (error) throw error;
-    return data;
-  } catch (error: any) {
-    console.error("Error fetching session:", error);
-    throw new Error(error.message || "Failed to fetch session");
-  }
+  const { data, error } = await client
+    .from("session_stats")
+    .select("*")
+    .eq("id", sessionId)
+    .single();
+
+  if (error) throw new NotFoundError(`Session ${sessionId} not found`);
+  return data;
 }
 
 // Create session
@@ -104,23 +98,20 @@ export async function createSessionStats(
   input: CreateSessionStatsInput,
   userId: string
 ): Promise<SessionStats> {
-  try {
-    const { data, error } = await supabase
-      .from("session_stats")
-      .insert({
-        ...input,
-        created_by: userId,
-        is_squad: input.is_squad ?? false,
-      })
-      .select()
-      .single();
+  const client = await AuthenticatedClient.getClient();
 
-    if (error) throw error;
-    return data;
-  } catch (error: any) {
-    console.error("Error creating session:", error);
-    throw new Error(error.message || "Failed to create session");
-  }
+  const { data, error } = await client
+    .from("session_stats")
+    .insert({
+      ...input,
+      created_by: userId,
+      is_squad: input.is_squad ?? false,
+    })
+    .select()
+    .single();
+
+  if (error) throw new DatabaseError(error.message);
+  return data;
 }
 
 // Update session
@@ -128,53 +119,44 @@ export async function updateSessionStats(
   sessionId: string,
   input: UpdateSessionStatsInput
 ): Promise<SessionStats> {
-  try {
-    const { data, error } = await supabase
-      .from("session_stats")
-      .update(input)
-      .eq("id", sessionId)
-      .select()
-      .single();
+  const client = await AuthenticatedClient.getClient();
 
-    if (error) throw error;
-    return data;
-  } catch (error: any) {
-    console.error("Error updating session:", error);
-    throw new Error(error.message || "Failed to update session");
-  }
+  const { data, error } = await client
+    .from("session_stats")
+    .update(input)
+    .eq("id", sessionId)
+    .select()
+    .single();
+
+  if (error) throw new DatabaseError(error.message);
+  return data;
 }
 
 // Delete session
 export async function deleteSessionStats(sessionId: string): Promise<void> {
-  try {
-    const { error } = await supabase
-      .from("session_stats")
-      .delete()
-      .eq("id", sessionId);
+  const client = await AuthenticatedClient.getClient();
 
-    if (error) throw error;
-  } catch (error: any) {
-    console.error("Error deleting session:", error);
-    throw new Error(error.message || "Failed to delete session");
-  }
+  const { error } = await client
+    .from("session_stats")
+    .delete()
+    .eq("id", sessionId);
+
+  if (error) throw new DatabaseError(error.message);
 }
 
 // End active session
 export async function endSessionStats(sessionId: string): Promise<SessionStats> {
-  try {
-    const { data, error } = await supabase
-      .from("session_stats")
-      .update({ ended_at: new Date().toISOString() })
-      .eq("id", sessionId)
-      .select()
-      .single();
+  const client = await AuthenticatedClient.getClient();
 
-    if (error) throw error;
-    return data;
-  } catch (error: any) {
-    console.error("Error ending session:", error);
-    throw new Error(error.message || "Failed to end session");
-  }
+  const { data, error } = await client
+    .from("session_stats")
+    .update({ ended_at: new Date().toISOString() })
+    .eq("id", sessionId)
+    .select()
+    .single();
+
+  if (error) throw new DatabaseError(error.message);
+  return data;
 }
 
 // Get active sessions (no ended_at)
@@ -182,25 +164,22 @@ export async function getActiveSessions(
   userId: string,
   orgId?: string | null
 ): Promise<SessionStats[]> {
-  try {
-    let query = supabase
-      .from("session_stats")
-      .select("*")
-      .is("ended_at", null)
-      .order("started_at", { ascending: false });
+  const client = await AuthenticatedClient.getClient();
 
-    if (orgId) {
-      query = query.eq("organization_id", orgId);
-    } else {
-      query = query.eq("created_by", userId).is("organization_id", null);
-    }
+  let query = client
+    .from("session_stats")
+    .select("*")
+    .is("ended_at", null)
+    .order("started_at", { ascending: false });
 
-    const { data, error } = await query;
-
-    if (error) throw error;
-    return data || [];
-  } catch (error: any) {
-    console.error("Error fetching active sessions:", error);
-    throw new Error(error.message || "Failed to fetch active sessions");
+  if (orgId) {
+    query = query.eq("organization_id", orgId);
+  } else {
+    query = query.eq("created_by", userId).is("organization_id", null);
   }
+
+  const { data, error } = await query;
+
+  if (error) throw new DatabaseError(error.message);
+  return data || [];
 }

@@ -1,28 +1,30 @@
-
-import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
+import { useColors } from "@/hooks/ui/useColors";
 import { router } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity } from "react-native";
 
-export const SignOutButton = () => {
+export function SignOutButton() {
+  const { signOut } = useAuth();
+  const colors = useColors();
+
   const handleSignOut = async () => {
     try {
-      await supabase.auth.signOut();  
+      await signOut();
       router.replace("/auth/sign-in");
     } catch (err) {
-    console.error(JSON.stringify(err, null, 2));
-  }
-};
+      console.error("Error signing out:", err);
+    }
+  };
 
-return (
-  <TouchableOpacity onPress={handleSignOut}>
-    <Text style={styles.text}>Sign out</Text>
-  </TouchableOpacity>
-);
-};
+  return (
+    <TouchableOpacity onPress={handleSignOut}>
+      <Text style={[styles.text, { color: colors.red }]}>Sign out</Text>
+    </TouchableOpacity>
+  );
+}
 
 const styles = StyleSheet.create({
   text: {
-    color: "red",
     fontWeight: "600",
   },
-  });
+});

@@ -1,6 +1,7 @@
 // services/organizationsService.ts
-import { AuthenticatedClient } from "@/lib/authenticatedClient";
+import { AuthenticatedClient, DatabaseError } from "@/lib/authenticatedClient";
 import type {
+  FlatOrganization,
   Organization,
   OrgMembership,
   UserOrg,
@@ -15,7 +16,6 @@ export class OrganizationsService {
       .select("*, users(*)")
       .eq("org_id", orgId);
     if (error) throw new Error(`Failed to get memberships: ${error.message}`);
-    console.log(data)
     return data as OrgMembership[];
   }
   // Get current user's organizations
@@ -40,6 +40,254 @@ export class OrganizationsService {
 
     if (error) throw new Error(`Failed to get orgs: ${error.message}`);
     return data || [];
+  }
+
+  /**
+   * Get ALL organizations user has access to (flattened hierarchy)
+   * Includes both root and child orgs with proper permissions:
+   * - Root commanders: See all, full permissions
+   * - Child commanders: See root (context), their org + descendants (full permissions), siblings (context)
+   * - Members: See root (context) + only their org
+   */
+  static async getAllAccessibleOrganizations(
+    userId: string
+  ): Promise<FlatOrganization[]> {
+    const client = await AuthenticatedClient.getClient();
+
+    // Get all user orgs (direct memberships with role information)
+    const { data: userOrgs, error: userOrgsError } = await client.rpc(
+      "get_user_orgs",
+      { p_user_id: userId }
+    );
+
+    if (userOrgsError) throw new DatabaseError(userOrgsError.message);
+
+    // Get ALL organizations to build the full hierarchy
+    const { data: allOrgs, error: allOrgsError } = await client
+      .from("organizations")
+      .select("id, name, org_type, parent_id, created_at");
+
+    if (allOrgsError) throw new DatabaseError(allOrgsError.message);
+
+    // Create lookup maps
+    const orgMap = new Map();
+    const childrenMap = new Map<string, any[]>();
+
+    for (const org of allOrgs || []) {
+      orgMap.set(org.id, org);
+      if (org.parent_id) {
+        if (!childrenMap.has(org.parent_id)) {
+          childrenMap.set(org.parent_id, []);
+        }
+        childrenMap.get(org.parent_id)!.push(org);
+      }
+    }
+
+    // Helper: Get root org ID for any org
+    const getRootId = (orgId: string): string => {
+      let current = orgMap.get(orgId);
+      while (current && current.parent_id) {
+        current = orgMap.get(current.parent_id);
+      }
+      return current?.id || orgId;
+    };
+
+    // Helper: Get all descendants of an org
+    const getDescendants = (orgId: string): string[] => {
+      const descendants: string[] = [];
+      const queue = [orgId];
+
+      while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        const children = childrenMap.get(currentId) || [];
+
+        for (const child of children) {
+          descendants.push(child.id);
+          queue.push(child.id);
+        }
+      }
+
+      return descendants;
+    };
+
+    // Helper: Get siblings of an org
+    const getSiblings = (orgId: string): string[] => {
+      const org = orgMap.get(orgId);
+      if (!org || !org.parent_id) return [];
+
+      const siblings = childrenMap.get(org.parent_id) || [];
+      return siblings.map((s: any) => s.id).filter((id: string) => id !== orgId);
+    };
+
+    // Build visible orgs with permissions
+    const visibleOrgs = new Map<string, {
+      org: any;
+      role: "commander" | "member" | "viewer";
+      hasFullPermission: boolean;
+      isContextOnly: boolean;
+      userOrgData?: any; // Store original userOrg data for full_path
+    }>();
+
+    // Process each direct membership
+    for (const userOrg of userOrgs || []) {
+      const orgId = userOrg.org_id;
+      const role = userOrg.role;
+      const isCommander = role === "commander";
+      const isRoot = userOrg.parent_id === null;
+
+      if (isCommander) {
+        // COMMANDER: See their org + descendants (full permissions)
+        // Add the commander's org
+        visibleOrgs.set(orgId, {
+          org: orgMap.get(orgId),
+          role,
+          hasFullPermission: true,
+          isContextOnly: false,
+          userOrgData: userOrg,
+        });
+
+        // Add all descendants (full permissions)
+        const descendants = getDescendants(orgId);
+        for (const descId of descendants) {
+          if (!visibleOrgs.has(descId) || visibleOrgs.get(descId)!.isContextOnly) {
+            visibleOrgs.set(descId, {
+              org: orgMap.get(descId),
+              role: "commander", // Inherited commander permission
+              hasFullPermission: true,
+              isContextOnly: false,
+            });
+          }
+        }
+
+        // If not root commander, add root for context
+        if (!isRoot) {
+          const rootId = getRootId(orgId);
+          if (!visibleOrgs.has(rootId) || visibleOrgs.get(rootId)!.isContextOnly) {
+            visibleOrgs.set(rootId, {
+              org: orgMap.get(rootId),
+              role: "viewer", // Context only
+              hasFullPermission: false,
+              isContextOnly: true,
+            });
+          }
+
+          // Add siblings for context
+          const siblings = getSiblings(orgId);
+          for (const siblingId of siblings) {
+            if (!visibleOrgs.has(siblingId) || visibleOrgs.get(siblingId)!.isContextOnly) {
+              visibleOrgs.set(siblingId, {
+                org: orgMap.get(siblingId),
+                role: "viewer", // Context only
+                hasFullPermission: false,
+                isContextOnly: true,
+              });
+            }
+          }
+        }
+      } else {
+        // MEMBER/VIEWER: See only their org + root for context
+        visibleOrgs.set(orgId, {
+          org: orgMap.get(orgId),
+          role,
+          hasFullPermission: false,
+          isContextOnly: false,
+          userOrgData: userOrg,
+        });
+
+        // Add root for context (if not already root)
+        if (!isRoot) {
+          const rootId = getRootId(orgId);
+          if (!visibleOrgs.has(rootId) || visibleOrgs.get(rootId)!.isContextOnly) {
+            visibleOrgs.set(rootId, {
+              org: orgMap.get(rootId),
+              role: "viewer",
+              hasFullPermission: false,
+              isContextOnly: true,
+            });
+          }
+        }
+      }
+    }
+
+    // Fetch child counts for all visible orgs in a single query
+    const visibleOrgIds = Array.from(visibleOrgs.keys());
+    const { data: childCounts, error: childCountsError } = await client
+      .from("organizations")
+      .select("parent_id")
+      .in("parent_id", visibleOrgIds);
+
+    if (childCountsError) throw new DatabaseError(childCountsError.message);
+
+    // Create a map of parent_id -> count for O(1) lookup
+    const childCountMap = (childCounts || []).reduce((acc, item) => {
+      acc[item.parent_id] = (acc[item.parent_id] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Helper: Calculate depth and breadcrumb for any org
+    const calculatePathInfo = (orgId: string): { depth: number; breadcrumb: string[] } => {
+      const path: string[] = [];
+      let current = orgMap.get(orgId);
+      let depth = 0;
+
+      while (current) {
+        path.unshift(current.name);
+        if (current.parent_id) {
+          current = orgMap.get(current.parent_id);
+          depth++;
+        } else {
+          break;
+        }
+      }
+
+      return { depth, breadcrumb: path };
+    };
+
+    // Convert to FlatOrganization array
+    const flattened: FlatOrganization[] = [];
+
+    for (const [orgId, data] of visibleOrgs.entries()) {
+      const { org, role, hasFullPermission, isContextOnly, userOrgData } = data;
+      if (!org) continue;
+
+      // Use userOrgData if available (has full_path), otherwise calculate
+      let breadcrumb: string[];
+      let depth: number;
+
+      if (userOrgData) {
+        breadcrumb = userOrgData.full_path
+          .split(" / ")
+          .map((s: string) => s.trim())
+          .filter(Boolean);
+        depth = userOrgData.depth;
+      } else {
+        const pathInfo = calculatePathInfo(orgId);
+        breadcrumb = pathInfo.breadcrumb;
+        depth = pathInfo.depth;
+      }
+
+      flattened.push({
+        id: org.id,
+        name: org.name,
+        org_type: org.org_type,
+        parent_id: org.parent_id,
+        depth,
+        role,
+        isRoot: org.parent_id === null,
+        breadcrumb,
+        childCount: childCountMap[org.id] || 0,
+        created_at: org.created_at || new Date().toISOString(),
+        hasFullPermission,
+        isContextOnly,
+      });
+    }
+
+    // Sort: roots first, then by breadcrumb alphabetically
+    return flattened.sort((a, b) => {
+      if (a.isRoot && !b.isRoot) return -1;
+      if (!a.isRoot && b.isRoot) return 1;
+      return a.breadcrumb.join(" → ").localeCompare(b.breadcrumb.join(" → "));
+    });
   }
 
   // ✅ Create root organization (RPC)

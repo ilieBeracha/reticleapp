@@ -1,6 +1,8 @@
-import CreateSessionBottomSheet from "@/components/CreateSessionBottomSheet";
+import { CreateSessionBottomSheet } from "@/components/CreateSessionBottomSheet";
 import CreateTrainingModal from "@/components/CreateTrainingModal";
 import Header from "@/components/Header";
+import { OrgBreadcrumb } from "@/components/OrgBreadcrumb";
+import { OrgSwitchIndicator } from "@/components/OrgSwitchIndicator";
 import QuickActionsFloatingButton from "@/components/QuickActionsFloatingButton";
 import { useColors } from "@/hooks/ui/useColors";
 import { useOrganizationsStore } from "@/store/organizationsStore";
@@ -39,6 +41,8 @@ export default function TabLayout() {
         style={isCameraPath ? "light" : (colors.background === "#0f172a" ? "dark" : "light")}
       />
       {!isCameraPath && <Header onNotificationPress={() => {}} />}
+      {!isCameraPath && <OrgBreadcrumb />}
+      <OrgSwitchIndicator />
 
       <View style={{ flex: 1 }}>
         <Tabs

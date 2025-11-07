@@ -8,7 +8,17 @@ import type {
   OrgTreeNode,
   UserOrg,
 } from "@/types/organizations";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
+
+interface OrgCache {
+  [orgId: string]: {
+    data: Organization;
+    timestamp: number;
+  };
+}
+
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 interface OrganizationsStore {
   // State
@@ -18,7 +28,9 @@ interface OrganizationsStore {
   orgChildren: OrgChild[];
   orgSubtree: OrgSubtree[];
   orgTree: OrgTreeNode[];
+  orgCache: OrgCache;
   loading: boolean;
+  switching: boolean;
   error: string | null;
   memberships: OrgMembership[] | null;
 
@@ -62,7 +74,9 @@ interface OrganizationsStore {
 
   removeMember: (userId: string, orgId: string) => Promise<void>;
 
+  switchOrganization: (orgId: string | null) => Promise<void>;
   setSelectedOrg: (orgId: string | null) => void;
+  clearCache: () => void;
   resetOrganizations: () => void;
 }
 
@@ -74,8 +88,10 @@ export const useOrganizationsStore = create<OrganizationsStore>((set, get) => ({
   orgChildren: [],
   orgSubtree: [],
   orgTree: [],
+  orgCache: {},
   memberships: null,
   loading: false,
+  switching: false,
   error: null,
   
   // Fetch user's organizations (memberships)
@@ -261,13 +277,56 @@ export const useOrganizationsStore = create<OrganizationsStore>((set, get) => ({
     }
   },
 
-  // Set selected organization
+  // Switch to organization with caching
+  switchOrganization: async (orgId: string | null) => {
+    const { orgCache } = get();
+
+    // Store selection immediately
+    set({ selectedOrgId: orgId, switching: true });
+    await AsyncStorage.setItem("selected_org_id", orgId || "");
+
+    if (!orgId) {
+      // Personal mode - no data to fetch
+      set({ switching: false });
+      return;
+    }
+
+    try {
+      // Check cache first
+      const cached = orgCache[orgId];
+      const now = Date.now();
+
+      if (cached && now - cached.timestamp < CACHE_DURATION) {
+        // Use cached data immediately
+        console.log("📦 Using cached org data");
+        set({ switching: false });
+
+        // Silently fetch children
+        get().fetchOrgChildren(orgId, { silent: true });
+      } else {
+        // Fetch fresh data (children already fetched via setSelectedOrg)
+        console.log("🔄 Fetching fresh org data");
+        await get().fetchOrgChildren(orgId, { silent: false });
+        set({ switching: false });
+      }
+    } catch (error) {
+      console.error("Error switching organization:", error);
+      set({ switching: false });
+    }
+  },
+
+  // Set selected organization (legacy support)
   setSelectedOrg: (orgId) => {
     set({ selectedOrgId: orgId });
     if (orgId) {
       // Silent fetch to avoid UI flicker while switching
       get().fetchOrgChildren(orgId, { silent: true });
     }
+  },
+
+  // Clear cache
+  clearCache: () => {
+    set({ orgCache: {} });
   },
 
   // Reset state
@@ -279,7 +338,9 @@ export const useOrganizationsStore = create<OrganizationsStore>((set, get) => ({
       orgChildren: [],
       orgSubtree: [],
       orgTree: [],
+      orgCache: {},
       loading: false,
+      switching: false,
       error: null,
       memberships: null,
     });
