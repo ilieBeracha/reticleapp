@@ -61,6 +61,10 @@ export function OrgInfoView({
   const isMember = org.role === "member";
   const isViewer = org.role === "viewer" || org.isContextOnly;
 
+  // Check if at maximum depth (0-2 = 3 levels total)
+  const MAX_DEPTH = 2;
+  const isAtMaxDepth = org.depth >= MAX_DEPTH;
+
   // Root org info (top of hierarchy)
   const rootName = org.breadcrumb[0];
   const rootOrg = org.breadcrumb.length > 1 ? rootName : null;
@@ -207,13 +211,23 @@ export function OrgInfoView({
         {/* Commander Actions */}
         {isCommander && (
           <>
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: colors.tint }]}
-              onPress={onCreateChild}
-            >
-              <Ionicons name="git-branch" size={20} color="white" />
-              <Text style={styles.actionButtonText}>Create Sub-Organization</Text>
-            </TouchableOpacity>
+            {/* Only show Create Sub-Org button if NOT at max depth */}
+            {!isAtMaxDepth ? (
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: colors.tint }]}
+                onPress={onCreateChild}
+              >
+                <Ionicons name="git-branch" size={20} color="white" />
+                <Text style={styles.actionButtonText}>Create Sub-Organization</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={[styles.maxDepthInfo, { backgroundColor: colors.yellow + '10', borderColor: colors.yellow }]}>
+                <Ionicons name="information-circle" size={20} color={colors.yellow} />
+                <Text style={[styles.maxDepthText, { color: colors.textMuted }]}>
+                  Maximum hierarchy depth reached. Cannot create sub-organizations at this level.
+                </Text>
+              </View>
+            )}
 
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: colors.green }]}
@@ -352,6 +366,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     letterSpacing: -0.3,
+  },
+  maxDepthInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 12,
+    gap: 10,
+    borderWidth: 1,
+  },
+  maxDepthText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "500",
+    lineHeight: 20,
   },
   switchButton: {
     flexDirection: "row",

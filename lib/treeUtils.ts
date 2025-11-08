@@ -1,7 +1,7 @@
 // lib/treeUtils.ts
 // Reusable tree traversal utilities for organization hierarchy
 
-const MAX_DEPTH = 5; // Maximum hierarchy depth (0-4)
+const MAX_DEPTH = 3; // Maximum hierarchy depth (0-2 = Battalion/Company/Platoon)
 
 export interface OrgNode {
   id: string;

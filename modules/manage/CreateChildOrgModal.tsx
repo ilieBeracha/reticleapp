@@ -87,14 +87,6 @@ export function CreateChildOrgModal({
       recommended: smartType === 'Squad',
       disabled: parentHierarchyIndex >= 2,  // Can't create Squad if parent is Squad
     },
-    { 
-      value: "Group", 
-      icon: "git-network", 
-      color: colors.indigo,
-      hierarchyIndex: 99,  // Not in hierarchy, always available
-      recommended: false,
-      disabled: false,
-    },
   ].filter(type => !type.disabled);  // Remove disabled types entirely
 
   const handleCreate = async () => {

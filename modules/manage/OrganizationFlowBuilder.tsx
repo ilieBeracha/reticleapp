@@ -7,12 +7,11 @@ import { OrgChild, Organization } from "@/types/organizations";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import {
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { CreateChildOrgModal } from "./CreateChildOrgModal";
 import { CreateRootOrgModal } from "./CreateRootOrgModal";
@@ -84,7 +83,8 @@ export function OrganizationFlowBuilder() {
   };
 
   const canCreateMoreChildren = (org: Organization) => {
-    if (org.depth >= 5) return false;
+    // Maximum depth is 2 (0-2 = 3 levels: Battalion/Company/Platoon)
+    if (org.depth >= 2) return false;
     const children = orgChildren.filter((c: OrgChild) => c.parent_id === org.id);
     return children.length < 3;
   };
@@ -158,7 +158,7 @@ export function OrganizationFlowBuilder() {
                 style={[styles.depthBadge, { backgroundColor: colors.indigo + "15" }]}
               >
                 <Text style={[styles.depthText, { color: colors.indigo }]}>
-                  Depth {currentOrg.depth + 1}/5
+                  Depth {currentOrg.depth + 1}/3
                 </Text>
               </View>
             </View>
@@ -171,7 +171,7 @@ export function OrganizationFlowBuilder() {
                 depthColor={getDepthColor(child.depth)}
                 onSelect={() => setSelectedOrg(child.id)}
                 onCreateChild={() => handleCreateChild(child.id, child.name)}
-                canCreateChild={child.depth < 5}
+                canCreateChild={child.depth < 2}
               />
             ))}
 
@@ -191,7 +191,7 @@ export function OrganizationFlowBuilder() {
               Hierarchy Limits
             </Text>
             <Text style={[styles.infoText, { color: colors.description }]}>
-              • Maximum 5 levels deep{"\n"}• Maximum 3 children per organization
+              • Maximum 3 levels deep (Battalion → Company → Platoon){"\n"}• Maximum 3 children per organization
             </Text>
           </View>
         </View>
