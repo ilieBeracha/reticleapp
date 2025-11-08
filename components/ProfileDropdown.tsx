@@ -1,10 +1,9 @@
+import BaseBottomSheet from "@/components/BaseBottomSheet";
 import { SignOutButton } from "@/components/SignOutButton";
 import { useColors } from "@/hooks/ui/useColors";
 import { useThemeColor } from "@/hooks/ui/useThemeColor";
 import { Ionicons } from "@expo/vector-icons";
 import {
-  Modal,
-  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -105,28 +104,21 @@ export default function ProfileDropdown({
   };
 
   return (
-    <Modal
+    <BaseBottomSheet
       visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
+      onClose={onClose}
+      enableDynamicSizing={true}
+      enablePanDownToClose={true}
     >
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <View style={styles.dropdownContainer}>
-          <View
-            style={[
-              styles.dropdown,
-              {
-                backgroundColor: colors.cardBackground,
-                borderColor: colors.border,
-                borderWidth: 1,
-              },
-            ]}
-            accessibilityRole="menu"
-            accessibilityLabel="Profile menu"
-          >
-            <ProfileHeader userName={userName} userEmail={userEmail} />
+      <View
+        style={styles.content}
+        accessibilityRole="menu"
+        accessibilityLabel="Profile menu"
+      >
+        <ProfileHeader userName={userName} userEmail={userEmail} />
 
+        {menuItems.length > 0 && (
+          <>
             <View
               style={[styles.divider, { backgroundColor: colors.border }]}
             />
@@ -140,41 +132,24 @@ export default function ProfileDropdown({
                 onPress={() => handleMenuAction(item.action)}
               />
             ))}
+          </>
+        )}
 
-            <SignOutButton />
-          </View>
-        </View>
-      </Pressable>
-    </Modal>
+        <SignOutButton />
+      </View>
+    </BaseBottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  dropdownContainer: {
-    position: "absolute",
-    top: 100,
-    right: 20,
-    minWidth: 280,
-  },
-  dropdown: {
-    borderRadius: 16,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+  content: {
+    paddingBottom: 8,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
+    paddingHorizontal: 4,
+    paddingVertical: 16,
     gap: 12,
   },
   avatar: {
@@ -201,7 +176,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    marginHorizontal: 16,
+    marginVertical: 8,
   },
   menuItem: {
     flexDirection: "row",
