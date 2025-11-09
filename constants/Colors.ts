@@ -16,7 +16,8 @@ export const Colors = {
     placeholderText: "#94A3B8",
     description: "#5B6473",           // Subtle contrast from main text
     overlay: "rgba(15, 17, 26, 0.04)",
-    textMuted: "#6B7280",             // Gentle muted gray-blue for secondary text
+    textMuted: "#6B7280",    
+    buttonPrimary: "#0E9F6E",          // Gentle muted gray-blue for secondary text
   
     // Refined accent palette — vivid but balanced
     blue: "#2563EB",                  // Vibrant yet professional blue
@@ -46,6 +47,7 @@ export const Colors = {
     description: "#94a3b8",
     overlay: "rgba(255,255,255,0.05)",
     textMuted: "#94a3b8",
+    buttonPrimary: "#0E9F6E",
 
     // Vibrant theme colors
     blue: "#60a5fa",

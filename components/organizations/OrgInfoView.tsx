@@ -34,6 +34,11 @@ export function OrgInfoView({
   if (isPersonalMode) {
     return (
       <View style={styles.container}>
+        {/* Personal Badge */}
+        <View style={[styles.personalBadge, { backgroundColor: colors.blue + '15' }]}>
+          <Ionicons name="person" size={24} color={colors.blue} />
+        </View>
+
         {/* Title */}
         <Text style={[styles.title, { color: colors.text }]}>
           Personal Workspace
@@ -42,13 +47,27 @@ export function OrgInfoView({
           Your private training space
         </Text>
 
-        {/* Switch Button */}
+        {/* Info Card */}
+        <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
+          <View style={styles.infoRow}>
+            <Ionicons name="shield-checkmark" size={18} color={colors.blue} />
+            <Text style={[styles.infoText, { color: colors.textMuted }]}>
+              Only you can see your personal sessions
+            </Text>
+          </View>
+        </View>
+
+        {/* Switch Action */}
         <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: colors.tint }]}
+          style={styles.menuItem}
           onPress={onSwitchOrg}
+          activeOpacity={0.6}
         >
-          <Ionicons name="swap-horizontal" size={20} color="white" />
-          <Text style={styles.actionButtonText}>Switch Organization</Text>
+          <Ionicons name="swap-horizontal" size={20} color={colors.text} />
+          <Text style={[styles.menuItemText, { color: colors.text }]}>
+            Switch to an organization
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
     );
@@ -71,15 +90,18 @@ export function OrgInfoView({
 
   return (
     <View style={styles.container}>
-      {/* Root Organization Context */}
-      {rootOrg && (
-        <View style={[styles.rootContext, { backgroundColor: colors.background }]}>
-          <Ionicons name="business" size={14} color={colors.textMuted} />
-          <Text style={[styles.rootText, { color: colors.textMuted }]}>
-            Part of {rootOrg}
-          </Text>
-        </View>
-      )}
+      {/* Organization Icon Badge */}
+      <View style={[styles.orgBadge, { backgroundColor: colors.tint + '15' }]}>
+        <Ionicons 
+          name={
+            org.depth === 0 ? 'business' :
+            org.depth === 1 ? 'people' :
+            'shield'
+          }
+          size={24} 
+          color={colors.tint} 
+        />
+      </View>
 
       {/* Current Organization Title */}
       <Text style={[styles.title, { color: colors.text }]}>
@@ -89,167 +111,149 @@ export function OrgInfoView({
         {org.org_type} • {org.role === "commander" && org.isRoot ? "Root Admin" : org.role.charAt(0).toUpperCase() + org.role.slice(1)}
       </Text>
 
-      {/* Visual Hierarchy Presentation */}
-      <View style={[styles.hierarchyFlow, { backgroundColor: colors.background }]}>
-        <Text style={[styles.flowTitle, { color: colors.textMuted }]}>
-          YOUR POSITION
-        </Text>
-        
-        {org.breadcrumb.map((levelName, index) => {
-          const isCurrentLevel = index === org.breadcrumb.length - 1;
-          const levelColors = [colors.purple, colors.blue, colors.teal, colors.green, colors.yellow];
-          const levelColor = levelColors[index % levelColors.length];
+      {/* Root Context Breadcrumb */}
+      {rootOrg && (
+        <View style={[styles.breadcrumbChip, { backgroundColor: colors.cardBackground }]}>
+          <Ionicons name="layers" size={12} color={colors.textMuted} />
+          <Text style={[styles.breadcrumbText, { color: colors.textMuted }]}>
+            {org.breadcrumb.join(' › ')}
+          </Text>
+        </View>
+      )}
 
-          return (
-            <View key={index} style={styles.hierarchyLevel}>
-              {/* Connection line */}
-              {index > 0 && (
-                <View style={[styles.connectionLine, { backgroundColor: levelColor + "30" }]} />
-              )}
-              
-              {/* Level item */}
-              <View style={styles.levelRow}>
-                <View style={[
-                  styles.levelDot, 
-                  { 
-                    backgroundColor: isCurrentLevel ? levelColor : levelColor + "30",
-                    width: isCurrentLevel ? 24 : 16,
-                    height: isCurrentLevel ? 24 : 16,
-                    borderRadius: isCurrentLevel ? 12 : 8,
-                  }
-                ]}>
-                  {isCurrentLevel && (
-                    <View style={[styles.levelDotInner, { backgroundColor: colors.background }]} />
-                  )}
-                </View>
-                
-                <View style={styles.levelInfo}>
-                  <Text style={[
-                    styles.levelName, 
-                    { color: isCurrentLevel ? colors.text : colors.textMuted },
-                    isCurrentLevel && styles.currentLevelName,
-                  ]}>
-                    {levelName}
-                  </Text>
-                  {isCurrentLevel && (
-                    <View style={styles.youAreHere}>
-                      <Ionicons name="location" size={12} color={levelColor} />
-                      <Text style={[styles.youAreHereText, { color: levelColor }]}>
-                        You are here
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            </View>
-          );
-        })}
 
-        {/* Child orgs indicator */}
-        {org.childCount > 0 && (
-          <View style={styles.childrenIndicator}>
-            <View style={[styles.connectionLine, { backgroundColor: colors.border }]} />
-            <View style={styles.childrenRow}>
-              <Ionicons name="git-network" size={16} color={colors.textMuted} />
-              <Text style={[styles.childrenText, { color: colors.textMuted }]}>
-                {org.childCount} team{org.childCount > 1 ? 's' : ''} below
-              </Text>
-            </View>
-          </View>
-        )}
+      {/* Organization Stats */}
+      <View style={[styles.statsGrid, { backgroundColor: colors.cardBackground }]}>
+        <View style={styles.statItem}>
+          <Text style={[styles.statValue, { color: colors.text }]}>
+            {org.childCount || 0}
+          </Text>
+          <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+            Sub-units
+          </Text>
+        </View>
+        <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+        <View style={styles.statItem}>
+          <Ionicons name="people" size={20} color={colors.textMuted} />
+          <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+            Members
+          </Text>
+        </View>
+        <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+        <View style={styles.statItem}>
+          <Ionicons name="fitness" size={20} color={colors.textMuted} />
+          <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+            Trainings
+          </Text>
+        </View>
       </View>
 
-      {/* Drill-Down Navigation for Commanders */}
+      {/* Child Organizations - Compact List */}
       {childOrgs.length > 0 && onNavigateToChild && (
-        <View style={[styles.drillDownSection, { backgroundColor: colors.green + '10', borderColor: colors.green }]}>
-          <View style={styles.drillDownHeader}>
-            <Ionicons name="arrow-down-circle" size={20} color={colors.green} />
-            <Text style={[styles.drillDownTitle, { color: colors.green }]}>
-              YOUR UNITS ({childOrgs.length})
+        <View style={styles.childOrgsSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Sub-Organizations ({childOrgs.length})
             </Text>
           </View>
-          <Text style={[styles.drillDownSubtitle, { color: colors.textMuted }]}>
-            Tap to focus on a specific unit
-          </Text>
           
-          <View style={styles.unitsList}>
-            {childOrgs.map((childOrg) => (
+          <View style={styles.childOrgsList}>
+            {childOrgs.slice(0, 3).map((childOrg) => (
               <TouchableOpacity
                 key={childOrg.id}
-                style={[styles.unitItem, { backgroundColor: colors.cardBackground }]}
+                style={[styles.childOrgCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}
                 onPress={() => onNavigateToChild(childOrg.id)}
                 activeOpacity={0.7}
               >
-                <View style={styles.unitLeft}>
+                <View style={[styles.childOrgIcon, { backgroundColor: colors.tint + '15' }]}>
                   <Ionicons 
                     name={
-                      childOrg.depth === 1 ? 'people' :  // Company/Team
-                      childOrg.depth === 2 ? 'shield' :  // Platoon/Squad
+                      childOrg.depth === 1 ? 'people' :
+                      childOrg.depth === 2 ? 'shield' :
                       'business'
                     }
-                    size={22} 
-                    color={colors.green} 
+                    size={18} 
+                    color={colors.tint} 
                   />
-                  <View style={styles.unitInfo}>
-                    <Text style={[styles.unitName, { color: colors.text }]}>
-                      {childOrg.name}
-                    </Text>
-                    <Text style={[styles.unitLevel, { color: colors.textMuted }]}>
-                      {childOrg.depth === 1 ? 'Company' : childOrg.depth === 2 ? 'Platoon' : `Level ${childOrg.depth}`}
-                    </Text>
-                  </View>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+                <View style={styles.childOrgInfo}>
+                  <Text style={[styles.childOrgName, { color: colors.text }]}>
+                    {childOrg.name}
+                  </Text>
+                  <Text style={[styles.childOrgType, { color: colors.textMuted }]}>
+                    {childOrg.org_type}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
               </TouchableOpacity>
             ))}
+            {childOrgs.length > 3 && (
+              <Text style={[styles.moreChildrenText, { color: colors.textMuted }]}>
+                +{childOrgs.length - 3} more
+              </Text>
+            )}
           </View>
         </View>
       )}
 
-      {/* Actions */}
-      <View style={styles.actions}>
-        {/* Commander Actions */}
-        {isCommander && (
-          <>
-            {/* Only show Create Sub-Org button if NOT at max depth */}
-            {!isAtMaxDepth ? (
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: colors.tint }]}
-                onPress={onCreateChild}
-              >
-                <Ionicons name="git-branch" size={20} color="white" />
-                <Text style={styles.actionButtonText}>Create Sub-Organization</Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={[styles.maxDepthInfo, { backgroundColor: colors.yellow + '10', borderColor: colors.yellow }]}>
-                <Ionicons name="information-circle" size={20} color={colors.yellow} />
-                <Text style={[styles.maxDepthText, { color: colors.textMuted }]}>
-                  Maximum hierarchy depth reached. Cannot create sub-organizations at this level.
-                </Text>
-              </View>
-            )}
+      {/* Actions Menu */}
+      {isCommander && (
+        <View style={styles.actionsMenu}>
+          {/* Max Depth Info - Inline if at max */}
+          {isAtMaxDepth && (
+            <View style={[styles.infoRow, { paddingVertical: 12 }]}>
+              <Ionicons name="information-circle" size={18} color={colors.yellow} />
+              <Text style={[styles.infoRowText, { color: colors.textMuted }]}>
+                Maximum depth reached
+              </Text>
+            </View>
+          )}
 
+          {/* Create Sub-Org */}
+          {!isAtMaxDepth && (
             <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: colors.green }]}
-              onPress={onInviteMembers}
+              style={styles.menuItem}
+              onPress={onCreateChild}
+              activeOpacity={0.6}
             >
-              <Ionicons name="person-add" size={20} color="white" />
-              <Text style={styles.actionButtonText}>Invite Members</Text>
+              <Ionicons name="git-branch" size={20} color={colors.text} />
+              <Text style={[styles.menuItemText, { color: colors.text }]}>
+                Create sub-organization
+              </Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
             </TouchableOpacity>
-          </>
-        )}
+          )}
 
-        {/* Switch Org Button */}
-        <TouchableOpacity
-          style={[styles.switchButton, { borderColor: colors.tint }]}
-          onPress={onSwitchOrg}
-        >
-          <Ionicons name="swap-horizontal" size={20} color={colors.tint} />
-          <Text style={[styles.switchButtonText, { color: colors.tint }]}>
-            Switch Organization
-          </Text>
-        </TouchableOpacity>
-      </View>
+          {/* Invite Members */}
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={onInviteMembers}
+            activeOpacity={0.6}
+          >
+            <Ionicons name="person-add" size={20} color={colors.text} />
+            <Text style={[styles.menuItemText, { color: colors.text }]}>
+              Invite members
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+
+          {/* Divider */}
+          <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+        </View>
+      )}
+
+      {/* Switch Organization */}
+      <TouchableOpacity
+        style={styles.menuItem}
+        onPress={onSwitchOrg}
+        activeOpacity={0.6}
+      >
+        <Ionicons name="swap-horizontal" size={20} color={colors.text} />
+        <Text style={[styles.menuItemText, { color: colors.text }]}>
+          Switch organization
+        </Text>
+        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -259,191 +263,180 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 8,
   },
-  rootContext: {
+  personalBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    marginBottom: 16,
+  },
+  orgBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    marginBottom: 16,
+  },
+  breadcrumbChip: {
     flexDirection: "row",
     alignItems: "center",
+    alignSelf: "center",
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 6,
-    marginBottom: 12,
+    borderRadius: 8,
+    marginBottom: 20,
   },
-  rootText: {
-    fontSize: 12,
+  breadcrumbText: {
+    fontSize: 11,
     fontWeight: "600",
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "700",
     letterSpacing: -0.6,
     marginBottom: 4,
+    textAlign: "center",
   },
   subtitle: {
-    fontSize: 15,
-    marginBottom: 20,
-  },
-  hierarchyFlow: {
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 20,
-  },
-  flowTitle: {
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-    marginBottom: 16,
-  },
-  hierarchyLevel: {
-    marginBottom: 4,
-  },
-  connectionLine: {
-    width: 3,
-    height: 20,
-    marginLeft: 10,
-  },
-  levelRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  levelDot: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  levelDotInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  levelInfo: {
-    flex: 1,
-  },
-  levelName: {
-    fontSize: 16,
-    fontWeight: "600",
-    letterSpacing: -0.3,
-  },
-  currentLevelName: {
-    fontWeight: "700",
-    fontSize: 17,
-  },
-  youAreHere: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 4,
-  },
-  youAreHereText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  childrenIndicator: {
-    marginTop: 4,
-  },
-  childrenRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginLeft: 10,
-  },
-  childrenText: {
-    fontSize: 13,
-    fontWeight: "500",
-  },
-  actions: {
-    gap: 10,
-  },
-  actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 10,
-  },
-  actionButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "600",
-    letterSpacing: -0.3,
-  },
-  maxDepthInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 14,
-    borderRadius: 12,
-    gap: 10,
-    borderWidth: 1,
-  },
-  maxDepthText: {
-    flex: 1,
     fontSize: 14,
-    fontWeight: "500",
-    lineHeight: 20,
+    marginBottom: 16,
+    textAlign: "center",
   },
-  switchButton: {
+  statsGrid: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    gap: 8,
-    marginTop: 4,
-  },
-  switchButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    letterSpacing: -0.3,
-  },
-  drillDownSection: {
+    justifyContent: "space-around",
     padding: 16,
     borderRadius: 12,
     marginBottom: 20,
-    borderWidth: 1,
   },
-  drillDownHeader: {
-    flexDirection: "row",
+  statItem: {
     alignItems: "center",
-    gap: 8,
-    marginBottom: 4,
+    gap: 6,
+    flex: 1,
   },
-  drillDownTitle: {
-    fontSize: 13,
+  statValue: {
+    fontSize: 24,
     fontWeight: "700",
-    letterSpacing: 0.5,
+    letterSpacing: -0.5,
   },
-  drillDownSubtitle: {
-    fontSize: 13,
+  statLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+  },
+  childOrgsSection: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
     marginBottom: 12,
   },
-  unitsList: {
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  childOrgsList: {
     gap: 8,
   },
-  unitItem: {
+  childOrgCard: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    padding: 14,
+    padding: 12,
     borderRadius: 10,
-  },
-  unitLeft: {
-    flexDirection: "row",
-    alignItems: "center",
+    borderWidth: 1,
     gap: 12,
-    flex: 1,
   },
-  unitInfo: {
-    flex: 1,
+  childOrgIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  unitName: {
-    fontSize: 16,
+  childOrgInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  childOrgName: {
+    fontSize: 15,
     fontWeight: "600",
     letterSpacing: -0.3,
   },
-  unitLevel: {
+  childOrgType: {
     fontSize: 12,
-    marginTop: 2,
+    fontWeight: "500",
+  },
+  moreChildrenText: {
+    fontSize: 12,
+    textAlign: "center",
+    marginTop: 4,
+  },
+  maxDepthBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+    marginBottom: 16,
+  },
+  maxDepthBannerText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  actionsMenu: {
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+  },
+  menuItemText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "500",
+    letterSpacing: -0.2,
+  },
+  menuDivider: {
+    height: 1,
+    marginVertical: 8,
+    opacity: 0.3,
+  },
+  infoRowText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  infoCard: {
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "500",
+    lineHeight: 18,
   },
 });
 

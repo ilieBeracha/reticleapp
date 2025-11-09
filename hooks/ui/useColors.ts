@@ -24,7 +24,7 @@ export function useColors() {
   const pink = useThemeColor({}, "pink");
   const teal = useThemeColor({}, "teal");
   const indigo = useThemeColor({}, "indigo");
-
+  const buttonPrimary = useThemeColor({}, "buttonPrimary");
   return {
     text,
     background,
@@ -49,5 +49,6 @@ export function useColors() {
     pink,
     teal,
     indigo,
-  };
+    buttonPrimary: buttonPrimary,
+      };
 }

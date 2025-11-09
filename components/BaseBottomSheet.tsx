@@ -5,7 +5,7 @@ import {
   BottomSheetModal,
   BottomSheetScrollView,
   BottomSheetView,
-  type BottomSheetBackdropProps,
+  type BottomSheetBackdropProps
 } from "@gorhom/bottom-sheet";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
@@ -13,6 +13,7 @@ import {
   Platform,
   StyleSheet,
   useColorScheme,
+  useWindowDimensions,
   View,
 } from "react-native";
 
@@ -49,6 +50,7 @@ export default function BaseBottomSheet({
 }: BaseBottomSheetProps) {
   const bottomSheetRef = useRef<BottomSheetModal>(null);
   const colorScheme = useColorScheme();
+  const { height: windowHeight } = useWindowDimensions();
 
   const cardBackground = useThemeColor({}, "cardBackground");
   const mutedForeground = useThemeColor({}, "description");
@@ -64,6 +66,13 @@ export default function BaseBottomSheet({
     if (enableDynamicSizing) return undefined;
     return customSnapPoints || ["50%"];
   }, [customSnapPoints, enableDynamicSizing]);
+
+  // Calculate max dynamic content size to prevent overflow above header
+  // Leave space for status bar (44-50px) + some padding
+  const maxDynamicContentSize = useMemo(() => {
+    const HEADER_SAFE_AREA = Platform.OS === "ios" ? 100 : 70; // Status bar + padding
+    return Math.floor(windowHeight - HEADER_SAFE_AREA);
+  }, [windowHeight]);
 
   // Open/close bottom sheet based on visible prop
   useEffect(() => {
@@ -152,9 +161,12 @@ export default function BaseBottomSheet({
         height: 6,
         borderRadius: 3,
       }}
+      maxDynamicContentSize={maxDynamicContentSize}
       keyboardBehavior={keyboardBehavior}
       keyboardBlurBehavior="restore"
       android_keyboardInputMode="adjustResize"
+      topInset={Platform.OS === "ios" ? 44 : 0}
+      animateOnMount={true}
     >
       {scrollable ? (
         <BottomSheetScrollView
