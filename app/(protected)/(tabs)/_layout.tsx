@@ -84,12 +84,13 @@ export default function TabLayout() {
             }}
           />
 
-          {/* Training Programs - Only in org mode */}
+          Training Programs - Only in org mode
           <Tabs.Screen
             name="programs"
             options={{
               title: "Programs",
-              href: isPersonalMode ? null : "/(protected)/(tabs)/programs",
+              // href: isPersonalMode ? null : "/(protected)/(tabs)/programs",
+              href: isPersonalMode ? null : null,
               tabBarIcon: ({ color, focused }) => (
                 <Ionicons
                   name={focused ? "folder" : "folder-outline"}
