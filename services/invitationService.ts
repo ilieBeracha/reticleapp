@@ -24,7 +24,7 @@ export async function createInvitationService(
     const { data, error } = await client
       .from("invitations")
       .insert({
-        email: inviteCode, // Store invite code in email field
+        code: inviteCode, // Store invite code in code field
         organization_id: orgId,
         role,
         invited_by: invitedBy,
@@ -82,7 +82,7 @@ export async function getInvitationByCodeService(
     const { data, error } = await client
       .from("invitations")
       .select("*, organizations(*)")
-      .eq("email", inviteCode.toUpperCase()) // Code stored in email field
+      .eq("code", inviteCode.toUpperCase()) // Code stored in code field
       .eq("status", "pending")
       .single();
 

@@ -124,13 +124,18 @@ export default function Header({
         visible={profileOpen}
         menuItems={[
           {
+            icon: "key-outline",
+            label: "Enter invite code",
+            action: "join-org",
+          },
+          {
             icon: "telescope-outline",
-            label: "loadout",
+            label: "Loadout",
             action: "loadout",
           },
           {
             icon: "settings-outline",
-            label: "settings",
+            label: "Settings",
             action: "settings",
           },
         ]}

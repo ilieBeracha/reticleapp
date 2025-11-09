@@ -3,9 +3,10 @@ import { AuthenticatedClient } from '@/lib/authenticatedClient'
 import { supabase } from '@/lib/supabase'
 import { Session, User } from '@supabase/supabase-js'
 import * as Linking from 'expo-linking'
-import * as WebBrowser from 'expo-web-browser'
 import { router } from 'expo-router'
+import * as WebBrowser from 'expo-web-browser'
 import React, { createContext, useContext, useEffect, useState } from 'react'
+import { Alert } from 'react-native'
 
 // Warm up the browser for faster OAuth
 WebBrowser.maybeCompleteAuthSession()
@@ -71,14 +72,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const pendingInviteCode = await AsyncStorage.getItem('pending_invite_code')
 
         if (pendingInviteCode) {
-          console.log('✅ Found pending invite code, redirecting to accept invite...')
-          // Clear the stored code
-          await AsyncStorage.removeItem('pending_invite_code')
-
-          // Redirect to protected invite page to accept
-          setTimeout(() => {
-            router.replace(`/(protected)/invite?token=${pendingInviteCode}`)
-          }, 500)
+          console.log('✅ Pending invite code available after sign-in')
+          Alert.alert(
+            'Invitation code ready',
+            'Open your profile menu and choose “Enter invite code” to join your organization.'
+          )
         }
       }
     })

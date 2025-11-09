@@ -9,7 +9,8 @@ import {
 } from "@/hooks/useOrganizationSwitch";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { useFonts } from "expo-font";
-import { Slot } from "expo-router";
+import * as Linking from "expo-linking";
+import { Slot, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
@@ -18,6 +19,7 @@ import "../global.css";
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const router = useRouter();
   const [loaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
   });
@@ -27,7 +29,36 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [loaded]);
- 
+
+  // Handle deep links
+  useEffect(() => {
+    const handleDeepLink = (event: { url: string }) => {
+      const url = event.url ?? "";
+      console.log("🔗 Deep link received:", url);
+      
+      const { path, queryParams } = Linking.parse(url);
+      console.log("📍 Parsed - path:", path, "queryParams:", queryParams);
+
+      // Handle invite links: reticle://invite?code=ABC123
+      if (path === "invite" && queryParams?.code) {
+        console.log("✅ Navigating to /invite with code:", queryParams.code);
+        router.push({
+          pathname: "/invite",
+          params: { code: queryParams.code as string },
+        });
+      }
+    };
+
+    // Listen for incoming links when app is already open
+    const subscription = Linking.addEventListener("url", handleDeepLink);
+
+    // Handle the case when app is opened from a deep link (cold start)
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink({ url });
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   return <RootLayoutInner />;
 }

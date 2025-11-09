@@ -17,9 +17,9 @@ interface InvitationStore {
 
   // Actions
   fetchInvitations: (orgId: string) => Promise<void>;
-  fetchPendingInvitations: (email: string) => Promise<void>;
+  fetchPendingInvitations: (code: string) => Promise<void>;
   createInvitation: (
-    email: string,
+    code: string,
     orgId: string,
     role: "commander" | "member" | "viewer",
     invitedBy: string
@@ -65,14 +65,14 @@ export const invitationStore = create<InvitationStore>((set, get) => ({
   },
 
   createInvitation: async (
-    email: string,
+    code: string,
     orgId: string,
     role: "commander" | "member" | "viewer",
     invitedBy: string
   ) => {
     try {
       const newInvitation = await createInvitationService(
-        email,
+        code,
         orgId,
         role,
         invitedBy
@@ -95,7 +95,7 @@ export const invitationStore = create<InvitationStore>((set, get) => ({
       // Remove from pending invitations
       set((state) => ({
         pendingInvitations: state.pendingInvitations.filter(
-          (inv) => inv.email === inviteCode
+          (inv) => inv.code === inviteCode
         ),
       }));
 

@@ -1,16 +1,19 @@
+import { useEffect, useState } from "react";
+
 import BaseBottomSheet from "@/components/BaseBottomSheet";
 import { SignOutButton } from "@/components/SignOutButton";
+import { EnterInviteCodeForm } from "@/components/profile/EnterInviteCodeForm";
+import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/ui/useColors";
 import { useThemeColor } from "@/hooks/ui/useThemeColor";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-
-import { useAuth } from "@/contexts/AuthContext";
 
 interface ProfileMenuItem {
   icon: string;
@@ -95,11 +98,61 @@ export default function ProfileDropdown({
   const { user } = useAuth();
 
   const userName = user?.user_metadata?.full_name || "User";
-  const userEmail =
-    user?.email || "user@example.com";
+  const userEmail = user?.email || "user@example.com";
+  const [isJoinOpen, setIsJoinOpen] = useState(false);
+  const [hasStoredInviteCode, setHasStoredInviteCode] = useState(false);
+  const [pendingInviteCode, setPendingInviteCode] = useState<string | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    let isMounted = true;
+
+    AsyncStorage.getItem("pending_invite_code")
+      .then((stored) => {
+        if (!isMounted) {
+          return;
+        }
+        setPendingInviteCode(stored);
+        setHasStoredInviteCode(Boolean(stored));
+      })
+      .catch(() => {
+        if (isMounted) {
+          setPendingInviteCode(null);
+          setHasStoredInviteCode(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [visible]);
 
   const handleMenuAction = (action: string) => {
+    if (action === "join-org") {
+      setIsJoinOpen(true);
+      return;
+    }
     onMenuAction(action);
+    onClose();
+  };
+
+  const handleJoinCancel = () => {
+    setIsJoinOpen(false);
+  };
+
+  const handlePendingInviteCleared = () => {
+    setPendingInviteCode(null);
+    setHasStoredInviteCode(false);
+  };
+
+  const handleJoinSuccess = () => {
+    handlePendingInviteCleared();
+    setIsJoinOpen(false);
     onClose();
   };
 
@@ -117,7 +170,7 @@ export default function ProfileDropdown({
       >
         <ProfileHeader userName={userName} userEmail={userEmail} />
 
-        {menuItems.length > 0 && (
+        {!isJoinOpen && menuItems.length > 0 && (
           <>
             <View
               style={[styles.divider, { backgroundColor: colors.border }]}
@@ -132,7 +185,37 @@ export default function ProfileDropdown({
                 onPress={() => handleMenuAction(item.action)}
               />
             ))}
+
+            {hasStoredInviteCode && (
+              <View
+                style={[
+                  styles.notice,
+                  {
+                    backgroundColor: colors.tint + "20",
+                    borderColor: colors.tint + "35",
+                  },
+                ]}
+              >
+                <Text style={[styles.noticeTitle, { color: colors.tint }]}>
+                  Invite code saved
+                </Text>
+                <Text
+                  style={[styles.noticeText, { color: colors.textMuted }]}
+                >
+                  Tap “Enter invite code” to join your organization.
+                </Text>
+              </View>
+            )}
           </>
+        )}
+
+        {isJoinOpen && (
+          <EnterInviteCodeForm
+            initialInviteCode={pendingInviteCode ?? ""}
+            onCancel={handleJoinCancel}
+            onSuccess={handleJoinSuccess}
+            onPendingInviteCleared={handlePendingInviteCleared}
+          />
         )}
 
         <SignOutButton />
@@ -187,5 +270,21 @@ const styles = StyleSheet.create({
   menuItemText: {
     fontSize: 15,
     fontWeight: "500",
+  },
+  notice: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 4,
+  },
+  noticeTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  noticeText: {
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

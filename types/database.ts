@@ -13,7 +13,7 @@ export interface InvitationWithDetails {
 
 export interface Invitation {
   id: string;
-  email: string;
+  code: string;
   organization_id: string;
   role: string;
   status: "pending" | "accepted" | "cancelled" | "expired";

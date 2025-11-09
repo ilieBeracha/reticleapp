@@ -49,6 +49,6 @@ export function useColors() {
     pink,
     teal,
     indigo,
-    buttonPrimary: buttonPrimary,
+    buttonPrimary,
       };
 }
