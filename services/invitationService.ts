@@ -23,26 +23,15 @@ export async function createInvitationService(
   try {
     const client = await AuthenticatedClient.getClient();
 
-    // Validate: Commander invites must be single-use
-    if (role === "commander" && maxUses !== undefined && maxUses !== 1) {
-      throw new Error("Commander invitations must be single-use");
-    }
-
-    const { data, error } = await client
-      .from("invitations")
-      .insert({
-        code: inviteCode,
-        organization_id: orgId,
-        role,
-        invited_by: invitedBy,
-        status: "pending",
-        max_uses: role === "commander" ? 1 : (maxUses || 1), // Commander = 1, Member = custom
-        current_uses: 0,
-      })
-      .select()
-      .single();
-
-    if (error) throw new DatabaseError(error.message);
+    // Use RPC function instead of direct INSERT (bypasses RLS issues)
+    const { data, error } = await client.rpc("create_invitation_rpc", {
+      p_code: inviteCode,
+      p_org_id: orgId,
+      p_role: role,
+      p_invited_by: invitedBy,
+      p_max_uses: role === "commander" ? 1 : (maxUses || 1),
+    });
+    if(error) throw new DatabaseError(error.message);
     return data as Invitation;
   } catch (err: any) {
     handleServiceError(err, "Failed to create invitation");

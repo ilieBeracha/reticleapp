@@ -38,7 +38,7 @@ export default function TabLayout() {
     <>
       <StatusBar
         translucent={isCameraPath}
-        style={isCameraPath ? "light" : (colors.background === "#0f172a" ? "dark" : "light")}
+
       />
       {!isCameraPath && <Header onNotificationPress={() => {}} />}
       {!isCameraPath && <OrgBreadcrumb />}

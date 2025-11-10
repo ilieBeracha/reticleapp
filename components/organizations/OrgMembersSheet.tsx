@@ -9,13 +9,13 @@ import type { OrgMembership } from "@/types/organizations";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 interface OrgMembersSheetProps {
@@ -51,8 +51,40 @@ export function OrgMembersSheet({
   const loadMembers = async () => {
     setLoading(true);
     try {
-      const data = await OrganizationsService.getMemberships(orgId);
-      setMembers(data);
+      // Get members in user's scope (automatically filtered by role)
+      // Commanders see org + descendants, members see only their org
+      const scopedMembers = await OrganizationsService.getMembersInScope();
+      
+      // DEDUPLICATE: User should only appear once even if in multiple orgs
+      const userMap = new Map<string, typeof scopedMembers[0]>();
+      
+      for (const member of scopedMembers) {
+        // Keep the highest role membership (commander > member > viewer)
+        const existing = userMap.get(member.userId);
+        if (!existing || 
+            (member.role === 'commander' && existing.role !== 'commander') ||
+            (member.role === 'member' && existing.role === 'viewer')) {
+          userMap.set(member.userId, member);
+        }
+      }
+      
+      // Transform deduplicated members to OrgMembership format
+      const memberships = Array.from(userMap.values()).map(m => ({
+        id: m.userId,
+        user_id: m.userId,
+        org_id: m.orgId,
+        role: m.role as "commander" | "member" | "viewer",
+        created_at: new Date().toISOString(),
+        users: {
+          id: m.userId,
+          email: m.email,
+          full_name: m.fullName,
+          avatar_url: m.avatarUrl || "",
+          created_at: new Date().toISOString(),
+        },
+      })) as OrgMembership[];
+      
+      setMembers(memberships);
     } catch (error: any) {
       Alert.alert("Error", error.message || "Failed to load members");
     } finally {
@@ -183,7 +215,7 @@ export function OrgMembersSheet({
           ) : (
             <>
               <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-                {members.length} MEMBER{members.length !== 1 ? "S" : ""}
+                {members.length} MEMBER{members.length !== 1 ? "S" : ""} IN SCOPE
               </Text>
 
               {members.map((member) => {

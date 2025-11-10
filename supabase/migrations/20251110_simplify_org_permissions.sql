@@ -286,7 +286,8 @@ BEGIN
 END;
 $$;
 
--- Update create_child_organization - creator becomes MEMBER, not commander  
+-- Update create_child_organization - creator is NOT added as member
+-- Commanders manage child orgs from their parent position (scope-based)
 CREATE OR REPLACE FUNCTION public.create_child_organization(
   p_name text,
   p_org_type text,
@@ -347,11 +348,9 @@ BEGIN
   VALUES (p_name, p_org_type, p_description, p_user_id, p_parent_id)
   RETURNING organizations.id INTO v_org_id;
 
-  -- Add creator as MEMBER (not commander)
-  -- Commander must be explicitly assigned
-  INSERT INTO org_memberships (user_id, org_id, role)
-  VALUES (p_user_id, v_org_id, 'member')
-  ON CONFLICT (user_id, org_id) DO NOTHING;
+  -- DO NOT add creator as member
+  -- Commander manages this org from their parent position via scope
+  -- Members must be explicitly invited
 
   -- Return created org
   RETURN QUERY
@@ -371,6 +370,35 @@ $$;
 -- Remove get_user_accessible_orgs in application code (not database, it's used elsewhere)
 
 -- Note: RLS policies already updated in Step 1.5 above
+
+-- ============================================================================
+-- Step 6: Fix invitation RLS policies for scope-based invitations
+-- ============================================================================
+
+-- Drop old invitation INSERT policy
+DROP POLICY IF EXISTS "commanders_create_invitations" ON invitations;
+
+-- Create new policy: Commanders can invite to any org in their scope
+CREATE POLICY "commanders_create_invitations_in_scope"
+ON invitations
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  -- User must be commander in the same tree as target org
+  EXISTS (
+    SELECT 1
+    FROM org_memberships om
+    JOIN organizations o1 ON o1.id = om.org_id
+    JOIN organizations o2 ON o2.id = invitations.organization_id
+    WHERE om.user_id = auth.uid()
+      AND om.role = 'commander'
+      AND o1.root_id = o2.root_id  -- Same tree
+  )
+  AND invited_by = auth.uid()
+);
+
+COMMENT ON POLICY "commanders_create_invitations_in_scope" ON invitations IS
+'Commanders can create invitations for any organization in their tree (same root_id), not just their direct org.';
 
 -- ============================================================================
 -- Step 7: RPC function to get org members (bypasses RLS)
@@ -395,16 +423,35 @@ SET search_path = public
 AS $$
 DECLARE
   v_user_id uuid;
+  v_org_root_id uuid;
+  v_has_access boolean;
 BEGIN
   v_user_id := auth.uid();
   
-  -- Check user is member of this org (to view members)
-  IF NOT EXISTS (
+  -- Get target org's root_id
+  SELECT root_id INTO v_org_root_id
+  FROM organizations
+  WHERE id = p_org_id;
+  
+  IF v_org_root_id IS NULL THEN
+    RAISE EXCEPTION 'Organization not found';
+  END IF;
+  
+  -- Check user has access:
+  -- 1. Direct member of this org, OR
+  -- 2. Commander in the same tree (can manage scope)
+  SELECT EXISTS (
     SELECT 1 FROM org_memberships om
+    JOIN organizations o ON o.id = om.org_id
     WHERE om.user_id = v_user_id
-      AND om.org_id = p_org_id
-  ) THEN
-    RAISE EXCEPTION 'Not a member of this organization';
+      AND (
+        om.org_id = p_org_id  -- Direct member
+        OR (om.role = 'commander' AND o.root_id = v_org_root_id)  -- Commander in tree
+      )
+  ) INTO v_has_access;
+  
+  IF NOT v_has_access THEN
+    RAISE EXCEPTION 'Permission denied: Not a member or commander in this tree';
   END IF;
   
   -- Return all members of this org
@@ -428,7 +475,7 @@ $$;
 GRANT EXECUTE ON FUNCTION public.get_org_members_simple TO authenticated;
 
 COMMENT ON FUNCTION public.get_org_members_simple IS 
-'Get all members of an organization. Bypasses RLS to avoid recursion. Requires user to be a member of the org.';
+'Get all members of an organization. Bypasses RLS. Allows commanders in same tree to view members without being direct members.';
 
 -- ============================================================================
 -- Step 8: Add helper to get members in user scope
@@ -527,6 +574,7 @@ COMMENT ON FUNCTION public.get_members_in_user_scope IS
 -- ✅ Removed recursive complexity
 
 -- Permission Model:
--- 🎯 ROOT ORG: Creator = COMMANDER (owns the tree)
--- 🎯 CHILD ORG: Creator = MEMBER (commander assigned by parent)
+-- 🎯 ROOT ORG: Creator becomes COMMANDER (direct membership)
+-- 🎯 CHILD ORG: Creator NOT added as member (manages via parent scope)
+-- 🎯 Commanders manage their scope without being members of every child org
 
