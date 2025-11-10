@@ -52,7 +52,7 @@ export function OrgTypePicker({
     {
       value: "Unit",
       icon: "business",
-      color: colors.teal,
+      color: colors.primary,
       hierarchyIndex: 0,
       recommended: smartType === "Unit",
       disabled: parentHierarchyIndex >= 0, // Can't create Unit if parent is Unit/Team/Squad
@@ -60,7 +60,7 @@ export function OrgTypePicker({
     {
       value: "Team",
       icon: "people",
-      color: colors.blue,
+      color: colors.accent,
       hierarchyIndex: 1,
       recommended: smartType === "Team",
       disabled: parentHierarchyIndex >= 1, // Can't create Team if parent is Team/Squad
@@ -68,7 +68,7 @@ export function OrgTypePicker({
     {
       value: "Squad",
       icon: "shield",
-      color: colors.orange,
+      color: colors.green,
       hierarchyIndex: 2,
       recommended: smartType === "Squad",
       disabled: parentHierarchyIndex >= 2, // Can't create Squad if parent is Squad

@@ -81,13 +81,6 @@ export const useOrganizationsStore = create<OrganizationsStore>((set, get) => ({
     try {
       if (!options?.silent) set({ loading: true, error: null });
       const userOrgContext = await OrganizationsService.getUserOrgContext(userId);
-      
-      // Auto-select user's org if they have one
-      if (userOrgContext && !get().selectedOrgId) {
-        set({ selectedOrgId: userOrgContext.orgId });
-        await AsyncStorage.setItem("selected_org_id", userOrgContext.orgId);
-      }
-      
       set({ userOrgContext, loading: false });
     } catch (err: any) {
       console.error("Error fetching user context:", err);

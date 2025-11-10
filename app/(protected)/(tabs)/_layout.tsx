@@ -54,7 +54,7 @@ export default function TabLayout() {
               fontWeight: "600",
               marginTop: 2,
             },
-            tabBarActiveTintColor: colors.indigo,
+            tabBarActiveTintColor: colors.accent,
             tabBarInactiveTintColor: colors.textMuted,
             tabBarStyle: isCameraPath ? {
               display: 'none'
