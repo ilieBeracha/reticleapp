@@ -27,16 +27,15 @@ export function OrgListView({
 }: OrgListViewProps) {
   const colors = useColors();
   const { user } = useAuth();
-  const { selectedOrgId, switchOrganization, accessibleOrgs, loading } = useOrganizationsStore();
+  const { selectedOrgId, switchOrganization, userOrgs, loading } = useOrganizationsStore();
 
   const handleSwitch = async (orgId: string | null) => {
     await switchOrganization(orgId);
     onBack(); // Go back to info view after switching
   };
 
-  // Get user's actual organizations (not context-only) - should be 1-3 max
-  const userOrgs = accessibleOrgs.filter((org) => !org.isContextOnly);
-  const currentOrg = accessibleOrgs.find((o) => o.id === selectedOrgId);
+  // User's direct organizations
+  const currentOrg = userOrgs.find((o) => o.org_id === selectedOrgId);
 
   return (
     <View style={styles.container}>
@@ -91,23 +90,23 @@ export function OrgListView({
             </Text>
 
             {userOrgs.map((org) => {
-              const isSelected = selectedOrgId === org.id;
+              const isSelected = selectedOrgId === org.org_id;
 
               return (
                 <TouchableOpacity
-                  key={org.id}
+                  key={org.org_id}
                   style={[
                     styles.orgItem,
                     { backgroundColor: colors.cardBackground },
                     isSelected && { borderColor: colors.tint, borderWidth: 2 },
                   ]}
-                  onPress={() => handleSwitch(org.id)}
+                  onPress={() => handleSwitch(org.org_id)}
                 >
                   <Ionicons
                     name={
-                      org.depth === 0 ? 'business' :  // Battalion
-                      org.depth === 1 ? 'people' :    // Company
-                      'shield'                        // Platoon
+                      org.depth === 0 ? 'business' :
+                      org.depth === 1 ? 'people' :
+                      'shield'
                     }
                     size={24}
                     color={isSelected ? colors.tint : colors.icon}
@@ -115,7 +114,7 @@ export function OrgListView({
                   <View style={styles.orgInfo}>
                     <View style={styles.orgNameRow}>
                       <Text style={[styles.orgName, { color: colors.text }]}>
-                        {org.name}
+                        {org.org_name}
                       </Text>
                       <View style={[styles.typeBadge, { backgroundColor: colors.border }]}>
                         <Text style={[styles.typeBadgeText, { color: colors.textMuted }]}>
@@ -123,9 +122,9 @@ export function OrgListView({
                         </Text>
                       </View>
                     </View>
-                    {org.depth > 0 && (
+                    {org.depth > 0 && org.full_path && (
                       <Text style={[styles.orgContext, { color: colors.textMuted }]}>
-                        in {org.breadcrumb[0]}
+                        {org.full_path}
                       </Text>
                     )}
                   </View>

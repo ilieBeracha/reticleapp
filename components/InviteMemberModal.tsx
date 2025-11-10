@@ -29,7 +29,7 @@ export function InviteMemberModal({
   onClose,
 }: InviteMemberModalProps) {
   const { user } = useAuth();
-  const { selectedOrgId, allOrgs } = useOrganizationsStore();
+  const { selectedOrgId, userOrgContext } = useOrganizationsStore();
   const { createInvitation } = useStore(invitationStore);
 
   const [selectedRole, setSelectedRole] = useState<"commander" | "member">("member");
@@ -42,12 +42,8 @@ export function InviteMemberModal({
   const tintColor = useThemeColor({}, "tint");
   const cardBackground = useThemeColor({}, "cardBackground");
 
-  const currentOrg = selectedOrgId
-    ? allOrgs.find((org) => org.id === selectedOrgId)
-    : null;
-
   const handleGenerateLink = async () => {
-    if (!selectedOrgId || !user?.id || !currentOrg) return;
+    if (!selectedOrgId || !user?.id || !userOrgContext) return;
 
     setIsGenerating(true);
     try {
@@ -61,7 +57,7 @@ export function InviteMemberModal({
 
       // Generate magic link
       const magicLink = `reticle://invite?code=${inviteCode}`;
-      const shareMessage = `🎯 You're invited to join ${currentOrg.name} as ${selectedRole}!\n\nInvite Code: ${inviteCode}\n\nTap to join instantly:\n${magicLink}\n\n—\nScopes Training App`;
+      const shareMessage = `🎯 You're invited to join ${userOrgContext.orgName} as ${selectedRole}!\n\nInvite Code: ${inviteCode}\n\nTap to join instantly:\n${magicLink}\n\n—\nScopes Training App`;
 
       // Copy to clipboard (works in simulator!)
       await Clipboard.setStringAsync(magicLink);
@@ -80,7 +76,7 @@ export function InviteMemberModal({
       } else {
         // Production - use native share
         await Share.share({
-          title: `Join ${currentOrg.name}`,
+          title: `Join ${userOrgContext.orgName}`,
           message: shareMessage,
         });
 
@@ -133,7 +129,7 @@ export function InviteMemberModal({
           Generate Invite Link
         </ThemedText>
         <ThemedText style={[styles.subtitle, { color: mutedColor }]}>
-          Create a shareable link for {currentOrg?.name || "your organization"}
+          Create a shareable link for {userOrgContext?.orgName || "your organization"}
         </ThemedText>
       </View>
 

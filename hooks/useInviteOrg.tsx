@@ -1,7 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { useOrganizationsStore } from "@/store/organizationsStore";
-import { Organization } from "@/types/organizations";
 import { useCallback, useState } from "react";
   
 export type OrgRole =
@@ -16,7 +15,7 @@ interface InviteOptions {
 }
 
 export function useInviteOrg() {
-  const { selectedOrgId, allOrgs } = useOrganizationsStore();
+  const { selectedOrgId, userOrgContext } = useOrganizationsStore();
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [emailAddress, setEmailAddress] = useState("");
@@ -52,9 +51,8 @@ export function useInviteOrg() {
         throw new Error("Invalid email format");
       }
 
-      // Get organization name
-      const currentOrg = allOrgs.find((org: Organization) => org.id === selectedOrgId);
-      if (!currentOrg) {
+      // Get organization name from context
+      if (!userOrgContext) {
         throw new Error("Organization not found");
       }
 
@@ -67,7 +65,7 @@ export function useInviteOrg() {
           body: {
             email: email,
             organizationId: selectedOrgId,
-            organizationName: currentOrg.name,
+            organizationName: userOrgContext.orgName,
             role: dbRole,
             invitedBy: user?.id,
           },
@@ -81,7 +79,7 @@ export function useInviteOrg() {
         setIsSubmitting(false);
       }
     },
-    [emailAddress, selectedRole, selectedOrgId, user?.id, allOrgs]
+    [emailAddress, selectedRole, selectedOrgId, user?.id, userOrgContext]
   );
 
   return {

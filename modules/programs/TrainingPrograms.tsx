@@ -20,16 +20,12 @@ import { useStore } from "zustand";
 export function TrainingPrograms() {
   const colors = useColors();
   const { user } = useAuth();
-  const { selectedOrgId, allOrgs } = useOrganizationsStore();
+  const { selectedOrgId, userOrgContext } = useOrganizationsStore();
   const { trainings, loading: trainingsLoading, fetchTrainings } = useStore(trainingsStore);
   const { sessions, loading: sessionsLoading, fetchSessions } = useStore(sessionStatsStore);
 
   const [activeTab, setActiveTab] = useState<"programs" | "sessions">("programs");
   const [selectedTraining, setSelectedTraining] = useState<string | null>(null);
-
-  const currentOrg = selectedOrgId
-    ? allOrgs.find((org) => org.id === selectedOrgId)
-    : null;
 
   useEffect(() => {
     if (user?.id) {
@@ -74,7 +70,7 @@ export function TrainingPrograms() {
             {selectedOrgId ? "Training Programs" : "My Training"}
           </Text>
           <Text style={[styles.subtitle, { color: colors.description }]}>
-            {currentOrg?.name || "Personal workspace"}
+            {userOrgContext?.orgName || "Personal workspace"}
           </Text>
         </View>
       </View>

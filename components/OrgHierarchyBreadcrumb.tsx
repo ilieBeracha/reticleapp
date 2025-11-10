@@ -11,10 +11,10 @@ export function OrgHierarchyBreadcrumb({
   onNavigateToOrg,
 }: OrgHierarchyBreadcrumbProps) {
   const colors = useColors();
-  const { selectedOrgId, allOrgs } = useOrganizationsStore();
+  const { selectedOrgId, userOrgContext } = useOrganizationsStore();
 
   // If no org selected, show "Personal Workspace"
-  if (!selectedOrgId) {
+  if (!selectedOrgId || !userOrgContext) {
     return (
       <View style={styles.container}>
         <Ionicons name="person" size={14} color={colors.textMuted} />
@@ -25,20 +25,12 @@ export function OrgHierarchyBreadcrumb({
     );
   }
 
-  // Find the selected org
-  const selectedOrg = allOrgs.find((org) => org.id === selectedOrgId);
-  if (!selectedOrg) return null;
-
-  // Build the hierarchy path using the org's path array
-  const hierarchyPath: Array<{ id: string; name: string }> = [];
-
-  // The path array contains UUIDs from root to current org
-  selectedOrg.path.forEach((orgId) => {
-    const org = allOrgs.find((o) => o.id === orgId);
-    if (org) {
-      hierarchyPath.push({ id: org.id, name: org.name });
-    }
-  });
+  // Use full path from context (already formatted)
+  const pathParts = userOrgContext.fullPath.split(' → ').filter(Boolean);
+  const hierarchyPath = pathParts.map((name, index) => ({
+    id: userOrgContext.orgPath[index] || userOrgContext.orgId,
+    name: name
+  }));
 
   return (
     <View style={styles.container}>
