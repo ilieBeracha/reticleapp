@@ -93,7 +93,7 @@ function RootLayoutInner() {
         <BottomSheetModalProvider>
           <OrganizationSwitchProvider>
             <Slot />
-            <StatusBar style="auto" />
+            <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
             <AppOverlay />
           </OrganizationSwitchProvider>
         </BottomSheetModalProvider>
