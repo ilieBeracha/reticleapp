@@ -150,6 +150,15 @@ export function OrganizationModal({ visible, onClose }: OrganizationModalProps) 
             orgId={userOrgContext.orgId}
             orgName={userOrgContext.orgName}
             userRole={userOrgContext.role}
+            onInvite={() => setShowInviteMember(true)}
+            onCreateChild={(orgId, orgName) => {
+              // Handle create child for specific org
+              setShowCreateChild(true);
+            }}
+            onInviteToOrg={(orgId, orgName) => {
+              // Handle invite to specific org
+              setShowInviteMember(true);
+            }}
           />
         </>
       )}
