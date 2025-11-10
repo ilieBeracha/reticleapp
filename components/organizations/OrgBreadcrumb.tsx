@@ -2,7 +2,7 @@
 import { useColors } from "@/hooks/ui/useColors";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { Ionicons } from "@expo/vector-icons";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 export function OrgBreadcrumb() {
   const colors = useColors();
@@ -24,7 +24,7 @@ export function OrgBreadcrumb() {
 
   // Build breadcrumb from full_path
   const pathParts = currentOrg.full_path
-    .split(" / ")
+    .split(" → ")
     .map((s) => s.trim())
     .filter(Boolean);
 
@@ -35,10 +35,15 @@ export function OrgBreadcrumb() {
     viewer: colors.textMuted,
   };
 
+  const getDepthIcon = (depth: number): any => {
+    if (depth === 0) return "business";
+    if (depth === 1) return "people";
+    if (depth === 2) return "shield";
+    return "business";
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.cardBackground }]}>
-      <Ionicons name="business" size={18} color={colors.tint} />
-
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -46,52 +51,55 @@ export function OrgBreadcrumb() {
       >
         {pathParts.map((part, index) => {
           const isLast = index === pathParts.length - 1;
+          const depth = index;
 
           return (
             <View key={`${part}-${index}`} style={styles.crumbContainer}>
-              <TouchableOpacity disabled={isLast} style={styles.crumb}>
-                <Text
-                  style={[
-                    styles.crumbText,
-                    { color: isLast ? colors.text : colors.textMuted },
-                    isLast && styles.crumbTextActive,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {part}
-                </Text>
-              </TouchableOpacity>
-
-              {!isLast && (
+              {/* Icon (subtle for parents, prominent for current) */}
+              <View style={[
+                styles.iconBadge,
+                {
+                  backgroundColor: isLast 
+                    ? colors.tint + '20'
+                    : 'transparent',
+                }
+              ]}>
                 <Ionicons
-                  name="chevron-forward"
-                  size={14}
-                  color={colors.textMuted}
-                  style={styles.separator}
+                  name={getDepthIcon(depth)}
+                  size={isLast ? 16 : 14}
+                  color={isLast ? colors.tint : colors.textMuted}
                 />
+              </View>
+
+              {/* Text */}
+              <Text
+                style={[
+                  styles.crumbText,
+                  { color: isLast ? colors.text : colors.textMuted },
+                  isLast && styles.crumbTextActive,
+                ]}
+                numberOfLines={1}
+              >
+                {part}
+              </Text>
+
+              {/* Separator - Subtle slash */}
+              {!isLast && (
+                <Text style={[styles.separator, { color: colors.border }]}>
+                  /
+                </Text>
               )}
             </View>
           );
         })}
       </ScrollView>
 
-      {/* Role Badge */}
-      <View
-        style={[
-          styles.roleBadge,
-          {
-            backgroundColor: roleColors[currentOrg.role] + "20",
-            borderColor: roleColors[currentOrg.role],
-          },
-        ]}
-      >
-        <Text
-          style={[styles.roleBadgeText, { color: roleColors[currentOrg.role] }]}
-          numberOfLines={1}
-        >
-          {currentOrg.role.toUpperCase()}
-        </Text>
-      </View>
+      {/* Role Badge - Minimal */}
+      {currentOrg.role === 'commander' && (
+        <View style={[styles.roleBadge, { backgroundColor: colors.orange + '15' }]}>
+          <Ionicons name="star" size={10} color={colors.orange} />
+        </View>
+      )}
     </View>
   );
 }
@@ -111,35 +119,40 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     alignItems: "center",
-    gap: 4,
+    gap: 10,
   },
   crumbContainer: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 10,
   },
-  crumb: {
-    paddingHorizontal: 4,
+  iconBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   crumbText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "500",
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
+    maxWidth: 140,
   },
   crumbTextActive: {
     fontWeight: "700",
+    fontSize: 16,
   },
   separator: {
-    marginHorizontal: 4,
+    fontSize: 16,
+    fontWeight: "300",
+    opacity: 0.4,
   },
   roleBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  roleBadgeText: {
-    fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 0.5,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
