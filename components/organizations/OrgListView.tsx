@@ -60,7 +60,7 @@ export function OrgListView({
 
       {/* Content */}
       {loading ? (
-        <ActivityIndicator size="large" color={colors.tint} style={styles.loader} />
+        <ActivityIndicator size="large" color={colors.indigo} style={styles.loader} />
       ) : (
         <>
           {/* Personal Workspace */}
@@ -68,13 +68,13 @@ export function OrgListView({
             style={[
               styles.orgItem,
               { backgroundColor: colors.card },
-              !selectedOrgId && [styles.selectedItem, { borderColor: colors.accent }],
+              !selectedOrgId && [styles.selectedItem, { borderColor: colors.blue }],
             ]}
             onPress={() => handleSwitch(null)}
             activeOpacity={0.7}
           >
-            <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
-              <Ionicons name="person" size={20} color={colors.primary} />
+            <View style={[styles.iconContainer, { backgroundColor: colors.blue + '15' }]}>
+              <Ionicons name="person" size={20} color={colors.blue} />
             </View>
             <View style={styles.orgInfo}>
               <Text style={[styles.orgName, { color: colors.text }]}>
@@ -85,7 +85,7 @@ export function OrgListView({
               </Text>
             </View>
             {!selectedOrgId && (
-              <Ionicons name="checkmark-circle" size={22} color={colors.accent} />
+              <Ionicons name="checkmark-circle" size={22} color={colors.blue} />
             )}
           </TouchableOpacity>
 
@@ -98,7 +98,7 @@ export function OrgListView({
             {userOrgs.map((org) => {
               const isSelected = selectedOrgId === org.org_id;
               const iconName = org.depth === 0 ? 'business' : org.depth === 1 ? 'people' : 'shield';
-              const iconColor = org.depth === 0 ? colors.accent : org.depth === 1 ? colors.primary : colors.green;
+              const iconColor = org.depth === 0 ? colors.indigo : org.depth === 1 ? colors.teal : colors.green;
 
               return (
                 <TouchableOpacity
@@ -106,7 +106,7 @@ export function OrgListView({
                   style={[
                     styles.orgItem,
                     { backgroundColor: colors.card },
-                    isSelected && [styles.selectedItem, { borderColor: colors.accent }],
+                    isSelected && [styles.selectedItem, { borderColor: colors.indigo }],
                   ]}
                   onPress={() => handleSwitch(org.org_id)}
                   activeOpacity={0.7}
@@ -135,17 +135,17 @@ export function OrgListView({
                       </Text>
                     )}
                     <View style={[styles.roleBadge, { 
-                      backgroundColor: org.role === 'commander' ? colors.accent + '20' : colors.muted + '30' 
+                      backgroundColor: org.role === 'commander' ? colors.purple + '20' : colors.muted + '30' 
                     }]}>
                       <Text style={[styles.roleBadgeText, { 
-                        color: org.role === 'commander' ? colors.accent : colors.textMuted 
+                        color: org.role === 'commander' ? colors.purple : colors.textMuted 
                       }]}>
                         {org.role === 'commander' ? '⚡ COMMANDER' : 'MEMBER'}
                       </Text>
                     </View>
                   </View>
                   {isSelected && (
-                    <Ionicons name="checkmark-circle" size={22} color={colors.accent} />
+                    <Ionicons name="checkmark-circle" size={22} color={colors.indigo} />
                   )}
                 </TouchableOpacity>
               );
@@ -164,7 +164,7 @@ export function OrgListView({
                   Create your first organization to collaborate with your team
                 </Text>
                 <TouchableOpacity
-                  style={[styles.createButton, { backgroundColor: colors.accent }]}
+                  style={[styles.createButton, { backgroundColor: colors.indigo }]}
                   onPress={onCreateRoot}
                   activeOpacity={0.8}
                 >
@@ -180,14 +180,14 @@ export function OrgListView({
             {userOrgs.length > 0 && (
               <TouchableOpacity
                 style={[styles.addOrgButton, { 
-                  borderColor: colors.accent, 
-                  backgroundColor: colors.accent + '10' 
+                  borderColor: colors.indigo, 
+                  backgroundColor: colors.indigo + '10' 
                 }]}
                 onPress={onCreateRoot}
                 activeOpacity={0.7}
               >
-                <Ionicons name="add-circle" size={20} color={colors.accent} />
-                <Text style={[styles.addOrgButtonText, { color: colors.accent }]}>
+                <Ionicons name="add-circle" size={20} color={colors.indigo} />
+                <Text style={[styles.addOrgButtonText, { color: colors.indigo }]}>
                   Create New Organization
                 </Text>
               </TouchableOpacity>
