@@ -59,7 +59,7 @@ export function OrgInfoView({
         </View>
 
         {/* Actions Menu - Only show if user has orgs */}
-        {hasOrganizations && (
+
           <View style={styles.actionsMenu}>
             {/* Switch to Organization */}
             <TouchableOpacity
@@ -74,7 +74,7 @@ export function OrgInfoView({
               <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
-        )}
+        
       </View>
     );
   }
@@ -269,26 +269,21 @@ export function OrgInfoView({
           </TouchableOpacity>
         )}
 
-        {/* Switch Organization (only if user has other orgs) */}
-        {hasOrganizations && (
-          <>
-            {/* Divider */}
-            <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+        {/* Divider */}
+        <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
 
-            {/* Switch Organization */}
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={onSwitchOrg}
-              activeOpacity={0.6}
-            >
-              <Ionicons name="swap-horizontal" size={20} color={colors.text} />
-              <Text style={[styles.menuItemText, { color: colors.text }]}>
-                Switch organization
-              </Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-            </TouchableOpacity>
-          </>
-        )}
+        {/* Switch Organization - Always show in org mode */}
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={onSwitchOrg}
+          activeOpacity={0.6}
+        >
+          <Ionicons name="swap-horizontal" size={20} color={colors.text} />
+          <Text style={[styles.menuItemText, { color: colors.text }]}>
+            Switch organization
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </TouchableOpacity>
       </View>
     </View>
   );

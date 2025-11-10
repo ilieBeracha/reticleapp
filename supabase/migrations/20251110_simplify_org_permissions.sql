@@ -18,6 +18,25 @@ COMMENT ON INDEX one_commander_per_org IS
 'Ensures only one commander per organization. Prevents multiple commanders in same org.';
 
 -- ============================================================================
+-- Step 1.5: Keep RLS simple - Use RPC functions for member queries
+-- ============================================================================
+
+-- Drop old restrictive policies
+DROP POLICY IF EXISTS "memberships_select" ON org_memberships;
+DROP POLICY IF EXISTS "org_memberships_select" ON org_memberships;
+
+-- Simple policy: Only see your own memberships via direct queries
+-- For getting org members, use the RPC function get_org_members_simple
+CREATE POLICY "org_memberships_select_own"
+ON org_memberships
+FOR SELECT
+TO authenticated
+USING (user_id = auth.uid());
+
+COMMENT ON POLICY "org_memberships_select_own" ON org_memberships IS
+'Users can only see their own memberships via direct queries. Use get_org_members_simple RPC to view other members.';
+
+-- ============================================================================
 -- Step 2: Create RPC - Get user org with computed permissions
 -- ============================================================================
 
@@ -351,18 +370,68 @@ $$;
 -- Keep get_user_orgs for backward compatibility (returns direct memberships only)
 -- Remove get_user_accessible_orgs in application code (not database, it's used elsewhere)
 
--- ============================================================================
--- Step 6: Simplify RLS policies (already simple, but document)
--- ============================================================================
-
-COMMENT ON POLICY "org_memberships_select" ON org_memberships IS 
-'Users can see their own memberships. Use get_user_org_with_permissions RPC for permissions.';
-
-COMMENT ON POLICY "organizations_select" ON organizations IS 
-'Users can see orgs they created or are members of. Hierarchical access via RPC functions.';
+-- Note: RLS policies already updated in Step 1.5 above
 
 -- ============================================================================
--- Step 7: Add helper to get members in user scope
+-- Step 7: RPC function to get org members (bypasses RLS)
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.get_org_members_simple(
+  p_org_id uuid
+)
+RETURNS TABLE (
+  id uuid,
+  user_id uuid,
+  org_id uuid,
+  role text,
+  created_at timestamptz,
+  email text,
+  full_name text,
+  avatar_url text
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id uuid;
+BEGIN
+  v_user_id := auth.uid();
+  
+  -- Check user is member of this org (to view members)
+  IF NOT EXISTS (
+    SELECT 1 FROM org_memberships om
+    WHERE om.user_id = v_user_id
+      AND om.org_id = p_org_id
+  ) THEN
+    RAISE EXCEPTION 'Not a member of this organization';
+  END IF;
+  
+  -- Return all members of this org
+  RETURN QUERY
+  SELECT 
+    om.id,
+    om.user_id,
+    om.org_id,
+    om.role,
+    om.created_at,
+    u.email,
+    u.full_name,
+    u.avatar_url
+  FROM org_memberships om
+  JOIN users u ON u.id = om.user_id
+  WHERE om.org_id = p_org_id
+  ORDER BY om.created_at ASC;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_org_members_simple TO authenticated;
+
+COMMENT ON FUNCTION public.get_org_members_simple IS 
+'Get all members of an organization. Bypasses RLS to avoid recursion. Requires user to be a member of the org.';
+
+-- ============================================================================
+-- Step 8: Add helper to get members in user scope
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.get_members_in_user_scope(

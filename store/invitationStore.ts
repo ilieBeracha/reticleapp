@@ -22,7 +22,8 @@ interface InvitationStore {
     code: string,
     orgId: string,
     role: "commander" | "member" | "viewer",
-    invitedBy: string
+    invitedBy: string,
+    maxUses?: number | null
   ) => Promise<void>;
   acceptInvitation: (
     inviteCode: string,
@@ -68,14 +69,16 @@ export const invitationStore = create<InvitationStore>((set, get) => ({
     code: string,
     orgId: string,
     role: "commander" | "member" | "viewer",
-    invitedBy: string
+    invitedBy: string,
+    maxUses?: number | null
   ) => {
     try {
       const newInvitation = await createInvitationService(
         code,
         orgId,
         role,
-        invitedBy
+        invitedBy,
+        maxUses
       );
 
       // Add to invitations list

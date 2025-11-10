@@ -10,25 +10,34 @@ import { Invitation } from "@/types/database";
  * @param orgId - Organization ID to invite to
  * @param role - Role to assign (commander, member, viewer)
  * @param invitedBy - User ID of the inviter
+ * @param maxUses - Maximum number of uses (default: 1 for commander, optional for members)
  * @returns Created invitation
  */
 export async function createInvitationService(
   inviteCode: string,
   orgId: string,
   role: "commander" | "member" | "viewer",
-  invitedBy: string
+  invitedBy: string,
+  maxUses?: number | null
 ): Promise<Invitation> {
   try {
     const client = await AuthenticatedClient.getClient();
 
+    // Validate: Commander invites must be single-use
+    if (role === "commander" && maxUses !== undefined && maxUses !== 1) {
+      throw new Error("Commander invitations must be single-use");
+    }
+
     const { data, error } = await client
       .from("invitations")
       .insert({
-        code: inviteCode, // Store invite code in code field
+        code: inviteCode,
         organization_id: orgId,
         role,
         invited_by: invitedBy,
         status: "pending",
+        max_uses: role === "commander" ? 1 : (maxUses || 1), // Commander = 1, Member = custom
+        current_uses: 0,
       })
       .select()
       .single();

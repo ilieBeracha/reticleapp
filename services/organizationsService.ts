@@ -33,15 +33,30 @@ export interface UserOrgContext {
 }
 
 export class OrganizationsService {
-  // Get memberships of an organization
+  // Get memberships of an organization (uses RPC to avoid RLS recursion)
   static async getMemberships(orgId: string): Promise<OrgMembership[]> {
     const client = await AuthenticatedClient.getClient();
-    const { data, error } = await client
-      .from("org_memberships")
-      .select("*, users(*)")
-      .eq("org_id", orgId);
-    if (error) throw new Error(`Failed to get memberships: ${error.message}`);
-    return data as OrgMembership[];
+    
+    const { data, error } = await client.rpc("get_org_members_simple", {
+      p_org_id: orgId,
+    });
+    
+    if (error) throw new DatabaseError(`Failed to get memberships: ${error.message}`);
+    
+    // Transform RPC result to OrgMembership format
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      user_id: row.user_id,
+      org_id: row.org_id,
+      role: row.role,
+      created_at: row.created_at,
+      users: {
+        id: row.user_id,
+        email: row.email,
+        full_name: row.full_name,
+        avatar_url: row.avatar_url,
+      },
+    })) as OrgMembership[];
   }
   // Get current user's organizations
   static async getUserOrgs(userId: string): Promise<UserOrg[]> {
