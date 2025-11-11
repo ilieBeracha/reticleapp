@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import BaseBottomSheet from "@/components/BaseBottomSheet";
 import { SignOutButton } from "@/components/SignOutButton";
-import { EnterInviteCodeForm } from "@/components/profile/EnterInviteCodeForm";
+import { EnterInviteCodeModal } from "@/components/profile/EnterInviteCodeModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/ui/useColors";
 import { useThemeColor } from "@/hooks/ui/useThemeColor";
@@ -99,7 +99,7 @@ export default function ProfileDropdown({
 
   const userName = user?.user_metadata?.full_name || "User";
   const userEmail = user?.email || "user@example.com";
-  const [isJoinOpen, setIsJoinOpen] = useState(false);
+  const [inviteModalVisible, setInviteModalVisible] = useState(false);
   const [hasStoredInviteCode, setHasStoredInviteCode] = useState(false);
   const [pendingInviteCode, setPendingInviteCode] = useState<string | null>(
     null,
@@ -134,93 +134,89 @@ export default function ProfileDropdown({
 
   const handleMenuAction = (action: string) => {
     if (action === "join-org") {
-      setIsJoinOpen(true);
+      setInviteModalVisible(true);
       return;
     }
     onMenuAction(action);
     onClose();
   };
 
-  const handleJoinCancel = () => {
-    setIsJoinOpen(false);
-  };
-
-  const handlePendingInviteCleared = () => {
+  const handleInviteSuccess = () => {
+    // Clear stored invite code
+    AsyncStorage.removeItem("pending_invite_code");
     setPendingInviteCode(null);
     setHasStoredInviteCode(false);
-  };
-
-  const handleJoinSuccess = () => {
-    handlePendingInviteCleared();
-    setIsJoinOpen(false);
+    
+    // Close profile dropdown
     onClose();
   };
 
   return (
-    <BaseBottomSheet
-      visible={visible}
-      onClose={onClose}
-      enableDynamicSizing={true}
-      enablePanDownToClose={true}
-    >
-      <View
-        style={styles.content}
-        accessibilityRole="menu"
-        accessibilityLabel="Profile menu"
+    <>
+      <BaseBottomSheet
+        visible={visible}
+        onClose={onClose}
+        enableDynamicSizing={true}
+        enablePanDownToClose={true}
       >
-        <ProfileHeader userName={userName} userEmail={userEmail} />
+        <View
+          style={styles.content}
+          accessibilityRole="menu"
+          accessibilityLabel="Profile menu"
+        >
+          <ProfileHeader userName={userName} userEmail={userEmail} />
 
-        {!isJoinOpen && menuItems.length > 0 && (
-          <>
-            <View
-              style={[styles.divider, { backgroundColor: colors.border }]}
-            />
-
-            {menuItems.map((item, idx) => (
-              <MenuItem
-                key={idx}
-                icon={item.icon}
-                label={item.label}
-                danger={item.danger}
-                onPress={() => handleMenuAction(item.action)}
-              />
-            ))}
-
-            {hasStoredInviteCode && (
+          {menuItems.length > 0 && (
+            <>
               <View
-                style={[
-                  styles.notice,
-                  {
-                    backgroundColor: colors.tint + "20",
-                    borderColor: colors.tint + "35",
-                  },
-                ]}
-              >
-                <Text style={[styles.noticeTitle, { color: colors.tint }]}>
-                  Invite code saved
-                </Text>
-                <Text
-                  style={[styles.noticeText, { color: colors.textMuted }]}
+                style={[styles.divider, { backgroundColor: colors.border }]}
+              />
+
+              {menuItems.map((item, idx) => (
+                <MenuItem
+                  key={idx}
+                  icon={item.icon}
+                  label={item.label}
+                  danger={item.danger}
+                  onPress={() => handleMenuAction(item.action)}
+                />
+              ))}
+
+              {hasStoredInviteCode && (
+                <View
+                  style={[
+                    styles.notice,
+                    {
+                      backgroundColor: colors.tint + "20",
+                      borderColor: colors.tint + "35",
+                    },
+                  ]}
                 >
-                  Tap “Enter invite code” to join your organization.
-                </Text>
-              </View>
-            )}
-          </>
-        )}
+                  <Text style={[styles.noticeTitle, { color: colors.tint }]}>
+                    Invite code saved
+                  </Text>
+                  <Text
+                    style={[styles.noticeText, { color: colors.textMuted }]}
+                  >
+                    Tap "Enter invite code" to join your organization.
+                  </Text>
+                </View>
+              )}
+            </>
+          )}
 
-        {isJoinOpen && (
-          <EnterInviteCodeForm
-            initialInviteCode={pendingInviteCode ?? ""}
-            onCancel={handleJoinCancel}
-            onSuccess={handleJoinSuccess}
-            onPendingInviteCleared={handlePendingInviteCleared}
-          />
-        )}
+          <SignOutButton />
+        </View>
+      </BaseBottomSheet>
 
-        <SignOutButton />
-      </View>
-    </BaseBottomSheet>
+      {/* Standalone Invite Modal */}
+      <EnterInviteCodeModal
+        visible={inviteModalVisible}
+        onClose={() => setInviteModalVisible(false)}
+        initialInviteCode={pendingInviteCode ?? undefined}
+        onSuccess={handleInviteSuccess}
+      />
+    </>
   );
 }
 

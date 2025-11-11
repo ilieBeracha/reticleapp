@@ -4,13 +4,13 @@ import { useColors } from "@/hooks/ui/useColors";
 import { useColorScheme } from "@/hooks/ui/useColorScheme";
 import { Ionicons } from "@expo/vector-icons";
 import {
-  Linking,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Linking,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 export default function Settings() {
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 20,
     paddingTop: 24,
-    paddingBottom: 100,
+    
   },
   section: {
     marginBottom: 32,

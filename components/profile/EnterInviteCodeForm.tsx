@@ -4,15 +4,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/ui/useColors";
 import { acceptInvitationService } from "@/services/invitationService";
 import { useOrganizationsStore } from "@/store/organizationsStore";
+import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
-    ActivityIndicator,
-    Alert,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
 
 interface EnterInviteCodeFormProps {
@@ -103,7 +103,7 @@ export function EnterInviteCodeForm({
         Paste or type the code that was sent to you to join the organization.
       </Text>
 
-      <TextInput
+      <BottomSheetTextInput
         value={inviteCode}
         onChangeText={handleInviteChange}
         autoCorrect={false}
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 16,
+
     gap: 12,
   },
   title: {

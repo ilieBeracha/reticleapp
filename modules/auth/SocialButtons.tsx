@@ -25,7 +25,6 @@ export function SocialButtons() {
   const handleOAuthLogin = async (provider: 'google' | 'apple') => {
     try {
       await signInWithOAuth(provider);
-      Alert.alert('Success', 'Signed in successfully!');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign in';
       Alert.alert('Error', errorMessage);
