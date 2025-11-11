@@ -7,7 +7,6 @@ import { useEnsureActiveOrg } from "@/hooks/useEnsureActiveOrg";
 import { useOrganizationSwitchStore } from "@/store/organizationSwitchStore";
 import { useOrganizationsStore } from "@/store/organizationsStore"; // ✅ New import
 import { sessionStatsStore } from "@/store/sessionsStore";
-import { Organization } from "@/types/organizations";
 import { useEffect, useRef } from "react";
 import { Animated, ScrollView, StyleSheet } from "react-native";
 import { useStore } from "zustand";
@@ -20,8 +19,8 @@ export function Home() {
   const { user } = useAuth();
   const colors = useColors();
 
-  // ✅ Use new organizations store instead of Clerk
-  const { selectedOrgId, allOrgs, fetchUserOrgs, fetchAllOrgs } =
+  // Simplified store usage
+  const { selectedOrgId, userOrgContext, userOrgs, fetchUserContext, fetchUserOrgs } =
     useOrganizationsStore();
 
   const { sessions, loading } = useStore(sessionStatsStore);
@@ -32,22 +31,23 @@ export function Home() {
   const userName =
     user?.user_metadata?.full_name?.split(" ")[0] || "User";
 
-  // ✅ Get selected organization from hierarchy
-  const selectedOrg = allOrgs.find((o: Organization) => o.id === selectedOrgId);
-  const organizationName = selectedOrg?.name;
+  // Get organization name from context or user orgs
+  const organizationName = selectedOrgId 
+    ? (userOrgs.find(o => o.org_id === selectedOrgId)?.org_name || userOrgContext?.orgName)
+    : null;
   const isPersonalWorkspace = !selectedOrgId;
 
   // Animation values for content fade-in and slide-up
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
-  const previousOrgId = useRef<string | null | undefined>(selectedOrgId); // ✅ Track hierarchy org
+  const previousOrgId = useRef<string | null | undefined>(selectedOrgId);
   const previousIsSwitching = useRef<boolean>(isSwitching);
 
-  // ✅ Fetch organizations on mount
+  // Fetch user context on mount
   useEffect(() => {
     if (user?.id) {
-      fetchUserOrgs(user?.id);
-      fetchAllOrgs(user?.id);
+      fetchUserContext(user.id);
+      fetchUserOrgs(user.id);
     }
   }, [user?.id]);
 
@@ -99,16 +99,16 @@ export function Home() {
       }
 
       if (user?.id) {
-        console.log("Fetching sessions for orgId:", selectedOrgId); // ✅ Use hierarchy org
+        console.log("Fetching sessions for orgId:", selectedOrgId);
 
-        // Get all org IDs the user is a member of (for personal mode)
-        const userOrgIds = allOrgs.map((org) => org.id);
+        // Get user org IDs from direct memberships
+        const userOrgIds = userOrgs.map((org) => org.org_id);
 
-        sessionStatsStore.getState().fetchSessions(user?.id, selectedOrgId, userOrgIds); // ✅ Pass hierarchy org ID + all org IDs
+        sessionStatsStore.getState().fetchSessions(user?.id, selectedOrgId, userOrgIds);
       }
     };
     loadSessions();
-  }, [user?.id, selectedOrgId, allOrgs]);
+  }, [user?.id, selectedOrgId, userOrgs]);
 
   // ✅ Animate when switching orgs
   useEffect(() => {
@@ -154,7 +154,7 @@ export function Home() {
           <GreetingSection
             isPersonalWorkspace={isPersonalWorkspace}
             userName={userName}
-            organizationName={organizationName}
+            organizationName={organizationName || undefined}
           />
 
           <Stats sessionsCount={sessions.length} />

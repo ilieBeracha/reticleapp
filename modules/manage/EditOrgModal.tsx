@@ -22,7 +22,7 @@ export function EditOrgModal({
 }: EditOrgModalProps) {
   const { user } = useAuth();
   const userId = user?.id;
-  const { updateOrg, fetchAllOrgs } = useOrganizationsStore();
+  const { updateOrg, fetchUserContext } = useOrganizationsStore();
 
   const [organizationName, setOrganizationName] = useState(organization.name);
   const [organizationType, setOrganizationType] = useState(
@@ -65,8 +65,8 @@ export function EditOrgModal({
         userId
       );
 
-      // Refresh org data
-      await fetchAllOrgs(userId);
+      // Refresh user context
+      await fetchUserContext(userId);
 
       Alert.alert("Success", "Organization updated successfully");
       onClose();

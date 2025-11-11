@@ -4,11 +4,11 @@
     "slug": "reticle",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/brand/reticle-logo.png",
+    "icon": "./assets/brand/logo.png",
     "scheme": "reticle",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/brand/reticle-logo.png",
+      "image": "./assets/brand/logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -16,7 +16,7 @@
     "ios": {
       "bundleIdentifier": "com.reticle.app",
       "supportsTablet": true,
-      "icon": "./assets/brand/reticle-logo.png",
+      "icon": "./assets/brand/logo.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -28,9 +28,9 @@
       "versionCode": 5,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/brand/reticle-logo.png",
-        "backgroundImage": "./assets/brand/reticle-logo.png",
-        "monochromeImage": "./assets/brand/reticle-logo.png"
+        "foregroundImage": "./assets/brand/logo.png",
+        "backgroundImage": "./assets/brand/logo.png",
+        "monochromeImage": "./assets/brand/logo.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -42,14 +42,14 @@
     },
     "web": {
       "output": "single",
-      "favicon": "./assets/brand/reticle-logo.png"
+      "favicon": "./assets/brand/logo.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/brand/reticle-logo.png",
+          "image": "./assets/brand/logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",

@@ -1,18 +1,17 @@
 import { CreateOrgModal } from "@/components/CreateOrg";
+import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/ui/useColors";
 import { useThemeColor } from "@/hooks/ui/useThemeColor";
-import { OrgChild } from "@/types/organizations";
 import { useOrganizationsStore } from "@/store/organizationsStore";
-import { useAuth } from "@/contexts/AuthContext";
+import { OrgChild } from "@/types/organizations";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { ChildOrgDetailModal } from "./ChildOrgDetailModal";
 import { DeleteOrgModal } from "./DeleteOrgModal";
@@ -25,9 +24,8 @@ export function ChildOrgsList() {
     selectedOrgId,
     orgChildren,
     fetchOrgChildren,
-    fetchUserOrgs,
-    fetchAllOrgs,
-    allOrgs,
+    fetchUserContext,
+    userOrgContext,
   } = useOrganizationsStore();
 
   const cardBackground = useThemeColor({}, "cardBackground");
@@ -70,8 +68,7 @@ export function ChildOrgsList() {
   const handleCreateSuccess = () => {
     setCreateModalVisible(false);
     if (userId && selectedOrgId) {
-      fetchUserOrgs(userId);
-      fetchAllOrgs(userId);
+      fetchUserContext(userId);
       fetchOrgChildren(selectedOrgId);
     }
   };
@@ -85,13 +82,10 @@ export function ChildOrgsList() {
     setDeleteModalVisible(false);
     setOrgToDelete(null);
     if (userId && selectedOrgId) {
-      fetchUserOrgs(userId);
-      fetchAllOrgs(userId);
+      fetchUserContext(userId);
       fetchOrgChildren(selectedOrgId);
     }
   };
-
-  const currentOrg = allOrgs.find((org) => org.id === selectedOrgId);
 
   if (loading) {
     return (

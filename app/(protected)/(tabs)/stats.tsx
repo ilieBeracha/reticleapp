@@ -17,13 +17,12 @@ import { useStore } from "zustand";
 export default function Stats() {
   const colors = useColors();
   const { user } = useAuth();
-  const { selectedOrgId, allOrgs } = useOrganizationsStore();
+  const { selectedOrgId, userOrgContext } = useOrganizationsStore();
   const { sessions, loading: sessionsLoading, fetchSessions } = useStore(sessionStatsStore);
   const [filterVisible, setFilterVisible] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState("All");
 
   const isPersonalMode = selectedOrgId === null;
-  const selectedOrg = allOrgs.find((o) => o.id === selectedOrgId);
   const userName =
     user?.user_metadata?.full_name ||
     user?.email ||
@@ -103,7 +102,7 @@ export default function Stats() {
         <View style={styles.headerContainer}>
           <StatsHeader
             isPersonalMode={isPersonalMode}
-            organizationName={selectedOrg?.name}
+            organizationName={userOrgContext?.orgName}
             userName={userName}
             selectedFilter={selectedFilter}
             onFilterPress={handleOpenFilters}

@@ -3,11 +3,11 @@ import { useColors } from "@/hooks/ui/useColors";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { Ionicons } from "@expo/vector-icons";
 import {
-    ActivityIndicator,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 interface OrgListViewProps {
@@ -27,16 +27,15 @@ export function OrgListView({
 }: OrgListViewProps) {
   const colors = useColors();
   const { user } = useAuth();
-  const { selectedOrgId, switchOrganization, accessibleOrgs, loading } = useOrganizationsStore();
+  const { selectedOrgId, switchOrganization, userOrgs, loading } = useOrganizationsStore();
 
   const handleSwitch = async (orgId: string | null) => {
     await switchOrganization(orgId);
     onBack(); // Go back to info view after switching
   };
 
-  // Get user's actual organizations (not context-only) - should be 1-3 max
-  const userOrgs = accessibleOrgs.filter((org) => !org.isContextOnly);
-  const currentOrg = accessibleOrgs.find((o) => o.id === selectedOrgId);
+  // User's direct organizations
+  const currentOrg = userOrgs.find((o) => o.org_id === selectedOrgId);
 
   return (
     <View style={styles.container}>
@@ -61,26 +60,32 @@ export function OrgListView({
 
       {/* Content */}
       {loading ? (
-        <ActivityIndicator size="large" color={colors.tint} style={styles.loader} />
+        <ActivityIndicator size="large" color={colors.indigo} style={styles.loader} />
       ) : (
         <>
           {/* Personal Workspace */}
           <TouchableOpacity
             style={[
               styles.orgItem,
-              { backgroundColor: colors.cardBackground },
-              !selectedOrgId && styles.selectedItem,
+              { backgroundColor: colors.card },
+              !selectedOrgId && [styles.selectedItem, { borderColor: colors.blue }],
             ]}
             onPress={() => handleSwitch(null)}
+            activeOpacity={0.7}
           >
-            <View style={styles.orgItemLeft}>
+            <View style={[styles.iconContainer, { backgroundColor: colors.blue + '15' }]}>
               <Ionicons name="person" size={20} color={colors.blue} />
+            </View>
+            <View style={styles.orgInfo}>
               <Text style={[styles.orgName, { color: colors.text }]}>
                 Personal Workspace
               </Text>
+              <Text style={[styles.orgSubtext, { color: colors.textMuted }]}>
+                Your private sessions & data
+              </Text>
             </View>
             {!selectedOrgId && (
-              <Ionicons name="checkmark-circle" size={20} color={colors.green} />
+              <Ionicons name="checkmark-circle" size={22} color={colors.blue} />
             )}
           </TouchableOpacity>
 
@@ -91,55 +96,56 @@ export function OrgListView({
             </Text>
 
             {userOrgs.map((org) => {
-              const isSelected = selectedOrgId === org.id;
+              const isSelected = selectedOrgId === org.org_id;
+              const iconName = org.depth === 0 ? 'business' : org.depth === 1 ? 'people' : 'shield';
+              const iconColor = org.depth === 0 ? colors.indigo : org.depth === 1 ? colors.teal : colors.green;
 
               return (
                 <TouchableOpacity
-                  key={org.id}
+                  key={org.org_id}
                   style={[
                     styles.orgItem,
-                    { backgroundColor: colors.cardBackground },
-                    isSelected && { borderColor: colors.tint, borderWidth: 2 },
+                    { backgroundColor: colors.card },
+                    isSelected && [styles.selectedItem, { borderColor: colors.indigo }],
                   ]}
-                  onPress={() => handleSwitch(org.id)}
+                  onPress={() => handleSwitch(org.org_id)}
+                  activeOpacity={0.7}
                 >
-                  <Ionicons
-                    name={
-                      org.depth === 0 ? 'business' :  // Battalion
-                      org.depth === 1 ? 'people' :    // Company
-                      'shield'                        // Platoon
-                    }
-                    size={24}
-                    color={isSelected ? colors.tint : colors.icon}
-                  />
+                  <View style={[styles.iconContainer, { backgroundColor: iconColor + '15' }]}>
+                    <Ionicons
+                      name={iconName}
+                      size={22}
+                      color={iconColor}
+                    />
+                  </View>
                   <View style={styles.orgInfo}>
                     <View style={styles.orgNameRow}>
                       <Text style={[styles.orgName, { color: colors.text }]}>
-                        {org.name}
+                        {org.org_name}
                       </Text>
-                      <View style={[styles.typeBadge, { backgroundColor: colors.border }]}>
-                        <Text style={[styles.typeBadgeText, { color: colors.textMuted }]}>
+                      <View style={[styles.typeBadge, { backgroundColor: iconColor + '20' }]}>
+                        <Text style={[styles.typeBadgeText, { color: iconColor }]}>
                           {org.org_type}
                         </Text>
                       </View>
                     </View>
-                    {org.depth > 0 && (
+                    {org.depth > 0 && org.full_path && (
                       <Text style={[styles.orgContext, { color: colors.textMuted }]}>
-                        in {org.breadcrumb[0]}
+                        {org.full_path}
                       </Text>
                     )}
-                  </View>
-                  <View style={[styles.roleBadge, { 
-                    backgroundColor: org.role === 'commander' ? colors.blue + '20' : colors.border 
-                  }]}>
-                    <Text style={[styles.roleBadgeText, { 
-                      color: org.role === 'commander' ? colors.blue : colors.textMuted 
+                    <View style={[styles.roleBadge, { 
+                      backgroundColor: org.role === 'commander' ? colors.purple + '20' : colors.muted + '30' 
                     }]}>
-                      {org.role === 'commander' ? 'ADMIN' : 'MEMBER'}
-                    </Text>
+                      <Text style={[styles.roleBadgeText, { 
+                        color: org.role === 'commander' ? colors.purple : colors.textMuted 
+                      }]}>
+                        {org.role === 'commander' ? '⚡ COMMANDER' : 'MEMBER'}
+                      </Text>
+                    </View>
                   </View>
                   {isSelected && (
-                    <Ionicons name="checkmark-circle" size={20} color={colors.tint} />
+                    <Ionicons name="checkmark-circle" size={22} color={colors.indigo} />
                   )}
                 </TouchableOpacity>
               );
@@ -148,16 +154,19 @@ export function OrgListView({
             {/* Empty State */}
             {userOrgs.length === 0 && (
               <View style={styles.emptyState}>
-                <Ionicons name="business-outline" size={48} color={colors.border} />
-                <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+                <View style={[styles.emptyIconContainer, { backgroundColor: colors.muted + '20' }]}>
+                  <Ionicons name="business-outline" size={48} color={colors.textMuted} />
+                </View>
+                <Text style={[styles.emptyText, { color: colors.text }]}>
                   No organizations yet
                 </Text>
                 <Text style={[styles.emptyHint, { color: colors.textMuted }]}>
-                  Create one to get started
+                  Create your first organization to collaborate with your team
                 </Text>
                 <TouchableOpacity
-                  style={[styles.createButton, { backgroundColor: colors.tint }]}
+                  style={[styles.createButton, { backgroundColor: colors.indigo }]}
                   onPress={onCreateRoot}
+                  activeOpacity={0.8}
                 >
                   <Ionicons name="add-circle" size={20} color="#fff" />
                   <Text style={styles.createButtonText}>
@@ -170,11 +179,15 @@ export function OrgListView({
             {/* Create Button (when orgs exist) */}
             {userOrgs.length > 0 && (
               <TouchableOpacity
-                style={[styles.addOrgButton, { borderColor: colors.tint, backgroundColor: colors.tint + '10' }]}
+                style={[styles.addOrgButton, { 
+                  borderColor: colors.indigo, 
+                  backgroundColor: colors.indigo + '10' 
+                }]}
                 onPress={onCreateRoot}
+                activeOpacity={0.7}
               >
-                <Ionicons name="add-circle" size={20} color={colors.tint} />
-                <Text style={[styles.addOrgButtonText, { color: colors.tint }]}>
+                <Ionicons name="add-circle" size={20} color={colors.indigo} />
+                <Text style={[styles.addOrgButtonText, { color: colors.indigo }]}>
                   Create New Organization
                 </Text>
               </TouchableOpacity>
@@ -196,138 +209,156 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 4,
     paddingTop: 8,
-    paddingBottom: 12,
+    paddingBottom: 16,
   },
   title: {
     fontSize: 20,
     fontWeight: "700",
     letterSpacing: -0.4,
   },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: 4,
-    marginBottom: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    gap: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-  },
   loader: {
     marginVertical: 40,
   },
   section: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
-    letterSpacing: 0.5,
+    letterSpacing: 1,
+    textTransform: "uppercase",
     marginHorizontal: 4,
-    marginBottom: 8,
+    marginBottom: 12,
+    opacity: 0.7,
   },
   orgItem: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 16,
     marginHorizontal: 0,
-    marginBottom: 8,
-    borderRadius: 12,
-    gap: 12,
+    marginBottom: 10,
+    borderRadius: 14,
+    gap: 14,
+    borderWidth: 1.5,
+    borderColor: "transparent",
   },
   selectedItem: {
     borderWidth: 2,
-    borderColor: "#6366f1",
   },
-  orgItemLeft: {
-    flexDirection: "row",
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     alignItems: "center",
-    gap: 12,
-    flex: 1,
+    justifyContent: "center",
   },
   orgInfo: {
     flex: 1,
-    gap: 4,
+    gap: 6,
   },
   orgNameRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    flexWrap: "wrap",
   },
   orgName: {
     fontSize: 16,
     fontWeight: "600",
     letterSpacing: -0.3,
-    flex: 1,
+  },
+  orgSubtext: {
+    fontSize: 13,
+    fontWeight: "500",
+    letterSpacing: -0.1,
   },
   typeBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: 6,
   },
   typeBadgeText: {
     fontSize: 11,
-    fontWeight: "600",
-    textTransform: "capitalize",
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   orgContext: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "500",
+    letterSpacing: -0.1,
   },
   roleBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
+    alignSelf: "flex-start",
   },
   roleBadgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "700",
     letterSpacing: 0.5,
   },
   emptyState: {
     alignItems: "center",
-    paddingVertical: 40,
-    gap: 12,
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+    gap: 16,
+  },
+  emptyIconContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
   },
   emptyText: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 18,
+    fontWeight: "700",
+    letterSpacing: -0.3,
   },
   emptyHint: {
     fontSize: 14,
-    marginBottom: 12,
+    fontWeight: "500",
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 8,
   },
   createButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingHorizontal: 28,
+    paddingVertical: 16,
+    borderRadius: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   createButtonText: {
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#fff",
+    letterSpacing: -0.2,
   },
   addOrgButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 16,
+    borderRadius: 14,
     borderWidth: 2,
-    marginTop: 16,
+    marginTop: 8,
   },
   addOrgButtonText: {
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: "700",
+    letterSpacing: -0.2,
   },
 });
 

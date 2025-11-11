@@ -32,11 +32,18 @@ export function CreateChildOrgModal({
 }: CreateChildOrgModalProps) {
   const colors = useColors();
   const { user } = useAuth();
-  const { createChildOrg, accessibleOrgs } = useOrganizationsStore();
+  const { createChildOrg, userOrgContext, orgChildren } = useOrganizationsStore();
 
-  // Get parent org to determine type
-  const parentOrg = accessibleOrgs.find(o => o.id === parentId);
-  const parentType = parentOrg?.org_type || 'Unit';
+  // Get parent org type from context or children
+  const getParentType = (): string => {
+    if (userOrgContext?.orgId === parentId) {
+      return userOrgContext.orgType;
+    }
+    const parentChild = orgChildren.find(c => c.id === parentId);
+    return parentChild?.org_type || 'Unit';
+  };
+  
+  const parentType = getParentType();
 
   const [name, setName] = useState("");
   const [orgType, setOrgType] = useState("Team"); // Will be set by useEffect

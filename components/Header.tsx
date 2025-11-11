@@ -71,15 +71,15 @@ export default function Header({
             styles.avatar,
             {
               backgroundColor: isPersonalMode
-                ? colors.indigo + "20"
-                : colors.orange + "20",
+                ? colors.primary + "20"
+                : colors.accent + "20",
             },
           ]}
         >
           <Ionicons
             name="person"
             size={24}
-            color={isPersonalMode ? colors.indigo : colors.orange}
+            color={isPersonalMode ? colors.primary : colors.accent}
           />
         </View>
         <View style={styles.userDetails}>

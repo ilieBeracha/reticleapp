@@ -1,13 +1,11 @@
 import BaseBottomSheet from "@/components/BaseBottomSheet";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/ui/useColors";
-import { OrganizationsService } from "@/services/organizationsService";
 import { DayPeriod } from "@/services/sessionService";
 import { useOrganizationsStore } from "@/store/organizationsStore";
 import { sessionStatsStore } from "@/store/sessionsStore";
-import type { FlatOrganization } from "@/types/organizations";
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -43,28 +41,9 @@ export function CreateSessionBottomSheet({
   const [comments, setComments] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Org picker state
-  const [destinationOrgId, setDestinationOrgId] = useState<string | null>(selectedOrgId);
-  const [showOrgPicker, setShowOrgPicker] = useState(false);
-  const [accessibleOrgs, setAccessibleOrgs] = useState<FlatOrganization[]>([]);
-
-  useEffect(() => {
-    if (visible) {
-      setDestinationOrgId(selectedOrgId);
-      loadAccessibleOrgs();
-    }
-  }, [visible, selectedOrgId]);
-
-  const loadAccessibleOrgs = async () => {
-    if (!user) return;
-    try {
-      const orgs = await OrganizationsService.getAllAccessibleOrganizations(user.id);
-      // Only show orgs where user can create (commander or member)
-      setAccessibleOrgs(orgs.filter((o) => o.role !== "viewer"));
-    } catch (error) {
-      console.error("Error loading orgs:", error);
-    }
-  };
+  // Simplified: session created in current org or personal
+  const { userOrgContext } = useOrganizationsStore();
+  const destinationOrgId = selectedOrgId; // Use selected org
 
   const resetForm = () => {
     setName("");
@@ -72,7 +51,6 @@ export function CreateSessionBottomSheet({
     setDayPeriod("morning");
     setIsSquad(false);
     setComments("");
-    setShowOrgPicker(false);
   };
 
   const handleClose = () => {
@@ -115,11 +93,6 @@ export function CreateSessionBottomSheet({
       setIsSubmitting(false);
     }
   };
-
-  const destinationOrg = accessibleOrgs.find((o) => o.id === destinationOrgId);
-  const destinationLabel = destinationOrgId
-    ? destinationOrg?.name || "Unknown Org"
-    : "Personal Workspace";
 
   return (
     <BaseBottomSheet
@@ -180,100 +153,34 @@ export function CreateSessionBottomSheet({
             />
           </View>
 
-          {/* Save To Destination */}
+          {/* Save To Info (Simplified - no picker needed) */}
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.text }]}>Save To</Text>
-            <TouchableOpacity
+            <View
               style={[
-                styles.orgPicker,
+                styles.orgDisplay,
                 {
                   backgroundColor: colors.cardBackground,
                   borderColor: colors.border,
                 },
               ]}
-              onPress={() => setShowOrgPicker(!showOrgPicker)}
-              disabled={isSubmitting}
             >
-              <View style={styles.orgPickerLeft}>
-                <Ionicons
-                  name={destinationOrgId ? "business" : "person"}
-                  size={18}
-                  color={destinationOrgId ? colors.tint : colors.blue}
-                />
-                <Text style={[styles.orgPickerText, { color: colors.text }]}>
-                  {destinationLabel}
-                </Text>
-              </View>
               <Ionicons
-                name={showOrgPicker ? "chevron-up" : "chevron-down"}
+                name={destinationOrgId ? "business" : "person"}
                 size={18}
-                color={colors.textMuted}
+                color={destinationOrgId ? colors.tint : colors.blue}
               />
-            </TouchableOpacity>
-
-            {/* Org Picker Dropdown */}
-            {showOrgPicker && (
-              <View style={[styles.orgPickerDropdown, { backgroundColor: colors.card }]}>
-                {/* Personal */}
-                <TouchableOpacity
-                  style={[
-                    styles.orgOption,
-                    !destinationOrgId && styles.orgOptionSelected,
-                    { backgroundColor: colors.cardBackground },
-                  ]}
-                  onPress={() => {
-                    setDestinationOrgId(null);
-                    setShowOrgPicker(false);
-                  }}
-                >
-                  <Ionicons name="person" size={16} color={colors.blue} />
-                  <Text style={[styles.orgOptionText, { color: colors.text }]}>
-                    Personal Workspace
-                  </Text>
-                  {!destinationOrgId && (
-                    <Ionicons name="checkmark" size={16} color={colors.green} />
-                  )}
-                </TouchableOpacity>
-
-                {/* Organizations */}
-                {accessibleOrgs.map((org) => (
-                  <TouchableOpacity
-                    key={org.id}
-                    style={[
-                      styles.orgOption,
-                      destinationOrgId === org.id && styles.orgOptionSelected,
-                      { backgroundColor: colors.cardBackground },
-                    ]}
-                    onPress={() => {
-                      setDestinationOrgId(org.id);
-                      setShowOrgPicker(false);
-                    }}
-                  >
-                    <Ionicons name="business" size={16} color={colors.tint} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.orgOptionText, { color: colors.text }]}>
-                        {org.name}
-                      </Text>
-                      {org.breadcrumb.length > 1 && (
-                        <Text style={[styles.orgOptionPath, { color: colors.textMuted }]}>
-                          {org.breadcrumb.join(" → ")}
-                        </Text>
-                      )}
-                    </View>
-                    {destinationOrgId === org.id && (
-                      <Ionicons name="checkmark" size={16} color={colors.green} />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
+              <Text style={[styles.orgDisplayText, { color: colors.text }]}>
+                {userOrgContext?.orgName}
+              </Text> 
+            </View>
 
             {/* Info Message */}
             <View style={styles.infoBox}>
               <Ionicons name="information-circle" size={16} color={colors.blue} />
               <Text style={[styles.infoText, { color: colors.textMuted }]}>
                 {destinationOrgId
-                  ? `Visible to all members of ${destinationLabel}`
+                  ? `Visible to members in your scope`
                   : "Only visible to you"}
               </Text>
             </View>
@@ -526,49 +433,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     fontSize: 15,
   },
-  orgPicker: {
+  orgDisplay: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: 10,
     height: 48,
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 16,
   },
-  orgPickerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flex: 1,
-  },
-  orgPickerText: {
+  orgDisplayText: {
     fontSize: 15,
     fontWeight: "500",
-  },
-  orgPickerDropdown: {
-    marginTop: 8,
-    borderRadius: 10,
-    padding: 8,
-    gap: 6,
-    maxHeight: 280,
-  },
-  orgOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    padding: 12,
-    borderRadius: 8,
-  },
-  orgOptionSelected: {
-    opacity: 0.7,
-  },
-  orgOptionText: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  orgOptionPath: {
-    fontSize: 11,
-    marginTop: 2,
   },
   infoBox: {
     flexDirection: "row",

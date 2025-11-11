@@ -2,32 +2,33 @@
 // Shows current organization overview with role-specific actions
 
 import { useColors } from "@/hooks/ui/useColors";
-import type { FlatOrganization } from "@/types/organizations";
+import type { UserOrgContext } from "@/services/organizationsService";
+import type { OrgChild } from "@/types/organizations";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 interface OrgInfoViewProps {
-  org: FlatOrganization | null;
+  orgContext: UserOrgContext | null;
   isPersonalMode: boolean;
+  childOrgs?: OrgChild[];
+  hasOrganizations?: boolean;  // Does user have any org memberships?
   onCreateChild: () => void;
   onInviteMembers: () => void;
   onViewMembers: () => void;
   onEditSettings: () => void;
   onSwitchOrg: () => void;
-  childOrgs?: FlatOrganization[];
-  onNavigateToChild?: (orgId: string) => void;
 }
 
 export function OrgInfoView({
-  org,
+  orgContext,
   isPersonalMode,
+  childOrgs = [],
   onCreateChild,
   onInviteMembers,
   onViewMembers,
   onEditSettings,
   onSwitchOrg,
-  childOrgs = [],
-  onNavigateToChild,
+  hasOrganizations,
 }: OrgInfoViewProps) {
   const colors = useColors();
 
@@ -57,36 +58,37 @@ export function OrgInfoView({
           </View>
         </View>
 
-        {/* Switch Action */}
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={onSwitchOrg}
-          activeOpacity={0.6}
-        >
-          <Ionicons name="swap-horizontal" size={20} color={colors.text} />
-          <Text style={[styles.menuItemText, { color: colors.text }]}>
-            Switch to an organization
-          </Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-        </TouchableOpacity>
+        {/* Actions Menu - Only show if user has orgs */}
+
+          <View style={styles.actionsMenu}>
+            {/* Switch to Organization */}
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={onSwitchOrg}
+              activeOpacity={0.6}
+            >
+              <Ionicons name="swap-horizontal" size={20} color={colors.text} />
+              <Text style={[styles.menuItemText, { color: colors.text }]}>
+                Switch to an organization
+              </Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+        
       </View>
     );
   }
 
-  if (!org) return null;
+  if (!orgContext) return null;
 
-  // Organization context
-  const isCommander = org.role === "commander" && org.hasFullPermission;
-  const isMember = org.role === "member";
-  const isViewer = org.role === "viewer" || org.isContextOnly;
+  // Simplified permissions from context
+  const isCommander = orgContext.role === "commander";
+  const isMember = orgContext.role === "member";
+  const isViewer = orgContext.role === "viewer";
 
-  // Check if at maximum depth (0-2 = 3 levels total)
+  // Check if at maximum depth
   const MAX_DEPTH = 2;
-  const isAtMaxDepth = org.depth >= MAX_DEPTH;
-
-  // Root org info (top of hierarchy)
-  const rootName = org.breadcrumb[0];
-  const rootOrg = org.breadcrumb.length > 1 ? rootName : null;
+  const isAtMaxDepth = orgContext.orgDepth >= MAX_DEPTH;
 
   return (
     <View style={styles.container}>
@@ -94,8 +96,8 @@ export function OrgInfoView({
       <View style={[styles.orgBadge, { backgroundColor: colors.tint + '15' }]}>
         <Ionicons 
           name={
-            org.depth === 0 ? 'business' :
-            org.depth === 1 ? 'people' :
+            orgContext.orgDepth === 0 ? 'business' :
+            orgContext.orgDepth === 1 ? 'people' :
             'shield'
           }
           size={24} 
@@ -105,28 +107,27 @@ export function OrgInfoView({
 
       {/* Current Organization Title */}
       <Text style={[styles.title, { color: colors.text }]}>
-        {org.name}
+        {orgContext.orgName}
       </Text>
       <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-        {org.org_type} • {org.role === "commander" && org.isRoot ? "Root Admin" : org.role.charAt(0).toUpperCase() + org.role.slice(1)}
+        {orgContext.orgType} • {orgContext.role === "commander" && orgContext.orgDepth === 0 ? "Root Admin" : orgContext.role.charAt(0).toUpperCase() + orgContext.role.slice(1)}
       </Text>
 
-      {/* Root Context Breadcrumb */}
-      {rootOrg && (
+      {/* Breadcrumb */}
+      {orgContext.fullPath && orgContext.orgDepth > 0 && (
         <View style={[styles.breadcrumbChip, { backgroundColor: colors.cardBackground }]}>
           <Ionicons name="layers" size={12} color={colors.textMuted} />
           <Text style={[styles.breadcrumbText, { color: colors.textMuted }]}>
-            {org.breadcrumb.join(' › ')}
+            {orgContext.fullPath}
           </Text>
         </View>
       )}
-
 
       {/* Organization Stats */}
       <View style={[styles.statsGrid, { backgroundColor: colors.cardBackground }]}>
         <View style={styles.statItem}>
           <Text style={[styles.statValue, { color: colors.text }]}>
-            {org.childCount || 0}
+            {childOrgs.length}
           </Text>
           <Text style={[styles.statLabel, { color: colors.textMuted }]}>
             Sub-units
@@ -148,22 +149,23 @@ export function OrgInfoView({
         </View>
       </View>
 
-      {/* Child Organizations - Compact List */}
-      {childOrgs.length > 0 && onNavigateToChild && (
+      {/* Child Organizations - Info Only (No Navigation) */}
+      {childOrgs.length > 0 && (
         <View style={styles.childOrgsSection}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
               Sub-Organizations ({childOrgs.length})
             </Text>
+            <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
+              Managed from this level
+            </Text>
           </View>
           
           <View style={styles.childOrgsList}>
-            {childOrgs.slice(0, 3).map((childOrg) => (
-              <TouchableOpacity
+            {childOrgs.slice(0, 5).map((childOrg) => (
+              <View
                 key={childOrg.id}
                 style={[styles.childOrgCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}
-                onPress={() => onNavigateToChild(childOrg.id)}
-                activeOpacity={0.7}
               >
                 <View style={[styles.childOrgIcon, { backgroundColor: colors.tint + '15' }]}>
                   <Ionicons 
@@ -181,15 +183,14 @@ export function OrgInfoView({
                     {childOrg.name}
                   </Text>
                   <Text style={[styles.childOrgType, { color: colors.textMuted }]}>
-                    {childOrg.org_type}
+                    {childOrg.org_type} • {childOrg.member_count || 0} members
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-              </TouchableOpacity>
+              </View>
             ))}
-            {childOrgs.length > 3 && (
+            {childOrgs.length > 5 && (
               <Text style={[styles.moreChildrenText, { color: colors.textMuted }]}>
-                +{childOrgs.length - 3} more
+                +{childOrgs.length - 5} more
               </Text>
             )}
           </View>
@@ -197,34 +198,36 @@ export function OrgInfoView({
       )}
 
       {/* Actions Menu */}
-      {isCommander && (
-        <View style={styles.actionsMenu}>
-          {/* Max Depth Info - Inline if at max */}
-          {isAtMaxDepth && (
-            <View style={[styles.infoRow, { paddingVertical: 12 }]}>
+      <View style={styles.actionsMenu}>
+        {/* Max Depth Info */}
+        {isCommander && isAtMaxDepth && (
+          <View style={[styles.infoCard, { backgroundColor: colors.yellow + '15', marginBottom: 12 }]}>
+            <View style={styles.infoRow}>
               <Ionicons name="information-circle" size={18} color={colors.yellow} />
-              <Text style={[styles.infoRowText, { color: colors.textMuted }]}>
-                Maximum depth reached
+              <Text style={[styles.infoText, { color: colors.textMuted }]}>
+                Maximum depth reached (no child orgs allowed)
               </Text>
             </View>
-          )}
+          </View>
+        )}
 
-          {/* Create Sub-Org */}
-          {!isAtMaxDepth && (
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={onCreateChild}
-              activeOpacity={0.6}
-            >
-              <Ionicons name="git-branch" size={20} color={colors.text} />
-              <Text style={[styles.menuItemText, { color: colors.text }]}>
-                Create sub-organization
-              </Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-            </TouchableOpacity>
-          )}
+        {/* Create Sub-Org (Commander only, not at max depth) */}
+        {orgContext.canCreateChild && (
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={onCreateChild}
+            activeOpacity={0.6}
+          >
+            <Ionicons name="git-branch" size={20} color={colors.text} />
+            <Text style={[styles.menuItemText, { color: colors.text }]}>
+              Create sub-organization
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
 
-          {/* Invite Members */}
+        {/* Invite Members (Commander only) */}
+        {orgContext.canManageMembers && (
           <TouchableOpacity
             style={styles.menuItem}
             onPress={onInviteMembers}
@@ -236,24 +239,52 @@ export function OrgInfoView({
             </Text>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </TouchableOpacity>
+        )}
 
-          {/* Divider */}
-          <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
-        </View>
-      )}
+        {/* View Members (All users) */}
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={onViewMembers}
+          activeOpacity={0.6}
+        >
+          <Ionicons name="people" size={20} color={colors.text} />
+          <Text style={[styles.menuItemText, { color: colors.text }]}>
+            View members ({orgContext.scopeOrgIds.length} org{orgContext.scopeOrgIds.length !== 1 ? 's' : ''})
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </TouchableOpacity>
 
-      {/* Switch Organization */}
-      <TouchableOpacity
-        style={styles.menuItem}
-        onPress={onSwitchOrg}
-        activeOpacity={0.6}
-      >
-        <Ionicons name="swap-horizontal" size={20} color={colors.text} />
-        <Text style={[styles.menuItemText, { color: colors.text }]}>
-          Switch organization
-        </Text>
-        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-      </TouchableOpacity>
+        {/* Edit Settings (Commander only) */}
+        {orgContext.canManageOrg && (
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={onEditSettings}
+            activeOpacity={0.6}
+          >
+            <Ionicons name="settings" size={20} color={colors.text} />
+            <Text style={[styles.menuItemText, { color: colors.text }]}>
+              Organization settings
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
+
+        {/* Divider */}
+        <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+
+        {/* Switch Organization - Always show in org mode */}
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={onSwitchOrg}
+          activeOpacity={0.6}
+        >
+          <Ionicons name="swap-horizontal" size={20} color={colors.text} />
+          <Text style={[styles.menuItemText, { color: colors.text }]}>
+            Switch organization
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -344,6 +375,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.5,
     textTransform: "uppercase",
+  },
+  sectionSubtitle: {
+    fontSize: 11,
+    fontWeight: "500",
+    marginTop: 4,
   },
   childOrgsList: {
     gap: 8,

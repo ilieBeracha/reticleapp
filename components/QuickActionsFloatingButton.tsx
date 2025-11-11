@@ -40,7 +40,7 @@ export default function QuickActionsFloatingButton({
       id: "scan",
       title: "Scan Target",
       icon: "scan",
-      color: "#3b82f6",
+      color: colors.primary,
       onPress: () => {
         setIsModalVisible(false);
         onPress("scan");
@@ -50,7 +50,7 @@ export default function QuickActionsFloatingButton({
       id: "session",
       title: "Create Session",
       icon: "add-circle",
-      color: "#10b981",
+      color: colors.green,
       onPress: () => {
         setIsModalVisible(false);
         onPress("session");
@@ -62,7 +62,7 @@ export default function QuickActionsFloatingButton({
             id: "training",
             title: "Create Training",
             icon: "fitness" as keyof typeof Ionicons.glyphMap,
-            color: colors.orange,
+            color: colors.accent,
             onPress: () => {
               setIsModalVisible(false);
               onPress("training");
@@ -78,7 +78,7 @@ export default function QuickActionsFloatingButton({
         style={[
           styles.fab,
           {
-            backgroundColor: colors.indigo,
+            backgroundColor: colors.accent,
             bottom: TAB_BAR_HEIGHT + BOTTOM_SPACING + insets.bottom,
             right: 20,
           },

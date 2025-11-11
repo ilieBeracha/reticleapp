@@ -10,30 +10,28 @@ import { Invitation } from "@/types/database";
  * @param orgId - Organization ID to invite to
  * @param role - Role to assign (commander, member, viewer)
  * @param invitedBy - User ID of the inviter
+ * @param maxUses - Maximum number of uses (default: 1 for commander, optional for members)
  * @returns Created invitation
  */
 export async function createInvitationService(
   inviteCode: string,
   orgId: string,
   role: "commander" | "member" | "viewer",
-  invitedBy: string
+  invitedBy: string,
+  maxUses?: number | null
 ): Promise<Invitation> {
   try {
     const client = await AuthenticatedClient.getClient();
 
-    const { data, error } = await client
-      .from("invitations")
-      .insert({
-        code: inviteCode, // Store invite code in code field
-        organization_id: orgId,
-        role,
-        invited_by: invitedBy,
-        status: "pending",
-      })
-      .select()
-      .single();
-
-    if (error) throw new DatabaseError(error.message);
+    // Use RPC function instead of direct INSERT (bypasses RLS issues)
+    const { data, error } = await client.rpc("create_invitation_rpc", {
+      p_code: inviteCode,
+      p_org_id: orgId,
+      p_role: role,
+      p_invited_by: invitedBy,
+      p_max_uses: role === "commander" ? 1 : (maxUses || 1),
+    });
+    if(error) throw new DatabaseError(error.message);
     return data as Invitation;
   } catch (err: any) {
     handleServiceError(err, "Failed to create invitation");

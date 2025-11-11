@@ -78,7 +78,7 @@ export function KeyMetrics({
       label: isPersonalMode ? "Total Sessions" : "Team Sessions",
       value: totalSessions,
       change: { value: 12, type: "increase" },
-      color: colors.blue,
+      color: colors.primary,
     },
     {
       icon: "target",
@@ -92,14 +92,14 @@ export function KeyMetrics({
       label: "Training Hours",
       value: `${hoursSpent}h`,
       change: { value: 8, type: "increase" },
-      color: colors.orange,
+      color: colors.accent,
     },
     {
       icon: "flame",
       label: "Current Streak",
       value: `${currentStreak} days`,
       change: currentStreak > 0 ? { value: currentStreak, type: "increase" } : undefined,
-      color: colors.purple,
+      color: colors.yellow,
     },
   ];
 

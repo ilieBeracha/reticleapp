@@ -18,57 +18,14 @@ export function GreetingSection({
 }: GreetingSectionProps) {
   const colors = useColors();
   const { user } = useAuth();
-  const { selectedOrgId, allOrgs, memberships } = useOrganizationsStore();
-  const { sessions } = useStore(sessionStatsStore);
 
   const currentHour = new Date().getHours();
   let greeting = "Good Morning";
   if (currentHour >= 12 && currentHour < 17) greeting = "Good Afternoon";
   if (currentHour >= 17) greeting = "Good Evening";
 
-  // Get current organization details
-  const currentOrg = selectedOrgId
-    ? allOrgs.find((org) => org.id === selectedOrgId)
-    : null;
-
-  // Get user's role in current org
-  const userMembership = memberships?.find(
-    (m) => m.user_id === user?.id && m.org_id === selectedOrgId
-  );
-
-  // Calculate meaningful stats
-  const now = new Date();
-  const thisMonth = sessions.filter((s: SessionStats) => {
-    const sessionDate = new Date(s.created_at);
-    return (
-      sessionDate.getMonth() === now.getMonth() &&
-      sessionDate.getFullYear() === now.getFullYear() &&
-      s.organization_id === selectedOrgId
-    );
-  }).length;
-
-  const lastWeek = sessions.filter((s: SessionStats) => {
-    const sessionDate = new Date(s.created_at);
-    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    return sessionDate >= weekAgo && s.organization_id === selectedOrgId;
-  }).length;
-
-  const totalMembers = memberships?.length || 0;
-  const commanders = memberships?.filter((m) => m.role === "commander").length || 0;
-
-  // Last session info
-  const lastSession = sessions
-    .filter((s: SessionStats) => s.organization_id === selectedOrgId)
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-
-  const lastSessionDaysAgo = lastSession
-    ? Math.floor(
-        (now.getTime() - new Date(lastSession.created_at).getTime()) /
-          (1000 * 60 * 60 * 24)
-      )
-    : null;
-
   // Today's date
+  const now = new Date();
   const today = now.toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",

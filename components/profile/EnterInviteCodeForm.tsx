@@ -31,9 +31,7 @@ export function EnterInviteCodeForm({
   const colors = useColors();
   const { user } = useAuth();
   const fetchUserOrgs = useOrganizationsStore((state) => state.fetchUserOrgs);
-  const fetchAccessibleOrgs = useOrganizationsStore(
-    (state) => state.fetchAccessibleOrgs,
-  );
+  const fetchUserContext = useOrganizationsStore((state) => state.fetchUserContext);
 
   const [inviteCode, setInviteCode] = useState(
     (initialInviteCode || "").toUpperCase(),
@@ -73,7 +71,7 @@ export function EnterInviteCodeForm({
 
       await Promise.allSettled([
         fetchUserOrgs(user.id, { silent: true }),
-        fetchAccessibleOrgs(user.id, { silent: true }),
+        fetchUserContext(user.id, { silent: true }),
       ]);
 
       await AsyncStorage.removeItem("pending_invite_code");

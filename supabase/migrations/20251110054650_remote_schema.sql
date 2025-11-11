@@ -117,7 +117,8 @@ ALTER FUNCTION "public"."accept_invitation"("p_invitation_id" "uuid") OWNER TO "
 
 CREATE OR REPLACE FUNCTION "public"."accept_org_invite"("p_token" "text") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$DECLARE
+    AS $$
+DECLARE
   v_invitation record;
   v_user_id uuid;
   v_user_email text;
@@ -130,20 +131,26 @@ BEGIN
     RAISE EXCEPTION 'Must be authenticated';
   END IF;
   
-  -- Get user email from auth.users (not from custom users table)
+  -- Get user email from auth.users
   SELECT email INTO v_user_email 
   FROM auth.users 
   WHERE id = v_user_id;
   
-  -- Find invitation by TOKEN (stored in email field) - not by user email!
+  -- Find invitation by code
   SELECT * INTO v_invitation
   FROM invitations
-  WHERE code = UPPER(p_token)  -- Match the invite code
+  WHERE code = UPPER(p_token)
     AND status = 'pending'
     AND expires_at > now();
   
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Invalid or expired invitation code';
+  END IF;
+  
+  -- Check if max uses reached
+  IF v_invitation.max_uses IS NOT NULL 
+     AND v_invitation.current_uses >= v_invitation.max_uses THEN
+    RAISE EXCEPTION 'This invitation has reached its maximum uses';
   END IF;
   
   -- Check if already a member of this org
@@ -159,12 +166,17 @@ BEGIN
   INSERT INTO org_memberships (user_id, org_id, role)
   VALUES (v_user_id, v_invitation.organization_id, v_invitation.role);
   
-  -- Mark invitation as accepted
+  -- Increment current_uses
   UPDATE invitations
   SET 
-    status = 'accepted', 
+    current_uses = current_uses + 1,
     accepted_at = now(),
-    updated_at = now()
+    updated_at = now(),
+    -- If max uses reached, mark as accepted (consumed)
+    status = CASE 
+      WHEN max_uses IS NOT NULL AND current_uses + 1 >= max_uses THEN 'accepted'
+      ELSE status
+    END
   WHERE id = v_invitation.id;
   
   -- Get organization details
@@ -180,13 +192,86 @@ BEGIN
     'org_name', v_org.name,
     'role', v_invitation.role
   );
-END;$$;
+END;
+$$;
 
 
 ALTER FUNCTION "public"."accept_org_invite"("p_token" "text") OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."accept_org_invite"("p_token" "text") IS 'Accept an organization invitation using an invite code/token. The token is stored in the invitations.email field.';
+COMMENT ON FUNCTION "public"."accept_org_invite"("p_token" "text") IS 'Accept an organization invitation. Supports multi-use invites - increments use count and marks as accepted when max uses reached.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."assign_commander"("p_org_id" "uuid", "p_user_id" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+DECLARE
+  v_current_user_id uuid;
+  v_org_root_id uuid;
+  v_existing_commander_id uuid;
+  v_is_authorized boolean;
+BEGIN
+  v_current_user_id := auth.uid();
+  
+  IF v_current_user_id IS NULL THEN
+    RAISE EXCEPTION 'Must be authenticated';
+  END IF;
+  
+  -- Get org root
+  SELECT root_id INTO v_org_root_id
+  FROM organizations
+  WHERE id = p_org_id;
+  
+  IF v_org_root_id IS NULL THEN
+    RAISE EXCEPTION 'Organization not found';
+  END IF;
+  
+  -- Check current user is commander in same tree
+  SELECT EXISTS (
+    SELECT 1
+    FROM org_memberships om
+    JOIN organizations o ON o.id = om.org_id
+    WHERE om.user_id = v_current_user_id
+      AND om.role = 'commander'
+      AND o.root_id = v_org_root_id
+  ) INTO v_is_authorized;
+  
+  IF NOT v_is_authorized THEN
+    RAISE EXCEPTION 'Only commanders in the same tree can assign commanders';
+  END IF;
+  
+  -- Check if org already has a commander
+  SELECT user_id INTO v_existing_commander_id
+  FROM org_memberships
+  WHERE org_id = p_org_id
+    AND role = 'commander';
+  
+  IF v_existing_commander_id IS NOT NULL AND v_existing_commander_id != p_user_id THEN
+    RAISE EXCEPTION 'Organization already has a commander. Remove existing commander first.';
+  END IF;
+  
+  -- Assign commander
+  INSERT INTO org_memberships (user_id, org_id, role)
+  VALUES (p_user_id, p_org_id, 'commander')
+  ON CONFLICT (user_id, org_id) 
+  DO UPDATE SET role = 'commander', created_at = now();
+  
+  RETURN jsonb_build_object(
+    'success', true,
+    'org_id', p_org_id,
+    'user_id', p_user_id,
+    'role', 'commander'
+  );
+END;
+$$;
+
+
+ALTER FUNCTION "public"."assign_commander"("p_org_id" "uuid", "p_user_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."assign_commander"("p_org_id" "uuid", "p_user_id" "uuid") IS 'Assign a user as commander of an organization. Validates only one commander per org.';
 
 
 
@@ -195,28 +280,28 @@ CREATE OR REPLACE FUNCTION "public"."create_child_organization"("p_name" "text",
     SET "search_path" TO 'public'
     AS $$
 DECLARE
-  v_org_id UUID;
-  v_parent_root_id UUID;
-  v_parent_depth INTEGER;
-  v_user_is_commander BOOLEAN;
+  v_org_id uuid;
+  v_parent_root_id uuid;
+  v_parent_depth integer;
+  v_user_is_commander boolean;
 BEGIN
   IF p_name IS NULL OR TRIM(p_name) = '' THEN
     RAISE EXCEPTION 'Organization name cannot be empty';
   END IF;
 
   -- Get parent info
-  SELECT organizations.root_id, organizations.depth
+  SELECT o.root_id, o.depth
   INTO v_parent_root_id, v_parent_depth
-  FROM organizations
-  WHERE organizations.id = p_parent_id;
+  FROM organizations o
+  WHERE o.id = p_parent_id;
 
   IF v_parent_root_id IS NULL THEN
     RAISE EXCEPTION 'Parent organization not found';
   END IF;
 
-  -- ⚠️ Check depth limit: Maximum 3 levels (0-2)
+  -- Check depth limit (0-2 = 3 levels)
   IF v_parent_depth >= 2 THEN
-    RAISE EXCEPTION 'Cannot create child organization: Parent is at maximum depth (%). Maximum hierarchy is 3 levels (0-2). Consider creating at a higher level.', v_parent_depth;
+    RAISE EXCEPTION 'Cannot create child: Parent at maximum depth (%). Max is 2.', v_parent_depth;
   END IF;
 
   -- Check user is commander in tree
@@ -230,7 +315,7 @@ BEGIN
   ) INTO v_user_is_commander;
 
   IF NOT v_user_is_commander THEN
-    RAISE EXCEPTION 'User is not a commander in this organization tree';
+    RAISE EXCEPTION 'Only commanders in the tree can create child organizations';
   END IF;
 
   -- Create organization
@@ -238,10 +323,9 @@ BEGIN
   VALUES (p_name, p_org_type, p_description, p_user_id, p_parent_id)
   RETURNING organizations.id INTO v_org_id;
 
-  -- Add creator as commander
-  INSERT INTO org_memberships (user_id, org_id, role)
-  VALUES (p_user_id, v_org_id, 'commander')
-  ON CONFLICT (user_id, org_id) DO NOTHING;
+  -- DO NOT add creator as member
+  -- Commander manages this org from their parent position via scope
+  -- Members must be explicitly invited
 
   -- Return created org
   RETURN QUERY
@@ -318,6 +402,76 @@ $$;
 ALTER FUNCTION "public"."create_invitation"("p_email" "text", "p_organization_id" "uuid", "p_role" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."create_invitation_rpc"("p_code" "text", "p_org_id" "uuid", "p_role" "text", "p_invited_by" "uuid", "p_max_uses" integer) RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+  v_org_root_id uuid;
+  v_is_commander boolean;
+  v_invitation_id uuid;
+BEGIN
+  IF p_code IS NULL OR LENGTH(TRIM(p_code)) = 0 THEN
+    RAISE EXCEPTION 'Invite code is required';
+  END IF;
+
+  IF p_org_id IS NULL THEN
+    RAISE EXCEPTION 'Organization ID is required';
+  END IF;
+
+  IF p_role NOT IN ('commander', 'member', 'viewer') THEN
+    RAISE EXCEPTION 'Invalid role';
+  END IF;
+
+  IF p_role = 'commander' AND p_max_uses != 1 THEN
+    RAISE EXCEPTION 'Commander invitations must be single-use';
+  END IF;
+
+  SELECT root_id INTO v_org_root_id
+  FROM organizations
+  WHERE id = p_org_id;
+
+  IF v_org_root_id IS NULL THEN
+    RAISE EXCEPTION 'Organization not found';
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM org_memberships om
+    JOIN organizations o ON o.id = om.org_id
+    WHERE om.user_id = p_invited_by
+      AND om.role = 'commander'
+      AND o.root_id = v_org_root_id
+  ) INTO v_is_commander;
+
+  IF NOT v_is_commander THEN
+    RAISE EXCEPTION 'Only commanders in this tree can create invites';
+  END IF;
+
+  INSERT INTO invitations (
+    code, organization_id, role, invited_by,
+    status, max_uses, current_uses
+  )
+  VALUES (
+    UPPER(p_code), p_org_id, p_role, p_invited_by,
+    'pending', p_max_uses, 0
+  )
+  RETURNING id INTO v_invitation_id;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'invitation_id', v_invitation_id,
+    'code', UPPER(p_code),
+    'org_id', p_org_id,
+    'role', p_role,
+    'max_uses', p_max_uses
+  );
+END;
+$$;
+
+
+ALTER FUNCTION "public"."create_invitation_rpc"("p_code" "text", "p_org_id" "uuid", "p_role" "text", "p_invited_by" "uuid", "p_max_uses" integer) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."create_org_invite"("p_org_id" "uuid", "p_role" "text" DEFAULT 'member'::"text", "p_max_uses" integer DEFAULT NULL::integer) RETURNS TABLE("token" "text", "invite_link" "text")
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -345,15 +499,18 @@ CREATE OR REPLACE FUNCTION "public"."create_root_organization"("p_name" "text", 
     SET "search_path" TO 'public'
     AS $$
 DECLARE
-  v_org_id UUID;
+  v_org_id uuid;
 BEGIN
+  -- Create organization
   INSERT INTO organizations (name, org_type, description, created_by, parent_id)
   VALUES (p_name, p_org_type, p_description, p_user_id, NULL)
   RETURNING organizations.id INTO v_org_id;
 
+  -- Add creator as COMMANDER (root org creator is always commander)
   INSERT INTO org_memberships (user_id, org_id, role)
   VALUES (p_user_id, v_org_id, 'commander');
 
+  -- Return created org
   RETURN QUERY
   SELECT org.id, org.name, org.org_type, org.parent_id, org.root_id,
          org.path, org.depth, org.description, org.created_by, 
@@ -460,6 +617,75 @@ $$;
 ALTER FUNCTION "public"."get_hierarchy_path"("org_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."get_members_in_user_scope"("p_user_id" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("user_id" "uuid", "email" "text", "full_name" "text", "avatar_url" "text", "org_id" "uuid", "org_name" "text", "org_depth" integer, "role" "text")
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+DECLARE
+  v_user_id uuid;
+  v_user_org_id uuid;
+  v_user_role text;
+  v_scope_ids uuid[];
+BEGIN
+  v_user_id := COALESCE(p_user_id, auth.uid());
+  
+  -- Get user's org and role
+  SELECT om.org_id, om.role
+  INTO v_user_org_id, v_user_role
+  FROM org_memberships om
+  WHERE om.user_id = v_user_id
+  ORDER BY 
+    CASE om.role 
+      WHEN 'commander' THEN 1 
+      WHEN 'member' THEN 2 
+      WHEN 'viewer' THEN 3 
+    END,
+    om.created_at DESC
+  LIMIT 1;
+  
+  IF v_user_org_id IS NULL THEN
+    RETURN; -- No memberships
+  END IF;
+  
+  -- Compute scope
+  IF v_user_role = 'commander' THEN
+    -- Commander: org + descendants
+    SELECT ARRAY_AGG(o.id)
+    INTO v_scope_ids
+    FROM organizations o
+    WHERE o.path @> ARRAY[v_user_org_id::text];
+  ELSE
+    -- Member/Viewer: only their org
+    v_scope_ids := ARRAY[v_user_org_id];
+  END IF;
+  
+  -- Return members in scope
+  RETURN QUERY
+  SELECT 
+    u.id AS user_id,
+    u.email,
+    u.full_name,
+    u.avatar_url,
+    om.org_id,
+    o.name AS org_name,
+    o.depth AS org_depth,
+    om.role
+  FROM org_memberships om
+  JOIN users u ON u.id = om.user_id
+  JOIN organizations o ON o.id = om.org_id
+  WHERE om.org_id = ANY(v_scope_ids)
+  ORDER BY o.depth ASC, u.full_name ASC;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_members_in_user_scope"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."get_members_in_user_scope"("p_user_id" "uuid") IS 'Get all members in user permission scope. Commanders see their org + descendants. Members see only their org.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."get_org_children"("p_org_id" "uuid") RETURNS TABLE("id" "uuid", "name" "text", "org_type" "text", "depth" integer, "member_count" bigint)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -482,6 +708,69 @@ $$;
 
 
 ALTER FUNCTION "public"."get_org_children"("p_org_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."get_org_members_simple"("p_org_id" "uuid") RETURNS TABLE("id" "uuid", "user_id" "uuid", "org_id" "uuid", "role" "text", "created_at" timestamp with time zone, "email" "text", "full_name" "text", "avatar_url" "text")
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+DECLARE
+  v_user_id uuid;
+  v_org_root_id uuid;
+  v_has_access boolean;
+BEGIN
+  v_user_id := auth.uid();
+  
+  -- Get target org's root_id
+  SELECT root_id INTO v_org_root_id
+  FROM organizations
+  WHERE id = p_org_id;
+  
+  IF v_org_root_id IS NULL THEN
+    RAISE EXCEPTION 'Organization not found';
+  END IF;
+  
+  -- Check user has access:
+  -- 1. Direct member of this org, OR
+  -- 2. Commander in the same tree (can manage scope)
+  SELECT EXISTS (
+    SELECT 1 FROM org_memberships om
+    JOIN organizations o ON o.id = om.org_id
+    WHERE om.user_id = v_user_id
+      AND (
+        om.org_id = p_org_id  -- Direct member
+        OR (om.role = 'commander' AND o.root_id = v_org_root_id)  -- Commander in tree
+      )
+  ) INTO v_has_access;
+  
+  IF NOT v_has_access THEN
+    RAISE EXCEPTION 'Permission denied: Not a member or commander in this tree';
+  END IF;
+  
+  -- Return all members of this org
+  RETURN QUERY
+  SELECT 
+    om.id,
+    om.user_id,
+    om.org_id,
+    om.role,
+    om.created_at,
+    u.email,
+    u.full_name,
+    u.avatar_url
+  FROM org_memberships om
+  JOIN users u ON u.id = om.user_id
+  WHERE om.org_id = p_org_id
+  ORDER BY om.created_at ASC;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_org_members_simple"("p_org_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."get_org_members_simple"("p_org_id" "uuid") IS 'Get all members of an organization. Bypasses RLS. Allows commanders in same tree to view members without being direct members.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."get_org_subtree"("p_org_id" "uuid") RETURNS TABLE("id" "uuid", "name" "text", "org_type" "text", "depth" integer, "parent_id" "uuid", "full_path" "text")
@@ -631,6 +920,105 @@ $$;
 ALTER FUNCTION "public"."get_user_accessible_orgs"("p_user_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."get_user_org_with_permissions"("p_user_id" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("membership_id" "uuid", "user_id" "uuid", "org_id" "uuid", "role" "text", "joined_at" timestamp with time zone, "org_name" "text", "org_type" "text", "org_depth" integer, "org_parent_id" "uuid", "org_root_id" "uuid", "org_path" "text"[], "full_path" "text", "can_create_child" boolean, "can_manage_members" boolean, "can_manage_org" boolean, "scope_org_ids" "uuid"[])
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+DECLARE
+  v_user_id uuid;
+  v_membership record;
+  v_org record;
+  v_scope_ids uuid[];
+  v_full_path text;  -- Declare at top level, not nested!
+BEGIN
+  v_user_id := COALESCE(p_user_id, auth.uid());
+  
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'User not authenticated';
+  END IF;
+  
+  -- Get user's primary org membership
+  -- If user has multiple memberships, prioritize commander role, then most recent
+  SELECT om.*, o.*
+  INTO v_membership
+  FROM org_memberships om
+  JOIN organizations o ON o.id = om.org_id
+  WHERE om.user_id = v_user_id
+  ORDER BY 
+    CASE om.role 
+      WHEN 'commander' THEN 1 
+      WHEN 'member' THEN 2 
+      WHEN 'viewer' THEN 3 
+    END,
+    om.created_at DESC
+  LIMIT 1;
+  
+  IF NOT FOUND THEN
+    -- User has no org memberships
+    RETURN;
+  END IF;
+  
+  -- Get organization details
+  SELECT * INTO v_org
+  FROM organizations
+  WHERE id = v_membership.org_id;
+  
+  -- Compute scope based on role
+  IF v_membership.role = 'commander' THEN
+    -- Commander: Get org + all descendants
+    SELECT ARRAY_AGG(o.id)
+    INTO v_scope_ids
+    FROM organizations o
+    WHERE o.path @> ARRAY[v_membership.org_id::text];
+  ELSE
+    -- Member/Viewer: Only their org
+    v_scope_ids := ARRAY[v_membership.org_id];
+  END IF;
+  
+  -- Build full path string (no nested block needed)
+  SELECT array_to_string(
+    ARRAY(
+      SELECT org.name 
+      FROM organizations org 
+      WHERE org.id = ANY(v_org.path::uuid[])
+      ORDER BY array_position(v_org.path::uuid[], org.id)
+    ),
+    ' → '
+  ) INTO v_full_path;
+  
+  -- Return single row with all permissions
+  RETURN QUERY
+  SELECT
+    v_membership.id AS membership_id,
+    v_membership.user_id,
+    v_membership.org_id,
+    v_membership.role,
+    v_membership.created_at AS joined_at,
+    
+    v_org.name AS org_name,
+    v_org.org_type,
+    v_org.depth AS org_depth,
+    v_org.parent_id AS org_parent_id,
+    v_org.root_id AS org_root_id,
+    v_org.path AS org_path,
+    v_full_path AS full_path,
+    
+    -- Permissions (based on role and depth)
+    (v_membership.role = 'commander' AND v_org.depth < 2) AS can_create_child,
+    (v_membership.role = 'commander') AS can_manage_members,
+    (v_membership.role = 'commander') AS can_manage_org,
+    v_scope_ids AS scope_org_ids;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_user_org_with_permissions"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."get_user_org_with_permissions"("p_user_id" "uuid") IS 'Get user primary org membership with computed tree-wide permissions. Returns single org with scope array.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."get_user_orgs"("p_user_id" "uuid") RETURNS TABLE("org_id" "uuid", "org_name" "text", "org_type" "text", "root_id" "uuid", "root_name" "text", "parent_id" "uuid", "parent_name" "text", "depth" integer, "role" "text", "full_path" "text")
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -706,18 +1094,6 @@ $$;
 
 
 ALTER FUNCTION "public"."handle_new_user"() OWNER TO "postgres";
-DROP TRIGGER IF EXISTS "on_auth_user_created" ON "auth"."users";
-DROP TRIGGER IF EXISTS "on_auth_user_updated" ON "auth"."users";
-
-CREATE TRIGGER "on_auth_user_created"
-  AFTER INSERT ON "auth"."users"
-  FOR EACH ROW
-  EXECUTE FUNCTION "public"."handle_new_user"();
-
-CREATE TRIGGER "on_auth_user_updated"
-  AFTER UPDATE ON "auth"."users"
-  FOR EACH ROW
-  EXECUTE FUNCTION "public"."handle_new_user"();
 
 
 CREATE OR REPLACE FUNCTION "public"."set_org_hierarchy"() RETURNS "trigger"
@@ -856,12 +1232,27 @@ CREATE TABLE IF NOT EXISTS "public"."invitations" (
     "expires_at" timestamp with time zone DEFAULT ("now"() + '7 days'::interval),
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "max_uses" integer DEFAULT 1,
+    "current_uses" integer DEFAULT 0,
+    CONSTRAINT "commander_invites_single_use" CHECK ((("role" <> 'commander'::"text") OR ("max_uses" = 1))),
     CONSTRAINT "invitations_role_check" CHECK (("role" = ANY (ARRAY['commander'::"text", 'member'::"text", 'viewer'::"text"]))),
     CONSTRAINT "invitations_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'accepted'::"text", 'cancelled'::"text", 'expired'::"text"])))
 );
 
 
 ALTER TABLE "public"."invitations" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."invitations"."max_uses" IS 'Maximum number of times this invite can be used. NULL = unlimited. Only for member invites.';
+
+
+
+COMMENT ON COLUMN "public"."invitations"."current_uses" IS 'Current number of times this invite has been used.';
+
+
+
+COMMENT ON CONSTRAINT "commander_invites_single_use" ON "public"."invitations" IS 'Commander invitations must be single-use (max_uses = 1). Only member/viewer invites can be multi-use.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."org_memberships" (
@@ -1229,6 +1620,14 @@ CREATE INDEX "idx_weapons_org" ON "public"."weapons" USING "btree" ("org_id");
 
 
 
+CREATE UNIQUE INDEX "one_commander_per_org" ON "public"."org_memberships" USING "btree" ("org_id") WHERE ("role" = 'commander'::"text");
+
+
+
+COMMENT ON INDEX "public"."one_commander_per_org" IS 'Ensures only one commander per organization. Prevents multiple commanders in same org.';
+
+
+
 CREATE UNIQUE INDEX "unique_pending_invitation_email" ON "public"."invitations" USING "btree" ("organization_id", "code", "status") WHERE ("status" = 'pending'::"text");
 
 
@@ -1392,12 +1791,6 @@ ALTER TABLE ONLY "public"."weapons"
 
 
 
-CREATE POLICY "commanders_create_invitations" ON "public"."invitations" FOR INSERT TO "authenticated" WITH CHECK (((EXISTS ( SELECT 1
-   FROM "public"."org_memberships"
-  WHERE (("org_memberships"."org_id" = "invitations"."organization_id") AND ("org_memberships"."user_id" = "auth"."uid"()) AND ("org_memberships"."role" = 'commander'::"text")))) AND ("invited_by" = "auth"."uid"())));
-
-
-
 ALTER TABLE "public"."group_scores" ENABLE ROW LEVEL SECURITY;
 
 
@@ -1432,10 +1825,6 @@ CREATE POLICY "memberships_insert" ON "public"."org_memberships" FOR INSERT WITH
 
 
 
-CREATE POLICY "memberships_select" ON "public"."org_memberships" FOR SELECT USING (("user_id" = "auth"."uid"()));
-
-
-
 CREATE POLICY "memberships_update" ON "public"."org_memberships" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM (("public"."org_memberships" "om"
      JOIN "public"."organizations" "o1" ON (("o1"."id" = "om"."org_id")))
@@ -1459,7 +1848,11 @@ CREATE POLICY "org_memberships_insert" ON "public"."org_memberships" FOR INSERT 
 
 
 
-CREATE POLICY "org_memberships_select" ON "public"."org_memberships" FOR SELECT TO "authenticated" USING (("user_id" = "auth"."uid"()));
+CREATE POLICY "org_memberships_select_own" ON "public"."org_memberships" FOR SELECT TO "authenticated" USING (("user_id" = "auth"."uid"()));
+
+
+
+COMMENT ON POLICY "org_memberships_select_own" ON "public"."org_memberships" IS 'Users can only see their own memberships via direct queries. Use get_org_members_simple RPC to view other members.';
 
 
 
@@ -1815,6 +2208,12 @@ GRANT ALL ON FUNCTION "public"."accept_org_invite"("p_token" "text") TO "service
 
 
 
+GRANT ALL ON FUNCTION "public"."assign_commander"("p_org_id" "uuid", "p_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."assign_commander"("p_org_id" "uuid", "p_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."assign_commander"("p_org_id" "uuid", "p_user_id" "uuid") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."create_child_organization"("p_name" "text", "p_org_type" "text", "p_parent_id" "uuid", "p_description" "text", "p_user_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."create_child_organization"("p_name" "text", "p_org_type" "text", "p_parent_id" "uuid", "p_description" "text", "p_user_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."create_child_organization"("p_name" "text", "p_org_type" "text", "p_parent_id" "uuid", "p_description" "text", "p_user_id" "uuid") TO "service_role";
@@ -1824,6 +2223,12 @@ GRANT ALL ON FUNCTION "public"."create_child_organization"("p_name" "text", "p_o
 GRANT ALL ON FUNCTION "public"."create_invitation"("p_email" "text", "p_organization_id" "uuid", "p_role" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."create_invitation"("p_email" "text", "p_organization_id" "uuid", "p_role" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."create_invitation"("p_email" "text", "p_organization_id" "uuid", "p_role" "text") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."create_invitation_rpc"("p_code" "text", "p_org_id" "uuid", "p_role" "text", "p_invited_by" "uuid", "p_max_uses" integer) TO "anon";
+GRANT ALL ON FUNCTION "public"."create_invitation_rpc"("p_code" "text", "p_org_id" "uuid", "p_role" "text", "p_invited_by" "uuid", "p_max_uses" integer) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."create_invitation_rpc"("p_code" "text", "p_org_id" "uuid", "p_role" "text", "p_invited_by" "uuid", "p_max_uses" integer) TO "service_role";
 
 
 
@@ -1857,9 +2262,21 @@ GRANT ALL ON FUNCTION "public"."get_hierarchy_path"("org_id" "uuid") TO "service
 
 
 
+GRANT ALL ON FUNCTION "public"."get_members_in_user_scope"("p_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_members_in_user_scope"("p_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_members_in_user_scope"("p_user_id" "uuid") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."get_org_children"("p_org_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_org_children"("p_org_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_org_children"("p_org_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."get_org_members_simple"("p_org_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_org_members_simple"("p_org_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_org_members_simple"("p_org_id" "uuid") TO "service_role";
 
 
 
@@ -1884,6 +2301,12 @@ GRANT ALL ON FUNCTION "public"."get_organizations_in_scope"("scope_org_id" "uuid
 GRANT ALL ON FUNCTION "public"."get_user_accessible_orgs"("p_user_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_user_accessible_orgs"("p_user_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_user_accessible_orgs"("p_user_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."get_user_org_with_permissions"("p_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_user_org_with_permissions"("p_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_user_org_with_permissions"("p_user_id" "uuid") TO "service_role";
 
 
 
@@ -2081,5 +2504,12 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TAB
 
 
 
+
+
+drop extension if exists "pg_net";
+
+CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+CREATE TRIGGER on_auth_user_updated AFTER UPDATE ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 

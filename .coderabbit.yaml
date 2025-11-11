@@ -1,0 +1,141 @@
+# CodeRabbit Configuration
+# Documentation: https://docs.coderabbit.ai/guides/configure-coderabbit
+
+# Language and tone
+language: en-US
+tone_instructions: "Be concise, technical, and focus on best practices for React Native and TypeScript."
+
+# Review settings
+reviews:
+  # Profile to use for reviews
+  profile: chill
+  
+  # Request changes workflow
+  request_changes_workflow: false
+  
+  # High level summary
+  high_level_summary: true
+  
+  # Poem generation
+  poem: false
+  
+  # Review status
+  review_status: true
+  
+  # Collapse walkthrough
+  collapse_walkthrough: false
+  
+  # Auto review triggers
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+      - dev-main
+      - develop
+  
+  # Tools configuration
+  tools:
+    # GitHub Checks integration
+    github-checks:
+      enabled: true
+      
+  # Path-based review instructions
+  path_instructions:
+    - path: "**/*.tsx"
+      instructions: |
+        - Follow Expo Router patterns (routes in app/, components elsewhere)
+        - Use TypeScript strict mode (no 'any' types)
+        - Named exports for components: export function Component() {}
+        - Use useAuth() from contexts/AuthContext.tsx for auth
+        - Colocate styles at bottom (StyleSheet.create)
+        - NO separate .styles.ts files
+        - Dynamic colors from useColors() hook
+        - Ensure proper error handling with Alert or error states
+        
+    - path: "app/**/*.tsx"
+      instructions: |
+        - Routes only - minimal logic
+        - Import screen components from modules/
+        - Use expo-router navigation (Link, router.push)
+        - _layout.tsx for navigation config
+        - index.tsx is default route for directory
+        
+    - path: "services/**/*.ts"
+      instructions: |
+        - ALL database operations must use AuthenticatedClient.getClient()
+        - NEVER accept token parameters (automatic injection)
+        - ALWAYS include JSDoc comments explaining params
+        - Throw custom error types (DatabaseError, NotFoundError, etc.)
+        - Return typed data (use generated types from types/database.ts)
+        - Context-aware filtering (personal vs org via userId/orgId params)
+        - Use async/await (never callbacks)
+        
+    - path: "store/**/*.ts"
+      instructions: |
+        - Use Zustand create() pattern with TypeScript interface
+        - Call service layer functions ONLY (no direct DB access)
+        - Handle loading and error states consistently
+        - Provide reset functions for cleanup (resetEntities, etc.)
+        - Use optimistic updates for better UX
+        - Keep stores focused on single entity/domain
+        
+    - path: "contexts/**/*.tsx"
+      instructions: |
+        - Auth context uses Supabase Auth (not Clerk)
+        - Export useAuth() hook, NOT useContext directly
+        - useAuth returns: { user, session, loading, signIn, signOut }
+        - user.id is UUID from auth.users table
+        - Initialize AuthenticatedClient with token provider
+        
+    - path: "lib/**/*.ts"
+      instructions: |
+        - Core utilities only (no business logic)
+        - AuthenticatedClient handles token injection
+        - Custom error classes extend Error with proper names
+        - Supabase client config (URL + anon key from env)
+        
+    - path: "modules/**/*.tsx"
+      instructions: |
+        - Feature modules (complete screens + components)
+        - Use stores or hooks for data fetching
+        - Handle loading/error states with UI feedback
+        - Extract complex logic to custom hooks
+        - Keep components focused (single responsibility)
+        
+    - path: "components/**/*.tsx"
+      instructions: |
+        - Reusable UI components
+        - Named exports: export function Component() {}
+        - Props interface above component
+        - Colocate styles at bottom (NO separate .styles.ts)
+        - Use useColors() for theme colors
+        - TypeScript strict mode (no 'any')
+        
+    - path: "types/**/*.ts"
+      instructions: |
+        - Generate database types from Supabase schema
+        - Run: npx supabase gen types typescript > types/database.ts
+        - Export Row, Insert, Update types for each table
+        - Use generated types in services and stores
+        
+    - path: "supabase/migrations/*.sql"
+      instructions: |
+        - Always include created_by uuid (references auth.users)
+        - Always include organization_id uuid (nullable, references organizations)
+        - Always include created_at and updated_at timestamps
+        - Create indexes for all foreign keys
+        - Enable RLS: ALTER TABLE [table] ENABLE ROW LEVEL SECURITY
+        - Add policies for SELECT, INSERT, UPDATE, DELETE
+        - Use auth.uid() in policies (returns current user UUID)
+        - Check org_memberships for organization access
+        
+    - path: "hooks/**/*.ts"
+      instructions: |
+        - Follow React hooks rules
+        - Use service layer for data operations
+        - Include proper TypeScript types
+
+# Chat settings
+chat:
+  auto_reply: true
