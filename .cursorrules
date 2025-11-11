@@ -1,4 +1,4 @@
-# Scopes Sniper Training App - Architecture Rules
+# Reticle - Sniper Training App Architecture Rules
 
 ## Technology Stack
 - **Framework**: React Native (Expo) with expo-router for navigation
@@ -22,18 +22,28 @@ Component/Hook
         → Database + RLS Policies
 ```
 
+**Authentication Setup:**
+```typescript
+// contexts/AuthContext.tsx provides auth state
+import { useAuth } from '@/contexts/AuthContext'
+
+const { user, session, loading, signIn, signOut } = useAuth()
+const userId = user?.id  // UUID from auth.users table
+```
+
 **Rules:**
 - NEVER pass tokens as parameters to service functions
 - NEVER create Supabase clients directly in components or hooks
 - ALWAYS use `AuthenticatedClient.getClient()` in service layer
 - Token injection is automatic - services don't need to know about auth
+- Use `user.id` for user UUID (not Clerk's userId pattern)
 
 **Example:**
 ```typescript
 // ✅ CORRECT - Service layer
 export async function getSessionsService(userId: string, orgId?: string) {
   const client = await AuthenticatedClient.getClient(); // Auto token injection
-  return client.from("sessions").select("*").eq("created_by", userId);
+  return client.from("session_stats").select("*").eq("created_by", userId);
 }
 
 // ✅ CORRECT - Component usage
@@ -55,13 +65,11 @@ const client = await getAuthenticatedClient(); // Bypass service layer
 /services/           → Database access layer (Supabase queries)
 /store/             → Zustand state management
 /hooks/             → Custom React hooks
-  /services/        → React hooks wrapping service functions
-  /ui/              → UI-specific hooks
 /components/
   /modals/          → Modal dialogs
   /ui/              → Reusable UI primitives (buttons, inputs)
   /forms/           → Form components
-  /[feature]/       → Feature-specific components
+  /organizations/   → Organization-specific components
 /modules/           → Feature modules (complete features)
   /[feature]/
     /components/    → Feature UI components
@@ -91,6 +99,7 @@ const client = await getAuthenticatedClient(); // Bypass service layer
 // services/[entity]Service.ts
 
 import { AuthenticatedClient } from "@/lib/authenticatedClient";
+import { DatabaseError } from "@/lib/errors";
 import type { Entity, CreateEntityInput, UpdateEntityInput } from "@/types/database";
 
 /**
@@ -116,7 +125,7 @@ export async function getEntitiesService(
   const { data, error } = await query;
 
   if (error) throw new DatabaseError(error.message);
-  return data;
+  return data || [];
 }
 
 /**
@@ -125,7 +134,7 @@ export async function getEntitiesService(
 export async function createEntityService(
   input: CreateEntityInput,
   userId: string,
-  orgId: string
+  orgId?: string
 ): Promise<Entity> {
   const client = await AuthenticatedClient.getClient();
 
@@ -134,7 +143,7 @@ export async function createEntityService(
     .insert({
       ...input,
       created_by: userId,
-      organization_id: orgId,
+      organization_id: orgId || null,
     })
     .select()
     .single();
@@ -225,7 +234,7 @@ interface EntitiesStore {
 
   // Actions
   fetchEntities: (userId: string, orgId?: string) => Promise<void>;
-  createEntity: (input: CreateEntityInput, userId: string, orgId: string) => Promise<void>;
+  createEntity: (input: CreateEntityInput, userId: string, orgId?: string) => Promise<void>;
   updateEntity: (entityId: string, input: UpdateEntityInput) => Promise<void>;
   deleteEntity: (entityId: string) => Promise<void>;
   resetEntities: () => void;
@@ -243,13 +252,13 @@ export const entitiesStore = create<EntitiesStore>((set, get) => ({
     try {
       const entities = await getEntitiesService(userId, orgId);
       set({ entities, loading: false });
-    } catch (error) {
+    } catch (error: any) {
       set({ error: error.message, loading: false });
     }
   },
 
   // Create entity with optimistic update
-  createEntity: async (input: CreateEntityInput, userId: string, orgId: string) => {
+  createEntity: async (input: CreateEntityInput, userId: string, orgId?: string) => {
     set({ loading: true, error: null });
     try {
       const newEntity = await createEntityService(input, userId, orgId);
@@ -257,7 +266,7 @@ export const entitiesStore = create<EntitiesStore>((set, get) => ({
         entities: [newEntity, ...state.entities], // Prepend to array
         loading: false,
       }));
-    } catch (error) {
+    } catch (error: any) {
       set({ error: error.message, loading: false });
       throw error; // Re-throw for component error handling
     }
@@ -274,7 +283,7 @@ export const entitiesStore = create<EntitiesStore>((set, get) => ({
         ),
         loading: false,
       }));
-    } catch (error) {
+    } catch (error: any) {
       set({ error: error.message, loading: false });
       throw error;
     }
@@ -289,7 +298,7 @@ export const entitiesStore = create<EntitiesStore>((set, get) => ({
         entities: state.entities.filter((e) => e.id !== entityId),
         loading: false,
       }));
-    } catch (error) {
+    } catch (error: any) {
       set({ error: error.message, loading: false });
       throw error;
     }
@@ -308,14 +317,17 @@ export const entitiesStore = create<EntitiesStore>((set, get) => ({
 ```typescript
 import { useStore } from "zustand";
 import { entitiesStore } from "@/store/entitiesStore";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function MyComponent() {
   const { entities, loading, error, fetchEntities } = useStore(entitiesStore);
-  const { userId, orgId } = useAuth();
+  const { user } = useAuth();
 
   useEffect(() => {
-    fetchEntities(userId, orgId);
-  }, [userId, orgId]);
+    if (user?.id) {
+      fetchEntities(user.id, orgId);
+    }
+  }, [user?.id, orgId]);
 
   if (loading) return <Spinner />;
   if (error) return <ErrorView message={error} />;
@@ -339,229 +351,13 @@ export function MyComponent() {
 
 ---
 
-### 5. HOOK PATTERNS
-
-#### Pattern A: Service Hooks (Recommended for Simple Queries)
-**Location:** `/hooks/services/use[Entity].ts`
-
-```typescript
-// hooks/services/useEntities.ts
-
-import { useState, useEffect } from "react";
-import { getEntitiesService } from "@/services/entityService";
-import { useAuth } from "@/hooks/useAuth";
-import type { Entity } from "@/types/database";
-
-export function useEntities(filter?: string) {
-  const { userId, orgId } = useAuth();
-  const [entities, setEntities] = useState<Entity[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const refetch = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await getEntitiesService(userId, orgId);
-      setEntities(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    refetch();
-  }, [userId, orgId, filter]);
-
-  return { entities, loading, error, refetch };
-}
-```
-
-**When to use:**
-- Simple data fetching for single component
-- Don't need to share state across components
-- Read-only operations
-- Want automatic dependency tracking
-
-#### Pattern B: Store Hooks (For Shared State)
-```typescript
-// Just use the store directly
-import { useStore } from "zustand";
-import { entitiesStore } from "@/store/entitiesStore";
-
-const { entities, loading, fetchEntities } = useStore(entitiesStore);
-```
-
-**When to use:**
-- Multiple components need same data
-- Need CRUD operations
-- Want centralized state
-- Need optimistic updates
-
-#### Pattern C: Organization Hooks
-**Location:** `/hooks/organizations/use[Feature].ts`
-
-Clerk-specific hooks for organization management (existing pattern is good).
-
----
-
-### 6. COMPONENT STRUCTURE RULES
-
-#### Module Components (Feature Components)
-**Location:** `/modules/[feature]/components/[Component].tsx`
-
-```typescript
-// modules/entities/components/EntityList.tsx
-
-import { useStore } from "zustand";
-import { entitiesStore } from "@/store/entitiesStore";
-import { useAuth } from "@/hooks/useAuth";
-import { ThemedView } from "@/components/Themed";
-import { EntityItem } from "./EntityItem";
-
-export function EntityList() {
-  const { entities, loading, error, fetchEntities } = useStore(entitiesStore);
-  const { userId, orgId } = useAuth();
-
-  useEffect(() => {
-    fetchEntities(userId, orgId);
-  }, [userId, orgId]);
-
-  if (loading) return <LoadingSpinner />;
-  if (error) return <ErrorMessage error={error} />;
-
-  return (
-    <ThemedView>
-      {entities.map((entity) => (
-        <EntityItem key={entity.id} entity={entity} />
-      ))}
-    </ThemedView>
-  );
-}
-```
-
-**Component Rules:**
-- One component per file
-- Use TypeScript interfaces for props
-- Extract complex logic to hooks
-- Keep components focused (single responsibility)
-- Use `Themed*` components for consistent styling
-
-#### Shared Components
-**Location:** `/components/[category]/[Component].tsx`
-
-Categories:
-- `/components/ui/` - Primitives (buttons, inputs, text)
-- `/components/modals/` - Modal dialogs
-- `/components/forms/` - Form inputs
-- `/components/[feature]/` - Reusable feature components
-
----
-
-### 7. ERROR HANDLING STANDARDS
-
-**Custom Error Types:**
-```typescript
-// lib/errors.ts (create this)
-
-export class ServiceError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ServiceError";
-  }
-}
-
-export class AuthenticationError extends ServiceError {
-  constructor(message: string) {
-    super(message);
-    this.name = "AuthenticationError";
-  }
-}
-
-export class DatabaseError extends ServiceError {
-  constructor(message: string) {
-    super(message);
-    this.name = "DatabaseError";
-  }
-}
-
-export class NotFoundError extends ServiceError {
-  constructor(message: string) {
-    super(message);
-    this.name = "NotFoundError";
-  }
-}
-
-export class ValidationError extends ServiceError {
-  constructor(message: string) {
-    super(message);
-    this.name = "ValidationError";
-  }
-}
-
-export class NetworkError extends ServiceError {
-  constructor(message: string) {
-    super(message);
-    this.name = "NetworkError";
-  }
-}
-
-export class PermissionError extends ServiceError {
-  constructor(message: string) {
-    super(message);
-    this.name = "PermissionError";
-  }
-}
-```
-
-**Error Handling Pattern:**
-```typescript
-// In services
-try {
-  const { data, error } = await client.from("entities").select();
-  if (error) throw new DatabaseError(error.message);
-  return data;
-} catch (error) {
-  if (error instanceof ServiceError) throw error;
-  if (error.name === "TypeError") throw new NetworkError("Connection failed");
-  throw new DatabaseError("Unknown database error");
-}
-
-// In stores
-try {
-  const data = await getEntitiesService(userId, orgId);
-  set({ entities: data, loading: false });
-} catch (error) {
-  set({ error: error.message, loading: false });
-  // Optional: log to error tracking service
-}
-
-// In components
-try {
-  await createEntity(input, userId, orgId);
-  Alert.alert("Success", "Entity created");
-} catch (error) {
-  if (error instanceof ValidationError) {
-    Alert.alert("Validation Error", error.message);
-  } else if (error instanceof PermissionError) {
-    Alert.alert("Permission Denied", "You don't have access");
-  } else {
-    Alert.alert("Error", "Something went wrong");
-  }
-}
-```
-
----
-
-### 8. CONTEXT-BASED DATA FILTERING
+### 5. CONTEXT-BASED DATA FILTERING
 
 **Personal vs Organization Context:**
 
 Every user operates in one of two contexts:
-1. **Personal Context** (`orgId = undefined`): User's personal data only
-2. **Organization Context** (`orgId = "org_xxx"`): Organization shared data
+1. **Personal Context** (`orgId = null | undefined`): User's personal data only
+2. **Organization Context** (`orgId = UUID`): Organization shared data
 
 **Implementation Pattern:**
 ```typescript
@@ -579,7 +375,7 @@ export async function getEntitiesService(
     query = query.eq("organization_id", orgId);
   } else {
     // PERSONAL CONTEXT: Get only entities created by this user
-    query = query.eq("created_by", userId);
+    query = query.eq("created_by", userId).is("organization_id", null);
   }
 
   if (additionalFilter) {
@@ -588,7 +384,7 @@ export async function getEntitiesService(
 
   const { data, error } = await query;
   if (error) throw new DatabaseError(error.message);
-  return data;
+  return data || [];
 }
 ```
 
@@ -600,7 +396,7 @@ export async function getEntitiesService(
 
 ---
 
-### 9. DATABASE SCHEMA CONVENTIONS
+### 6. DATABASE SCHEMA CONVENTIONS
 
 **Table Structure:**
 ```sql
@@ -682,7 +478,165 @@ CREATE POLICY "Users can delete own entities"
 
 ---
 
-### 10. TYPE SAFETY RULES
+### 7. AUTHENTICATION SETUP
+
+**Supabase Auth Provider:**
+```typescript
+// contexts/AuthContext.tsx
+import { supabase } from '@/lib/supabase'
+import { User, Session } from '@supabase/supabase-js'
+
+interface AuthContextType {
+  user: User | null           // Supabase User object
+  session: Session | null     // Supabase Session with access_token
+  loading: boolean
+  signUp: (email: string, password: string) => Promise<void>
+  signIn: (email: string, password: string) => Promise<void>
+  signInWithOAuth: (provider: 'google' | 'apple') => Promise<void>
+  signOut: () => Promise<void>
+}
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setUser(session?.user ?? null)
+      setLoading(false)
+    })
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+      setUser(session?.user ?? null)
+      setLoading(false)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  // Initialize AuthenticatedClient with token provider
+  useEffect(() => {
+    AuthenticatedClient.initialize(async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      return session?.access_token ?? ''
+    })
+  }, [])
+
+  // ... signIn, signOut, etc.
+}
+```
+
+**Usage:**
+```typescript
+import { useAuth } from '@/contexts/AuthContext'
+
+const { user, session, loading, signIn, signOut } = useAuth()
+const userId = user?.id  // UUID from auth.users
+```
+
+---
+
+### 8. ERROR HANDLING STANDARDS
+
+**Custom Error Types:**
+```typescript
+// lib/errors.ts
+
+export class ServiceError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ServiceError";
+  }
+}
+
+export class AuthenticationError extends ServiceError {
+  constructor(message: string) {
+    super(message);
+    this.name = "AuthenticationError";
+  }
+}
+
+export class DatabaseError extends ServiceError {
+  constructor(message: string) {
+    super(message);
+    this.name = "DatabaseError";
+  }
+}
+
+export class NotFoundError extends ServiceError {
+  constructor(message: string) {
+    super(message);
+    this.name = "NotFoundError";
+  }
+}
+
+export class ValidationError extends ServiceError {
+  constructor(message: string) {
+    super(message);
+    this.name = "ValidationError";
+  }
+}
+
+export class NetworkError extends ServiceError {
+  constructor(message: string) {
+    super(message);
+    this.name = "NetworkError";
+  }
+}
+
+export class PermissionError extends ServiceError {
+  constructor(message: string) {
+    super(message);
+    this.name = "PermissionError";
+  }
+}
+```
+
+**Error Handling Pattern:**
+```typescript
+// In services
+try {
+  const { data, error } = await client.from("entities").select();
+  if (error) throw new DatabaseError(error.message);
+  return data;
+} catch (error) {
+  if (error instanceof ServiceError) throw error;
+  if (error.name === "TypeError") throw new NetworkError("Connection failed");
+  throw new DatabaseError("Unknown database error");
+}
+
+// In stores
+try {
+  const data = await getEntitiesService(userId, orgId);
+  set({ entities: data, loading: false });
+} catch (err: any) {
+  console.error("Error fetching entities:", err);
+  set({ error: err.message, entities: [], loading: false });
+}
+
+// In components
+try {
+  await createEntity(input, userId, orgId);
+  Alert.alert("Success", "Entity created");
+} catch (error: any) {
+  if (error instanceof ValidationError) {
+    Alert.alert("Validation Error", error.message);
+  } else if (error instanceof PermissionError) {
+    Alert.alert("Permission Denied", "You don't have access");
+  } else {
+    Alert.alert("Error", "Something went wrong");
+  }
+}
+```
+
+---
+
+### 9. TYPE SAFETY RULES
 
 **Database Types:**
 ```typescript
@@ -710,24 +664,6 @@ export type UpdateEntityInput = Database["public"]["Tables"]["entities"]["Update
 npx supabase gen types typescript --project-id <project-id> > types/database.ts
 ```
 
-**API Types:**
-```typescript
-// types/api.ts
-
-export interface ApiResponse<T> {
-  data: T;
-  error: string | null;
-  status: number;
-}
-
-export interface PaginatedResponse<T> {
-  items: T[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
-```
-
 **DO:**
 - ✅ Always generate types from database schema
 - ✅ Use strict TypeScript mode
@@ -737,7 +673,7 @@ export interface PaginatedResponse<T> {
 
 ---
 
-### 11. NAMING CONVENTIONS
+### 10. NAMING CONVENTIONS
 
 **Files:**
 - Components: PascalCase (`EntityList.tsx`)
@@ -760,60 +696,7 @@ export interface PaginatedResponse<T> {
 
 ---
 
-### 12. MIGRATION CHECKLIST
-
-When adding a new feature:
-
-**1. Database Schema** (`supabase/migrations/[timestamp]_[name].sql`)
-- [ ] Create table with proper columns
-- [ ] Add `organization_id` and `created_by` columns
-- [ ] Add `created_at` and `updated_at` with trigger
-- [ ] Add foreign key constraints with `ON DELETE CASCADE`
-- [ ] Create indexes for foreign keys
-- [ ] Enable RLS
-- [ ] Add RLS policies (SELECT, INSERT, UPDATE, DELETE)
-- [ ] Add seed data if needed (`supabase/seed.sql`)
-
-**2. Generate Types**
-- [ ] Run `npx supabase gen types` to update `types/database.ts`
-
-**3. Service Layer** (`services/[entity]Service.ts`)
-- [ ] Create `get[Entity]Service(userId, orgId)`
-- [ ] Create `create[Entity]Service(input, userId, orgId)`
-- [ ] Create `update[Entity]Service(id, input)`
-- [ ] Create `delete[Entity]Service(id)`
-- [ ] Add JSDoc comments
-- [ ] Add error handling
-- [ ] Export all functions
-
-**4. State Management** (`store/[entity]Store.ts`)
-- [ ] Define state interface
-- [ ] Create Zustand store
-- [ ] Add `fetch`, `create`, `update`, `delete` actions
-- [ ] Add `reset` action
-- [ ] Add loading/error handling
-- [ ] Call service functions
-
-**5. Hooks** (`hooks/services/use[Entity].ts`) - Optional
-- [ ] Create hook wrapper if needed for simple queries
-- [ ] Use service functions
-- [ ] Return loading/error/data/refetch
-
-**6. Components** (`modules/[feature]/components/`)
-- [ ] Create feature components
-- [ ] Use stores or hooks for data
-- [ ] Handle loading/error states
-- [ ] Add proper TypeScript types
-
-**7. Test**
-- [ ] Test personal context (no orgId)
-- [ ] Test organization context (with orgId)
-- [ ] Test RLS policies work correctly
-- [ ] Test error handling
-
----
-
-### 13. FORBIDDEN PATTERNS (DON'T DO THIS)
+### 11. FORBIDDEN PATTERNS (DON'T DO THIS)
 
 ❌ **Passing tokens to services:**
 ```typescript
@@ -875,63 +758,51 @@ const appStore = create(() => ({
 
 ---
 
-### 14. QUICK REFERENCE
+### 12. MIGRATION CHECKLIST
 
-**Need to fetch data?**
-→ Create service function → Call from hook or store
+When adding a new feature:
 
-**Need shared state?**
-→ Create Zustand store → Use in components
+**1. Database Schema** (`supabase/migrations/[timestamp]_[name].sql`)
+- [ ] Create table with proper columns
+- [ ] Add `organization_id` and `created_by` columns (UUIDs)
+- [ ] Add `created_at` and `updated_at` with trigger
+- [ ] Add foreign key constraints with `ON DELETE CASCADE`
+- [ ] Create indexes for foreign keys
+- [ ] Enable RLS
+- [ ] Add RLS policies (SELECT, INSERT, UPDATE, DELETE)
+- [ ] Add seed data if needed (`supabase/seed.sql`)
 
-**Need component-specific data?**
-→ Create custom hook wrapping service function
+**2. Generate Types**
+- [ ] Run `npx supabase gen types` to update `types/database.ts`
 
-**Need to add new table?**
-→ Follow migration checklist (Section 12)
+**3. Service Layer** (`services/[entity]Service.ts`)
+- [ ] Create `get[Entity]Service(userId, orgId)`
+- [ ] Create `create[Entity]Service(input, userId, orgId)`
+- [ ] Create `update[Entity]Service(id, input)`
+- [ ] Create `delete[Entity]Service(id)`
+- [ ] Add JSDoc comments
+- [ ] Add error handling
+- [ ] Export all functions
 
-**Getting auth errors?**
-→ Check RLS policies → Verify JWT token has correct claims
+**4. State Management** (`store/[entity]Store.ts`)
+- [ ] Define state interface
+- [ ] Create Zustand store
+- [ ] Add `fetch`, `create`, `update`, `delete` actions
+- [ ] Add `reset` action
+- [ ] Add loading/error handling
+- [ ] Call service functions
 
-**Need organization context?**
-→ Use `const { orgId } = useAuth()` → Pass to service functions
+**5. Components** (`modules/[feature]/components/`)
+- [ ] Create feature components
+- [ ] Use stores or hooks for data
+- [ ] Handle loading/error states
+- [ ] Add proper TypeScript types
 
-**Data not updating?**
-→ Check store is calling service → Verify RLS allows operation
-
----
-
-### 15. SUPABASE AUTHENTICATION SETUP
-
-**Authentication Provider:**
-```typescript
-// contexts/AuthContext.tsx
-import { supabase } from '@/lib/supabase'
-import { User, Session } from '@supabase/supabase-js'
-
-interface AuthContextType {
-  user: User | null           // Supabase User object
-  session: Session | null     // Supabase Session with access_token
-  loading: boolean
-  signUp: (email: string, password: string) => Promise<void>
-  signIn: (email: string, password: string) => Promise<void>
-  signInWithOAuth: (provider: 'google' | 'apple') => Promise<void>
-  signOut: () => Promise<void>
-}
-```
-
-**Usage:**
-```typescript
-import { useAuth } from '@/contexts/AuthContext'
-
-const { user, session, loading, signIn, signOut } = useAuth()
-const userId = user?.id  // UUID from auth.users
-```
-
-**Required Setup:**
-1. Initialize Supabase client with project URL and anon key
-2. Wrap app with `AuthProvider` from `contexts/AuthContext.tsx`
-3. Initialize `AuthenticatedClient` with token provider
-4. Configure OAuth redirect URLs in Supabase dashboard
+**6. Test**
+- [ ] Test personal context (no orgId)
+- [ ] Test organization context (with orgId)
+- [ ] Test RLS policies work correctly
+- [ ] Test error handling
 
 ---
 
@@ -947,9 +818,16 @@ const userId = user?.id  // UUID from auth.users
 7. Consistent error handling with custom error types
 8. Follow migration checklist for new features
 
+**Authentication Pattern:**
+- Use `useAuth()` hook from `contexts/AuthContext.tsx`
+- User ID: `user.id` (UUID from `auth.users`)
+- RLS uses `auth.uid()` to identify current user
+- Organization context via UUID references (not `org_xxx` format)
+
 **When in doubt:**
 - Refer to existing patterns in `sessionService.ts`, `sessionsStore.ts`
 - Use service layer pattern consistently
 - Keep components simple and focused
 - Let RLS handle permission enforcement
 - Test both personal and organization contexts
+
