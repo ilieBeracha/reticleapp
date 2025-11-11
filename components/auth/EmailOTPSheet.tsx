@@ -5,15 +5,15 @@ import BaseBottomSheet from "@/components/BaseBottomSheet";
 import { useColors } from "@/hooks/ui/useColors";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
+import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import { useState } from "react";
 import {
     ActivityIndicator,
     Alert,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
-    View,
+    View
 } from "react-native";
 
 interface EmailOTPSheetProps {
@@ -102,8 +102,11 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
   return (
     <BaseBottomSheet
       visible={visible}
-      onClose={handleClose}
-      snapPoints={["60%"]}
+      onClose={handleClose} 
+      snapPoints={["60%", "80%"]}
+      keyboardBehavior="interactive"
+      keyboardSnapPoint={1}
+      enableKeyboardAutoSnap={true}
       enablePanDownToClose={!loading}
     >
       <View style={styles.container}>
@@ -142,7 +145,7 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
                 <Text style={[styles.label, { color: colors.text }]}>
                   Email Address
                 </Text>
-                <TextInput
+                <BottomSheetTextInput
                   style={[
                     styles.input,
                     {
@@ -203,7 +206,7 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
                 <Text style={[styles.label, { color: colors.text }]}>
                   Verification Code
                 </Text>
-                <TextInput
+                <BottomSheetTextInput
                   style={[
                     styles.input,
                     styles.otpInput,
@@ -264,7 +267,7 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 16,
+    // paddingHorizontal: 16,
   },
   header: {
     flexDirection: "row",
