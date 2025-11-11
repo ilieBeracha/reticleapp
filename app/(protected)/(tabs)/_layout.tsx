@@ -57,7 +57,7 @@ export default function TabLayout() {
         id: "training",
         title: "Create Training",
         icon: "fitness" as keyof typeof Ionicons.glyphMap,
-        color: colors.accent,
+        color: colors.teal,
         onPress: () => handleQuickActionsPress("training"),
       },
     ]),
@@ -83,7 +83,7 @@ export default function TabLayout() {
               fontWeight: "600",
               marginTop: 2,
             },
-            tabBarActiveTintColor: colors.accent,
+            tabBarActiveTintColor: colors.indigo,
             tabBarInactiveTintColor: colors.textMuted,
             tabBarStyle: isCameraPath ? {
               display: 'none'
@@ -113,22 +113,21 @@ export default function TabLayout() {
             }}
           />
 
-          {/* AI Insights - Always shown */}
+          {/* Training Calendar - Org mode only */}
           <Tabs.Screen
-            name="weapons"
+            name="calendar"
             options={{
-              title: "AI",
+              title: "Calendar",
+              href: isPersonalMode ? null : "/(protected)/(tabs)/calendar",
               tabBarIcon: ({ color, focused }) => (
                 <Ionicons
-                  name={focused ? "sparkles" : "sparkles-outline"}
+                  name={focused ? "calendar" : "calendar-outline"}
                   size={22}
                   color={color}
                 />
               ),
             }}
           />
-
-        
 
           {/* Center Action Button - Always shown */}
           <Tabs.Screen
@@ -142,25 +141,9 @@ export default function TabLayout() {
             options={{
               title: "",
               tabBarIcon: () => (
-                <View style={[localStyles.centerButton, { backgroundColor: colors.accent }]}>
+                <View style={[localStyles.centerButton, { backgroundColor: colors.indigo }]}>
                   <Ionicons name="add" size={28} color="#FFFFFF" />
                 </View>
-              ),
-            }}
-          />
-
-            {/* Training Calendar - Org mode */}
-            <Tabs.Screen
-            name="calendar"
-            options={{
-              title: "Calendar",
-              href: isPersonalMode ? null : "/(protected)/(tabs)/calendar",
-              tabBarIcon: ({ color, focused }) => (
-                <Ionicons
-                  name={focused ? "calendar" : "calendar-outline"}
-                  size={22}
-                  color={color}
-                />
               ),
             }}
           />
@@ -180,19 +163,27 @@ export default function TabLayout() {
             }}
           />
 
-          {/* Settings - Personal mode */}
+          {/* AI Insights - Org mode only */}
           <Tabs.Screen
-            name="settings"
+            name="weapons"
             options={{
-              title: "Settings",
-              href: isPersonalMode ? "/(protected)/(tabs)/settings" : null,
+              title: "AI",
+              href: isPersonalMode ? null : "/(protected)/(tabs)/weapons",
               tabBarIcon: ({ color, focused }) => (
                 <Ionicons
-                  name={focused ? "settings" : "settings-outline"}
+                  name={focused ? "sparkles" : "sparkles-outline"}
                   size={22}
                   color={color}
                 />
               ),
+            }}
+          />
+
+          {/* Settings - Hidden from tabs, accessible via other routes */}
+          <Tabs.Screen
+            name="settings"
+            options={{
+              href: null,
             }}
           />
 
