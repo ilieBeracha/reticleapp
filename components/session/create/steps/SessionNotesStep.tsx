@@ -1,3 +1,4 @@
+import { BaseButton } from "@/components/ui/baseButton";
 import { useColors } from "@/hooks/ui/useColors";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -5,10 +6,10 @@ import {
     StyleSheet,
     Text,
     TextInput,
-    TouchableOpacity,
-    View,
+    View
 } from "react-native";
 import { StepProps } from "../types";
+import { SessionInfo } from "./SessionInfo";
 
 export interface SessionNotesStepProps extends StepProps {
   onSubmit: () => Promise<void>;
@@ -26,18 +27,10 @@ export function SessionNotesStep({
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={[styles.iconContainer, { backgroundColor: colors.green || colors.tint }]}>
-          <Ionicons name="checkmark-done-circle" size={36} color="#FFF" />
-        </View>
-        <Text style={[styles.title, { color: colors.text }]}>
-          Review & Start
-        </Text>
-        <Text style={[styles.subtitle, { color: colors.description }]}>
-          Add optional notes and confirm your session
-        </Text>
-      </View>
+      <SessionInfo 
+        title="Review & Start" 
+        subtitle="Add optional notes and confirm your session"
+      />
 
       {/* Form Content */}
       <View style={styles.content}>
@@ -71,13 +64,13 @@ export function SessionNotesStep({
           style={[
             styles.summaryCard,
             {
-              backgroundColor: colors.tint + "10",
-              borderColor: colors.tint + "30",
+              backgroundColor: colors.blue + "10",
+              borderColor: colors.blue + "30",
             },
           ]}
         >
           <View style={styles.summaryHeader}>
-            <View style={[styles.summaryIcon, { backgroundColor: colors.tint }]}>
+            <View style={[styles.summaryIcon, { backgroundColor: colors.blue }]}>
               <Ionicons name="list" size={18} color="#FFF" />
             </View>
             <Text style={[styles.summaryTitle, { color: colors.text }]}>
@@ -131,49 +124,37 @@ export function SessionNotesStep({
 
       {/* Navigation */}
       <View style={styles.navigation}>
-        <TouchableOpacity
-          style={[
-            styles.navButton,
-            styles.backButton,
-            { 
-              borderColor: colors.border,
-              backgroundColor: colors.cardBackground,
-            },
-          ]}
-          onPress={onBack}
-          disabled={isSubmitting}
-        >
-          <View style={[styles.iconCircle, { backgroundColor: colors.border }]}>
-            <Ionicons name="arrow-back" size={18} color={colors.text} />
-          </View>
+        <BaseButton onPress={onBack} style={[styles.backButton, { borderColor: colors.border, backgroundColor: colors.cardBackground, flex: 1, justifyContent: "center", alignItems: "center" }]}>
+          <Ionicons name="arrow-back" size={18} color={colors.text} />  
           <Text style={[styles.navButtonText, { color: colors.text }]}>
             Back
           </Text>
-        </TouchableOpacity>
+        </BaseButton>
 
-        <TouchableOpacity
+        <BaseButton 
+          onPress={isSubmitting ? () => {} : onSubmit}
           style={[
-            styles.navButton,
-            styles.startButton,
-            { backgroundColor: colors.green || colors.tint },
-            isSubmitting && styles.buttonDisabled,
+            styles.startButton, 
+            { 
+              backgroundColor: colors.blue, 
+              flex: 1.5, 
+              justifyContent: "center", 
+              alignItems: "center" 
+            },
+            isSubmitting && { opacity: 0.7 },
           ]}
-          onPress={onSubmit}
-          disabled={isSubmitting}
         >
           {isSubmitting ? (
             <ActivityIndicator size="small" color="#FFF" />
           ) : (
             <>
-              <View style={[styles.iconCircle, { backgroundColor: "rgba(255,255,255,0.25)" }]}>
-                <Ionicons name="play-circle" size={20} color="#FFF" />
-              </View>
+              <Ionicons name="play-circle" size={22} color="#FFF" />
               <Text style={[styles.navButtonText, { color: "#FFF" }]}>
                 Start Session
               </Text>
             </>
           )}
-        </TouchableOpacity>
+        </BaseButton>
       </View>
     </View>
   );
@@ -184,36 +165,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 8,
   },
-  header: {
-    alignItems: "center",
-    marginBottom: 32,
-  },
-  iconContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  subtitle: {
-    fontSize: 15,
-    textAlign: "center",
-  },
   content: {
     flex: 1,
     gap: 20,
+    marginBottom: 16,
   },
   field: {
     gap: 10,
@@ -238,11 +193,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 2,
     gap: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
   },
   summaryHeader: {
     flexDirection: "row",
@@ -281,41 +231,13 @@ const styles = StyleSheet.create({
   navigation: {
     flexDirection: "row",
     gap: 12,
-    marginTop: 16,
-  },
-  navButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 14,
-    gap: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 4,
+    marginTop: "auto",
+
   },
   backButton: {
     borderWidth: 2,
-    shadowOpacity: 0.06,
   },
-  startButton: {
-    shadowColor: "#10B981",
-    shadowOpacity: 0.3,
-  },
-  iconCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
+  startButton: {},
   navButtonText: {
     fontSize: 16,
     fontWeight: "700",

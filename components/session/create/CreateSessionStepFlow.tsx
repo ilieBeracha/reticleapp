@@ -7,8 +7,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useStore } from "zustand";
-import { SessionDetailsStep } from "./steps/SessionDetailsStep";
+import { SessionNameStep } from "./steps/SessionNameStep";
 import { SessionNotesStep } from "./steps/SessionNotesStep";
+import { SessionTimeLocationStep } from "./steps/SessionTimeLocationStep";
 import { SessionFormData } from "./types";
 
 interface CreateSessionStepFlowProps {
@@ -17,8 +18,9 @@ interface CreateSessionStepFlowProps {
 }
 
 const STEPS = [
-  { id: 1, title: "Details", component: SessionDetailsStep },
-  { id: 2, title: "Notes", component: SessionNotesStep },
+  { id: 1, title: "Name", component: SessionNameStep },
+  { id: 2, title: "Time & Location", component: SessionTimeLocationStep },
+  { id: 3, title: "Notes", component: SessionNotesStep },
 ];
 
 export function CreateSessionStepFlow({
@@ -120,8 +122,7 @@ export function CreateSessionStepFlow({
     <BaseBottomSheet
       visible={visible}
       onClose={handleClose}
-      snapPoints={["90%"]}
-      enableDynamicSizing={false}
+      enableDynamicSizing={true}
       enablePanDownToClose={!isSubmitting}
       backdropOpacity={0.45}
       scrollable={true}
@@ -134,7 +135,7 @@ export function CreateSessionStepFlow({
               <View
                 style={[
                   styles.headerIcon,
-                  { backgroundColor: colors.tint },
+                  { backgroundColor: colors.blue },
                 ]}
               >
                 <Ionicons name="play-circle" size={28} color="#FFF" />
@@ -174,7 +175,7 @@ export function CreateSessionStepFlow({
                   {
                     backgroundColor:
                       index <= currentStep
-                        ? colors.tint
+                        ? colors.blue
                         : colors.border + "40",
                   },
                 ]}
@@ -200,7 +201,27 @@ export function CreateSessionStepFlow({
 
         {/* Step Content */}
         <View style={styles.stepContainer}>
-          {isLastStep ? (
+          {currentStep === 0 && (
+            <SessionNameStep
+              formData={formData}
+              updateFormData={updateFormData}
+              onNext={handleNext}
+              onBack={handleBack}
+              isFirstStep={true}
+              isLastStep={false}
+            />
+          )}
+          {currentStep === 1 && (
+            <SessionTimeLocationStep
+              formData={formData}
+              updateFormData={updateFormData}
+              onNext={handleNext}
+              onBack={handleBack}
+              isFirstStep={false}
+              isLastStep={false}
+            />
+          )}
+          {currentStep === 2 && (
             <SessionNotesStep
               formData={formData}
               updateFormData={updateFormData}
@@ -210,15 +231,6 @@ export function CreateSessionStepFlow({
               isLastStep={true}
               onSubmit={handleSubmit}
               isSubmitting={isSubmitting}
-            />
-          ) : (
-            <SessionDetailsStep
-              formData={formData}
-              updateFormData={updateFormData}
-              onNext={handleNext}
-              onBack={handleBack}
-              isFirstStep={true}
-              isLastStep={false}
             />
           )}
         </View>

@@ -6,30 +6,36 @@ A user-friendly multi-step wizard for creating new shooting sessions.
 
 ```
 components/session/create/
-├── CreateSessionStepFlow.tsx    # Main orchestrator
-├── types.ts                      # Shared TypeScript types
-├── index.ts                      # Public exports
+├── CreateSessionStepFlow.tsx       # Main orchestrator
+├── types.ts                         # Shared TypeScript types
+├── index.ts                         # Public exports
 └── steps/
-    ├── SessionDetailsStep.tsx    # Step 1: Type, name, location, time
-    └── SessionNotesStep.tsx      # Step 2: Notes & review
+    ├── SessionNameStep.tsx          # Step 1: Type & name
+    ├── SessionTimeLocationStep.tsx  # Step 2: Time & location
+    └── SessionNotesStep.tsx         # Step 3: Notes & review
 ```
 
 ## 🎯 Flow Overview
 
-### Step 1: Session Details
+### Step 1: Name Your Session
 - **Session Type**: Individual or Squad Training (visual toggle cards)
 - **Session Name** (optional): Custom name like "Morning Practice"
-- **Range Location** (optional): e.g., "Range A"
-- **Time of Day**: Morning, Afternoon, Evening, or Night
-- Visual period selector with weather icons
 - Single "Continue" button
-- **Note**: Organization context is automatically based on your selected org
+- Icon: Create/pen
 
-### Step 2: Notes & Review
+### Step 2: Time & Location
+- **Time of Day**: Morning, Afternoon, Evening, or Night (visual selector with weather icons)
+- **Range Location** (optional): e.g., "Range A"
+- Back/Continue navigation
+- Icon: Clock
+
+### Step 3: Notes & Review
 - **Session Notes** (optional): Freeform text area for additional information
 - **Summary Card**: Review all entered details before starting
-- Shows name, location, time, and type in a clean card
+- Shows type, name, location, and time in a clean card
 - Back/Start Session buttons with loading state
+- Icon: Checkmark
+- **Note**: Organization context is automatically based on your selected org
 
 ## 🔧 Usage
 
@@ -63,16 +69,18 @@ interface SessionFormData {
 
 ## 🎨 Design Features
 
-- **Progress Indicator**: Shows current step (1 of 2, 2 of 2)
+- **Progress Indicator**: Shows current step (1 of 3, 2 of 3, 3 of 3)
 - **Visual Progress Bar**: Numbered steps with checkmarks for completed
-- **Step Headers**: Large icon, title, and description for each step
+- **Step Headers**: Large icon (72px), title, and description for each step
 - **Smart Navigation**: 
-  - Step 1: Only "Continue" (first step)
-  - Step 2: "Back" + "Start Session" (final step)
+  - Step 1 (Name): Only "Continue" button
+  - Step 2 (Time & Location): "Back" + "Continue" buttons
+  - Step 3 (Notes): "Back" + "Start Session" button
 - **Auto Context**: Organization context automatically set from selected org
 - **Validation**: Form submits only on final step
 - **Loading States**: Disabled buttons and spinner during submission
 - **Error Handling**: User-friendly alerts for authentication or network errors
+- **Icon Circles**: All buttons have icons in colored circles for visual interest
 
 ## 🔄 State Management
 
@@ -101,10 +109,25 @@ export function MyNewStep({ formData, updateFormData, onNext, onBack }: StepProp
 2. Add to `STEPS` array in `CreateSessionStepFlow.tsx`:
 ```tsx
 const STEPS = [
-  { id: 1, title: "Details", component: SessionDetailsStep },
-  { id: 2, title: "My New Step", component: MyNewStep },
-  { id: 3, title: "Notes", component: SessionNotesStep },
+  { id: 1, title: "Name", component: SessionNameStep },
+  { id: 2, title: "Time & Location", component: SessionTimeLocationStep },
+  { id: 3, title: "My New Step", component: MyNewStep },
+  { id: 4, title: "Notes", component: SessionNotesStep },
 ];
+```
+
+3. Update step rendering in `CreateSessionStepFlow.tsx`:
+```tsx
+{currentStep === 2 && (
+  <MyNewStep
+    formData={formData}
+    updateFormData={updateFormData}
+    onNext={handleNext}
+    onBack={handleBack}
+    isFirstStep={false}
+    isLastStep={false}
+  />
+)}
 ```
 
 3. Update `SessionFormData` in `types.ts` if needed:
