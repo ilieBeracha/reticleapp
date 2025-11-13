@@ -3,9 +3,10 @@ import { StyleSheet, Text, View } from "react-native";
 
 export default function HomePage() {
   const { signOut } = useAuth();
+
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>home</Text>
+      <Text style={styles.text}>Home</Text>
     </View>
   );
 }
@@ -22,4 +23,3 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 });
-

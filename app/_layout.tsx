@@ -6,6 +6,7 @@ import { Slot } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "../global.css";
 
 SplashScreen.preventAutoHideAsync();
@@ -29,10 +30,12 @@ function RootLayoutInner() {
 
   return (
     <GluestackUIProvider mode={colorScheme === "dark" ? "dark" : "light"}>
-      <AuthProvider>
-        <Slot />
-        <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-      </AuthProvider>
+      <GestureHandlerRootView>
+        <AuthProvider>
+          <Slot />
+          <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
+        </AuthProvider>
+      </GestureHandlerRootView>
     </GluestackUIProvider>
   );
 }

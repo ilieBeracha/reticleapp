@@ -10,6 +10,61 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 // Warm up the browser for faster OAuth
 WebBrowser.maybeCompleteAuthSession()
 
+interface ParsedOAuthCallback {
+  accessToken?: string;
+  refreshToken?: string;
+  error?: string;
+  errorDescription?: string;
+}
+
+const parseOAuthCallback = (callbackUrl: string): ParsedOAuthCallback => {
+  try {
+    const params: string[] = [];
+    const queryIndex = callbackUrl.indexOf("?"); 
+    const hashIndex = callbackUrl.indexOf("#");
+
+    if (queryIndex !== -1) {
+      const query = callbackUrl.slice(
+        queryIndex + 1,
+        hashIndex !== -1 ? hashIndex : undefined
+      );
+      if (query) params.push(query);
+    }
+
+    if (hashIndex !== -1) {
+      const hash = callbackUrl.slice(hashIndex + 1);
+      if (hash) params.push(hash);
+    }
+
+    const searchParams = new URLSearchParams(params.join("&"));
+
+    const accessToken = searchParams.get("access_token") ?? undefined;
+    const refreshToken = searchParams.get("refresh_token") ?? undefined;
+    const error = searchParams.get("error") ?? searchParams.get("error_code") ?? undefined;
+    const errorDescription = searchParams.get("error_description") ?? undefined;
+
+    return {
+      accessToken,
+      refreshToken,
+      error,
+      errorDescription,
+    };
+  } catch (parseError) {
+    console.error("❌ Failed to parse OAuth callback URL:", parseError);
+    return {};
+  }
+};
+
+const formatOAuthError = (error?: string, errorDescription?: string) => {
+  if (!error) return undefined;
+  if (!errorDescription) return error;
+  try {
+    return `${error}: ${decodeURIComponent(errorDescription)}`;
+  } catch {
+    return `${error}: ${errorDescription}`;
+  }
+};
+
 interface AuthContextType {
   user: User | null
   session: Session | null
@@ -87,21 +142,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (url.includes("auth/callback")) {
         console.log("🔗 Processing OAuth callback...");
         
-        try {
-          // Parse URL to get tokens from hash fragment
-          const urlObj = new URL(url);    
-          const hash = urlObj.hash.substring(1) // Remove #
-          const params = new URLSearchParams(hash);
-          
-          const accessToken = params.get("access_token");
-          const refreshToken = params.get("refresh_token");
-          
-          console.log("🔗 Tokens found:", {
-            hasAccess: !!accessToken,
-            hasRefresh: !!refreshToken,
-          });
+        const { accessToken, refreshToken, error: oauthError, errorDescription } = parseOAuthCallback(url);
+        const formattedError = formatOAuthError(oauthError, errorDescription);
 
-          if (accessToken && refreshToken) {
+        if (formattedError) {
+          console.error("❌ OAuth callback returned error:", formattedError);
+          return;
+        }
+
+        console.log("🔗 Tokens found:", {
+          hasAccess: !!accessToken,
+          hasRefresh: !!refreshToken,
+        });
+
+        if (accessToken && refreshToken) {
+          try {
             console.log('🔗 Setting session...')
             const { data, error } = await supabase.auth.setSession({
               access_token: accessToken,
@@ -113,11 +168,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } else {
               console.log('✅ Session set successfully:', data.user?.email)
             }
-          } else {
-            console.warn('⚠️ No tokens found in URL')
+          } catch (parseError) {
+            console.error('❌ Error setting session from deep link:', parseError)
           }
-        } catch (parseError) {
-          console.error('❌ Error parsing OAuth callback:', parseError)
+        } else {
+          console.warn('⚠️ No tokens found in URL')
         }
       }
     }
@@ -161,7 +216,7 @@ const signInWithOAuth = async (provider: 'google' | 'apple') => {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: 'reticle://auth/callback',
+        redirectTo: 'reticlestats://auth/callback',
         skipBrowserRedirect: true,
       },
     })
@@ -169,24 +224,22 @@ const signInWithOAuth = async (provider: 'google' | 'apple') => {
     if (error) throw error
     if (!data?.url) throw new Error('No OAuth URL returned')
 
-    console.log('🔵 Opening browser...')
     const result = await WebBrowser.openAuthSessionAsync(
       data.url,
-      'reticle://auth/callback'
+      'reticlestats://auth/callback'
     )
-    
-    console.log('🔵 Browser result type:', result.type)
-    
+        
     if (result.type === 'success' && result.url) {
       console.log('✅ OAuth success! Callback URL:', result.url)
-      
-      // Extract tokens from URL hash
-      const url = new URL(result.url)
-      const hash = url.hash.substring(1) // Remove #
-      const params = new URLSearchParams(hash)
-      
-      const accessToken = params.get('access_token')
-      const refreshToken = params.get('refresh_token')
+      console.log("result",result)
+
+      const { accessToken, refreshToken, error: oauthError, errorDescription } = parseOAuthCallback(result.url)
+      const formattedError = formatOAuthError(oauthError, errorDescription)
+
+      if (formattedError) {
+        console.error('❌ OAuth error returned in callback:', formattedError)
+        throw new Error(formattedError)
+      }
       
       console.log('🔵 Extracted tokens:', { 
         hasAccess: !!accessToken, 
