@@ -1,19 +1,19 @@
 // components/auth/EmailOTPSheet.tsx
 // Bottom sheet for email OTP authentication
 
-import BaseBottomSheet from "@/components/BaseBottomSheet";
 import { useColors } from "@/hooks/ui/useColors";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
 
 interface EmailOTPSheetProps {
@@ -100,14 +100,9 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
   };
 
   return (
-    <BaseBottomSheet
+    <Modal
       visible={visible}
-      onClose={handleClose} 
-      snapPoints={["60%", "80%"]}
-      keyboardBehavior="interactive"
-      keyboardSnapPoint={1}
-      enableKeyboardAutoSnap={true}
-      enablePanDownToClose={!loading}
+      onRequestClose={handleClose}
     >
       <View style={styles.container}>
         {/* Header */}
@@ -260,7 +255,7 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
           </>
         )}
       </View>
-    </BaseBottomSheet>
+    </Modal>
   );
 }
 

@@ -1,5 +1,5 @@
 // contexts/AuthContext.tsx
-import { AuthenticatedClient } from '@/lib/authenticatedClient'
+import { AuthenticatedClient } from '@/services/authenticatedClient'
 import { supabase } from '@/lib/supabase'
 import { Session, User } from '@supabase/supabase-js'
 import * as Linking from 'expo-linking'

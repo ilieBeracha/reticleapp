@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Reticle",
-    "slug": "reticle",
+    "name": "ReticleStats",
+    "slug": "reticlestats",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/brand/logo.png",
-    "scheme": "reticle",
+    "scheme": "reticlestats",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/brand/logo.png",
@@ -14,7 +14,7 @@
     },
     "newArchEnabled": true,
     "ios": {
-      "bundleIdentifier": "com.reticle.app",
+      "bundleIdentifier": "com.reticlestats.app",
       "supportsTablet": true,
       "icon": "./assets/brand/logo.png",
       "infoPlist": {
@@ -34,7 +34,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.reticle.app",
+      "package": "com.reticlestats.app",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
@@ -71,7 +71,7 @@
         {
           "url": "https://sentry.io/",
           "project": "native",
-          "organization": "reticle"
+          "organization": "reticlestats"
         }
       ]
     ],

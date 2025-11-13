@@ -1,4 +1,4 @@
-import SocialLoginButton from "@/components/SocialLoginButton";
+import SocialLoginButton from "@/components/auth/SocialLoginButton";
 import { useAuth } from "@/contexts/AuthContext";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect } from "react";
