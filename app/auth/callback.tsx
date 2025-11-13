@@ -16,7 +16,7 @@ export default function AuthCallbackScreen() {
     // If user is authenticated, redirect to app
     if (user) {
       console.log('OAuth callback: User authenticated, redirecting...');
-      router.replace('/(protected)/(tabs)');
+      router.replace('/(protected)/home');
     } else {
       // If not authenticated after callback, something went wrong
       console.log('OAuth callback: No user found');

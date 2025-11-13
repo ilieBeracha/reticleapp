@@ -1,12 +1,11 @@
 // contexts/AuthContext.tsx
-import { AuthenticatedClient } from '@/services/authenticatedClient'
 import { supabase } from '@/lib/supabase'
+import { AuthenticatedClient } from '@/services/authenticatedClient'
 import { Session, User } from '@supabase/supabase-js'
 import * as Linking from 'expo-linking'
 import { router } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { Alert } from 'react-native'
 
 // Warm up the browser for faster OAuth
 WebBrowser.maybeCompleteAuthSession()
@@ -38,10 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false)
     })
 
-    
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log('🔵 Auth state changed:', _event, session?.user?.email || 'none')
       
       // Update state first
@@ -68,55 +64,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Check for pending invite code after successful sign in
       if (_event === 'SIGNED_IN' && session?.user) {
-        const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage')
-        const pendingInviteCode = await AsyncStorage.getItem('pending_invite_code')
-
-        if (pendingInviteCode) {
-          console.log('✅ Pending invite code available after sign-in')
-          Alert.alert(
-            'Invitation code ready',
-            'Open your profile menu and choose “Enter invite code” to join your organization.'
-          )
-        }
+        console.log('✅ Signed in:', session?.user?.email)
       }
-    })
-
-  
-
-    return () => subscription.unsubscribe()
-  }, [])
+    });
+  }, []);
 
   // Initialize AuthenticatedClient with token provider
   useEffect(() => {
     AuthenticatedClient.initialize(async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      return session?.access_token ?? ''
-    })
-  }, [])
+      const { data: { session } } = await supabase.auth.getSession();
+      return session?.access_token ?? "";
+    });
+  }, []);
 
   // Handle OAuth deep links
   useEffect(() => {
     const handleDeepLink = async (event: Linking.EventType) => {
-      const url = event.url
-      console.log('🔗 Deep link received:', url)
+      const url = event.url;
+      console.log("🔗 Deep link received:", url);
 
       // Check if this is an OAuth callback
-      if (url.includes('auth/callback')) {
-        console.log('🔗 Processing OAuth callback...')
+      if (url.includes("auth/callback")) {
+        console.log("🔗 Processing OAuth callback...");
         
         try {
           // Parse URL to get tokens from hash fragment
-          const urlObj = new URL(url)
+          const urlObj = new URL(url);    
           const hash = urlObj.hash.substring(1) // Remove #
-          const params = new URLSearchParams(hash)
+          const params = new URLSearchParams(hash);
           
-          const accessToken = params.get('access_token')
-          const refreshToken = params.get('refresh_token')
+          const accessToken = params.get("access_token");
+          const refreshToken = params.get("refresh_token");
           
-          console.log('🔗 Tokens found:', { 
-            hasAccess: !!accessToken, 
-            hasRefresh: !!refreshToken 
-          })
+          console.log("🔗 Tokens found:", {
+            hasAccess: !!accessToken,
+            hasRefresh: !!refreshToken,
+          });
 
           if (accessToken && refreshToken) {
             console.log('🔗 Setting session...')

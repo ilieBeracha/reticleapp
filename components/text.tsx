@@ -1,4 +1,4 @@
-import { useColor } from "@/hooks/useColor";
+import { useColors } from "@/hooks/ui/useColors";
 import { FONT_SIZE } from "@/theme/globals";
 import React, { forwardRef } from "react";
 import {
@@ -27,8 +27,9 @@ export const Text = forwardRef<RNText, TextProps>(
     { variant = "body", lightColor, darkColor, style, children, ...props },
     ref
   ) => {
-    const textColor = useColor({ light: lightColor, dark: darkColor }, "text");
-    const mutedColor = useColor({}, "textMuted");
+    const colors = useColors();
+    const textColor = colors.text;
+    const mutedColor = colors.textMuted;
 
     const getTextStyle = (): TextStyle => {
       const baseStyle: TextStyle = {

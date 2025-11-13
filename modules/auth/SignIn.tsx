@@ -1,27 +1,16 @@
 import { EmailOTPSheet } from "@/components/auth/EmailOTPSheet";
 import { useColors } from "@/hooks/ui/useColors";
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SignInHeader } from "./SignInHeader";
 import { SocialButtons } from "./SocialButtons";
 
-interface SignInProps {
-  inviteCode: string | undefined;
-}
-
-export function SignIn({ inviteCode }: SignInProps) {
+export function SignIn() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [showEmailOTP, setShowEmailOTP] = useState(false);
-
-  useEffect(() => {
-    if (inviteCode) {
-      AsyncStorage.setItem("pending_invite_code", inviteCode);
-    }
-  }, [inviteCode]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -36,13 +25,6 @@ export function SignIn({ inviteCode }: SignInProps) {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.content}>
-          {inviteCode && (
-            <View style={[styles.inviteBanner, { backgroundColor: colors.tint + "15" }]}>
-              <Text style={[styles.inviteText, { color: colors.tint }]}>
-                You've been invited to join an organization
-              </Text>
-            </View>
-          )}
           <SignInHeader />
           <SocialButtons />
 

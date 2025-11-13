@@ -1,25 +1,14 @@
 import { useColors } from "@/hooks/ui/useColors";
 import { StyleSheet, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 
 export function SignInHeader() {
   const colors = useColors();
 
   return (
     <View style={styles.container}>
-      {/* App Icon/Logo */}
-      <View
-        style={[
-          styles.iconContainer,
-          { backgroundColor: colors.indigo + "15" },
-        ]}
-      >
-        <Ionicons name="shield-checkmark" size={32} color={colors.indigo} />
-      </View>
-
       {/* Title */}
       <Text style={[styles.title, { color: colors.text }]}>
-        Welcome to Scopes
+        Welcome to Reticle Stats
       </Text>
 
       {/* Description */}

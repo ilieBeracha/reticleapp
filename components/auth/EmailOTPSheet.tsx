@@ -4,7 +4,6 @@
 import { useColors } from "@/hooks/ui/useColors";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
-import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -15,6 +14,7 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+import { InputField } from "../ui/input";
 
 interface EmailOTPSheetProps {
   visible: boolean;
@@ -139,16 +139,8 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
               <View style={styles.field}>
                 <Text style={[styles.label, { color: colors.text }]}>
                   Email Address
-                </Text>
-                <BottomSheetTextInput
-                  style={[
-                    styles.input,
-                    {
-                      backgroundColor: colors.cardBackground,
-                      borderColor: colors.border,
-                      color: colors.text,
-                    },
-                  ]}
+                </Text> 
+                  <InputField
                   value={email}
                   onChangeText={setEmail}
                   placeholder="your@email.com"
@@ -201,24 +193,15 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
                 <Text style={[styles.label, { color: colors.text }]}>
                   Verification Code
                 </Text>
-                <BottomSheetTextInput
-                  style={[
-                    styles.input,
-                    styles.otpInput,
-                    {
-                      backgroundColor: colors.cardBackground,
-                      borderColor: colors.border,
-                      color: colors.text,
-                    },
-                  ]}
-                  value={otp}
-                  onChangeText={setOtp}
-                  placeholder="000000"
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType="number-pad"
-                  maxLength={6}
-                  autoFocus
-                />
+                  <InputField
+                    value={otp}
+                    onChangeText={setOtp}
+                    placeholder="000000"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    autoFocus
+                  />
               </View>
             </View>
 
