@@ -6,7 +6,7 @@ import { useFonts } from 'expo-font';
 import { Slot } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import '../global.css';
@@ -29,9 +29,9 @@ export default function RootLayout() {
 
 function RootLayoutInner() {
   const colorScheme = useColorScheme();
-
+  const mode = colorScheme === 'dark' ? 'dark' : 'light';
   return (
-    <GluestackUIProvider mode={colorScheme === 'dark' ? 'dark' : 'light'}>
+    <GluestackUIProvider mode={mode as 'dark' | 'light' | 'system'}>
       <AuthProvider>
         <SafeAreaProvider>
           <BottomSheetModalProvider>

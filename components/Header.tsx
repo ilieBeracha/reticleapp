@@ -1,9 +1,9 @@
+
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
-import React from 'react';
+import { BellIcon } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { BaseAvatar } from './BaseAvatar';
-import { BellIcon, Icon } from './ui/icon';
 
 interface HeaderProps {
   notificationCount?: number;
@@ -45,7 +45,7 @@ export function Header({ notificationCount = 0, onNotificationPress }: HeaderPro
           pressed && styles.notificationPressed,
         ]}
       >
-        <Icon as={BellIcon} size="md" color={colors.text} />
+        <BellIcon size="md" color={colors.text} />
         {notificationCount > 0 && (
           <View style={[styles.badge, { backgroundColor: colors.text, borderColor: colors.background }]}>
             <Text style={[styles.badgeText, { color: colors.background }]}>
@@ -63,8 +63,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 0,
-    marginVertical: 12,
+    paddingHorizontal: 6,
+    flex: 1,
     gap: 12,
   },
   textContainer: {

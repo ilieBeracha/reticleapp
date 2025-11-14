@@ -1,6 +1,7 @@
 import { useColors } from "@/hooks/ui/useColors";
 import { FONT_SIZE } from "@/theme/globals";
-import React, { forwardRef } from "react";
+import * as React from "react";
+import { ForwardedRef, forwardRef } from "react";
 import {
   Text as RNText,
   TextProps as RNTextProps,
@@ -79,9 +80,9 @@ export const Text = forwardRef<RNText, TextProps>(
     };
 
     return (
-      <RNText ref={ref} style={[getTextStyle(), style]} {...props}>
+      <RNText ref={ref as unknown as ForwardedRef<RNText>} style={[getTextStyle(), style]} {...props}>
         {children}
       </RNText>
-    );
+    )
   }
-);
+)

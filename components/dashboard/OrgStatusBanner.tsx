@@ -10,7 +10,7 @@ export function OrgStatusBanner({ organizationCount, onConnectPress }: OrgStatus
   const { text, textMuted, card, border } = useColors();
 
   if (organizationCount > 0) {
-    return null; // Don't show banner if already connected
+    return null;
   }
 
   return (

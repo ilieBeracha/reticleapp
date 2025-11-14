@@ -2,9 +2,10 @@ import { Header } from '@/components/Header';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { Stack } from 'expo-router';
+import React from 'react';
 
 export default function ProtectedLayout() {
-  const { background } = useColors();
+  const { background, text } = useColors();
   const { user } = useAuth();
   const handleNotificationPress = () => {
     console.log('Notifications pressed');
@@ -20,6 +21,7 @@ export default function ProtectedLayout() {
           headerShadowVisible: false,
           headerTitle: () => <Header onNotificationPress={handleNotificationPress} />,
           headerTitleAlign: 'left',
+          headerTintColor: text,
           
         }}
       >

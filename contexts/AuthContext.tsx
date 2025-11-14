@@ -217,7 +217,7 @@ const signInWithOAuth = async (provider: 'google' | 'apple') => {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: 'reticlestats://auth/callback',
+        redirectTo: 'stretic://auth/callback',
         skipBrowserRedirect: true,
       },
     })
@@ -227,7 +227,7 @@ const signInWithOAuth = async (provider: 'google' | 'apple') => {
 
     const result = await WebBrowser.openAuthSessionAsync(
       data.url,
-      'reticlestats://auth/callback'
+      'stretic://auth/callback',
     )
         
     if (result.type === 'success' && result.url) {

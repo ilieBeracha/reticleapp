@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "ReticleStats",
-    "slug": "reticlestats",
+    "name": "stretic",
+    "slug": "stretic",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/brand/logo.png",
-    "scheme": "reticlestats",
+    "scheme": "stretic",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/brand/logo.png",
@@ -14,7 +14,7 @@
     },
     "newArchEnabled": true,
     "ios": {
-      "bundleIdentifier": "com.reticlestats.app",
+      "bundleIdentifier": "com.stretic.app",
       "supportsTablet": true,
       "icon": "./assets/brand/logo.png",
       "infoPlist": {
@@ -31,7 +31,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.reticlestats.app",
+      "package": "com.stretic.app",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
@@ -62,14 +62,6 @@
           "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone",
           "recordAudioAndroid": true
         }
-      ],
-      [
-        "@sentry/react-native/expo",
-        {
-          "url": "https://sentry.io/",
-          "project": "native",
-          "organization": "reticlestats"
-        }
       ]
     ],
     "experiments": {
@@ -77,14 +69,10 @@
       "reactCompiler": true
     },
     "extra": {
-      "router": {},
+      "owner": "ilieberacha",
       "eas": {
-        "projectId": "92107bc7-13c1-40c0-b361-0f49f73416f2"
-      }
-    },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "owner": "ilieberacha"
+      "router": {}
+    }
   }
+}
 }
