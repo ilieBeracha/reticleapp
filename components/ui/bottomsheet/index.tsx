@@ -98,6 +98,8 @@ export const BottomSheetPortal = ({
   snapPoints,
   handleComponent: DragIndicator,
   backdropComponent: BackDrop,
+  defaultIsOpen = false,
+  snapToIndex = 0,
   ...props
 }: Partial<IBottomSheetProps> & {
   defaultIsOpen?: boolean;
@@ -108,18 +110,21 @@ export const BottomSheetPortal = ({
 
   const handleSheetChanges = useCallback(
     (index: number) => {
-      if (index === 0 || index === -1) {
+      if (index === -1) {
         handleClose();
       }
     },
     [handleClose]
   );
 
+  // Determine initial index based on defaultIsOpen
+  const initialIndex = defaultIsOpen ? snapToIndex : -1;
+
   return (
     <GorhomBottomSheet
       ref={bottomSheetRef}
       snapPoints={snapPoints}
-      index={-1}
+      index={initialIndex}
       backdropComponent={BackDrop}
       onChange={handleSheetChanges}
       handleComponent={DragIndicator}

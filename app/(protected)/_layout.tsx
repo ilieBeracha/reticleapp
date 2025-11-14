@@ -20,10 +20,11 @@ export default function ProtectedLayout() {
           headerShadowVisible: false,
           headerTitle: () => <Header onNotificationPress={handleNotificationPress} />,
           headerTitleAlign: 'left',
+          
         }}
       >
-        <Stack.Screen name="modal" options={{ headerShown: false, presentation: 'modal', headerBlurEffect: 'light' }} />
-        <Stack.Screen name="index" options={{ headerShown: true }} />
+          <Stack.Screen name="modal" options={{ headerShown: false, presentation: 'modal', headerBlurEffect: 'light' }} />
+          <Stack.Screen name="index" options={{ headerShown: true }} />
       </Stack>
   );
 }

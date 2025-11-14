@@ -26,6 +26,41 @@ function MyComponent() {
 
 ## Available Components
 
+### SlightlyOpenBottomSheet ⭐ NEW
+A bottom sheet that's slightly open by default at initialization - perfect for quick actions or persistent UI.
+
+```tsx
+import { SlightlyOpenBottomSheet } from '@/components/modals/bottomSheets';
+
+<SlightlyOpenBottomSheet
+  snapPoints={["20%", "50%", "90%"]}
+  initialSnapIndex={0} // Opens at 20%
+>
+  <YourContent />
+</SlightlyOpenBottomSheet>
+```
+
+**Props:**
+- `snapPoints` - Height snap points (default: ["25%", "50%", "90%"])
+- `initialSnapIndex` - Which snap point to open to (default: 0)
+- `onClose` - Callback when sheet is closed
+- `children` - Content to render inside the sheet
+
+### QuickActionsSheet
+A practical implementation of slightly open bottom sheet for quick actions.
+
+```tsx
+import { QuickActionsSheet } from '@/components/modals/bottomSheets';
+
+<QuickActionsSheet
+  title="Quick Actions"
+  actions={[
+    { label: "New Session", icon: "🎯", onPress: () => {} },
+    { label: "View Stats", icon: "📊", onPress: () => {} },
+  ]}
+/>
+```
+
 ### ExampleBottomSheet
 Basic example showing how to create custom bottom sheets.
 
