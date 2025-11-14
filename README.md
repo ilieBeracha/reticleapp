@@ -465,3 +465,4 @@ npx supabase db push
 # Generate TypeScript types
 npm run db:types
 ```
+# reticleapp
