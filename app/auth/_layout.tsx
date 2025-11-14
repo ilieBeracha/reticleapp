@@ -7,17 +7,15 @@ export default function AuthRoutesLayout() {
   const router = useRouter();
 
   useEffect(() => {
-    if (user) {
-      router.replace("/(protected)/home");
+    if (user && user.id) {
+      router.replace('/(protected)');
     }
   }, [user]);
-
-  if (loading) return ;
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="sign-in" />
-      <Stack.Screen name="callback" />
+      <Stack.Screen name="(protected)" options={{ headerShown: false }} />
     </Stack>
   );
 }

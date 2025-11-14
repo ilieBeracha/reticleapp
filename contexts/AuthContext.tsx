@@ -117,9 +117,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('🔴 No initial session found')
       }
 
-      // Check for pending invite code after successful sign in
+      // Set flag to show welcome sheet after successful sign in
       if (_event === 'SIGNED_IN' && session?.user) {
         console.log('✅ Signed in:', session?.user?.email)
+        // TODO: Check if user has organizations, if so skip setting flag
       }
     });
   }, []);

@@ -1,12 +1,19 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { Redirect } from "expo-router";
+import { Redirect, useLocalSearchParams } from "expo-router";
+import { ActivityIndicator } from "react-native";
 
 export default function Index() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  
+  if(loading) return <ActivityIndicator size="large" />;
 
+  const initial = useLocalSearchParams();
+  if(initial.initial === 'login') {
+    return <Redirect href="/(protected)/modal" />;
+  }
   if (user && user.id) {
-    return <Redirect href="/(protected)/home" />;
-  } else {
+    return <Redirect href="/(protected)" />;
+  } else {  // If user is not authenticated, redirect to sign in
     return <Redirect href="/auth/sign-in" />;
   }
 }
