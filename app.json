@@ -71,8 +71,10 @@
     "extra": {
       "owner": "ilieberacha",
       "eas": {
+        "router": {},
+        "projectId": "3fec5540-c6df-4994-901d-b600678cbb37"
+      },
       "router": {}
     }
   }
-}
 }
