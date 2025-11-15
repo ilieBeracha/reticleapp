@@ -62,6 +62,14 @@
           "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone",
           "recordAudioAndroid": true
         }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "retic",
+          "organization": "reticle"
+        }
       ]
     ],
     "experiments": {
