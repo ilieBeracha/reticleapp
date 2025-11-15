@@ -8,9 +8,10 @@ import { BaseAvatar } from './BaseAvatar';
 interface HeaderProps {
   notificationCount?: number;
   onNotificationPress?: () => void;
+  onUserPress?: () => void;
 }
 
-export function Header({ notificationCount = 0, onNotificationPress }: HeaderProps) {
+export function Header({ notificationCount = 0, onNotificationPress, onUserPress }: HeaderProps) {
   const { user } = useAuth();
   const colors = useColors();
 
@@ -23,19 +24,21 @@ export function Header({ notificationCount = 0, onNotificationPress }: HeaderPro
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <BaseAvatar
-        source={avatarUri ? { uri: avatarUri } : undefined}
-        fallbackText={fallbackInitial}
-        size="md"
-        borderWidth={2}
-      />
+      <Pressable onPress={onUserPress} style={styles.userSection}>
+        <BaseAvatar
+          source={avatarUri ? { uri: avatarUri } : undefined}
+          fallbackText={fallbackInitial}
+          size="md"
+          borderWidth={2}
+        />
 
-      <View style={styles.textContainer}>
-        <Text style={[styles.welcomeText, { color: colors.text }]}>Welcome</Text>
-        <Text style={[styles.nameText, { color: colors.text }]} numberOfLines={1}>
-          {displayName}
-        </Text>
-      </View>
+        <View style={styles.textContainer}>
+          <Text style={[styles.welcomeText, { color: colors.text }]}>Welcome</Text>
+          <Text style={[styles.nameText, { color: colors.text }]} numberOfLines={1}>
+            {displayName}
+          </Text>
+        </View>
+      </Pressable>
 
       <Pressable
         onPress={onNotificationPress}
@@ -67,6 +70,12 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 12,
   },
+  userSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
   textContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -74,7 +83,6 @@ const styles = StyleSheet.create({
   welcomeText: {
     fontSize: 14,
     fontWeight: '400',
-
   },
   nameText: {
     fontSize: 18,

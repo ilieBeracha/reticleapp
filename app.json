@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "stretic",
-    "slug": "stretic",
+    "name": "retic",
+    "slug": "retic",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/brand/logo.png",
-    "scheme": "stretic",
+    "scheme": "retic",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/brand/logo.png",
@@ -14,7 +14,7 @@
     },
     "newArchEnabled": true,
     "ios": {
-      "bundleIdentifier": "com.stretic.app",
+      "bundleIdentifier": "com.retic.app",
       "supportsTablet": true,
       "icon": "./assets/brand/logo.png",
       "infoPlist": {
@@ -31,7 +31,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.stretic.app",
+      "package": "com.retic.app",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
@@ -72,9 +72,10 @@
       "owner": "ilieberacha",
       "eas": {
         "router": {},
-        "projectId": "3fec5540-c6df-4994-901d-b600678cbb37"
+        "projectId": "a6389fa6-2be9-4cf2-803c-58ceab564997"
       },
       "router": {}
-    }
+    },
+    "owner": "ilieberacha"
   }
 }

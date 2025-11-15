@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Stretic App - Development Setup Script
+# Retic App - Development Setup Script
 
 echo "🎯 Stretic Development Setup"
 echo ""
