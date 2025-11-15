@@ -33,7 +33,6 @@ export function Header({ notificationCount = 0, onNotificationPress, onUserPress
         />
 
         <View style={styles.textContainer}>
-          <Text style={[styles.welcomeText, { color: colors.text }]}>Welcome</Text>
           <Text style={[styles.nameText, { color: colors.text }]} numberOfLines={1}>
             {displayName}
           </Text>
