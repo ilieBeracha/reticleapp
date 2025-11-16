@@ -154,6 +154,46 @@ $$;
 
 ALTER FUNCTION "public"."get_team_members"("p_team_id" "uuid") OWNER TO "postgres";
 
+-- Create new organization workspace
+CREATE OR REPLACE FUNCTION "public"."create_org_workspace"("p_name" "text", "p_description" "text" DEFAULT NULL)
+RETURNS TABLE("id" "uuid", "name" "text", "description" "text", "workspace_slug" "text", "created_by" "uuid", "created_at" timestamptz)
+LANGUAGE "plpgsql"
+SECURITY DEFINER
+SET "search_path" TO 'public'
+AS $$
+DECLARE
+  v_user_id uuid;
+  v_workspace_id uuid;
+  v_slug text;
+BEGIN
+  v_user_id := auth.uid();
+  
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  -- Generate slug
+  v_slug := LOWER(REGEXP_REPLACE(p_name, '[^a-zA-Z0-9]', '-', 'g')) || '-' || SUBSTRING(gen_random_uuid()::text, 1, 8);
+
+  -- Create workspace
+  INSERT INTO org_workspaces (name, description, workspace_slug, created_by)
+  VALUES (p_name, p_description, v_slug, v_user_id)
+  RETURNING org_workspaces.id INTO v_workspace_id;
+
+  -- Grant owner access
+  INSERT INTO workspace_access (workspace_type, org_workspace_id, member_id, role)
+  VALUES ('org', v_workspace_id, v_user_id, 'owner');
+
+  -- Return created workspace
+  RETURN QUERY
+  SELECT ow.id, ow.name, ow.description, ow.workspace_slug, ow.created_by, ow.created_at
+  FROM org_workspaces ow
+  WHERE ow.id = v_workspace_id;
+END;
+$$;
+
+ALTER FUNCTION "public"."create_org_workspace"("p_name" "text", "p_description" "text") OWNER TO "postgres";
+
 -- =====================================================
 -- TABLES
 -- =====================================================
@@ -179,36 +219,51 @@ CREATE TABLE IF NOT EXISTS "public"."profiles" (
 ALTER TABLE "public"."profiles" OWNER TO "postgres";
 COMMENT ON TABLE "public"."profiles" IS 'Users (each user is also a workspace)';
 
--- WORKSPACE ACCESS: Who can access whose workspace
+-- WORKSPACE ACCESS: Who can access whose workspace (personal OR org)
 CREATE TABLE IF NOT EXISTS "public"."workspace_access" (
   "id" "uuid" PRIMARY KEY DEFAULT gen_random_uuid(),
-  "workspace_owner_id" "uuid" NOT NULL,  -- The profile.id of workspace owner
+  "workspace_type" "text" NOT NULL DEFAULT 'personal',  -- 'personal' or 'org'
+  "workspace_owner_id" "uuid",           -- For personal: profile.id, for org: null
+  "org_workspace_id" "uuid",             -- For org: org_workspaces.id, for personal: null
   "member_id" "uuid" NOT NULL,           -- The user who has access
   "role" "text" NOT NULL DEFAULT 'member',
   "joined_at" timestamptz DEFAULT now() NOT NULL,
 
   CONSTRAINT "workspace_access_role_check" CHECK ("role" IN ('owner', 'admin', 'member')),
-  CONSTRAINT "workspace_access_unique" UNIQUE ("workspace_owner_id", "member_id")
+  CONSTRAINT "workspace_access_type_check" CHECK ("workspace_type" IN ('personal', 'org')),
+  CONSTRAINT "workspace_access_valid_refs" CHECK (
+    (workspace_type = 'personal' AND workspace_owner_id IS NOT NULL AND org_workspace_id IS NULL) OR
+    (workspace_type = 'org' AND org_workspace_id IS NOT NULL AND workspace_owner_id IS NULL)
+  ),
+  CONSTRAINT "workspace_access_unique_personal" UNIQUE ("workspace_owner_id", "member_id"),
+  CONSTRAINT "workspace_access_unique_org" UNIQUE ("org_workspace_id", "member_id")
 );
 
 ALTER TABLE "public"."workspace_access" OWNER TO "postgres";
-COMMENT ON TABLE "public"."workspace_access" IS 'Workspace membership (workspace_owner_id = profile.id)';
+COMMENT ON TABLE "public"."workspace_access" IS 'Workspace membership (supports personal and org workspaces)';
 
--- TEAMS: Sub-groups within a workspace
+-- TEAMS: Sub-groups within a workspace (personal OR org)
 CREATE TABLE IF NOT EXISTS "public"."teams" (
   "id" "uuid" PRIMARY KEY DEFAULT gen_random_uuid(),
-  "workspace_owner_id" "uuid" NOT NULL,  -- References profiles(id)
+  "workspace_type" "text" NOT NULL DEFAULT 'personal',
+  "workspace_owner_id" "uuid",           -- For personal workspace (profile.id)
+  "org_workspace_id" "uuid",             -- For org workspace
   "name" "text" NOT NULL,
   "team_type" "text",
   "description" "text",
   "created_at" timestamptz DEFAULT now() NOT NULL,
   "updated_at" timestamptz DEFAULT now() NOT NULL,
 
-  CONSTRAINT "teams_team_type_check" CHECK ("team_type" IN ('field', 'back_office'))
+  CONSTRAINT "teams_team_type_check" CHECK ("team_type" IN ('field', 'back_office')),
+  CONSTRAINT "teams_workspace_type_check" CHECK ("workspace_type" IN ('personal', 'org')),
+  CONSTRAINT "teams_valid_refs" CHECK (
+    (workspace_type = 'personal' AND workspace_owner_id IS NOT NULL AND org_workspace_id IS NULL) OR
+    (workspace_type = 'org' AND org_workspace_id IS NOT NULL AND workspace_owner_id IS NULL)
+  )
 );
 
 ALTER TABLE "public"."teams" OWNER TO "postgres";
-COMMENT ON TABLE "public"."teams" IS 'Teams within workspaces (optional sub-groups)';
+COMMENT ON TABLE "public"."teams" IS 'Teams within workspaces (supports personal and org workspaces)';
 
 -- TEAM MEMBERS: Team membership
 CREATE TABLE IF NOT EXISTS "public"."team_members" (
@@ -224,6 +279,20 @@ CREATE TABLE IF NOT EXISTS "public"."team_members" (
 ALTER TABLE "public"."team_members" OWNER TO "postgres";
 COMMENT ON TABLE "public"."team_members" IS 'Team membership';
 
+-- ORG WORKSPACES: User-created organization workspaces
+CREATE TABLE IF NOT EXISTS "public"."org_workspaces" (
+  "id" "uuid" PRIMARY KEY DEFAULT gen_random_uuid(),
+  "name" "text" NOT NULL,
+  "description" "text",
+  "workspace_slug" "text" UNIQUE,
+  "created_by" "uuid" NOT NULL,
+  "created_at" timestamptz DEFAULT now() NOT NULL,
+  "updated_at" timestamptz DEFAULT now() NOT NULL
+);
+
+ALTER TABLE "public"."org_workspaces" OWNER TO "postgres";
+COMMENT ON TABLE "public"."org_workspaces" IS 'User-created organization workspaces (multiple per user allowed)';
+
 -- =====================================================
 -- FOREIGN KEYS
 -- =====================================================
@@ -233,19 +302,32 @@ ALTER TABLE ONLY "public"."profiles"
   ADD CONSTRAINT "profiles_id_fkey"
   FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
--- Workspace access references profiles
+-- Workspace access references profiles and org workspaces
 ALTER TABLE ONLY "public"."workspace_access"
   ADD CONSTRAINT "workspace_access_owner_fkey"
   FOREIGN KEY ("workspace_owner_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
 ALTER TABLE ONLY "public"."workspace_access"
+  ADD CONSTRAINT "workspace_access_org_fkey"
+  FOREIGN KEY ("org_workspace_id") REFERENCES "public"."org_workspaces"("id") ON DELETE CASCADE;
+
+ALTER TABLE ONLY "public"."workspace_access"
   ADD CONSTRAINT "workspace_access_member_fkey"
   FOREIGN KEY ("member_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
--- Teams reference workspace owners (profiles)
+-- Org workspaces reference creator
+ALTER TABLE ONLY "public"."org_workspaces"
+  ADD CONSTRAINT "org_workspaces_created_by_fkey"
+  FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+-- Teams reference workspace owners (profiles) or org workspaces
 ALTER TABLE ONLY "public"."teams"
   ADD CONSTRAINT "teams_workspace_owner_fkey"
   FOREIGN KEY ("workspace_owner_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+ALTER TABLE ONLY "public"."teams"
+  ADD CONSTRAINT "teams_org_workspace_fkey"
+  FOREIGN KEY ("org_workspace_id") REFERENCES "public"."org_workspaces"("id") ON DELETE CASCADE;
 
 -- Team members reference teams and profiles
 ALTER TABLE ONLY "public"."team_members"
@@ -258,8 +340,12 @@ ALTER TABLE ONLY "public"."team_members"
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS "idx_workspace_access_owner" ON "public"."workspace_access"("workspace_owner_id");
+CREATE INDEX IF NOT EXISTS "idx_workspace_access_org" ON "public"."workspace_access"("org_workspace_id");
 CREATE INDEX IF NOT EXISTS "idx_workspace_access_member" ON "public"."workspace_access"("member_id");
+CREATE INDEX IF NOT EXISTS "idx_workspace_access_type" ON "public"."workspace_access"("workspace_type");
+CREATE INDEX IF NOT EXISTS "idx_org_workspaces_created_by" ON "public"."org_workspaces"("created_by");
 CREATE INDEX IF NOT EXISTS "idx_teams_workspace_owner" ON "public"."teams"("workspace_owner_id");
+CREATE INDEX IF NOT EXISTS "idx_teams_org_workspace" ON "public"."teams"("org_workspace_id");
 CREATE INDEX IF NOT EXISTS "idx_team_members_team" ON "public"."team_members"("team_id");
 CREATE INDEX IF NOT EXISTS "idx_team_members_user" ON "public"."team_members"("user_id");
 
@@ -303,9 +389,9 @@ BEGIN
   )
   ON CONFLICT (id) DO NOTHING;
 
-  -- 2. Grant user access to their own workspace (they are the owner)
-  INSERT INTO public.workspace_access (workspace_owner_id, member_id, role)
-  VALUES (NEW.id, NEW.id, 'owner')
+  -- 2. Grant user access to their own workspace (personal workspace)
+  INSERT INTO public.workspace_access (workspace_type, workspace_owner_id, member_id, role)
+  VALUES ('personal', NEW.id, NEW.id, 'owner')
   ON CONFLICT (workspace_owner_id, member_id) DO NOTHING;
 
   RETURN NEW;
@@ -320,6 +406,11 @@ CREATE OR REPLACE TRIGGER "update_profiles_updated_at"
   FOR EACH ROW
   EXECUTE FUNCTION "public"."update_updated_at_column"();
 
+CREATE OR REPLACE TRIGGER "update_org_workspaces_updated_at"
+  BEFORE UPDATE ON "public"."org_workspaces"
+  FOR EACH ROW
+  EXECUTE FUNCTION "public"."update_updated_at_column"();
+
 CREATE OR REPLACE TRIGGER "update_teams_updated_at"
   BEFORE UPDATE ON "public"."teams"
   FOR EACH ROW
@@ -331,6 +422,7 @@ CREATE OR REPLACE TRIGGER "update_teams_updated_at"
 
 ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."workspace_access" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."org_workspaces" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."teams" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."team_members" ENABLE ROW LEVEL SECURITY;
 
@@ -351,141 +443,152 @@ CREATE POLICY "profiles_update_self" ON "public"."profiles"
 CREATE POLICY "profiles_delete_self" ON "public"."profiles"
   FOR DELETE USING (auth.uid() = id);
 
--- WORKSPACE ACCESS: Can see memberships for workspaces they belong to
+-- WORKSPACE ACCESS: Can see own memberships or memberships in workspaces they own
 CREATE POLICY "workspace_access_select" ON "public"."workspace_access"
   FOR SELECT USING (
-    member_id = auth.uid() OR  -- Own memberships
-    workspace_owner_id IN (  -- Memberships of workspaces I own/admin
-      SELECT workspace_owner_id 
-      FROM public.workspace_access 
-      WHERE member_id = auth.uid() 
-        AND role IN ('owner', 'admin')
-    )
+    member_id = auth.uid() OR           -- Can see own memberships
+    workspace_owner_id = auth.uid()     -- Can see memberships in my workspace
   );
 
--- Owners/admins can insert new members
+-- Only workspace owners can insert new members
 CREATE POLICY "workspace_access_insert" ON "public"."workspace_access"
   FOR INSERT WITH CHECK (
-    workspace_owner_id IN (
-      SELECT workspace_owner_id 
-      FROM public.workspace_access 
-      WHERE member_id = auth.uid() 
-        AND role IN ('owner', 'admin')
-    )
+    workspace_owner_id = auth.uid()  -- Only workspace owner can add members
   );
 
--- Owners/admins can update/delete members
+-- Workspace owners can update member roles
 CREATE POLICY "workspace_access_update" ON "public"."workspace_access"
   FOR UPDATE USING (
-    workspace_owner_id IN (
-      SELECT workspace_owner_id 
-      FROM public.workspace_access 
-      WHERE member_id = auth.uid() 
-        AND role IN ('owner', 'admin')
-    )
+    workspace_owner_id = auth.uid()  -- Only workspace owner can update
   );
 
+-- Users can leave workspaces, owners can remove members
 CREATE POLICY "workspace_access_delete" ON "public"."workspace_access"
   FOR DELETE USING (
-    member_id = auth.uid() OR  -- Can leave workspace
-    workspace_owner_id IN (  -- Owners/admins can remove members
-      SELECT workspace_owner_id 
-      FROM public.workspace_access 
-      WHERE member_id = auth.uid() 
-        AND role IN ('owner', 'admin')
+    member_id = auth.uid() OR        -- Can leave any workspace
+    workspace_owner_id = auth.uid() OR  -- Personal workspace owner can remove
+    EXISTS (  -- Org workspace owner can remove
+      SELECT 1 FROM public.org_workspaces ow
+      WHERE ow.id = workspace_access.org_workspace_id
+        AND ow.created_by = auth.uid()
     )
   );
 
--- TEAMS: Can see teams in workspaces I have access to
+-- ORG WORKSPACES: Can see workspaces I created or have access to
+CREATE POLICY "org_workspaces_select" ON "public"."org_workspaces"
+  FOR SELECT USING (
+    created_by = auth.uid() OR  -- Own workspaces
+    EXISTS (  -- Workspaces I have access to
+      SELECT 1 FROM public.workspace_access wa
+      WHERE wa.org_workspace_id = org_workspaces.id
+        AND wa.member_id = auth.uid()
+    )
+  );
+
+-- Anyone can create org workspaces
+CREATE POLICY "org_workspaces_insert" ON "public"."org_workspaces"
+  FOR INSERT WITH CHECK (
+    created_by = auth.uid()
+  );
+
+-- Only creators can update their org workspaces
+CREATE POLICY "org_workspaces_update" ON "public"."org_workspaces"
+  FOR UPDATE USING (
+    created_by = auth.uid()
+  );
+
+-- Only creators can delete their org workspaces
+CREATE POLICY "org_workspaces_delete" ON "public"."org_workspaces"
+  FOR DELETE USING (
+    created_by = auth.uid()
+  );
+
+-- TEAMS: Can see teams in own workspace or workspaces with access
 CREATE POLICY "teams_select" ON "public"."teams"
   FOR SELECT USING (
-    workspace_owner_id IN (
-      SELECT workspace_owner_id 
-      FROM public.workspace_access 
-      WHERE member_id = auth.uid()
+    workspace_owner_id = auth.uid() OR  -- Own workspace teams
+    EXISTS (  -- Teams in workspaces I have access to
+      SELECT 1 FROM public.workspace_access
+      WHERE workspace_access.workspace_owner_id = teams.workspace_owner_id
+        AND workspace_access.member_id = auth.uid()
     )
   );
 
--- Owners/admins can manage teams
+-- Only workspace owners can manage teams
 CREATE POLICY "teams_insert" ON "public"."teams"
   FOR INSERT WITH CHECK (
-    workspace_owner_id IN (
-      SELECT workspace_owner_id 
-      FROM public.workspace_access 
-      WHERE member_id = auth.uid() 
-        AND role IN ('owner', 'admin')
-    )
+    workspace_owner_id = auth.uid()
   );
 
 CREATE POLICY "teams_update" ON "public"."teams"
   FOR UPDATE USING (
-    workspace_owner_id IN (
-      SELECT workspace_owner_id 
-      FROM public.workspace_access 
-      WHERE member_id = auth.uid() 
-        AND role IN ('owner', 'admin')
-    )
+    workspace_owner_id = auth.uid()
   );
 
 CREATE POLICY "teams_delete" ON "public"."teams"
   FOR DELETE USING (
-    workspace_owner_id IN (
-      SELECT workspace_owner_id 
-      FROM public.workspace_access 
-      WHERE member_id = auth.uid() 
-        AND role IN ('owner', 'admin')
-    )
+    workspace_owner_id = auth.uid()
   );
 
 -- TEAM MEMBERS: Can see team members if you're in the workspace
 CREATE POLICY "team_members_select" ON "public"."team_members"
   FOR SELECT USING (
     user_id = auth.uid() OR  -- Own membership
-    team_id IN (
-      SELECT t.id 
-      FROM public.teams t
-      JOIN public.workspace_access wa ON wa.workspace_owner_id = t.workspace_owner_id
-      WHERE wa.member_id = auth.uid()
+    EXISTS (  -- Member of a team in a workspace I have access to
+      SELECT 1 FROM public.teams t
+      LEFT JOIN public.workspace_access wa 
+        ON wa.workspace_owner_id = t.workspace_owner_id 
+        AND wa.member_id = auth.uid()
+      WHERE t.id = team_members.team_id
+        AND (t.workspace_owner_id = auth.uid() OR wa.id IS NOT NULL)
     )
   );
 
--- Team managers/commanders can manage team members
+-- Team managers/commanders and workspace owners can manage team members
 CREATE POLICY "team_members_insert" ON "public"."team_members"
   FOR INSERT WITH CHECK (
-    team_id IN (
-      SELECT tm.team_id
-      FROM public.team_members tm
-      WHERE tm.user_id = auth.uid() 
+    EXISTS (  -- I'm a manager/commander of this team
+      SELECT 1 FROM public.team_members tm
+      WHERE tm.team_id = team_members.team_id
+        AND tm.user_id = auth.uid() 
         AND tm.role IN ('manager', 'commander')
     ) OR
-    team_id IN (  -- Workspace admins can also add
-      SELECT t.id
-      FROM public.teams t
-      JOIN public.workspace_access wa ON wa.workspace_owner_id = t.workspace_owner_id
-      WHERE wa.member_id = auth.uid() 
-        AND wa.role IN ('owner', 'admin')
+    EXISTS (  -- I'm the workspace owner
+      SELECT 1 FROM public.teams t
+      WHERE t.id = team_members.team_id
+        AND t.workspace_owner_id = auth.uid()
     )
   );
 
 CREATE POLICY "team_members_update" ON "public"."team_members"
   FOR UPDATE USING (
     user_id = auth.uid() OR  -- Can update own membership
-    team_id IN (
-      SELECT tm.team_id
-      FROM public.team_members tm
-      WHERE tm.user_id = auth.uid() 
+    EXISTS (  -- I'm a manager/commander of this team
+      SELECT 1 FROM public.team_members tm
+      WHERE tm.team_id = team_members.team_id
+        AND tm.user_id = auth.uid() 
         AND tm.role IN ('manager', 'commander')
+    ) OR
+    EXISTS (  -- I'm the workspace owner
+      SELECT 1 FROM public.teams t
+      WHERE t.id = team_members.team_id
+        AND t.workspace_owner_id = auth.uid()
     )
   );
 
 CREATE POLICY "team_members_delete" ON "public"."team_members"
   FOR DELETE USING (
     user_id = auth.uid() OR  -- Can leave team
-    team_id IN (
-      SELECT tm.team_id
-      FROM public.team_members tm
-      WHERE tm.user_id = auth.uid() 
+    EXISTS (  -- I'm a manager/commander of this team
+      SELECT 1 FROM public.team_members tm
+      WHERE tm.team_id = team_members.team_id
+        AND tm.user_id = auth.uid() 
         AND tm.role IN ('manager', 'commander')
+    ) OR
+    EXISTS (  -- I'm the workspace owner
+      SELECT 1 FROM public.teams t
+      WHERE t.id = team_members.team_id
+        AND t.workspace_owner_id = auth.uid()
     )
   );
 
@@ -533,6 +636,10 @@ GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "anon";
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "service_role";
 
+GRANT ALL ON FUNCTION "public"."create_org_workspace"("p_name" "text", "p_description" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."create_org_workspace"("p_name" "text", "p_description" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."create_org_workspace"("p_name" "text", "p_description" "text") TO "service_role";
+
 -- Table grants
 GRANT ALL ON TABLE "public"."profiles" TO "anon";
 GRANT ALL ON TABLE "public"."profiles" TO "authenticated";
@@ -549,6 +656,10 @@ GRANT ALL ON TABLE "public"."teams" TO "service_role";
 GRANT ALL ON TABLE "public"."team_members" TO "anon";
 GRANT ALL ON TABLE "public"."team_members" TO "authenticated";
 GRANT ALL ON TABLE "public"."team_members" TO "service_role";
+
+GRANT ALL ON TABLE "public"."org_workspaces" TO "anon";
+GRANT ALL ON TABLE "public"."org_workspaces" TO "authenticated";
+GRANT ALL ON TABLE "public"."org_workspaces" TO "service_role";
 
 -- Default privileges
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "postgres";

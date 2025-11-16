@@ -1,23 +1,43 @@
 // =====================================================
-// SIMPLIFIED WORKSPACE TYPES
-// User = Workspace (no separate workspace table)
+// HYBRID WORKSPACE TYPES
+// Personal Workspace (user profile) + Org Workspaces (created)
 // =====================================================
 
 export type WorkspaceRole = "owner" | "admin" | "member";
+export type WorkspaceType = "personal" | "org";
 
-// Profile IS the workspace
+// UNIFIED WORKSPACE INTERFACE
+// Can be either a personal workspace (profile) or org workspace
 export interface Workspace {
-  id: string;                   // user's profile.id
-  email: string;
-  full_name?: string | null;
-  avatar_url?: string | null;
+  id: string;
+  workspace_type: WorkspaceType;
   workspace_name?: string | null;
   workspace_slug?: string | null;
   created_at: string;
   updated_at: string;
   
-  // If viewing someone else's workspace, include access info
+  // Personal workspace fields (when workspace_type = 'personal')
+  email?: string;
+  full_name?: string | null;
+  avatar_url?: string | null;
+  
+  // Org workspace fields (when workspace_type = 'org')
+  description?: string | null;
+  created_by?: string;
+  
+  // Access info
   access_role?: WorkspaceRole;
+}
+
+// Organization workspace (user-created)
+export interface OrgWorkspace {
+  id: string;
+  name: string;
+  description?: string | null;
+  workspace_slug?: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface WorkspaceAccess {

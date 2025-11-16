@@ -57,28 +57,111 @@ export async function updateMyWorkspace(input: {
 // =====================================================
 
 /**
- * Get all workspaces I have access to (including my own)
+ * Get all workspaces I have access to (personal + org)
  */
 export async function getAccessibleWorkspaces(): Promise<Workspace[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  // Get profiles where I have workspace_access
-  const { data, error } = await supabase
+  const workspaces: Workspace[] = [];
+
+  // 1. Get my personal workspace (my profile)
+  const { data: myProfile } = await supabase
     .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single();
+
+  if (myProfile) {
+    workspaces.push({
+      ...myProfile,
+      workspace_type: 'personal' as const,
+      access_role: 'owner' as const,
+    });
+  }
+
+  // 2. Get personal workspaces I have access to (other people's profiles)
+  const { data: sharedPersonalWorkspaces } = await supabase
+    .from("workspace_access")
     .select(`
-      *,
-      access:workspace_access!workspace_owner_id(role)
+      role,
+      workspace_owner:profiles!workspace_owner_id(*)
     `)
-    .eq("workspace_access.member_id", user.id);
+    .eq("member_id", user.id)
+    .eq("workspace_type", "personal")
+    .neq("workspace_owner_id", user.id);
+
+  if (sharedPersonalWorkspaces) {
+    sharedPersonalWorkspaces.forEach((access: any) => {
+      if (access.workspace_owner) {
+        workspaces.push({
+          ...access.workspace_owner,
+          workspace_type: 'personal' as const,
+          access_role: access.role,
+        });
+      }
+    });
+  }
+
+  // 3. Get org workspaces I have access to
+  const { data: orgWorkspaces } = await supabase
+    .from("workspace_access")
+    .select(`
+      role,
+      org_workspace:org_workspaces!org_workspace_id(*)
+    `)
+    .eq("member_id", user.id)
+    .eq("workspace_type", "org");
+
+  if (orgWorkspaces) {
+    orgWorkspaces.forEach((access: any) => {
+      if (access.org_workspace) {
+        workspaces.push({
+          id: access.org_workspace.id,
+          workspace_type: 'org' as const,
+          workspace_name: access.org_workspace.name,
+          workspace_slug: access.org_workspace.workspace_slug,
+          description: access.org_workspace.description,
+          created_by: access.org_workspace.created_by,
+          created_at: access.org_workspace.created_at,
+          updated_at: access.org_workspace.updated_at,
+          access_role: access.role,
+        });
+      }
+    });
+  }
+
+  return workspaces;
+}
+
+/**
+ * Create a new organization workspace (uses RPC for clean permissions)
+ */
+export async function createOrgWorkspace(input: {
+  name: string;
+  description?: string;
+}): Promise<Workspace> {
+  const { data, error } = await supabase.rpc('create_org_workspace', {
+    p_name: input.name,
+    p_description: input.description || null,
+  });
 
   if (error) throw error;
+  if (!data || data.length === 0) throw new Error("Failed to create workspace");
 
-  // Map to include access_role
-  return (data || []).map((profile: any) => ({
-    ...profile,
-    access_role: profile.access?.[0]?.role || 'member'
-  }));
+  const orgWorkspace = data[0];
+
+  return {
+    id: orgWorkspace.id,
+    workspace_type: 'org',
+    workspace_name: orgWorkspace.name,
+    workspace_slug: orgWorkspace.workspace_slug,
+    description: orgWorkspace.description,
+    created_by: orgWorkspace.created_by,
+    created_at: orgWorkspace.created_at,
+    updated_at: orgWorkspace.created_at,
+    access_role: 'owner',
+  };
 }
 
 /**
@@ -98,6 +181,7 @@ export async function getWorkspace(workspaceOwnerId: string): Promise<Workspace 
 
   return {
     ...data,
+    workspace_type: 'personal' as const,
     access_role: data.access?.[0]?.role || 'member'
   };
 }
