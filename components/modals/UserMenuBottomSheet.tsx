@@ -1,15 +1,15 @@
 import { BaseAvatar } from '@/components/BaseAvatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
-import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { router } from 'expo-router';
 import {
-    BuildingIcon,
-    ChevronRightIcon,
-    LogOutIcon,
-    SettingsIcon
+  BuildingIcon,
+  ChevronRightIcon,
+  LogOutIcon,
+  SettingsIcon
 } from 'lucide-react-native';
-import { forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 export interface UserMenuBottomSheetRef {
@@ -28,7 +28,6 @@ export const UserMenuBottomSheet = forwardRef<UserMenuBottomSheetRef, UserMenuBo
     const colors = useColors();
     const bottomSheetRef = useRef<BottomSheet>(null);
 
-
     const avatarUri = user?.user_metadata?.avatar_url;
     const fallbackInitial = user?.email?.charAt(0)?.toUpperCase() ?? "?";
     const displayName = user?.user_metadata?.full_name || 
@@ -40,6 +39,8 @@ export const UserMenuBottomSheet = forwardRef<UserMenuBottomSheetRef, UserMenuBo
       open: () => bottomSheetRef.current?.expand(),
       close: () => bottomSheetRef.current?.close(),
     }));
+
+    const snapPoints = useMemo(() => ['50%'], []);
 
     const handleSignOut = useCallback(async () => {
       try {
@@ -54,15 +55,12 @@ export const UserMenuBottomSheet = forwardRef<UserMenuBottomSheetRef, UserMenuBo
     const handleSettings = useCallback(() => {
       bottomSheetRef.current?.close();
       onSettingsPress?.();
-      // TODO: Navigate to settings screen when available
       console.log('Navigate to settings');
     }, [onSettingsPress]);
 
     const handleSwitchOrg = useCallback(() => {
       bottomSheetRef.current?.close();
       onSwitchOrgPress?.();
-      // TODO: Navigate to organization switcher when available
-      console.log('Switch organization');
     }, [onSwitchOrgPress]);
 
     const renderBackdrop = useCallback(
@@ -71,114 +69,140 @@ export const UserMenuBottomSheet = forwardRef<UserMenuBottomSheetRef, UserMenuBo
           {...props}
           disappearsOnIndex={-1}
           appearsOnIndex={0}
-          opacity={0.5}
         />
       ),
       []
-    );
-
-    const renderHandle = useCallback(
-      () => (
-        <View style={[styles.handleContainer, { backgroundColor: colors.background }]}>
-          <View style={[styles.dragIndicatorBar, { backgroundColor: colors.text + '40' }]} />
-        </View>
-      ),
-      [colors]
     );
 
     return (
       <BottomSheet
         ref={bottomSheetRef}
         index={-1}
-        enableDynamicSizing={true}
+        snapPoints={snapPoints}
         enablePanDownToClose={true}
         backdropComponent={renderBackdrop}
-        handleComponent={renderHandle}
         backgroundStyle={{ backgroundColor: colors.background }}
+        handleIndicatorStyle={{ backgroundColor: colors.textMuted }}
       >
-        <BottomSheetView style={[styles.contentContainer, { backgroundColor: colors.background }]}>
-          {/* User Info Section */}
-          <View style={[styles.userSection, { backgroundColor: colors.card }]}>
-            <BaseAvatar
-              source={avatarUri ? { uri: avatarUri } : undefined}
-              fallbackText={fallbackInitial}
-              size="lg"
-              borderWidth={2}
-            />
-            <View style={styles.userInfo}>
-              <Text style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
-                {displayName}
-              </Text>
-              <Text style={[styles.userEmail, { color: colors.text + 'B3' }]} numberOfLines={1}>
-                {email}
-              </Text>
+        <BottomSheetScrollView style={styles.container}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: colors.text }]}>
+              Account
+            </Text>
+          </View>
+
+          {/* User Profile Card */}
+          <View style={styles.profileSection}>
+            <View style={[
+              styles.profileCard,
+              { 
+                backgroundColor: colors.card,
+              }
+            ]}>
+              <BaseAvatar
+                source={avatarUri ? { uri: avatarUri } : undefined}
+                fallbackText={fallbackInitial}
+                size="lg"
+                borderWidth={0}
+              />
+              <View style={styles.userInfo}>
+                <Text style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
+                  {displayName}
+                </Text>
+                <Text style={[styles.userEmail, { color: colors.textMuted }]} numberOfLines={1}>
+                  {email}
+                </Text>
+              </View>
             </View>
           </View>
 
-          {/* Divider */}
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-          {/* Menu Items */}
+          {/* Menu Items Section */}
           <View style={styles.menuSection}>
-            {/* Settings */}
-            <Pressable
-              onPress={handleSettings}
-              style={({ pressed }) => [
-                styles.menuItem,
-                { backgroundColor: colors.card },
-                pressed && styles.menuItemPressed,
-              ]}
-            >
-              <View style={[styles.iconContainer, { backgroundColor: colors.primary + '20' }]}>
-                <SettingsIcon size={20} color={colors.primary} />
-              </View>
-              <Text style={[styles.menuItemText, { color: colors.text }]}>
-                Settings
-              </Text>
-              <ChevronRightIcon size={20} color={colors.text + '60'} style={styles.chevron} />
-            </Pressable>
+            <View style={[styles.menuGroup, { backgroundColor: colors.card }]}>
+              {/* Settings */}
+              <Pressable
+                onPress={handleSettings}
+                style={({ pressed }) => [
+                  styles.menuItemWrapper,
+                  pressed && { backgroundColor: colors.background + '40' },
+                ]}
+              >
+                <View style={styles.menuItemInner}>
+                  <View style={[
+                    styles.iconContainer,
+                    { backgroundColor: colors.primary }
+                  ]}>
+                    <SettingsIcon size={18} color="#FFF" strokeWidth={2.5} />
+                  </View>
+                  <View style={styles.menuItemContent}>
+                    <Text style={[styles.menuItemText, { color: colors.text }]}>
+                      Settings
+                    </Text>
+                  </View>
+                  <ChevronRightIcon size={16} color={colors.textMuted} strokeWidth={2.5} />
+                </View>
+              </Pressable>
 
-            {/* Switch Organization */}
-            <Pressable
-              onPress={handleSwitchOrg}
-              style={({ pressed }) => [
-                styles.menuItem,
-                { backgroundColor: colors.card },
-                pressed && styles.menuItemPressed,
-              ]}
-            >
-              <View style={[styles.iconContainer, { backgroundColor: colors.green + '20' }]}>
-                <BuildingIcon size={20} color={colors.green} />
-              </View>
-              <Text style={[styles.menuItemText, { color: colors.text }]}>
-                Switch Organization
-              </Text>
-              <ChevronRightIcon size={20} color={colors.text + '60'} style={styles.chevron} />
-            </Pressable>
+              {/* Separator */}
+              <View style={[styles.separator, { backgroundColor: colors.border }]} />
+
+              {/* Switch Workspace */}
+              <Pressable
+                onPress={handleSwitchOrg}
+                style={({ pressed }) => [
+                  styles.menuItemWrapper,
+                  pressed && { backgroundColor: colors.background + '40' },
+                ]}
+              >
+                <View style={styles.menuItemInner}>
+                  <View style={[
+                    styles.iconContainer,
+                    { backgroundColor: colors.primary }
+                  ]}>
+                    <BuildingIcon size={18} color="#FFF" strokeWidth={2.5} />
+                  </View>
+                  <View style={styles.menuItemContent}>
+                    <Text style={[styles.menuItemText, { color: colors.text }]}>
+                      Switch Workspace
+                    </Text>
+                  </View>
+                  <ChevronRightIcon size={16} color={colors.textMuted} strokeWidth={2.5} />
+                </View>
+              </Pressable>
+            </View>
           </View>
 
-          {/* Divider */}
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-          {/* Logout */}
-          <View style={styles.menuSection}>
-            <Pressable
-              onPress={handleSignOut}
-              style={({ pressed }) => [
-                styles.menuItem,
-                { backgroundColor: colors.card },
-                pressed && styles.menuItemPressed,
-              ]}
-            >
-              <View style={[styles.iconContainer, { backgroundColor: colors.destructive + '20' }]}>
-                <LogOutIcon size={20} color={colors.destructive} />
-              </View>
-              <Text style={[styles.menuItemText, { color: colors.destructive }]}>
-                Log Out
-              </Text>
-            </Pressable>
+          {/* Danger Zone */}
+          <View style={styles.dangerSection}>
+            <View style={[styles.menuGroup, { backgroundColor: colors.card }]}>
+              <Pressable
+                onPress={handleSignOut}
+                style={({ pressed }) => [
+                  styles.menuItemWrapper,
+                  pressed && { backgroundColor: colors.background + '40' },
+                ]}
+              >
+                <View style={styles.menuItemInner}>
+                  <View style={[
+                    styles.iconContainer,
+                    { backgroundColor: colors.destructive, opacity: 0.8 }
+                  ]}>
+                    <LogOutIcon size={18} color="#FFF" strokeWidth={2.5} />
+                  </View>
+                  <View style={styles.menuItemContent}>
+                    <Text style={[styles.menuItemText, { color: colors.destructive, opacity: 0.8 }]}>
+                      Log Out
+                    </Text>
+                  </View>
+                </View>
+              </Pressable>
+            </View>
           </View>
-        </BottomSheetView>
+
+          {/* Bottom Padding */}
+          <View style={styles.bottomPadding} />
+        </BottomSheetScrollView>
       </BottomSheet>
     );
   }
@@ -187,76 +211,91 @@ export const UserMenuBottomSheet = forwardRef<UserMenuBottomSheetRef, UserMenuBo
 UserMenuBottomSheet.displayName = 'UserMenuBottomSheet';
 
 const styles = StyleSheet.create({
-  handleContainer: {
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
-  dragIndicatorBar: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-  },
-  contentContainer: {
+  container: {
     flex: 1,
-    paddingBottom: 30,
-    paddingHorizontal: 8,
   },
-  userSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 20,
-    gap: 16,
-    marginHorizontal: 16,
-    marginTop: 8,
-    borderRadius: 16,
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 20,
   },
-  userInfo: {
-    flex: 1,
-    justifyContent: 'center',
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
-  userName: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  userEmail: {
-    fontSize: 14,
-    fontWeight: '400',
-  },
-  divider: {
-    height: 1,
-    marginVertical: 16,
-    marginHorizontal: 16,
-  },
-  menuSection: {
-    gap: 8,
+  profileSection: {
     paddingHorizontal: 16,
+    marginBottom: 28,
   },
-  menuItem: {
+  profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderRadius: 12,
-    gap: 12,
+    minHeight: 80,
   },
-  menuItemPressed: {
-    opacity: 0.7,
+  userInfo: {
+    flex: 1,
+    marginLeft: 16,
+    justifyContent: 'center',
+  },
+  userName: {
+    fontSize: 20,
+    fontWeight: '600',
+    lineHeight: 24,
+    marginBottom: 2,
+  },
+  userEmail: {
+    fontSize: 15,
+    fontWeight: '400',
+    lineHeight: 20,
+  },
+  menuSection: {
+    paddingHorizontal: 16,
+    marginBottom: 24,
+  },
+  menuGroup: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  menuItemWrapper: {
+    overflow: 'hidden',
+  },
+  menuItemInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    minHeight: 56,
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 60,
+  },
+  dangerSection: {
+    paddingHorizontal: 16,
+    marginBottom: 8,
   },
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 28,
+    height: 28,
+    borderRadius: 6,
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
+  },
+  menuItemContent: {
+    flex: 1,
+    justifyContent: 'center',
+    marginLeft: 16,
   },
   menuItemText: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 17,
+    fontWeight: '400',
+    lineHeight: 22,
   },
-  chevron: {
-    marginLeft: 'auto',
+  bottomPadding: {
+    height: 32,
   },
 });

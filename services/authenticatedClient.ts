@@ -9,20 +9,36 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 /**
- * Singleton AuthenticatedClient class that automatically handles token injection
- * This eliminates the need to pass tokens manually to service functions
+ * Workspace context for automatic scoping
+ */
+export interface WorkspaceContext {
+  userId: string;
+  workspaceId: string | null;
+}
+
+/**
+ * Singleton AuthenticatedClient class that automatically handles:
+ * 1. Token injection (auth)
+ * 2. Workspace context injection (data scoping)
+ * 
+ * This eliminates the need to pass auth/context manually to service functions
  */
 export class AuthenticatedClient {
   private static instance: SupabaseClient | null = null;
   private static tokenProvider: (() => Promise<string>) | null = null;
+  private static contextProvider: (() => WorkspaceContext | null) | null = null;
 
   /**
-   * Initialize the client with a token provider function
+   * Initialize the client with token and context providers
    * This should be called once during app initialization
    */
-  static initialize(tokenProvider: () => Promise<string>) {
+  static initialize(
+    tokenProvider: () => Promise<string>,
+    contextProvider: () => WorkspaceContext | null
+  ) {
     this.tokenProvider = tokenProvider;
-    this.instance = null; // Reset instance to force recreation with new token provider
+    this.contextProvider = contextProvider;
+    this.instance = null; // Reset instance to force recreation
   }
 
   /**
@@ -79,11 +95,39 @@ export class AuthenticatedClient {
   }
 
   /**
+   * Get the current workspace context
+   * Returns { userId, workspaceId } automatically
+   */
+  static getContext(): WorkspaceContext {
+    if (!this.contextProvider) {
+      throw new AuthenticationError(
+        "AuthenticatedClient not initialized. Call initialize() first."
+      );
+    }
+
+    const context = this.contextProvider();
+    
+    if (!context) {
+      throw new AuthenticationError("No user context available");
+    }
+
+    return context;
+  }
+
+  /**
    * Check if the client is initialized
    */
   static isInitialized(): boolean {
-    return this.tokenProvider !== null;
+    return this.tokenProvider !== null && this.contextProvider !== null;
   }
+}
+
+/**
+ * Helper to get context in service functions
+ * Usage: const { userId, workspaceId } = getContext()
+ */
+export function getContext(): WorkspaceContext {
+  return AuthenticatedClient.getContext();
 }
 
 // Re-export error classes and helper for backward compatibility

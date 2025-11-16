@@ -1,7 +1,7 @@
 
-import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
-import { BellIcon } from 'lucide-react-native';
+import { useAppContext } from '@/hooks/useAppContext';
+import { BellIcon, ChevronDownIcon } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { BaseAvatar } from './BaseAvatar';
 
@@ -9,49 +9,72 @@ interface HeaderProps {
   notificationCount?: number;
   onNotificationPress?: () => void;
   onUserPress?: () => void;
+  onWorkspacePress?: () => void;
 }
 
-export function Header({ notificationCount = 0, onNotificationPress, onUserPress }: HeaderProps) {
-  const { user } = useAuth();
+export function Header({ 
+  notificationCount = 0, 
+  onNotificationPress, 
+  onUserPress,
+  onWorkspacePress 
+}: HeaderProps) {
+  // ✨ SINGLE SOURCE OF TRUTH
+  const { email, avatarUrl, activeWorkspace } = useAppContext();
   const colors = useColors();
 
-  const avatarUri = user?.user_metadata?.avatar_url;
-  const fallbackInitial = user?.email?.charAt(0)?.toUpperCase() ?? "?";
+  const fallbackInitial = email?.charAt(0)?.toUpperCase() ?? "?";
   
-  const displayName = user?.user_metadata?.full_name || 
-                      user?.email?.split('@')[0] || 
-                      'User';
+  // Display "Personal" for personal workspaces, full name for orgs
+  const workspaceName = activeWorkspace?.workspace_type === 'personal'
+    ? 'Personal'
+    : (activeWorkspace?.name || 'Personal');
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Pressable onPress={onUserPress} style={styles.userSection}>
-        <BaseAvatar
-          source={avatarUri ? { uri: avatarUri } : undefined}
-          fallbackText={fallbackInitial}
-          size="md"
-          borderWidth={2}
-        />
+      {/* Left: Avatar + Workspace */}
+      <View style={styles.leftSection}>
+        <Pressable 
+          onPress={onUserPress}
+          style={({ pressed }) => [
+            styles.avatarButton,
+            pressed && { opacity: 0.7 }
+          ]}
+        >
+          <BaseAvatar
+            source={avatarUrl ? { uri: avatarUrl } : undefined}
+            fallbackText={fallbackInitial}
+            size="sm"
+            borderWidth={0}
+          />
+        </Pressable>
 
-        <View style={styles.textContainer}>
-          <Text style={[styles.nameText, { color: colors.text }]} numberOfLines={1}>
-            {displayName}
+        <Pressable 
+          onPress={onWorkspacePress} 
+          style={({ pressed }) => [
+            styles.workspaceButton,
+            pressed && { opacity: 0.6 }
+          ]}
+        >
+          <Text style={[styles.workspaceName, { color: colors.text }]} numberOfLines={1}>
+            {workspaceName}
           </Text>
-        </View>
-      </Pressable>
+          <ChevronDownIcon size={14} color={colors.textMuted} strokeWidth={2.5} />
+        </Pressable>
+      </View>
 
+      {/* Right: Notifications */}
       <Pressable
         onPress={onNotificationPress}
         style={({ pressed }) => [
-          styles.notificationContainer,
-          { backgroundColor: colors.card },
-          pressed && styles.notificationPressed,
+          styles.iconButton,
+          pressed && styles.iconButtonPressed,
         ]}
       >
-        <BellIcon size="md" color={colors.text} />
+        <BellIcon size={20} color={colors.text} strokeWidth={2} />
         {notificationCount > 0 && (
-          <View style={[styles.badge, { backgroundColor: colors.text, borderColor: colors.background }]}>
-            <Text style={[styles.badgeText, { color: colors.background }]}>
-              {notificationCount > 99 ? '99+' : notificationCount}
+          <View style={[styles.badge, { backgroundColor: colors.destructive }]}>
+            <Text style={styles.badgeText}>
+              {notificationCount > 9 ? '9+' : notificationCount}
             </Text>
           </View>
         )}
@@ -63,56 +86,66 @@ export function Header({ notificationCount = 0, onNotificationPress, onUserPress
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 6,
+    paddingHorizontal: 12,
+    height: 44,
     flex: 1,
-    gap: 12,
   },
-  userSection: {
+  leftSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
     flex: 1,
   },
-  textContainer: {
+  avatarButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  workspaceButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 8,
     flex: 1,
-    justifyContent: 'center',
+    maxWidth: '80%',
   },
-  welcomeText: {
-    fontSize: 14,
-    fontWeight: '400',
-  },
-  nameText: {
-    fontSize: 18,
+  workspaceName: {
+    fontSize: 17,
     fontWeight: '600',
+    letterSpacing: -0.3,
+    flexShrink: 1,
   },
-  notificationContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  iconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
   },
-  notificationPressed: {
-    opacity: 0.7,
+  iconButtonPressed: {
+    opacity: 0.6,
   },
   badge: {
     position: 'absolute',
-    top: 4,
-    right: 4,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
+    top: 0,
+    right: 0,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 4,
-    borderWidth: 2,
   },
   badgeText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
+    color: '#FFF',
     textAlign: 'center',
   },
 });
