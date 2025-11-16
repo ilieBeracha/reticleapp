@@ -8,31 +8,24 @@ export default function HomePage() {
     userId,
     email,
     fullName,
-    workspaceId,
+    myWorkspaceId,
+    activeWorkspaceId,
     activeWorkspace,
-    isPersonal,
-    isOrganization,
+    isMyWorkspace,
+    isOtherWorkspace,
     workspaces,
   } = useAppContext();
 
-  console.log('activeWorkspace', activeWorkspace)
-  console.log('workspaces', workspaces)
-  console.log('isPersonal', isPersonal)
-  console.log('isOrganization', isOrganization)
-  console.log('userId', userId)
-  console.log('email', email)
-  console.log('fullName', fullName)
-  console.log('workspaceId', workspaceId)
-  console.log('isPersonal', isPersonal)
-  console.log('isOrganization', isOrganization)
-  console.log('workspaces', workspaces)
-  console.log('activeWorkspace', activeWorkspace)
-  console.log('workspaceId', workspaceId)
-  console.log('isPersonal', isPersonal)
-  console.log('isOrganization', isOrganization)
+  console.log('📍 HomePage Context:')
+  console.log('  myWorkspaceId:', myWorkspaceId)
+  console.log('  activeWorkspaceId:', activeWorkspaceId)
+  console.log('  activeWorkspace:', activeWorkspace)
+  console.log('  isMyWorkspace:', isMyWorkspace)
+  console.log('  isOtherWorkspace:', isOtherWorkspace)
+  console.log('  workspaces count:', workspaces.length)
   
   const colors = useColors();
-  const workspaceName = activeWorkspace?.name;
+  const workspaceName = activeWorkspace?.workspace_name || activeWorkspace?.full_name;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -45,19 +38,17 @@ export default function HomePage() {
           <Text style={[styles.label, { color: colors.textMuted }]}>Email</Text>
           <Text style={[styles.value, { color: colors.text }]}>{email}</Text>
           
-          <Text style={[styles.label, { color: colors.textMuted, marginTop: 16 }]}>Context</Text>
+          <Text style={[styles.label, { color: colors.textMuted, marginTop: 16 }]}>Viewing</Text>
           <Text style={[styles.value, { color: colors.text }]}>
-            {isPersonal ? '🏠 Personal' : '🏢 Organization'}
+            {isMyWorkspace ? '🏠 My Workspace' : '🏢 ' + workspaceName}
           </Text>
           
-          {isOrganization && (
-            <>
-              <Text style={[styles.label, { color: colors.textMuted, marginTop: 16 }]}>Active Workspace</Text>
-              <Text style={[styles.value, { color: colors.text }]}>{workspaceName}</Text>
-            </>
-          )}
+          <Text style={[styles.label, { color: colors.textMuted, marginTop: 16 }]}>Access Role</Text>
+          <Text style={[styles.value, { color: colors.text }]}>
+            {isMyWorkspace ? 'Owner' : activeWorkspace?.access_role || 'Member'}
+          </Text>
           
-          <Text style={[styles.label, { color: colors.textMuted, marginTop: 16 }]}>Total Workspaces</Text>
+          <Text style={[styles.label, { color: colors.textMuted, marginTop: 16 }]}>Accessible Workspaces</Text>
           <Text style={[styles.value, { color: colors.text }]}>{workspaces.length}</Text>
           
           <Text style={[styles.label, { color: colors.textMuted, marginTop: 16 }]}>User ID</Text>

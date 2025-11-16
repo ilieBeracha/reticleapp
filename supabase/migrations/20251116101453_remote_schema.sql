@@ -1,6 +1,6 @@
 -- =====================================================
--- CLEAN SCHEMA: Profile + Workspaces + Teams
--- Single trigger, correct IDs, proper RLS
+-- SIMPLIFIED SCHEMA: User-as-Workspace Model
+-- Every user IS a workspace, simple access control
 -- =====================================================
 
 SET statement_timeout = 0;
@@ -39,6 +39,7 @@ $$;
 
 ALTER FUNCTION "public"."update_updated_at_column"() OWNER TO "postgres";
 
+-- Check if user has access to a workspace (workspace_id = profile.id)
 CREATE OR REPLACE FUNCTION "public"."has_workspace_access"("p_workspace_id" "uuid") 
 RETURNS boolean
 LANGUAGE "plpgsql" 
@@ -47,15 +48,16 @@ SET "search_path" TO 'public'
 AS $$
 BEGIN
   RETURN EXISTS (
-    SELECT 1 FROM workspace_members
-    WHERE workspace_id = p_workspace_id
-      AND user_id = auth.uid()
+    SELECT 1 FROM workspace_access
+    WHERE workspace_owner_id = p_workspace_id
+      AND member_id = auth.uid()
   );
 END;
 $$;
 
 ALTER FUNCTION "public"."has_workspace_access"("p_workspace_id" "uuid") OWNER TO "postgres";
 
+-- Check if user is admin/owner of a workspace
 CREATE OR REPLACE FUNCTION "public"."is_workspace_admin"("p_workspace_id" "uuid", "p_user_id" "uuid") 
 RETURNS boolean
 LANGUAGE "plpgsql" 
@@ -63,16 +65,17 @@ SECURITY DEFINER
 AS $$
 BEGIN
   RETURN EXISTS (
-    SELECT 1 FROM workspace_members
-    WHERE workspace_id = p_workspace_id
-      AND user_id = p_user_id
-      AND workspace_role IN ('owner', 'admin')
+    SELECT 1 FROM workspace_access
+    WHERE workspace_owner_id = p_workspace_id
+      AND member_id = p_user_id
+      AND role IN ('owner', 'admin')
   );
 END;
 $$;
 
 ALTER FUNCTION "public"."is_workspace_admin"("p_workspace_id" "uuid", "p_user_id" "uuid") OWNER TO "postgres";
 
+-- Check if user is a team leader
 CREATE OR REPLACE FUNCTION "public"."is_team_leader"("p_team_id" "uuid", "p_user_id" "uuid") 
 RETURNS boolean
 LANGUAGE "plpgsql" 
@@ -80,17 +83,17 @@ SECURITY DEFINER
 AS $$
 BEGIN
   RETURN EXISTS (
-    SELECT 1 FROM team_memberships
+    SELECT 1 FROM team_members
     WHERE team_id = p_team_id
       AND user_id = p_user_id
       AND role IN ('manager', 'commander')
-      AND is_active = true
   );
 END;
 $$;
 
 ALTER FUNCTION "public"."is_team_leader"("p_team_id" "uuid", "p_user_id" "uuid") OWNER TO "postgres";
 
+-- Get teams for a workspace
 CREATE OR REPLACE FUNCTION "public"."get_workspace_teams"("p_workspace_id" "uuid") 
 RETURNS TABLE("team_id" "uuid", "team_name" "text", "team_type" "text", "member_count" bigint)
 LANGUAGE "plpgsql" 
@@ -98,11 +101,7 @@ SECURITY DEFINER
 SET "search_path" TO 'public'
 AS $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM workspace_members
-    WHERE workspace_id = p_workspace_id
-      AND user_id = auth.uid()
-  ) THEN
+  IF NOT has_workspace_access(p_workspace_id) THEN
     RAISE EXCEPTION 'Access denied to workspace %', p_workspace_id;
   END IF;
 
@@ -113,10 +112,8 @@ BEGIN
     t.team_type,
     COUNT(tm.user_id) AS member_count
   FROM teams t
-  LEFT JOIN team_memberships tm
-    ON tm.team_id = t.id
-   AND tm.is_active = true
-  WHERE t.workspace_id = p_workspace_id
+  LEFT JOIN team_members tm ON tm.team_id = t.id
+  WHERE t.workspace_owner_id = p_workspace_id
   GROUP BY t.id
   ORDER BY t.team_type, t.name;
 END;
@@ -124,21 +121,21 @@ $$;
 
 ALTER FUNCTION "public"."get_workspace_teams"("p_workspace_id" "uuid") OWNER TO "postgres";
 
+-- Get members of a team
 CREATE OR REPLACE FUNCTION "public"."get_team_members"("p_team_id" "uuid") 
-RETURNS TABLE("user_id" "uuid", "email" "text", "full_name" "text", "role" "text", "joined_at" timestamp with time zone)
+RETURNS TABLE("user_id" "uuid", "email" "text", "full_name" "text", "role" "text")
 LANGUAGE "plpgsql" 
 SECURITY DEFINER
 SET "search_path" TO 'public'
 AS $$
+DECLARE
+  v_workspace_id uuid;
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM teams t
-    JOIN workspace_members wm
-      ON wm.workspace_id = t.workspace_id
-     AND wm.user_id = auth.uid()
-    WHERE t.id = p_team_id
-  ) THEN
+  -- Get workspace owner from team
+  SELECT workspace_owner_id INTO v_workspace_id
+  FROM teams WHERE id = p_team_id;
+  
+  IF NOT has_workspace_access(v_workspace_id) THEN
     RAISE EXCEPTION 'Access denied to team %', p_team_id;
   END IF;
 
@@ -147,12 +144,10 @@ BEGIN
     p.id,
     p.email,
     p.full_name,
-    tm.role,
-    tm.joined_at
-  FROM team_memberships tm
+    tm.role
+  FROM team_members tm
   JOIN profiles p ON p.id = tm.user_id
   WHERE tm.team_id = p_team_id
-    AND tm.is_active = true
   ORDER BY tm.role, p.full_name;
 END;
 $$;
@@ -166,75 +161,46 @@ ALTER FUNCTION "public"."get_team_members"("p_team_id" "uuid") OWNER TO "postgre
 SET default_tablespace = '';
 SET default_table_access_method = "heap";
 
--- PROFILES (id = auth.users.id, NO DEFAULT!)
+-- PROFILES: User = Workspace Owner
 CREATE TABLE IF NOT EXISTS "public"."profiles" (
-  "id" "uuid" PRIMARY KEY,  -- NO DEFAULT - must match auth.users.id
-  "email" "text" UNIQUE,
-  "username" "text" UNIQUE,
-  "display_name" "text",
+  "id" "uuid" PRIMARY KEY,  -- matches auth.users.id (NO default)
+  "email" "text" UNIQUE NOT NULL,
   "full_name" "text",
   "avatar_url" "text",
-  "bio" "text",
-  "location" "text",
-  "website" "text",
-
-  "personal_workspace_id" "uuid",
-  "active_workspace_id" "uuid",
-  "active_view_mode" "text" DEFAULT 'personal',
-
-  "auth_provider" "text",
-  "external_provider_id" "text",
-  "oauth_sub" "text",
-  "last_login_at" timestamptz,
-  "is_email_verified" boolean DEFAULT false,
-  "is_phone_verified" boolean DEFAULT false,
-
+  
+  -- Workspace info (each user IS a workspace)
+  "workspace_name" "text" DEFAULT 'My Workspace',
+  "workspace_slug" "text" UNIQUE,
+  
   "created_at" timestamptz DEFAULT now() NOT NULL,
-  "updated_at" timestamptz DEFAULT now() NOT NULL,
-
-  CONSTRAINT "profiles_active_view_mode_check" CHECK ("active_view_mode" IN ('personal', 'org'))
+  "updated_at" timestamptz DEFAULT now() NOT NULL
 );
 
 ALTER TABLE "public"."profiles" OWNER TO "postgres";
-COMMENT ON TABLE "public"."profiles" IS 'User profiles (id = auth.users.id)';
+COMMENT ON TABLE "public"."profiles" IS 'Users (each user is also a workspace)';
 
--- WORKSPACES
-CREATE TABLE IF NOT EXISTS "public"."workspaces" (
+-- WORKSPACE ACCESS: Who can access whose workspace
+CREATE TABLE IF NOT EXISTS "public"."workspace_access" (
   "id" "uuid" PRIMARY KEY DEFAULT gen_random_uuid(),
-  "name" "text" NOT NULL,
-  "workspace_type" "text" NOT NULL,
-  "description" "text",
-  "created_by" "uuid",
-  "created_at" timestamptz DEFAULT now() NOT NULL,
-  "updated_at" timestamptz DEFAULT now() NOT NULL,
-
-  CONSTRAINT "workspaces_workspace_type_check" CHECK ("workspace_type" IN ('personal', 'organization'))
-);
-
-ALTER TABLE "public"."workspaces" OWNER TO "postgres";
-
--- WORKSPACE MEMBERS
-CREATE TABLE IF NOT EXISTS "public"."workspace_members" (
-  "id" "uuid" PRIMARY KEY DEFAULT gen_random_uuid(),
-  "user_id" "uuid" NOT NULL,
-  "workspace_id" "uuid" NOT NULL,
-  "workspace_role" "text" NOT NULL DEFAULT 'member',
+  "workspace_owner_id" "uuid" NOT NULL,  -- The profile.id of workspace owner
+  "member_id" "uuid" NOT NULL,           -- The user who has access
+  "role" "text" NOT NULL DEFAULT 'member',
   "joined_at" timestamptz DEFAULT now() NOT NULL,
 
-  CONSTRAINT "workspace_members_workspace_role_check" CHECK ("workspace_role" IN ('owner', 'admin', 'member')),
-  CONSTRAINT "workspace_members_user_id_workspace_id_key" UNIQUE ("user_id", "workspace_id")
+  CONSTRAINT "workspace_access_role_check" CHECK ("role" IN ('owner', 'admin', 'member')),
+  CONSTRAINT "workspace_access_unique" UNIQUE ("workspace_owner_id", "member_id")
 );
 
-ALTER TABLE "public"."workspace_members" OWNER TO "postgres";
+ALTER TABLE "public"."workspace_access" OWNER TO "postgres";
+COMMENT ON TABLE "public"."workspace_access" IS 'Workspace membership (workspace_owner_id = profile.id)';
 
--- TEAMS
+-- TEAMS: Sub-groups within a workspace
 CREATE TABLE IF NOT EXISTS "public"."teams" (
   "id" "uuid" PRIMARY KEY DEFAULT gen_random_uuid(),
-  "workspace_id" "uuid" NOT NULL,
+  "workspace_owner_id" "uuid" NOT NULL,  -- References profiles(id)
   "name" "text" NOT NULL,
-  "team_type" "text" NOT NULL,
+  "team_type" "text",
   "description" "text",
-  "created_by" "uuid",
   "created_at" timestamptz DEFAULT now() NOT NULL,
   "updated_at" timestamptz DEFAULT now() NOT NULL,
 
@@ -242,239 +208,142 @@ CREATE TABLE IF NOT EXISTS "public"."teams" (
 );
 
 ALTER TABLE "public"."teams" OWNER TO "postgres";
+COMMENT ON TABLE "public"."teams" IS 'Teams within workspaces (optional sub-groups)';
 
--- TEAM MEMBERSHIPS
-CREATE TABLE IF NOT EXISTS "public"."team_memberships" (
-  "id" "uuid" PRIMARY KEY DEFAULT gen_random_uuid(),
-  "user_id" "uuid" NOT NULL,
+-- TEAM MEMBERS: Team membership
+CREATE TABLE IF NOT EXISTS "public"."team_members" (
   "team_id" "uuid" NOT NULL,
+  "user_id" "uuid" NOT NULL,
   "role" "text" NOT NULL,
-  "is_active" boolean DEFAULT true,
   "joined_at" timestamptz DEFAULT now() NOT NULL,
 
-  CONSTRAINT "team_memberships_role_check" CHECK ("role" IN ('sniper', 'pistol', 'manager', 'commander', 'instructor', 'staff')),
-  CONSTRAINT "team_memberships_user_id_team_id_key" UNIQUE ("user_id", "team_id")
+  PRIMARY KEY ("team_id", "user_id"),
+  CONSTRAINT "team_members_role_check" CHECK ("role" IN ('sniper', 'pistol', 'manager', 'commander', 'instructor', 'staff'))
 );
 
-ALTER TABLE "public"."team_memberships" OWNER TO "postgres";
+ALTER TABLE "public"."team_members" OWNER TO "postgres";
+COMMENT ON TABLE "public"."team_members" IS 'Team membership';
 
 -- =====================================================
 -- FOREIGN KEYS
 -- =====================================================
 
-ALTER TABLE ONLY "public"."workspaces"
-  ADD CONSTRAINT "workspaces_created_by_fkey" 
-  FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+-- Profiles references auth.users
+ALTER TABLE ONLY "public"."profiles"
+  ADD CONSTRAINT "profiles_id_fkey"
+  FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
-ALTER TABLE ONLY "public"."workspace_members"
-  ADD CONSTRAINT "workspace_members_user_fkey" 
-  FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+-- Workspace access references profiles
+ALTER TABLE ONLY "public"."workspace_access"
+  ADD CONSTRAINT "workspace_access_owner_fkey"
+  FOREIGN KEY ("workspace_owner_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
-ALTER TABLE ONLY "public"."workspace_members"
-  ADD CONSTRAINT "workspace_members_workspace_fkey" 
-  FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE CASCADE;
+ALTER TABLE ONLY "public"."workspace_access"
+  ADD CONSTRAINT "workspace_access_member_fkey"
+  FOREIGN KEY ("member_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
+-- Teams reference workspace owners (profiles)
 ALTER TABLE ONLY "public"."teams"
-  ADD CONSTRAINT "teams_workspace_id_fkey" 
-  FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE CASCADE;
+  ADD CONSTRAINT "teams_workspace_owner_fkey"
+  FOREIGN KEY ("workspace_owner_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
-ALTER TABLE ONLY "public"."teams"
-  ADD CONSTRAINT "teams_created_by_fkey" 
-  FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
-
-ALTER TABLE ONLY "public"."team_memberships"
-  ADD CONSTRAINT "team_memberships_user_id_fkey" 
-  FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
-
-ALTER TABLE ONLY "public"."team_memberships"
-  ADD CONSTRAINT "team_memberships_team_id_fkey" 
+-- Team members reference teams and profiles
+ALTER TABLE ONLY "public"."team_members"
+  ADD CONSTRAINT "team_members_team_fkey"
   FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE CASCADE;
 
+ALTER TABLE ONLY "public"."team_members"
+  ADD CONSTRAINT "team_members_user_fkey"
+  FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS "idx_workspace_access_owner" ON "public"."workspace_access"("workspace_owner_id");
+CREATE INDEX IF NOT EXISTS "idx_workspace_access_member" ON "public"."workspace_access"("member_id");
+CREATE INDEX IF NOT EXISTS "idx_teams_workspace_owner" ON "public"."teams"("workspace_owner_id");
+CREATE INDEX IF NOT EXISTS "idx_team_members_team" ON "public"."team_members"("team_id");
+CREATE INDEX IF NOT EXISTS "idx_team_members_user" ON "public"."team_members"("user_id");
+
 -- =====================================================
--- SINGLE TRIGGER: Create profile + workspace on signup
+-- TRIGGERS: Simple profile creation on signup
 -- =====================================================
 
-CREATE OR REPLACE FUNCTION "public"."handle_new_user_full"()
+CREATE OR REPLACE FUNCTION "public"."handle_new_user"()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  personal_ws_id uuid;
+  v_workspace_slug text;
 BEGIN
-  -- 1. Create profile (id = auth.users.id)
+  -- Generate unique workspace slug
+  v_workspace_slug := LOWER(REGEXP_REPLACE(
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email),
+    '[^a-zA-Z0-9]',
+    '-',
+    'g'
+  )) || '-' || SUBSTRING(NEW.id::text, 1, 8);
+  
+  -- 1. Create profile (user IS a workspace)
   INSERT INTO public.profiles (
     id,
     email,
-    username,
-    display_name,
     full_name,
     avatar_url,
-    auth_provider,
-    external_provider_id,
-    oauth_sub,
-    is_email_verified,
-    is_phone_verified,
-    last_login_at
+    workspace_name,
+    workspace_slug
   )
   VALUES (
     NEW.id,
     NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'username', NEW.email),
-    COALESCE(NEW.raw_user_meta_data->>'name', NEW.email),
-    NEW.raw_user_meta_data->>'full_name',
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email),
     NEW.raw_user_meta_data->>'avatar_url',
-    NEW.raw_user_meta_data->>'provider',
-    NEW.raw_user_meta_data->>'provider_id',
-    NEW.raw_user_meta_data->>'sub',
-    COALESCE((NEW.raw_user_meta_data->>'email_verified')::boolean, false),
-    COALESCE((NEW.raw_user_meta_data->>'phone_verified')::boolean, false),
-    NEW.last_sign_in_at
+    CONCAT(COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email), '''s Workspace'),
+    v_workspace_slug
   )
   ON CONFLICT (id) DO NOTHING;
 
-  -- 2. Create personal workspace
-  INSERT INTO public.workspaces (name, workspace_type, description, created_by)
-  VALUES (
-    CONCAT('Personal - ', COALESCE(NEW.raw_user_meta_data->>'name', NEW.email)),
-    'personal',
-    'Personal workspace',
-    NEW.id
-  )
-  RETURNING id INTO personal_ws_id;
-
-  -- 3. Update profile with workspace IDs
-  UPDATE public.profiles
-  SET 
-    personal_workspace_id = personal_ws_id,
-    active_workspace_id = personal_ws_id,
-    active_view_mode = 'personal'
-  WHERE id = NEW.id;
-
-  -- 4. Create membership
-  INSERT INTO public.workspace_members (user_id, workspace_id, workspace_role)
-  VALUES (NEW.id, personal_ws_id, 'owner');
-
-  -- 5. ✨ UPDATE auth.users.raw_user_meta_data with workspace ID
-  -- This ensures auth.getUser() returns active_workspace_id in user_metadata
-  UPDATE auth.users
-  SET raw_user_meta_data = 
-    COALESCE(raw_user_meta_data, '{}'::jsonb) || 
-    jsonb_build_object('active_workspace_id', personal_ws_id::text)
-  WHERE id = NEW.id;
+  -- 2. Grant user access to their own workspace (they are the owner)
+  INSERT INTO public.workspace_access (workspace_owner_id, member_id, role)
+  VALUES (NEW.id, NEW.id, 'owner')
+  ON CONFLICT (workspace_owner_id, member_id) DO NOTHING;
 
   RETURN NEW;
 END;
 $$;
 
-ALTER FUNCTION "public"."handle_new_user_full"() OWNER TO "postgres";
+ALTER FUNCTION "public"."handle_new_user"() OWNER TO "postgres";
+
+-- Update updated_at timestamp
+CREATE OR REPLACE TRIGGER "update_profiles_updated_at"
+  BEFORE UPDATE ON "public"."profiles"
+  FOR EACH ROW
+  EXECUTE FUNCTION "public"."update_updated_at_column"();
+
+CREATE OR REPLACE TRIGGER "update_teams_updated_at"
+  BEFORE UPDATE ON "public"."teams"
+  FOR EACH ROW
+  EXECUTE FUNCTION "public"."update_updated_at_column"();
 
 -- =====================================================
--- SYNC: Keep auth.users.raw_user_meta_data in sync with profiles
--- =====================================================
-
-CREATE OR REPLACE FUNCTION "public"."sync_profile_to_auth_metadata"()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  -- Only sync if values actually changed (prevent infinite recursion)
-  IF (OLD.active_workspace_id IS DISTINCT FROM NEW.active_workspace_id) OR
-     (OLD.full_name IS DISTINCT FROM NEW.full_name) OR
-     (OLD.avatar_url IS DISTINCT FROM NEW.avatar_url) THEN
-    
-    -- Sync to auth.users.raw_user_meta_data
-    UPDATE auth.users
-    SET raw_user_meta_data = 
-      COALESCE(raw_user_meta_data, '{}'::jsonb) || 
-      jsonb_build_object(
-        'active_workspace_id', NEW.active_workspace_id::text,
-        'full_name', NEW.full_name,
-        'avatar_url', NEW.avatar_url
-      )
-    WHERE id = NEW.id
-      -- Only update if value actually changed
-      AND (
-        COALESCE(raw_user_meta_data->>'active_workspace_id', '') != COALESCE(NEW.active_workspace_id::text, '')
-        OR COALESCE(raw_user_meta_data->>'full_name', '') != COALESCE(NEW.full_name, '')
-        OR COALESCE(raw_user_meta_data->>'avatar_url', '') != COALESCE(NEW.avatar_url, '')
-      );
-  END IF;
-
-  RETURN NEW;
-END;
-$$;
-
-ALTER FUNCTION "public"."sync_profile_to_auth_metadata"() OWNER TO "postgres";
-
-CREATE OR REPLACE FUNCTION "public"."sync_auth_metadata_to_profile"()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  new_workspace_id uuid;
-  new_full_name text;
-  new_avatar_url text;
-BEGIN
-  -- Extract values from metadata
-  new_workspace_id := (NEW.raw_user_meta_data->>'active_workspace_id')::uuid;
-  new_full_name := NEW.raw_user_meta_data->>'full_name';
-  new_avatar_url := NEW.raw_user_meta_data->>'avatar_url';
-  
-  -- Only sync if values actually changed (prevent infinite recursion)
-  UPDATE public.profiles
-  SET 
-    active_workspace_id = new_workspace_id,
-    full_name = new_full_name,
-    avatar_url = new_avatar_url,
-    updated_at = now()
-  WHERE id = NEW.id
-    -- Only update if value actually changed
-    AND (
-      COALESCE(active_workspace_id::text, '') != COALESCE(new_workspace_id::text, '')
-      OR COALESCE(full_name, '') != COALESCE(new_full_name, '')
-      OR COALESCE(avatar_url, '') != COALESCE(new_avatar_url, '')
-    );
-
-  RETURN NEW;
-END;
-$$;
-
-ALTER FUNCTION "public"."sync_auth_metadata_to_profile"() OWNER TO "postgres";
-
-CREATE OR REPLACE FUNCTION "public"."delete_auth_user_on_profile_delete"()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  -- When profile is deleted, also delete the auth.users record
-  DELETE FROM auth.users WHERE id = OLD.id;
-  RETURN OLD;
-END;
-$$;
-
-ALTER FUNCTION "public"."delete_auth_user_on_profile_delete"() OWNER TO "postgres";
-
--- =====================================================
--- ROW LEVEL SECURITY (Enable first, policies after)
+-- ROW LEVEL SECURITY
 -- =====================================================
 
 ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "public"."workspaces" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "public"."workspace_members" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."workspace_access" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."teams" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "public"."team_memberships" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."team_members" ENABLE ROW LEVEL SECURITY;
 
--- Create policies AFTER all tables are set up
-CREATE POLICY "profiles_select_self" ON "public"."profiles"
-  FOR SELECT USING (auth.uid() = id);
+-- PROFILES: Users can view their own profile and profiles of workspaces they have access to
+CREATE POLICY "profiles_select" ON "public"."profiles"
+  FOR SELECT USING (
+    auth.uid() = id OR  -- Own profile
+    id IN (  -- Profiles of workspaces I have access to
+      SELECT workspace_owner_id 
+      FROM public.workspace_access 
+      WHERE member_id = auth.uid()
+    )
+  );
 
 CREATE POLICY "profiles_update_self" ON "public"."profiles"
   FOR UPDATE USING (auth.uid() = id);
@@ -482,57 +351,149 @@ CREATE POLICY "profiles_update_self" ON "public"."profiles"
 CREATE POLICY "profiles_delete_self" ON "public"."profiles"
   FOR DELETE USING (auth.uid() = id);
 
-CREATE POLICY "workspaces_select_member" ON "public"."workspaces"
+-- WORKSPACE ACCESS: Can see memberships for workspaces they belong to
+CREATE POLICY "workspace_access_select" ON "public"."workspace_access"
   FOR SELECT USING (
-    id IN (SELECT workspace_id FROM public.workspace_members WHERE user_id = auth.uid())
-  );
-
-CREATE POLICY "workspace_members_select_own" ON "public"."workspace_members"
-  FOR SELECT USING (user_id = auth.uid());
-
-CREATE POLICY "teams_select_workspace_member" ON "public"."teams"
-  FOR SELECT USING (
-    workspace_id IN (SELECT workspace_id FROM public.workspace_members WHERE user_id = auth.uid())
-  );
-
-CREATE POLICY "team_memberships_select" ON "public"."team_memberships"
-  FOR SELECT USING (
-    user_id = auth.uid() OR
-    team_id IN (
-      SELECT t.id FROM public.teams t
-      JOIN public.workspace_members wm ON wm.workspace_id = t.workspace_id
-      WHERE wm.user_id = auth.uid()
+    member_id = auth.uid() OR  -- Own memberships
+    workspace_owner_id IN (  -- Memberships of workspaces I own/admin
+      SELECT workspace_owner_id 
+      FROM public.workspace_access 
+      WHERE member_id = auth.uid() 
+        AND role IN ('owner', 'admin')
     )
   );
 
-CREATE POLICY "team_memberships_update_self" ON "public"."team_memberships"
-  FOR UPDATE USING (user_id = auth.uid());
+-- Owners/admins can insert new members
+CREATE POLICY "workspace_access_insert" ON "public"."workspace_access"
+  FOR INSERT WITH CHECK (
+    workspace_owner_id IN (
+      SELECT workspace_owner_id 
+      FROM public.workspace_access 
+      WHERE member_id = auth.uid() 
+        AND role IN ('owner', 'admin')
+    )
+  );
 
--- Attach triggers (AFTER all tables + policies are ready)
+-- Owners/admins can update/delete members
+CREATE POLICY "workspace_access_update" ON "public"."workspace_access"
+  FOR UPDATE USING (
+    workspace_owner_id IN (
+      SELECT workspace_owner_id 
+      FROM public.workspace_access 
+      WHERE member_id = auth.uid() 
+        AND role IN ('owner', 'admin')
+    )
+  );
 
--- When new user signs up → create profile + workspace
+CREATE POLICY "workspace_access_delete" ON "public"."workspace_access"
+  FOR DELETE USING (
+    member_id = auth.uid() OR  -- Can leave workspace
+    workspace_owner_id IN (  -- Owners/admins can remove members
+      SELECT workspace_owner_id 
+      FROM public.workspace_access 
+      WHERE member_id = auth.uid() 
+        AND role IN ('owner', 'admin')
+    )
+  );
+
+-- TEAMS: Can see teams in workspaces I have access to
+CREATE POLICY "teams_select" ON "public"."teams"
+  FOR SELECT USING (
+    workspace_owner_id IN (
+      SELECT workspace_owner_id 
+      FROM public.workspace_access 
+      WHERE member_id = auth.uid()
+    )
+  );
+
+-- Owners/admins can manage teams
+CREATE POLICY "teams_insert" ON "public"."teams"
+  FOR INSERT WITH CHECK (
+    workspace_owner_id IN (
+      SELECT workspace_owner_id 
+      FROM public.workspace_access 
+      WHERE member_id = auth.uid() 
+        AND role IN ('owner', 'admin')
+    )
+  );
+
+CREATE POLICY "teams_update" ON "public"."teams"
+  FOR UPDATE USING (
+    workspace_owner_id IN (
+      SELECT workspace_owner_id 
+      FROM public.workspace_access 
+      WHERE member_id = auth.uid() 
+        AND role IN ('owner', 'admin')
+    )
+  );
+
+CREATE POLICY "teams_delete" ON "public"."teams"
+  FOR DELETE USING (
+    workspace_owner_id IN (
+      SELECT workspace_owner_id 
+      FROM public.workspace_access 
+      WHERE member_id = auth.uid() 
+        AND role IN ('owner', 'admin')
+    )
+  );
+
+-- TEAM MEMBERS: Can see team members if you're in the workspace
+CREATE POLICY "team_members_select" ON "public"."team_members"
+  FOR SELECT USING (
+    user_id = auth.uid() OR  -- Own membership
+    team_id IN (
+      SELECT t.id 
+      FROM public.teams t
+      JOIN public.workspace_access wa ON wa.workspace_owner_id = t.workspace_owner_id
+      WHERE wa.member_id = auth.uid()
+    )
+  );
+
+-- Team managers/commanders can manage team members
+CREATE POLICY "team_members_insert" ON "public"."team_members"
+  FOR INSERT WITH CHECK (
+    team_id IN (
+      SELECT tm.team_id
+      FROM public.team_members tm
+      WHERE tm.user_id = auth.uid() 
+        AND tm.role IN ('manager', 'commander')
+    ) OR
+    team_id IN (  -- Workspace admins can also add
+      SELECT t.id
+      FROM public.teams t
+      JOIN public.workspace_access wa ON wa.workspace_owner_id = t.workspace_owner_id
+      WHERE wa.member_id = auth.uid() 
+        AND wa.role IN ('owner', 'admin')
+    )
+  );
+
+CREATE POLICY "team_members_update" ON "public"."team_members"
+  FOR UPDATE USING (
+    user_id = auth.uid() OR  -- Can update own membership
+    team_id IN (
+      SELECT tm.team_id
+      FROM public.team_members tm
+      WHERE tm.user_id = auth.uid() 
+        AND tm.role IN ('manager', 'commander')
+    )
+  );
+
+CREATE POLICY "team_members_delete" ON "public"."team_members"
+  FOR DELETE USING (
+    user_id = auth.uid() OR  -- Can leave team
+    team_id IN (
+      SELECT tm.team_id
+      FROM public.team_members tm
+      WHERE tm.user_id = auth.uid() 
+        AND tm.role IN ('manager', 'commander')
+    )
+  );
+
+-- Attach trigger: when new user signs up → create profile + workspace access
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW
-  EXECUTE FUNCTION public.handle_new_user_full();
-
--- When auth.users.raw_user_meta_data is updated → sync to profiles
-CREATE TRIGGER on_auth_metadata_updated
-  AFTER UPDATE OF raw_user_meta_data ON auth.users
-  FOR EACH ROW
-  EXECUTE FUNCTION public.sync_auth_metadata_to_profile();
-
--- When profiles table is updated → sync back to auth.users
-CREATE TRIGGER on_profile_updated
-  AFTER UPDATE OF active_workspace_id, full_name, avatar_url ON public.profiles
-  FOR EACH ROW
-  EXECUTE FUNCTION public.sync_profile_to_auth_metadata();
-
--- When profile is deleted → delete auth.users record
-CREATE TRIGGER on_profile_deleted
-  BEFORE DELETE ON public.profiles
-  FOR EACH ROW
-  EXECUTE FUNCTION public.delete_auth_user_on_profile_delete();
+  EXECUTE FUNCTION public.handle_new_user();
 
 -- =====================================================
 -- GRANTS
@@ -543,6 +504,7 @@ GRANT USAGE ON SCHEMA "public" TO "anon";
 GRANT USAGE ON SCHEMA "public" TO "authenticated";
 GRANT USAGE ON SCHEMA "public" TO "service_role";
 
+-- Function grants
 GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "anon";
 GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "service_role";
@@ -567,42 +529,28 @@ GRANT ALL ON FUNCTION "public"."get_team_members"("p_team_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_team_members"("p_team_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_team_members"("p_team_id" "uuid") TO "service_role";
 
-GRANT ALL ON FUNCTION "public"."handle_new_user_full"() TO "anon";
-GRANT ALL ON FUNCTION "public"."handle_new_user_full"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."handle_new_user_full"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "anon";
+GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "service_role";
 
-GRANT ALL ON FUNCTION "public"."sync_profile_to_auth_metadata"() TO "anon";
-GRANT ALL ON FUNCTION "public"."sync_profile_to_auth_metadata"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."sync_profile_to_auth_metadata"() TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."sync_auth_metadata_to_profile"() TO "anon";
-GRANT ALL ON FUNCTION "public"."sync_auth_metadata_to_profile"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."sync_auth_metadata_to_profile"() TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."delete_auth_user_on_profile_delete"() TO "anon";
-GRANT ALL ON FUNCTION "public"."delete_auth_user_on_profile_delete"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."delete_auth_user_on_profile_delete"() TO "service_role";
-
+-- Table grants
 GRANT ALL ON TABLE "public"."profiles" TO "anon";
 GRANT ALL ON TABLE "public"."profiles" TO "authenticated";
 GRANT ALL ON TABLE "public"."profiles" TO "service_role";
 
-GRANT ALL ON TABLE "public"."workspaces" TO "anon";
-GRANT ALL ON TABLE "public"."workspaces" TO "authenticated";
-GRANT ALL ON TABLE "public"."workspaces" TO "service_role";
-
-GRANT ALL ON TABLE "public"."workspace_members" TO "anon";
-GRANT ALL ON TABLE "public"."workspace_members" TO "authenticated";
-GRANT ALL ON TABLE "public"."workspace_members" TO "service_role";
+GRANT ALL ON TABLE "public"."workspace_access" TO "anon";
+GRANT ALL ON TABLE "public"."workspace_access" TO "authenticated";
+GRANT ALL ON TABLE "public"."workspace_access" TO "service_role";
 
 GRANT ALL ON TABLE "public"."teams" TO "anon";
 GRANT ALL ON TABLE "public"."teams" TO "authenticated";
 GRANT ALL ON TABLE "public"."teams" TO "service_role";
 
-GRANT ALL ON TABLE "public"."team_memberships" TO "anon";
-GRANT ALL ON TABLE "public"."team_memberships" TO "authenticated";
-GRANT ALL ON TABLE "public"."team_memberships" TO "service_role";
+GRANT ALL ON TABLE "public"."team_members" TO "anon";
+GRANT ALL ON TABLE "public"."team_members" TO "authenticated";
+GRANT ALL ON TABLE "public"."team_members" TO "service_role";
 
+-- Default privileges
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "postgres";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "authenticated";

@@ -1,5 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import type { Workspace } from "@/types/workspace";
 import { useMemo } from "react";
 
 export interface AppContext {
@@ -9,25 +10,21 @@ export interface AppContext {
   fullName: string | null;
   avatarUrl: string | null;
   
-  // Workspace
-  workspaceId: string | null;
-  activeWorkspace: {
-    id: string;
-    name: string;
-    workspace_type: "personal" | "organization";
-    description: string | null;
-  } | null;
+  // Workspace (user IS a workspace)
+  myWorkspaceId: string | null;  // Always my profile.id
+  activeWorkspaceId: string | null;  // Currently viewing workspace (could be mine or someone else's)
+  activeWorkspace: Workspace | null;
   
   // Context type
-  isPersonal: boolean;
-  isOrganization: boolean;
+  isMyWorkspace: boolean;  // Viewing my own workspace
+  isOtherWorkspace: boolean;  // Viewing someone else's workspace
   
-  // All workspaces
-  workspaces: any[];
+  // All accessible workspaces
+  workspaces: Workspace[];
   
   // Actions
   switchWorkspace: (workspaceId: string | null) => Promise<void>;
-  switchToPersonal: () => Promise<void>;
+  switchToMyWorkspace: () => Promise<void>;
   
   // Loading states
   loading: boolean;
@@ -40,14 +37,23 @@ export interface AppContext {
  * Use this hook in ALL components to get user and workspace context.
  * NEVER access user or workspace data directly from other sources.
  * 
+ * Simplified Model: User = Workspace
+ * - Every user's profile IS their workspace
+ * - Can view own workspace or other workspaces they have access to
+ * 
  * Examples:
  * ```
- * const { userId, workspaceId, activeWorkspace, isPersonal } = useAppContext()
+ * const { userId, myWorkspaceId, activeWorkspaceId, isMyWorkspace } = useAppContext()
  * ```
  */
 export function useAppContext(): AppContext {
-  const { user, loading: authLoading, switchWorkspace, switchToPersonal } = useAuth();
-  const { workspaces, getActiveWorkspace, loading: workspacesLoading } = useWorkspaceStore();
+  const { user, loading: authLoading } = useAuth();
+  const { 
+    workspaces, 
+    activeWorkspaceId, 
+    setActiveWorkspace,
+    loading: workspacesLoading 
+  } = useWorkspaceStore();
 
   // Calculate derived values with memoization
   const context = useMemo<AppContext>(() => {
@@ -60,19 +66,20 @@ export function useAppContext(): AppContext {
         avatarUrl: null,
         
         // Workspace
-        workspaceId: null,
+        myWorkspaceId: null,
+        activeWorkspaceId: null,
         activeWorkspace: null,
         
         // Context type
-        isPersonal: true,
-        isOrganization: false,
+        isMyWorkspace: true,
+        isOtherWorkspace: false,
         
         // All workspaces
         workspaces: [],
         
         // Actions
         switchWorkspace: async () => {},
-        switchToPersonal: async () => {},
+        switchToMyWorkspace: async () => {},
         
         // Loading
         loading: authLoading,
@@ -80,18 +87,23 @@ export function useAppContext(): AppContext {
       };
     }
 
-    // ✅ SINGLE SOURCE OF TRUTH: user.user_metadata
-    const activeWorkspaceId = user.user_metadata?.active_workspace_id;
-    const activeWorkspace = getActiveWorkspace(activeWorkspaceId);
+    // In simplified model: user.id IS their workspace ID
+    const myWorkspaceId = user.id;
     
-    // ✅ Check workspace TYPE, not ID!
-    const isPersonal = !activeWorkspace || activeWorkspace.workspace_type === "personal";
-    const isOrganization = !!activeWorkspace && activeWorkspace.workspace_type === "organization";
+    // Active workspace could be mine or someone else's
+    const currentActiveId = activeWorkspaceId || myWorkspaceId;
+    const activeWorkspace = workspaces.find(w => w.id === currentActiveId) || null;
     
-    console.log('🔍 useAppContext - activeWorkspaceId:', activeWorkspaceId);
-    console.log('🔍 useAppContext - activeWorkspace:', activeWorkspace);
-    console.log('🔍 useAppContext - isPersonal:', isPersonal);
-    console.log('🔍 useAppContext - isOrganization:', isOrganization);
+    // Check if viewing my workspace
+    const isMyWorkspace = currentActiveId === myWorkspaceId;
+    const isOtherWorkspace = !isMyWorkspace;
+    
+    console.log('🔍 useAppContext:');
+    console.log('  - myWorkspaceId:', myWorkspaceId);
+    console.log('  - activeWorkspaceId:', currentActiveId);
+    console.log('  - activeWorkspace:', activeWorkspace?.workspace_name);
+    console.log('  - isMyWorkspace:', isMyWorkspace);
+    console.log('  - workspaces count:', workspaces.length);
 
     return {
       // User
@@ -101,26 +113,37 @@ export function useAppContext(): AppContext {
       avatarUrl: user.user_metadata?.avatar_url ?? null,
       
       // Workspace
-      workspaceId: isOrganization ? activeWorkspaceId ?? null : null,  // null for personal
+      myWorkspaceId,
+      activeWorkspaceId: currentActiveId,
       activeWorkspace,
       
       // Context type
-      isPersonal,
-      isOrganization,
+      isMyWorkspace,
+      isOtherWorkspace,
       
       // All workspaces
       workspaces,
       
       // Actions
-      switchWorkspace,
-      switchToPersonal,
+      switchWorkspace: async (workspaceId: string | null) => {
+        setActiveWorkspace(workspaceId || myWorkspaceId);
+      },
+      switchToMyWorkspace: async () => {
+        setActiveWorkspace(myWorkspaceId);
+      },
       
       // Loading
       loading: authLoading || workspacesLoading,
       isAuthenticated: true,
     };
-  }, [user, workspaces, authLoading, workspacesLoading, getActiveWorkspace, switchWorkspace, switchToPersonal]);
+  }, [
+    user,
+    workspaces,
+    activeWorkspaceId,
+    authLoading,
+    workspacesLoading,
+    setActiveWorkspace
+  ]);
 
   return context;
 }
-

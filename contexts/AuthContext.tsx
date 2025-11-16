@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.replace("/(protected)")
     
     // Load workspaces in background (non-blocking)
-    useWorkspaceStore.getState().loadWorkspaces(session.user.id).catch(err => 
+    useWorkspaceStore.getState().loadWorkspaces().catch(err => 
       console.error("Background workspace load error:", err)
     )
   }
@@ -69,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.replace("/(protected)")
     
     // Load workspaces in background (non-blocking)
-    useWorkspaceStore.getState().loadWorkspaces(session.user.id).catch(err => 
+    useWorkspaceStore.getState().loadWorkspaces().catch(err => 
       console.error("Background workspace load error:", err)
     )
   }
@@ -155,7 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Load workspaces in background (non-blocking)
       if (session?.user) {
-        useWorkspaceStore.getState().loadWorkspaces(session.user.id).catch((err: Error) => 
+        useWorkspaceStore.getState().loadWorkspaces().catch((err: Error) => 
           console.error("Background workspace load error:", err)
         )
       }
@@ -183,17 +183,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // So it always has the latest user state
         if (!user) return null
         
-        const activeWorkspaceId = user.user_metadata?.active_workspace_id
+        const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
         
-        // Get workspace to check type
-        const activeWorkspace = useWorkspaceStore.getState().getActiveWorkspace(activeWorkspaceId)
-        
-        // ✅ Check workspace TYPE, not ID
-        const isPersonal = !activeWorkspace || activeWorkspace.workspace_type === "personal"
+        // ✅ In new model: user.id is MY workspace
+        // activeWorkspaceId is the workspace I'm currently viewing (mine or someone else's)
+        const isMyWorkspace = activeWorkspaceId === user.id || !activeWorkspaceId
         
         return {
           userId: user.id,
-          workspaceId: isPersonal ? null : activeWorkspaceId ?? null
+          workspaceId: isMyWorkspace ? null : activeWorkspaceId  // null = my workspace, else = viewing someone else's
         }
       }
     )
@@ -211,26 +209,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         () => {
           if (!user) return null
           
-          const activeWorkspaceId = user.user_metadata?.active_workspace_id
+          const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
           
-          // Get workspace to check type
-          const activeWorkspace = useWorkspaceStore.getState().getActiveWorkspace(activeWorkspaceId)
+          // ✅ In new model: user.id is MY workspace
+          const isMyWorkspace = activeWorkspaceId === user.id || !activeWorkspaceId
           
-          // ✅ Check workspace TYPE, not ID
-          const isPersonal = !activeWorkspace || activeWorkspace.workspace_type === "personal"
-          
+          console.log("🔍 AuthClient context - myWorkspaceId:", user.id)
           console.log("🔍 AuthClient context - activeWorkspaceId:", activeWorkspaceId)
-          console.log("🔍 AuthClient context - workspace_type:", activeWorkspace?.workspace_type)
-          console.log("🔍 AuthClient context - returning workspaceId:", isPersonal ? null : activeWorkspaceId)
+          console.log("🔍 AuthClient context - returning workspaceId:", isMyWorkspace ? null : activeWorkspaceId)
           
           return {
             userId: user.id,
-            workspaceId: isPersonal ? null : activeWorkspaceId ?? null
+            workspaceId: isMyWorkspace ? null : activeWorkspaceId
           }
         }
       )
     }
-  }, [user?.user_metadata?.active_workspace_id]) // Only when workspace changes
+  }, [user?.id, useWorkspaceStore.getState().activeWorkspaceId]) // When user or active workspace changes
 
   const signUp = async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email, password })

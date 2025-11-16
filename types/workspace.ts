@@ -1,22 +1,30 @@
-export type WorkspaceType = "personal" | "organization";
-
-export interface Workspace {
-  id: string;
-  name: string;
-  workspace_type: WorkspaceType;
-  description: string | null;
-  created_by: string;            // profile.id
-  created_at: string;
-  updated_at: string;
-}
+// =====================================================
+// SIMPLIFIED WORKSPACE TYPES
+// User = Workspace (no separate workspace table)
+// =====================================================
 
 export type WorkspaceRole = "owner" | "admin" | "member";
 
-export interface WorkspaceMember {
+// Profile IS the workspace
+export interface Workspace {
+  id: string;                   // user's profile.id
+  email: string;
+  full_name?: string | null;
+  avatar_url?: string | null;
+  workspace_name?: string | null;
+  workspace_slug?: string | null;
+  created_at: string;
+  updated_at: string;
+  
+  // If viewing someone else's workspace, include access info
+  access_role?: WorkspaceRole;
+}
+
+export interface WorkspaceAccess {
   id: string;
-  user_id: string;
-  workspace_id: string;
-  workspace_role: WorkspaceRole;
+  workspace_owner_id: string;  // profile.id of workspace owner
+  member_id: string;            // user who has access
+  role: WorkspaceRole;
   joined_at: string;
 }
 
@@ -24,11 +32,10 @@ export type TeamType = "field" | "back_office";
 
 export interface Team {
   id: string;
-  workspace_id: string;
+  workspace_owner_id: string;  // profile.id (workspace owner)
   name: string;
-  team_type: TeamType;
-  description: string | null;
-  created_by: string;
+  team_type?: TeamType | null;
+  description?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -41,11 +48,27 @@ export type TeamRole =
   | "instructor"
   | "staff";
 
-export interface TeamMembership {
-  id: string;
-  user_id: string;
+export interface TeamMember {
   team_id: string;
+  user_id: string;
   role: TeamRole;
-  is_active: boolean;
   joined_at: string;
+}
+
+// Enriched types
+export interface WorkspaceWithTeams extends Workspace {
+  teams?: Team[];
+  member_count?: number;
+}
+
+export interface TeamWithMembers extends Team {
+  members?: (TeamMember & {
+    profile?: {
+      id: string;
+      email: string;
+      full_name?: string | null;
+      avatar_url?: string | null;
+    };
+  })[];
+  member_count?: number;
 }

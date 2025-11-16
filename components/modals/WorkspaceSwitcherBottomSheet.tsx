@@ -1,213 +1,293 @@
 import { useColors } from "@/hooks/ui/useColors";
 import { useAppContext } from "@/hooks/useAppContext";
+import type { Workspace } from "@/types/workspace";
 import { Ionicons } from "@expo/vector-icons";
-import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from "@gorhom/bottom-sheet";
-import { forwardRef, useImperativeHandle, useMemo, useRef } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import BottomSheet, { BottomSheetBackdrop, BottomSheetFlatList, BottomSheetView } from "@gorhom/bottom-sheet";
+import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef } from "react";
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export interface WorkspaceSwitcherRef {
   open: () => void;
   close: () => void;
 }
 
-export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef>((_, ref) => {
-  const colors = useColors();
-  // ✨ SINGLE SOURCE OF TRUTH
-  const { workspaceId, workspaces, switchWorkspace } = useAppContext();
-  const sheetRef = useRef<BottomSheet>(null);
+interface WorkspaceSwitcherBottomSheetProps {
+  onSettingsPress?: () => void;
+}
 
-  useImperativeHandle(ref, () => ({
-    open: () => sheetRef.current?.expand(),
-    close: () => sheetRef.current?.close(),
-  }));
+/**
+ * SIMPLIFIED WORKSPACE SWITCHER
+ * 
+ * Model: User = Workspace
+ * - Shows user's own workspace
+ * - Shows other workspaces they have access to
+ * - Each workspace is a profile (user)
+ */
+export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, WorkspaceSwitcherBottomSheetProps>(
+  (props, ref) => {
+    const colors = useColors();
+    const bottomSheetRef = useRef<BottomSheet>(null);
+    
+    const { 
+      myWorkspaceId, 
+      activeWorkspaceId, 
+      workspaces,
+      switchWorkspace,
+      switchToMyWorkspace,
+      loading 
+    } = useAppContext();
 
-  const snapPoints = useMemo(() => ["45%", "70%"], []);
+    useImperativeHandle(ref, () => ({
+      open: () => bottomSheetRef.current?.expand(),
+      close: () => bottomSheetRef.current?.close(),
+    }));
 
-  const handleWorkspacePress = (workspaceId: string) => {
-    switchWorkspace(workspaceId);
-    sheetRef.current?.close();
-  };
+    const snapPoints = useMemo(() => ['70%'], []);
 
-  const getWorkspaceIcon = (type: string) => {
-    return type === "personal" ? "person-circle-outline" : "business-outline";
-  };
+    // Group workspaces: My workspace first, then others
+    const groupedWorkspaces = useMemo(() => {
+      const myWorkspace = workspaces.find(w => w.id === myWorkspaceId);
+      const otherWorkspaces = workspaces.filter(w => w.id !== myWorkspaceId);
 
-  return (
-    <BottomSheet
-      ref={sheetRef}
-      index={-1}
-      snapPoints={snapPoints}
-      enablePanDownToClose={true}
-      backdropComponent={(props) => (
-        <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} />
-      )}
-      backgroundStyle={{ backgroundColor: colors.background }}
-      handleIndicatorStyle={{ backgroundColor: colors.textMuted }}
-    >
-      <BottomSheetScrollView style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>
-            Workspaces
-          </Text>
-        </View>
+      return {
+        myWorkspace: myWorkspace ? [myWorkspace] : [],
+        otherWorkspaces
+      };
+    }, [workspaces, myWorkspaceId]);
 
-        {/* Workspace List */}
-        <View style={styles.workspaceList}>
-          <View style={[styles.listGroup, { backgroundColor: colors.card }]}>
-            {workspaces.map((ws, index) => {
-              // ✨ Compare with SINGLE SOURCE OF TRUTH
-              const isActive = ws.id === workspaceId;
-              const isPersonal = ws.workspace_type === "personal";
-              const isLast = index === workspaces.length - 1;
+    const handleSelectWorkspace = useCallback(async (workspace: Workspace) => {
+      try {
+        await switchWorkspace(workspace.id);
+        bottomSheetRef.current?.close();
+      } catch (error: any) {
+        console.error("Failed to switch workspace:", error);
+        Alert.alert("Error", "Failed to switch workspace");
+      }
+    }, [switchWorkspace]);
 
-              return (
-                <View key={ws.id}>
-                  <TouchableOpacity
-                    onPress={() => handleWorkspacePress(ws.id)}
-                    activeOpacity={0.6}
-                    style={styles.workspaceRow}
-                  >
-                    {/* Icon */}
-                    <View
-                      style={[
-                        styles.iconContainer,
-                        {
-                          backgroundColor: isPersonal ? colors.accent : colors.green,
-                        },
-                      ]}
-                    >
+    const handleSelectMyWorkspace = useCallback(async () => {
+      try {
+        await switchToMyWorkspace();
+        bottomSheetRef.current?.close();
+      } catch (error: any) {
+        console.error("Failed to switch to my workspace:", error);
+        Alert.alert("Error", "Failed to switch to my workspace");
+      }
+    }, [switchToMyWorkspace]);
+
+    const renderBackdrop = useCallback(
+      (props: any) => (
+        <BottomSheetBackdrop
+          {...props}
+          disappearsOnIndex={-1}
+          appearsOnIndex={0}
+        />
+      ),
+      []
+    );
+
+    const renderWorkspaceItem = useCallback(({ item }: { item: Workspace }) => {
+      const isActive = item.id === activeWorkspaceId;
+      const isMyWorkspace = item.id === myWorkspaceId;
+
+      return (
+        <TouchableOpacity
+          style={[styles.workspaceItem, isActive && styles.activeItem]}
+          onPress={() => handleSelectWorkspace(item)}
+        >
+          <View style={styles.workspaceInfo}>
+            <View style={[styles.iconContainer, { backgroundColor: colors.card }]}>
+              <Ionicons
+                name={isMyWorkspace ? "person" : "people"}
+                size={24}
+                color={isActive ? colors.primary : colors.textMuted}
+              />
+            </View>
+            <View style={styles.textContainer}>
+              <Text style={[styles.workspaceName, { color: isActive ? colors.primary : colors.text }]}>
+                {item.workspace_name || item.full_name || item.email}
+              </Text>
+              <Text style={[styles.workspaceType, { color: colors.textMuted }]}>
+                {isMyWorkspace ? "My Workspace" : `${item.access_role || 'member'}`}
+              </Text>
+            </View>
+          </View>
+          {isActive && (
+            <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+          )}
+        </TouchableOpacity>
+      );
+    }, [activeWorkspaceId, myWorkspaceId, colors, handleSelectWorkspace]);
+
+    return (
+      <BottomSheet
+        ref={bottomSheetRef}
+        index={-1}
+        snapPoints={snapPoints}
+        enablePanDownToClose={true}
+        backdropComponent={renderBackdrop}
+        backgroundStyle={{ backgroundColor: colors.background }}
+        handleIndicatorStyle={{ backgroundColor: colors.textMuted }}
+      >
+        <BottomSheetView style={styles.container}>
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: colors.text }]}>Switch Workspace</Text>
+          </View>
+
+          {/* My Workspace */}
+          {groupedWorkspaces.myWorkspace.length > 0 && (
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>My Workspace</Text>
+              {groupedWorkspaces.myWorkspace.map((workspace) => (
+                <TouchableOpacity
+                  key={workspace.id}
+                  style={[
+                    styles.workspaceItem,
+                    workspace.id === activeWorkspaceId && { backgroundColor: colors.primary + '15' },
+                  ]}
+                  onPress={() => handleSelectWorkspace(workspace)}
+                >
+                  <View style={styles.workspaceInfo}>
+                    <View style={[styles.iconContainer, { backgroundColor: colors.card }]}>
                       <Ionicons
-                        name={getWorkspaceIcon(ws.workspace_type) as any}
-                        size={18}
-                        color="#FFF"
+                        name="person"
+                        size={24}
+                        color={workspace.id === activeWorkspaceId ? colors.primary : colors.textMuted}
                       />
                     </View>
-
-                    {/* Content */}
-                    <View style={styles.content}>
+                    <View style={styles.textContainer}>
                       <Text
                         style={[
                           styles.workspaceName,
-                          {
-                            color: colors.text,
-                            fontWeight: isActive ? "600" : "400",
-                          },
+                          { color: workspace.id === activeWorkspaceId ? colors.primary : colors.text }
                         ]}
-                        numberOfLines={1}
                       >
-                        {isPersonal ? 'Personal' : ws.name}
+                        {workspace.workspace_name || workspace.full_name || workspace.email}
                       </Text>
+                      <Text style={[styles.workspaceType, { color: colors.textMuted }]}>Owner</Text>
                     </View>
-
-                    {/* Active Indicator */}
-                    {isActive && (
-                      <Ionicons
-                        name="checkmark"
-                        size={20}
-                        color={colors.accent}
-                        style={styles.checkmark}
-                      />
-                    )}
-                  </TouchableOpacity>
-
-                  {/* Separator */}
-                  {!isLast && (
-                    <View
-                      style={[
-                        styles.separator,
-                        { backgroundColor: colors.border },
-                      ]}
-                    />
+                  </View>
+                  {workspace.id === activeWorkspaceId && (
+                    <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
                   )}
-                </View>
-              );
-            })}
-          </View>
-        </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
-        {/* Empty State */}
-        {workspaces.length === 0 && (
-          <View style={styles.emptyState}>
-            <Ionicons name="briefcase-outline" size={48} color={colors.textMuted} />
-            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-              No workspaces available
-            </Text>
-          </View>
-        )}
+          {/* Other Workspaces */}
+          {groupedWorkspaces.otherWorkspaces.length > 0 && (
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
+                Other Workspaces ({groupedWorkspaces.otherWorkspaces.length})
+              </Text>
+              <BottomSheetFlatList
+                data={groupedWorkspaces.otherWorkspaces}
+                renderItem={renderWorkspaceItem}
+                keyExtractor={(item: Workspace) => item.id}
+                style={styles.list}
+              />
+            </View>
+          )}
 
-        {/* Bottom padding for scroll */}
-        <View style={styles.bottomPadding} />
-      </BottomSheetScrollView>
-    </BottomSheet>
-  );
-});
+          {/* Empty state */}
+          {groupedWorkspaces.myWorkspace.length === 0 && groupedWorkspaces.otherWorkspaces.length === 0 && (
+            <View style={styles.emptyState}>
+              <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+                {loading ? "Loading workspaces..." : "No workspaces available"}
+              </Text>
+            </View>
+          )}
+        </BottomSheetView>
+      </BottomSheet>
+    );
+  }
+);
 
-WorkspaceSwitcherBottomSheet.displayName = "WorkspaceSwitcherBottomSheet";
+WorkspaceSwitcherBottomSheet.displayName = 'WorkspaceSwitcherBottomSheet';
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "transparent",
   },
   header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
   },
   title: {
-    fontSize: 28,
-    fontWeight: "700",
-    letterSpacing: 0.3,
+    fontSize: 20,
+    fontWeight: "bold",
   },
-  workspaceList: {
-    paddingHorizontal: 16,
+  closeButton: {
+    padding: 4,
   },
-  listGroup: {
-    borderRadius: 12,
-    overflow: "hidden",
+  section: {
+    paddingVertical: 12,
   },
-  workspaceRow: {
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#666",
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    textTransform: "uppercase",
+  },
+  list: {
+    flexGrow: 0,
+  },
+  workspaceItem: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
     paddingVertical: 12,
-    paddingHorizontal: 16,
-    minHeight: 56,
+    backgroundColor: "transparent",
+  },
+  activeItem: {
+    backgroundColor: "rgba(0, 122, 255, 0.1)",
+  },
+  workspaceInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
   },
   iconContainer: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.05)",
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0,
+    marginRight: 12,
   },
-  content: {
+  textContainer: {
     flex: 1,
-    justifyContent: "center",
-    marginLeft: 16,
   },
   workspaceName: {
-    fontSize: 17,
-    lineHeight: 22,
+    fontSize: 16,
+    fontWeight: "500",
+    marginBottom: 2,
   },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    marginLeft: 60,
+  activeText: {
+    color: "#007AFF",
+    fontWeight: "600",
   },
-  checkmark: {
-    marginLeft: 8,
+  workspaceType: {
+    fontSize: 13,
+    color: "#666",
   },
   emptyState: {
+    padding: 40,
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 48,
   },
   emptyText: {
-    fontSize: 16,
-    marginTop: 12,
-  },
-  bottomPadding: {
-    height: 32,
+    fontSize: 14,
+    color: "#999",
   },
 });
-

@@ -236,3 +236,54 @@ export interface LoadoutWithDetails extends UserLoadout {
   sight?: Sight & { model?: SightModel };
 }
 
+// =====================================================
+// WORKSPACE TYPES (Simplified Schema)
+// =====================================================
+
+export interface Profile {
+  id: string;
+  email: string;
+  full_name?: string | null;
+  avatar_url?: string | null;
+  workspace_name?: string | null;
+  workspace_slug?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkspaceAccess {
+  id: string;
+  workspace_owner_id: string;  // profile.id of workspace owner
+  member_id: string;            // user who has access
+  role: 'owner' | 'admin' | 'member';
+  joined_at: string;
+}
+
+export interface Team {
+  id: string;
+  workspace_owner_id: string;  // profile.id
+  name: string;
+  team_type?: 'field' | 'back_office' | null;
+  description?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TeamMember {
+  team_id: string;
+  user_id: string;
+  role: 'sniper' | 'pistol' | 'manager' | 'commander' | 'instructor' | 'staff';
+  joined_at: string;
+}
+
+// Enriched types
+export interface WorkspaceWithOwner extends Profile {
+  // The profile IS the workspace
+  access_role?: 'owner' | 'admin' | 'member';
+}
+
+export interface TeamWithMembers extends Team {
+  members?: (TeamMember & { profile?: Profile })[];
+  member_count?: number;
+}
+
