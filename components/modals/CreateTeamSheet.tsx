@@ -2,8 +2,9 @@ import { useColors } from "@/hooks/ui/useColors";
 import { useAppContext } from "@/hooks/useAppContext";
 import { createTeam } from "@/services/workspaceService";
 import { Ionicons } from "@expo/vector-icons";
+import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import { forwardRef, useState } from "react";
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { BaseBottomSheet, type BaseBottomSheetRef } from "./BaseBottomSheet";
 
 interface CreateTeamSheetProps {
@@ -59,10 +60,10 @@ export const CreateTeamSheet = forwardRef<BaseBottomSheetRef, CreateTeamSheetPro
     };
 
     return (
-      <BaseBottomSheet ref={ref} snapPoints={['90%']} backdropOpacity={0.6}>
+      <BaseBottomSheet ref={ref} snapPoints={['75%']} backdropOpacity={0.6}>
         <View style={styles.header}>
           <View style={[styles.icon, { backgroundColor: colors.primary + '15' }]}>
-            <Ionicons name="people" size={32} color={colors.primary} />
+            <Ionicons name="people" size={24} color={colors.primary} />
           </View>
           <Text style={[styles.title, { color: colors.text }]}>
             Create Team
@@ -76,7 +77,7 @@ export const CreateTeamSheet = forwardRef<BaseBottomSheetRef, CreateTeamSheetPro
         <View style={styles.inputContainer}>
           <Text style={[styles.inputLabel, { color: colors.text }]}>Team Name</Text>
           <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.card }]}>
-            <TextInput
+            <BottomSheetTextInput
               style={[styles.input, { color: colors.text }]}
               placeholder="e.g. Alpha Squad"
               placeholderTextColor={colors.textMuted + 'CC'}
@@ -147,7 +148,7 @@ export const CreateTeamSheet = forwardRef<BaseBottomSheetRef, CreateTeamSheetPro
         <View style={styles.inputContainer}>
           <Text style={[styles.inputLabel, { color: colors.text }]}>Description (Optional)</Text>
           <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.card }]}>
-            <TextInput
+            <BottomSheetTextInput
               style={[styles.textArea, { color: colors.text }]}
               placeholder="Describe the team's purpose..."
               placeholderTextColor={colors.textMuted + 'CC'}
@@ -205,26 +206,26 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 24,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
   icon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '700',
-    marginBottom: 6,
+    marginBottom: 4,
     textAlign: 'center',
     letterSpacing: -0.3,
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '400',
     textAlign: 'center',
     letterSpacing: -0.2,
@@ -233,31 +234,31 @@ const styles = StyleSheet.create({
   // Input
   inputContainer: {
     paddingHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 14,
   },
   inputLabel: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
-    marginBottom: 10,
+    marginBottom: 8,
     letterSpacing: -0.2,
   },
   inputWrapper: {
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
     overflow: "hidden",
   },
   input: {
-    height: 48,
-    paddingHorizontal: 16,
-    fontSize: 16,
+    height: 42,
+    paddingHorizontal: 14,
+    fontSize: 15,
     fontWeight: "400",
     backgroundColor: 'transparent',
   },
   textArea: {
-    minHeight: 80,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
+    minHeight: 64,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 15,
     fontWeight: "400",
     backgroundColor: 'transparent',
   },
@@ -265,9 +266,9 @@ const styles = StyleSheet.create({
   // Info Card
   infoCard: {
     marginHorizontal: 20,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 24,
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 20,
   },
   infoRow: {
     flexDirection: 'row',
@@ -275,7 +276,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   infoText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
     letterSpacing: -0.1,
     flex: 1,
@@ -284,23 +285,23 @@ const styles = StyleSheet.create({
   // Team Type Selection
   teamTypeContainer: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
   },
   teamTypeButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 10,
     borderWidth: 1,
   },
   teamTypeButtonActive: {
     borderWidth: 2,
   },
   teamTypeText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     letterSpacing: -0.1,
   },
@@ -308,10 +309,10 @@ const styles = StyleSheet.create({
   // Actions
   actions: {
     paddingHorizontal: 20,
-    gap: 12,
+    gap: 10,
   },
   primaryButton: {
-    borderRadius: 12,
+    borderRadius: 10,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
@@ -325,11 +326,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    height: 50,
+    height: 44,
     gap: 8,
   },
   primaryButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
     letterSpacing: -0.2,
   },

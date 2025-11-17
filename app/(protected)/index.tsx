@@ -1,15 +1,11 @@
-import type { BaseBottomSheetRef } from '@/components/modals/BaseBottomSheet';
-import type { BaseDetachedBottomSheetRef } from '@/components/modals/BaseDetachedBottomSheet';
-import { ComingSoonSheet } from '@/components/modals/ComingSoonSheet';
-import { CreateSessionSheet } from '@/components/modals/CreateSessionSheet';
-import { CreateTeamSheet } from '@/components/modals/CreateTeamSheet';
+import { useModals } from '@/contexts/ModalContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
 import { useWorkspacePermissions } from '@/hooks/usePermissions';
 import { getWorkspaceTeams } from '@/services/workspaceService';
 import type { Team } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { PieChart } from 'react-native-gifted-charts';
 
@@ -46,9 +42,16 @@ console.log('isInstructor:', isInstructor)
 // {canInviteMembers && <Button>Invite Members</Button>}
   const colors = useColors();
   const workspaceName = activeWorkspace?.workspace_name || activeWorkspace?.full_name;
-  const chartDetailsSheetRef = useRef<BaseDetachedBottomSheetRef>(null);
-  const createSessionSheetRef = useRef<BaseBottomSheetRef>(null);
-  const createTeamSheetRef = useRef<BaseBottomSheetRef>(null);
+  
+  // Get modal refs from context
+  const { 
+    chartDetailsSheetRef, 
+    createSessionSheetRef, 
+    createTeamSheetRef,
+    setOnSessionCreated,
+    setOnTeamCreated,
+  } = useModals();
+  
   const permissions = useWorkspacePermissions();
   
   // Tab state for workspace view
@@ -57,6 +60,23 @@ console.log('isInstructor:', isInstructor)
   // Teams state
   const [teams, setTeams] = useState<Team[]>([]);
   const [loadingTeams, setLoadingTeams] = useState(false);
+
+  const loadTeams = useCallback(async () => {
+    if (!activeWorkspaceId || !activeWorkspace) return;
+    
+    setLoadingTeams(true);
+    try {
+      const workspaceType = activeWorkspace.workspace_type === 'org' ? 'org' : 'personal';
+      console.log('🔄 Loading teams for workspace:', { workspaceType, activeWorkspaceId });
+      const fetchedTeams = await getWorkspaceTeams(workspaceType, activeWorkspaceId);
+      console.log('✅ Teams loaded:', fetchedTeams.length, fetchedTeams);
+      setTeams(fetchedTeams);
+    } catch (error) {
+      console.error('❌ Failed to load teams:', error);
+    } finally {
+      setLoadingTeams(false);
+    }
+  }, [activeWorkspaceId, activeWorkspace]);
 
   // Load teams when in workspace view
   useEffect(() => {
@@ -72,24 +92,13 @@ console.log('isInstructor:', isInstructor)
     } else {
       console.log('❌ Conditions not met for loading teams');
     }
-  }, [isMyWorkspace, activeWorkspaceId, activeWorkspace?.workspace_type]);
+  }, [isMyWorkspace, activeWorkspaceId, activeWorkspace?.workspace_type, loadTeams]);
 
-  const loadTeams = async () => {
-    if (!activeWorkspaceId || !activeWorkspace) return;
-    
-    setLoadingTeams(true);
-    try {
-      const workspaceType = activeWorkspace.workspace_type === 'org' ? 'org' : 'personal';
-      console.log('🔄 Loading teams for workspace:', { workspaceType, activeWorkspaceId });
-      const fetchedTeams = await getWorkspaceTeams(workspaceType, activeWorkspaceId);
-      console.log('✅ Teams loaded:', fetchedTeams.length, fetchedTeams);
-      setTeams(fetchedTeams);
-    } catch (error) {
-      console.error('❌ Failed to load teams:', error);
-    } finally {
-      setLoadingTeams(false);
-    }
-  };
+  // Register callback for team creation
+  useEffect(() => {
+    setOnTeamCreated(() => loadTeams);
+    return () => setOnTeamCreated(null);
+  }, [setOnTeamCreated, loadTeams]);
 
   // Pie chart data - elegant muted tones with depth
   const pieData = [
@@ -375,15 +384,6 @@ console.log('isInstructor:', isInstructor)
             </>
           )}
         </ScrollView>
-
-        {/* Create Team Bottom Sheet */}
-        <CreateTeamSheet
-          ref={createTeamSheetRef}
-          onTeamCreated={() => {
-            createTeamSheetRef.current?.close();
-            loadTeams(); // Refresh teams list
-          }}
-        />
       </View>
     );
   }
@@ -403,11 +403,9 @@ console.log('isInstructor:', isInstructor)
               <Text style={[styles.welcomeGreeting, { color: colors.textMuted }]}>Welcome back,</Text>
               <Text style={[styles.welcomeName, { color: colors.text }]}>{fullName || 'User'}</Text>
             </View>
-            <View style={[styles.welcomeAvatar, { backgroundColor: colors.primary }]}>
-              <Text style={styles.welcomeAvatarText}>
-                {(fullName || email || 'U').charAt(0).toUpperCase()}
-              </Text>
-            </View>
+            {/* <View style={[styles.welcomeAvatar, { backgroundColor: colors.primary }]}>
+                
+            </View> */}
           </View>
           <View style={styles.welcomeStats}>
             <View style={styles.welcomeStat}>
@@ -530,7 +528,7 @@ console.log('isInstructor:', isInstructor)
                 <TouchableOpacity
                   style={[
                     styles.actionCard,
-                    { backgroundColor: isPrimary ? colors.primary : colors.card }
+                    { backgroundColor:   colors.card, borderColor: isPrimary ? colors.primary : colors.border }
                   ]}
                   onPress={action.onPress}
                   onPressIn={animatePressIn}
@@ -589,32 +587,6 @@ console.log('isInstructor:', isInstructor)
           </View>
         </View>
       </ScrollView>
-
-      {/* Chart Details Bottom Sheet */}
-      <ComingSoonSheet
-        ref={chartDetailsSheetRef}
-        title="Detailed Analytics"
-        subtitle="Get insights into your training patterns"
-        icon="bar-chart"
-      />
-
-      {/* Create Session Bottom Sheet */}
-      <CreateSessionSheet
-        ref={createSessionSheetRef}
-        onSessionCreated={() => {
-          createSessionSheetRef.current?.close();
-          // TODO: Refresh dashboard data
-        }}
-      />
-
-      {/* Create Team Bottom Sheet */}
-      <CreateTeamSheet
-        ref={createTeamSheetRef}
-        onTeamCreated={() => {
-          createTeamSheetRef.current?.close();
-          // TODO: Refresh teams list
-        }}
-      />
     </View>
   );
 }
