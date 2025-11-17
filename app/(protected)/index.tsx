@@ -2,11 +2,14 @@ import type { BaseBottomSheetRef } from '@/components/modals/BaseBottomSheet';
 import type { BaseDetachedBottomSheetRef } from '@/components/modals/BaseDetachedBottomSheet';
 import { ComingSoonSheet } from '@/components/modals/ComingSoonSheet';
 import { CreateSessionSheet } from '@/components/modals/CreateSessionSheet';
+import { CreateTeamSheet } from '@/components/modals/CreateTeamSheet';
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
 import { useWorkspacePermissions } from '@/hooks/usePermissions';
+import { getWorkspaceTeams } from '@/services/workspaceService';
+import type { Team } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { PieChart } from 'react-native-gifted-charts';
 
@@ -45,10 +48,48 @@ console.log('isInstructor:', isInstructor)
   const workspaceName = activeWorkspace?.workspace_name || activeWorkspace?.full_name;
   const chartDetailsSheetRef = useRef<BaseDetachedBottomSheetRef>(null);
   const createSessionSheetRef = useRef<BaseBottomSheetRef>(null);
+  const createTeamSheetRef = useRef<BaseBottomSheetRef>(null);
   const permissions = useWorkspacePermissions();
   
   // Tab state for workspace view
   const [workspaceTab, setWorkspaceTab] = useState<'overview' | 'manage'>('overview');
+  
+  // Teams state
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [loadingTeams, setLoadingTeams] = useState(false);
+
+  // Load teams when in workspace view
+  useEffect(() => {
+    console.log('📍 Teams useEffect:', { 
+      isMyWorkspace, 
+      activeWorkspaceId, 
+      workspaceType: activeWorkspace?.workspace_type 
+    });
+    
+    if (!isMyWorkspace && activeWorkspaceId && activeWorkspace) {
+      console.log('✅ Conditions met, loading teams...');
+      loadTeams();
+    } else {
+      console.log('❌ Conditions not met for loading teams');
+    }
+  }, [isMyWorkspace, activeWorkspaceId, activeWorkspace?.workspace_type]);
+
+  const loadTeams = async () => {
+    if (!activeWorkspaceId || !activeWorkspace) return;
+    
+    setLoadingTeams(true);
+    try {
+      const workspaceType = activeWorkspace.workspace_type === 'org' ? 'org' : 'personal';
+      console.log('🔄 Loading teams for workspace:', { workspaceType, activeWorkspaceId });
+      const fetchedTeams = await getWorkspaceTeams(workspaceType, activeWorkspaceId);
+      console.log('✅ Teams loaded:', fetchedTeams.length, fetchedTeams);
+      setTeams(fetchedTeams);
+    } catch (error) {
+      console.error('❌ Failed to load teams:', error);
+    } finally {
+      setLoadingTeams(false);
+    }
+  };
 
   // Pie chart data - elegant muted tones with depth
   const pieData = [
@@ -209,14 +250,14 @@ console.log('isInstructor:', isInstructor)
               {/* Recent Sessions */}
               <View style={styles.workspaceSection}>
                 <View style={styles.workspaceSectionHeader}>
-                  <Text style={[styles.workspaceSectionTitle, { color: colors.text }]}>Recent Sessions</Text>
+                  <Text style={[styles.workspaceSectionTitle, { color: colors.text }]}>Recent Trainings</Text>
                 </View>
 
                 <View style={[styles.workspaceEmptyState, { backgroundColor: colors.card }]}>
                   <Ionicons name="fitness-outline" size={40} color={colors.textMuted} />
-                  <Text style={[styles.workspaceEmptyTitle, { color: colors.text }]}>No sessions yet</Text>
+                  <Text style={[styles.workspaceEmptyTitle, { color: colors.text }]}>No trainings yet</Text>
                   <Text style={[styles.workspaceEmptySubtitle, { color: colors.textMuted }]}>
-                    Training sessions will appear here
+                    Trainings will appear here
                   </Text>
                 </View>
               </View>
@@ -245,19 +286,56 @@ console.log('isInstructor:', isInstructor)
                 <View style={styles.workspaceSectionHeader}>
                   <Text style={[styles.workspaceSectionTitle, { color: colors.text }]}>Teams</Text>
                   {permissions.canManageTeams && (
-                    <TouchableOpacity style={[styles.workspaceAddButton, { backgroundColor: colors.primary }]}>
+                    <TouchableOpacity 
+                      style={[styles.workspaceAddButton, { backgroundColor: colors.primary }]}
+                      onPress={() => createTeamSheetRef.current?.open()}
+                    >
                       <Ionicons name="add" size={18} color="#fff" />
                     </TouchableOpacity>
                   )}
                 </View>
 
-                <View style={[styles.workspaceEmptyState, { backgroundColor: colors.card }]}>
-                  <Ionicons name="people-outline" size={40} color={colors.textMuted} />
-                  <Text style={[styles.workspaceEmptyTitle, { color: colors.text }]}>No teams yet</Text>
-                  <Text style={[styles.workspaceEmptySubtitle, { color: colors.textMuted }]}>
-                    Create teams to organize your training groups
-                  </Text>
-                </View>
+                {loadingTeams ? (
+                  <View style={[styles.workspaceEmptyState, { backgroundColor: colors.card }]}>
+                    <Text style={[styles.workspaceEmptyTitle, { color: colors.text }]}>Loading teams...</Text>
+                  </View>
+                ) : teams.length === 0 ? (
+                  <View style={[styles.workspaceEmptyState, { backgroundColor: colors.card }]}>
+                    <Ionicons name="people-outline" size={40} color={colors.textMuted} />
+                    <Text style={[styles.workspaceEmptyTitle, { color: colors.text }]}>No teams yet</Text>
+                    <Text style={[styles.workspaceEmptySubtitle, { color: colors.textMuted }]}>
+                      Create teams to organize your training groups
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.teamsList}>
+                    {teams.map((team) => (
+                      <TouchableOpacity
+                        key={team.id}
+                        style={[styles.teamCard, { backgroundColor: colors.card }]}
+                        activeOpacity={0.8}
+                      >
+                        <View style={[
+                          styles.teamIcon,
+                          { backgroundColor: team.team_type === 'field' ? '#5B7A8C15' : '#E7692515' }
+                        ]}>
+                          <Ionicons 
+                            name={team.team_type === 'field' ? 'shield' : 'desktop'} 
+                            size={20} 
+                            color={team.team_type === 'field' ? '#5B7A8C' : '#E76925'} 
+                          />
+                        </View>
+                        <View style={styles.teamInfo}>
+                          <Text style={[styles.teamName, { color: colors.text }]}>{team.name}</Text>
+                          <Text style={[styles.teamMeta, { color: colors.textMuted }]}>
+                            {team.team_type === 'field' ? 'Field Team' : 'Back Office'} • 0 members
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
               </View>
 
               {/* Members Management */}
@@ -297,6 +375,15 @@ console.log('isInstructor:', isInstructor)
             </>
           )}
         </ScrollView>
+
+        {/* Create Team Bottom Sheet */}
+        <CreateTeamSheet
+          ref={createTeamSheetRef}
+          onTeamCreated={() => {
+            createTeamSheetRef.current?.close();
+            loadTeams(); // Refresh teams list
+          }}
+        />
       </View>
     );
   }
@@ -519,6 +606,15 @@ console.log('isInstructor:', isInstructor)
           // TODO: Refresh dashboard data
         }}
       />
+
+      {/* Create Team Bottom Sheet */}
+      <CreateTeamSheet
+        ref={createTeamSheetRef}
+        onTeamCreated={() => {
+          createTeamSheetRef.current?.close();
+          // TODO: Refresh teams list
+        }}
+      />
     </View>
   );
 }
@@ -648,6 +744,45 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     textAlign: 'center',
     lineHeight: 24,
+    letterSpacing: -0.1,
+  },
+
+  // Teams List
+  teamsList: {
+    gap: 8,
+  },
+  teamCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  teamIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  teamInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  teamName: {
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
+  teamMeta: {
+    fontSize: 13,
+    fontWeight: '400',
     letterSpacing: -0.1,
   },
 

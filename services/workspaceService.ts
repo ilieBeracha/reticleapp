@@ -274,12 +274,22 @@ export async function updateWorkspaceMemberRole(
 /**
  * Get teams for a workspace
  */
-export async function getWorkspaceTeams(workspaceOwnerId: string): Promise<Team[]> {
-  const { data, error } = await supabase
+export async function getWorkspaceTeams(
+  workspaceType: 'personal' | 'org',
+  workspaceId: string
+): Promise<Team[]> {
+  let query = supabase
     .from("teams")
-    .select("*")
-    .eq("workspace_owner_id", workspaceOwnerId)
+    .select("*, team_members(count)")
     .order("name");
+
+  if (workspaceType === 'personal') {
+    query = query.eq("workspace_owner_id", workspaceId);
+  } else {
+    query = query.eq("org_workspace_id", workspaceId);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
   return data || [];
@@ -289,19 +299,26 @@ export async function getWorkspaceTeams(workspaceOwnerId: string): Promise<Team[
  * Create a team
  */
 export async function createTeam(input: {
-  workspace_owner_id: string;
+  workspace_type: 'personal' | 'org';
+  workspace_owner_id?: string;  // For personal workspace
+  org_workspace_id?: string;    // For org workspace
   name: string;
   team_type?: 'field' | 'back_office';
   description?: string;
 }): Promise<Team> {
   const { data, error } = await supabase
-    .from("teams")
-    .insert(input)
-    .select()
+    .rpc('create_team', {
+      p_workspace_type: input.workspace_type,
+      p_name: input.name,
+      p_workspace_owner_id: input.workspace_owner_id || null,
+      p_org_workspace_id: input.org_workspace_id || null,
+      p_team_type: input.team_type || 'field',
+      p_description: input.description || null,
+    })
     .single();
 
   if (error) throw error;
-  return data;
+  return data as Team;
 }
 
 /**
