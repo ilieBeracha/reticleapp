@@ -12,7 +12,7 @@ export default function ProtectedLayout() {
 
   return (
     <>
-      <Stack
+      <Stack 
         initialRouteName="index"
         screenOptions={{
           headerStyle: { backgroundColor: background },

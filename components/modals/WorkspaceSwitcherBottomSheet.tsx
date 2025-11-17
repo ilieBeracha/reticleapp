@@ -4,9 +4,9 @@ import { createOrgWorkspace } from "@/services/workspaceService";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import type { Workspace } from "@/types/workspace";
 import { Ionicons } from "@expo/vector-icons";
-import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Animated, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { BaseBottomSheet, type BaseBottomSheetRef } from "./BaseBottomSheet";
 
 export interface WorkspaceSwitcherRef {
   open: () => void;
@@ -28,8 +28,8 @@ interface WorkspaceSwitcherBottomSheetProps {
 export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, WorkspaceSwitcherBottomSheetProps>(
   (props, ref) => {
     const colors = useColors();
-    const bottomSheetRef = useRef<BottomSheet>(null);
-    const createSheetRef = useRef<BottomSheet>(null);
+    const bottomSheetRef = useRef<BaseBottomSheetRef>(null);
+    const createSheetRef = useRef<BaseBottomSheetRef>(null);
     
     const { 
       myWorkspaceId, 
@@ -43,13 +43,34 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
     const [workspaceName, setWorkspaceName] = useState("");
     const [isCreating, setIsCreating] = useState(false);
 
+    // iOS-style press animation functions
+    const createPressAnimation = () => {
+      const scaleAnim = new Animated.Value(1);
+      const animatePressIn = () => {
+        Animated.spring(scaleAnim, {
+          toValue: 0.98,
+          useNativeDriver: true,
+          speed: 20,
+          bounciness: 8,
+        }).start();
+      };
+      const animatePressOut = () => {
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          speed: 20,
+          bounciness: 8,
+        }).start();
+      };
+      return { scaleAnim, animatePressIn, animatePressOut };
+    };
+
     useImperativeHandle(ref, () => ({
-      open: () => bottomSheetRef.current?.expand(),
+      open: () => bottomSheetRef.current?.open(),
       close: () => bottomSheetRef.current?.close(),
     }));
 
-    const snapPoints = useMemo(() => ['75%'], []);
-    const createSnapPoints = useMemo(() => ['50%'], []);
+
 
     // Group workspaces: My workspace first, then others
     const groupedWorkspaces = useMemo(() => {
@@ -84,7 +105,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
 
     const handleOpenCreateWorkspace = useCallback(() => {
       setWorkspaceName("");  // Clear for new workspace
-      createSheetRef.current?.expand();
+      createSheetRef.current?.open();
     }, []);
 
     const handleCreateWorkspace = useCallback(async () => {
@@ -120,129 +141,117 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
       }
     }, [workspaceName, switchWorkspace]);
 
-    const renderBackdrop = useCallback(
-      (props: any) => (
-        <BottomSheetBackdrop
-          {...props}
-          disappearsOnIndex={-1}
-          appearsOnIndex={0}
-          opacity={0.5}
-        />
-      ),
-      []
-    );
 
     const renderWorkspaceItem = useCallback(({ item }: { item: Workspace }) => {
       const isActive = item.id === activeWorkspaceId;
       const isMyWorkspace = item.id === myWorkspaceId;
+      const isOrgWorkspace = item.workspace_type === 'org';
+
+      const { scaleAnim, animatePressIn, animatePressOut } = createPressAnimation();
 
       return (
+        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
         <TouchableOpacity
           style={[
             styles.workspaceItem,
-            isActive && { backgroundColor: colors.primary + '10' }
+              isActive && styles.workspaceItemActive,
           ]}
           onPress={() => handleSelectWorkspace(item)}
-          activeOpacity={0.7}
+            onPressIn={animatePressIn}
+            onPressOut={animatePressOut}
+            activeOpacity={0.8}
         >
-          <View style={styles.workspaceInfo}>
+            <View style={styles.workspaceItemContent}>
             <View style={[
-              styles.iconContainer,
+              styles.workspaceIcon,
               {
-                backgroundColor: isActive ? colors.primary : colors.card,
+                backgroundColor: isActive ? colors.primary : colors.secondary,
               }
             ]}>
               <Ionicons
-                name={isMyWorkspace ? "person" : "people"}
-                size={22}
+                name={isMyWorkspace ? "person" : isOrgWorkspace ? "business" : "people"}
+                size={20}
                 color={isActive ? '#fff' : colors.textMuted}
               />
             </View>
-            <View style={styles.textContainer}>
+
+            <View style={styles.workspaceDetails}>
               <Text style={[
                 styles.workspaceName,
+                isActive && styles.workspaceNameActive,
                 { color: isActive ? colors.primary : colors.text }
               ]}>
                 {item.workspace_name || item.full_name || item.email}
               </Text>
-              <Text style={[styles.workspaceType, { color: colors.textMuted }]}>
-                {isMyWorkspace ? "Owner" : (item.access_role || 'Member')}
-              </Text>
+
+              <View style={styles.workspaceMeta}>
+                <View style={[
+                  styles.roleBadge,
+                  isMyWorkspace && styles.roleBadgeOwner,
+                ]}>
+                  <Text style={[
+                    styles.roleBadgeText,
+                    { color: isMyWorkspace ? '#FF6B35' : colors.textMuted }
+                  ]}>
+                    {isMyWorkspace ? "Owner" : (item.access_role || 'Member')}
+                  </Text>
+                </View>
+              </View>
             </View>
+
+            {isActive && (
+              <View style={[styles.checkmarkContainer, { backgroundColor: colors.primary }]}>
+                <Ionicons name="checkmark" size={18} color="#fff" />
           </View>
-          {isActive && (
-            <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
           )}
+            </View>
         </TouchableOpacity>
+        </Animated.View>
       );
-    }, [activeWorkspaceId, myWorkspaceId, colors, handleSelectWorkspace]);
+    }, [activeWorkspaceId, myWorkspaceId, handleSelectWorkspace, createPressAnimation]);
 
     return (
       <>
         {/* Main Workspace Switcher */}
-        <BottomSheet
+        <BaseBottomSheet
           ref={bottomSheetRef}
-          index={-1}
-          snapPoints={snapPoints}
-          enablePanDownToClose={true}
-          backdropComponent={renderBackdrop}
-          backgroundStyle={{ backgroundColor: colors.background }}
-          handleIndicatorStyle={{ backgroundColor: colors.textMuted }}
+          backdropOpacity={0.6}
+          enableDynamicSizing={true}
         >
-          <BottomSheetScrollView style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
-              <View>
-                <Text style={[styles.title, { color: colors.text }]}>Workspaces</Text>
-                <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-                  {workspaces.length} {workspaces.length === 1 ? 'workspace' : 'workspaces'}
-                </Text>
+              <View style={styles.headerTop}>
+                <View style={styles.headerContent}>
+                  <Text style={[styles.title, { color: colors.text }]}>Workspaces</Text>
+                  <View style={[styles.countBadge, { backgroundColor: '#FF6B351A' }]}>
+                    <Text style={[styles.countBadgeText, { color: '#FF6B35' }]}>
+                      {workspaces.length}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={[styles.addButton, { backgroundColor: colors.primary }]}
+                  onPress={handleOpenCreateWorkspace}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="add" size={20} color="#fff" />
+                </TouchableOpacity>
               </View>
+              <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+                Switch between your workspaces
+              </Text>
             </View>
 
             {/* My Workspace Section */}
             {groupedWorkspaces.myWorkspace.length > 0 && (
               <View style={styles.section}>
-                <View style={styles.sectionHeaderSimple}>
+                <View style={styles.sectionHeader}>
                   <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Personal</Text>
                 </View>
                 {groupedWorkspaces.myWorkspace.map((workspace) => (
-                  <TouchableOpacity
-                    key={workspace.id}
-                    style={[
-                      styles.workspaceItem,
-                      workspace.id === activeWorkspaceId && { backgroundColor: colors.primary + '10' }
-                    ]}
-                    onPress={() => handleSelectWorkspace(workspace)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.workspaceInfo}>
-                      <View style={[
-                        styles.iconContainer,
-                        {
-                          backgroundColor: workspace.id === activeWorkspaceId ? colors.primary : colors.card,
-                        }
-                      ]}>
-                        <Ionicons
-                          name="person"
-                          size={22}
-                          color={workspace.id === activeWorkspaceId ? '#fff' : colors.textMuted}
-                        />
-                      </View>
-                      <View style={styles.textContainer}>
-                        <Text style={[
-                          styles.workspaceName,
-                          { color: workspace.id === activeWorkspaceId ? colors.primary : colors.text }
-                        ]}>
-                          {workspace.workspace_name || workspace.full_name || workspace.email}
-                        </Text>
-                        <Text style={[styles.workspaceType, { color: colors.textMuted }]}>Owner</Text>
-                      </View>
-                    </View>
-                    {workspace.id === activeWorkspaceId && (
-                      <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                    )}
-                  </TouchableOpacity>
+                  <View key={workspace.id}>
+                    {renderWorkspaceItem({ item: workspace })}
+                        </View>
                 ))}
               </View>
             )}
@@ -250,7 +259,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
             {/* Other Workspaces Section */}
             {groupedWorkspaces.otherWorkspaces.length > 0 && (
               <View style={styles.section}>
-                <View style={styles.sectionHeaderSimple}>
+                <View style={styles.sectionHeader}>
                   <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
                     Organizations
                   </Text>
@@ -266,47 +275,33 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
             {/* Empty state */}
             {groupedWorkspaces.myWorkspace.length === 0 && groupedWorkspaces.otherWorkspaces.length === 0 && (
               <View style={styles.emptyState}>
-                <Ionicons name="briefcase-outline" size={48} color={colors.textMuted} />
-                <Text style={[styles.emptyText, { color: colors.text }]}>
-                  {loading ? "Loading workspaces..." : "No workspaces available"}
+                <View style={[styles.emptyIconContainer, { backgroundColor: colors.card }]}>
+                  <Ionicons name="briefcase-outline" size={48} color={colors.textMuted} />
+                </View>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                  {loading ? "Loading workspaces..." : "No Workspaces Yet"}
                 </Text>
-                <Text style={[styles.emptySubtext, { color: colors.textMuted }]}>
-                  Create your first workspace to get started
+                <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
+                  Create your first workspace to organize your training data
                 </Text>
               </View>
             )}
 
-            {/* Action Buttons */}
-            <View style={styles.actionSection}>
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: colors.primary }]}
-                onPress={handleOpenCreateWorkspace}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="add-circle" size={24} color="#fff" />
-                <Text style={styles.actionButtonText}>Create New Workspace</Text>
-              </TouchableOpacity>
-            </View>
-          </BottomSheetScrollView>
-        </BottomSheet>
+        </BaseBottomSheet>
 
-        {/* Create/Edit Workspace Modal */}
-        <BottomSheet
+        {/* Create Workspace Modal */}
+        <BaseBottomSheet
+          snapPoints={['90%']}
           ref={createSheetRef}
-          index={-1}
-          snapPoints={createSnapPoints}
-          enablePanDownToClose={true}
-          backdropComponent={renderBackdrop}
-          backgroundStyle={{ backgroundColor: colors.background }}
-          handleIndicatorStyle={{ backgroundColor: colors.textMuted }}
+          backdropOpacity={0.6}
+          enableDynamicSizing={false}
         >
-          <BottomSheetScrollView style={styles.createContainer}>
             <View style={styles.createHeader}>
-              <View style={[styles.createIcon, { backgroundColor: colors.primary + '15' }]}>
+              <View style={[styles.createIcon, { backgroundColor: colors.primary + '1A' }]}>
                 <Ionicons name="business" size={32} color={colors.primary} />
               </View>
               <Text style={[styles.createTitle, { color: colors.text }]}>
-                Create New Workspace
+                Create Workspace
               </Text>
               <Text style={[styles.createSubtitle, { color: colors.textMuted }]}>
                 Set up a new workspace for your team or organization
@@ -315,60 +310,57 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
 
             <View style={styles.inputContainer}>
               <Text style={[styles.inputLabel, { color: colors.text }]}>Workspace Name</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.card,
-                    color: colors.text,
-                    borderColor: colors.border,
-                  }
-                ]}
-                placeholder="e.g. Alpha Team Training Hub"
-                placeholderTextColor={colors.textMuted}
-                value={workspaceName}
-                onChangeText={setWorkspaceName}
-                autoFocus
-                returnKeyType="done"
-                onSubmitEditing={handleCreateWorkspace}
-              />
+              <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  placeholder="e.g. Alpha Team Training Hub"
+                  placeholderTextColor={colors.textMuted + 'CC'}
+                  value={workspaceName}
+                  onChangeText={setWorkspaceName}
+                  autoFocus
+                  returnKeyType="done"
+                  onSubmitEditing={handleCreateWorkspace}
+                />
+              </View>
               <Text style={[styles.inputHint, { color: colors.textMuted }]}>
-                This will be visible to all members of your workspace
+                Choose a memorable name for your team
               </Text>
             </View>
 
-            <View style={styles.buttonContainer}>
+            <View style={styles.createActions}>
               <TouchableOpacity
                 style={[
-                  styles.createButton,
+                  styles.primaryButton,
                   {
-                    backgroundColor: colors.primary,
-                    opacity: !workspaceName.trim() || isCreating ? 0.5 : 1
-                  }
+                    backgroundColor: (!workspaceName.trim() || isCreating) ? colors.secondary : colors.primary,
+                    shadowColor: (!workspaceName.trim() || isCreating) ? 'transparent' : colors.primary
+                  },
+                  (!workspaceName.trim() || isCreating) && styles.primaryButtonDisabled
                 ]}
                 onPress={handleCreateWorkspace}
                 disabled={!workspaceName.trim() || isCreating}
                 activeOpacity={0.8}
               >
-                <Ionicons name="rocket" size={22} color="#fff" />
-                <Text style={styles.createButtonText}>
-                  {isCreating ? "Creating..." : "Create Workspace"}
-                </Text>
+                <View style={styles.primaryButtonContent}>
+                  <Ionicons name="add" size={18} color="#fff" />
+                  <Text style={[styles.primaryButtonText, { color: '#fff' }]}>
+                    {isCreating ? "Creating..." : "Create Workspace"}
+                  </Text>
+                </View>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.cancelButton}
+                style={[styles.secondaryButton, { backgroundColor: colors.secondary }]}
                 onPress={() => {
                   setWorkspaceName("");
                   createSheetRef.current?.close();
                 }}
-                activeOpacity={0.7}
+                activeOpacity={0.8}
               >
-                <Text style={[styles.cancelButtonText, { color: colors.textMuted }]}>Cancel</Text>
+                <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>Cancel</Text>
               </TouchableOpacity>
             </View>
-          </BottomSheetScrollView>
-        </BottomSheet>
+        </BaseBottomSheet>
       </>
     );
   }
@@ -377,132 +369,180 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
 WorkspaceSwitcherBottomSheet.displayName = 'WorkspaceSwitcherBottomSheet';
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "transparent",
-  },
+
+  // Header
   header: {
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 20,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 32,
+  },
+  headerTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  addButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   title: {
     fontSize: 28,
     fontWeight: "700",
-    letterSpacing: 0.3,
-    marginBottom: 4,
+    letterSpacing: -0.4,
+  },
+  countBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    minWidth: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  countBadgeText: {
+    fontSize: 13,
+    fontWeight: "600",
+    letterSpacing: -0.1,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "400",
+    lineHeight: 20,
+    letterSpacing: -0.2,
   },
+
+  // Sections
   section: {
-    paddingVertical: 8,
+    marginBottom: 8,
   },
-  sectionHeaderSimple: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+  sectionHeader: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    paddingBottom: 12,
   },
   sectionTitle: {
     fontSize: 13,
     fontWeight: "600",
     textTransform: "uppercase",
-    letterSpacing: 0.8,
+    letterSpacing: 0.5,
+    opacity: 0.8,
   },
+
+  // Workspace Items
   workspaceItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 24,
-    paddingVertical: 14,
     marginHorizontal: 16,
-    marginVertical: 4,
+    marginVertical: 2,
     borderRadius: 12,
-    backgroundColor: "transparent",
+    overflow: 'hidden',
   },
-  workspaceInfo: {
+  workspaceItemActive: {
+    backgroundColor: 'rgba(231, 105, 37, 0.08)',
+  },
+  workspaceItemContent: {
     flexDirection: "row",
     alignItems: "center",
-    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
-  iconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  workspaceIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 14,
+    marginRight: 12,
   },
-  textContainer: {
+  workspaceDetails: {
     flex: 1,
+    gap: 2,
   },
   workspaceName: {
     fontSize: 16,
+    fontWeight: "500",
+    lineHeight: 20,
+    letterSpacing: -0.2,
+  },
+  workspaceNameActive: {
     fontWeight: "600",
-    marginBottom: 3,
   },
-  workspaceType: {
-    fontSize: 13,
-    fontWeight: "400",
+  workspaceMeta: {
+    flexDirection: "row",
+    alignItems: "center",
   },
+  roleBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  roleBadgeOwner: {
+    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+  },
+  roleBadgeText: {
+    fontSize: 11,
+    fontWeight: "500",
+    textTransform: "capitalize",
+    letterSpacing: -0.1,
+  },
+  checkmarkContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Empty State
   emptyState: {
     paddingVertical: 60,
     paddingHorizontal: 40,
     alignItems: "center",
   },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginTop: 16,
-    marginBottom: 8,
-    textAlign: "center",
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
   },
-  emptySubtext: {
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    textAlign: "center",
+    marginBottom: 8,
+    letterSpacing: -0.2,
+  },
+  emptySubtitle: {
     fontSize: 14,
     fontWeight: "400",
     textAlign: "center",
-  },
-  
-  // Action Section
-  actionSection: {
-    paddingHorizontal: 24,
-    paddingVertical: 24,
-    marginTop: 8,
-  },
-  actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    height: 56,
-    borderRadius: 16,
-    gap: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  actionButtonText: {
-    color: "#fff",
-    fontSize: 17,
-    fontWeight: "600",
-  },
-  
-  // Create Workspace Modal Styles
-  createContainer: {
-    flex: 1,
-    backgroundColor: "transparent",
+    lineHeight: 20,
+    maxWidth: 280,
+    letterSpacing: -0.1,
   },
   createHeader: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 24,
+    paddingBottom: 28,
     alignItems: "center",
   },
   createIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
@@ -510,67 +550,92 @@ const styles = StyleSheet.create({
   createTitle: {
     fontSize: 24,
     fontWeight: "700",
-    marginBottom: 8,
+    marginBottom: 6,
     textAlign: "center",
+    letterSpacing: -0.3,
   },
   createSubtitle: {
     fontSize: 15,
     fontWeight: "400",
-    lineHeight: 22,
+    lineHeight: 20,
     textAlign: "center",
+    paddingHorizontal: 20,
+    letterSpacing: -0.1,
   },
+
+  // Input
   inputContainer: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     marginBottom: 32,
   },
   inputLabel: {
     fontSize: 15,
     fontWeight: "600",
+    color: '#1c1c1e',
     marginBottom: 10,
+    letterSpacing: -0.2,
+  },
+  inputWrapper: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(142, 142, 147, 0.2)',
+    backgroundColor: '#f2f2f7',
+    overflow: "hidden",
   },
   input: {
-    height: 54,
-    borderRadius: 12,
-    paddingHorizontal: 18,
-    fontSize: 17,
-    fontWeight: "500",
-    borderWidth: 1.5,
+    height: 48,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    fontWeight: "400",
+    backgroundColor: 'transparent',
   },
   inputHint: {
     fontSize: 13,
     fontWeight: "400",
     marginTop: 8,
     lineHeight: 18,
+    paddingHorizontal: 4,
+    letterSpacing: -0.1,
   },
-  buttonContainer: {
-    paddingHorizontal: 24,
+
+  // Create Actions
+  createActions: {
+    paddingHorizontal: 20,
     gap: 12,
+    paddingBottom: 20,
   },
-  createButton: {
+  primaryButton: {
+    borderRadius: 12,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  primaryButtonDisabled: {
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  primaryButtonContent: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    height: 54,
-    borderRadius: 14,
+    height: 50,
     gap: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
   },
-  createButtonText: {
-    color: "#fff",
-    fontSize: 17,
+  primaryButtonText: {
+    fontSize: 16,
     fontWeight: "600",
+    letterSpacing: -0.2,
   },
-  cancelButton: {
-    height: 48,
+  secondaryButton: {
+    height: 50,
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: 12,
   },
-  cancelButtonText: {
+  secondaryButtonText: {
     fontSize: 16,
     fontWeight: "500",
+    letterSpacing: -0.2,
   },
 });

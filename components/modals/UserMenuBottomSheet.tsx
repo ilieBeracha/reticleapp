@@ -1,7 +1,7 @@
 import { BaseAvatar } from '@/components/BaseAvatar';
+import { BaseBottomSheet, type BaseBottomSheetRef } from '@/components/modals/BaseBottomSheet';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
-import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { router } from 'expo-router';
 import {
   BuildingIcon,
@@ -9,7 +9,7 @@ import {
   LogOutIcon,
   SettingsIcon
 } from 'lucide-react-native';
-import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef } from 'react';
+import { forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 export interface UserMenuBottomSheetRef {
@@ -26,7 +26,7 @@ export const UserMenuBottomSheet = forwardRef<UserMenuBottomSheetRef, UserMenuBo
   ({ onSettingsPress, onSwitchOrgPress }, ref) => {
     const { user, signOut } = useAuth();
     const colors = useColors();
-    const bottomSheetRef = useRef<BottomSheet>(null);
+    const bottomSheetRef = useRef<BaseBottomSheetRef>(null);
 
     const avatarUri = user?.user_metadata?.avatar_url;
     const fallbackInitial = user?.email?.charAt(0)?.toUpperCase() ?? "?";
@@ -36,11 +36,9 @@ export const UserMenuBottomSheet = forwardRef<UserMenuBottomSheetRef, UserMenuBo
     const email = user?.email || '';
 
     useImperativeHandle(ref, () => ({
-      open: () => bottomSheetRef.current?.expand(),
+      open: () => bottomSheetRef.current?.open(),
       close: () => bottomSheetRef.current?.close(),
     }));
-
-    const snapPoints = useMemo(() => ['50%'], []);
 
     const handleSignOut = useCallback(async () => {
       try {
@@ -63,28 +61,12 @@ export const UserMenuBottomSheet = forwardRef<UserMenuBottomSheetRef, UserMenuBo
       onSwitchOrgPress?.();
     }, [onSwitchOrgPress]);
 
-    const renderBackdrop = useCallback(
-      (props: any) => (
-        <BottomSheetBackdrop
-          {...props}
-          disappearsOnIndex={-1}
-          appearsOnIndex={0}
-        />
-      ),
-      []
-    );
-
     return (
-      <BottomSheet
+      <BaseBottomSheet
         ref={bottomSheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose={true}
-        backdropComponent={renderBackdrop}
-        backgroundStyle={{ backgroundColor: colors.background }}
-        handleIndicatorStyle={{ backgroundColor: colors.textMuted }}
+        snapPoints={['50%']}
+        backdropOpacity={0.6}
       >
-        <BottomSheetScrollView style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>
@@ -202,8 +184,7 @@ export const UserMenuBottomSheet = forwardRef<UserMenuBottomSheetRef, UserMenuBo
 
           {/* Bottom Padding */}
           <View style={styles.bottomPadding} />
-        </BottomSheetScrollView>
-      </BottomSheet>
+      </BaseBottomSheet>
     );
   }
 );
@@ -211,9 +192,6 @@ export const UserMenuBottomSheet = forwardRef<UserMenuBottomSheetRef, UserMenuBo
 UserMenuBottomSheet.displayName = 'UserMenuBottomSheet';
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   header: {
     paddingHorizontal: 20,
     paddingTop: 12,
