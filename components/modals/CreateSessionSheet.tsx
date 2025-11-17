@@ -66,7 +66,6 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
               placeholderTextColor={colors.textMuted + 'CC'}
               value={sessionTitle}
               onChangeText={setSessionTitle}
-              autoFocus
               returnKeyType="next"
             />
           </View>
