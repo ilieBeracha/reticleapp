@@ -3,13 +3,21 @@
 // Personal Workspace (user profile) + Org Workspaces (created)
 // =====================================================
 
-export type WorkspaceRole = "owner" | "admin" | "member";
-export type WorkspaceType = "personal" | "org";
+export type WorkspaceRole = 'owner' | 'admin' | 'instructor' | 'member';
+export type WorkspaceType = 'personal' | 'org';
+export type TeamMemberShip =
+  | "sniper"
+  | "pistol"
+  | "manager"
+  | "commander"
+  | "instructor"
+  | "staff";
 
 // UNIFIED WORKSPACE INTERFACE
 // Can be either a personal workspace (profile) or org workspace
 export interface Workspace {
   id: string;
+  personal_workspace_id?: string | null;
   workspace_type: WorkspaceType;
   workspace_name?: string | null;
   workspace_slug?: string | null;
@@ -60,18 +68,11 @@ export interface Team {
   updated_at: string;
 }
 
-export type TeamRole =
-  | "sniper"
-  | "pistol"
-  | "manager"
-  | "commander"
-  | "instructor"
-  | "staff";
 
 export interface TeamMember {
   team_id: string;
   user_id: string;
-  role: TeamRole;
+  role: TeamMemberShip;
   joined_at: string;
 }
 

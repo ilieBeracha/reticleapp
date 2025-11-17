@@ -4,8 +4,9 @@ import { ComingSoonSheet } from '@/components/modals/ComingSoonSheet';
 import { CreateSessionSheet } from '@/components/modals/CreateSessionSheet';
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
+import { useWorkspacePermissions } from '@/hooks/usePermissions';
 import { Ionicons } from '@expo/vector-icons';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { PieChart } from 'react-native-gifted-charts';
 
@@ -30,11 +31,24 @@ export default function HomePage() {
   console.log('  isMyWorkspace:', isMyWorkspace)
   console.log('  isOtherWorkspace:', isOtherWorkspace)
   console.log('  workspaces count:', workspaces.length)
+// Example: In workspace view
 
+const { canManageTeams, canInviteMembers, isInstructor } = useWorkspacePermissions();
+
+console.log('canManageTeams:', canManageTeams)
+console.log('canInviteMembers:', canInviteMembers)
+console.log('isInstructor:', isInstructor)
+// Show/hide buttons based on permissions
+// {canManageTeams && <Button>Create Team</Button>}
+// {canInviteMembers && <Button>Invite Members</Button>}
   const colors = useColors();
   const workspaceName = activeWorkspace?.workspace_name || activeWorkspace?.full_name;
   const chartDetailsSheetRef = useRef<BaseDetachedBottomSheetRef>(null);
   const createSessionSheetRef = useRef<BaseBottomSheetRef>(null);
+  const permissions = useWorkspacePermissions();
+  
+  // Tab state for workspace view
+  const [workspaceTab, setWorkspaceTab] = useState<'overview' | 'manage'>('overview');
 
   // Pie chart data - elegant muted tones with depth
   const pieData = [
@@ -94,26 +108,75 @@ export default function HomePage() {
     return { scaleAnim, animatePressIn, animatePressOut };
   };
 
-  // Show organization workspace view
+  // Show organization workspace view with tabs
   if (!isMyWorkspace) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
+        {/* Custom Tabs */}
+        <View style={[styles.tabBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+          <TouchableOpacity
+            style={[
+              styles.tab,
+              workspaceTab === 'overview' && [styles.tabActive, { borderBottomColor: colors.primary }]
+            ]}
+            onPress={() => setWorkspaceTab('overview')}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name="stats-chart" 
+              size={18} 
+              color={workspaceTab === 'overview' ? colors.primary : colors.textMuted} 
+            />
+            <Text style={[
+              styles.tabText,
+              { color: workspaceTab === 'overview' ? colors.primary : colors.textMuted }
+            ]}>
+              Overview
+            </Text>
+          </TouchableOpacity>
+
+          {permissions.canManageWorkspace && (
+            <TouchableOpacity
+              style={[
+                styles.tab,
+                workspaceTab === 'manage' && [styles.tabActive, { borderBottomColor: colors.primary }]
+              ]}
+              onPress={() => setWorkspaceTab('manage')}
+              activeOpacity={0.7}
+            >
+              <Ionicons 
+                name="settings" 
+                size={18} 
+                color={workspaceTab === 'manage' ? colors.primary : colors.textMuted} 
+              />
+              <Text style={[
+                styles.tabText,
+                { color: workspaceTab === 'manage' ? colors.primary : colors.textMuted }
+              ]}>
+                Manage
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         <ScrollView
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
           contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={styles.content}
         >
-          {/* Workspace Stats Overview */}
-          <View style={styles.workspaceStatsCard}>
+          {workspaceTab === 'overview' ? (
+            <>
+              {/* Overview Tab - Sessions and Activity */}
+              <View style={styles.workspaceStatsCard}>
             <View style={styles.workspaceStatsRow}>
               <View style={styles.workspaceStatItem}>
                 <View style={[styles.workspaceStatIcon, { backgroundColor: '#5B7A8C15' }]}>
-                  <Ionicons name="people-outline" size={20} color="#5B7A8C" />
+                  <Ionicons name="calendar-outline" size={20} color="#5B7A8C" />
                 </View>
                 <View style={styles.workspaceStatText}>
                   <Text style={[styles.workspaceStatValue, { color: colors.text }]}>0</Text>
-                  <Text style={[styles.workspaceStatLabel, { color: colors.textMuted }]}>Members</Text>
+                  <Text style={[styles.workspaceStatLabel, { color: colors.textMuted }]}>Sessions</Text>
                 </View>
               </View>
 
@@ -121,11 +184,11 @@ export default function HomePage() {
 
               <View style={styles.workspaceStatItem}>
                 <View style={[styles.workspaceStatIcon, { backgroundColor: '#E7692515' }]}>
-                  <Ionicons name="people-circle-outline" size={20} color="#E76925" />
+                  <Ionicons name="time-outline" size={20} color="#E76925" />
                 </View>
                 <View style={styles.workspaceStatText}>
-                  <Text style={[styles.workspaceStatValue, { color: colors.text }]}>0</Text>
-                  <Text style={[styles.workspaceStatLabel, { color: colors.textMuted }]}>Teams</Text>
+                  <Text style={[styles.workspaceStatValue, { color: colors.text }]}>0h</Text>
+                  <Text style={[styles.workspaceStatLabel, { color: colors.textMuted }]}>Training Time</Text>
                 </View>
               </View>
 
@@ -133,66 +196,106 @@ export default function HomePage() {
 
               <View style={styles.workspaceStatItem}>
                 <View style={[styles.workspaceStatIcon, { backgroundColor: '#5A847315' }]}>
-                  <Ionicons name="calendar-outline" size={20} color="#5A8473" />
+                  <Ionicons name="people-outline" size={20} color="#5A8473" />
                 </View>
                 <View style={styles.workspaceStatText}>
                   <Text style={[styles.workspaceStatValue, { color: colors.text }]}>0</Text>
-                  <Text style={[styles.workspaceStatLabel, { color: colors.textMuted }]}>Sessions</Text>
+                  <Text style={[styles.workspaceStatLabel, { color: colors.textMuted }]}>Active Users</Text>
                 </View>
               </View>
             </View>
           </View>
 
-          {/* Teams Section */}
-          <View style={styles.workspaceSection}>
-            <View style={styles.workspaceSectionHeader}>
-              <Text style={[styles.workspaceSectionTitle, { color: colors.text }]}>Teams</Text>
-              <TouchableOpacity style={[styles.workspaceAddButton, { backgroundColor: colors.primary }]}>
-                <Ionicons name="add" size={18} color="#fff" />
-              </TouchableOpacity>
-            </View>
+              {/* Recent Sessions */}
+              <View style={styles.workspaceSection}>
+                <View style={styles.workspaceSectionHeader}>
+                  <Text style={[styles.workspaceSectionTitle, { color: colors.text }]}>Recent Sessions</Text>
+                </View>
 
-            <View style={[styles.workspaceEmptyState, { backgroundColor: colors.card }]}>
-              <Ionicons name="people-outline" size={40} color={colors.textMuted} />
-              <Text style={[styles.workspaceEmptyTitle, { color: colors.text }]}>No teams yet</Text>
-              <Text style={[styles.workspaceEmptySubtitle, { color: colors.textMuted }]}>
-                Create teams to organize your training groups
-              </Text>
-            </View>
-          </View>
+                <View style={[styles.workspaceEmptyState, { backgroundColor: colors.card }]}>
+                  <Ionicons name="fitness-outline" size={40} color={colors.textMuted} />
+                  <Text style={[styles.workspaceEmptyTitle, { color: colors.text }]}>No sessions yet</Text>
+                  <Text style={[styles.workspaceEmptySubtitle, { color: colors.textMuted }]}>
+                    Training sessions will appear here
+                  </Text>
+                </View>
+              </View>
 
-          {/* Members Section */}
-          <View style={styles.workspaceSection}>
-            <View style={styles.workspaceSectionHeader}>
-              <Text style={[styles.workspaceSectionTitle, { color: colors.text }]}>Members</Text>
-              <TouchableOpacity style={[styles.workspaceAddButton, { backgroundColor: colors.primary }]}>
-                <Ionicons name="person-add" size={18} color="#fff" />
-              </TouchableOpacity>
-            </View>
+              {/* Recent Activity */}
+              <View style={styles.workspaceSection}>
+                <View style={styles.workspaceSectionHeader}>
+                  <Text style={[styles.workspaceSectionTitle, { color: colors.text }]}>Recent Activity</Text>
+                </View>
 
-            <View style={[styles.workspaceEmptyState, { backgroundColor: colors.card }]}>
-              <Ionicons name="person-outline" size={40} color={colors.textMuted} />
-              <Text style={[styles.workspaceEmptyTitle, { color: colors.text }]}>No members yet</Text>
-              <Text style={[styles.workspaceEmptySubtitle, { color: colors.textMuted }]}>
-                Invite members to collaborate on training
-              </Text>
-            </View>
-          </View>
+                <View style={[styles.workspaceEmptyState, { backgroundColor: colors.card }]}>
+                  <Ionicons name="time-outline" size={40} color={colors.textMuted} />
+                  <Text style={[styles.workspaceEmptyTitle, { color: colors.text }]}>No recent activity</Text>
+                  <Text style={[styles.workspaceEmptySubtitle, { color: colors.textMuted }]}>
+                    Workspace activity will appear here
+                  </Text>
+                </View>
+              </View>
+            </>
+          ) : (
+            <>
+              {/* Manage Tab - Teams, Members, Settings */}
+              
+              {/* Teams Management */}
+              <View style={styles.workspaceSection}>
+                <View style={styles.workspaceSectionHeader}>
+                  <Text style={[styles.workspaceSectionTitle, { color: colors.text }]}>Teams</Text>
+                  {permissions.canManageTeams && (
+                    <TouchableOpacity style={[styles.workspaceAddButton, { backgroundColor: colors.primary }]}>
+                      <Ionicons name="add" size={18} color="#fff" />
+                    </TouchableOpacity>
+                  )}
+                </View>
 
-          {/* Activity Section */}
-          <View style={styles.workspaceSection}>
-            <View style={styles.workspaceSectionHeader}>
-              <Text style={[styles.workspaceSectionTitle, { color: colors.text }]}>Recent Activity</Text>
-            </View>
+                <View style={[styles.workspaceEmptyState, { backgroundColor: colors.card }]}>
+                  <Ionicons name="people-outline" size={40} color={colors.textMuted} />
+                  <Text style={[styles.workspaceEmptyTitle, { color: colors.text }]}>No teams yet</Text>
+                  <Text style={[styles.workspaceEmptySubtitle, { color: colors.textMuted }]}>
+                    Create teams to organize your training groups
+                  </Text>
+                </View>
+              </View>
 
-            <View style={[styles.workspaceEmptyState, { backgroundColor: colors.card }]}>
-              <Ionicons name="time-outline" size={40} color={colors.textMuted} />
-              <Text style={[styles.workspaceEmptyTitle, { color: colors.text }]}>No recent activity</Text>
-              <Text style={[styles.workspaceEmptySubtitle, { color: colors.textMuted }]}>
-                Activity from this workspace will appear here
-              </Text>
-            </View>
-          </View>
+              {/* Members Management */}
+              <View style={styles.workspaceSection}>
+                <View style={styles.workspaceSectionHeader}>
+                  <Text style={[styles.workspaceSectionTitle, { color: colors.text }]}>Members</Text>
+                  {permissions.canInviteMembers && (
+                    <TouchableOpacity style={[styles.workspaceAddButton, { backgroundColor: colors.primary }]}>
+                      <Ionicons name="person-add" size={18} color="#fff" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <View style={[styles.workspaceEmptyState, { backgroundColor: colors.card }]}>
+                  <Ionicons name="person-outline" size={40} color={colors.textMuted} />
+                  <Text style={[styles.workspaceEmptyTitle, { color: colors.text }]}>No members yet</Text>
+                  <Text style={[styles.workspaceEmptySubtitle, { color: colors.textMuted }]}>
+                    Invite members to collaborate on training
+                  </Text>
+                </View>
+              </View>
+
+              {/* Workspace Settings */}
+              <View style={styles.workspaceSection}>
+                <View style={styles.workspaceSectionHeader}>
+                  <Text style={[styles.workspaceSectionTitle, { color: colors.text }]}>Settings</Text>
+                </View>
+
+                <View style={[styles.workspaceEmptyState, { backgroundColor: colors.card }]}>
+                  <Ionicons name="settings-outline" size={40} color={colors.textMuted} />
+                  <Text style={[styles.workspaceEmptyTitle, { color: colors.text }]}>Workspace Settings</Text>
+                  <Text style={[styles.workspaceEmptySubtitle, { color: colors.textMuted }]}>
+                    Manage workspace preferences and configurations
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
         </ScrollView>
       </View>
     );
@@ -433,10 +536,36 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
 
-  // Workspace View (for non-personal workspaces)
+  // Workspace Tabs
+  tabBar: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    borderBottomWidth: 1,
+  },
+  tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginRight: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabActive: {
+    borderBottomWidth: 2,
+  },
+  tabText: {
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
+
+  // Workspace View Styles
   workspaceStatsCard: {
     marginBottom: 40,
-    paddingTop: 8,
+    paddingTop: 20,
   },
   workspaceStatsRow: {
     flexDirection: 'row',
@@ -521,6 +650,7 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     letterSpacing: -0.1,
   },
+
 
   // Welcome Card
   welcomeCard: {

@@ -7,7 +7,7 @@
  */
 
 import { supabase } from "@/lib/supabase";
-import type { Team, TeamMember, TeamRole, Workspace, WorkspaceAccess, WorkspaceRole } from "@/types/workspace";
+import type { Team, TeamMember, TeamMemberShip, Workspace, WorkspaceAccess, WorkspaceRole } from "@/types/workspace";
 
 // =====================================================
 // MY WORKSPACE
@@ -364,7 +364,7 @@ export async function getTeamMembers(teamId: string): Promise<(TeamMember & { pr
 export async function addTeamMember(
   teamId: string,
   userId: string,
-  role: TeamRole
+  role: TeamMemberShip
 ): Promise<TeamMember> {
   const { data, error } = await supabase
     .from("team_members")
@@ -386,7 +386,7 @@ export async function addTeamMember(
 export async function updateTeamMemberRole(
   teamId: string,
   userId: string,
-  role: TeamRole
+  role: TeamMemberShip
 ): Promise<TeamMember> {
   const { data, error } = await supabase
     .from("team_members")
