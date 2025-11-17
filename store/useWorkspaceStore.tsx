@@ -1,72 +1,129 @@
 // store/useWorkspaceStore.ts
-import { createWorkspaceService, getUserWorkspacesService } from "@/services/workspaceService";
+import {
+  getAccessibleWorkspaces,
+  getMyWorkspace,
+  updateMyWorkspace
+} from "@/services/workspaceService";
 import { Workspace } from "@/types/workspace";
 import { create } from "zustand";
 
 interface WorkspaceStore {
   workspaces: Workspace[];
+  activeWorkspaceId: string | null;  // Currently viewing workspace
   loading: boolean;
+  error: string | null;
 
-  loadWorkspaces: (userId: string) => Promise<void>;
-  createWorkspace: (name: string, description: string, userId: string) => Promise<void>;
-  getActiveWorkspace: (activeWorkspaceId: string | null | undefined) => Workspace | null;
+  loadWorkspaces: () => Promise<void>;
+  setActiveWorkspace: (workspaceId: string | null) => void;
+  updateWorkspace: (input: {
+    workspace_name?: string;
+    full_name?: string;
+    avatar_url?: string;
+  }) => Promise<void>;
+  reset: () => void;
 }
 
 /**
  * ✨ SIMPLIFIED WORKSPACE STORE ✨
  * 
- * - Stores list of available workspaces
- * - Does NOT store activeWorkspace (source of truth is user.user_metadata)
- * - Provides helper to find workspace by ID
+ * Simplified Model: User = Workspace
+ * - Each user's profile IS their workspace
+ * - Can view own workspace or other workspaces they have access to
+ * - activeWorkspaceId tracks which workspace is currently being viewed
  * 
- * Why? To avoid sync issues between store and auth context!
+ * Source of truth:
+ * - workspaces: list of accessible workspaces (mine + others I have access to)
+ * - activeWorkspaceId: currently viewing workspace ID (defaults to my workspace)
  */
 export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   workspaces: [],
+  activeWorkspaceId: null,
   loading: true,
+  error: null,
 
   /**
-   * Load all workspaces user is a member of
+   * Load all workspaces user has access to
+   * Includes: their own workspace + any workspaces they have been granted access to
    */
-  loadWorkspaces: async (userId: string) => {
-    if (!userId) {
-      set({ workspaces: [], loading: false });
-      return;
+  loadWorkspaces: async () => {
+    try {
+      set({ loading: true, error: null });
+      
+      // Check if user is authenticated first
+      const { supabase } = await import("@/lib/supabase");
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.log("📦 Workspace Store: User not authenticated yet, skipping load");
+        set({ loading: false, workspaces: [], activeWorkspaceId: null });
+        return;
+      }
+      
+      const workspaces = await getAccessibleWorkspaces();
+      
+      // Set active workspace to user's own workspace by default
+      const myWorkspace = await getMyWorkspace();
+      
+      set({
+        workspaces,
+        activeWorkspaceId: myWorkspace?.id || null,
+        loading: false,
+      });
+    } catch (error: any) {
+      console.error("Failed to load workspaces:", error);
+      set({ 
+        error: error.message, 
+        loading: false,
+        workspaces: [],
+        activeWorkspaceId: null
+      });
     }
-
-    const workspaces = await getUserWorkspacesService(userId);
-
-    set({
-      workspaces,
-      loading: false,
-    });
   },
 
   /**
-   * Get active workspace by ID
-   * Helper function - does not store state
+   * Set which workspace is currently active (viewing)
    */
-  getActiveWorkspace: (activeWorkspaceId: string | null | undefined) => {
-    if (!activeWorkspaceId || activeWorkspaceId === "personal") {
-      return null;
-    }
-
-    const list = get().workspaces;
-    return list.find((w) => w.id === activeWorkspaceId) ?? null;
+  setActiveWorkspace: (workspaceId: string | null) => {
+    console.log('🔄 Setting active workspace:', workspaceId);
+    set({ activeWorkspaceId: workspaceId });
   },
 
   /**
-   * Create a new organization workspace
+   * Update my workspace (profile)
    */
-  createWorkspace: async (name: string, description: string, userId: string) => {
-    if (!userId) return;
-
-    const newWorkspace = await createWorkspaceService(name, description, userId);
-
-    if (newWorkspace) {
+  updateWorkspace: async (input: {
+    workspace_name?: string;
+    full_name?: string;
+    avatar_url?: string;
+  }) => {
+    try {
+      set({ loading: true, error: null });
+      
+      const updated = await updateMyWorkspace(input);
+      
+      // Update in workspaces list
       set((state) => ({
-        workspaces: [...state.workspaces, newWorkspace],
+        workspaces: state.workspaces.map((w) =>
+          w.id === updated.id ? updated : w
+        ),
+        loading: false,
       }));
+    } catch (error: any) {
+      console.error("Failed to update workspace:", error);
+      set({ error: error.message, loading: false });
+      throw error;
     }
+  },
+
+  /**
+   * Reset store (on logout)
+   */
+  reset: () => {
+    set({
+      workspaces: [],
+      activeWorkspaceId: null,
+      loading: false,
+      error: null,
+    });
   },
 }));
