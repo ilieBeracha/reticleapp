@@ -17,7 +17,6 @@ export function useWelcomeSheet(sheetRef: RefObject<BottomSheetModal | null>) {
   const checkAndShowWelcome = async () => {
     try {
       const shouldShow = await AsyncStorage.getItem(WELCOME_SHEET_KEY);
-      console.log('shouldShow', shouldShow);
       if (shouldShow === 'true') {
         // Small delay to ensure layout is ready
         setTimeout(() => {

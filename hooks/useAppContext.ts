@@ -97,13 +97,6 @@ export function useAppContext(): AppContext {
     // Check if viewing my workspace
     const isMyWorkspace = currentActiveId === myWorkspaceId;
     const isOtherWorkspace = !isMyWorkspace;
-    
-    console.log('🔍 useAppContext:');
-    console.log('  - myWorkspaceId:', myWorkspaceId);
-    console.log('  - activeWorkspaceId:', currentActiveId);
-    console.log('  - activeWorkspace:', activeWorkspace?.workspace_name);
-    console.log('  - isMyWorkspace:', isMyWorkspace);
-    console.log('  - workspaces count:', workspaces.length);
 
     return {
       // User

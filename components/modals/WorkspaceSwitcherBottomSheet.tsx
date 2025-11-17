@@ -86,6 +86,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
     const handleSelectWorkspace = useCallback(async (workspace: Workspace) => {
       try {
         await switchWorkspace(workspace.id);
+        
         bottomSheetRef.current?.close();
       } catch (error: any) {
         console.error("Failed to switch workspace:", error);
@@ -235,7 +236,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
                   onPress={handleOpenCreateWorkspace}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="add" size={20} color="#fff" />
+                  <Ionicons name="add" size={20}  />
                 </TouchableOpacity>
               </View>
               <Text style={[styles.subtitle, { color: colors.textMuted }]}>

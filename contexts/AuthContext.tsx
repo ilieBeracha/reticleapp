@@ -213,11 +213,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           
           // ✅ In new model: user.id is MY workspace
           const isMyWorkspace = activeWorkspaceId === user.id || !activeWorkspaceId
-          
-          console.log("🔍 AuthClient context - myWorkspaceId:", user.id)
-          console.log("🔍 AuthClient context - activeWorkspaceId:", activeWorkspaceId)
-          console.log("🔍 AuthClient context - returning workspaceId:", isMyWorkspace ? null : activeWorkspaceId)
-          
+        
           return {
             userId: user.id,
             workspaceId: isMyWorkspace ? null : activeWorkspaceId
