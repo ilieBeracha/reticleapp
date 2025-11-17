@@ -24,10 +24,10 @@ export function Header({
 
   const fallbackInitial = email?.charAt(0)?.toUpperCase() ?? "?";
   
-  // Display "Personal" for personal workspaces, full name for orgs
+  // Display "Personal" for personal workspaces, workspace name for others
   const workspaceName = activeWorkspace?.workspace_type === 'personal'
     ? 'Personal'
-    : (activeWorkspace?.name || 'Personal');
+    : (activeWorkspace?.workspace_name || activeWorkspace?.name || 'Workspace');
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

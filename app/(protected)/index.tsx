@@ -1,5 +1,7 @@
+import type { BaseBottomSheetRef } from '@/components/modals/BaseBottomSheet';
 import type { BaseDetachedBottomSheetRef } from '@/components/modals/BaseDetachedBottomSheet';
 import { ComingSoonSheet } from '@/components/modals/ComingSoonSheet';
+import { CreateSessionSheet } from '@/components/modals/CreateSessionSheet';
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +34,7 @@ export default function HomePage() {
   const colors = useColors();
   const workspaceName = activeWorkspace?.workspace_name || activeWorkspace?.full_name;
   const chartDetailsSheetRef = useRef<BaseDetachedBottomSheetRef>(null);
+  const createSessionSheetRef = useRef<BaseBottomSheetRef>(null);
 
   // Pie chart data - elegant muted tones with depth
   const pieData = [
@@ -91,26 +94,106 @@ export default function HomePage() {
     return { scaleAnim, animatePressIn, animatePressOut };
   };
 
-  // Show simple view for organization workspace
+  // Show organization workspace view
   if (!isMyWorkspace) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.orgContent}>
-          <View style={[styles.orgCard, { backgroundColor: colors.card }]}>
-            <Ionicons name="business-outline" size={56} color={colors.primary} />
-            <Text style={[styles.orgTitle, { color: colors.text }]}>
-              {workspaceName}
-            </Text>
-            <Text style={[styles.orgSubtitle, { color: colors.textMuted }]}>
-              Organization Workspace
-            </Text>
-            <View style={[styles.orgBadge, { backgroundColor: colors.primary + '15' }]}>
-              <Text style={[styles.orgBadgeText, { color: colors.primary }]}>
-                {activeWorkspace?.access_role || 'Member'}
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerStyle={styles.content}
+        >
+          {/* Workspace Stats Overview */}
+          <View style={styles.workspaceStatsCard}>
+            <View style={styles.workspaceStatsRow}>
+              <View style={styles.workspaceStatItem}>
+                <View style={[styles.workspaceStatIcon, { backgroundColor: '#5B7A8C15' }]}>
+                  <Ionicons name="people-outline" size={20} color="#5B7A8C" />
+                </View>
+                <View style={styles.workspaceStatText}>
+                  <Text style={[styles.workspaceStatValue, { color: colors.text }]}>0</Text>
+                  <Text style={[styles.workspaceStatLabel, { color: colors.textMuted }]}>Members</Text>
+                </View>
+              </View>
+
+              <View style={[styles.workspaceStatDivider, { backgroundColor: colors.border }]} />
+
+              <View style={styles.workspaceStatItem}>
+                <View style={[styles.workspaceStatIcon, { backgroundColor: '#E7692515' }]}>
+                  <Ionicons name="people-circle-outline" size={20} color="#E76925" />
+                </View>
+                <View style={styles.workspaceStatText}>
+                  <Text style={[styles.workspaceStatValue, { color: colors.text }]}>0</Text>
+                  <Text style={[styles.workspaceStatLabel, { color: colors.textMuted }]}>Teams</Text>
+                </View>
+              </View>
+
+              <View style={[styles.workspaceStatDivider, { backgroundColor: colors.border }]} />
+
+              <View style={styles.workspaceStatItem}>
+                <View style={[styles.workspaceStatIcon, { backgroundColor: '#5A847315' }]}>
+                  <Ionicons name="calendar-outline" size={20} color="#5A8473" />
+                </View>
+                <View style={styles.workspaceStatText}>
+                  <Text style={[styles.workspaceStatValue, { color: colors.text }]}>0</Text>
+                  <Text style={[styles.workspaceStatLabel, { color: colors.textMuted }]}>Sessions</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Teams Section */}
+          <View style={styles.workspaceSection}>
+            <View style={styles.workspaceSectionHeader}>
+              <Text style={[styles.workspaceSectionTitle, { color: colors.text }]}>Teams</Text>
+              <TouchableOpacity style={[styles.workspaceAddButton, { backgroundColor: colors.primary }]}>
+                <Ionicons name="add" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.workspaceEmptyState, { backgroundColor: colors.card }]}>
+              <Ionicons name="people-outline" size={40} color={colors.textMuted} />
+              <Text style={[styles.workspaceEmptyTitle, { color: colors.text }]}>No teams yet</Text>
+              <Text style={[styles.workspaceEmptySubtitle, { color: colors.textMuted }]}>
+                Create teams to organize your training groups
               </Text>
             </View>
           </View>
-        </View>
+
+          {/* Members Section */}
+          <View style={styles.workspaceSection}>
+            <View style={styles.workspaceSectionHeader}>
+              <Text style={[styles.workspaceSectionTitle, { color: colors.text }]}>Members</Text>
+              <TouchableOpacity style={[styles.workspaceAddButton, { backgroundColor: colors.primary }]}>
+                <Ionicons name="person-add" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.workspaceEmptyState, { backgroundColor: colors.card }]}>
+              <Ionicons name="person-outline" size={40} color={colors.textMuted} />
+              <Text style={[styles.workspaceEmptyTitle, { color: colors.text }]}>No members yet</Text>
+              <Text style={[styles.workspaceEmptySubtitle, { color: colors.textMuted }]}>
+                Invite members to collaborate on training
+              </Text>
+            </View>
+          </View>
+
+          {/* Activity Section */}
+          <View style={styles.workspaceSection}>
+            <View style={styles.workspaceSectionHeader}>
+              <Text style={[styles.workspaceSectionTitle, { color: colors.text }]}>Recent Activity</Text>
+            </View>
+
+            <View style={[styles.workspaceEmptyState, { backgroundColor: colors.card }]}>
+              <Ionicons name="time-outline" size={40} color={colors.textMuted} />
+              <Text style={[styles.workspaceEmptyTitle, { color: colors.text }]}>No recent activity</Text>
+              <Text style={[styles.workspaceEmptySubtitle, { color: colors.textMuted }]}>
+                Activity from this workspace will appear here
+              </Text>
+            </View>
+          </View>
+        </ScrollView>
       </View>
     );
   }
@@ -123,13 +206,74 @@ export default function HomePage() {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
       >
+        {/* User Welcome Card */}
+        <View style={styles.welcomeCard}>
+          <View style={styles.welcomeContent}>
+            <View>
+              <Text style={[styles.welcomeGreeting, { color: colors.textMuted }]}>Welcome back,</Text>
+              <Text style={[styles.welcomeName, { color: colors.text }]}>{fullName || 'User'}</Text>
+            </View>
+            <View style={[styles.welcomeAvatar, { backgroundColor: colors.primary }]}>
+              <Text style={styles.welcomeAvatarText}>
+                {(fullName || email || 'U').charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.welcomeStats}>
+            <View style={styles.welcomeStat}>
+              <Text style={[styles.welcomeStatValue, { color: colors.text }]}>0</Text>
+              <Text style={[styles.welcomeStatLabel, { color: colors.textMuted }]}>Sessions</Text>
+            </View>
+            <View style={[styles.welcomeStatDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.welcomeStat}>
+              <Text style={[styles.welcomeStatValue, { color: colors.text }]}>0h</Text>
+              <Text style={[styles.welcomeStatLabel, { color: colors.textMuted }]}>Total Time</Text>
+            </View>
+            <View style={[styles.welcomeStatDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.welcomeStat}>
+              <Text style={[styles.welcomeStatValue, { color: colors.text }]}>0</Text>
+              <Text style={[styles.welcomeStatLabel, { color: colors.textMuted }]}>This Week</Text>
+            </View>
+          </View>
+        </View>
+
         {/* Hero Section with Chart */}
-        <View style={[styles.hero, { backgroundColor: colors.cardForeground + 'F2' }]}>
+        <View style={[styles.hero, { backgroundColor: colors.card }]}>
           <View style={styles.heroHeader}>
-            <Text style={[styles.heroTitle, { color: colors.background }]}>Training Distribution</Text>
+            <Text style={[styles.heroTitle, { color: colors.text }]}>Training Distribution</Text>
             <Text style={[styles.heroSubtitle, { color: colors.textMuted }]}>
               Track your workout categories
             </Text>
+          </View>
+
+          {/* Category Tabs */}
+          <View style={styles.categoryTabs}>
+            {[
+              { label: 'All', color: '#6B8FA3' },
+              { label: 'Strength', color: '#6B8FA3' },
+              { label: 'Cardio', color: '#FF8A5C' },
+              { label: 'Flexibility', color: '#7AA493' },
+            ].map((category, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.categoryTab,
+                  index === 0 && styles.categoryTabActive,
+                  { 
+                    backgroundColor: index === 0 ? category.color + '15' : 'transparent',
+                    borderColor: index === 0 ? category.color : colors.border
+                  }
+                ]}
+                activeOpacity={0.7}
+              >
+                <Text style={[
+                  styles.categoryTabText,
+                  { color: index === 0 ? category.color : colors.textMuted }
+                ]}>
+                  {category.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
 
           <TouchableOpacity 
@@ -165,9 +309,27 @@ export default function HomePage() {
           </View>
 
           {[
-            { icon: 'add-circle', title: 'Start New Session', subtitle: 'Begin your training', isPrimary: true },
-            { icon: 'bar-chart-outline', title: 'View Progress', subtitle: 'Track your stats', color: '#5B7A8C' },
-            { icon: 'calendar', title: 'Schedule Training', subtitle: 'Plan your sessions', color: '#5A8473' },
+            { 
+              icon: 'add-circle', 
+              title: 'Start New Session', 
+              subtitle: 'Begin your training', 
+              isPrimary: true,
+              onPress: () => createSessionSheetRef.current?.open()
+            },
+            { 
+              icon: 'bar-chart-outline', 
+              title: 'View Progress', 
+              subtitle: 'Track your stats', 
+              color: '#5B7A8C',
+              onPress: () => chartDetailsSheetRef.current?.open()
+            },
+            { 
+              icon: 'calendar', 
+              title: 'Schedule Training', 
+              subtitle: 'Plan your sessions', 
+              color: '#5A8473',
+              onPress: () => chartDetailsSheetRef.current?.open()
+            },
           ].map((action, index) => {
             const { scaleAnim, animatePressIn, animatePressOut } = createPressAnimation();
             const isPrimary = action.isPrimary;
@@ -180,6 +342,7 @@ export default function HomePage() {
                     styles.actionCard,
                     { backgroundColor: isPrimary ? colors.primary : colors.card }
                   ]}
+                  onPress={action.onPress}
                   onPressIn={animatePressIn}
                   onPressOut={animatePressOut}
                   activeOpacity={0.8}
@@ -244,6 +407,15 @@ export default function HomePage() {
         subtitle="Get insights into your training patterns"
         icon="bar-chart"
       />
+
+      {/* Create Session Bottom Sheet */}
+      <CreateSessionSheet
+        ref={createSessionSheetRef}
+        onSessionCreated={() => {
+          createSessionSheetRef.current?.close();
+          // TODO: Refresh dashboard data
+        }}
+      />
     </View>
   );
 }
@@ -261,45 +433,160 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
 
-  // Organization View
-  orgContent: {
-    flex: 1,
+  // Workspace View (for non-personal workspaces)
+  workspaceStatsCard: {
+    marginBottom: 40,
+    paddingTop: 8,
+  },
+  workspaceStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-evenly',
+  },
+  workspaceStatItem: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 10,
+    width: '30%',
+  },
+  workspaceStatIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
   },
-  orgCard: {
+  workspaceStatText: {
     alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 40,
-    borderRadius: 20,
-    width: '100%',
-    maxWidth: 400,
+    gap: 4,
   },
-  orgTitle: {
-    fontSize: 24,
+  workspaceStatValue: {
+    fontSize: 22,
     fontWeight: '700',
-    marginTop: 20,
-    marginBottom: 8,
-    textAlign: 'center',
     letterSpacing: -0.3,
   },
-  orgSubtitle: {
-    fontSize: 16,
-    fontWeight: '400',
-    marginBottom: 16,
-    textAlign: 'center',
+  workspaceStatLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    letterSpacing: -0.1,
+  },
+  workspaceStatDivider: {
+    width: 1,
+    height: 48,
+    marginHorizontal: 0,
+  },
+  workspaceSection: {
+    marginBottom: 40,
+  },
+  workspaceSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  workspaceSectionTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  workspaceAddButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  workspaceEmptyState: {
+    alignItems: 'center',
+    paddingVertical: 56,
+    paddingHorizontal: 40,
+    borderRadius: 16,
+  },
+  workspaceEmptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 20,
+    marginBottom: 10,
     letterSpacing: -0.2,
   },
-  orgBadge: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  orgBadgeText: {
-    fontSize: 14,
-    fontWeight: '600',
+  workspaceEmptySubtitle: {
+    fontSize: 15,
+    fontWeight: '400',
+    textAlign: 'center',
+    lineHeight: 24,
     letterSpacing: -0.1,
+  },
+
+  // Welcome Card
+  welcomeCard: {
+    marginBottom: 24,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+  },
+  welcomeContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  welcomeGreeting: {
+    fontSize: 15,
+    fontWeight: '400',
+    marginBottom: 4,
+    letterSpacing: -0.2,
+  },
+  welcomeName: {
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: -0.4,
+  },
+  welcomeAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  welcomeAvatarText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  welcomeStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  welcomeStat: {
+    alignItems: 'center',
+  },
+  welcomeStatValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 2,
+    letterSpacing: -0.3,
+  },
+  welcomeStatLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    letterSpacing: -0.1,
+  },
+  welcomeStatDivider: {
+    width: 1,
+    height: 28,
   },
 
   // Section Headers
@@ -338,6 +625,26 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '400',
     letterSpacing: -0.2,
+  },
+  categoryTabs: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 20,
+    paddingHorizontal: 4,
+  },
+  categoryTab: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  categoryTabActive: {
+    borderWidth: 1,
+  },
+  categoryTabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: -0.1,
   },
   chartContainer: {
     paddingVertical: 32,
