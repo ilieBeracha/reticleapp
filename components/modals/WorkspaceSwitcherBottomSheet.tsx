@@ -317,7 +317,6 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
                   placeholderTextColor={colors.textMuted + 'CC'}
                   value={workspaceName}
                   onChangeText={setWorkspaceName}
-                  autoFocus
                   returnKeyType="done"
                   onSubmitEditing={handleCreateWorkspace}
                 />
