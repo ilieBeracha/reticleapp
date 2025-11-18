@@ -50,8 +50,10 @@ export interface OrgWorkspace {
 
 export interface WorkspaceAccess {
   id: string;
-  workspace_owner_id: string;  // profile.id of workspace owner
-  member_id: string;            // user who has access
+  workspace_type: WorkspaceType;
+  workspace_owner_id: string | null;  // For personal: profile.id, for org: null
+  org_workspace_id?: string | null;   // For org: org_workspaces.id, for personal: null
+  member_id: string;                   // user who has access
   role: WorkspaceRole;
   joined_at: string;
 }

@@ -19,7 +19,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const sessions = await getPersonalSessions();
-      console.log("🔍 Personal sessions:", sessions);
       set({ sessions, loading: false });
     } catch (error: any) {
       set({ error: error.message, loading: false });

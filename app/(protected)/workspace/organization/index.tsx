@@ -11,11 +11,11 @@ import { useSessionStore } from '@/store/sessionStore';
 import type { Team } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function OrganizationWorkspacePage() {
   const colors = useColors();
-  const { activeWorkspaceId, activeWorkspace } = useAppContext();
+  const { activeWorkspaceId } = useAppContext();
   const permissions = useWorkspacePermissions();
   const { createTeamSheetRef, setOnTeamCreated, createSessionSheetRef, setOnSessionCreated, inviteMembersSheetRef } = useModals();
   const { sessions, loading: sessionsLoading, error: sessionsError, loadWorkspaceSessions } = useSessionStore();
@@ -24,19 +24,9 @@ export default function OrganizationWorkspacePage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [loadingTeams, setLoadingTeams] = useState(false);
 
-  // Role display
-  const roleDisplay = permissions.role.charAt(0).toUpperCase() + permissions.role.slice(1);
-  const roleConfig = {
-    owner: { icon: 'shield-checkmark' as const, color: '#FF6B35', bg: '#FF6B3515' },
-    admin: { icon: 'shield-half' as const, color: '#5B7A8C', bg: '#5B7A8C15' },
-    instructor: { icon: 'school' as const, color: '#E76925', bg: '#E7692515' },
-    member: { icon: 'person' as const, color: '#666', bg: '#E0E0E0' },
-  };
-  const currentRole = roleConfig[permissions.role] || roleConfig.member;
-
   // Load teams
   const loadTeams = useCallback(async () => {
-    if (!activeWorkspaceId || !activeWorkspace) return;
+    if (!activeWorkspaceId) return;
     setLoadingTeams(true);
     try {
       const fetchedTeams = await getWorkspaceTeams('org', activeWorkspaceId);
@@ -46,7 +36,7 @@ export default function OrganizationWorkspacePage() {
     } finally {
       setLoadingTeams(false);
     }
-  }, [activeWorkspaceId, activeWorkspace]);
+  }, [activeWorkspaceId]);
 
   // Load sessions
   useEffect(() => {
@@ -57,10 +47,10 @@ export default function OrganizationWorkspacePage() {
 
   // Load teams on mount
   useEffect(() => {
-    if (activeWorkspaceId && activeWorkspace) {
+    if (activeWorkspaceId) {
       loadTeams();
     }
-  }, [activeWorkspaceId, activeWorkspace, loadTeams]);
+  }, [activeWorkspaceId, loadTeams]);
 
   // Register callbacks
   const refreshSessions = useMemo(() => () => {
@@ -81,35 +71,9 @@ export default function OrganizationWorkspacePage() {
   const activeSessions = sessions.filter(s => s.status === 'active').length;
   const completedSessions = sessions.filter(s => s.status === 'completed').length;
 
-  // Memoize container style
-  const containerStyle = useMemo(() => [
-    styles.container,
-    { backgroundColor: colors.background }
-  ], [colors.background]);
-
   return (
-    <View style={containerStyle}>
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.content}
-        removeClippedSubviews={true}
-      >
-        {/* Workspace Header */}
-        <View style={styles.header}>
-          <Text style={[styles.workspaceName, { color: colors.text }]}>
-            {activeWorkspace?.workspace_name || 'Organization'}
-          </Text>
-          <View style={[styles.roleBadge, { backgroundColor: currentRole.bg }]}>
-            <Ionicons name={currentRole.icon} size={12} color={currentRole.color} />
-            <Text style={[styles.roleBadgeText, { color: currentRole.color }]}>
-              {roleDisplay}
-            </Text>
-          </View>
-        </View>
-        
-        <StatsOverview 
+    <>
+      <StatsOverview 
           totalSessions={totalSessions} 
           activeSessions={activeSessions} 
           completedSessions={completedSessions} 
@@ -221,49 +185,11 @@ export default function OrganizationWorkspacePage() {
             </Text>
           </View>
         )}
-      </ScrollView>
-    </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 40,
-  },
-
-  // Header
-  header: {
-    marginBottom: 24,
-  },
-  workspaceName: {
-    fontSize: 32,
-    fontWeight: '700',
-    marginBottom: 10,
-    letterSpacing: -0.5,
-  },
-  roleBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    gap: 5,
-  },
-  roleBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: -0.1,
-  },
-
   // Section (for Management section)
   section: {
     marginBottom: 28,

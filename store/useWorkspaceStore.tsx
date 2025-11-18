@@ -2,9 +2,10 @@
 import {
   getAccessibleWorkspaces,
   getMyWorkspace,
+  getWorkspaceMembers,
   updateMyWorkspace
 } from "@/services/workspaceService";
-import { Workspace } from "@/types/workspace";
+import { Workspace, WorkspaceAccess } from "@/types/workspace";
 import { create } from "zustand";
 
 interface WorkspaceStore {
@@ -12,7 +13,8 @@ interface WorkspaceStore {
   activeWorkspaceId: string | null;  // Currently viewing workspace
   loading: boolean;
   error: string | null;
-
+  workspaceMembers: (WorkspaceAccess & { profile?: any })[];
+  loadWorkspaceMembers: () => Promise<void>;
   loadWorkspaces: () => Promise<void>;
   setActiveWorkspace: (workspaceId: string | null) => void;
   updateWorkspace: (input: {
@@ -40,7 +42,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   activeWorkspaceId: null,
   loading: true,
   error: null,
-
+  workspaceMembers: [],
   /**
    * Load all workspaces user has access to
    * Includes: their own workspace + any workspaces they have been granted access to
@@ -79,6 +81,25 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       });
     }
   },
+
+  loadWorkspaceMembers: async () => {
+    const { activeWorkspaceId, workspaces } = get();
+    if (!activeWorkspaceId) return;
+    
+    // Only load members for organization workspaces
+    const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId);
+    if (!activeWorkspace || activeWorkspace.workspace_type !== 'org') {
+      set({ workspaceMembers: [] });
+      return;
+    }
+    
+    try {
+      const members = await getWorkspaceMembers(activeWorkspaceId);
+      set({ workspaceMembers: members });
+    } catch (error) {
+      console.error('Failed to load members:', error);
+    }
+  },  
 
   /**
    * Set which workspace is currently active (viewing)

@@ -91,7 +91,6 @@ export default function PersonalWorkspacePage() {
       icon: 'add-circle' as const, 
       title: 'Start New Session', 
       subtitle: 'Begin your training', 
-      isPrimary: true,
       onPress: handleStartSession
     },
     { 
@@ -161,7 +160,6 @@ export default function PersonalWorkspacePage() {
                 icon={action.icon}
                 title={action.title}
                 subtitle={action.subtitle}
-                isPrimary={action.isPrimary}
                 color={action.color}
                 onPress={action.onPress}
                 isFirst={isFirst}

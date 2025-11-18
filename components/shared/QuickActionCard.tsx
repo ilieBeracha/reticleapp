@@ -7,7 +7,6 @@ interface QuickActionCardProps {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   subtitle: string;
-  isPrimary?: boolean;
   color?: string;
   onPress: () => void;
   isFirst?: boolean;
@@ -18,7 +17,6 @@ const QuickActionCard = memo(function QuickActionCard({
   icon, 
   title, 
   subtitle, 
-  isPrimary = false, 
   color,
   onPress,
   isFirst,
@@ -50,32 +48,32 @@ const QuickActionCard = memo(function QuickActionCard({
   const cardStyle = useMemo(() => [
     styles.card,
     { 
-      backgroundColor: isPrimary ? colors.primary : 'transparent',
+      backgroundColor: 'transparent',
     }
-  ], [isPrimary, colors.primary]);
+  ], []);
 
   const iconStyle = useMemo(() => [
     styles.icon,
-    { backgroundColor: isPrimary ? 'rgba(255, 255, 255, 0.2)' : actionColor + '15' }
-  ], [isPrimary, actionColor]);
+    { backgroundColor: actionColor + '15' }
+  ], [actionColor]);
 
   const iconColor = useMemo(() => 
-    isPrimary ? '#fff' : actionColor
-  , [isPrimary, actionColor]);
+    actionColor
+  , [actionColor]);
 
   const titleStyle = useMemo(() => [
     styles.title,
-    { color: isPrimary ? '#fff' : colors.text }
-  ], [isPrimary, colors.text]);
+    { color: colors.text }
+  ], [colors.text]);
 
   const subtitleStyle = useMemo(() => [
     styles.subtitle,
-    { color: isPrimary ? 'rgba(255, 255, 255, 0.8)' : colors.textMuted }
-  ], [isPrimary, colors.textMuted]);
+    { color: colors.textMuted }
+  ], [colors.textMuted]);
 
   const chevronColor = useMemo(() => 
-    isPrimary ? '#fff' : colors.textMuted
-  , [isPrimary, colors.textMuted]);
+    colors.textMuted
+  , [colors.textMuted]);
 
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
