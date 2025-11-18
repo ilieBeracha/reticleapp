@@ -9,9 +9,16 @@ interface StatsOverviewProps {
   activeSessions: number;
   completedSessions: number;
   teams: Team[];
+  loading?: boolean;
 }
 
-export default function StatsOverview({ totalSessions, activeSessions, completedSessions, teams }: StatsOverviewProps) {
+export default function StatsOverview({ 
+  totalSessions, 
+  activeSessions, 
+  completedSessions, 
+  teams,
+  loading 
+}: StatsOverviewProps) {
   const colors = useColors();
 
   const stats = useMemo(() => [{
@@ -32,6 +39,11 @@ export default function StatsOverview({ totalSessions, activeSessions, completed
     label: 'Teams',
   }], [totalSessions, activeSessions, completedSessions, teams]);
 
+  const skeletonStyle = useMemo(() => [
+    styles.skeleton,
+    { backgroundColor: colors.secondary }
+  ], [colors.secondary]);
+
   return (
     <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <Text style={[styles.cardTitle, { color: colors.text }]}>Stats Overview</Text>
@@ -43,8 +55,17 @@ export default function StatsOverview({ totalSessions, activeSessions, completed
               <Ionicons name={stat.icon as keyof typeof Ionicons.glyphMap} size={20} color={colors.muted} />
             </View>
             <View style={styles.statContent}>
-              <Text style={[styles.statValue, { color: colors.text }]}>{stat.value}</Text>
-              <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{stat.label}</Text>
+              {loading ? (
+                <>
+                  <View style={[skeletonStyle, styles.skeletonValue]} />
+                  <View style={[skeletonStyle, styles.skeletonLabel]} />
+                </>
+              ) : (
+                <>
+                  <Text style={[styles.statValue, { color: colors.text }]}>{stat.value}</Text>
+                  <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{stat.label}</Text>
+                </>
+              )}
             </View>
           </View>
         ))}
@@ -104,5 +125,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     letterSpacing: -0.1,
+  },
+  skeleton: {
+    borderRadius: 6,
+    opacity: 0.6,
+  },
+  skeletonValue: {
+    width: 50,
+    height: 26,
+    marginBottom: 4,
+  },
+  skeletonLabel: {
+    width: 90,
+    height: 14,
   },
 });

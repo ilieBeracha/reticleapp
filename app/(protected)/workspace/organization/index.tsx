@@ -113,7 +113,8 @@ export default function OrganizationWorkspacePage() {
           totalSessions={totalSessions} 
           activeSessions={activeSessions} 
           completedSessions={completedSessions} 
-          teams={teams} 
+          teams={teams}
+          loading={sessionsLoading || loadingTeams}
         />
 
         <QuickActions

@@ -139,6 +139,7 @@ export default function PersonalWorkspacePage() {
         <WelcomeCard 
           fullName={fullName || ''}
           stats={stats}
+          loading={loading}
         />
 
         {/* Training Distribution Chart */}

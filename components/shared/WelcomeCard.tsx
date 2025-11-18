@@ -11,6 +11,7 @@ interface WelcomeCardProps {
     totalCompletedSessions: number;
     totalTime: string;
   };
+  loading?: boolean;
 }
 
 // Separate Header Component
@@ -40,7 +41,13 @@ const WelcomeHeader = memo(function WelcomeHeader({ fullName }: { fullName?: str
 });
 
 // Separate Stats Grid Component
-const StatsGrid = memo(function StatsGrid({ stats }: { stats: WelcomeCardProps['stats'] }) {
+const StatsGrid = memo(function StatsGrid({ 
+  stats, 
+  loading 
+}: { 
+  stats: WelcomeCardProps['stats'];
+  loading?: boolean;
+}) {
   const colors = useColors();
 
   const statsConfig = useMemo(() => [
@@ -80,6 +87,29 @@ const StatsGrid = memo(function StatsGrid({ stats }: { stats: WelcomeCardProps['
     { color: colors.textMuted }
   ], [colors.textMuted]);
 
+  const skeletonStyle = useMemo(() => [
+    styles.skeleton,
+    { backgroundColor: colors.secondary }
+  ], [colors.secondary]);
+
+  if (loading) {
+    return (
+      <View style={styles.statsGrid}>
+        {statsConfig.map((stat, index) => (
+          <View key={index} style={styles.statItem}>
+            <View style={[styles.statIcon, { backgroundColor: stat.iconColor + '15' }]}>
+              <Ionicons name={stat.icon} size={18} color={stat.iconColor} />
+            </View>
+            <View style={styles.statContent}>
+              <View style={[skeletonStyle, styles.skeletonValue]} />
+              <View style={[skeletonStyle, styles.skeletonLabel]} />
+            </View>
+          </View>
+        ))}
+      </View>
+    );
+  }
+
   return (
     <View style={styles.statsGrid}>
       {statsConfig.map((stat, index) => (
@@ -102,11 +132,11 @@ const StatsGrid = memo(function StatsGrid({ stats }: { stats: WelcomeCardProps['
 });
 
 // Main Component - Combines Header and Stats
-export default function WelcomeCard({ fullName, stats }: WelcomeCardProps) {
+export default function WelcomeCard({ fullName, stats, loading }: WelcomeCardProps) {
   return (
     <View style={styles.wrapper}>
       <WelcomeHeader fullName={fullName} />
-      <StatsGrid stats={stats} />
+      <StatsGrid stats={stats} loading={loading} />
     </View>
   );
 }
@@ -162,6 +192,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     letterSpacing: -0.1,
+  },
+  skeleton: {
+    borderRadius: 6,
+    opacity: 0.6,
+  },
+  skeletonValue: {
+    width: 50,
+    height: 24,
+    marginBottom: 4,
+  },
+  skeletonLabel: {
+    width: 80,
+    height: 14,
   },
 });
 
