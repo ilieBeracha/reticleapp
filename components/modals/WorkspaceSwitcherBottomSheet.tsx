@@ -149,7 +149,8 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
       bottomSheetRef.current?.close();
       
       // Set callback to reload workspaces when invite is accepted
-      setOnInviteAccepted(async () => {
+      // Wrap in arrow function so React stores the function, not calls it
+      setOnInviteAccepted(() => async () => {
         await useWorkspaceStore.getState().loadWorkspaces();
       });
       
@@ -232,6 +233,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
       <>
         {/* Main Workspace Switcher */}
         <BaseBottomSheet
+      
           ref={bottomSheetRef}
           backdropOpacity={0.6}
           snapPoints={['60%','92%']}

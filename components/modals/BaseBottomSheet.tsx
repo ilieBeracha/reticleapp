@@ -14,10 +14,11 @@ interface BaseBottomSheetProps {
   snapPoints?: string[];
   enableDynamicSizing?: boolean;
   backdropOpacity?: number;
+  scrollToRefresh?: boolean;
 }
 
 export const BaseBottomSheet = forwardRef<BaseBottomSheetRef, BaseBottomSheetProps>(
-  ({ children, snapPoints, enableDynamicSizing = false, backdropOpacity = 0.3 }, ref) => {
+  ({ children, snapPoints, enableDynamicSizing = false, backdropOpacity = 0.3, scrollToRefresh = false }, ref) => {
     const colors = useColors();
     const bottomSheetRef = useRef<BottomSheet>(null);
 

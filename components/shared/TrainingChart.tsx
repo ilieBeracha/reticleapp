@@ -1,5 +1,5 @@
 import { useColors } from '@/hooks/ui/useColors';
-import { useRef } from 'react';
+import { memo, useMemo, useRef } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { PieChart } from 'react-native-gifted-charts';
 
@@ -31,7 +31,7 @@ const defaultCategories: Category[] = [
   { label: 'Flexibility', color: '#7AA493' },
 ];
 
-export default function TrainingChart({ 
+const TrainingChart = memo(function TrainingChart({ 
   data, 
   categories = defaultCategories,
   centerValue = '0',
@@ -53,11 +53,51 @@ export default function TrainingChart({
     lastTap.current = now;
   };
 
+  // Memoize dynamic styles
+  const heroStyle = useMemo(() => [
+    styles.hero,
+    { backgroundColor: colors.card }
+  ], [colors.card]);
+
+  const heroTitleStyle = useMemo(() => [
+    styles.heroTitle,
+    { color: colors.text }
+  ], [colors.text]);
+
+  const heroSubtitleStyle = useMemo(() => [
+    styles.heroSubtitle,
+    { color: colors.textMuted }
+  ], [colors.textMuted]);
+
+  const centerValueTextStyle = useMemo(() => [
+    styles.centerLabelValue,
+    { color: colors.text }
+  ], [colors.text]);
+
+  const centerLabelTextStyle = useMemo(() => [
+    styles.centerLabelText,
+    { color: colors.textMuted }
+  ], [colors.textMuted]);
+
+  const centerSubtextTextStyle = useMemo(() => [
+    styles.centerLabelSubtext,
+    { color: colors.textMuted }
+  ], [colors.textMuted]);
+
+  // Memoize center label component to prevent recreations
+  const centerLabelComponent = useMemo(() => () => (
+    <View style={styles.centerLabel}>
+      <Text style={centerValueTextStyle}>{centerValue}</Text>
+      <Text style={centerLabelTextStyle}>{centerLabel}</Text>
+      <Text style={centerSubtextTextStyle}>{centerSubtext}</Text>
+    </View>
+  ), [centerValue, centerLabel, centerSubtext, centerValueTextStyle, centerLabelTextStyle, centerSubtextTextStyle]);
+
   return (
-    <View style={[styles.hero, { backgroundColor: colors.card }]}>
+    <View style={heroStyle}>
       <View style={styles.heroHeader}>
-        <Text style={[styles.heroTitle, { color: colors.text }]}>Training Distribution</Text>
-        <Text style={[styles.heroSubtitle, { color: colors.textMuted }]}>
+        <Text style={heroTitleStyle}>Training Distribution</Text>
+        <Text style={heroSubtitleStyle}>
           Track your workout categories
         </Text>
       </View>
@@ -100,20 +140,16 @@ export default function TrainingChart({
           radius={120}
           innerRadius={85}
           innerCircleColor={colors.card}
-          centerLabelComponent={() => (
-            <View style={styles.centerLabel}>
-              <Text style={[styles.centerLabelValue, { color: colors.text }]}>{centerValue}</Text>
-              <Text style={[styles.centerLabelText, { color: colors.textMuted }]}>{centerLabel}</Text>
-              <Text style={[styles.centerLabelSubtext, { color: colors.textMuted }]}>{centerSubtext}</Text>
-            </View>
-          )}
+          centerLabelComponent={centerLabelComponent}
           focusOnPress
           toggleFocusOnPress
         />
       </TouchableOpacity>
     </View>
   );
-}
+});
+
+export default TrainingChart;
 
 const styles = StyleSheet.create({
   hero: {

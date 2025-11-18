@@ -1,6 +1,6 @@
 import { useColors } from '@/hooks/ui/useColors';
 import { Ionicons } from '@expo/vector-icons';
-import { useRef } from 'react';
+import { memo, useMemo, useRef } from 'react';
 import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface QuickActionCardProps {
@@ -12,7 +12,7 @@ interface QuickActionCardProps {
   onPress: () => void;
 }
 
-export default function QuickActionCard({ 
+const QuickActionCard = memo(function QuickActionCard({ 
   icon, 
   title, 
   subtitle, 
@@ -22,7 +22,7 @@ export default function QuickActionCard({
 }: QuickActionCardProps) {
   const colors = useColors();
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const actionColor = color || colors.primary;
+  const actionColor = useMemo(() => color || colors.primary, [color, colors.primary]);
 
   const animatePressIn = () => {
     Animated.spring(scaleAnim, {
@@ -42,43 +42,60 @@ export default function QuickActionCard({
     }).start();
   };
 
+  // Memoize all dynamic styles
+  const cardStyle = useMemo(() => [
+    styles.card,
+    { 
+      backgroundColor: isPrimary ? colors.primary : colors.card, 
+      borderColor: isPrimary ? colors.primary : colors.border 
+    }
+  ], [isPrimary, colors.primary, colors.card, colors.border]);
+
+  const iconStyle = useMemo(() => [
+    styles.icon,
+    { backgroundColor: isPrimary ? 'rgba(255, 255, 255, 0.2)' : actionColor + '15' }
+  ], [isPrimary, actionColor]);
+
+  const iconColor = useMemo(() => 
+    isPrimary ? '#fff' : actionColor
+  , [isPrimary, actionColor]);
+
+  const titleStyle = useMemo(() => [
+    styles.title,
+    { color: isPrimary ? '#fff' : colors.text }
+  ], [isPrimary, colors.text]);
+
+  const subtitleStyle = useMemo(() => [
+    styles.subtitle,
+    { color: isPrimary ? 'rgba(255, 255, 255, 0.8)' : colors.textMuted }
+  ], [isPrimary, colors.textMuted]);
+
+  const chevronColor = useMemo(() => 
+    isPrimary ? '#fff' : colors.textMuted
+  , [isPrimary, colors.textMuted]);
+
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
       <TouchableOpacity
-        style={[
-          styles.card,
-          { 
-            backgroundColor: isPrimary ? colors.primary : colors.card, 
-            borderColor: isPrimary ? colors.primary : colors.border 
-          }
-        ]}
+        style={cardStyle}
         onPress={onPress}
         onPressIn={animatePressIn}
         onPressOut={animatePressOut}
         activeOpacity={0.8}
       >
         <View style={styles.content}>
-          <View style={[
-            styles.icon,
-            { backgroundColor: isPrimary ? 'rgba(255, 255, 255, 0.2)' : actionColor + '15' }
-          ]}>
+          <View style={iconStyle}>
             <Ionicons 
               name={icon} 
               size={20} 
-              color={isPrimary ? '#fff' : actionColor} 
+              color={iconColor} 
             />
           </View>
           <View style={styles.textContainer}>
-            <Text style={[
-              styles.title,
-              { color: isPrimary ? '#fff' : colors.text }
-            ]}>
+            <Text style={titleStyle}>
               {title}
             </Text>
-            <Text style={[
-              styles.subtitle,
-              { color: isPrimary ? 'rgba(255, 255, 255, 0.8)' : colors.textMuted }
-            ]}>
+            <Text style={subtitleStyle}>
               {subtitle}
             </Text>
           </View>
@@ -86,12 +103,14 @@ export default function QuickActionCard({
         <Ionicons 
           name="chevron-forward" 
           size={18} 
-          color={isPrimary ? '#fff' : colors.textMuted} 
+          color={chevronColor} 
         />
       </TouchableOpacity>
     </Animated.View>
   );
-}
+});
+
+export default QuickActionCard;
 
 const styles = StyleSheet.create({
   card: {

@@ -1,8 +1,9 @@
 import { useModals } from '@/contexts/ModalContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
+import { SessionWithDetails } from '@/services/sessionService';
 import { useSessionStore } from '@/store/sessionStore';
-import { useEffect, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import EmptyState from '../../components/shared/EmptyState';
 import QuickActionCard from '../../components/shared/QuickActionCard';
@@ -26,6 +27,133 @@ function formatLabel(label: string) {
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
+
+// Memoized Session Card Component
+interface SessionCardProps {
+  session: SessionWithDetails;
+}
+
+const SessionCard = memo(({ session }: SessionCardProps) => {
+  const colors = useColors(); // Use hook internally for stable reference
+  
+  const sessionPayload = session.session_data as Record<string, any> | null;
+  const environment = sessionPayload?.environment ?? null;
+  const trainingId = sessionPayload?.training_id ?? null;
+  const drillId = sessionPayload?.drill_id ?? null;
+
+  // Memoize status colors based on session status
+  const statusColor = useMemo(() => {
+    const statusColors: Record<string, { bg: string; text: string }> = {
+      active: { bg: colors.blue + '20', text: colors.blue },
+      completed: { bg: colors.green + '25', text: colors.green },
+      cancelled: { bg: colors.red + '20', text: colors.red },
+    };
+    return statusColors[session.status] ?? { bg: colors.muted + '20', text: colors.mutedForeground };
+  }, [session.status, colors]);
+
+  // Memoize card styles
+  const cardStyle = useMemo(() => [
+    styles.sessionCard,
+    { backgroundColor: colors.card, borderColor: colors.border }
+  ], [colors.card, colors.border]);
+
+  const statusBadgeStyle = useMemo(() => [
+    styles.sessionStatusBadge,
+    { backgroundColor: statusColor.bg }
+  ], [statusColor.bg]);
+
+  return (
+    <View style={cardStyle}>
+      <View style={styles.sessionHeader}>
+        <View>
+          <Text style={[styles.sessionTitle, { color: colors.text }]}>
+            {session.session_mode === 'group' ? 'Group Session' : 'Solo Session'}
+          </Text>
+          <Text style={[styles.sessionSubtitle, { color: colors.textMuted }]}>
+            {formatDateTime(session.started_at)}
+          </Text>
+        </View>
+
+        <View style={statusBadgeStyle}>
+          <Text style={[styles.sessionStatusText, { color: statusColor.text }]}>
+            {formatLabel(session.status)}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.sessionMetaRow}>
+        <Text style={[styles.sessionMetaLabel, { color: colors.textMuted }]}>
+          Mode
+        </Text>
+        <Text style={[styles.sessionMetaValue, { color: colors.text }]}>
+          {formatLabel(session.session_mode)}
+        </Text>
+      </View>
+
+      {session.ended_at && (
+        <View style={styles.sessionMetaRow}>
+          <Text style={[styles.sessionMetaLabel, { color: colors.textMuted }]}>
+            Ended
+          </Text>
+          <Text style={[styles.sessionMetaValue, { color: colors.text }]}>
+            {formatDateTime(session.ended_at)}
+          </Text>
+        </View>
+      )}
+
+      {session.team_name && (
+        <View style={styles.sessionMetaRow}>
+          <Text style={[styles.sessionMetaLabel, { color: colors.textMuted }]}>
+            Team
+          </Text>
+          <Text style={[styles.sessionMetaValue, { color: colors.text }]}>
+            {session.team_name}
+          </Text>
+        </View>
+      )}
+
+      {trainingId && (
+        <View style={styles.sessionMetaRow}>
+          <Text style={[styles.sessionMetaLabel, { color: colors.textMuted }]}>
+            Training ID
+          </Text>
+          <Text style={[styles.sessionMetaValue, { color: colors.text }]}>
+            {trainingId}
+          </Text>
+        </View>
+      )}
+
+      {drillId && (
+        <View style={styles.sessionMetaRow}>
+          <Text style={[styles.sessionMetaLabel, { color: colors.textMuted }]}>
+            Drill ID
+          </Text>
+          <Text style={[styles.sessionMetaValue, { color: colors.text }]}>
+            {drillId}
+          </Text>
+        </View>
+      )}
+
+      {environment && Object.keys(environment).length > 0 && (
+        <View style={styles.sessionEnvironment}>
+          <Text style={[styles.environmentTitle, { color: colors.text }]}>
+            Environment
+          </Text>
+          {Object.entries(environment).map(([key, value]) => (
+            <Text
+              key={key}
+              style={[styles.environmentItem, { color: colors.textMuted }]}
+            >
+              {formatLabel(key)}: {String(value)}
+            </Text>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+});
+
+SessionCard.displayName = 'SessionCard';
 
 export default function PersonalWorkspaceView() {
   const colors = useColors();
@@ -52,8 +180,33 @@ export default function PersonalWorkspaceView() {
     return () => setOnSessionCreated(null);
   }, [refreshSessions, setOnSessionCreated]);
 
+  // Memoized callbacks for quick actions
+  const handleStartSession = useCallback(() => {
+    createSessionSheetRef.current?.open();
+  }, [createSessionSheetRef]);
+
+  const handleViewProgress = useCallback(() => {
+    chartDetailsSheetRef.current?.open();
+  }, [chartDetailsSheetRef]);
+
+  const handleScheduleTraining = useCallback(() => {
+    chartDetailsSheetRef.current?.open();
+  }, [chartDetailsSheetRef]);
+
+  const handleChartDoubleTap = useCallback(() => {
+    chartDetailsSheetRef.current?.open();
+  }, [chartDetailsSheetRef]);
+
+  // Memoize stats object
+  const stats = useMemo(() => ({
+    totalSessions,
+    totalAbg,
+    totalCompletedSessions,
+    totalTime: '0h',
+  }), [totalSessions, totalAbg, totalCompletedSessions]);
+
   // Pie chart data - elegant muted tones with depth
-  const pieData = [
+  const pieData = useMemo(() => [
     { 
       value: 40, 
       color: '#6B8FA3', 
@@ -75,61 +228,73 @@ export default function PersonalWorkspaceView() {
       color: '#8A8A8A',
       gradientCenterColor: '#A8A8A8',
     },
-  ];
+  ], []);
 
-  const quickActions = [
+  const quickActions = useMemo(() => [
     { 
       icon: 'add-circle' as const, 
       title: 'Start New Session', 
       subtitle: 'Begin your training', 
       isPrimary: true,
-      onPress: () => createSessionSheetRef.current?.open()
+      onPress: handleStartSession
     },
     { 
       icon: 'bar-chart-outline' as const, 
       title: 'View Progress', 
       subtitle: 'Track your stats', 
       color: '#5B7A8C',
-      onPress: () => chartDetailsSheetRef.current?.open()
+      onPress: handleViewProgress
     },
     { 
       icon: 'calendar' as const, 
       title: 'Schedule Training', 
       subtitle: 'Plan your sessions', 
       color: '#5A8473',
-      onPress: () => chartDetailsSheetRef.current?.open()
+      onPress: handleScheduleTraining
     },
-  ];
+  ], [handleStartSession, handleViewProgress, handleScheduleTraining]);
+
+  // Memoize all dynamic styles
+  const containerStyle = useMemo(() => [
+    styles.container,
+    { backgroundColor: colors.background }
+  ], [colors.background]);
+
+  const sectionTitleStyle = useMemo(() => [
+    styles.sectionTitle,
+    { color: colors.text }
+  ], [colors.text]);
+
+  const loadingTextStyle = useMemo(() => [
+    styles.loadingText,
+    { color: colors.textMuted }
+  ], [colors.textMuted]);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={containerStyle}>
       <ScrollView 
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
+        removeClippedSubviews={true}
       >
         {/* User Welcome Card */}
         <WelcomeCard 
           fullName={fullName || ''}
-          stats={{
-            totalSessions,
-            totalAbg,
-            totalCompletedSessions,
-            totalTime: '0h',
-          }}
+          stats={stats}
         />
 
         {/* Training Distribution Chart */}
         <TrainingChart 
           data={pieData}
-          onDoubleTap={() => chartDetailsSheetRef.current?.open()}
+          onDoubleTap={handleChartDoubleTap}
         />
 
         {/* Quick Actions */}
         <View style={styles.actionsSection}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Quick Actions</Text>
+            <Text style={sectionTitleStyle}>Quick Actions</Text>
           </View>
 
           {quickActions.map((action, index) => (
@@ -148,13 +313,13 @@ export default function PersonalWorkspaceView() {
         {/* Recent Activity */}
         <View style={styles.activitySection}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Activity</Text>
+            <Text style={sectionTitleStyle}>Recent Activity</Text>
           </View>
 
           {loading ? (
             <View style={styles.loadingState}>
               <ActivityIndicator color={colors.primary} />
-              <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading sessions...</Text>
+              <Text style={loadingTextStyle}>Loading sessions...</Text>
             </View>
           ) : error ? (
             <EmptyState
@@ -172,125 +337,12 @@ export default function PersonalWorkspaceView() {
             />
           ) : (
             <View style={styles.sessionList}>
-              {sessions.map((session) => {
-                const sessionPayload = session.session_data as Record<string, any> | null;
-                const environment = sessionPayload?.environment ?? null;
-                const trainingId = sessionPayload?.training_id ?? null;
-                const drillId = sessionPayload?.drill_id ?? null;
-
-                const statusColors: Record<string, { bg: string; text: string }> = {
-                  active: { bg: colors.blue + '20', text: colors.blue },
-                  completed: { bg: colors.green + '25', text: colors.green },
-                  cancelled: { bg: colors.red + '20', text: colors.red },
-                };
-                const statusColor = statusColors[session.status] ?? { bg: colors.muted + '20', text: colors.mutedForeground };
-
-                return (
-                  <View
-                    key={session.id}
-                    style={[
-                      styles.sessionCard,
-                      { backgroundColor: colors.card, borderColor: colors.border }
-                    ]}
-                  >
-                    <View style={styles.sessionHeader}>
-                      <View>
-                        <Text style={[styles.sessionTitle, { color: colors.text }]}>
-                          {session.session_mode === 'group' ? 'Group Session' : 'Solo Session'}
-                        </Text>
-                        <Text style={[styles.sessionSubtitle, { color: colors.textMuted }]}>
-                          {formatDateTime(session.started_at)}
-                        </Text>
-                      </View>
-
-                      <View
-                        style={[
-                          styles.sessionStatusBadge,
-                          { backgroundColor: statusColor.bg }
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.sessionStatusText,
-                            { color: statusColor.text }
-                          ]}
-                        >
-                          {formatLabel(session.status)}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.sessionMetaRow}>
-                      <Text style={[styles.sessionMetaLabel, { color: colors.textMuted }]}>
-                        Mode
-                      </Text>
-                      <Text style={[styles.sessionMetaValue, { color: colors.text }]}>
-                        {formatLabel(session.session_mode)}
-                      </Text>
-                    </View>
-
-                    {session.ended_at && (
-                      <View style={styles.sessionMetaRow}>
-                        <Text style={[styles.sessionMetaLabel, { color: colors.textMuted }]}>
-                          Ended
-                        </Text>
-                        <Text style={[styles.sessionMetaValue, { color: colors.text }]}>
-                          {formatDateTime(session.ended_at)}
-                        </Text>
-                      </View>
-                    )}
-
-                    {session.team_name && (
-                      <View style={styles.sessionMetaRow}>
-                        <Text style={[styles.sessionMetaLabel, { color: colors.textMuted }]}>
-                          Team
-                        </Text>
-                        <Text style={[styles.sessionMetaValue, { color: colors.text }]}>
-                          {session.team_name}
-                        </Text>
-                      </View>
-                    )}
-
-                    {trainingId && (
-                      <View style={styles.sessionMetaRow}>
-                        <Text style={[styles.sessionMetaLabel, { color: colors.textMuted }]}>
-                          Training ID
-                        </Text>
-                        <Text style={[styles.sessionMetaValue, { color: colors.text }]}>
-                          {trainingId}
-                        </Text>
-                      </View>
-                    )}
-
-                    {drillId && (
-                      <View style={styles.sessionMetaRow}>
-                        <Text style={[styles.sessionMetaLabel, { color: colors.textMuted }]}>
-                          Drill ID
-                        </Text>
-                        <Text style={[styles.sessionMetaValue, { color: colors.text }]}>
-                          {drillId}
-                        </Text>
-                      </View>
-                    )}
-
-                    {environment && Object.keys(environment).length > 0 && (
-                      <View style={styles.sessionEnvironment}>
-                        <Text style={[styles.environmentTitle, { color: colors.text }]}>
-                          Environment
-                        </Text>
-                        {Object.entries(environment).map(([key, value]) => (
-                          <Text
-                            key={key}
-                            style={[styles.environmentItem, { color: colors.textMuted }]}
-                          >
-                            {formatLabel(key)}: {String(value)}
-                          </Text>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                );
-              })}
+              {sessions.map((session) => (
+                <SessionCard 
+                  key={session.id} 
+                  session={session} 
+                />
+              ))}
             </View>
           )}
         </View>

@@ -1,5 +1,6 @@
 import { useColors } from '@/hooks/ui/useColors';
 import { Ionicons } from '@expo/vector-icons';
+import { memo, useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 interface WelcomeCardProps {
@@ -13,26 +14,36 @@ interface WelcomeCardProps {
 }
 
 // Separate Header Component
-function WelcomeHeader({ fullName }: { fullName?: string }) {
+const WelcomeHeader = memo(function WelcomeHeader({ fullName }: { fullName?: string }) {
   const colors = useColors();
+  
+  const greetingStyle = useMemo(() => [
+    styles.greeting,
+    { color: colors.textMuted }
+  ], [colors.textMuted]);
+
+  const nameStyle = useMemo(() => [
+    styles.name,
+    { color: colors.text }
+  ], [colors.text]);
   
   return (
     <View style={styles.header}>
-      <Text style={[styles.greeting, { color: colors.textMuted }]}>
+      <Text style={greetingStyle}>
         Welcome back,
       </Text>
-      <Text style={[styles.name, { color: colors.text }]}>
+      <Text style={nameStyle}>
         {fullName || 'User'}
       </Text>
     </View>
   );
-}
+});
 
 // Separate Stats Grid Component
-function StatsGrid({ stats }: { stats: WelcomeCardProps['stats'] }) {
+const StatsGrid = memo(function StatsGrid({ stats }: { stats: WelcomeCardProps['stats'] }) {
   const colors = useColors();
 
-  const statsConfig = [
+  const statsConfig = useMemo(() => [
     {
       icon: 'calendar-outline' as const,
       iconColor: '#5B7A8C',
@@ -57,7 +68,17 @@ function StatsGrid({ stats }: { stats: WelcomeCardProps['stats'] }) {
       value: stats.totalCompletedSessions,
       label: 'Completed',
     },
-  ];
+  ], [stats]);
+
+  const statValueStyle = useMemo(() => [
+    styles.statValue,
+    { color: colors.text }
+  ], [colors.text]);
+
+  const statLabelStyle = useMemo(() => [
+    styles.statLabel,
+    { color: colors.textMuted }
+  ], [colors.textMuted]);
 
   return (
     <View style={styles.statsGrid}>
@@ -67,10 +88,10 @@ function StatsGrid({ stats }: { stats: WelcomeCardProps['stats'] }) {
             <Ionicons name={stat.icon} size={18} color={stat.iconColor} />
           </View>
           <View style={styles.statContent}>
-            <Text style={[styles.statValue, { color: colors.text }]}>
+            <Text style={statValueStyle}>
               {stat.value}
             </Text>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+            <Text style={statLabelStyle}>
               {stat.label}
             </Text>
           </View>
@@ -78,7 +99,7 @@ function StatsGrid({ stats }: { stats: WelcomeCardProps['stats'] }) {
       ))}
     </View>
   );
-}
+});
 
 // Main Component - Combines Header and Stats
 export default function WelcomeCard({ fullName, stats }: WelcomeCardProps) {
