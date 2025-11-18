@@ -1,3 +1,4 @@
+import { useModals } from "@/contexts/ModalContext";
 import { useColors } from "@/hooks/ui/useColors";
 import { useAppContext } from "@/hooks/useAppContext";
 import { createOrgWorkspace } from "@/services/workspaceService";
@@ -30,6 +31,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
     const colors = useColors();
     const bottomSheetRef = useRef<BaseBottomSheetRef>(null);
     const createSheetRef = useRef<BaseBottomSheetRef>(null);
+    const { acceptInviteSheetRef, setOnInviteAccepted } = useModals();
     
     const { 
       myWorkspaceId, 
@@ -142,6 +144,21 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
       }
     }, [workspaceName, switchWorkspace]);
 
+    const handleJoinWorkspace = useCallback(() => {
+      // Close this sheet and open the accept invite sheet
+      bottomSheetRef.current?.close();
+      
+      // Set callback to reload workspaces when invite is accepted
+      setOnInviteAccepted(async () => {
+        await useWorkspaceStore.getState().loadWorkspaces();
+      });
+      
+      // Open the accept invite sheet
+      setTimeout(() => {
+        acceptInviteSheetRef.current?.open();
+      }, 300);
+    }, [acceptInviteSheetRef, setOnInviteAccepted]);
+
 
     const renderWorkspaceItem = useCallback(({ item }: { item: Workspace }) => {
       const isActive = item.id === activeWorkspaceId;
@@ -231,13 +248,22 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
                     </Text>
                   </View>
                 </View>
-                <TouchableOpacity
-                  style={[styles.addButton, { backgroundColor: colors.primary }]}
-                  onPress={handleOpenCreateWorkspace}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="add" size={20}  />
-                </TouchableOpacity>
+                <View style={styles.headerButtons}>
+                  <TouchableOpacity
+                    style={[styles.joinButtonSmall, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={handleJoinWorkspace}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="enter" size={16} color={colors.primary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.addButton, { backgroundColor: colors.primary }]}
+                    onPress={handleOpenCreateWorkspace}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="add" size={20}  />
+                  </TouchableOpacity>
+                </View>
               </View>
               <Text style={[styles.subtitle, { color: colors.textMuted }]}>
                 Switch between your workspaces
@@ -388,6 +414,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
+  headerButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   addButton: {
     width: 36,
     height: 36,
@@ -399,6 +430,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
+  },
+  joinButtonSmall: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
   },
   title: {
     fontSize: 28,

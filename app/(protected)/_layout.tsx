@@ -1,7 +1,9 @@
 import { Header } from '@/components/Header';
+import { AcceptInviteSheet } from '@/components/modals/AcceptInviteSheet';
 import { ComingSoonSheet } from '@/components/modals/ComingSoonSheet';
 import { CreateSessionSheet } from '@/components/modals/CreateSessionSheet';
 import { CreateTeamSheet } from '@/components/modals/CreateTeamSheet';
+import { InviteMembersSheet } from '@/components/modals/InviteMembersSheet';
 import { UserMenuBottomSheet, UserMenuBottomSheetRef } from '@/components/modals/UserMenuBottomSheet';
 import { WorkspaceSwitcherBottomSheet, WorkspaceSwitcherRef } from '@/components/modals/WorkspaceSwitcherBottomSheet';
 import { ModalProvider, useModals } from '@/contexts/ModalContext';
@@ -19,8 +21,12 @@ function ProtectedLayoutContent() {
     chartDetailsSheetRef, 
     createSessionSheetRef, 
     createTeamSheetRef,
+    inviteMembersSheetRef,
+    acceptInviteSheetRef,
     onSessionCreated,
     onTeamCreated,
+    onMemberInvited,
+    onInviteAccepted,
   } = useModals();
 
   return (
@@ -82,6 +88,30 @@ function ProtectedLayoutContent() {
           // Call the registered callback if it exists
           if (onTeamCreated) {
             onTeamCreated();
+          }
+        }}
+      />
+
+      {/* INVITE MEMBERS */}
+      <InviteMembersSheet
+        ref={inviteMembersSheetRef}
+        onMemberInvited={() => {
+          // Don't close the sheet - let user see the generated code
+          // Call the registered callback if it exists
+          if (onMemberInvited) {
+            onMemberInvited();
+          }
+        }}
+      />
+
+      {/* ACCEPT INVITE */}
+      <AcceptInviteSheet
+        ref={acceptInviteSheetRef}
+        onInviteAccepted={() => {
+          acceptInviteSheetRef.current?.close();
+          // Call the registered callback if it exists
+          if (onInviteAccepted) {
+            onInviteAccepted();
           }
         }}
       />

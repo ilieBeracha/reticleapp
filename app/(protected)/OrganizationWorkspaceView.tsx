@@ -28,7 +28,7 @@ export default function OrganizationWorkspaceView() {
   const colors = useColors();
   const { activeWorkspaceId, activeWorkspace } = useAppContext();
   const permissions = useWorkspacePermissions();
-  const { createTeamSheetRef, setOnTeamCreated, createSessionSheetRef, setOnSessionCreated } = useModals();
+  const { createTeamSheetRef, setOnTeamCreated, createSessionSheetRef, setOnSessionCreated, inviteMembersSheetRef } = useModals();
   const { sessions, loading: sessionsLoading, error: sessionsError, loadWorkspaceSessions } = useSessionStore();
 
   // Teams state
@@ -313,7 +313,7 @@ export default function OrganizationWorkspaceView() {
               {permissions.canInviteMembers && (
                 <TouchableOpacity
                   style={[styles.managementItem, { borderBottomColor: colors.border }]}
-                  onPress={() => {}}
+                  onPress={() => inviteMembersSheetRef.current?.open()}
                   activeOpacity={0.7}
                 >
                   <View style={styles.managementLeft}>

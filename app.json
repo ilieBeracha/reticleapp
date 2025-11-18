@@ -4,11 +4,11 @@
     "slug": "retic",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/brand/logo.png",
+    "icon": "./assets/images/icon.jpg",
     "scheme": "retic",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/brand/logo.png",
+      "image": "./assets/images/icon.jpg",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -16,7 +16,7 @@
     "ios": {
       "bundleIdentifier": "com.retic.app",
       "supportsTablet": true,
-      "icon": "./assets/brand/logo.png",
+      "icon": "./assets/images/icon.jpg",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -25,9 +25,9 @@
       "versionCode": 5,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/brand/logo.png",
-        "backgroundImage": "./assets/brand/logo.png",
-        "monochromeImage": "./assets/brand/logo.png"
+        "foregroundImage": "./assets/images/icon.jpg",
+        "backgroundImage": "./assets/images/icon.jpg",
+        "monochromeImage": "./assets/images/icon.jpg"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -39,14 +39,14 @@
     },
     "web": {
       "output": "single",
-      "favicon": "./assets/brand/logo.png"
+      "favicon": "./assets/images/icon.jpg"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/brand/logo.png",
+          "image": "./assets/images/splash.jpg",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",

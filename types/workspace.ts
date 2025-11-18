@@ -56,6 +56,28 @@ export interface WorkspaceAccess {
   joined_at: string;
 }
 
+export type InvitationStatus = 'pending' | 'accepted' | 'cancelled' | 'expired';
+
+export interface WorkspaceInvitation {
+  id: string;
+  org_workspace_id: string;
+  invite_code: string;
+  role: WorkspaceRole;
+  status: InvitationStatus;
+  invited_by: string;
+  accepted_by?: string | null;
+  accepted_at?: string | null;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkspaceInvitationWithDetails extends WorkspaceInvitation {
+  workspace_name?: string;
+  invited_by_name?: string;
+  accepted_by_name?: string;
+}
+
 export type TeamType = "field" | "back_office";
 
 export interface Team {

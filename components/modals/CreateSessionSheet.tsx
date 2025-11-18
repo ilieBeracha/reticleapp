@@ -48,13 +48,23 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
 
     const handleNext = () => {
       if (step < 3) {
-        setStep(step + 1);
+        // Skip step 2 for personal workspace
+        if (isMyWorkspace && step === 1) {
+          setStep(3);
+        } else {
+          setStep(step + 1);
+        }
       }
     };
 
     const handleBack = () => {
       if (step > 1) {
-        setStep(step - 1);
+        // Skip step 2 for personal workspace
+        if (isMyWorkspace && step === 3) {
+          setStep(1);
+        } else {
+          setStep(step - 1);
+        }
       }
     };
 
@@ -123,7 +133,10 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
       }
     };
 
-    const progressWidth = (step / 3) * 100;
+    // Personal workspace has 2 steps (skip step 2), org workspace has 3 steps
+    const totalSteps = isMyWorkspace ? 2 : 3;
+    const currentStep = isMyWorkspace && step === 3 ? 2 : step;
+    const progressWidth = (currentStep / totalSteps) * 100;
 
     return (
       <BaseBottomSheet ref={ref} snapPoints={['92%']} backdropOpacity={0.8}>
@@ -156,7 +169,7 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
               />
             </View>
             <Text style={[styles.progressText, { color: colors.textMuted }]}>
-              Step {step} of 3
+              Step {currentStep} of {totalSteps}
             </Text>
           </View>
 
