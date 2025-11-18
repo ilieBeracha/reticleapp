@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-export default function OrganizationWorkspaceView() {
+export default function OrganizationWorkspacePage() {
   const colors = useColors();
   const { activeWorkspaceId, activeWorkspace } = useAppContext();
   const permissions = useWorkspacePermissions();
@@ -263,7 +263,6 @@ const styles = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-
   // Section (for Management section)
   section: {
     marginBottom: 28,
@@ -341,3 +340,4 @@ const styles = StyleSheet.create({
     letterSpacing: -0.1,
   },
 });
+

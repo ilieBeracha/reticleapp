@@ -15,8 +15,6 @@ function ProtectedLayoutContent() {
   const { background, text } = useColors();
   const userMenuRef = useRef<UserMenuBottomSheetRef>(null);
   const workspaceSwitcherRef = useRef<WorkspaceSwitcherRef>(null);
-  
-  // Get modal refs and callbacks from context
   const { 
     chartDetailsSheetRef, 
     createSessionSheetRef, 
@@ -34,6 +32,7 @@ function ProtectedLayoutContent() {
       <Stack 
         initialRouteName="index"
         screenOptions={{
+          animation: 'none',
           headerStyle: { backgroundColor: background },
           headerShadowVisible: false,
           headerTitle: () => (
@@ -49,6 +48,8 @@ function ProtectedLayoutContent() {
       >
         <Stack.Screen name="modal" options={{ headerShown: false, presentation: 'modal', headerBlurEffect: 'light' }} />
         <Stack.Screen name="index" options={{ headerShown: true }} />
+        <Stack.Screen name="workspace/personal" options={{ headerShown: true , animation: 'none'}} />
+        <Stack.Screen name="workspace/organization" options={{ headerShown: true , animation: 'none'}} />
       </Stack>
 
       {/* USER MENU */}

@@ -1,18 +1,16 @@
 import { useAppContext } from '@/hooks/useAppContext';
-import OrganizationWorkspaceView from './OrganizationWorkspaceView';
-import PersonalWorkspaceView from './PersonalWorkspaceView';
+import { Redirect } from 'expo-router';
 
 /**
  * HomePage Router
  * 
- * Simple routing component that decides which workspace view to render
- * based on the user's current workspace context.
+ * Redirects to the appropriate workspace route based on user's current workspace context.
  * 
- * - Personal Workspace (isMyWorkspace): Shows user's personal dashboard
- * - Organization Workspace (!isMyWorkspace): Shows organization management view
+ * - Personal Workspace (isMyWorkspace): Redirects to /workspace/personal
+ * - Organization Workspace (!isMyWorkspace): Redirects to /workspace/organization (with sub-routes)
  */
 export default function HomePage() {
   const { isMyWorkspace } = useAppContext();
 
-  return isMyWorkspace ? <PersonalWorkspaceView /> : <OrganizationWorkspaceView />;
+  return <Redirect href={isMyWorkspace ? '/(protected)/workspace/personal' : '/(protected)/workspace/organization'} />;
 }

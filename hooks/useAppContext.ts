@@ -1,6 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import type { Workspace } from "@/types/workspace";
+import { useRouter } from "expo-router";
 import { useMemo } from "react";
 
 export interface AppContext {
@@ -48,6 +49,7 @@ export interface AppContext {
  */
 export function useAppContext(): AppContext {
   const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const { 
     workspaces, 
     activeWorkspaceId, 
@@ -119,10 +121,20 @@ export function useAppContext(): AppContext {
       
       // Actions
       switchWorkspace: async (workspaceId: string | null) => {
-        setActiveWorkspace(workspaceId || myWorkspaceId);
+        const targetId = workspaceId || myWorkspaceId;
+        setActiveWorkspace(targetId);
+        
+        // Navigate to appropriate route based on workspace type
+        const isPersonal = targetId === myWorkspaceId;
+        
+        // Navigate to the correct workspace route
+        router.replace(isPersonal ? '/(protected)/workspace/personal' : '/(protected)/workspace/organization');
       },
       switchToMyWorkspace: async () => {
         setActiveWorkspace(myWorkspaceId);
+        
+        // Navigate to personal workspace route
+        router.replace('/(protected)/workspace/personal');
       },
       
       // Loading
@@ -135,7 +147,8 @@ export function useAppContext(): AppContext {
     activeWorkspaceId,
     authLoading,
     workspacesLoading,
-    setActiveWorkspace
+    setActiveWorkspace,
+    router
   ]);
 
   return context;

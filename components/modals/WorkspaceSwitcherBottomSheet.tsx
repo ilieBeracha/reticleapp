@@ -127,6 +127,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
       // Set callback to reload workspaces when invite is accepted
       // Wrap in arrow function so React stores the function, not calls it
       setOnInviteAccepted(() => async () => {
+        // Reload workspaces to include the newly joined workspace
         await useWorkspaceStore.getState().loadWorkspaces();
       });
       

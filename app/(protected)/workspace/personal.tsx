@@ -4,14 +4,14 @@ import { useAppContext } from '@/hooks/useAppContext';
 import { useSessionStore } from '@/store/sessionStore';
 import { useCallback, useEffect, useMemo } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
-import EmptyState from '../../components/shared/EmptyState';
-import GroupedList from '../../components/shared/GroupedList';
-import QuickActionCard from '../../components/shared/QuickActionCard';
-import SessionCard from '../../components/shared/SessionCard';
-import TrainingChart from '../../components/shared/TrainingChart';
-import WelcomeCard from '../../components/shared/WelcomeCard';
+import EmptyState from '../../../components/shared/EmptyState';
+import GroupedList from '../../../components/shared/GroupedList';
+import QuickActionCard from '../../../components/shared/QuickActionCard';
+import SessionCard from '../../../components/shared/SessionCard';
+import TrainingChart from '../../../components/shared/TrainingChart';
+import WelcomeCard from '../../../components/shared/WelcomeCard';
 
-export default function PersonalWorkspaceView() {
+export default function PersonalWorkspacePage() {
   const colors = useColors();
   const { fullName } = useAppContext();
   const { chartDetailsSheetRef, createSessionSheetRef, setOnSessionCreated } = useModals();
