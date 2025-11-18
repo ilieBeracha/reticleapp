@@ -7,15 +7,17 @@ interface TeamCardProps {
   team: Team;
   memberCount?: number;
   onPress?: (team: Team) => void;
+  isFirst?: boolean;
+  isLast?: boolean;
 }
 
-export default function TeamCard({ team, memberCount = 0, onPress }: TeamCardProps) {
+export default function TeamCard({ team, memberCount = 0, onPress, isFirst, isLast }: TeamCardProps) {
   const colors = useColors();
   const isFieldTeam = team.team_type === 'field';
 
   return (
     <TouchableOpacity
-      style={[styles.card, { backgroundColor: colors.card }]}
+      style={[styles.card]}
       onPress={() => onPress?.(team)}
       activeOpacity={0.8}
     >
@@ -46,12 +48,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 14,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   icon: {
     width: 40,

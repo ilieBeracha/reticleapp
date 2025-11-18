@@ -1,3 +1,7 @@
+import QuickActions from '@/components/organization/QuickActions';
+import RecentSessions from '@/components/organization/RecentSessions';
+import StatsOverview from '@/components/organization/StatsOverview';
+import TeamsSection from '@/components/organization/TeamsSection';
 import { useModals } from '@/contexts/ModalContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
@@ -7,22 +11,7 @@ import { useSessionStore } from '@/store/sessionStore';
 import type { Team } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import EmptyState from '../../components/shared/EmptyState';
-import TeamCard from '../../components/shared/TeamCard';
-
-function formatDateTime(value?: string | null) {
-  if (!value) return 'In progress';
-  try {
-    return new Date(value).toLocaleString();
-  } catch {
-    return value;
-  }
-}
-
-function formatLabel(label: string) {
-  return label.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
-}
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function OrganizationWorkspaceView() {
   const colors = useColors();
@@ -92,13 +81,20 @@ export default function OrganizationWorkspaceView() {
   const activeSessions = sessions.filter(s => s.status === 'active').length;
   const completedSessions = sessions.filter(s => s.status === 'completed').length;
 
+  // Memoize container style
+  const containerStyle = useMemo(() => [
+    styles.container,
+    { backgroundColor: colors.background }
+  ], [colors.background]);
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={containerStyle}>
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
+        removeClippedSubviews={true}
       >
         {/* Workspace Header */}
         <View style={styles.header}>
@@ -112,195 +108,32 @@ export default function OrganizationWorkspaceView() {
             </Text>
           </View>
         </View>
+        
+        <StatsOverview 
+          totalSessions={totalSessions} 
+          activeSessions={activeSessions} 
+          completedSessions={completedSessions} 
+          teams={teams} 
+        />
 
-        {/* Stats Overview */}
-        <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Workspace Overview</Text>
-          
-          <View style={styles.statsGrid}>
-            <View style={styles.statItem}>
-              <View style={[styles.statIconContainer, { backgroundColor: '#5B7A8C15' }]}>
-                <Ionicons name="calendar-outline" size={20} color="#5B7A8C" />
-              </View>
-              <View style={styles.statContent}>
-                <Text style={[styles.statValue, { color: colors.text }]}>{totalSessions}</Text>
-                <Text style={[styles.statLabel, { color: colors.textMuted }]}>Total Sessions</Text>
-              </View>
-            </View>
+        <QuickActions
+          onStartSession={() => createSessionSheetRef.current?.open()}
+          onCreateTeam={() => createTeamSheetRef.current?.open()}
+          canManageTeams={permissions.canManageTeams}
+        />
 
-            <View style={styles.statItem}>
-              <View style={[styles.statIconContainer, { backgroundColor: '#E7692515' }]}>
-                <Ionicons name="play-circle-outline" size={20} color="#E76925" />
-              </View>
-              <View style={styles.statContent}>
-                <Text style={[styles.statValue, { color: colors.text }]}>{activeSessions}</Text>
-                <Text style={[styles.statLabel, { color: colors.textMuted }]}>Active Now</Text>
-              </View>
-            </View>
+        <TeamsSection
+          teams={teams}
+          loading={loadingTeams}
+          canManageTeams={permissions.canManageTeams}
+          onCreateTeam={() => createTeamSheetRef.current?.open()}
+        />
 
-            <View style={styles.statItem}>
-              <View style={[styles.statIconContainer, { backgroundColor: '#5A847315' }]}>
-                <Ionicons name="checkmark-circle-outline" size={20} color="#5A8473" />
-              </View>
-              <View style={styles.statContent}>
-                <Text style={[styles.statValue, { color: colors.text }]}>{completedSessions}</Text>
-                <Text style={[styles.statLabel, { color: colors.textMuted }]}>Completed</Text>
-              </View>
-            </View>
-
-            <View style={styles.statItem}>
-              <View style={[styles.statIconContainer, { backgroundColor: '#6B8FA315' }]}>
-                <Ionicons name="people-outline" size={20} color="#6B8FA3" />
-              </View>
-              <View style={styles.statContent}>
-                <Text style={[styles.statValue, { color: colors.text }]}>{teams.length}</Text>
-                <Text style={[styles.statLabel, { color: colors.textMuted }]}>Teams</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Quick Actions */}
-        <View style={[styles.actionsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Quick Actions</Text>
-          
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: colors.primary }]}
-            onPress={() => createSessionSheetRef.current?.open()}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="play-circle" size={20} color="#fff" />
-            <Text style={styles.actionButtonText}>Start Session</Text>
-          </TouchableOpacity>
-
-          {permissions.canManageTeams && (
-            <TouchableOpacity
-              style={[styles.actionButtonSecondary, { borderColor: colors.border }]}
-              onPress={() => createTeamSheetRef.current?.open()}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="people" size={20} color={colors.text} />
-              <Text style={[styles.actionButtonSecondaryText, { color: colors.text }]}>Create Team</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Teams Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Teams</Text>
-            {permissions.canManageTeams && teams.length > 0 && (
-              <TouchableOpacity onPress={() => createTeamSheetRef.current?.open()}>
-                <Text style={[styles.seeAllText, { color: colors.primary }]}>+ New</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {loadingTeams ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator color={colors.primary} />
-              <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading teams...</Text>
-            </View>
-          ) : teams.length === 0 ? (
-            <EmptyState
-              icon="people-outline"
-              title={permissions.canManageTeams ? "No teams yet" : "No teams available"}
-              subtitle={permissions.canManageTeams ? "Create your first team to get started" : "Teams will appear here when created"}
-              size="small"
-            />
-          ) : (
-            <View style={styles.teamsList}>
-              {teams.map((team) => (
-                <TeamCard key={team.id} team={team} memberCount={0} />
-              ))}
-            </View>
-          )}
-        </View>
-
-        {/* Recent Sessions */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Sessions</Text>
-          </View>
-
-          {sessionsLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator color={colors.primary} />
-              <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading sessions...</Text>
-            </View>
-          ) : sessionsError ? (
-            <EmptyState
-              icon="warning-outline"
-              title="Unable to load sessions"
-              subtitle={sessionsError}
-              size="small"
-            />
-          ) : sessions.length === 0 ? (
-            <EmptyState
-              icon="fitness-outline"
-              title="No sessions yet"
-              subtitle="Start your first training session"
-              size="small"
-            />
-          ) : (
-            <View style={styles.sessionsList}>
-              {sessions.slice(0, 5).map((session) => {
-                const sessionPayload = session.session_data as Record<string, any> | null;
-                const statusColors: Record<string, { bg: string; text: string }> = {
-                  active: { bg: colors.blue + '20', text: colors.blue },
-                  completed: { bg: colors.green + '25', text: colors.green },
-                  cancelled: { bg: colors.red + '20', text: colors.red },
-                };
-                const statusColor = statusColors[session.status] ?? { bg: colors.muted + '20', text: colors.mutedForeground };
-
-                return (
-                  <View
-                    key={session.id}
-                    style={[styles.sessionCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-                  >
-                    <View style={styles.sessionHeader}>
-                      <View style={styles.sessionLeft}>
-                        <View style={[styles.sessionIcon, { backgroundColor: '#5B7A8C15' }]}>
-                          <Ionicons name="fitness" size={18} color="#5B7A8C" />
-                        </View>
-                        <View>
-                          <Text style={[styles.sessionTitle, { color: colors.text }]}>
-                            {session.session_mode === 'group' ? 'Group Session' : 'Solo Session'}
-                          </Text>
-                          <Text style={[styles.sessionSubtitle, { color: colors.textMuted }]}>
-                            {session.user_full_name || 'Unknown User'}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={[styles.sessionStatusBadge, { backgroundColor: statusColor.bg }]}>
-                        <Text style={[styles.sessionStatusText, { color: statusColor.text }]}>
-                          {formatLabel(session.status)}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.sessionMeta}>
-                      <View style={styles.sessionMetaItem}>
-                        <Ionicons name="time-outline" size={14} color={colors.textMuted} />
-                        <Text style={[styles.sessionMetaText, { color: colors.textMuted }]}>
-                          {formatDateTime(session.started_at)}
-                        </Text>
-                      </View>
-                      {session.team_name && (
-                        <View style={styles.sessionMetaItem}>
-                          <Ionicons name="people-outline" size={14} color={colors.textMuted} />
-                          <Text style={[styles.sessionMetaText, { color: colors.textMuted }]}>
-                            {session.team_name}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          )}
-        </View>
+        <RecentSessions
+          sessions={sessions}
+          loading={sessionsLoading}
+          error={sessionsError}
+        />
 
         {/* Management Section (Owner/Admin Only) */}
         {permissions.canManageWorkspace && (
@@ -430,106 +263,8 @@ const styles = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-  // Stats Card
-  statsCard: {
-    padding: 20,
-    borderRadius: 20,
-    borderWidth: 1,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 20,
-    letterSpacing: -0.3,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-  },
-  statItem: {
-    flex: 1,
-    minWidth: '45%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  statIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statContent: {
-    flex: 1,
-  },
-  statValue: {
-    fontSize: 22,
-    fontWeight: '700',
-    marginBottom: 2,
-    letterSpacing: -0.3,
-  },
-  statLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    letterSpacing: -0.1,
-  },
 
-  // Actions Card
-  actionsCard: {
-    padding: 20,
-    borderRadius: 20,
-    borderWidth: 1,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 16,
-    gap: 10,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: -0.2,
-  },
-  actionButtonSecondary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    gap: 10,
-  },
-  actionButtonSecondaryText: {
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: -0.2,
-  },
-
-  // Section
+  // Section (for Management section)
   section: {
     marginBottom: 28,
   },
@@ -543,95 +278,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     letterSpacing: -0.3,
-  },
-  seeAllText: {
-    fontSize: 15,
-    fontWeight: '600',
-    letterSpacing: -0.2,
-  },
-  teamsList: {
-    gap: 12,
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    paddingVertical: 32,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    fontWeight: '500',
-    letterSpacing: -0.1,
-  },
-
-  // Sessions List
-  sessionsList: {
-    gap: 12,
-  },
-  sessionCard: {
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  sessionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  sessionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  sessionIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sessionTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 2,
-    letterSpacing: -0.2,
-  },
-  sessionSubtitle: {
-    fontSize: 12,
-    fontWeight: '500',
-    letterSpacing: -0.1,
-  },
-  sessionStatusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
-  },
-  sessionStatusText: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-    textTransform: 'uppercase',
-  },
-  sessionMeta: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  sessionMetaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  sessionMetaText: {
-    fontSize: 12,
-    fontWeight: '500',
-    letterSpacing: -0.1,
   },
 
   // Management Card

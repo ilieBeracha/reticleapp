@@ -10,6 +10,8 @@ interface QuickActionCardProps {
   isPrimary?: boolean;
   color?: string;
   onPress: () => void;
+  isFirst?: boolean;
+  isLast?: boolean;
 }
 
 const QuickActionCard = memo(function QuickActionCard({ 
@@ -18,7 +20,9 @@ const QuickActionCard = memo(function QuickActionCard({
   subtitle, 
   isPrimary = false, 
   color,
-  onPress 
+  onPress,
+  isFirst,
+  isLast
 }: QuickActionCardProps) {
   const colors = useColors();
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -46,10 +50,9 @@ const QuickActionCard = memo(function QuickActionCard({
   const cardStyle = useMemo(() => [
     styles.card,
     { 
-      backgroundColor: isPrimary ? colors.primary : colors.card, 
-      borderColor: isPrimary ? colors.primary : colors.border 
+      backgroundColor: isPrimary ? colors.primary : 'transparent',
     }
-  ], [isPrimary, colors.primary, colors.card, colors.border]);
+  ], [isPrimary, colors.primary]);
 
   const iconStyle = useMemo(() => [
     styles.icon,
@@ -119,10 +122,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 14,
-    marginBottom: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    overflow: 'hidden',
   },
   content: {
     flexDirection: 'row',

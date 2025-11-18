@@ -9,6 +9,7 @@ export { CreateTeamSheet } from './CreateTeamSheet';
 export { InviteMembersSheet } from './InviteMembersSheet';
 export { UserMenuBottomSheet } from './UserMenuBottomSheet';
 export type { UserMenuBottomSheetRef } from './UserMenuBottomSheet';
+export { default as WorkspaceItem } from './WorkspaceItem';
 export { WorkspaceSwitcherBottomSheet } from './WorkspaceSwitcherBottomSheet';
 export type { WorkspaceSwitcherRef } from './WorkspaceSwitcherBottomSheet';
 
