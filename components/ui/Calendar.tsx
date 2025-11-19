@@ -2,7 +2,6 @@ import { useColors } from '@/hooks/ui/useColors';
 import { useColorScheme } from '@/hooks/ui/useColorScheme';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { CalendarProps, DateData, Calendar as RNCalendar } from 'react-native-calendars';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 
 interface CustomCalendarProps extends Partial<CalendarProps> {
   onDayPress?: (date: DateData) => void;
@@ -62,11 +61,8 @@ export function Calendar({
   };
 
   return (
-    <Animated.View 
-      entering={FadeInDown.duration(400).springify()}
-      style={[styles.container, { backgroundColor: colors.card }]}
-    >
-      {showTitle && (
+    <View style={[styles.container, { backgroundColor: colors.card }]}>
+      {showTitle && title && (
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
         </View>
@@ -79,14 +75,13 @@ export function Calendar({
         enableSwipeMonths={true}
         style={[styles.calendar, { 
           backgroundColor: colors.card,
-          borderRadius: 16,
         }]}
         markingType={'multi-dot'}
         hideExtraDays={true}
         firstDay={1} // Monday
         renderArrow={(direction) => (
           <View style={styles.arrow}>
-            <Text style={[styles.arrowText, { color: colors.accent }]}>
+            <Text style={[styles.arrowText, { color: colors.text }]}>
               {direction === 'left' ? '‹' : '›'}
             </Text>
           </View>
@@ -136,7 +131,7 @@ export function Calendar({
         }}
         {...props}
       />
-    </Animated.View>
+    </View>
   );
 }
 
@@ -153,53 +148,44 @@ export function CompactCalendar(props: CustomCalendarProps) {
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  header: {
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  calendar: {
-    borderRadius: 16,
+    borderRadius: 12,
+    padding: 16,
     overflow: 'hidden',
   },
-  compact: {
-    padding: 12,
+  header: {
+    marginBottom: 12,
   },
-  arrow: {
+  title: {
+    fontSize: 20,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+  },
+  calendar: {
+    borderRadius: 0,
+  },
+  compact: {
     padding: 8,
   },
+  arrow: {
+    padding: 6,
+  },
   arrowText: {
-    fontSize: 28,
-    fontWeight: '300',
+    fontSize: 24,
+    fontWeight: '400',
   },
   dayContainer: {
-    width: 36,
-    height: 36,
+    width: 34,
+    height: 34,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 18,
+    borderRadius: 17,
     position: 'relative',
   },
   selectedDay: {
-    shadowColor: '#E76925',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
+    // Simple selected state, no heavy shadows
   },
   todayDay: {
-    borderWidth: 1.5,
+    borderWidth: 1,
   },
   dayText: {
     fontSize: 15,
@@ -215,12 +201,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 2,
     position: 'absolute',
-    bottom: 2,
+    bottom: 3,
   },
   dot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
   },
 });
 

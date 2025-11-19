@@ -95,7 +95,7 @@ ALTER FUNCTION "public"."is_team_leader"("p_team_id" "uuid", "p_user_id" "uuid")
 
 -- Get teams for a workspace
 CREATE OR REPLACE FUNCTION "public"."get_workspace_teams"("p_workspace_id" "uuid") 
-RETURNS TABLE("team_id" "uuid", "team_name" "text", "team_type" "text", "member_count" bigint)
+RETURNS TABLE("team_id" "uuid", "team_name" "text","org_workspace_id" "uuid", "member_count" bigint)
 LANGUAGE "plpgsql" 
 SECURITY DEFINER
 SET "search_path" TO 'public'
@@ -109,13 +109,13 @@ BEGIN
   SELECT 
     t.id,
     t.name,
-    t.team_type,
+    t.org_workspace_id,
     COUNT(tm.user_id) AS member_count
   FROM teams t
   LEFT JOIN team_members tm ON tm.team_id = t.id
   WHERE t.workspace_owner_id = p_workspace_id
   GROUP BY t.id
-  ORDER BY t.team_type, t.name;
+  ORDER BY t.name;
 END;
 $$;
 
@@ -136,7 +136,7 @@ BEGIN
   FROM teams WHERE id = p_team_id;
   
   IF NOT has_workspace_access(v_workspace_id) THEN
-    RAISE EXCEPTION 'Access denied to team %', p_team_id;
+    RAISE EXCEPTION 'Access denied to team %', 0P[p_team_id;
   END IF;
 
   RETURN QUERY
@@ -245,11 +245,9 @@ COMMENT ON TABLE "public"."workspace_access" IS 'Workspace membership (supports 
 -- TEAMS: Sub-groups within a workspace (personal OR org)
 CREATE TABLE IF NOT EXISTS "public"."teams" (
   "id" "uuid" PRIMARY KEY DEFAULT gen_random_uuid(),
-  "workspace_type" "text" NOT NULL DEFAULT 'personal',
   "workspace_owner_id" "uuid",           -- For personal workspace (profile.id)
   "org_workspace_id" "uuid",             -- For org workspace
   "name" "text" NOT NULL,
-  "team_type" "text",
   "description" "text",
   "created_at" timestamptz DEFAULT now() NOT NULL,
   "updated_at" timestamptz DEFAULT now() NOT NULL,

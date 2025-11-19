@@ -122,15 +122,27 @@ export function useAppContext(): AppContext {
       // Actions
       switchWorkspace: async (workspaceId: string | null) => {
         const targetId = workspaceId || myWorkspaceId;
+        const isPersonal = targetId === myWorkspaceId;
+        const targetWorkspace = workspaces.find(w => w.id === targetId);
+        
+        console.log('🔄 Switching workspace:', {
+          from: currentActiveId,
+          to: targetId,
+          isPersonal,
+          workspaceType: targetWorkspace?.workspace_type,
+          workspaceName: targetWorkspace?.workspace_name || targetWorkspace?.full_name
+        });
+        
+        // Update store
         setActiveWorkspace(targetId);
         
-        // Navigate to appropriate route based on workspace type
-        const isPersonal = targetId === myWorkspaceId;
-        
         // Navigate to the correct workspace route
-        router.replace(isPersonal ? '/(protected)/workspace/personal' : '/(protected)/workspace/organization');
+        const targetRoute = isPersonal ? '/(protected)/workspace/personal' : '/(protected)/workspace/organization';
+        console.log('🚀 Navigating to:', targetRoute);
+        router.replace(targetRoute);
       },
       switchToMyWorkspace: async () => {
+        console.log('🏠 Switching to my workspace:', myWorkspaceId);
         setActiveWorkspace(myWorkspaceId);
         
         // Navigate to personal workspace route

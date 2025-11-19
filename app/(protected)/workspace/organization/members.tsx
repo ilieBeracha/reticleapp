@@ -2,32 +2,64 @@ import EmptyState from '@/components/shared/EmptyState';
 import GroupedList from '@/components/shared/GroupedList';
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
+import { useWorkspacePermissions } from '@/hooks/usePermissions';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export default function MembersPage() {
   const colors = useColors();
-  const { activeWorkspaceId } = useAppContext();  
+  const { activeWorkspaceId, activeWorkspace } = useAppContext();  
+  const permissions = useWorkspacePermissions();
   const { workspaceMembers, loadWorkspaceMembers } = useWorkspaceStore();
 
   useEffect(() => {
     loadWorkspaceMembers();
   }, [activeWorkspaceId, loadWorkspaceMembers]);
 
+  // Role display
+  const roleDisplay = permissions.role.charAt(0).toUpperCase() + permissions.role.slice(1);
+  const roleConfig = {
+    owner: { icon: 'shield-checkmark' as const, color: '#FF6B35', bg: '#FF6B3515' },
+    admin: { icon: 'shield-half' as const, color: '#5B7A8C', bg: '#5B7A8C15' },
+    instructor: { icon: 'school' as const, color: '#E76925', bg: '#E7692515' },
+    member: { icon: 'person' as const, color: '#666', bg: '#E0E0E0' },
+  };
+  const currentRole = roleConfig[permissions.role] || roleConfig.member;
+
   if (workspaceMembers.length === 0) {
     return (
+      <View style={styles.content}>
       <EmptyState
         icon="people-outline"
         title="No members yet"
         subtitle="Invite members to your organization workspace"
         size="small"
-      />
+        />
+        </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView 
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Workspace Header */}
+      <View style={styles.header}>
+        <Text style={[styles.workspaceName, { color: colors.text }]}>
+          {activeWorkspace?.workspace_name || 'Organization'}
+        </Text>
+        <View style={[styles.roleBadge, { backgroundColor: currentRole.bg }]}>
+          <Ionicons name={currentRole.icon} size={12} color={currentRole.color} />
+          <Text style={[styles.roleBadgeText, { color: currentRole.color }]}>
+            {roleDisplay}
+          </Text>
+        </View>
+      </View>
+
       <GroupedList
         data={workspaceMembers}
         renderItem={(member, isFirst, isLast) => (
@@ -63,7 +95,7 @@ export default function MembersPage() {
         )}
         keyExtractor={(member) => member.id}
       />
-    </View>
+    </ScrollView>
   );
 }
 
@@ -81,6 +113,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+
+  // Header
+  header: {
+    marginBottom: 20,
+  },
+  workspaceName: {
+    fontSize: 32,
+    fontWeight: '700',
+    marginBottom: 10,
+    letterSpacing: -0.5,
+  },
+
+  // Member List
   memberItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -118,10 +168,21 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     letterSpacing: -0.1,
   },
+  
+  // Badge styles (shared with header)
   roleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 12,
+    gap: 5,
+  },
+  roleBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: -0.1,
   },
   roleText: {
     fontSize: 12,
