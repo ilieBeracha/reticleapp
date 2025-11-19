@@ -27,7 +27,7 @@ export default function OrganizationLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
+        tabBarActiveTintColor: colors.text,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: {
           backgroundColor: colors.background,
@@ -52,7 +52,7 @@ export default function OrganizationLayout() {
         }}
       />
       <Tabs.Screen
-        name="calendar-demo"
+        name="calendar"
         options={{
           title: 'Calendar',
           tabBarIcon: ({ color, size }) => (

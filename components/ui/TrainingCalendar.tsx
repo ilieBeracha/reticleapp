@@ -1,19 +1,23 @@
-import { Calendar } from './Calendar';
-import { useCalendar, CalendarEvent, formatCalendarDate } from '@/hooks/ui/useCalendar';
+import { CalendarEvent, formatCalendarDate, useCalendar } from '@/hooks/ui/useCalendar';
 import { useColors } from '@/hooks/ui/useColors';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Calendar } from './Calendar';
+
+type CalendarViewMode = 'week' | 'month';
 
 interface TrainingCalendarProps {
   events?: CalendarEvent[];
   onEventPress?: (event: CalendarEvent) => void;
   onCreateTraining?: (date: string) => void;
+  viewMode?: CalendarViewMode;
 }
 
 export function TrainingCalendar({ 
   events = [], 
   onEventPress,
   onCreateTraining,
+  viewMode = 'month',
 }: TrainingCalendarProps) {
   const colors = useColors();
   
@@ -39,6 +43,7 @@ export function TrainingCalendar({
         onDayPress={handleDayPress}
         selectedDate={selectedDate}
         markedDates={markedDates}
+        viewMode={viewMode}
       />
 
       {/* Selected Date Events */}
@@ -58,18 +63,17 @@ export function TrainingCalendar({
             </View>
             
             {selectedDate && (
-              <Pressable
+              <TouchableOpacity
                 onPress={handleCreatePress}
-                style={({ pressed }) => [
+                style={ [
                   styles.createButton,
                   { 
                     backgroundColor: colors.accent,
-                    opacity: pressed ? 0.7 : 1,
                   },
                 ]}
               >
                 <Ionicons name="add" size={20} color={colors.accentForeground} />
-              </Pressable>
+              </TouchableOpacity>
             )}
           </View>
 
@@ -109,14 +113,13 @@ function EventCard({ event, onPress, color }: EventCardProps) {
   };
 
   return (
-    <Pressable
+    <TouchableOpacity
       onPress={onPress}
-      style={({ pressed }) => [
+      style={ [
         styles.eventCard,
         { 
           backgroundColor: colors.card,
           borderLeftColor: color,
-          opacity: pressed ? 0.8 : 1,
         },
       ]}
     >
@@ -132,7 +135,7 @@ function EventCard({ event, onPress, color }: EventCardProps) {
       </View>
 
       <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-    </Pressable>
+    </TouchableOpacity>
   );
 }
 

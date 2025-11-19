@@ -17,85 +17,118 @@ const QuickActions = memo(function QuickActions({
   const colors = useColors();
 
   return (
-    <View style={[styles.actionsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>Quick Actions</Text>
+    <View style={styles.container}>
+      <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>QUICK ACTIONS</Text>
       
-      <TouchableOpacity
-        style={[styles.actionButton, { backgroundColor: colors.primary }]}
-        onPress={onStartSession}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="play-circle" size={20} color="#fff" />
-        <Text style={styles.actionButtonText}>Start Session</Text>
-      </TouchableOpacity>
-
-      {canManageTeams && onCreateTeam && (
+      <View style={styles.grid}>
         <TouchableOpacity
-          style={[styles.actionButtonSecondary, { borderColor: colors.border }]}
-          onPress={onCreateTeam}
-          activeOpacity={0.8}
+          style={[
+            styles.actionButton, 
+            { 
+              backgroundColor: colors.card,  
+            }
+          ]}
+          onPress={onStartSession}
+          activeOpacity={0.9}
         >
-          <Ionicons name="people" size={20} color={colors.text} />
-          <Text style={[styles.actionButtonSecondaryText, { color: colors.text }]}>Create Team</Text>
+          <View style={styles.content}>
+           
+            <Text style={styles.actionTitle}>Start Session</Text>
+            <Text style={styles.actionDesc}>Launch a new training</Text>
+          </View>
+          <Ionicons name="arrow-forward" size={20} color="rgba(255,255,255,0.6)" />
         </TouchableOpacity>
-      )}
+
+        {canManageTeams && onCreateTeam && (
+          <TouchableOpacity
+            style={[
+              styles.secondaryButton, 
+              { 
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+              }
+            ]}
+            onPress={onCreateTeam}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.secondaryIcon, { backgroundColor: colors.secondary }]}>
+              <Ionicons name="people-outline" size={22} color={colors.text} />
+            </View>
+            <View>
+              <Text style={[styles.secondaryTitle, { color: colors.text }]}>Create Team</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 });
 
 const styles = StyleSheet.create({
-  actionsCard: {
-    padding: 20,
-    borderRadius: 20,
-    borderWidth: 1,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
+  container: {
+    marginBottom: 32,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 12,
     fontWeight: '700',
-    marginBottom: 20,
-    letterSpacing: -0.3,
+    letterSpacing: 0.5,
+    marginBottom: 12,
+    paddingLeft: 4,
+  },
+  grid: {
+    gap: 12,
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 16,
-    gap: 10,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 3,
+    justifyContent: 'space-between',
+    padding: 20,
+    borderRadius: 20,
   },
-  actionButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: -0.2,
+  content: {
+    gap: 4,
   },
-  actionButtonSecondary: {
-    flexDirection: 'row',
+  iconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    gap: 10,
+    marginBottom: 8,
   },
-  actionButtonSecondaryText: {
-    fontSize: 16,
+  actionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: -0.3,
+  },
+  actionDesc: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '500',
+  },
+  
+  // Secondary
+  secondaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 14,
+  },
+  secondaryIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryTitle: {
+    fontSize: 15,
     fontWeight: '600',
     letterSpacing: -0.2,
   },
 });
 
 export default QuickActions;
-

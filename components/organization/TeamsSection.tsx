@@ -24,10 +24,10 @@ const TeamsSection = memo(function TeamsSection({
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Teams</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>TEAMS</Text>
         {canManageTeams && teams.length > 0 && (
           <TouchableOpacity onPress={onCreateTeam}>
-            <Text style={[styles.seeAllText, { color: colors.primary }]}>+ New</Text>
+            <Text style={[styles.actionText, { color: colors.primary }]}>+ Add Team</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -35,7 +35,6 @@ const TeamsSection = memo(function TeamsSection({
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading teams...</Text>
         </View>
       ) : teams.length === 0 ? (
         <EmptyState
@@ -64,35 +63,28 @@ const TeamsSection = memo(function TeamsSection({
 
 const styles = StyleSheet.create({
   section: {
-    marginBottom: 28,
+    marginBottom: 32,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
+    paddingLeft: 4,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 12,
     fontWeight: '700',
-    letterSpacing: -0.3,
+    letterSpacing: 0.5,
   },
-  seeAllText: {
-    fontSize: 15,
+  actionText: {
+    fontSize: 13,
     fontWeight: '600',
-    letterSpacing: -0.2,
   },
   loadingContainer: {
     alignItems: 'center',
     paddingVertical: 32,
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    fontWeight: '500',
-    letterSpacing: -0.1,
-  },
 });
 
 export default TeamsSection;
-

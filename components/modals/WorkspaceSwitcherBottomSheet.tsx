@@ -142,7 +142,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
         <BaseBottomSheet
       
           ref={bottomSheetRef}
-          backdropOpacity={0.6}
+
           snapPoints={['60%','92%']}
           enableDynamicSizing={false}
         >
@@ -238,7 +238,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
         <BaseBottomSheet
           snapPoints={['90%']}
           ref={createSheetRef}
-          backdropOpacity={0.6}
+
           enableDynamicSizing={false}
         >
             <View style={styles.createHeader}>

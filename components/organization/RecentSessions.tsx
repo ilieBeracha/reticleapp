@@ -22,13 +22,12 @@ const RecentSessions = memo(function RecentSessions({
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Sessions</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>RECENT SESSIONS</Text>
       </View>
 
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading sessions...</Text>
         </View>
       ) : error ? (
         <EmptyState
@@ -63,28 +62,23 @@ const RecentSessions = memo(function RecentSessions({
 
 const styles = StyleSheet.create({
   section: {
-    marginBottom: 28,
+    marginBottom: 32,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
+    paddingLeft: 4,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 12,
     fontWeight: '700',
-    letterSpacing: -0.3,
+    letterSpacing: 0.5,
   },
   loadingContainer: {
     alignItems: 'center',
     paddingVertical: 32,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    fontWeight: '500',
-    letterSpacing: -0.1,
   },
 });
 

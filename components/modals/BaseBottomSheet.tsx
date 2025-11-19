@@ -18,7 +18,7 @@ interface BaseBottomSheetProps {
 }
 
 export const BaseBottomSheet = forwardRef<BaseBottomSheetRef, BaseBottomSheetProps>(
-  ({ children, snapPoints, enableDynamicSizing = false, backdropOpacity = 0.3, scrollToRefresh = false }, ref) => {
+  ({ children, snapPoints, enableDynamicSizing = false, backdropOpacity = 0.8, scrollToRefresh = false }, ref) => {
     const colors = useColors();
     const bottomSheetRef = useRef<BottomSheet>(null);
 

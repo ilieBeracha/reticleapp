@@ -2,6 +2,9 @@ import { useColors } from '@/hooks/ui/useColors';
 import { useColorScheme } from '@/hooks/ui/useColorScheme';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { CalendarProps, DateData, Calendar as RNCalendar } from 'react-native-calendars';
+import { Ionicons } from '@expo/vector-icons';
+
+type CalendarViewMode = 'week' | 'month';
 
 interface CustomCalendarProps extends Partial<CalendarProps> {
   onDayPress?: (date: DateData) => void;
@@ -9,6 +12,7 @@ interface CustomCalendarProps extends Partial<CalendarProps> {
   selectedDate?: string;
   showTitle?: boolean;
   title?: string;
+  viewMode?: CalendarViewMode;
 }
 
 export function Calendar({
@@ -17,6 +21,7 @@ export function Calendar({
   selectedDate,
   showTitle = true,
   title = "Schedule",
+  viewMode = 'month',
   ...props
 }: CustomCalendarProps) {
   const colors = useColors();
@@ -30,7 +35,7 @@ export function Calendar({
       [selectedDate]: {
         ...markedDates[selectedDate],
         selected: true,
-        selectedColor: colors.accent,
+        // We don't set selectedColor here anymore, as we handle it in the custom component
       },
     }),
   };
@@ -46,7 +51,7 @@ export function Calendar({
     textDisabledColor: colors.muted,
     dotColor: colors.accent,
     selectedDotColor: colors.accentForeground,
-    arrowColor: colors.accent,
+    arrowColor: colors.text,
     monthTextColor: colors.text,
     indicatorColor: colors.accent,
     textDayFontFamily: 'System',
@@ -54,14 +59,150 @@ export function Calendar({
     textDayHeaderFontFamily: 'System',
     textDayFontWeight: '400' as const,
     textMonthFontWeight: '600' as const,
-    textDayHeaderFontWeight: '500' as const,
+    textDayHeaderFontWeight: '600' as const,
     textDayFontSize: 15,
     textMonthFontSize: 18,
-    textDayHeaderFontSize: 13,
+    textDayHeaderFontSize: 12, // Slightly smaller for cleaner look
+    
+    // Header style adjustments
+    'stylesheet.calendar.header': {
+      header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingLeft: 10,
+        paddingRight: 10,
+        marginTop: 6,
+        alignItems: 'center',
+      },
+      monthText: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: colors.text,
+        margin: 10,
+      },
+      dayHeader: {
+        marginTop: 2,
+        marginBottom: 7,
+        width: 32,
+        textAlign: 'center',
+        fontSize: 12,
+        fontWeight: '600',
+        color: colors.textMuted,
+        textTransform: 'uppercase',
+      },
+    }
+  };
+  
+  const dayComponent = ({ date, state, marking }: any) => {
+    const isSelected = marking?.selected;
+    const isToday = date?.dateString === new Date().toISOString().split('T')[0];
+    const isDisabled = state === 'disabled';
+    
+    // Logic to determine if we should show dots
+    // This handles both the simple 'dots' array and the 'dotColor' property
+    const hasDots = marking?.dots && marking.dots.length > 0;
+    const hasMarked = marking?.marked; 
+    
+    return (
+      <Pressable
+        onPress={() => date && onDayPress?.(date)}
+        disabled={isDisabled}
+        style={[
+          styles.dayContainer,
+        ]}
+      >
+        {/* Selection circle background */}
+        {isSelected && (
+          <View style={[StyleSheet.absoluteFill, styles.selectedBackground, { backgroundColor: colors.accent }]} />
+        )}
+        
+        {/* Today ring */}
+        {isToday && !isSelected && (
+          <View style={[StyleSheet.absoluteFill, styles.todayRing, { borderColor: colors.accent }]} />
+        )}
+
+        <Text
+          style={[
+            styles.dayText,
+            { color: colors.text },
+            isDisabled && [styles.disabledDayText, { color: colors.muted }],
+            isSelected && [styles.selectedDayText, { color: colors.accentForeground }],
+            isToday && !isSelected && { color: colors.accent, fontWeight: '700' },
+          ]}
+        >
+          {date?.day}
+        </Text>
+        
+        {/* Dots Indicator */}
+        <View style={styles.dotsWrapper}>
+          {hasDots ? (
+             <View style={styles.dotsContainer}>
+              {marking.dots.slice(0, 3).map((dot: any, index: number) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.dot,
+                    { backgroundColor: isSelected ? colors.accentForeground : (dot.color || colors.accent) },
+                  ]}
+                />
+              ))}
+            </View>
+          ) : hasMarked ? (
+             // Fallback for simple 'marked: true'
+             <View 
+               style={[
+                 styles.dot, 
+                 { backgroundColor: isSelected ? colors.accentForeground : colors.accent }
+               ]} 
+             />
+          ) : null}
+        </View>
+      </Pressable>
+    );
   };
 
+  const renderArrow = (direction: 'left' | 'right') => (
+    <View style={[styles.arrowContainer, { backgroundColor: colors.secondary }]}>
+      <Ionicons 
+        name={direction === 'left' ? 'chevron-back' : 'chevron-forward'} 
+        size={18} 
+        color={colors.text} 
+      />
+    </View>
+  );
+
+  if (viewMode === 'week') {
+    // 7-week view: Shows current month + adjacent days to display ~7 weeks
+    return (
+      <View style={[styles.container, styles.weekContainer, { backgroundColor: colors.card }]}>
+        {showTitle && title && (
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+          </View>
+        )}
+        
+        <RNCalendar
+          theme={theme as any}
+          onDayPress={onDayPress}
+          markedDates={enhancedMarkedDates}
+          enableSwipeMonths={true}
+          style={[styles.calendar, styles.weekCalendar, { 
+            backgroundColor: colors.card,
+          }]}
+          markingType={'multi-dot'}
+          hideExtraDays={false} // Show days from adjacent months to display more weeks
+          firstDay={1} // Monday
+          renderArrow={renderArrow}
+          dayComponent={dayComponent}
+          {...props}
+        />
+      </View>
+    );
+  }
+
+  // Default monthly view
   return (
-    <View style={[styles.container, { backgroundColor: colors.card }]}>
+    <View style={[styles.container, { backgroundColor: colors.card, shadowColor: colors.text + '20' }]}>
       {showTitle && title && (
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
@@ -69,7 +210,7 @@ export function Calendar({
       )}
       
       <RNCalendar
-        theme={theme}
+        theme={theme as any}
         onDayPress={onDayPress}
         markedDates={enhancedMarkedDates}
         enableSwipeMonths={true}
@@ -79,56 +220,8 @@ export function Calendar({
         markingType={'multi-dot'}
         hideExtraDays={true}
         firstDay={1} // Monday
-        renderArrow={(direction) => (
-          <View style={styles.arrow}>
-            <Text style={[styles.arrowText, { color: colors.text }]}>
-              {direction === 'left' ? '‹' : '›'}
-            </Text>
-          </View>
-        )}
-        dayComponent={({ date, state, marking }) => {
-          const isSelected = marking?.selected;
-          const isToday = date?.dateString === new Date().toISOString().split('T')[0];
-          const isDisabled = state === 'disabled';
-          
-          return (
-            <Pressable
-              onPress={() => date && onDayPress?.(date)}
-              disabled={isDisabled}
-              style={[
-                styles.dayContainer,
-                isSelected && [styles.selectedDay, { backgroundColor: colors.accent }],
-                isToday && !isSelected && [styles.todayDay, { borderColor: colors.accent }],
-              ]}
-            >
-              <Text
-                style={[
-                  styles.dayText,
-                  { color: colors.text },
-                  isSelected && [styles.selectedDayText, { color: colors.accentForeground }],
-                  isDisabled && [styles.disabledDayText, { color: colors.muted }],
-                  isToday && !isSelected && { color: colors.accent, fontWeight: '600' },
-                ]}
-              >
-                {date?.day}
-              </Text>
-              
-              {marking?.dots && marking.dots.length > 0 && (
-                <View style={styles.dotsContainer}>
-                  {marking.dots.slice(0, 3).map((dot: any, index: number) => (
-                    <View
-                      key={index}
-                      style={[
-                        styles.dot,
-                        { backgroundColor: dot.color || colors.accent },
-                      ]}
-                    />
-                  ))}
-                </View>
-              )}
-            </Pressable>
-          );
-        }}
+        renderArrow={renderArrow}
+        dayComponent={dayComponent}
         {...props}
       />
     </View>
@@ -148,65 +241,89 @@ export function CompactCalendar(props: CustomCalendarProps) {
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 12,
-    padding: 16,
-    overflow: 'hidden',
+    borderRadius: 24,
+    padding: 12,
+    overflow: 'visible', // Changed to visible for shadows if needed
+    // Subtle shadow for the container
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  weekContainer: {
+    minHeight: 420, // Accommodate 7 weeks display
   },
   header: {
-    marginBottom: 12,
+    marginBottom: 16,
+    paddingHorizontal: 8,
   },
   title: {
     fontSize: 20,
-    fontWeight: '600',
-    letterSpacing: -0.3,
+    fontWeight: '700',
+    letterSpacing: -0.5,
   },
   calendar: {
     borderRadius: 0,
   },
+  weekCalendar: {
+    height: 380, // Taller to show more weeks
+  },
   compact: {
     padding: 8,
   },
-  arrow: {
-    padding: 6,
-  },
-  arrowText: {
-    fontSize: 24,
-    fontWeight: '400',
-  },
-  dayContainer: {
-    width: 34,
-    height: 34,
+  
+  // Arrow
+  arrowContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 17,
+  },
+  
+  // Day Cell
+  dayContainer: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
     position: 'relative',
   },
-  selectedDay: {
-    // Simple selected state, no heavy shadows
+  selectedBackground: {
+    borderRadius: 14, // Softer square
   },
-  todayDay: {
-    borderWidth: 1,
+  todayRing: {
+    borderWidth: 2,
+    borderRadius: 14,
+    opacity: 0.5,
   },
   dayText: {
     fontSize: 15,
-    fontWeight: '400',
+    fontWeight: '500',
+    marginBottom: 2, // Room for dots
   },
   selectedDayText: {
-    fontWeight: '600',
+    fontWeight: '700',
   },
   disabledDayText: {
     opacity: 0.3,
   },
+  
+  // Dots
+  dotsWrapper: {
+    position: 'absolute',
+    bottom: 5,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   dotsContainer: {
     flexDirection: 'row',
-    gap: 2,
-    position: 'absolute',
-    bottom: 3,
+    gap: 3,
   },
   dot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
   },
 });
-
