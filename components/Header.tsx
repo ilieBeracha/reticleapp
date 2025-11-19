@@ -1,4 +1,3 @@
-
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
 import { BellIcon, ChevronDownIcon } from 'lucide-react-native';
@@ -12,140 +11,137 @@ interface HeaderProps {
   onWorkspacePress?: () => void;
 }
 
-export function Header({ 
-  notificationCount = 0, 
-  onNotificationPress, 
-  onUserPress,
-  onWorkspacePress 
-}: HeaderProps) {
-  // ✨ SINGLE SOURCE OF TRUTH
+export function Header({ notificationCount = 0, onNotificationPress, onUserPress, onWorkspacePress }: HeaderProps) {
   const { email, avatarUrl, activeWorkspace } = useAppContext();
   const colors = useColors();
 
-  const fallbackInitial = email?.charAt(0)?.toUpperCase() ?? "?";
-  
-  // Display "Personal" for personal workspaces, workspace name for others
-  const workspaceName = activeWorkspace?.workspace_type === 'personal'
-    ? 'Personal'
-    : (activeWorkspace?.workspace_name || activeWorkspace?.name || 'Workspace');
+  const fallbackInitial = email?.charAt(0)?.toUpperCase() ?? '?';
+  const workspaceName =
+    activeWorkspace?.workspace_type === 'personal' ? 'Personal' : activeWorkspace?.workspace_name || 'Workspace';
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Left: Avatar + Workspace */}
-      <View style={styles.leftSection}>
-        <Pressable 
-          onPress={onUserPress}
-          style={({ pressed }) => [
-            styles.avatarButton,
-            pressed && { opacity: 0.7 }
-          ]}
-        >
-          <BaseAvatar
-            source={avatarUrl ? { uri: avatarUrl } : undefined}
-            fallbackText={fallbackInitial}
-            size="sm"
-            borderWidth={0}
-          />
-        </Pressable>
+    <View style={styles.wrapper}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        {/* Left Section */}
+        <View style={styles.left}>
+          <Pressable onPress={onUserPress} style={({ pressed }) => [styles.avatar, { opacity: pressed ? 0.6 : 1 }]}>
+            <View style={[styles.avatarRing, { borderColor: colors.primary + '20' }]}>
+              <BaseAvatar
+                source={avatarUrl ? { uri: avatarUrl } : undefined}
+                fallbackText={fallbackInitial}
+                size="sm"
+                borderWidth={0}
+              />
+            </View>
+          </Pressable>
 
-        <Pressable 
-          onPress={onWorkspacePress} 
-          style={({ pressed }) => [
-            styles.workspaceButton,
-            pressed && { opacity: 0.6 }
-          ]}
+          <Pressable
+            onPress={onWorkspacePress}
+            style={({ pressed }) => [styles.workspace, { backgroundColor: pressed ? colors.secondary : 'transparent' }]}
+          >
+            <Text style={[styles.workspaceText, { color: colors.text }]} numberOfLines={1}>
+              {workspaceName}
+            </Text>
+
+            <ChevronDownIcon size={16} color={colors.tint} strokeWidth={2.5} />
+          </Pressable>
+        </View>
+
+        {/* Right Section */}
+        <Pressable
+          onPress={onNotificationPress}
+          style={({ pressed }) => [styles.notification, pressed && { opacity: 0.8 }]}
         >
-          <Text style={[styles.workspaceName, { color: colors.text }]} numberOfLines={1}>
-            {workspaceName}
-          </Text>
-          <ChevronDownIcon size={14} color={colors.textMuted} strokeWidth={2.5} />
+          <BellIcon size={18} color={colors.tint} strokeWidth={2} />
         </Pressable>
       </View>
 
-      {/* Right: Notifications */}
-      <Pressable
-        onPress={onNotificationPress}
-        style={({ pressed }) => [
-          styles.iconButton,
-          pressed && styles.iconButtonPressed,
-        ]}
-      >
-        <BellIcon size={20} color={colors.text} strokeWidth={2} />
-        {notificationCount > 0 && (
-          <View style={[styles.badge, { backgroundColor: colors.destructive }]}>
-            <Text style={styles.badgeText}>
-              {notificationCount > 9 ? '9+' : notificationCount}
-            </Text>
-          </View>
-        )}
-      </Pressable>
+      <View style={[styles.divider, { backgroundColor: colors.border }]} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    flex: 1,
+  },
   container: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    height: 44,
-    flex: 1,
+    paddingHorizontal: 10,
+    height: 60,
   },
-  leftSection: {
+  divider: {
+    height: 0.5,
+    opacity: 0.3,
+  },
+
+  // Left Section
+  left: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 14,
     flex: 1,
   },
-  avatarButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  avatar: {
+    width: 40,
+    height: 40,
+  },
+  avatarRing: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
     overflow: 'hidden',
-  },
-  workspaceButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    flex: 1,
-    maxWidth: '80%',
-  },
-  workspaceName: {
-    fontSize: 17,
-    fontWeight: '600',
-    letterSpacing: -0.3,
-    flexShrink: 1,
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
   },
-  iconButtonPressed: {
-    opacity: 0.6,
+  workspace: {
+    display: 'flex',
+    flexDirection: 'row',
+  },
+  workspaceText: {
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: -0.5,
+    flexShrink: 1,
+  },
+  chevronWrapper: {
+    justifyContent: 'center',
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
   badge: {
     position: 'absolute',
-    top: 0,
-    right: 0,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
+    top: -4,
+    right: -4,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
+    borderWidth: 2.5,
+    borderColor: '#FFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 4,
   },
   badgeText: {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '700',
     color: '#FFF',
-    textAlign: 'center',
+  },
+  notification: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

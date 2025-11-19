@@ -678,3 +678,395 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TAB
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "service_role";
 
 ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
+
+-- =====================================================
+-- SIMPLIFIED SESSIONS TABLE
+-- Remove drill/training complexity for now
+-- =====================================================
+
+-- Drop the existing sessions table constraints/policies first
+DROP TABLE IF EXISTS public.sessions CASCADE;
+
+CREATE TABLE public.sessions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  
+  -- Workspace reference (simplified)
+  workspace_type text NOT NULL DEFAULT 'personal',
+  workspace_owner_id uuid,  -- For personal: user's profile.id
+  org_workspace_id uuid,    -- For org: org_workspaces.id
+  
+  -- Session ownership
+  user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  
+  -- Optional: Team context
+  team_id uuid REFERENCES public.teams(id) ON DELETE SET NULL,
+  
+  -- Session details
+  session_mode text NOT NULL DEFAULT 'solo',  -- 'solo' or 'group'
+  status text NOT NULL DEFAULT 'active',      -- 'active', 'completed', 'cancelled'
+  
+  -- Timing
+  started_at timestamptz NOT NULL DEFAULT now(),
+  ended_at timestamptz,
+  
+  -- Session data (flexible JSONB for any session-specific data)
+  session_data jsonb DEFAULT '{}'::jsonb,
+  
+  -- Metadata
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  
+  -- Constraints
+  CONSTRAINT sessions_workspace_type_check 
+    CHECK (workspace_type IN ('personal', 'org')),
+  CONSTRAINT sessions_session_mode_check 
+    CHECK (session_mode IN ('solo', 'group')),
+  CONSTRAINT sessions_status_check 
+    CHECK (status IN ('active', 'completed', 'cancelled')),
+  CONSTRAINT sessions_valid_workspace_refs CHECK (
+    (workspace_type = 'personal' AND workspace_owner_id IS NOT NULL AND org_workspace_id IS NULL) OR
+    (workspace_type = 'org' AND org_workspace_id IS NOT NULL AND workspace_owner_id IS NULL)
+  )
+);
+
+-- Foreign keys
+ALTER TABLE public.sessions
+  ADD CONSTRAINT sessions_workspace_owner_fkey
+  FOREIGN KEY (workspace_owner_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+ALTER TABLE public.sessions
+  ADD CONSTRAINT sessions_org_workspace_fkey
+  FOREIGN KEY (org_workspace_id) REFERENCES public.org_workspaces(id) ON DELETE CASCADE;
+
+-- Indexes for performance
+CREATE INDEX idx_sessions_user ON public.sessions(user_id);
+CREATE INDEX idx_sessions_workspace_owner ON public.sessions(workspace_owner_id);
+CREATE INDEX idx_sessions_org_workspace ON public.sessions(org_workspace_id);
+CREATE INDEX idx_sessions_status ON public.sessions(status);
+CREATE INDEX idx_sessions_started_at ON public.sessions(started_at DESC);
+CREATE INDEX idx_sessions_team ON public.sessions(team_id);
+
+-- Enable RLS
+ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY;
+
+-- =====================================================
+-- HELPER FUNCTION: Create Session
+-- =====================================================
+
+CREATE OR REPLACE FUNCTION public.create_session(
+  p_workspace_type text,
+  p_workspace_owner_id uuid DEFAULT NULL,
+  p_org_workspace_id uuid DEFAULT NULL,
+  p_team_id uuid DEFAULT NULL,
+  p_session_mode text DEFAULT 'solo',
+  p_session_data jsonb DEFAULT NULL
+)
+RETURNS public.sessions
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+DECLARE
+  v_session public.sessions;
+BEGIN
+  -- Verify authentication
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  -- Validate workspace type
+  IF p_workspace_type NOT IN ('personal', 'org') THEN
+    RAISE EXCEPTION 'Invalid workspace_type. Must be "personal" or "org"';
+  END IF;
+
+  -- Personal workspace session
+  IF p_workspace_type = 'personal' THEN
+    -- Must be in your own workspace
+    IF p_workspace_owner_id != auth.uid() THEN
+      RAISE EXCEPTION 'Can only create personal sessions in your own workspace';
+    END IF;
+    
+    IF p_org_workspace_id IS NOT NULL THEN
+      RAISE EXCEPTION 'Personal sessions cannot have org_workspace_id';
+    END IF;
+  
+  -- Org workspace session
+  ELSE
+    IF p_org_workspace_id IS NULL THEN
+      RAISE EXCEPTION 'Org sessions require org_workspace_id';
+    END IF;
+    
+    IF p_workspace_owner_id IS NOT NULL THEN
+      RAISE EXCEPTION 'Org sessions cannot have workspace_owner_id';
+    END IF;
+    
+    -- Verify access to org workspace
+    IF NOT EXISTS (
+      SELECT 1 FROM public.workspace_access
+      WHERE org_workspace_id = p_org_workspace_id
+        AND member_id = auth.uid()
+    ) THEN
+      RAISE EXCEPTION 'Access denied to workspace';
+    END IF;
+  END IF;
+
+  -- Create the session
+  INSERT INTO public.sessions (
+    workspace_type,
+    workspace_owner_id,
+    org_workspace_id,
+    user_id,
+    team_id,
+    session_mode,
+    session_data
+  ) VALUES (
+    p_workspace_type,
+    p_workspace_owner_id,
+    p_org_workspace_id,
+    auth.uid(),
+    p_team_id,
+    p_session_mode,
+    COALESCE(p_session_data, '{}'::jsonb)
+  )
+  RETURNING * INTO v_session;
+
+  RETURN v_session;
+END;
+$$;
+
+-- =====================================================
+-- HELPER FUNCTION: Get User's Sessions
+-- =====================================================
+
+CREATE OR REPLACE FUNCTION public.get_my_sessions(
+  p_limit integer DEFAULT 50,
+  p_offset integer DEFAULT 0
+)
+RETURNS TABLE(
+  id uuid,
+  workspace_type text,
+  workspace_owner_id uuid,
+  org_workspace_id uuid,
+  workspace_name text,
+  user_id uuid,
+  team_id uuid,
+  team_name text,
+  session_mode text,
+  status text,
+  started_at timestamptz,
+  ended_at timestamptz,
+  session_data jsonb,
+  created_at timestamptz,
+  updated_at timestamptz
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+BEGIN
+  -- Verify authentication
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    s.id,
+    s.workspace_type,
+    s.workspace_owner_id,
+    s.org_workspace_id,
+    CASE 
+      WHEN s.workspace_type = 'personal' THEN p.workspace_name
+      WHEN s.workspace_type = 'org' THEN ow.name
+      ELSE 'Unknown'
+    END as workspace_name,
+    s.user_id,
+    s.team_id,
+    t.name as team_name,
+    s.session_mode,
+    s.status,
+    s.started_at,
+    s.ended_at,
+    s.session_data,
+    s.created_at,
+    s.updated_at
+  FROM public.sessions s
+  LEFT JOIN public.profiles p ON p.id = s.workspace_owner_id
+  LEFT JOIN public.org_workspaces ow ON ow.id = s.org_workspace_id
+  LEFT JOIN public.teams t ON t.id = s.team_id
+  WHERE s.user_id = auth.uid()
+  ORDER BY s.started_at DESC
+  LIMIT p_limit
+  OFFSET p_offset;
+END;
+$$;
+
+-- =====================================================
+-- HELPER FUNCTION: Get Workspace Sessions
+-- =====================================================
+
+CREATE OR REPLACE FUNCTION public.get_workspace_sessions(
+  p_workspace_id uuid,
+  p_limit integer DEFAULT 50,
+  p_offset integer DEFAULT 0
+)
+RETURNS TABLE(
+  id uuid,
+  workspace_type text,
+  user_id uuid,
+  user_full_name text,
+  team_id uuid,
+  team_name text,
+  session_mode text,
+  status text,
+  started_at timestamptz,
+  ended_at timestamptz,
+  session_data jsonb,
+  created_at timestamptz
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+BEGIN
+  -- Verify authentication
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  -- Verify access (could be personal or org workspace)
+  IF NOT EXISTS (
+    SELECT 1 FROM public.workspace_access wa
+    WHERE (wa.workspace_owner_id = p_workspace_id OR wa.org_workspace_id = p_workspace_id)
+      AND wa.member_id = auth.uid()
+  ) THEN
+    RAISE EXCEPTION 'Access denied to workspace';
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    s.id,
+    s.workspace_type,
+    s.user_id,
+    p.full_name as user_full_name,
+    s.team_id,
+    t.name as team_name,
+    s.session_mode,
+    s.status,
+    s.started_at,
+    s.ended_at,
+    s.session_data,
+    s.created_at
+  FROM public.sessions s
+  LEFT JOIN public.profiles p ON p.id = s.user_id
+  LEFT JOIN public.teams t ON t.id = s.team_id
+  WHERE (s.workspace_owner_id = p_workspace_id OR s.org_workspace_id = p_workspace_id)
+  ORDER BY s.started_at DESC
+  LIMIT p_limit
+  OFFSET p_offset;
+END;
+$$;
+
+-- =====================================================
+-- HELPER FUNCTION: End Session
+-- =====================================================
+
+CREATE OR REPLACE FUNCTION public.end_session(
+  p_session_id uuid,
+  p_status text DEFAULT 'completed'
+)
+RETURNS public.sessions
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+DECLARE
+  v_session public.sessions;
+BEGIN
+  -- Verify authentication
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  -- Validate status
+  IF p_status NOT IN ('completed', 'cancelled') THEN
+    RAISE EXCEPTION 'Status must be "completed" or "cancelled"';
+  END IF;
+
+  -- Update and return
+  UPDATE public.sessions
+  SET 
+    status = p_status,
+    ended_at = COALESCE(ended_at, now()),
+    updated_at = now()
+  WHERE id = p_session_id
+    AND user_id = auth.uid()
+  RETURNING * INTO v_session;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Session not found or access denied';
+  END IF;
+
+  RETURN v_session;
+END;
+$$;
+
+-- =====================================================
+-- ROW LEVEL SECURITY POLICIES
+-- =====================================================
+
+-- Users can see their own sessions OR sessions in workspaces they have access to
+CREATE POLICY sessions_select ON public.sessions
+  FOR SELECT USING (
+    user_id = auth.uid() OR
+    workspace_owner_id = auth.uid() OR
+    EXISTS (
+      SELECT 1 FROM public.workspace_access wa
+      WHERE (wa.workspace_owner_id = sessions.workspace_owner_id 
+         OR wa.org_workspace_id = sessions.org_workspace_id)
+        AND wa.member_id = auth.uid()
+    )
+  );
+
+-- Users can create sessions in their workspace or workspaces they have access to
+CREATE POLICY sessions_insert ON public.sessions
+  FOR INSERT WITH CHECK (
+    user_id = auth.uid() AND (
+      workspace_owner_id = auth.uid() OR
+      EXISTS (
+        SELECT 1 FROM public.workspace_access wa
+        WHERE wa.org_workspace_id = sessions.org_workspace_id
+          AND wa.member_id = auth.uid()
+      )
+    )
+  );
+
+-- Users can update their own sessions
+CREATE POLICY sessions_update ON public.sessions
+  FOR UPDATE USING (
+    user_id = auth.uid()
+  );
+
+-- Users can delete their own sessions OR workspace owners/admins can delete
+CREATE POLICY sessions_delete ON public.sessions
+  FOR DELETE USING (
+    user_id = auth.uid() OR
+    workspace_owner_id = auth.uid() OR
+    EXISTS (
+      SELECT 1 FROM public.workspace_access wa
+      WHERE wa.org_workspace_id = sessions.org_workspace_id
+        AND wa.member_id = auth.uid()
+        AND wa.role IN ('owner', 'admin')
+    )
+  );
+
+-- Trigger for updated_at
+CREATE TRIGGER update_sessions_updated_at
+  BEFORE UPDATE ON public.sessions
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at_column();
+
+-- Grants
+GRANT ALL ON TABLE public.sessions TO anon;
+GRANT ALL ON TABLE public.sessions TO authenticated;
+GRANT ALL ON TABLE public.sessions TO service_role;

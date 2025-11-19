@@ -32,7 +32,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     // Listen for changes
     const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-      console.log("Theme changed to:", colorScheme);
       setThemeState(colorScheme === "dark" ? "dark" : "light");
     });
 

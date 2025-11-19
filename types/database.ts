@@ -2,6 +2,8 @@
 
 export type SessionType = "steel" | "paper";
 export type DayPeriod = "day" | "night";
+export type SessionMode = "solo" | "squad";
+export type Environment = "steel" | "paper";
 
 export interface InvitationWithDetails {
   id: string;
@@ -35,37 +37,49 @@ export interface Training {
   created_at: string;
 }
 
+// =====================================================
+// SESSION TYPES (Matches actual schema)
+// =====================================================
 export interface Session {
   id: string;
-  training_id?: string;
-  organization_id?: string | null;
-  name: string;
-  session_type: SessionType;
-  range_m?: number;
-  day_period: DayPeriod;
-  env_wind_mps?: number;
-  env_temp_c?: number;
-  env_pressure_hpa?: number;
-  created_by: string;
+  workspace_type: 'personal' | 'org';
+  workspace_owner_id: string | null;
+  org_workspace_id: string | null;
+  user_id: string;
+  training_id: string | null;
+  team_id: string | null;
+  drill_id: string | null;
+  session_mode: 'solo' | 'group';
+  status: 'active' | 'completed' | 'cancelled';
+  started_at: string;
+  ended_at: string | null;
+  environment: Record<string, any> | null;
   created_at: string;
   updated_at: string;
 }
 
 export interface CreateSessionInput {
+  workspace_type: 'personal' | 'org';
+  workspace_owner_id?: string;
+  org_workspace_id?: string;
   training_id?: string;
-  name: string;
-  session_type: SessionType;
-  day_period: DayPeriod;
+  team_id?: string;
+  drill_id?: string;
+  session_mode?: 'solo' | 'group';
+  environment?: Record<string, any>;
+}
+
+export interface SessionWithDetails extends Session {
+  training_name?: string;
+  drill_name?: string;
+  team_name?: string;
+  user_full_name?: string;
 }
 
 export interface UpdateSessionInput {
-  name?: string;
-  session_type?: SessionType;
-  day_period?: DayPeriod;
-  range_m?: number;
-  env_wind_mps?: number;
-  env_temp_c?: number;
-  env_pressure_hpa?: number;
+  status?: 'active' | 'completed' | 'cancelled';
+  ended_at?: string;
+  environment?: Record<string, any>;
 }
 
 export interface CreateTrainingInput {

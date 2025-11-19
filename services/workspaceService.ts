@@ -191,19 +191,31 @@ export async function getWorkspace(workspaceOwnerId: string): Promise<Workspace 
 // =====================================================
 
 /**
- * Get members of a workspace
+ * Get members of an organization workspace using RPC
  */
-export async function getWorkspaceMembers(workspaceOwnerId: string): Promise<(WorkspaceAccess & { profile?: any })[]> {
-  const { data, error } = await supabase
-    .from("workspace_access")
-    .select(`
-      *,
-      profile:profiles!member_id(id, email, full_name, avatar_url)
-    `)
-    .eq("workspace_owner_id", workspaceOwnerId);
+export async function getWorkspaceMembers(orgWorkspaceId: string): Promise<(WorkspaceAccess & { profile?: any })[]> {
+  const { data, error } = await supabase.rpc('get_org_workspace_members', {
+    p_org_workspace_id: orgWorkspaceId
+  });
 
   if (error) throw error;
-  return data || [];
+  
+  // Transform RPC result to match our interface
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    workspace_type: row.workspace_type,
+    workspace_owner_id: row.workspace_owner_id,
+    org_workspace_id: row.org_workspace_id,
+    member_id: row.member_id,
+    role: row.role,
+    joined_at: row.joined_at,
+    profile: {
+      id: row.profile_id,
+      email: row.profile_email,
+      full_name: row.profile_full_name,
+      avatar_url: row.profile_avatar_url
+    }
+  }));
 }
 
 /**

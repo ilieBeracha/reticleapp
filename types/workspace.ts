@@ -50,10 +50,34 @@ export interface OrgWorkspace {
 
 export interface WorkspaceAccess {
   id: string;
-  workspace_owner_id: string;  // profile.id of workspace owner
-  member_id: string;            // user who has access
+  workspace_type: WorkspaceType;
+  workspace_owner_id: string | null;  // For personal: profile.id, for org: null
+  org_workspace_id?: string | null;   // For org: org_workspaces.id, for personal: null
+  member_id: string;                   // user who has access
   role: WorkspaceRole;
   joined_at: string;
+}
+
+export type InvitationStatus = 'pending' | 'accepted' | 'cancelled' | 'expired';
+
+export interface WorkspaceInvitation {
+  id: string;
+  org_workspace_id: string;
+  invite_code: string;
+  role: WorkspaceRole;
+  status: InvitationStatus;
+  invited_by: string;
+  accepted_by?: string | null;
+  accepted_at?: string | null;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkspaceInvitationWithDetails extends WorkspaceInvitation {
+  workspace_name?: string;
+  invited_by_name?: string;
+  accepted_by_name?: string;
 }
 
 export type TeamType = "field" | "back_office";

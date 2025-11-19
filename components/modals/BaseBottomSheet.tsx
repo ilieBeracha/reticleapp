@@ -14,10 +14,11 @@ interface BaseBottomSheetProps {
   snapPoints?: string[];
   enableDynamicSizing?: boolean;
   backdropOpacity?: number;
+  scrollToRefresh?: boolean;
 }
 
 export const BaseBottomSheet = forwardRef<BaseBottomSheetRef, BaseBottomSheetProps>(
-  ({ children, snapPoints, enableDynamicSizing = false, backdropOpacity = 0.3 }, ref) => {
+  ({ children, snapPoints, enableDynamicSizing = false, backdropOpacity = 0.3, scrollToRefresh = false }, ref) => {
     const colors = useColors();
     const bottomSheetRef = useRef<BottomSheet>(null);
 
@@ -52,11 +53,15 @@ export const BaseBottomSheet = forwardRef<BaseBottomSheetRef, BaseBottomSheetPro
         backdropComponent={renderBackdrop}
         backgroundStyle={[styles.bottomSheetBackground, { backgroundColor: colors.background + 'F2' }]}
         handleIndicatorStyle={[styles.handleIndicator, { backgroundColor: colors.textMuted + '4D' }]}
+        keyboardBehavior="extend"
+        keyboardBlurBehavior="restore"
+        android_keyboardInputMode="adjustResize"
       >
         <BottomSheetScrollView 
           style={styles.container}
           showsVerticalScrollIndicator={false}
           contentInsetAdjustmentBehavior="automatic"
+          keyboardShouldPersistTaps="handled"
         >
           {children}
         </BottomSheetScrollView>

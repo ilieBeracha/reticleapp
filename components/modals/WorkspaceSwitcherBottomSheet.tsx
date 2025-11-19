@@ -1,3 +1,4 @@
+import { useModals } from "@/contexts/ModalContext";
 import { useColors } from "@/hooks/ui/useColors";
 import { useAppContext } from "@/hooks/useAppContext";
 import { createOrgWorkspace } from "@/services/workspaceService";
@@ -5,8 +6,9 @@ import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import type { Workspace } from "@/types/workspace";
 import { Ionicons } from "@expo/vector-icons";
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { Alert, Animated, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { BaseBottomSheet, type BaseBottomSheetRef } from "./BaseBottomSheet";
+import WorkspaceItem from "./WorkspaceItem";
 
 export interface WorkspaceSwitcherRef {
   open: () => void;
@@ -30,6 +32,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
     const colors = useColors();
     const bottomSheetRef = useRef<BaseBottomSheetRef>(null);
     const createSheetRef = useRef<BaseBottomSheetRef>(null);
+    const { acceptInviteSheetRef, setOnInviteAccepted } = useModals();
     
     const { 
       myWorkspaceId, 
@@ -43,34 +46,10 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
     const [workspaceName, setWorkspaceName] = useState("");
     const [isCreating, setIsCreating] = useState(false);
 
-    // iOS-style press animation functions
-    const createPressAnimation = () => {
-      const scaleAnim = new Animated.Value(1);
-      const animatePressIn = () => {
-        Animated.spring(scaleAnim, {
-          toValue: 0.98,
-          useNativeDriver: true,
-          speed: 20,
-          bounciness: 8,
-        }).start();
-      };
-      const animatePressOut = () => {
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          useNativeDriver: true,
-          speed: 20,
-          bounciness: 8,
-        }).start();
-      };
-      return { scaleAnim, animatePressIn, animatePressOut };
-    };
-
     useImperativeHandle(ref, () => ({
       open: () => bottomSheetRef.current?.open(),
       close: () => bottomSheetRef.current?.close(),
     }));
-
-
 
     // Group workspaces: My workspace first, then others
     const groupedWorkspaces = useMemo(() => {
@@ -141,82 +120,32 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
       }
     }, [workspaceName, switchWorkspace]);
 
-
-    const renderWorkspaceItem = useCallback(({ item }: { item: Workspace }) => {
-      const isActive = item.id === activeWorkspaceId;
-      const isMyWorkspace = item.id === myWorkspaceId;
-      const isOrgWorkspace = item.workspace_type === 'org';
-
-      const { scaleAnim, animatePressIn, animatePressOut } = createPressAnimation();
-
-      return (
-        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-        <TouchableOpacity
-          style={[
-            styles.workspaceItem,
-              isActive && styles.workspaceItemActive,
-          ]}
-          onPress={() => handleSelectWorkspace(item)}
-            onPressIn={animatePressIn}
-            onPressOut={animatePressOut}
-            activeOpacity={0.8}
-        >
-            <View style={styles.workspaceItemContent}>
-            <View style={[
-              styles.workspaceIcon,
-              {
-                backgroundColor: isActive ? colors.primary : colors.secondary,
-              }
-            ]}>
-              <Ionicons
-                name={isMyWorkspace ? "person" : isOrgWorkspace ? "business" : "people"}
-                size={20}
-                color={isActive ? '#fff' : colors.textMuted}
-              />
-            </View>
-
-            <View style={styles.workspaceDetails}>
-              <Text style={[
-                styles.workspaceName,
-                isActive && styles.workspaceNameActive,
-                { color: isActive ? colors.primary : colors.text }
-              ]}>
-                {item.workspace_name || item.full_name || item.email}
-              </Text>
-
-              <View style={styles.workspaceMeta}>
-                <View style={[
-                  styles.roleBadge,
-                  isMyWorkspace && styles.roleBadgeOwner,
-                ]}>
-                  <Text style={[
-                    styles.roleBadgeText,
-                    { color: isMyWorkspace ? '#FF6B35' : colors.textMuted }
-                  ]}>
-                    {isMyWorkspace ? "Owner" : (item.access_role || 'Member')}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            {isActive && (
-              <View style={[styles.checkmarkContainer, { backgroundColor: colors.primary }]}>
-                <Ionicons name="checkmark" size={18} color="#fff" />
-          </View>
-          )}
-            </View>
-        </TouchableOpacity>
-        </Animated.View>
-      );
-    }, [activeWorkspaceId, myWorkspaceId, handleSelectWorkspace, createPressAnimation]);
+    const handleJoinWorkspace = useCallback(() => {
+      // Close this sheet and open the accept invite sheet
+      bottomSheetRef.current?.close();
+      
+      // Set callback to reload workspaces when invite is accepted
+      // Wrap in arrow function so React stores the function, not calls it
+      setOnInviteAccepted(() => async () => {
+        // Reload workspaces to include the newly joined workspace
+        await useWorkspaceStore.getState().loadWorkspaces();
+      });
+      
+      // Open the accept invite sheet
+      setTimeout(() => {
+        acceptInviteSheetRef.current?.open();
+      }, 300);
+    }, [acceptInviteSheetRef, setOnInviteAccepted]);
 
     return (
       <>
         {/* Main Workspace Switcher */}
         <BaseBottomSheet
+      
           ref={bottomSheetRef}
           backdropOpacity={0.6}
-          enableDynamicSizing={true}
+          snapPoints={['60%','92%']}
+          enableDynamicSizing={false}
         >
             {/* Header */}
             <View style={styles.header}>
@@ -229,13 +158,22 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
                     </Text>
                   </View>
                 </View>
-                <TouchableOpacity
-                  style={[styles.addButton, { backgroundColor: colors.primary }]}
-                  onPress={handleOpenCreateWorkspace}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="add" size={20} color="#fff" />
-                </TouchableOpacity>
+                <View style={styles.headerButtons}>
+                  <TouchableOpacity
+                    style={[styles.joinButtonSmall, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={handleJoinWorkspace}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="enter" size={16} color={colors.primary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.addButton, { backgroundColor: colors.primary }]}
+                    onPress={handleOpenCreateWorkspace}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="add" size={20}  />
+                  </TouchableOpacity>
+                </View>
               </View>
               <Text style={[styles.subtitle, { color: colors.textMuted }]}>
                 Switch between your workspaces
@@ -249,9 +187,13 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
                   <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Personal</Text>
                 </View>
                 {groupedWorkspaces.myWorkspace.map((workspace) => (
-                  <View key={workspace.id}>
-                    {renderWorkspaceItem({ item: workspace })}
-                        </View>
+                  <WorkspaceItem
+                    key={workspace.id}
+                    workspace={workspace}
+                    isActive={workspace.id === activeWorkspaceId}
+                    isMyWorkspace={workspace.id === myWorkspaceId}
+                    onSelect={handleSelectWorkspace}
+                  />
                 ))}
               </View>
             )}
@@ -265,9 +207,13 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
                   </Text>
                 </View>
                 {groupedWorkspaces.otherWorkspaces.map((workspace) => (
-                  <View key={workspace.id}>
-                    {renderWorkspaceItem({ item: workspace })}
-                  </View>
+                  <WorkspaceItem
+                    key={workspace.id}
+                    workspace={workspace}
+                    isActive={workspace.id === activeWorkspaceId}
+                    isMyWorkspace={workspace.id === myWorkspaceId}
+                    onSelect={handleSelectWorkspace}
+                  />
                 ))}
               </View>
             )}
@@ -386,6 +332,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
+  headerButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   addButton: {
     width: 36,
     height: 36,
@@ -397,6 +348,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
+  },
+  joinButtonSmall: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
   },
   title: {
     fontSize: 28,
