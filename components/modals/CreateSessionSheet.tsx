@@ -35,7 +35,7 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
     const [step, setStep] = useState(1);
     const [isCreating, setIsCreating] = useState(false);
     const [formData, setFormData] = useState<SessionFormData>({
-      session_mode: 'solo',
+      session_mode: isMyWorkspace ? 'solo' : 'group',
       environment: {},
     });
 
@@ -115,7 +115,7 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
         // Reset form
         setStep(1);
         setFormData({
-          session_mode: 'solo',
+          session_mode: isMyWorkspace ? 'solo' : 'group',
           environment: {},
         });
         setWeather('');
@@ -182,78 +182,75 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
               </Text>
 
               <View style={styles.optionsGrid}>
-                <TouchableOpacity
-                  style={[
-                    styles.optionCard,
-                    { 
-                      backgroundColor: colors.card,
-                      borderColor: formData.session_mode === 'solo' ? colors.primary : colors.border,
-                      borderWidth: 2,
-                    }
-                  ]}
-                  onPress={() => setFormData({ ...formData, session_mode: 'solo' })}
-                  activeOpacity={0.7}
-                >
-                  <View style={[
-                    styles.optionIcon,
-                    { backgroundColor: formData.session_mode === 'solo' ? colors.primary + '20' : colors.secondary }
-                  ]}>
-                    <Ionicons 
-                      name="person" 
-                      size={28} 
-                      color={formData.session_mode === 'solo' ? colors.primary : colors.textMuted} 
-                    />
-                  </View>
-                  <Text style={[styles.optionTitle, { color: colors.text }]}>Solo</Text>
-                  <Text style={[styles.optionDescription, { color: colors.textMuted }]}>
-                    Individual practice
-                  </Text>
-                  {formData.session_mode === 'solo' && (
+                {/* Show Solo only for personal workspace */}
+                {isMyWorkspace && (
+                  <TouchableOpacity
+                    style={[
+                      styles.optionCard,
+                      styles.optionCardFull,
+                      { 
+                        backgroundColor: colors.card,
+                        borderColor: colors.primary,
+                        borderWidth: 2,
+                      }
+                    ]}
+                    onPress={() => setFormData({ ...formData, session_mode: 'solo' })}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[
+                      styles.optionIcon,
+                      { backgroundColor: colors.primary + '20' }
+                    ]}>
+                      <Ionicons 
+                        name="person" 
+                        size={28} 
+                        color={colors.primary} 
+                      />
+                    </View>
+                    <Text style={[styles.optionTitle, { color: colors.text }]}>Solo Training</Text>
+                    <Text style={[styles.optionDescription, { color: colors.textMuted }]}>
+                      Individual practice session
+                    </Text>
                     <View style={[styles.checkmark, { backgroundColor: colors.primary }]}>
                       <Ionicons name="checkmark" size={16} color="#fff" />
                     </View>
-                  )}
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                )}
 
-                <TouchableOpacity
-                  style={[
-                    styles.optionCard,
-                    { 
-                      backgroundColor: colors.card,
-                      borderColor: formData.session_mode === 'group' ? colors.primary : colors.border,
-                      borderWidth: 2,
-                      opacity: isMyWorkspace ? 0.5 : 1,
-                    }
-                  ]}
-                  onPress={() => !isMyWorkspace && setFormData({ ...formData, session_mode: 'group' })}
-                  activeOpacity={isMyWorkspace ? 1 : 0.7}
-                  disabled={isMyWorkspace}
-                >
-                  <View style={[
-                    styles.optionIcon,
-                    { backgroundColor: formData.session_mode === 'group' ? colors.primary + '20' : colors.secondary }
-                  ]}>
-                    <Ionicons 
-                      name="people" 
-                      size={28} 
-                      color={formData.session_mode === 'group' ? colors.primary : colors.textMuted} 
-                    />
-                  </View>
-                  <Text style={[styles.optionTitle, { color: colors.text }]}>Group</Text>
-                  <Text style={[styles.optionDescription, { color: colors.textMuted }]}>
-                    {isMyWorkspace ? 'Organization only' : 'Team training'}
-                  </Text>
-                  {isMyWorkspace && (
-                    <View style={[styles.lockBadge, { backgroundColor: colors.textMuted + '30' }]}>
-                      <Ionicons name="lock-closed" size={14} color={colors.textMuted} />
+                {/* Show Group only for org workspace */}
+                {!isMyWorkspace && (
+                  <TouchableOpacity
+                    style={[
+                      styles.optionCard,
+                      styles.optionCardFull,
+                      { 
+                        backgroundColor: colors.card,
+                        borderColor: colors.primary,
+                        borderWidth: 2,
+                      }
+                    ]}
+                    onPress={() => setFormData({ ...formData, session_mode: 'group' })}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[
+                      styles.optionIcon,
+                      { backgroundColor: colors.primary + '20' }
+                    ]}>
+                      <Ionicons 
+                        name="people" 
+                        size={28} 
+                        color={colors.primary} 
+                      />
                     </View>
-                  )}
-                  {formData.session_mode === 'group' && !isMyWorkspace && (
+                    <Text style={[styles.optionTitle, { color: colors.text }]}>Group Training</Text>
+                    <Text style={[styles.optionDescription, { color: colors.textMuted }]}>
+                      Team practice session
+                    </Text>
                     <View style={[styles.checkmark, { backgroundColor: colors.primary }]}>
                       <Ionicons name="checkmark" size={16} color="#fff" />
                     </View>
-                  )}
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           )}
@@ -544,6 +541,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     position: 'relative',
+  },
+  optionCardFull: {
+    flex: 1,
   },
   optionIcon: {
     width: 64,
