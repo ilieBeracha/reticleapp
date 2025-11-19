@@ -95,7 +95,6 @@ jobs:
     # CRITICAL: Require manual approval
     environment:
       name: production
-      url: https://app.supabase.com/project/${{ secrets.PROD_PROJECT_REF }}
     
     steps:
       - name: Checkout code
