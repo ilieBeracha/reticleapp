@@ -108,7 +108,7 @@ jobs:
       - name: Verify migrations exist
         run: |
           if [ ! -d "supabase/migrations" ]; then
-            echo "❌ No migrations directory found"
+            echo "No migrations directory found"
             exit 1
           fi
           
