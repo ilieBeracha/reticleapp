@@ -1,3 +1,4 @@
+import { ManageMemberSheet, type ManageMemberSheetRef } from '@/components/modals/ManageMemberSheet';
 import { useModals } from '@/contexts/ModalContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
@@ -7,7 +8,7 @@ import { useTeamStore } from '@/store/teamStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function OrganizationPage() {
@@ -17,6 +18,7 @@ export default function OrganizationPage() {
   const { workspaceMembers, loadWorkspaceMembers, loading: membersLoading } = useWorkspaceStore();
   const { teams, loadTeams: loadTeamsStore, loading: teamsLoading } = useTeamStore();
   const { inviteMembersSheetRef, createTeamSheetRef, setOnTeamCreated } = useModals();
+  const manageMemberSheetRef = useRef<ManageMemberSheetRef>(null);
 
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
   const [teamMembers, setTeamMembers] = useState<Record<string, any[]>>({});
@@ -47,6 +49,12 @@ export default function OrganizationPage() {
     await Promise.all([loadWorkspaceMembers(), loadTeams()]);
     setRefreshing(false);
   }, [loadWorkspaceMembers, loadTeams]);
+
+  // Prepare teams with members for ManageMemberSheet
+  const teamsWithMembers = teams.map(team => ({
+    ...team,
+    members: teamMembers[team.id] || [],
+  }));
 
   const toggleTeam = async (teamId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -308,43 +316,93 @@ export default function OrganizationPage() {
                 </View>
               ) : (
                 <View style={[styles.membersList, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  {workspaceMembers.map((member, index) => (
-                    <View
-                      key={`${member.id}-${index}`}
-                      style={[
-                        styles.memberItem,
-                        {
-                          borderBottomColor: colors.border,
-                          borderBottomWidth: index === workspaceMembers.length - 1 ? 0 : 0.5,
-                        },
-                      ]}
-                    >
-                      <View style={[styles.avatar, { backgroundColor: colors.accent + '20' }]}>
-                        <Text style={[styles.avatarText, { color: colors.accent }]}>
-                          {member.profile?.full_name?.charAt(0)?.toUpperCase() || '?'}
-                        </Text>
+                  {workspaceMembers.map((member, index) => {
+                    // Find if member is in a team
+                    const memberTeam = teams.find(t => 
+                      teamMembers[t.id]?.some(m => m.user_id === member.member_id)
+                    );
+                    const memberTeamData = memberTeam ? teamMembers[memberTeam.id]?.find(m => m.user_id === member.member_id) : null;
+                    
+                    return (
+                      <View
+                        key={`${member.id}-${index}`}
+                        style={[
+                          styles.memberItem,
+                          {
+                            borderBottomColor: colors.border,
+                            borderBottomWidth: index === workspaceMembers.length - 1 ? 0 : 0.5,
+                          },
+                        ]}
+                      >
+                        <View style={[styles.avatar, { backgroundColor: colors.accent + '20' }]}>
+                          <Text style={[styles.avatarText, { color: colors.accent }]}>
+                            {member.profile?.full_name?.charAt(0)?.toUpperCase() || '?'}
+                          </Text>
+                        </View>
+                        <View style={styles.memberInfo}>
+                          <Text style={[styles.memberName, { color: colors.text }]}>
+                            {member.profile?.full_name || 'Unknown'}
+                          </Text>
+                          <View style={styles.memberMetaRow}>
+                            <Text style={[styles.memberEmail, { color: colors.textMuted }]}>
+                              {member.profile?.email || ''}
+                            </Text>
+                            {memberTeam && (
+                              <>
+                                <Text style={[styles.memberEmail, { color: colors.textMuted }]}> • </Text>
+                                <View style={[styles.teamBadgeTiny, { backgroundColor: colors.primary + '15' }]}>
+                                  <Ionicons name="people" size={10} color={colors.primary} />
+                                  <Text style={[styles.teamBadgeTinyText, { color: colors.primary }]}>
+                                    {memberTeam.name}
+                                  </Text>
+                                </View>
+                                {memberTeamData?.details?.squad_id && (
+                                  <View style={[styles.teamBadgeTiny, { backgroundColor: colors.accent + '15' }]}>
+                                    <Ionicons name="shield" size={10} color={colors.accent} />
+                                    <Text style={[styles.teamBadgeTinyText, { color: colors.accent }]}>
+                                      {memberTeamData.details.squad_id}
+                                    </Text>
+                                  </View>
+                                )}
+                              </>
+                            )}
+                          </View>
+                        </View>
+                        <View style={[styles.roleBadgeSmall, { backgroundColor: getRoleColor(member.role).bg }]}>
+                          <Text style={[styles.roleTextSmall, { color: getRoleColor(member.role).color }]}>
+                            {member.role}
+                          </Text>
+                        </View>
+                        {permissions.canManageMembers && (
+                          <TouchableOpacity
+                            style={[styles.manageButton, { backgroundColor: colors.primary + '15' }]}
+                            onPress={() => {
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                              manageMemberSheetRef.current?.open(member, teamsWithMembers);
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Ionicons name="settings-outline" size={16} color={colors.primary} />
+                          </TouchableOpacity>
+                        )}
                       </View>
-                      <View style={styles.memberInfo}>
-                        <Text style={[styles.memberName, { color: colors.text }]}>
-                          {member.profile?.full_name || 'Unknown'}
-                        </Text>
-                        <Text style={[styles.memberEmail, { color: colors.textMuted }]}>
-                          {member.profile?.email || ''}
-                        </Text>
-                      </View>
-                      <View style={[styles.roleBadgeSmall, { backgroundColor: getRoleColor(member.role).bg }]}>
-                        <Text style={[styles.roleTextSmall, { color: getRoleColor(member.role).color }]}>
-                          {member.role}
-                        </Text>
-                      </View>
-                    </View>
-                  ))}
+                    );
+                  })}
                 </View>
               )}
             </View>
           </>
         )}
       </ScrollView>
+
+      {/* Manage Member Sheet */}
+      <ManageMemberSheet
+        ref={manageMemberSheetRef}
+        onMemberUpdated={() => {
+          loadWorkspaceMembers();
+          loadTeams();
+        }}
+      />
     </View>
   );
 }
@@ -607,6 +665,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     letterSpacing: -0.1,
+  },
+  memberMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 4,
   },
   memberEmail: {
     fontSize: 13,
