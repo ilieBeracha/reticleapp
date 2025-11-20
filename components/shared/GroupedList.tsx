@@ -34,10 +34,10 @@ function GroupedListComponent<T>({
     const isLast = index === data.length - 1;
     
     return (
-      <View>
+      <>
         {renderItem(item, isFirst, isLast)}
         {!isLast && <View style={[styles.separator, { backgroundColor: colors.border }]} />}
-      </View>
+      </>
     );
   };
 

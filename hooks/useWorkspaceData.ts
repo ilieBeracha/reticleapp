@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { getWorkspaceTeams } from '@/services/workspaceService';
-import { useSessionStore } from '@/store/sessionStore';
 import { useAppContext } from '@/hooks/useAppContext';
+import { useSessionStore } from '@/store/sessionStore';
+import { useTeamStore } from '@/store/teamStore';
 import type { Team } from '@/types/workspace';
+import { useCallback, useEffect } from 'react';
 
 interface UseWorkspaceDataReturn {
   teams: Team[];
@@ -15,25 +15,16 @@ interface UseWorkspaceDataReturn {
 }
 
 export function useWorkspaceData(): UseWorkspaceDataReturn {
-  const { activeWorkspaceId } = useAppContext();
+  const { activeWorkspaceId, activeWorkspace } = useAppContext();
   const { sessions, loading: sessionsLoading, error: sessionsError, loadWorkspaceSessions } = useSessionStore();
-
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [loadingTeams, setLoadingTeams] = useState(false);
+  const { teams, loading: loadingTeams, loadTeams: loadTeamsStore } = useTeamStore();
 
   // Load teams
   const loadTeams = useCallback(async () => {
     if (!activeWorkspaceId) return;
-    setLoadingTeams(true);
-    try {
-      const fetchedTeams = await getWorkspaceTeams('org', activeWorkspaceId);
-      setTeams(fetchedTeams);
-    } catch (error) {
-      console.error('Failed to load teams:', error);
-    } finally {
-      setLoadingTeams(false);
-    }
-  }, [activeWorkspaceId]);
+    const workspaceType = activeWorkspace?.workspace_type === 'org' ? 'org' : 'personal';
+    await loadTeamsStore(workspaceType, activeWorkspaceId);
+  }, [activeWorkspaceId, activeWorkspace, loadTeamsStore]);
 
   // Load sessions
   useEffect(() => {

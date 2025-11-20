@@ -1,10 +1,10 @@
+import EmptyState from '@/components/shared/EmptyState';
 import GroupedList from '@/components/shared/GroupedList';
 import OrgSessionCard from '@/components/shared/OrgSessionCard';
 import { useColors } from '@/hooks/ui/useColors';
 import { SessionWithDetails } from '@/services/sessionService';
 import { memo } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import EmptyState from '../shared/EmptyState';
 
 interface RecentSessionsProps {
   sessions: SessionWithDetails[];

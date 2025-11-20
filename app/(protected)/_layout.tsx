@@ -52,17 +52,15 @@ function ProtectedLayoutContent() {
         <Stack.Screen 
           name="index" 
           options={{ headerShown: true }} 
-          getId={() => `index-${activeWorkspaceId}`}
-        />
+
+          />
         <Stack.Screen 
           name="workspace/personal" 
           options={{ headerShown: true, animation: 'none' }} 
-          getId={() => `personal-${activeWorkspaceId}`}
         />
         <Stack.Screen 
           name="workspace/organization" 
           options={{ headerShown: true, animation: 'none' }} 
-          getId={() => `organization-${activeWorkspaceId}`}
         />
       </Stack>
 

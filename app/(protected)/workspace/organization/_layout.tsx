@@ -61,9 +61,9 @@ export default function OrganizationLayout() {
         }}
       />
       <Tabs.Screen
-        name="members"
+        name="organization"
         options={{
-          title: 'Members',
+          title: 'Organization',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="people" size={size} color={color} />
           ),

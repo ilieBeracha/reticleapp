@@ -1,5 +1,4 @@
 import { TrainingCalendar } from '@/components/ui/TrainingCalendar';
-import { WeekCalendar } from '@/components/ui/WeekCalendar';
 import { CalendarEvent, getTodayString } from '@/hooks/ui/useCalendar';
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
@@ -407,16 +406,7 @@ export default function CalendarDemoScreen() {
             layout={LinearTransition.springify().damping(20)}
             style={styles.weekViewContainer}
           >
-            {/* Current Week View */}
-            <WeekCalendar
-              selectedDate={selectedWeekDate}
-              onDayPress={(date) => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setSelectedWeekDate(date);
-              }}
-              markedDates={markedDates}
-              showTitle={false}
-            />
+          
 
             {/* Current Week Events - Grouped by Day */}
             {currentWeekEvents.length > 0 ? (
