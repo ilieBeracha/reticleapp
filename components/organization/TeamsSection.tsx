@@ -49,7 +49,7 @@ const TeamsSection = memo(function TeamsSection({
           renderItem={(team, isFirst, isLast) => (
             <TeamCard 
               team={team} 
-              memberCount={0} 
+              memberCount={(team as any).member_count || 0} 
               isFirst={isFirst}
               isLast={isLast}
             />

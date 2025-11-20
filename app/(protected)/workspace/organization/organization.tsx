@@ -2,6 +2,7 @@ import { useModals } from '@/contexts/ModalContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
 import { useWorkspacePermissions } from '@/hooks/usePermissions';
+import { getTeamWithMembers } from '@/services/teamService';
 import { useTeamStore } from '@/store/teamStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +19,8 @@ export default function OrganizationPage() {
   const { inviteMembersSheetRef, createTeamSheetRef, setOnTeamCreated } = useModals();
 
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
+  const [teamMembers, setTeamMembers] = useState<Record<string, any[]>>({});
+  const [loadingTeamMembers, setLoadingTeamMembers] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
 
   // Load Teams
@@ -45,8 +48,11 @@ export default function OrganizationPage() {
     setRefreshing(false);
   }, [loadWorkspaceMembers, loadTeams]);
 
-  const toggleTeam = (teamId: string) => {
+  const toggleTeam = async (teamId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    const isCurrentlyExpanded = expandedTeams.has(teamId);
+    
     setExpandedTeams((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(teamId)) {
@@ -56,6 +62,29 @@ export default function OrganizationPage() {
       }
       return newSet;
     });
+
+    // Load team members if expanding and not already loaded
+    if (!isCurrentlyExpanded && !teamMembers[teamId]) {
+      setLoadingTeamMembers((prev) => new Set(prev).add(teamId));
+      try {
+        // Fetch team members directly instead of relying on store state
+        const teamWithMembers = await getTeamWithMembers(teamId);
+        if (teamWithMembers) {
+          setTeamMembers((prev) => ({
+            ...prev,
+            [teamId]: teamWithMembers.members || [],
+          }));
+        }
+      } catch (error) {
+        console.error('Failed to load team members:', error);
+      } finally {
+        setLoadingTeamMembers((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(teamId);
+          return newSet;
+        });
+      }
+    }
   };
 
   // Role display
@@ -172,9 +201,70 @@ export default function OrganizationPage() {
 
                         {isExpanded && (
                           <View style={[styles.teamMembers, { borderTopColor: colors.border }]}>
-                            <Text style={[styles.teamMembersTitle, { color: colors.textMuted }]}>
-                              0 members • Tap to manage
-                            </Text>
+                            {loadingTeamMembers.has(team.id) ? (
+                              <ActivityIndicator color={colors.primary} size="small" style={{ marginVertical: 12 }} />
+                            ) : teamMembers[team.id] && teamMembers[team.id].length > 0 ? (
+                              <>
+                                <Text style={[styles.teamMembersTitle, { color: colors.textMuted, marginBottom: 8 }]}>
+                                  {teamMembers[team.id].length} member{teamMembers[team.id].length !== 1 ? 's' : ''}
+                                </Text>
+                                {teamMembers[team.id].map((member: any, idx: number) => (
+                                  <View
+                                    key={`${member.user_id}-${idx}`}
+                                    style={[
+                                      styles.teamMemberRow,
+                                      {
+                                        borderBottomColor: colors.border,
+                                        borderBottomWidth: idx === teamMembers[team.id].length - 1 ? 0 : 0.5,
+                                      },
+                                      ]}
+                                      >
+                                        <View style={[styles.avatarSmall, { backgroundColor: colors.accent + '20' }]}>
+                                          <Text style={[styles.avatarTextSmall, { color: colors.accent }]}>
+                                          {member.profile?.full_name?.charAt(0)?.toUpperCase() || '?'}
+                                      </Text>
+                                    </View>
+                                    <View style={styles.teamMemberInfo}>
+                                      <Text style={[styles.teamMemberName, { color: colors.text }]}>
+                                        {member.profile?.full_name || 'Unknown'}
+                                      </Text>
+                                      <View style={styles.teamMemberMeta}>
+                                        <Text style={[styles.teamMemberRole, { color: colors.textMuted }]}>
+                                          {member.role.split('_').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                                        </Text>
+                                        {member.details?.squad_id && (
+                                          <>
+                                            <Text style={[styles.teamMemberRole, { color: colors.textMuted }]}> • </Text>
+                                            <View style={[
+                                              styles.squadBadge, 
+                                              { 
+                                                backgroundColor: member.role === 'squad_commander' ? colors.accent + '15' : colors.primary + '15'
+                                              }
+                                            ]}>
+                                              <Ionicons 
+                                                name={member.role === 'squad_commander' ? 'star' : 'shield'} 
+                                                size={10} 
+                                                color={member.role === 'squad_commander' ? colors.accent : colors.primary} 
+                                              />
+                                              <Text style={[
+                                                styles.squadText, 
+                                                { color: member.role === 'squad_commander' ? colors.accent : colors.primary }
+                                              ]}>
+                                                {member.details.squad_id}
+                                              </Text>
+                                            </View>
+                                          </>
+                                        )}
+                                      </View>
+                                    </View>
+                                  </View>
+                                ))}
+                              </>
+                            ) : (
+                              <Text style={[styles.teamMembersTitle, { color: colors.textMuted }]}>
+                                No members yet • Invite members to this team
+                              </Text>
+                            )}
                           </View>
                         )}
                       </TouchableOpacity>
@@ -427,6 +517,51 @@ const styles = StyleSheet.create({
   teamMembersTitle: {
     fontSize: 13,
     fontWeight: '500',
+  },
+  teamMemberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    gap: 10,
+  },
+  avatarSmall: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarTextSmall: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  teamMemberInfo: {
+    flex: 1,
+  },
+  teamMemberName: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  teamMemberMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  teamMemberRole: {
+    fontSize: 12,
+    textTransform: 'capitalize',
+  },
+  squadBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: 3,
+  },
+  squadText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
 
   // Members List

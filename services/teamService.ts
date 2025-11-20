@@ -4,7 +4,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
-import type { Team, TeamMember, TeamWithMembers } from '@/types/workspace';
+import type { Team, TeamMember, TeamMemberDetails, TeamMemberShip, TeamWithMembers } from '@/types/workspace';
 
 export interface CreateTeamInput {
   workspace_type: 'personal' | 'org';
@@ -23,7 +23,8 @@ export interface UpdateTeamInput {
 export interface AddTeamMemberInput {
   team_id: string;
   user_id: string;
-  role: 'sniper' | 'pistol' | 'manager' | 'commander' | 'instructor' | 'staff';
+  role: TeamMemberShip;
+  details?: TeamMemberDetails; // NEW
 }
 
 /**
@@ -49,15 +50,15 @@ export async function createTeam(input: CreateTeamInput): Promise<Team> {
 }
 
 /**
- * Get teams for a workspace
+ * Get teams for a workspace with member count
  */
 export async function getWorkspaceTeams(
   workspaceType: 'personal' | 'org',
   workspaceId: string
-): Promise<Team[]> {
+): Promise<(Team & { member_count?: number })[]> {
   let query = supabase
     .from('teams')
-    .select('*')
+    .select('*, team_members(count)')
     .order('created_at', { ascending: false });
 
   if (workspaceType === 'personal') {
@@ -73,7 +74,14 @@ export async function getWorkspaceTeams(
     throw new Error(error.message || 'Failed to fetch teams');
   }
 
-  return data || [];
+  // Transform the data to include member_count
+  const teams = (data || []).map((team: any) => ({
+    ...team,
+    member_count: team.team_members?.[0]?.count || 0,
+    team_members: undefined, // Remove the nested structure
+  }));
+
+  return teams;
 }
 
 /**
@@ -86,7 +94,7 @@ export async function getTeamWithMembers(teamId: string): Promise<TeamWithMember
       *,
       members:team_members(
         *,
-        profile:profiles(id, email, full_name, avatar_url)
+        profile:profiles!team_members_user_fkey(id, email, full_name, avatar_url)
       )
     `)
     .eq('id', teamId)
@@ -149,6 +157,7 @@ export async function addTeamMember(input: AddTeamMemberInput): Promise<TeamMemb
       team_id: input.team_id,
       user_id: input.user_id,
       role: input.role,
+      details: input.details || {}, // NEW
     })
     .select()
     .single();
@@ -178,16 +187,20 @@ export async function removeTeamMember(teamId: string, userId: string): Promise<
 }
 
 /**
- * Update team member role
+ * Update team member role & details
  */
 export async function updateTeamMemberRole(
   teamId: string,
   userId: string,
-  role: TeamMember['role']
+  role: TeamMemberShip,
+  details?: TeamMemberDetails // NEW
 ): Promise<TeamMember> {
+  const updates: any = { role };
+  if (details) updates.details = details;
+
   const { data, error } = await supabase
     .from('team_members')
-    .update({ role })
+    .update(updates)
     .eq('team_id', teamId)
     .eq('user_id', userId)
     .select()
@@ -209,7 +222,7 @@ export async function getTeamMembers(teamId: string): Promise<(TeamMember & { pr
     .from('team_members')
     .select(`
       *,
-      profile:profiles(id, email, full_name, avatar_url)
+      profile:profiles!team_members_user_fkey(id, email, full_name, avatar_url)
     `)
     .eq('team_id', teamId)
     .order('joined_at', { ascending: false });
@@ -221,4 +234,3 @@ export async function getTeamMembers(teamId: string): Promise<(TeamMember & { pr
 
   return data || [];
 }
-

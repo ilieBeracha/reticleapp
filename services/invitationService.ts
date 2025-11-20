@@ -1,4 +1,4 @@
-import type { WorkspaceInvitation, WorkspaceInvitationWithDetails, WorkspaceRole } from '@/types/workspace';
+import type { TeamMemberDetails, TeamMemberShip, WorkspaceInvitation, WorkspaceInvitationWithDetails, WorkspaceRole } from '@/types/workspace';
 import { AuthenticatedClient } from './authenticatedClient';
 
 /**
@@ -17,9 +17,12 @@ function generateInviteCode(): string {
  * Create a new workspace invitation
  */
 export async function createInvitation(
-  orgWorkspaceId: string,
-  role: WorkspaceRole = 'member'
-): Promise<WorkspaceInvitation> {
+    orgWorkspaceId: string,
+    role: WorkspaceRole = 'member',
+    teamId?: string | null,
+    teamRole?: TeamMemberShip | null,
+    teamDetails?: TeamMemberDetails
+  ): Promise<WorkspaceInvitation> {
   const supabase = await AuthenticatedClient.getClient();
 
   // Generate unique invite code
@@ -59,13 +62,21 @@ export async function createInvitation(
     throw new Error('You must be logged in to create an invitation');
   }
 
-  // Create invitation
+  // Enforce rule: Only members can be assigned to teams via invite
+  const finalTeamId = role === 'member' ? teamId : null;
+  const finalTeamRole = role === 'member' ? teamRole : null;
+  const finalTeamDetails = role === 'member' && teamDetails ? teamDetails : {};
+
+  // Create invitation with squad details
   const { data, error } = await supabase
     .from('workspace_invitations')
     .insert({
       org_workspace_id: orgWorkspaceId,
       invite_code: inviteCode,
       role,
+      team_id: finalTeamId,
+      team_role: finalTeamRole,
+      details: finalTeamDetails,
       status: 'pending',
       invited_by: user.id,
       expires_at: expiresAt.toISOString(),
@@ -88,15 +99,16 @@ export async function getWorkspaceInvitations(orgWorkspaceId: string): Promise<W
   const supabase = await AuthenticatedClient.getClient();
 
   const { data, error } = await supabase
-    .from('workspace_invitations')
-    .select(
-      `
-      *,
-      invited_by_profile:profiles!workspace_invitations_invited_by_fkey(full_name, email),
-      accepted_by_profile:profiles!workspace_invitations_accepted_by_fkey(full_name, email),
-      workspace:org_workspaces!workspace_invitations_org_workspace_fkey(name)
+  .from('workspace_invitations')
+  .select(
     `
-    )
+    *,
+    invited_by_profile:profiles!workspace_invitations_invited_by_fkey(full_name, email),
+    accepted_by_profile:profiles!workspace_invitations_accepted_by_fkey(full_name, email),
+    workspace:org_workspaces!workspace_invitations_org_workspace_fkey(name),
+    team:teams!workspace_invitations_team_id_fkey(name)
+  `
+  )
     .eq('org_workspace_id', orgWorkspaceId)
     .order('created_at', { ascending: false });
 
@@ -121,6 +133,9 @@ export async function getWorkspaceInvitations(orgWorkspaceId: string): Promise<W
     workspace_name: inv.workspace?.name,
     invited_by_name: inv.invited_by_profile?.full_name || inv.invited_by_profile?.email,
     accepted_by_name: inv.accepted_by_profile?.full_name || inv.accepted_by_profile?.email,
+    team_id: inv.team_id,
+    team_role: inv.team_role,
+    team_name: inv.team?.name, // NEW
   }));
 }
 

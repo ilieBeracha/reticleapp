@@ -1,12 +1,13 @@
 import { useColors } from "@/hooks/ui/useColors";
 import { useAppContext } from "@/hooks/useAppContext";
+import { useWorkspaceData } from "@/hooks/useWorkspaceData";
 import { cancelInvitation, createInvitation, getPendingInvitations } from "@/services/invitationService";
-import type { WorkspaceInvitationWithDetails, WorkspaceRole } from "@/types/workspace";
+import type { TeamMemberShip, WorkspaceInvitationWithDetails, WorkspaceRole } from "@/types/workspace";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import * as Clipboard from 'expo-clipboard';
 import { forwardRef, useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { BaseBottomSheet, type BaseBottomSheetRef } from "./BaseBottomSheet";
 
 interface InviteMembersSheetProps {
@@ -52,12 +53,19 @@ const ROLE_OPTIONS: RoleOption[] = [
   },
 ];
 
+const TEAM_ROLE_OPTIONS: TeamMemberShip[] = ['commander', 'squad_commander', 'soldier'];
+
 export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSheetProps>(
   ({ onMemberInvited }, ref) => {
     const colors = useColors();
     const { activeWorkspaceId, activeWorkspace } = useAppContext();
+    const { teams } = useWorkspaceData();
     
     const [selectedRole, setSelectedRole] = useState<WorkspaceRole>('member');
+    const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+    const [selectedTeamRole, setSelectedTeamRole] = useState<TeamMemberShip>('soldier');
+    const [selectedSquadName, setSelectedSquadName] = useState<string>('');
+
     const [isCreating, setIsCreating] = useState(false);
     const [pendingInvites, setPendingInvites] = useState<WorkspaceInvitationWithDetails[]>([]);
     const [loadingInvites, setLoadingInvites] = useState(false);
@@ -82,15 +90,42 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
       loadInvitations();
     }, [loadInvitations]);
 
+    // Reset team selection if role changes from member
+    useEffect(() => {
+      if (selectedRole !== 'member') {
+        setSelectedTeamId(null);
+      }
+    }, [selectedRole]);
+
     const handleCreateInvite = async () => {
       if (!activeWorkspaceId) {
         Alert.alert("Error", "No active workspace");
         return;
       }
 
+      // Validate squad name for soldiers and squad commanders
+      if (selectedTeamId && (selectedTeamRole === 'soldier' || selectedTeamRole === 'squad_commander')) {
+        if (!selectedSquadName.trim()) {
+          Alert.alert(
+            "Squad Required",
+            selectedTeamRole === 'soldier' 
+              ? "Soldiers must be assigned to a squad. Please enter a squad name."
+              : "Squad commanders must be assigned to a squad to command. Please enter a squad name."
+          );
+          return;
+        }
+      }
+
       setIsCreating(true);
       try {
-        const invitation = await createInvitation(activeWorkspaceId, selectedRole);
+        // Pass team info if selected
+        const invitation = await createInvitation(
+          activeWorkspaceId, 
+          selectedRole, 
+          selectedTeamId, 
+          selectedTeamId ? selectedTeamRole : null,
+          selectedTeamId && selectedSquadName ? { squad_id: selectedSquadName } : undefined
+        );
         
         // Copy to clipboard automatically
         await Clipboard.setStringAsync(invitation.invite_code);
@@ -102,6 +137,10 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
         // Reload invitations list
         await loadInvitations();
         onMemberInvited?.();
+        
+        // Reset selection
+        setSelectedTeamId(null);
+        setSelectedSquadName('');
       } catch (error: any) {
         console.error("Failed to create invitation:", error);
         Alert.alert("Error", error.message || "Failed to create invitation");
@@ -112,7 +151,6 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
 
     const handleCopyCode = async (code: string) => {
       await Clipboard.setStringAsync(code);
-      // Optional: Show a toast or small feedback instead of Alert for smoother UX
       Alert.alert("Copied!", `Invite code ${code} copied to clipboard`);
     };
 
@@ -174,7 +212,7 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
 
           {/* Role Selection */}
           <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>SELECT ROLE</Text>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>ORG ROLE</Text>
             <View style={styles.rolesGrid}>
               {ROLE_OPTIONS.map((role) => {
                 const isSelected = selectedRole === role.value;
@@ -184,10 +222,9 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
                     style={[
                       styles.roleCard,
                       {
-                        backgroundColor: isSelected ? colors.card : colors.card,
+                        backgroundColor: colors.card,
                         borderColor: isSelected ? role.color : 'transparent',
                         borderWidth: isSelected ? 2 : 0,
-                        // Subtle shadow for depth
                         shadowColor: "#000",
                         shadowOffset: { width: 0, height: 2 },
                         shadowOpacity: 0.05,
@@ -212,7 +249,7 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
                     
                     <Text style={[
                       styles.roleLabel, 
-                      { color: isSelected ? colors.text : colors.text }
+                      { color: colors.text }
                     ]}>
                       {role.label}
                     </Text>
@@ -224,6 +261,107 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
               })}
             </View>
           </View>
+
+          {/* Team Selection (Optional) */}
+          {teams.length > 0 && selectedRole === 'member' && (
+            <View style={styles.section}>
+              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>ASSIGN TO TEAM (OPTIONAL)</Text>
+              
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 24, gap: 8 }}>
+                <TouchableOpacity
+                  key="no-team"
+                  style={[
+                    styles.teamChip,
+                    { 
+                      backgroundColor: selectedTeamId === null ? colors.primary : colors.card,
+                      borderColor: selectedTeamId === null ? 'transparent' : colors.border,
+                      borderWidth: 1
+                    }
+                  ]}
+                  onPress={() => setSelectedTeamId(null)}
+                >
+                  <Text style={[styles.teamChipText, { color: selectedTeamId === null ? colors.primaryForeground : colors.text }]}>
+                    No Team
+                  </Text>
+                </TouchableOpacity>
+                
+                {teams.map(team => (
+                  <TouchableOpacity
+                    key={team.id}
+                    style={[
+                      styles.teamChip,
+                      { 
+                        backgroundColor: selectedTeamId === team.id ? colors.primary : colors.card,
+                        borderColor: selectedTeamId === team.id ? 'transparent' : colors.border,
+                        borderWidth: 1,
+                      }
+                    ]}
+                    onPress={() => setSelectedTeamId(team.id)}
+                  >
+                    <Text style={[styles.teamChipText, { color: selectedTeamId === team.id ? colors.primaryForeground : colors.text }]}>
+                      {team.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* Team Role Selection (only if team selected) */}
+              {selectedTeamId && (
+                <View style={{ marginTop: 16 }}>
+                  <Text style={[styles.sectionLabel, { color: colors.textMuted, fontSize: 11 }]}>
+                    TEAM ROLE & SQUAD
+                  </Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                    {TEAM_ROLE_OPTIONS.map((role) => (
+                       <TouchableOpacity
+                          key={role}
+                          style={[
+                            styles.teamRoleChip, 
+                            { 
+                              backgroundColor: selectedTeamRole === role ? colors.primary + '20' : colors.card,
+                              borderWidth: 1,
+                              borderColor: selectedTeamRole === role ? colors.primary : colors.border
+                            }
+                          ]}
+                          onPress={() => setSelectedTeamRole(role)}
+                       >
+                         <Text style={{ 
+                           fontSize: 13,
+                           fontWeight: '600',
+                           color: selectedTeamRole === role ? colors.primary : colors.text
+                         }}>
+                           {role.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                         </Text>
+                       </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+
+                  {/* Squad Name Input - Only for soldiers and squad commanders */}
+                  {(selectedTeamRole === 'soldier' || selectedTeamRole === 'squad_commander') && (
+                    <View style={{ marginTop: 12 }}>
+                      <Text style={[styles.inputLabel, { color: colors.textMuted }]}>
+                        {selectedTeamRole === 'soldier' ? 'SQUAD NAME (REQUIRED FOR SOLDIER)' : 'SQUAD TO COMMAND (REQUIRED)'}
+                      </Text>
+                      <TextInput
+                        style={[
+                          styles.input,
+                          { 
+                            backgroundColor: colors.card, 
+                            color: colors.text,
+                            borderColor: colors.border
+                          }
+                        ]}
+                        placeholder={selectedTeamRole === 'soldier' ? "e.g. Alpha, Bravo, Squad 1" : "Which squad will you command?"}
+                        placeholderTextColor={colors.textMuted}
+                        value={selectedSquadName}
+                        onChangeText={setSelectedSquadName}
+                      />
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+          )}
 
           {/* Generate Action */}
           <View style={styles.actionContainer}>
@@ -297,6 +435,9 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
                         <View style={styles.inviteMeta}>
                           <Text style={[styles.roleMetaText, { color: colors.text }]}>
                             {invite.role.charAt(0).toUpperCase() + invite.role.slice(1)}
+                            {invite.team_name && (
+                              <Text style={{ color: colors.textMuted }}> • {invite.team_name} ({invite.team_role})</Text>
+                            )}
                           </Text>
                           <Text style={[styles.expiryText, { color: colors.textMuted }]}>
                              • {getTimeRemaining(invite.expires_at)}
@@ -401,6 +542,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
   },
+  teamChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  teamChipText: {
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  teamRoleChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    minWidth: 70,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   actionContainer: {
     marginBottom: 32,
   },
@@ -469,15 +629,16 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   inviteMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column', // Stacked meta info
+    alignItems: 'flex-start',
   },
   roleMetaText: {
     fontSize: 13,
     fontWeight: '600',
   },
   expiryText: {
-    fontSize: 13,
+    fontSize: 12,
+    marginTop: 2,
   },
   inviteActions: {
     flexDirection: 'row',
@@ -489,5 +650,17 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  input: {
+    height: 44,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    fontSize: 14,
   },
 });

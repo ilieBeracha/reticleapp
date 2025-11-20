@@ -6,12 +6,16 @@
 export type WorkspaceRole = 'owner' | 'admin' | 'instructor' | 'member';
 export type WorkspaceType = 'personal' | 'org';
 export type TeamMemberShip =
-  | "sniper"
-  | "pistol"
-  | "manager"
-  | "commander"
-  | "instructor"
-  | "staff";
+  | "commander"        // One per team - full control
+  | "squad_commander"  // Manages a squad
+  | "soldier";         // Regular team member
+
+// NEW: Detailed squad metadata
+export interface TeamMemberDetails {
+  squad_id?: string; // The name/ID of the squad (e.g. "Alpha")
+  callsign?: string; // Optional callsign
+  specialty?: string; // Optional display specialty
+}
 
 // UNIFIED WORKSPACE INTERFACE
 // Can be either a personal workspace (profile) or org workspace
@@ -65,6 +69,9 @@ export interface WorkspaceInvitation {
   org_workspace_id: string;
   invite_code: string;
   role: WorkspaceRole;
+  // NEW FIELDS
+  team_id?: string | null;
+  team_role?: TeamMemberShip | null;
   status: InvitationStatus;
   invited_by: string;
   accepted_by?: string | null;
@@ -78,6 +85,7 @@ export interface WorkspaceInvitationWithDetails extends WorkspaceInvitation {
   workspace_name?: string;
   invited_by_name?: string;
   accepted_by_name?: string;
+  team_name?: string; // NEW
 }
 
 export type TeamType = "field" | "back_office";
@@ -97,6 +105,7 @@ export interface TeamMember {
   team_id: string;
   user_id: string;
   role: TeamMemberShip;
+  details?: TeamMemberDetails; // NEW: Added details
   joined_at: string;
 }
 
