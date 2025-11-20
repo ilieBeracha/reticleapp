@@ -21,6 +21,8 @@ export const CreateTeamSheet = forwardRef<BaseBottomSheetRef, CreateTeamSheetPro
     
     const [teamName, setTeamName] = useState("");
     const [teamDescription, setTeamDescription] = useState("");
+    const [squads, setSquads] = useState<string[]>([]);
+    const [newSquadName, setNewSquadName] = useState("");
 
     const handleCreateTeam = async () => {
       if (!teamName.trim()) {
@@ -45,6 +47,7 @@ export const CreateTeamSheet = forwardRef<BaseBottomSheetRef, CreateTeamSheetPro
           org_workspace_id: isOrgWorkspace ? activeWorkspaceId : undefined,
           name: teamName.trim(),
           description: teamDescription.trim() || undefined,
+          squads: squads.length > 0 ? squads : undefined,
         });
         
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -57,6 +60,8 @@ export const CreateTeamSheet = forwardRef<BaseBottomSheetRef, CreateTeamSheetPro
         // Reset form
         setTeamName("");
         setTeamDescription("");
+        setSquads([]);
+        setNewSquadName("");
         
         // Call the callback
         onTeamCreated?.();
@@ -72,8 +77,27 @@ export const CreateTeamSheet = forwardRef<BaseBottomSheetRef, CreateTeamSheetPro
       }
     };
 
+    const handleAddSquad = () => {
+      const trimmedName = newSquadName.trim();
+      if (!trimmedName) return;
+      
+      if (squads.includes(trimmedName)) {
+        Alert.alert("Duplicate", "This squad name already exists");
+        return;
+      }
+      
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setSquads([...squads, trimmedName]);
+      setNewSquadName("");
+    };
+
+    const handleRemoveSquad = (squadName: string) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setSquads(squads.filter(s => s !== squadName));
+    };
+
     return (
-      <BaseBottomSheet ref={ref} snapPoints={['60%']} backdropOpacity={0.6}>
+      <BaseBottomSheet ref={ref} snapPoints={['75%']} backdropOpacity={0.6}>
         <View style={styles.header}>
           <View style={[styles.icon, { backgroundColor: colors.primary + '15' }]}>
             <Ionicons name="people" size={24} color={colors.primary} />
@@ -119,12 +143,74 @@ export const CreateTeamSheet = forwardRef<BaseBottomSheetRef, CreateTeamSheetPro
           </View>
         </View>
 
+        {/* Squads (Optional) */}
+        <View style={styles.inputContainer}>
+          <Text style={[styles.inputLabel, { color: colors.text }]}>
+            Squads (Optional)
+          </Text>
+          <Text style={[styles.inputHint, { color: colors.textMuted }]}>
+            Organize team members into sub-units
+          </Text>
+          
+          {/* Add Squad Input */}
+          <View style={styles.squadInputRow}>
+            <View style={[styles.squadInputWrapper, { borderColor: colors.border, backgroundColor: colors.card }]}>
+              <BottomSheetTextInput
+                style={[styles.squadInput, { color: colors.text }]}
+                placeholder="e.g. Alpha, Bravo..."
+                placeholderTextColor={colors.textMuted + 'CC'}
+                value={newSquadName}
+                onChangeText={setNewSquadName}
+                onSubmitEditing={handleAddSquad}
+                returnKeyType="done"
+              />
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.addSquadButton,
+                {
+                  backgroundColor: newSquadName.trim() ? colors.primary : colors.secondary,
+                  opacity: newSquadName.trim() ? 1 : 0.5,
+                }
+              ]}
+              onPress={handleAddSquad}
+              disabled={!newSquadName.trim()}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="add" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Squad Chips */}
+          {squads.length > 0 && (
+            <View style={styles.squadChipsContainer}>
+              {squads.map((squad, index) => (
+                <View
+                  key={index}
+                  style={[styles.squadChip, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }]}
+                >
+                  <Ionicons name="shield" size={14} color={colors.primary} />
+                  <Text style={[styles.squadChipText, { color: colors.primary }]}>
+                    {squad}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => handleRemoveSquad(squad)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="close-circle" size={16} color={colors.primary} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
         {/* Team Info */}
         <View style={[styles.infoCard, { backgroundColor: colors.secondary }]}>
           <View style={styles.infoRow}>
             <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
             <Text style={[styles.infoText, { color: colors.textMuted }]}>
-              You can add members after creating the team
+              You can add members and assign them to squads after creating the team
             </Text>
           </View>
         </View>
@@ -197,8 +283,13 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: 4,
     letterSpacing: -0.1,
+  },
+  inputHint: {
+    fontSize: 12,
+    marginBottom: 10,
+    opacity: 0.7,
   },
   inputWrapper: {
     borderRadius: 10,
@@ -219,6 +310,52 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "400",
     backgroundColor: 'transparent',
+  },
+
+  // Squad Input
+  squadInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  squadInputWrapper: {
+    flex: 1,
+    borderRadius: 10,
+    borderWidth: 0.5,
+    overflow: "hidden",
+  },
+  squadInput: {
+    height: 44,
+    paddingHorizontal: 14,
+    fontSize: 15,
+    fontWeight: "400",
+    backgroundColor: 'transparent',
+  },
+  addSquadButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  squadChipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  squadChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  squadChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: -0.1,
   },
 
   // Info Card

@@ -12,12 +12,14 @@ export interface CreateTeamInput {
   org_workspace_id?: string;    // For org workspace
   name: string;
   description?: string;
+  squads?: string[];  // Optional array of squad names
 }
 
 export interface UpdateTeamInput {
   team_id: string;
   name?: string;
   description?: string;
+  squads?: string[];  // Update squads array
 }
 
 export interface AddTeamMemberInput {
@@ -38,6 +40,7 @@ export async function createTeam(input: CreateTeamInput): Promise<Team> {
       p_workspace_owner_id: input.workspace_owner_id || null,
       p_org_workspace_id: input.org_workspace_id || null,
       p_description: input.description || null,
+      p_squads: input.squads || [],
     })
     .single();
 
@@ -116,6 +119,7 @@ export async function updateTeam(input: UpdateTeamInput): Promise<Team> {
   
   if (input.name !== undefined) updates.name = input.name;
   if (input.description !== undefined) updates.description = input.description;
+  if (input.squads !== undefined) updates.squads = input.squads;
 
   const { data, error } = await supabase
     .from('teams')

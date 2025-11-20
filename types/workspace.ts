@@ -10,13 +10,6 @@ export type TeamMemberShip =
   | "squad_commander"  // Manages a squad
   | "soldier";         // Regular team member
 
-// NEW: Detailed squad metadata
-export interface TeamMemberDetails {
-  squad_id?: string; // The name/ID of the squad (e.g. "Alpha")
-  callsign?: string; // Optional callsign
-  specialty?: string; // Optional display specialty
-}
-
 // UNIFIED WORKSPACE INTERFACE
 // Can be either a personal workspace (profile) or org workspace
 export interface Workspace {
@@ -96,6 +89,7 @@ export interface Team {
   name: string;
   team_type?: TeamType | null;
   description?: string | null;
+  squads?: string[];  // Array of squad names (e.g. ["Alpha", "Bravo", "Charlie"])
   created_at: string;
   updated_at: string;
 }
@@ -105,7 +99,7 @@ export interface TeamMember {
   team_id: string;
   user_id: string;
   role: TeamMemberShip;
-  details?: TeamMemberDetails; // NEW: Added details
+  details?: { squad_id?: string };  // Squad assignment from team's squads array
   joined_at: string;
 }
 

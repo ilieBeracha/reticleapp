@@ -336,28 +336,72 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
                     ))}
                   </ScrollView>
 
-                  {/* Squad Name Input - Only for soldiers and squad commanders */}
-                  {(selectedTeamRole === 'soldier' || selectedTeamRole === 'squad_commander') && (
-                    <View style={{ marginTop: 12 }}>
-                      <Text style={[styles.inputLabel, { color: colors.textMuted }]}>
-                        {selectedTeamRole === 'soldier' ? 'SQUAD NAME (REQUIRED FOR SOLDIER)' : 'SQUAD TO COMMAND (REQUIRED)'}
-                      </Text>
-                      <TextInput
-                        style={[
-                          styles.input,
-                          { 
-                            backgroundColor: colors.card, 
-                            color: colors.text,
-                            borderColor: colors.border
-                          }
-                        ]}
-                        placeholder={selectedTeamRole === 'soldier' ? "e.g. Alpha, Bravo, Squad 1" : "Which squad will you command?"}
-                        placeholderTextColor={colors.textMuted}
-                        value={selectedSquadName}
-                        onChangeText={setSelectedSquadName}
-                      />
-                    </View>
-                  )}
+                  {/* Squad Selection - Only for soldiers and squad commanders */}
+                  {(selectedTeamRole === 'soldier' || selectedTeamRole === 'squad_commander') && (() => {
+                    const selectedTeam = teams.find(t => t.id === selectedTeamId);
+                    const availableSquads = selectedTeam?.squads || [];
+                    
+                    return (
+                      <View style={{ marginTop: 12 }}>
+                        <Text style={[styles.inputLabel, { color: colors.textMuted }]}>
+                          {selectedTeamRole === 'soldier' ? 'SQUAD NAME (REQUIRED FOR SOLDIER)' : 'SQUAD TO COMMAND (REQUIRED)'}
+                        </Text>
+                        
+                        {/* Show available squads as chips */}
+                        {availableSquads.length > 0 && (
+                          <ScrollView 
+                            horizontal 
+                            showsHorizontalScrollIndicator={false}
+                            style={{ marginBottom: 8 }}
+                            contentContainerStyle={{ gap: 8, paddingVertical: 4 }}
+                          >
+                            {availableSquads.map((squad) => (
+                              <TouchableOpacity
+                                key={squad}
+                                style={[
+                                  styles.squadChip,
+                                  {
+                                    backgroundColor: selectedSquadName === squad ? colors.primary : colors.card,
+                                    borderColor: selectedSquadName === squad ? colors.primary : colors.border,
+                                  }
+                                ]}
+                                onPress={() => setSelectedSquadName(squad)}
+                              >
+                                <Ionicons 
+                                  name="shield" 
+                                  size={14} 
+                                  color={selectedSquadName === squad ? '#fff' : colors.primary} 
+                                />
+                                <Text style={{ 
+                                  fontSize: 13,
+                                  fontWeight: '600',
+                                  color: selectedSquadName === squad ? '#fff' : colors.text
+                                }}>
+                                  {squad}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </ScrollView>
+                        )}
+                        
+                        {/* Input for custom squad name */}
+                        <TextInput
+                          style={[
+                            styles.input,
+                            { 
+                              backgroundColor: colors.card, 
+                              color: colors.text,
+                              borderColor: colors.border
+                            }
+                          ]}
+                          placeholder={availableSquads.length > 0 ? "Or enter a new squad name..." : "e.g. Alpha, Bravo, Squad 1"}
+                          placeholderTextColor={colors.textMuted}
+                          value={selectedSquadName}
+                          onChangeText={setSelectedSquadName}
+                        />
+                      </View>
+                    );
+                  })()}
                 </View>
               )}
             </View>
@@ -662,5 +706,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 12,
     fontSize: 14,
+  },
+  squadChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
   },
 });
