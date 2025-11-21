@@ -1,103 +1,122 @@
 /**
- * Team Service
+ * Team Service (Multi-Profile Architecture)
  * Handles all team-related operations
  */
 
 import { supabase } from '@/lib/supabase';
-import type { Team, TeamMember, TeamMemberDetails, TeamMemberShip, TeamWithMembers } from '@/types/workspace';
+import { AuthenticatedClient } from './authenticatedClient';
 
 export interface CreateTeamInput {
-  workspace_type: 'personal' | 'org';
-  workspace_owner_id?: string;  // For personal workspace
-  org_workspace_id?: string;    // For org workspace
+  org_id: string;
   name: string;
+  team_type?: 'field' | 'back_office';
   description?: string;
-  squads?: string[];  // Optional array of squad names
+  squads?: string[];
 }
 
 export interface UpdateTeamInput {
   team_id: string;
   name?: string;
   description?: string;
-  squads?: string[];  // Update squads array
+  squads?: string[];
 }
 
 export interface AddTeamMemberInput {
   team_id: string;
-  user_id: string;
-  role: TeamMemberShip;
-  details?: TeamMemberDetails; // NEW
+  profile_id: string;
+  role: 'commander' | 'squad_commander' | 'soldier';
+  details?: { squad_id?: string; [key: string]: any };
+}
+
+export interface Team {
+  id: string;
+  org_id: string;
+  name: string;
+  team_type?: 'field' | 'back_office' | null;
+  description?: string | null;
+  squads?: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TeamMember {
+  team_id: string;
+  profile_id: string;
+  role: string;
+  details?: any;
+  joined_at: string;
+}
+
+export interface TeamWithMembers extends Team {
+  members?: (TeamMember & {
+    profile?: {
+      id: string;
+      display_name?: string;
+      avatar_url?: string;
+    };
+  })[];
+  member_count?: number;
 }
 
 /**
  * Create a new team
  */
-export async function createTeam(input: CreateTeamInput): Promise<Team> {
+export async function createTeam(input: CreateTeamInput): Promise<any> {
   const { data, error } = await supabase
-    .rpc('create_team', {
-      p_workspace_type: input.workspace_type,
+    .rpc('create_team_for_org', {
+      p_org_id: input.org_id,
       p_name: input.name,
-      p_workspace_owner_id: input.workspace_owner_id || null,
-      p_org_workspace_id: input.org_workspace_id || null,
+      p_team_type: input.team_type || 'field',
       p_description: input.description || null,
-      p_squads: input.squads || [],
-    })
-    .single();
+    });
 
   if (error) {
     console.error('Failed to create team:', error);
     throw new Error(error.message || 'Failed to create team');
   }
   
-  return data as Team;
+  return data;
 }
 
 /**
- * Get teams for a workspace with member count
+ * Get teams for an org with member count
  */
-export async function getWorkspaceTeams(
-  workspaceType: 'personal' | 'org',
-  workspaceId: string
-): Promise<(Team & { member_count?: number })[]> {
-  let query = supabase
-    .from('teams')
-    .select('*, team_members(count)')
-    .order('created_at', { ascending: false });
-
-  if (workspaceType === 'personal') {
-    query = query.eq('workspace_owner_id', workspaceId);
-  } else {
-    query = query.eq('org_workspace_id', workspaceId);
-  }
-
-  const { data, error } = await query;
+export async function getOrgTeams(orgId: string): Promise<(Team & { member_count?: number })[]> {
+  const { data, error } = await supabase.rpc('get_org_teams', {
+    p_org_id: orgId
+  });
 
   if (error) {
     console.error('Failed to fetch teams:', error);
     throw new Error(error.message || 'Failed to fetch teams');
   }
 
-  // Transform the data to include member_count
-  const teams = (data || []).map((team: any) => ({
-    ...team,
-    member_count: team.team_members?.[0]?.count || 0,
-    team_members: undefined, // Remove the nested structure
+  return (data || []).map((team: any) => ({
+    id: team.team_id,
+    org_id: orgId,
+    name: team.team_name,
+    team_type: team.team_type,
+    description: null,
+    squads: team.squads || [],
+    member_count: parseInt(team.member_count) || 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   }));
-
-  return teams;
 }
 
 /**
  * Get a single team with members
  */
 export async function getTeamWithMembers(teamId: string): Promise<TeamWithMembers | null> {
-  const { data, error } = await supabase
+  const client = await AuthenticatedClient.getClient();
+  
+  const { data, error } = await client
     .from('teams')
     .select(`
       *,
       members:team_members(
         *,
-        profile:profiles!team_members_user_fkey(id, email, full_name, avatar_url)
+        profile:profiles!team_members_profile_fkey(id, display_name, avatar_url)
       )
     `)
     .eq('id', teamId)
@@ -108,20 +127,26 @@ export async function getTeamWithMembers(teamId: string): Promise<TeamWithMember
     throw new Error(error.message || 'Failed to fetch team');
   }
 
-  return data as TeamWithMembers;
+  if (!data) return null;
+
+  return {
+    ...data,
+    member_count: data.members?.length || 0,
+  };
 }
 
 /**
  * Update a team
  */
 export async function updateTeam(input: UpdateTeamInput): Promise<Team> {
-  const updates: Partial<Team> = {};
+  const client = await AuthenticatedClient.getClient();
   
-  if (input.name !== undefined) updates.name = input.name;
+  const updates: Partial<Team> = {};
+  if (input.name) updates.name = input.name;
   if (input.description !== undefined) updates.description = input.description;
   if (input.squads !== undefined) updates.squads = input.squads;
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from('teams')
     .update(updates)
     .eq('id', input.team_id)
@@ -133,14 +158,16 @@ export async function updateTeam(input: UpdateTeamInput): Promise<Team> {
     throw new Error(error.message || 'Failed to update team');
   }
 
-  return data as Team;
+  return data;
 }
 
 /**
  * Delete a team
  */
 export async function deleteTeam(teamId: string): Promise<void> {
-  const { error } = await supabase
+  const client = await AuthenticatedClient.getClient();
+  
+  const { error } = await client
     .from('teams')
     .delete()
     .eq('id', teamId);
@@ -154,35 +181,35 @@ export async function deleteTeam(teamId: string): Promise<void> {
 /**
  * Add a member to a team
  */
-export async function addTeamMember(input: AddTeamMemberInput): Promise<TeamMember> {
-  const { data, error } = await supabase
+export async function addTeamMember(input: AddTeamMemberInput): Promise<void> {
+  const client = await AuthenticatedClient.getClient();
+  
+  const { error } = await client
     .from('team_members')
     .insert({
       team_id: input.team_id,
-      user_id: input.user_id,
+      profile_id: input.profile_id,
       role: input.role,
-      details: input.details || {}, // NEW
-    })
-    .select()
-    .single();
+      details: input.details || {},
+    });
 
   if (error) {
     console.error('Failed to add team member:', error);
     throw new Error(error.message || 'Failed to add team member');
   }
-
-  return data as TeamMember;
 }
 
 /**
  * Remove a member from a team
  */
-export async function removeTeamMember(teamId: string, userId: string): Promise<void> {
-  const { error } = await supabase
+export async function removeTeamMember(teamId: string, profileId: string): Promise<void> {
+  const client = await AuthenticatedClient.getClient();
+  
+  const { error } = await client
     .from('team_members')
     .delete()
     .eq('team_id', teamId)
-    .eq('user_id', userId);
+    .eq('profile_id', profileId);
 
   if (error) {
     console.error('Failed to remove team member:', error);
@@ -191,50 +218,26 @@ export async function removeTeamMember(teamId: string, userId: string): Promise<
 }
 
 /**
- * Update team member role & details
+ * Update a team member's role or details
  */
-export async function updateTeamMemberRole(
+export async function updateTeamMember(
   teamId: string,
-  userId: string,
-  role: TeamMemberShip,
-  details?: TeamMemberDetails // NEW
-): Promise<TeamMember> {
-  const updates: any = { role };
-  if (details) updates.details = details;
-
-  const { data, error } = await supabase
+  profileId: string,
+  updates: {
+    role?: 'commander' | 'squad_commander' | 'soldier';
+    details?: any;
+  }
+): Promise<void> {
+  const client = await AuthenticatedClient.getClient();
+  
+  const { error } = await client
     .from('team_members')
     .update(updates)
     .eq('team_id', teamId)
-    .eq('user_id', userId)
-    .select()
-    .single();
+    .eq('profile_id', profileId);
 
   if (error) {
-    console.error('Failed to update team member role:', error);
-    throw new Error(error.message || 'Failed to update team member role');
+    console.error('Failed to update team member:', error);
+    throw new Error(error.message || 'Failed to update team member');
   }
-
-  return data as TeamMember;
-}
-
-/**
- * Get team members
- */
-export async function getTeamMembers(teamId: string): Promise<(TeamMember & { profile?: any })[]> {
-  const { data, error } = await supabase
-    .from('team_members')
-    .select(`
-      *,
-      profile:profiles!team_members_user_fkey(id, email, full_name, avatar_url)
-    `)
-    .eq('team_id', teamId)
-    .order('joined_at', { ascending: false });
-
-  if (error) {
-    console.error('Failed to fetch team members:', error);
-    throw new Error(error.message || 'Failed to fetch team members');
-  }
-
-  return data || [];
 }

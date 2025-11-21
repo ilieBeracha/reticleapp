@@ -1,7 +1,6 @@
 // contexts/AuthContext.tsx
 import { supabase } from '@/lib/supabase'
 import { AuthenticatedClient } from '@/services/authenticatedClient'
-import { useWorkspaceStore } from '@/store/useWorkspaceStore'
 import { Session, User } from '@supabase/supabase-js'
 import { router } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
@@ -13,12 +12,12 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  activeProfileId: string | null;
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithOAuth: (provider: 'google' | 'apple') => Promise<void>;
   signOut: () => Promise<void>;
-  switchWorkspace: (workspaceId: string | null) => Promise<void>;
-  switchToPersonal: () => Promise<void>;
+  switchProfile: (profileId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,6 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [activeProfileId, setActiveProfileId] = useState<string | null>(null)
 
   // ═══════════════════════════════════════════════════
   // AUTH EVENT HANDLERS
@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   /**
    * Handle initial session (app startup with existing session)
-   * Redirect to protected area and load workspaces in background
+   * Check if user has selected a profile, otherwise show profile selector
    */
   const handleInitialSession = async (session: Session | null) => {
     if (!session?.user) {
@@ -50,63 +50,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    setLoading(false)
-    router.replace("/(protected)")
+    // Check if user has an active profile selected
+    const savedProfileId = session.user.user_metadata?.active_profile_id
     
-    // Load workspaces in background (non-blocking)
-    useWorkspaceStore.getState().loadWorkspaces().catch(err => 
-      console.error("Background workspace load error:", err)
-    )
+    if (savedProfileId) {
+      setActiveProfileId(savedProfileId)
+      setLoading(false)
+      router.replace("/(protected)")
+    } else {
+      // No profile selected, show profile selector
+      setLoading(false)
+      router.replace("/auth/select-profile")
+    }
   }
 
   /**
-   * Handle new sign in - redirect to protected area and load workspaces
+   * Handle new sign in - redirect to profile selector
    */
   const handleSignIn = async (session: Session | null) => {
     if (!session?.user) return
 
     setLoading(false)
-    router.replace("/(protected)")
     
-    // Load workspaces in background (non-blocking)
-    useWorkspaceStore.getState().loadWorkspaces().catch(err => 
-      console.error("Background workspace load error:", err)
-    )
+    // Redirect to profile selector
+    router.replace("/auth/select-profile")
   }
 
   /**
-   * Switch active workspace
-   * Updates user.user_metadata.active_workspace_id (SINGLE SOURCE OF TRUTH)
+   * Switch active profile
+   * Updates user.user_metadata.active_profile_id (SINGLE SOURCE OF TRUTH)
    */
-  const switchWorkspace = async (workspaceId: string | null) => {
+  const switchProfile = async (profileId: string) => {
     if (!user) return
 
     try {
-      // Update user metadata (SINGLE SOURCE OF TRUTH)
+      // Update user metadata
       await supabase.auth.updateUser({
-        data: { active_workspace_id: workspaceId }  // null = personal mode
+        data: { active_profile_id: profileId }
       })
 
       // Refresh user to get updated metadata
       const { data: { user: updatedUser } } = await supabase.auth.getUser()
       if (updatedUser) {
         setUser(updatedUser)
+        setActiveProfileId(profileId)
       }
 
-      // ✨ No need to update workspace store!
-      // workspaceStore is just a cache of available workspaces
-      // Active workspace is determined by user.user_metadata.active_workspace_id
+      // Redirect to home to refresh with new profile context
+      router.replace("/(protected)")
     } catch (error) {
-      console.error("Switch workspace error:", error)
+      console.error("Switch profile error:", error)
       throw error
     }
-  }
-
-  /**
-   * Switch to personal mode
-   */
-  const switchToPersonal = async () => {
-    await switchWorkspace(null)
   }
 
   /**
@@ -120,10 +115,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setSession(session)
     setUser(session?.user ?? null)
+    
+    // Update active profile from user metadata
+    if (session?.user?.user_metadata?.active_profile_id) {
+      setActiveProfileId(session.user.user_metadata.active_profile_id)
+    } else {
+      setActiveProfileId(null)
+    }
 
     switch (event) {
       case "SIGNED_OUT":
         setLoading(false)
+        setActiveProfileId(null)
         handleSignOut()
         break
 
@@ -151,14 +154,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
-      setLoading(false)
       
-      // Load workspaces in background (non-blocking)
-      if (session?.user) {
-        useWorkspaceStore.getState().loadWorkspaces().catch((err: Error) => 
-          console.error("Background workspace load error:", err)
-        )
+      // Set active profile from metadata
+      if (session?.user?.user_metadata?.active_profile_id) {
+        setActiveProfileId(session.user.user_metadata.active_profile_id)
       }
+      
+      setLoading(false)
     })
 
     // Subscribe to auth state changes
@@ -177,27 +179,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: { session } } = await supabase.auth.getSession()
         return session?.access_token ?? ""
       },
-      // Context provider - gets LATEST user from closure
+      // Context provider - provides active profile ID
       () => {
-        // This function is called fresh each time getContext() is called
-        // So it always has the latest user state
         if (!user) return null
-        
-        const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
-        
-        // ✅ In new model: user.id is MY workspace
-        // activeWorkspaceId is the workspace I'm currently viewing (mine or someone else's)
-        const isMyWorkspace = activeWorkspaceId === user.id || !activeWorkspaceId
         
         return {
           userId: user.id,
-          workspaceId: isMyWorkspace ? null : activeWorkspaceId  // null = my workspace, else = viewing someone else's
+          profileId: activeProfileId  // Currently active profile
         }
       }
     )
   }, []) // Only initialize ONCE
 
-  // Update context when user changes (for workspace switches)
+  // Update context when user or profile changes
   useEffect(() => {
     if (user) {
       // Re-initialize with fresh context provider
@@ -209,19 +203,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         () => {
           if (!user) return null
           
-          const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
-          
-          // ✅ In new model: user.id is MY workspace
-          const isMyWorkspace = activeWorkspaceId === user.id || !activeWorkspaceId
-        
           return {
             userId: user.id,
-            workspaceId: isMyWorkspace ? null : activeWorkspaceId
+            profileId: activeProfileId
           }
         }
       )
     }
-  }, [user?.id, useWorkspaceStore.getState().activeWorkspaceId]) // When user or active workspace changes
+  }, [user?.id, activeProfileId]) // When user or active profile changes
 
   const signUp = async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email, password })
@@ -268,12 +257,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       session,
       loading,
+      activeProfileId,
       signUp,
       signIn,
       signInWithOAuth,
       signOut,
-      switchWorkspace,
-      switchToPersonal
+      switchProfile
     }}>
       {children}
     </AuthContext.Provider>

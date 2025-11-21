@@ -1,23 +1,27 @@
 /**
- * ManageMemberSheet - Assign existing org members to teams and manage roles
- * Only 'member' role users can be assigned to teams
+ * ManageMemberSheet - Simplified for Multi-Profile Architecture
+ * Manages profile roles within an organization
  */
 
 import { BaseBottomSheet, type BaseBottomSheetRef } from '@/components/modals/BaseBottomSheet';
 import { useColors } from '@/hooks/ui/useColors';
-import { addTeamMember, removeTeamMember, updateTeamMemberRole } from '@/services/teamService';
-import { useTeamStore } from '@/store/teamStore';
-import type { TeamMemberShip, TeamWithMembers, WorkspaceAccess } from '@/types/workspace';
+import { useProfileContext } from '@/hooks/useProfileContext';
+import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import * as Haptics from 'expo-haptics';
-import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-type WorkspaceMember = WorkspaceAccess & { profile?: any };
+interface Profile {
+  id: string;
+  display_name: string | null;
+  role: string;
+  avatar_url: string | null;
+}
 
 export interface ManageMemberSheetRef {
-  open: (member: WorkspaceMember, teams: TeamWithMembers[]) => void;
+  open: (profile: Profile) => void;
   close: () => void;
 }
 
@@ -25,41 +29,26 @@ interface ManageMemberSheetProps {
   onMemberUpdated?: () => void;
 }
 
-const TEAM_ROLE_OPTIONS: TeamMemberShip[] = ['commander', 'squad_commander', 'soldier'];
+const ROLE_OPTIONS = [
+  { value: 'member', label: 'Member', icon: 'person' as const, color: '#6B8FA3' },
+  { value: 'instructor', label: 'Instructor', icon: 'school' as const, color: '#E76925' },
+  { value: 'admin', label: 'Admin', icon: 'shield-half' as const, color: '#5B7A8C' },
+];
 
 export const ManageMemberSheet = forwardRef<ManageMemberSheetRef, ManageMemberSheetProps>(
   ({ onMemberUpdated }, ref) => {
     const colors = useColors();
+    const { currentOrgId, isOwner } = useProfileContext();
     const sheetRef = useRef<BaseBottomSheetRef>(null);
     
-    const [member, setMember] = useState<WorkspaceMember | null>(null);
-    const [teams, setTeams] = useState<TeamWithMembers[]>([]);
-    const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-    const [selectedTeamRole, setSelectedTeamRole] = useState<TeamMemberShip>('soldier');
-    const [selectedSquadName, setSelectedSquadName] = useState<string>('');
+    const [profile, setProfile] = useState<Profile | null>(null);
+    const [selectedRole, setSelectedRole] = useState<string>('member');
     const [isUpdating, setIsUpdating] = useState(false);
 
     useImperativeHandle(ref, () => ({
-      open: (workspaceMember: WorkspaceMember, availableTeams: TeamWithMembers[]) => {
-        setMember(workspaceMember);
-        setTeams(availableTeams);
-        
-        // Find if member is already in a team
-        const memberTeam = availableTeams.find(team =>
-          team.members?.some(m => m.user_id === workspaceMember.member_id)
-        );
-        
-        if (memberTeam) {
-          const memberData = memberTeam.members?.find(m => m.user_id === workspaceMember.member_id);
-          setSelectedTeamId(memberTeam.id);
-          setSelectedTeamRole(memberData?.role || 'soldier');
-          setSelectedSquadName(memberData?.details?.squad_id || '');
-        } else {
-          setSelectedTeamId(null);
-          setSelectedTeamRole('soldier');
-          setSelectedSquadName('');
-        }
-        
+      open: (memberProfile: Profile) => {
+        setProfile(memberProfile);
+        setSelectedRole(memberProfile.role);
         sheetRef.current?.open();
       },
       close: () => {
@@ -67,350 +56,145 @@ export const ManageMemberSheet = forwardRef<ManageMemberSheetRef, ManageMemberSh
       },
     }));
 
-    const handleSave = async () => {
-      if (!member) return;
-
-      // Check if user is 'member' role
-      if (member.role !== 'member') {
-        Alert.alert(
-          'Cannot Assign to Team',
-          `Only users with "member" role can be assigned to teams. This user is ${member.role}.`
-        );
-        return;
-      }
-
-      // Validate squad for soldiers and squad commanders
-      if (selectedTeamId && (selectedTeamRole === 'soldier' || selectedTeamRole === 'squad_commander')) {
-        if (!selectedSquadName.trim()) {
-          Alert.alert(
-            'Squad Required',
-            selectedTeamRole === 'soldier'
-              ? 'Soldiers must be assigned to a squad.'
-              : 'Squad commanders must be assigned to a squad to command.'
-          );
-          return;
-        }
-      }
+    const handleUpdateRole = async () => {
+      if (!profile || !currentOrgId) return;
 
       setIsUpdating(true);
       try {
-        const currentTeam = teams.find(t => t.members?.some(m => m.user_id === member.member_id));
-        const squadDetails = (selectedTeamRole === 'soldier' || selectedTeamRole === 'squad_commander') && selectedSquadName
-          ? { squad_id: selectedSquadName.trim() }
-          : undefined;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        
+        const { error } = await supabase
+          .from('profiles')
+          .update({ role: selectedRole })
+          .eq('id', profile.id);
 
-        // Case 1: Member is not in any team, and we're assigning them to one
-        if (!currentTeam && selectedTeamId) {
-          await addTeamMember({
-            team_id: selectedTeamId,
-            user_id: member.member_id,
-            role: selectedTeamRole,
-            details: squadDetails,
-          });
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          Alert.alert('Success', `${member.profile?.full_name || 'Member'} has been added to the team`);
-        }
-        // Case 2: Member is in a team, and we're moving them to a different team
-        else if (currentTeam && selectedTeamId && currentTeam.id !== selectedTeamId) {
-          await removeTeamMember(currentTeam.id, member.member_id);
-          await addTeamMember({
-            team_id: selectedTeamId,
-            user_id: member.member_id,
-            role: selectedTeamRole,
-            details: squadDetails,
-          });
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          Alert.alert('Success', `${member.profile?.full_name || 'Member'} has been moved to the new team`);
-        }
-        // Case 3: Member is in a team, and we're updating their role/squad
-        else if (currentTeam && selectedTeamId && currentTeam.id === selectedTeamId) {
-          await updateTeamMemberRole(
-            selectedTeamId,
-            member.member_id,
-            selectedTeamRole,
-            squadDetails
-          );
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          Alert.alert('Success', `${member.profile?.full_name || 'Member'}'s role has been updated`);
-        }
-        // Case 4: Member is in a team, and we're removing them (selectedTeamId is null)
-        else if (currentTeam && !selectedTeamId) {
-          await removeTeamMember(currentTeam.id, member.member_id);
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          Alert.alert('Success', `${member.profile?.full_name || 'Member'} has been removed from the team`);
-        }
+        if (error) throw error;
 
-        onMemberUpdated?.();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         sheetRef.current?.close();
+        onMemberUpdated?.();
+        
+        setTimeout(() => {
+          Alert.alert("Success", "Member role updated");
+        }, 300);
       } catch (error: any) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        console.error('Failed to update member:', error);
-        Alert.alert('Error', error.message || 'Failed to update member');
+        console.error("Failed to update member:", error);
+        Alert.alert("Error", error.message || "Failed to update member");
       } finally {
         setIsUpdating(false);
       }
     };
 
-    if (!member) return null;
+    const handleRemoveMember = async () => {
+      if (!profile || !currentOrgId) return;
 
-    const currentTeam = teams.find(t => t.members?.some(m => m.user_id === member.member_id));
-    const currentMemberData = currentTeam?.members?.find(m => m.user_id === member.member_id);
-    const selectedTeam = teams.find(t => t.id === selectedTeamId);
-    const availableSquads = selectedTeam?.squads || [];
+      Alert.alert(
+        "Remove Member",
+        `Are you sure you want to remove ${profile.display_name || 'this member'} from the organization?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Remove",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                const { error } = await supabase
+                  .from('profiles')
+                  .delete()
+                  .eq('id', profile.id);
 
-    // Check if user can be assigned to teams
-    const canAssignToTeam = member.role === 'member';
+                if (error) throw error;
+
+                sheetRef.current?.close();
+                onMemberUpdated?.();
+                
+                Alert.alert("Success", "Member removed");
+              } catch (error: any) {
+                console.error("Failed to remove member:", error);
+                Alert.alert("Error", "Failed to remove member");
+              }
+            },
+          },
+        ]
+      );
+    };
+
+    if (!profile) return null;
 
     return (
-      <BaseBottomSheet ref={sheetRef} snapPoints={['85%']} backdropOpacity={0.6}>
-        <BottomSheetScrollView style={styles.scrollView}>
-          <View style={styles.content}>
-            {/* Header */}
-            <View style={styles.header}>
-              <View style={[styles.avatar, { backgroundColor: colors.primary + '15' }]}>
-                <Text style={[styles.avatarText, { color: colors.primary }]}>
-                  {(member.profile?.full_name || member.profile?.email || 'U')[0].toUpperCase()}
-                </Text>
-              </View>
-              <Text style={[styles.title, { color: colors.text }]}>
-                {member.profile?.full_name || 'Unknown User'}
-              </Text>
-              <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-                {member.profile?.email}
-              </Text>
-              <View style={[styles.roleBadge, { backgroundColor: colors.secondary }]}>
-                <Text style={[styles.roleBadgeText, { color: colors.textMuted }]}>
-                  {member.role.toUpperCase()}
-                </Text>
-              </View>
+      <BaseBottomSheet ref={sheetRef} snapPoints={['70%']}>
+        <BottomSheetScrollView style={styles.container}>
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={[styles.avatarContainer, { backgroundColor: `${colors.primary}20` }]}>
+              <Ionicons name="person" size={32} color={colors.primary} />
             </View>
+            <Text style={[styles.title, { color: colors.text }]}>
+              {profile.display_name || 'Member'}
+            </Text>
+            <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+              Current Role: {profile.role}
+            </Text>
+          </View>
 
-            {/* Cannot assign warning */}
-            {!canAssignToTeam && (
-              <View style={[styles.warningCard, { backgroundColor: colors.accent + '15', borderColor: colors.accent + '30' }]}>
-                <Ionicons name="alert-circle" size={20} color={colors.accent} />
-                <Text style={[styles.warningText, { color: colors.accent }]}>
-                  Only users with "member" role can be assigned to teams. This user is {member.role}.
-                </Text>
-              </View>
-            )}
-
-            {/* Current Assignment */}
-            {currentTeam && (
-              <View style={[styles.currentCard, { backgroundColor: colors.secondary }]}>
-                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-                  CURRENT ASSIGNMENT
-                </Text>
-                <View style={styles.currentTeamRow}>
-                  <Ionicons name="people" size={20} color={colors.primary} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.currentTeamName, { color: colors.text }]}>
-                      {currentTeam.name}
-                    </Text>
-                    <Text style={[styles.currentTeamSubtext, { color: colors.primary }]}>
-                      {currentMemberData?.role.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
-                      {currentMemberData?.details?.squad_id && ` • Squad ${currentMemberData.details.squad_id}`}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            )}
-
-            {/* Team Selection */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-                ASSIGN TO TEAM
-              </Text>
-              
-              {/* No Team Option */}
-              <TouchableOpacity
-                style={[
-                  styles.teamOption,
-                  {
-                    backgroundColor: selectedTeamId === null ? colors.primary + '15' : colors.card,
-                    borderColor: selectedTeamId === null ? colors.primary : colors.border,
-                  }
-                ]}
-                onPress={() => {
-                  setSelectedTeamId(null);
-                  setSelectedSquadName('');
-                }}
-                disabled={!canAssignToTeam}
-              >
-                <Ionicons 
-                  name="close-circle" 
-                  size={20} 
-                  color={selectedTeamId === null ? colors.primary : colors.textMuted} 
-                />
-                <Text style={[
-                  styles.teamOptionText,
-                  { color: selectedTeamId === null ? colors.primary : colors.text }
-                ]}>
-                  No Team
-                </Text>
-              </TouchableOpacity>
-
-              {/* Team Options */}
-              {teams.map((team) => (
+          {/* Role Selection */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Change Role</Text>
+            <View style={styles.roleList}>
+              {ROLE_OPTIONS.map((option) => (
                 <TouchableOpacity
-                  key={team.id}
+                  key={option.value}
                   style={[
-                    styles.teamOption,
+                    styles.roleCard,
                     {
-                      backgroundColor: selectedTeamId === team.id ? colors.primary + '15' : colors.card,
-                      borderColor: selectedTeamId === team.id ? colors.primary : colors.border,
-                    }
+                      backgroundColor: colors.cardBackground,
+                      borderColor: selectedRole === option.value ? option.color : colors.border,
+                      borderWidth: selectedRole === option.value ? 2 : 1,
+                    },
                   ]}
-                  onPress={() => {
-                    setSelectedTeamId(team.id);
-                    setSelectedSquadName('');
-                  }}
-                  disabled={!canAssignToTeam}
+                  onPress={() => setSelectedRole(option.value)}
+                  activeOpacity={0.7}
                 >
-                  <Ionicons 
-                    name="people" 
-                    size={20} 
-                    color={selectedTeamId === team.id ? colors.primary : colors.textMuted} 
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[
-                      styles.teamOptionText,
-                      { color: selectedTeamId === team.id ? colors.primary : colors.text }
-                    ]}>
-                      {team.name}
-                    </Text>
-                    {team.squads && team.squads.length > 0 && (
-                      <Text style={[styles.teamSquadsHint, { color: colors.textMuted }]}>
-                        {team.squads.length} squad{team.squads.length !== 1 ? 's' : ''}: {team.squads.join(', ')}
-                      </Text>
-                    )}
+                  <View style={[styles.roleIcon, { backgroundColor: `${option.color}20` }]}>
+                    <Ionicons name={option.icon} size={20} color={option.color} />
                   </View>
+                  <Text style={[styles.roleLabel, { color: colors.text }]}>
+                    {option.label}
+                  </Text>
+                  {selectedRole === option.value && (
+                    <Ionicons name="checkmark-circle" size={20} color={option.color} />
+                  )}
                 </TouchableOpacity>
               ))}
             </View>
+          </View>
 
-            {/* Role Selection - Only if team selected */}
-            {selectedTeamId && canAssignToTeam && (
-              <View style={styles.section}>
-                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-                  TEAM ROLE
-                </Text>
-                <ScrollView 
-                  horizontal 
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.roleChipsContainer}
-                >
-                  {TEAM_ROLE_OPTIONS.map((role) => (
-                    <TouchableOpacity
-                      key={role}
-                      style={[
-                        styles.roleChip,
-                        {
-                          backgroundColor: selectedTeamRole === role ? colors.primary : colors.card,
-                          borderColor: selectedTeamRole === role ? colors.primary : colors.border,
-                        }
-                      ]}
-                      onPress={() => {
-                        setSelectedTeamRole(role);
-                        if (role === 'commander') {
-                          setSelectedSquadName('');
-                        }
-                      }}
-                    >
-                      <Text style={[
-                        styles.roleChipText,
-                        { color: selectedTeamRole === role ? '#fff' : colors.text }
-                      ]}>
-                        {role.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
+          {/* Actions */}
+          <View style={styles.actions}>
+            <TouchableOpacity
+              style={[styles.updateButton, { backgroundColor: colors.primary }]}
+              onPress={handleUpdateRole}
+              disabled={isUpdating || selectedRole === profile.role}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.updateButtonText}>
+                {isUpdating ? "Updating..." : "Update Role"}
+              </Text>
+            </TouchableOpacity>
 
-            {/* Squad Selection - Only for soldiers and squad commanders */}
-            {selectedTeamId && canAssignToTeam && (selectedTeamRole === 'soldier' || selectedTeamRole === 'squad_commander') && (
-              <View style={styles.section}>
-                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-                  SQUAD {availableSquads.length > 0 ? '(SELECT OR CREATE NEW)' : '*'}
-                </Text>
-                
-                {/* Available Squads */}
-                {availableSquads.length > 0 && (
-                  <ScrollView 
-                    horizontal 
-                    showsHorizontalScrollIndicator={false}
-                    style={{ marginBottom: 12 }}
-                    contentContainerStyle={styles.squadChipsContainer}
-                  >
-                    {availableSquads.map((squad) => (
-                      <TouchableOpacity
-                        key={squad}
-                        style={[
-                          styles.squadChip,
-                          {
-                            backgroundColor: selectedSquadName === squad ? colors.primary : colors.card,
-                            borderColor: selectedSquadName === squad ? colors.primary : colors.border,
-                          }
-                        ]}
-                        onPress={() => setSelectedSquadName(squad)}
-                      >
-                        <Ionicons 
-                          name="shield" 
-                          size={14} 
-                          color={selectedSquadName === squad ? '#fff' : colors.primary} 
-                        />
-                        <Text style={[
-                          styles.squadChipText,
-                          { color: selectedSquadName === squad ? '#fff' : colors.text }
-                        ]}>
-                          {squad}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                )}
-                
-                {/* Custom Squad Input */}
-                <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                  <TextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder={availableSquads.length > 0 ? "Or enter a new squad name..." : "e.g. Alpha, Bravo, Squad 1"}
-                    placeholderTextColor={colors.textMuted + 'CC'}
-                    value={selectedSquadName}
-                    onChangeText={setSelectedSquadName}
-                  />
-                </View>
-              </View>
-            )}
-
-            {/* Actions */}
-            <View style={styles.actions}>
+            {isOwner && (
               <TouchableOpacity
-                style={[
-                  styles.primaryButton,
-                  {
-                    backgroundColor: isUpdating || !canAssignToTeam ? colors.secondary : colors.primary,
-                    opacity: isUpdating || !canAssignToTeam ? 0.5 : 1,
-                  }
-                ]}
-                onPress={handleSave}
-                disabled={isUpdating || !canAssignToTeam}
+                style={[styles.removeButton, { backgroundColor: `${colors.destructive}20` }]}
+                onPress={handleRemoveMember}
                 activeOpacity={0.8}
               >
-                {isUpdating ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <View style={styles.primaryButtonContent}>
-                    <Ionicons name="checkmark" size={20} color="#fff" />
-                    <Text style={styles.primaryButtonText}>
-                      Save Changes
-                    </Text>
-                  </View>
-                )}
+                <Ionicons name="trash" size={18} color={colors.destructive} />
+                <Text style={[styles.removeButtonText, { color: colors.destructive }]}>
+                  Remove from Organization
+                </Text>
               </TouchableOpacity>
-            </View>
+            )}
           </View>
         </BottomSheetScrollView>
       </BaseBottomSheet>
@@ -421,172 +205,88 @@ export const ManageMemberSheet = forwardRef<ManageMemberSheetRef, ManageMemberSh
 ManageMemberSheet.displayName = 'ManageMemberSheet';
 
 const styles = StyleSheet.create({
-  scrollView: {
+  container: {
     flex: 1,
   },
-  content: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
   header: {
-    alignItems: 'center',
-    paddingVertical: 20,
-    marginBottom: 20,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 24,
+    alignItems: "center",
   },
-  avatar: {
+  avatarContainer: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  avatarText: {
-    fontSize: 28,
-    fontWeight: '700',
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
   },
   title: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: "700",
     marginBottom: 4,
-    letterSpacing: -0.3,
   },
   subtitle: {
     fontSize: 14,
-    marginBottom: 8,
-  },
-  roleBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  roleBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  warningCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 20,
-  },
-  warningText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
-    lineHeight: 20,
-  },
-  currentCard: {
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 20,
-  },
-  currentTeamRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  currentTeamName: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  currentTeamSubtext: {
-    fontSize: 13,
-    fontWeight: '500',
   },
   section: {
+    paddingHorizontal: 24,
     marginBottom: 24,
   },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    marginBottom: 12,
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 16,
   },
-  teamOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  roleList: {
     gap: 12,
+  },
+  roleCard: {
+    flexDirection: "row",
+    alignItems: "center",
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 8,
+    gap: 12,
   },
-  teamOptionText: {
-    fontSize: 15,
-    fontWeight: '600',
+  roleIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  roleLabel: {
     flex: 1,
-  },
-  teamSquadsHint: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  roleChipsContainer: {
-    gap: 8,
-    paddingVertical: 4,
-  },
-  roleChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  roleChipText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  squadChipsContainer: {
-    gap: 8,
-    paddingVertical: 4,
-  },
-  squadChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  squadChipText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  inputWrapper: {
-    borderRadius: 10,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  input: {
-    height: 44,
-    paddingHorizontal: 14,
-    fontSize: 15,
-    fontWeight: '400',
+    fontSize: 16,
+    fontWeight: "600",
   },
   actions: {
-    gap: 10,
-    marginTop: 10,
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    gap: 12,
   },
-  primaryButton: {
-    borderRadius: 10,
-    height: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
+  updateButton: {
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
   },
-  primaryButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  primaryButtonText: {
+  updateButtonText: {
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
+    fontWeight: "600",
+  },
+  removeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 16,
+    borderRadius: 12,
+  },
+  removeButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
-

@@ -1,6 +1,6 @@
 import { useColors } from "@/hooks/ui/useColors";
-import { useAppContext } from "@/hooks/useAppContext";
-import { useTeamStore } from "@/store/teamStore";
+import { useProfileContext } from "@/hooks/useProfileContext";
+import { createTeam } from "@/services/teamService";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import * as Haptics from 'expo-haptics';
@@ -15,14 +15,14 @@ interface CreateTeamSheetProps {
 export const CreateTeamSheet = forwardRef<BaseBottomSheetRef, CreateTeamSheetProps>(
   ({ onTeamCreated }, ref) => {
     const colors = useColors();
-    const { activeWorkspaceId, activeWorkspace } = useAppContext();
-    const { createTeam, loading } = useTeamStore();
+    const { currentOrgId, isPersonalOrg } = useProfileContext();
     const sheetRef = useRef<BaseBottomSheetRef>(null);
     
     const [teamName, setTeamName] = useState("");
     const [teamDescription, setTeamDescription] = useState("");
     const [squads, setSquads] = useState<string[]>([]);
     const [newSquadName, setNewSquadName] = useState("");
+    const [loading, setLoading] = useState(false);
 
     const handleCreateTeam = async () => {
       if (!teamName.trim()) {
@@ -31,25 +31,25 @@ export const CreateTeamSheet = forwardRef<BaseBottomSheetRef, CreateTeamSheetPro
         return;
       }
 
-      if (!activeWorkspaceId) {
+      if (!currentOrgId) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert("Error", "No active workspace");
+        Alert.alert("Error", "No active organization");
         return;
       }
 
       try {
+        setLoading(true);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        const isOrgWorkspace = activeWorkspace?.workspace_type === 'org';
         
         await createTeam({
-          workspace_type: isOrgWorkspace ? 'org' : 'personal',
-          workspace_owner_id: isOrgWorkspace ? undefined : activeWorkspaceId,
-          org_workspace_id: isOrgWorkspace ? activeWorkspaceId : undefined,
+          org_id: currentOrgId,
           name: teamName.trim(),
+          team_type: 'field',
           description: teamDescription.trim() || undefined,
           squads: squads.length > 0 ? squads : undefined,
         });
         
+        setLoading(false);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         
         // Close the sheet first
@@ -71,6 +71,7 @@ export const CreateTeamSheet = forwardRef<BaseBottomSheetRef, CreateTeamSheetPro
           Alert.alert("Success", `Team "${teamName}" created successfully!`);
         }, 300);
       } catch (error: any) {
+        setLoading(false);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         console.error("Failed to create team:", error);
         Alert.alert("Error", error.message || "Failed to create team");

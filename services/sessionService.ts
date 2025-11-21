@@ -1,14 +1,13 @@
 /**
- * SESSION SERVICE
- * Handles session creation and management for both personal and org workspaces
+ * SESSION SERVICE (Multi-Profile Architecture)
+ * Handles session creation and management
  */
 
 import { AuthenticatedClient } from './authenticatedClient';
 
 export interface CreateSessionParams {
-  workspace_type: 'personal' | 'org';
-  workspace_owner_id?: string;
-  org_workspace_id?: string;
+  org_id: string;
+  profile_id?: string;
   team_id?: string;
   session_mode?: 'solo' | 'group';
   session_data?: Record<string, any>;
@@ -16,41 +15,34 @@ export interface CreateSessionParams {
 
 export interface SessionWithDetails {
   id: string;
-  workspace_type: 'personal' | 'org';
-  workspace_owner_id: string | null;
-  org_workspace_id: string | null;
-  workspace_name?: string | null;
+  org_id: string;
+  org_name?: string;
+  profile_id: string | null;
   user_id: string;
-  user_full_name?: string | null;
+  profile_name?: string;
   team_id: string | null;
-  team_name?: string | null;
+  team_name?: string;
   session_mode: 'solo' | 'group';
   status: 'active' | 'completed' | 'cancelled';
   started_at: string;
   ended_at: string | null;
   session_data: Record<string, any> | null;
   created_at: string;
-  updated_at?: string;
+  updated_at: string;
 }
 
 function mapSession(row: any): SessionWithDetails {
-  if (!row) {
-    throw new Error('Session payload is empty');
-  }
-
-  const profiles = row.profiles ?? {};
-  const teams = row.teams ?? {};
+  if (!row) throw new Error('Session payload is empty');
 
   return {
     id: row.id,
-    workspace_type: row.workspace_type,
-    workspace_owner_id: row.workspace_owner_id ?? null,
-    org_workspace_id: row.org_workspace_id ?? null,
-    workspace_name: row.workspace_name ?? profiles.workspace_name ?? null,
+    org_id: row.org_id,
+    org_name: row.org?.name ?? null,
+    profile_id: row.profile_id ?? null,
     user_id: row.user_id,
-    user_full_name: row.user_full_name ?? profiles.full_name ?? null,
+    profile_name: row.profile?.display_name ?? null,
     team_id: row.team_id ?? null,
-    team_name: row.team_name ?? teams.name ?? null,
+    team_name: row.team?.name ?? null,
     session_mode: row.session_mode,
     status: row.status,
     started_at: row.started_at,
@@ -62,19 +54,29 @@ function mapSession(row: any): SessionWithDetails {
 }
 
 /**
- * Create a new session (personal or org)
+ * Create a new session
  */
 export async function createSession(params: CreateSessionParams) {
   const client = await AuthenticatedClient.getClient();
+  const context = await AuthenticatedClient.getContext();
+  
   const { data, error } = await client
-    .rpc('create_session', {
-      p_workspace_type: params.workspace_type,
-      p_workspace_owner_id: params.workspace_owner_id ?? null,
-      p_org_workspace_id: params.org_workspace_id ?? null,
-      p_team_id: params.team_id ?? null,
-      p_session_mode: params.session_mode ?? 'solo',
-      p_session_data: params.session_data ?? null,
+    .from('sessions')
+    .insert({
+      org_id: params.org_id,
+      profile_id: params.profile_id ?? context.profileId,
+      user_id: context.userId,
+      team_id: params.team_id ?? null,
+      session_mode: params.session_mode ?? 'solo',
+      session_data: params.session_data ?? {},
+      status: 'active'
     })
+    .select(`
+      *,
+      org:orgs(name),
+      profile:profiles(display_name),
+      team:teams(name)
+    `)
     .single();
 
   if (error) throw error;
@@ -82,40 +84,21 @@ export async function createSession(params: CreateSessionParams) {
 }
 
 /**
- * Get personal sessions for the authenticated user
+ * Get all sessions for current user (across all profiles/orgs)
  */
-export async function getPersonalSessions(): Promise<SessionWithDetails[]> {
+export async function getAllSessions(): Promise<SessionWithDetails[]> {
   const client = await AuthenticatedClient.getClient();
-
-  const { data: userResult, error: userError } = await client.auth.getUser();
-  if (userError) throw userError;
-  const userId = userResult.user?.id;
-
-  if (!userId) {
-    throw new Error('Not authenticated');
-  }
+  const context = await AuthenticatedClient.getContext();
   
   const { data, error } = await client
     .from('sessions')
     .select(`
-      id,
-      workspace_type,
-      workspace_owner_id,
-      org_workspace_id,
-      user_id,
-      team_id,
-      session_mode,
-      status,
-      started_at,
-      ended_at,
-      session_data,
-      created_at,
-      updated_at,
-      profiles:user_id(full_name, workspace_name),
-      teams:team_id(name)
+      *,
+      org:orgs(name),
+      profile:profiles(display_name),
+      team:teams(name)
     `)
-    .eq('workspace_type', 'personal')
-    .eq('workspace_owner_id', userId)
+    .eq('user_id', context.userId)
     .order('started_at', { ascending: false });
 
   if (error) throw error;
@@ -123,31 +106,20 @@ export async function getPersonalSessions(): Promise<SessionWithDetails[]> {
 }
 
 /**
- * Get sessions for a specific workspace
+ * Get sessions for a specific org
  */
-export async function getWorkspaceSessions(workspaceId: string): Promise<SessionWithDetails[]> {
+export async function getOrgSessions(orgId: string): Promise<SessionWithDetails[]> {
   const client = await AuthenticatedClient.getClient();
   
   const { data, error } = await client
     .from('sessions')
     .select(`
-      id,
-      workspace_type,
-      workspace_owner_id,
-      org_workspace_id,
-      user_id,
-      team_id,
-      session_mode,
-      status,
-      started_at,
-      ended_at,
-      session_data,
-      created_at,
-      updated_at,
-      profiles:user_id(full_name, workspace_name),
-      teams:team_id(name)
+      *,
+      org:orgs(name),
+      profile:profiles(display_name),
+      team:teams(name)
     `)
-    .or(`workspace_owner_id.eq.${workspaceId},org_workspace_id.eq.${workspaceId}`)
+    .eq('org_id', orgId)
     .order('started_at', { ascending: false });
 
   if (error) throw error;
@@ -187,7 +159,12 @@ export async function updateSession(
     .from('sessions')
     .update(updatePayload)
     .eq('id', sessionId)
-    .select()
+    .select(`
+      *,
+      org:orgs(name),
+      profile:profiles(display_name),
+      team:teams(name)
+    `)
     .single();
 
   if (error) throw error;

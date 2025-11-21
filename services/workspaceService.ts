@@ -1,353 +1,112 @@
 /**
- * WORKSPACE SERVICE
- * Simplified: User = Workspace (no separate workspace table)
+ * WORKSPACE/ORG SERVICE (Multi-Profile Architecture)
  * 
- * Each user's profile IS their workspace.
- * Access control via workspace_access table.
+ * In the new architecture:
+ * - Workspaces are now called "orgs"
+ * - Users have profiles (one per org)
+ * - Use useProfileStore for most operations
  */
 
 import { supabase } from "@/lib/supabase";
-import type { Team, TeamMember, TeamMemberShip, Workspace, WorkspaceAccess, WorkspaceRole } from "@/types/workspace";
+import { AuthenticatedClient } from "./authenticatedClient";
 
-// =====================================================
-// MY WORKSPACE
-// =====================================================
+export interface Org {
+  id: string;
+  name: string;
+  slug: string | null;
+  org_type: 'personal' | 'organization';
+  description: string | null;
+  avatar_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Profile {
+  id: string;
+  user_id: string;
+  org_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  role: 'owner' | 'admin' | 'instructor' | 'member';
+  status: string;
+  created_at: string;
+}
 
 /**
- * Get current user's profile (which is their workspace)
+ * Get all orgs user has access to (via their profiles)
  */
-export async function getMyWorkspace(): Promise<Workspace | null> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
-
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
+export async function getAccessibleOrgs(): Promise<Org[]> {
+  const client = await AuthenticatedClient.getClient();
+  const context = await AuthenticatedClient.getContext();
+  
+  const { data, error } = await client
+    .from('profiles')
+    .select('org:orgs(*)')
+    .eq('user_id', context.userId)
+    .eq('status', 'active');
 
   if (error) throw error;
-  return data;
+  
+  return (data || []).map((item: any) => item.org).filter(Boolean);
 }
 
 /**
- * Update my workspace (profile)
- */
-export async function updateMyWorkspace(input: {
-  workspace_name?: string;
-  full_name?: string;
-  avatar_url?: string;
-}): Promise<Workspace> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
-
-  const { data, error } = await supabase
-    .from("profiles")
-    .update(input)
-    .eq("id", user.id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-// =====================================================
-// WORKSPACES I CAN ACCESS
-// =====================================================
-
-/**
- * Get all workspaces I have access to (personal + org)
- */
-export async function getAccessibleWorkspaces(): Promise<Workspace[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
-
-  const workspaces: Workspace[] = [];
-
-  // 1. Get my personal workspace (my profile)
-  const { data: myProfile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
-
-  if (myProfile) {
-    workspaces.push({
-      ...myProfile,
-      workspace_type: 'personal' as const,
-      access_role: 'owner' as const,
-    });
-  }
-
-  // 2. Get personal workspaces I have access to (other people's profiles)
-  const { data: sharedPersonalWorkspaces } = await supabase
-    .from("workspace_access")
-    .select(`
-      role,
-      workspace_owner:profiles!workspace_owner_id(*)
-    `)
-    .eq("member_id", user.id)
-    .eq("workspace_type", "personal")
-    .neq("workspace_owner_id", user.id);
-
-  if (sharedPersonalWorkspaces) {
-    sharedPersonalWorkspaces.forEach((access: any) => {
-      if (access.workspace_owner) {
-        workspaces.push({
-          ...access.workspace_owner,
-          workspace_type: 'personal' as const,
-          access_role: access.role,
-        });
-      }
-    });
-  }
-
-  // 3. Get org workspaces I have access to
-  const { data: orgWorkspaces } = await supabase
-    .from("workspace_access")
-    .select(`
-      role,
-      org_workspace:org_workspaces!org_workspace_id(*)
-    `)
-    .eq("member_id", user.id)
-    .eq("workspace_type", "org");
-
-  if (orgWorkspaces) {
-    orgWorkspaces.forEach((access: any) => {
-      if (access.org_workspace) {
-        workspaces.push({
-          id: access.org_workspace.id,
-          workspace_type: 'org' as const,
-          workspace_name: access.org_workspace.name,
-          workspace_slug: access.org_workspace.workspace_slug,
-          description: access.org_workspace.description,
-          created_by: access.org_workspace.created_by,
-          created_at: access.org_workspace.created_at,
-          updated_at: access.org_workspace.updated_at,
-          access_role: access.role,
-        });
-      }
-    });
-  }
-
-  return workspaces;
-}
-
-/**
- * Create a new organization workspace (uses RPC for clean permissions)
+ * Create a new organization
  */
 export async function createOrgWorkspace(input: {
   name: string;
   description?: string;
-}): Promise<Workspace> {
+}): Promise<Org> {
   const { data, error } = await supabase.rpc('create_org_workspace', {
     p_name: input.name,
     p_description: input.description || null,
   });
 
   if (error) throw error;
-  if (!data || data.length === 0) throw new Error("Failed to create workspace");
+  if (!data || data.length === 0) throw new Error("Failed to create organization");
 
-  const orgWorkspace = data[0];
-
-  return {
-    id: orgWorkspace.id,
-    workspace_type: 'org',
-    workspace_name: orgWorkspace.name,
-    workspace_slug: orgWorkspace.workspace_slug,
-    description: orgWorkspace.description,
-    created_by: orgWorkspace.created_by,
-    created_at: orgWorkspace.created_at,
-    updated_at: orgWorkspace.created_at,
-    access_role: 'owner',
-  };
+  return data[0];
 }
 
 /**
- * Get a specific workspace by owner ID
+ * Get org members (profiles in an org)
  */
-export async function getWorkspace(workspaceOwnerId: string): Promise<Workspace | null> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select(`
-      *,
-      access:workspace_access!workspace_owner_id(role)
-    `)
-    .eq("id", workspaceOwnerId)
-    .single();
-
-  if (error) throw error;
-
-  return {
-    ...data,
-    workspace_type: 'personal' as const,
-    access_role: data.access?.[0]?.role || 'member'
-  };
-}
-
-// =====================================================
-// WORKSPACE ACCESS (Members)
-// =====================================================
-
-/**
- * Get members of an organization workspace using RPC
- */
-export async function getWorkspaceMembers(orgWorkspaceId: string): Promise<(WorkspaceAccess & { profile?: any })[]> {
-  const { data, error } = await supabase.rpc('get_org_workspace_members', {
-    p_org_workspace_id: orgWorkspaceId
+export async function getOrgMembers(orgId: string): Promise<Profile[]> {
+  const { data, error } = await supabase.rpc('get_org_members', {
+    p_org_id: orgId
   });
 
   if (error) throw error;
   
-  // Transform RPC result to match our interface
   return (data || []).map((row: any) => ({
-    id: row.id,
-    workspace_type: row.workspace_type,
-    workspace_owner_id: row.workspace_owner_id,
-    org_workspace_id: row.org_workspace_id,
-    member_id: row.member_id,
+    id: row.profile_id,
+    user_id: row.user_id,
+    org_id: orgId,
+    display_name: row.display_name,
+    avatar_url: row.avatar_url,
     role: row.role,
-    joined_at: row.joined_at,
-    profile: {
-      id: row.profile_id,
-      email: row.profile_email,
-      full_name: row.profile_full_name,
-      avatar_url: row.profile_avatar_url
-    }
+    status: row.status,
+    created_at: row.joined_at,
   }));
 }
 
 /**
- * Add a member to workspace
+ * Update org details
  */
-export async function addWorkspaceMember(
-  workspaceOwnerId: string,
-  memberEmail: string,
-  role: WorkspaceRole = 'member'
-): Promise<WorkspaceAccess> {
-  // Find user by email
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("email", memberEmail)
-    .single();
-
-  if (!profile) throw new Error("User not found");
-
-  const { data, error } = await supabase
-    .from("workspace_access")
-    .insert({
-      workspace_owner_id: workspaceOwnerId,
-      member_id: profile.id,
-      role
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-/**
- * Remove a member from workspace
- */
-export async function removeWorkspaceMember(accessId: string): Promise<void> {
-  const { error } = await supabase
-    .from("workspace_access")
-    .delete()
-    .eq("id", accessId);
-
-  if (error) throw error;
-}
-
-/**
- * Update member role
- */
-export async function updateWorkspaceMemberRole(
-  accessId: string,
-  role: WorkspaceRole
-): Promise<WorkspaceAccess> {
-  const { data, error } = await supabase
-    .from("workspace_access")
-    .update({ role })
-    .eq("id", accessId)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-// =====================================================
-// TEAMS
-// =====================================================
-
-/**
- * Get teams for a workspace
- */
-export async function getWorkspaceTeams(
-  workspaceType: 'personal' | 'org',
-  workspaceId: string
-): Promise<Team[]> {
-  let query = supabase
-    .from("teams")
-    .select("*, team_members(count)")
-    .order("name");
-
-  if (workspaceType === 'personal') {
-    query = query.eq("workspace_owner_id", workspaceId);
-  } else {
-    query = query.eq("org_workspace_id", workspaceId);
-  }
-
-  const { data, error } = await query;
-
-  if (error) throw error;
-  return data || [];
-}
-
-/**
- * Create a team
- */
-export async function createTeam(input: {
-  workspace_type: 'personal' | 'org';
-  workspace_owner_id?: string;  // For personal workspace
-  org_workspace_id?: string;    // For org workspace
-  name: string;
-  team_type?: 'field' | 'back_office';
-  description?: string;
-}): Promise<Team> {
-  const { data, error } = await supabase
-    .rpc('create_team', {
-      p_workspace_type: input.workspace_type,
-      p_name: input.name,
-      p_workspace_owner_id: input.workspace_owner_id || null,
-      p_org_workspace_id: input.org_workspace_id || null,
-      p_team_type: input.team_type || 'field',
-      p_description: input.description || null,
-    })
-    .single();
-
-  if (error) throw error;
-  return data as Team;
-}
-
-/**
- * Update a team
- */
-export async function updateTeam(
-  teamId: string,
-  input: {
+export async function updateOrg(
+  orgId: string,
+  updates: {
     name?: string;
-    team_type?: 'field' | 'back_office';
     description?: string;
+    avatar_url?: string;
   }
-): Promise<Team> {
-  const { data, error } = await supabase
-    .from("teams")
-    .update(input)
-    .eq("id", teamId)
+): Promise<Org> {
+  const client = await AuthenticatedClient.getClient();
+  
+  const { data, error } = await client
+    .from('orgs')
+    .update(updates)
+    .eq('id', orgId)
     .select()
     .single();
 
@@ -356,52 +115,22 @@ export async function updateTeam(
 }
 
 /**
- * Delete a team
+ * Update profile in an org
  */
-export async function deleteTeam(teamId: string): Promise<void> {
-  const { error } = await supabase
-    .from("teams")
-    .delete()
-    .eq("id", teamId);
-
-  if (error) throw error;
-}
-
-// =====================================================
-// TEAM MEMBERS
-// =====================================================
-
-/**
- * Get team members
- */
-export async function getTeamMembers(teamId: string): Promise<(TeamMember & { profile?: any })[]> {
-  const { data, error } = await supabase
-    .from("team_members")
-    .select(`
-      *,
-      profile:profiles(id, email, full_name, avatar_url)
-    `)
-    .eq("team_id", teamId);
-
-  if (error) throw error;
-  return data || [];
-}
-
-/**
- * Add team member
- */
-export async function addTeamMember(
-  teamId: string,
-  userId: string,
-  role: TeamMemberShip
-): Promise<TeamMember> {
-  const { data, error } = await supabase
-    .from("team_members")
-    .insert({
-      team_id: teamId,
-      user_id: userId,
-      role
-    })
+export async function updateProfile(
+  profileId: string,
+  updates: {
+    display_name?: string;
+    avatar_url?: string;
+    preferences?: Record<string, any>;
+  }
+): Promise<Profile> {
+  const client = await AuthenticatedClient.getClient();
+  
+  const { data, error } = await client
+    .from('profiles')
+    .update(updates)
+    .eq('id', profileId)
     .select()
     .single();
 
@@ -410,74 +139,50 @@ export async function addTeamMember(
 }
 
 /**
- * Update team member role
+ * Check if user is org admin
  */
-export async function updateTeamMemberRole(
-  teamId: string,
-  userId: string,
-  role: TeamMemberShip
-): Promise<TeamMember> {
-  const { data, error } = await supabase
-    .from("team_members")
-    .update({ role })
-    .eq("team_id", teamId)
-    .eq("user_id", userId)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-/**
- * Remove team member
- */
-export async function removeTeamMember(teamId: string, userId: string): Promise<void> {
-  const { error } = await supabase
-    .from("team_members")
-    .delete()
-    .eq("team_id", teamId)
-    .eq("user_id", userId);
-
-  if (error) throw error;
-}
-
-// =====================================================
-// HELPER FUNCTIONS
-// =====================================================
-
-/**
- * Check if user is workspace admin
- */
-export async function isWorkspaceAdmin(workspaceOwnerId: string, userId?: string): Promise<boolean> {
-  const { data: { user } } = await supabase.auth.getUser();
-  const checkUserId = userId || user?.id;
-  if (!checkUserId) return false;
-
-  const { data } = await supabase
-    .from("workspace_access")
-    .select("role")
-    .eq("workspace_owner_id", workspaceOwnerId)
-    .eq("member_id", checkUserId)
+export async function isOrgAdmin(orgId: string): Promise<boolean> {
+  const client = await AuthenticatedClient.getClient();
+  const context = await AuthenticatedClient.getContext();
+  
+  const { data } = await client
+    .from('profiles')
+    .select('role')
+    .eq('org_id', orgId)
+    .eq('user_id', context.userId)
+    .eq('status', 'active')
     .single();
 
   return data?.role === 'owner' || data?.role === 'admin';
 }
 
-/**
- * Check if user is team leader
- */
-export async function isTeamLeader(teamId: string, userId?: string): Promise<boolean> {
-  const { data: { user } } = await supabase.auth.getUser();
-  const checkUserId = userId || user?.id;
-  if (!checkUserId) return false;
+// =====================================================
+// LEGACY COMPATIBILITY (for old code still using these)
+// =====================================================
 
-  const { data } = await supabase
-    .from("team_members")
-    .select("role")
-    .eq("team_id", teamId)
-    .eq("user_id", checkUserId)
-    .single();
+// Alias for backwards compatibility
+export const getMyWorkspace = async () => {
+  const { data } = await supabase.rpc('get_my_profiles');
+  const personalProfile = (data || []).find((p: any) => p.org_type === 'personal');
+  return personalProfile ? {
+    id: personalProfile.org_id,
+    workspace_name: personalProfile.org_name,
+    workspace_type: 'personal'
+  } : null;
+};
 
-  return data?.role === 'manager' || data?.role === 'commander';
-}
+export const updateMyWorkspace = async (input: any) => {
+  const context = await AuthenticatedClient.getContext();
+  return updateProfile(context.profileId!, {
+    display_name: input.full_name || input.workspace_name,
+    avatar_url: input.avatar_url
+  });
+};
+
+export const getAccessibleWorkspaces = async () => {
+  return getAccessibleOrgs();
+};
+
+export const getWorkspaceMembers = async (orgId: string) => {
+  return getOrgMembers(orgId);
+};

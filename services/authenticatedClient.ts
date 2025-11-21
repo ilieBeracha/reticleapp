@@ -9,11 +9,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 /**
- * Workspace context for automatic scoping
+ * Profile context for automatic scoping in multi-profile architecture
  */
 export interface WorkspaceContext {
   userId: string;
-  workspaceId: string | null;
+  profileId: string | null;
+  // Deprecated: kept for backwards compatibility
+  workspaceId?: string | null;
 }
 
 /**
@@ -95,8 +97,8 @@ export class AuthenticatedClient {
   }
 
   /**
-   * Get the current workspace context
-   * Returns { userId, workspaceId } automatically
+   * Get the current profile context
+   * Returns { userId, profileId } automatically
    */
   static getContext(): WorkspaceContext {
     if (!this.contextProvider) {
@@ -124,7 +126,7 @@ export class AuthenticatedClient {
 
 /**
  * Helper to get context in service functions
- * Usage: const { userId, workspaceId } = getContext()
+ * Usage: const { userId, profileId } = getContext()
  */
 export function getContext(): WorkspaceContext {
   return AuthenticatedClient.getContext();

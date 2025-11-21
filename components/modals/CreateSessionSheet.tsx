@@ -1,5 +1,5 @@
 import { useColors } from "@/hooks/ui/useColors";
-import { useAppContext } from "@/hooks/useAppContext";
+import { useProfileContext } from "@/hooks/useProfileContext";
 import { createSession } from "@/services/sessionService";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetScrollView, BottomSheetTextInput } from "@gorhom/bottom-sheet";
@@ -30,12 +30,12 @@ interface SessionFormData {
 export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSheetProps>(
   ({ onSessionCreated }, ref) => {
     const colors = useColors();
-    const { activeWorkspaceId, isMyWorkspace, userId } = useAppContext();
+    const { currentOrgId, activeProfileId, isPersonalOrg } = useProfileContext();
     
     const [step, setStep] = useState(1);
     const [isCreating, setIsCreating] = useState(false);
     const [formData, setFormData] = useState<SessionFormData>({
-      session_mode: isMyWorkspace ? 'solo' : 'group',
+      session_mode: isPersonalOrg ? 'solo' : 'group',
       environment: {},
     });
 
@@ -48,8 +48,8 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
 
     const handleNext = () => {
       if (step < 3) {
-        // Skip step 2 for personal workspace
-        if (isMyWorkspace && step === 1) {
+        // Skip step 2 for personal org
+        if (isPersonalOrg && step === 1) {
           setStep(3);
         } else {
           setStep(step + 1);
@@ -59,8 +59,8 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
 
     const handleBack = () => {
       if (step > 1) {
-        // Skip step 2 for personal workspace
-        if (isMyWorkspace && step === 3) {
+        // Skip step 2 for personal org
+        if (isPersonalOrg && step === 3) {
           setStep(1);
         } else {
           setStep(step - 1);
@@ -71,14 +71,8 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
     const handleCreateSession = async () => {
       setIsCreating(true);
       try {
-        if (isMyWorkspace && !userId) {
-          Alert.alert("Error", "User information is still loading. Please try again in a moment.");
-          setIsCreating(false);
-          return;
-        }
-
-        if (!isMyWorkspace && !activeWorkspaceId) {
-          Alert.alert("Error", "Workspace not found. Please select a workspace and try again.");
+        if (!currentOrgId || !activeProfileId) {
+          Alert.alert("Error", "No active organization. Please select a profile.");
           setIsCreating(false);
           return;
         }
@@ -102,10 +96,9 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
         }
 
         await createSession({
-          workspace_type: isMyWorkspace ? 'personal' : 'org',
-          workspace_owner_id: isMyWorkspace ? userId || undefined : undefined,
-          org_workspace_id: !isMyWorkspace ? activeWorkspaceId || undefined : undefined,
-          team_id: !isMyWorkspace ? formData.team_id || undefined : undefined,
+          org_id: currentOrgId,
+          profile_id: activeProfileId,
+          team_id: !isPersonalOrg ? formData.team_id : undefined,
           session_mode: formData.session_mode,
           session_data: Object.keys(sessionData).length > 0 ? sessionData : undefined,
         });
@@ -115,7 +108,7 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
         // Reset form
         setStep(1);
         setFormData({
-          session_mode: isMyWorkspace ? 'solo' : 'group',
+          session_mode: isPersonalOrg ? 'solo' : 'group',
           environment: {},
         });
         setWeather('');
@@ -133,9 +126,9 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
       }
     };
 
-    // Personal workspace has 2 steps (skip step 2), org workspace has 3 steps
-    const totalSteps = isMyWorkspace ? 2 : 3;
-    const currentStep = isMyWorkspace && step === 3 ? 2 : step;
+    // Personal org has 2 steps (skip step 2), org workspace has 3 steps
+    const totalSteps = isPersonalOrg ? 2 : 3;
+    const currentStep = isPersonalOrg && step === 3 ? 2 : step;
     const progressWidth = (currentStep / totalSteps) * 100;
 
     return (
@@ -154,7 +147,7 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
               Start New Session
             </Text>
             <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-              {isMyWorkspace ? 'Personal Training' : 'Team Training'}
+              {isPersonalOrg ? 'Personal Training' : 'Team Training'}
             </Text>
           </View>
 
@@ -183,7 +176,7 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
 
               <View style={styles.optionsGrid}>
                 {/* Show Solo only for personal workspace */}
-                {isMyWorkspace && (
+                {isPersonalOrg && (
                   <TouchableOpacity
                     style={[
                       styles.optionCard,
@@ -218,7 +211,7 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
                 )}
 
                 {/* Show Group only for org workspace */}
-                {!isMyWorkspace && (
+                {!isPersonalOrg && (
                   <TouchableOpacity
                     style={[
                       styles.optionCard,
@@ -293,7 +286,7 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
                 </View>
               </View>
 
-              {!isMyWorkspace && (
+              {!isPersonalOrg && (
                 <View style={styles.inputContainer}>
                   <Text style={[styles.inputLabel, { color: colors.text }]}>
                     <Ionicons name="people-outline" size={14} color={colors.text} /> Team ID (Optional)

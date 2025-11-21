@@ -1,14 +1,12 @@
+import { useAuth } from "@/contexts/AuthContext";
 import { useModals } from "@/contexts/ModalContext";
 import { useColors } from "@/hooks/ui/useColors";
-import { useAppContext } from "@/hooks/useAppContext";
-import { createOrgWorkspace } from "@/services/workspaceService";
-import { useWorkspaceStore } from "@/store/useWorkspaceStore";
-import type { Workspace } from "@/types/workspace";
+import { useProfileStore, type ProfileWithOrg } from "@/store/useProfileStore";
 import { Ionicons } from "@expo/vector-icons";
-import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { BaseBottomSheet, type BaseBottomSheetRef } from "./BaseBottomSheet";
-import WorkspaceItem from "./WorkspaceItem";
+import { supabase } from "@/lib/supabase";
 
 export interface WorkspaceSwitcherRef {
   open: () => void;
@@ -19,13 +17,90 @@ interface WorkspaceSwitcherBottomSheetProps {
   onSettingsPress?: () => void;
 }
 
+// Profile Item Component
+interface ProfileItemProps {
+  profile: ProfileWithOrg;
+  isActive: boolean;
+  colors: any;
+  onSelect: () => void;
+}
+
+function ProfileItem({ profile, isActive, colors, onSelect }: ProfileItemProps) {
+  const isPersonal = profile.org?.org_type === 'personal';
+  
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'owner': return '#FFD700';
+      case 'admin': return '#FF6B6B';
+      case 'instructor': return '#4ECDC4';
+      default: return colors.textMuted;
+    }
+  };
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.workspaceItem,
+        isActive && styles.workspaceItemActive
+      ]}
+      onPress={onSelect}
+      activeOpacity={0.7}
+    >
+      <View style={styles.workspaceItemContent}>
+        {/* Icon */}
+        <View style={[
+          styles.workspaceIcon,
+          { backgroundColor: isPersonal ? `${colors.primary}20` : `${getRoleColor(profile.role)}20` }
+        ]}>
+          <Ionicons
+            name={isPersonal ? 'person' : 'business'}
+            size={20}
+            color={isPersonal ? colors.primary : getRoleColor(profile.role)}
+          />
+        </View>
+
+        {/* Details */}
+        <View style={styles.workspaceDetails}>
+          <Text style={[
+            styles.workspaceName,
+            { color: colors.text },
+            isActive && styles.workspaceNameActive
+          ]}>
+            {profile.org?.name || 'Unknown Org'}
+          </Text>
+          <View style={styles.workspaceMeta}>
+            <View style={[
+              styles.roleBadge,
+              { backgroundColor: `${getRoleColor(profile.role)}20` }
+            ]}>
+              <Text style={[
+                styles.roleBadgeText,
+                { color: getRoleColor(profile.role) }
+              ]}>
+                {profile.role}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Active Indicator */}
+        {isActive && (
+          <View style={[styles.checkmarkContainer, { backgroundColor: `${colors.primary}20` }]}>
+            <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 /**
- * SIMPLIFIED WORKSPACE SWITCHER
+ * PROFILE-BASED WORKSPACE SWITCHER
  * 
- * Model: User = Workspace
- * - Shows user's own workspace
- * - Shows other workspaces they have access to
- * - Each workspace is a profile (user)
+ * Model: Multiple profiles per user, one per org
+ * - Shows all user's profiles
+ * - Each profile = identity in an organization
+ * - Switch between profiles to change context
  */
 export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, WorkspaceSwitcherBottomSheetProps>(
   (props, ref) => {
@@ -34,107 +109,100 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
     const createSheetRef = useRef<BaseBottomSheetRef>(null);
     const { acceptInviteSheetRef, setOnInviteAccepted } = useModals();
     
-    const { 
-      myWorkspaceId, 
-      activeWorkspaceId, 
-      workspaces,
-      switchWorkspace,
-      switchToMyWorkspace,
-      loading 
-    } = useAppContext();
+    const { activeProfileId, switchProfile } = useAuth();
+    const { profiles, activeProfile, loadProfiles, loading } = useProfileStore();
 
-    const [workspaceName, setWorkspaceName] = useState("");
+    const [orgName, setOrgName] = useState("");
     const [isCreating, setIsCreating] = useState(false);
+    
+    // Load profiles on mount
+    useEffect(() => {
+      loadProfiles();
+    }, [loadProfiles]);
 
     useImperativeHandle(ref, () => ({
       open: () => bottomSheetRef.current?.open(),
       close: () => bottomSheetRef.current?.close(),
     }));
 
-    // Group workspaces: My workspace first, then others
-    const groupedWorkspaces = useMemo(() => {
-      const myWorkspace = workspaces.find(w => w.id === myWorkspaceId);
-      const otherWorkspaces = workspaces.filter(w => w.id !== myWorkspaceId);
+    // Group profiles: Personal first, then organizations
+    const groupedProfiles = useMemo(() => {
+      const personalProfiles = profiles.filter(p => p.org?.org_type === 'personal');
+      const orgProfiles = profiles.filter(p => p.org?.org_type === 'organization');
 
       return {
-        myWorkspace: myWorkspace ? [myWorkspace] : [],
-        otherWorkspaces
+        personalProfiles,
+        orgProfiles
       };
-    }, [workspaces, myWorkspaceId]);
+    }, [profiles]);
 
-    const handleSelectWorkspace = useCallback(async (workspace: Workspace) => {
+    const handleSelectProfile = useCallback(async (profile: ProfileWithOrg) => {
       try {
-        await switchWorkspace(workspace.id);
+        await switchProfile(profile.id);
         bottomSheetRef.current?.close();
       } catch (error: any) {
-        console.error("Failed to switch workspace:", error);
-        Alert.alert("Error", "Failed to switch workspace");
+        console.error("Failed to switch profile:", error);
+        Alert.alert("Error", "Failed to switch profile");
       }
-    }, [switchWorkspace]);
+    }, [switchProfile]);
 
-    const handleSelectMyWorkspace = useCallback(async () => {
-      try {
-        await switchToMyWorkspace();
-        bottomSheetRef.current?.close();
-      } catch (error: any) {
-        console.error("Failed to switch to my workspace:", error);
-        Alert.alert("Error", "Failed to switch to my workspace");
-      }
-    }, [switchToMyWorkspace]);
-
-    const handleOpenCreateWorkspace = useCallback(() => {
-      setWorkspaceName("");  // Clear for new workspace
+    const handleOpenCreateOrg = useCallback(() => {
+      setOrgName("");
       createSheetRef.current?.open();
     }, []);
 
-    const handleCreateWorkspace = useCallback(async () => {
-      if (!workspaceName.trim()) {
-        Alert.alert("Error", "Please enter a workspace name");
+    const handleCreateOrg = useCallback(async () => {
+      if (!orgName.trim()) {
+        Alert.alert("Error", "Please enter an organization name");
         return;
       }
 
       setIsCreating(true);
       try {
-        // Create new org workspace
-        const newWorkspace = await createOrgWorkspace({
-          name: workspaceName.trim(),
-          description: undefined,
+        // Create new org using RPC
+        const { data, error } = await supabase.rpc('create_org_workspace', {
+          p_name: orgName.trim(),
+          p_description: null
         });
+
+        if (error) throw error;
         
-        // Reload workspaces to show the new one
-        await useWorkspaceStore.getState().loadWorkspaces();
+        // Reload profiles to show the new one
+        await loadProfiles();
         
-        // Switch to the newly created workspace
-        await switchWorkspace(newWorkspace.id);
+        // Find the new profile and switch to it
+        const newProfile = profiles.find(p => p.org_id === data[0].id);
+        if (newProfile) {
+          await switchProfile(newProfile.id);
+        }
         
-        setWorkspaceName("");
+        setOrgName("");
         createSheetRef.current?.close();
         bottomSheetRef.current?.close();
         
-        Alert.alert("Success", `Workspace "${newWorkspace.workspace_name}" created!`);
+        Alert.alert("Success", `Organization "${data[0].name}" created!`);
       } catch (error: any) {
-        console.error("Failed to create workspace:", error);
-        Alert.alert("Error", "Failed to create workspace");
+        console.error("Failed to create organization:", error);
+        Alert.alert("Error", "Failed to create organization");
       } finally {
         setIsCreating(false);
       }
-    }, [workspaceName, switchWorkspace]);
+    }, [orgName, switchProfile, loadProfiles, profiles]);
 
-    const handleJoinWorkspace = useCallback(() => {
+    const handleJoinOrg = useCallback(() => {
       // Close this sheet and open the accept invite sheet
       bottomSheetRef.current?.close();
       
-      // Set callback to reload workspaces when invite is accepted
-      // Wrap in arrow function so React stores the function, not calls it
+      // Set callback to reload profiles when invite is accepted
       setOnInviteAccepted(() => async () => {
-        await useWorkspaceStore.getState().loadWorkspaces();
+        await loadProfiles();
       });
       
       // Open the accept invite sheet
       setTimeout(() => {
         acceptInviteSheetRef.current?.open();
       }, 300);
-    }, [acceptInviteSheetRef, setOnInviteAccepted]);
+    }, [acceptInviteSheetRef, setOnInviteAccepted, loadProfiles]);
 
     return (
       <>
@@ -150,24 +218,24 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
             <View style={styles.header}>
               <View style={styles.headerTop}>
                 <View style={styles.headerContent}>
-                  <Text style={[styles.title, { color: colors.text }]}>Workspaces</Text>
+                  <Text style={[styles.title, { color: colors.text }]}>Profiles</Text>
                   <View style={[styles.countBadge, { backgroundColor: '#FF6B351A' }]}>
                     <Text style={[styles.countBadgeText, { color: '#FF6B35' }]}>
-                      {workspaces.length}
+                      {profiles.length}
                     </Text>
                   </View>
                 </View>
                 <View style={styles.headerButtons}>
                   <TouchableOpacity
                     style={[styles.joinButtonSmall, { backgroundColor: colors.card, borderColor: colors.border }]}
-                    onPress={handleJoinWorkspace}
+                    onPress={handleJoinOrg}
                     activeOpacity={0.7}
                   >
                     <Ionicons name="enter" size={16} color={colors.primary} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.addButton, { backgroundColor: colors.primary }]}
-                    onPress={handleOpenCreateWorkspace}
+                    onPress={handleOpenCreateOrg}
                     activeOpacity={0.8}
                   >
                     <Ionicons name="add" size={20} color={colors.background} />
@@ -175,59 +243,59 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
                 </View>
               </View>
               <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-                Switch between your workspaces
+                Switch between your organizations
               </Text>
             </View>
 
-            {/* My Workspace Section */}
-            {groupedWorkspaces.myWorkspace.length > 0 && (
+            {/* Personal Profile Section */}
+            {groupedProfiles.personalProfiles.length > 0 && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Personal</Text>
                 </View>
-                {groupedWorkspaces.myWorkspace.map((workspace) => (
-                  <WorkspaceItem
-                    key={workspace.id}
-                    workspace={workspace}
-                    isActive={workspace.id === activeWorkspaceId}
-                    isMyWorkspace={workspace.id === myWorkspaceId}
-                    onSelect={handleSelectWorkspace}
+                {groupedProfiles.personalProfiles.map((profile) => (
+                  <ProfileItem
+                    key={profile.id}
+                    profile={profile}
+                    isActive={profile.id === activeProfileId}
+                    colors={colors}
+                    onSelect={() => handleSelectProfile(profile)}
                   />
                 ))}
               </View>
             )}
 
-            {/* Other Workspaces Section */}
-            {groupedWorkspaces.otherWorkspaces.length > 0 && (
+            {/* Organization Profiles Section */}
+            {groupedProfiles.orgProfiles.length > 0 && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
                     Organizations
                   </Text>
                 </View>
-                {groupedWorkspaces.otherWorkspaces.map((workspace) => (
-                  <WorkspaceItem
-                    key={workspace.id}
-                    workspace={workspace}
-                    isActive={workspace.id === activeWorkspaceId}
-                    isMyWorkspace={workspace.id === myWorkspaceId}
-                    onSelect={handleSelectWorkspace}
+                {groupedProfiles.orgProfiles.map((profile) => (
+                  <ProfileItem
+                    key={profile.id}
+                    profile={profile}
+                    isActive={profile.id === activeProfileId}
+                    colors={colors}
+                    onSelect={() => handleSelectProfile(profile)}
                   />
                 ))}
               </View>
             )}
 
             {/* Empty state */}
-            {groupedWorkspaces.myWorkspace.length === 0 && groupedWorkspaces.otherWorkspaces.length === 0 && (
+            {profiles.length === 0 && (
               <View style={styles.emptyState}>
                 <View style={[styles.emptyIconContainer, { backgroundColor: colors.card }]}>
-                  <Ionicons name="briefcase-outline" size={48} color={colors.textMuted} />
+                  <Ionicons name="person-outline" size={48} color={colors.textMuted} />
                 </View>
                 <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                  {loading ? "Loading workspaces..." : "No Workspaces Yet"}
+                  {loading ? "Loading profiles..." : "No Profiles Yet"}
                 </Text>
                 <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-                  Create your first workspace to organize your training data
+                  Join an organization or create one to get started
                 </Text>
               </View>
             )}
@@ -246,28 +314,28 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
                 <Ionicons name="business" size={32} color={colors.primary} />
               </View>
               <Text style={[styles.createTitle, { color: colors.text }]}>
-                Create Workspace
+                Create Organization
               </Text>
               <Text style={[styles.createSubtitle, { color: colors.textMuted }]}>
-                Set up a new workspace for your team or organization
+                Set up a new organization for your team
               </Text>
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Workspace Name</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>Organization Name</Text>
               <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.card }]}>
                 <TextInput
                   style={[styles.input, { color: colors.text }]}
                   placeholder="e.g. Alpha Team Training Hub"
                   placeholderTextColor={colors.textMuted + 'CC'}
-                  value={workspaceName}
-                  onChangeText={setWorkspaceName}
+                  value={orgName}
+                  onChangeText={setOrgName}
                   returnKeyType="done"
-                  onSubmitEditing={handleCreateWorkspace}
+                  onSubmitEditing={handleCreateOrg}
                 />
               </View>
               <Text style={[styles.inputHint, { color: colors.textMuted }]}>
-                Choose a memorable name for your team
+                Choose a memorable name for your organization
               </Text>
             </View>
 
@@ -276,19 +344,19 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
                 style={[
                   styles.primaryButton,
                   {
-                    backgroundColor: (!workspaceName.trim() || isCreating) ? colors.primary : colors.primaryForeground,
-                    shadowColor: (!workspaceName.trim() || isCreating) ? 'transparent' : colors.primary
+                    backgroundColor: (!orgName.trim() || isCreating) ? colors.primary : colors.primaryForeground,
+                    shadowColor: (!orgName.trim() || isCreating) ? 'transparent' : colors.primary
                   },
-                  (!workspaceName.trim() || isCreating) && styles.primaryButtonDisabled
+                  (!orgName.trim() || isCreating) && styles.primaryButtonDisabled
                 ]}
-                onPress={handleCreateWorkspace}
-                disabled={!workspaceName.trim() || isCreating}
+                onPress={handleCreateOrg}
+                disabled={!orgName.trim() || isCreating}
                 activeOpacity={0.8}
               >
                 <View style={styles.primaryButtonContent}>
                   <Ionicons name="add" size={18} color={colors.primaryForeground} />
                   <Text style={[styles.primaryButtonText, { color: '#fff' }]}>
-                    {isCreating ? "Creating..." : "Create Workspace"}
+                    {isCreating ? "Creating..." : "Create Organization"}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -296,7 +364,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
               <TouchableOpacity
                 style={[styles.secondaryButton, { backgroundColor: colors.secondary }]}
                 onPress={() => {
-                  setWorkspaceName("");
+                  setOrgName("");
                   createSheetRef.current?.close();
                 }}
                 activeOpacity={0.8}
