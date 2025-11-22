@@ -127,7 +127,6 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
       // Set callback to reload workspaces when invite is accepted
       // Wrap in arrow function so React stores the function, not calls it
       setOnInviteAccepted(() => async () => {
-        // Reload workspaces to include the newly joined workspace
         await useWorkspaceStore.getState().loadWorkspaces();
       });
       
@@ -143,7 +142,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
         <BaseBottomSheet
       
           ref={bottomSheetRef}
-          backdropOpacity={0.6}
+
           snapPoints={['60%','92%']}
           enableDynamicSizing={false}
         >
@@ -171,7 +170,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
                     onPress={handleOpenCreateWorkspace}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="add" size={20}  />
+                    <Ionicons name="add" size={20} color={colors.background} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -239,7 +238,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
         <BaseBottomSheet
           snapPoints={['90%']}
           ref={createSheetRef}
-          backdropOpacity={0.6}
+
           enableDynamicSizing={false}
         >
             <View style={styles.createHeader}>
@@ -277,7 +276,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
                 style={[
                   styles.primaryButton,
                   {
-                    backgroundColor: (!workspaceName.trim() || isCreating) ? colors.secondary : colors.primary,
+                    backgroundColor: (!workspaceName.trim() || isCreating) ? colors.primary : colors.primaryForeground,
                     shadowColor: (!workspaceName.trim() || isCreating) ? 'transparent' : colors.primary
                   },
                   (!workspaceName.trim() || isCreating) && styles.primaryButtonDisabled
@@ -287,7 +286,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
                 activeOpacity={0.8}
               >
                 <View style={styles.primaryButtonContent}>
-                  <Ionicons name="add" size={18} color="#fff" />
+                  <Ionicons name="add" size={18} color={colors.primaryForeground} />
                   <Text style={[styles.primaryButtonText, { color: '#fff' }]}>
                     {isCreating ? "Creating..." : "Create Workspace"}
                   </Text>

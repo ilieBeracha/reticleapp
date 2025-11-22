@@ -38,4 +38,3 @@ BEGIN
   ORDER BY wa.joined_at DESC;
 END;
 $$;
-

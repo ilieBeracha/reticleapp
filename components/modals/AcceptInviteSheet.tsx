@@ -1,10 +1,10 @@
 import { useColors } from "@/hooks/ui/useColors";
-import { validateInviteCode, acceptInvitation } from "@/services/invitationService";
+import { acceptInvitation, validateInviteCode } from "@/services/invitationService";
 import type { WorkspaceInvitationWithDetails } from "@/types/workspace";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetScrollView, BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import { forwardRef, useState } from "react";
-import { Alert, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from "react-native";
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { BaseBottomSheet, type BaseBottomSheetRef } from "./BaseBottomSheet";
 
 interface AcceptInviteSheetProps {
@@ -124,7 +124,7 @@ export const AcceptInviteSheet = forwardRef<BaseBottomSheetRef, AcceptInviteShee
     };
 
     return (
-      <BaseBottomSheet ref={ref} snapPoints={['70%']} backdropOpacity={0.7}>
+      <BaseBottomSheet ref={ref} snapPoints={['70%']}>
         <BottomSheetScrollView 
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}

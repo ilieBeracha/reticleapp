@@ -34,7 +34,7 @@ export default function TeamCard({ team, memberCount = 0, onPress, isFirst, isLa
       <View style={styles.info}>
         <Text style={[styles.name, { color: colors.text }]}>{team.name}</Text>
         <Text style={[styles.meta, { color: colors.textMuted }]}>
-          {isFieldTeam ? 'Field Team' : 'Back Office'} • {memberCount} members
+          {memberCount} members
         </Text>
       </View>
       <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />

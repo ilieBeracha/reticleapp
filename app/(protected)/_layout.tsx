@@ -8,11 +8,13 @@ import { UserMenuBottomSheet, UserMenuBottomSheetRef } from '@/components/modals
 import { WorkspaceSwitcherBottomSheet, WorkspaceSwitcherRef } from '@/components/modals/WorkspaceSwitcherBottomSheet';
 import { ModalProvider, useModals } from '@/contexts/ModalContext';
 import { useColors } from '@/hooks/ui/useColors';
+import { useAppContext } from '@/hooks/useAppContext';
 import { Stack } from 'expo-router';
 import { useRef } from 'react';
 
 function ProtectedLayoutContent() {
   const { background, text } = useColors();
+  const { activeWorkspaceId } = useAppContext();
   const userMenuRef = useRef<UserMenuBottomSheetRef>(null);
   const workspaceSwitcherRef = useRef<WorkspaceSwitcherRef>(null);
   const { 
@@ -47,9 +49,19 @@ function ProtectedLayoutContent() {
         }}
       >
         <Stack.Screen name="modal" options={{ headerShown: false, presentation: 'modal', headerBlurEffect: 'light' }} />
-        <Stack.Screen name="index" options={{ headerShown: true }} />
-        <Stack.Screen name="workspace/personal" options={{ headerShown: true , animation: 'none'}} />
-        <Stack.Screen name="workspace/organization" options={{ headerShown: true , animation: 'none'}} />
+        <Stack.Screen 
+          name="index" 
+          options={{ headerShown: true }} 
+
+          />
+        <Stack.Screen 
+          name="workspace/personal" 
+          options={{ headerShown: true, animation: 'none' }} 
+        />
+        <Stack.Screen 
+          name="workspace/organization" 
+          options={{ headerShown: true, animation: 'none' }} 
+        />
       </Stack>
 
       {/* USER MENU */}

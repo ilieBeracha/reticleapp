@@ -1,7 +1,6 @@
 import { useColors } from '@/hooks/ui/useColors';
 import { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface WeekCalendarProps {
   selectedDate?: string;
@@ -41,8 +40,7 @@ export function WeekCalendar({
   const todayString = new Date().toISOString().split('T')[0];
 
   return (
-    <Animated.View 
-      entering={FadeInDown.duration(400).springify()}
+    <View 
       style={[styles.container, { backgroundColor: colors.card }]}
     >
       {showTitle && (
@@ -68,26 +66,23 @@ export function WeekCalendar({
           const dayNumber = date.getDate();
 
           return (
-            <Animated.View
+            <TouchableOpacity
+              activeOpacity={0.7}
               key={dateString}
-              entering={FadeIn.delay(index * 50).duration(300)}
+              onPress={() => onDayPress?.(dateString)}
+              style={ [
+                styles.dayCard,
+                {
+                  backgroundColor: isSelected 
+                    ? colors.accent 
+                    : colors.background,
+                  borderColor: isToday && !isSelected 
+                    ? colors.accent 
+                    : 'transparent',
+                },
+                isSelected && styles.selectedCard,
+              ]}
             >
-              <Pressable
-                onPress={() => onDayPress?.(dateString)}
-                style={({ pressed }) => [
-                  styles.dayCard,
-                  {
-                    backgroundColor: isSelected 
-                      ? colors.accent 
-                      : colors.background,
-                    borderColor: isToday && !isSelected 
-                      ? colors.accent 
-                      : 'transparent',
-                    opacity: pressed ? 0.7 : 1,
-                  },
-                  isSelected && styles.selectedCard,
-                ]}
-              >
                 <Text
                   style={[
                     styles.dayName,
@@ -134,67 +129,66 @@ export function WeekCalendar({
                     ))}
                   </View>
                 )}
-              </Pressable>
-            </Animated.View>
+              </TouchableOpacity>
           );
         })}
       </View>
-    </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 12,
+    padding: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 2,
   },
   header: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
   },
   daysContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: 6,
   },
   dayCard: {
     flex: 1,
-    paddingVertical: 16,
-    paddingHorizontal: 4,
-    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 3,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    borderWidth: 2,
+    gap: 6,
+    borderWidth: 1.5,
   },
   selectedCard: {
-    shadowColor: '#E76925',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   dayName: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   dayNumber: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: '700',
   },
   todayNumber: {
@@ -202,13 +196,13 @@ const styles = StyleSheet.create({
   },
   dotsContainer: {
     flexDirection: 'row',
-    gap: 3,
-    marginTop: 4,
+    gap: 2,
+    marginTop: 2,
   },
   dot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
   },
 });
 

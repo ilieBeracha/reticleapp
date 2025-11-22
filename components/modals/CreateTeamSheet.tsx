@@ -1,9 +1,10 @@
 import { useColors } from "@/hooks/ui/useColors";
 import { useAppContext } from "@/hooks/useAppContext";
-import { createTeam } from "@/services/workspaceService";
+import { useTeamStore } from "@/store/teamStore";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
-import { forwardRef, useState } from "react";
+import * as Haptics from 'expo-haptics';
+import { forwardRef, useRef, useState } from "react";
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { BaseBottomSheet, type BaseBottomSheetRef } from "./BaseBottomSheet";
 
@@ -14,27 +15,30 @@ interface CreateTeamSheetProps {
 export const CreateTeamSheet = forwardRef<BaseBottomSheetRef, CreateTeamSheetProps>(
   ({ onTeamCreated }, ref) => {
     const colors = useColors();
-    const { activeWorkspaceId, activeWorkspace, isMyWorkspace } = useAppContext();
+    const { activeWorkspaceId, activeWorkspace } = useAppContext();
+    const { createTeam, loading } = useTeamStore();
+    const sheetRef = useRef<BaseBottomSheetRef>(null);
     
     const [teamName, setTeamName] = useState("");
     const [teamDescription, setTeamDescription] = useState("");
-    const [teamType, setTeamType] = useState<'field' | 'back_office'>('field');
-    const [isCreating, setIsCreating] = useState(false);
+    const [squads, setSquads] = useState<string[]>([]);
+    const [newSquadName, setNewSquadName] = useState("");
 
     const handleCreateTeam = async () => {
       if (!teamName.trim()) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         Alert.alert("Error", "Please enter a team name");
         return;
       }
 
       if (!activeWorkspaceId) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         Alert.alert("Error", "No active workspace");
         return;
       }
 
-      setIsCreating(true);
       try {
-        // Determine workspace type and IDs
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         const isOrgWorkspace = activeWorkspace?.workspace_type === 'org';
         
         await createTeam({
@@ -42,21 +46,54 @@ export const CreateTeamSheet = forwardRef<BaseBottomSheetRef, CreateTeamSheetPro
           workspace_owner_id: isOrgWorkspace ? undefined : activeWorkspaceId,
           org_workspace_id: isOrgWorkspace ? activeWorkspaceId : undefined,
           name: teamName.trim(),
-          team_type: teamType,
           description: teamDescription.trim() || undefined,
+          squads: squads.length > 0 ? squads : undefined,
         });
         
-        Alert.alert("Success", `Team "${teamName}" created successfully!`);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        
+        // Close the sheet first
+        if (typeof ref === 'object' && ref?.current) {
+          ref.current.close();
+        }
+        
+        // Reset form
         setTeamName("");
         setTeamDescription("");
-        setTeamType('field');
+        setSquads([]);
+        setNewSquadName("");
+        
+        // Call the callback
         onTeamCreated?.();
+        
+        // Show success message after sheet closes
+        setTimeout(() => {
+          Alert.alert("Success", `Team "${teamName}" created successfully!`);
+        }, 300);
       } catch (error: any) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         console.error("Failed to create team:", error);
         Alert.alert("Error", error.message || "Failed to create team");
-      } finally {
-        setIsCreating(false);
       }
+    };
+
+    const handleAddSquad = () => {
+      const trimmedName = newSquadName.trim();
+      if (!trimmedName) return;
+      
+      if (squads.includes(trimmedName)) {
+        Alert.alert("Duplicate", "This squad name already exists");
+        return;
+      }
+      
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setSquads([...squads, trimmedName]);
+      setNewSquadName("");
+    };
+
+    const handleRemoveSquad = (squadName: string) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setSquads(squads.filter(s => s !== squadName));
     };
 
     return (
@@ -69,7 +106,7 @@ export const CreateTeamSheet = forwardRef<BaseBottomSheetRef, CreateTeamSheetPro
             Create Team
           </Text>
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            Organize your training groups
+            Organize your members into groups
           </Text>
         </View>
 
@@ -85,62 +122,6 @@ export const CreateTeamSheet = forwardRef<BaseBottomSheetRef, CreateTeamSheetPro
               onChangeText={setTeamName}
               returnKeyType="next"
             />
-          </View>
-        </View>
-
-        {/* Team Type */}
-        <View style={styles.inputContainer}>
-          <Text style={[styles.inputLabel, { color: colors.text }]}>Team Type</Text>
-          <View style={styles.teamTypeContainer}>
-            <TouchableOpacity
-              style={[
-                styles.teamTypeButton,
-                teamType === 'field' && styles.teamTypeButtonActive,
-                { 
-                  backgroundColor: teamType === 'field' ? colors.primary + '15' : colors.card,
-                  borderColor: teamType === 'field' ? colors.primary : colors.border
-                }
-              ]}
-              onPress={() => setTeamType('field')}
-              activeOpacity={0.7}
-            >
-              <Ionicons 
-                name="shield" 
-                size={20} 
-                color={teamType === 'field' ? colors.primary : colors.textMuted} 
-              />
-              <Text style={[
-                styles.teamTypeText,
-                { color: teamType === 'field' ? colors.primary : colors.textMuted }
-              ]}>
-                Field Team
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.teamTypeButton,
-                teamType === 'back_office' && styles.teamTypeButtonActive,
-                { 
-                  backgroundColor: teamType === 'back_office' ? colors.primary + '15' : colors.card,
-                  borderColor: teamType === 'back_office' ? colors.primary : colors.border
-                }
-              ]}
-              onPress={() => setTeamType('back_office')}
-              activeOpacity={0.7}
-            >
-              <Ionicons 
-                name="desktop" 
-                size={20} 
-                color={teamType === 'back_office' ? colors.primary : colors.textMuted} 
-              />
-              <Text style={[
-                styles.teamTypeText,
-                { color: teamType === 'back_office' ? colors.primary : colors.textMuted }
-              ]}>
-                Back Office
-              </Text>
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -162,12 +143,74 @@ export const CreateTeamSheet = forwardRef<BaseBottomSheetRef, CreateTeamSheetPro
           </View>
         </View>
 
+        {/* Squads (Optional) */}
+        <View style={styles.inputContainer}>
+          <Text style={[styles.inputLabel, { color: colors.text }]}>
+            Squads (Optional)
+          </Text>
+          <Text style={[styles.inputHint, { color: colors.textMuted }]}>
+            Organize team members into sub-units
+          </Text>
+          
+          {/* Add Squad Input */}
+          <View style={styles.squadInputRow}>
+            <View style={[styles.squadInputWrapper, { borderColor: colors.border, backgroundColor: colors.card }]}>
+              <BottomSheetTextInput
+                style={[styles.squadInput, { color: colors.text }]}
+                placeholder="e.g. Alpha, Bravo..."
+                placeholderTextColor={colors.textMuted + 'CC'}
+                value={newSquadName}
+                onChangeText={setNewSquadName}
+                onSubmitEditing={handleAddSquad}
+                returnKeyType="done"
+              />
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.addSquadButton,
+                {
+                  backgroundColor: newSquadName.trim() ? colors.primary : colors.secondary,
+                  opacity: newSquadName.trim() ? 1 : 0.5,
+                }
+              ]}
+              onPress={handleAddSquad}
+              disabled={!newSquadName.trim()}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="add" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Squad Chips */}
+          {squads.length > 0 && (
+            <View style={styles.squadChipsContainer}>
+              {squads.map((squad, index) => (
+                <View
+                  key={index}
+                  style={[styles.squadChip, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }]}
+                >
+                  <Ionicons name="shield" size={14} color={colors.primary} />
+                  <Text style={[styles.squadChipText, { color: colors.primary }]}>
+                    {squad}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => handleRemoveSquad(squad)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="close-circle" size={16} color={colors.primary} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
         {/* Team Info */}
         <View style={[styles.infoCard, { backgroundColor: colors.secondary }]}>
           <View style={styles.infoRow}>
             <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
             <Text style={[styles.infoText, { color: colors.textMuted }]}>
-              You can add members after creating the team
+              You can add members and assign them to squads after creating the team
             </Text>
           </View>
         </View>
@@ -178,19 +221,19 @@ export const CreateTeamSheet = forwardRef<BaseBottomSheetRef, CreateTeamSheetPro
             style={[
               styles.primaryButton,
               {
-                backgroundColor: (!teamName.trim() || isCreating) ? colors.secondary : colors.primary,
-                shadowColor: (!teamName.trim() || isCreating) ? 'transparent' : colors.primary
+                backgroundColor: (!teamName.trim() || loading) ? colors.secondary : colors.primary,
+                shadowColor: (!teamName.trim() || loading) ? 'transparent' : colors.primary
               },
-              (!teamName.trim() || isCreating) && styles.primaryButtonDisabled
+              (!teamName.trim() || loading) && styles.primaryButtonDisabled
             ]}
             onPress={handleCreateTeam}
-            disabled={!teamName.trim() || isCreating}
+            disabled={!teamName.trim() || loading}
             activeOpacity={0.8}
           >
             <View style={styles.primaryButtonContent}>
               <Ionicons name="add" size={18} color="#fff" />
               <Text style={[styles.primaryButtonText, { color: '#fff' }]}>
-                {isCreating ? "Creating..." : "Create Team"}
+                {loading ? "Creating..." : "Create Team"}
               </Text>
             </View>
           </TouchableOpacity>
@@ -219,7 +262,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: '600',
     marginBottom: 4,
     textAlign: 'center',
     letterSpacing: -0.3,
@@ -228,39 +271,91 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '400',
     textAlign: 'center',
-    letterSpacing: -0.2,
+    letterSpacing: -0.1,
+    opacity: 0.7,
   },
 
   // Input
   inputContainer: {
     paddingHorizontal: 20,
-    marginBottom: 14,
+    marginBottom: 16,
   },
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
-    marginBottom: 8,
-    letterSpacing: -0.2,
+    marginBottom: 4,
+    letterSpacing: -0.1,
+  },
+  inputHint: {
+    fontSize: 12,
+    marginBottom: 10,
+    opacity: 0.7,
   },
   inputWrapper: {
     borderRadius: 10,
-    borderWidth: 1,
+    borderWidth: 0.5,
     overflow: "hidden",
   },
   input: {
-    height: 42,
+    height: 44,
     paddingHorizontal: 14,
     fontSize: 15,
     fontWeight: "400",
     backgroundColor: 'transparent',
   },
   textArea: {
-    minHeight: 64,
+    minHeight: 80,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 12,
     fontSize: 15,
     fontWeight: "400",
     backgroundColor: 'transparent',
+  },
+
+  // Squad Input
+  squadInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  squadInputWrapper: {
+    flex: 1,
+    borderRadius: 10,
+    borderWidth: 0.5,
+    overflow: "hidden",
+  },
+  squadInput: {
+    height: 44,
+    paddingHorizontal: 14,
+    fontSize: 15,
+    fontWeight: "400",
+    backgroundColor: 'transparent',
+  },
+  addSquadButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  squadChipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  squadChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  squadChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: -0.1,
   },
 
   // Info Card
@@ -277,33 +372,10 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: 13,
-    fontWeight: '500',
-    letterSpacing: -0.1,
+    fontWeight: '400',
+    letterSpacing: 0,
     flex: 1,
-  },
-
-  // Team Type Selection
-  teamTypeContainer: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  teamTypeButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  teamTypeButtonActive: {
-    borderWidth: 2,
-  },
-  teamTypeText: {
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: -0.1,
+    opacity: 0.8,
   },
 
   // Actions
@@ -314,7 +386,7 @@ const styles = StyleSheet.create({
   primaryButton: {
     borderRadius: 10,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 2,
   },
@@ -326,13 +398,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    height: 44,
+    height: 48,
     gap: 8,
   },
   primaryButtonText: {
     fontSize: 15,
     fontWeight: "600",
-    letterSpacing: -0.2,
+    letterSpacing: -0.1,
   },
 });
-

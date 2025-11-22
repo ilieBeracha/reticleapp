@@ -1,5 +1,6 @@
 import { useAppContext } from '@/hooks/useAppContext';
 import { Redirect } from 'expo-router';
+import { useEffect } from 'react';
 
 /**
  * HomePage Router
@@ -10,7 +11,17 @@ import { Redirect } from 'expo-router';
  * - Organization Workspace (!isMyWorkspace): Redirects to /workspace/organization (with sub-routes)
  */
 export default function HomePage() {
-  const { isMyWorkspace } = useAppContext();
+  const { isMyWorkspace, activeWorkspaceId, activeWorkspace } = useAppContext();
+
+  // Debug logging
+  useEffect(() => {
+    console.log('🏠 HomePage redirect:', {
+      isMyWorkspace,
+      activeWorkspaceId,
+      workspaceType: activeWorkspace?.workspace_type,
+      redirectTo: isMyWorkspace ? 'personal' : 'organization'
+    });
+  }, [isMyWorkspace, activeWorkspaceId, activeWorkspace]);
 
   return <Redirect href={isMyWorkspace ? '/(protected)/workspace/personal' : '/(protected)/workspace/organization'} />;
 }

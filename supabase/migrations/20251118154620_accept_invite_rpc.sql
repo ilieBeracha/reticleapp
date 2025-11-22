@@ -126,4 +126,3 @@ COMMENT ON FUNCTION accept_invite_code IS
 'Securely accepts an invite code and adds user to workspace.
 Performs atomic validation and insertion in a single transaction.
 Returns JSON with success flag and workspace details or error message.';
-

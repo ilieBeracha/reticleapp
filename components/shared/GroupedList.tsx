@@ -1,6 +1,6 @@
 import { useColors } from '@/hooks/ui/useColors';
 import { memo, ReactElement, useMemo } from 'react';
-import { FlatList, StyleSheet, View, ViewStyle } from 'react-native';
+import { StyleSheet, View, ViewStyle } from 'react-native';
 
 interface GroupedListProps<T> {
   data: T[];
@@ -15,7 +15,6 @@ function GroupedListComponent<T>({
   renderItem,
   keyExtractor,
   style,
-  scrollEnabled = false,
 }: GroupedListProps<T>) {
   const colors = useColors();
 
@@ -29,30 +28,19 @@ function GroupedListComponent<T>({
     style,
   ], [colors.card, colors.border, style]);
 
-  const renderItemWrapper = ({ item, index }: { item: T; index: number }) => {
-    const isFirst = index === 0;
-    const isLast = index === data.length - 1;
-    
-    return (
-      <View>
-        {renderItem(item, isFirst, isLast)}
-        {!isLast && <View style={[styles.separator, { backgroundColor: colors.border }]} />}
-      </View>
-    );
-  };
-
   return (
     <View style={containerStyle}>
-      <FlatList
-        data={data}
-        renderItem={renderItemWrapper}
-        keyExtractor={(item, index) => keyExtractor(item, index)}
-        scrollEnabled={scrollEnabled}
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={10}
-        windowSize={5}
-        initialNumToRender={10}
-      />
+      {data.map((item, index) => {
+        const isFirst = index === 0;
+        const isLast = index === data.length - 1;
+        
+        return (
+          <View key={keyExtractor(item, index)}>
+            {renderItem(item, isFirst, isLast)}
+            {!isLast && <View style={[styles.separator, { backgroundColor: colors.border }]} />}
+          </View>
+        );
+      })}
     </View>
   );
 }

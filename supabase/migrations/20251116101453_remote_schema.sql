@@ -1070,3 +1070,4 @@ CREATE TRIGGER update_sessions_updated_at
 GRANT ALL ON TABLE public.sessions TO anon;
 GRANT ALL ON TABLE public.sessions TO authenticated;
 GRANT ALL ON TABLE public.sessions TO service_role;
+

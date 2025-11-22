@@ -145,4 +145,3 @@ BEGIN
     AND "expires_at" < now();
 END;
 $$;
-

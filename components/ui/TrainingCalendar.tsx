@@ -1,23 +1,25 @@
-import { Calendar } from './Calendar';
-import { useCalendar, CalendarEvent, formatCalendarDate } from '@/hooks/ui/useCalendar';
+import { CalendarEvent, formatCalendarDate, useCalendar } from '@/hooks/ui/useCalendar';
 import { useColors } from '@/hooks/ui/useColors';
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
-import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
-import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Calendar } from './Calendar';
+
+type CalendarViewMode = 'week' | 'month';
 
 interface TrainingCalendarProps {
   events?: CalendarEvent[];
   onEventPress?: (event: CalendarEvent) => void;
   onCreateTraining?: (date: string) => void;
+  viewMode?: CalendarViewMode;
 }
 
 export function TrainingCalendar({ 
   events = [], 
   onEventPress,
   onCreateTraining,
+  viewMode = 'month',
 }: TrainingCalendarProps) {
   const colors = useColors();
-  const router = useRouter();
   
   const {
     selectedDate,
@@ -30,67 +32,64 @@ export function TrainingCalendar({
   const handleCreatePress = () => {
     if (selectedDate && onCreateTraining) {
       onCreateTraining(selectedDate);
-    } else if (selectedDate) {
-      // Default navigation
-      router.push('/(protected)/modal'); // TODO: Replace with actual training creation route
     }
   };
 
   return (
     <View style={styles.container}>
       <Calendar
-        title="Training Calendar"
+        title=""
+        showTitle={false}
         onDayPress={handleDayPress}
         selectedDate={selectedDate}
         markedDates={markedDates}
+        viewMode={viewMode}
       />
 
       {/* Selected Date Events */}
       {selectedDate && (
-        <Animated.View 
-          entering={FadeInDown.duration(300).springify()}
-          style={styles.eventsSection}
-        >
+        <View style={styles.eventsSection}>
           <View style={styles.eventsHeader}>
-            <View>
-              <Text style={[styles.eventsTitle, { color: colors.text }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.eventsDate, { color: colors.text }]}>
                 {formatCalendarDate(selectedDate)}
               </Text>
               <Text style={[styles.eventsCount, { color: colors.textMuted }]}>
                 {selectedDateEvents.length === 0 
-                  ? 'No trainings scheduled' 
-                  : `${selectedDateEvents.length} training${selectedDateEvents.length !== 1 ? 's' : ''} scheduled`
+                  ? 'No events scheduled' 
+                  : `${selectedDateEvents.length} event${selectedDateEvents.length !== 1 ? 's' : ''}`
                 }
               </Text>
             </View>
             
-            <Pressable
-              onPress={handleCreatePress}
-              style={[styles.createButton, { backgroundColor: colors.accent }]}
-            >
-              <Text style={[styles.createButtonText, { color: colors.accentForeground }]}>
-                + Create
-              </Text>
-            </Pressable>
+            {selectedDate && (
+              <TouchableOpacity
+                onPress={handleCreatePress}
+                style={ [
+                  styles.createButton,
+                  { 
+                    backgroundColor: colors.accent,
+                  },
+                ]}
+              >
+                <Ionicons name="add" size={20} color={colors.accentForeground} />
+              </TouchableOpacity>
+            )}
           </View>
 
           {selectedDateEvents.length > 0 && (
-            <ScrollView 
-              style={styles.eventsList}
-              showsVerticalScrollIndicator={false}
-            >
-              {selectedDateEvents.map((event, index) => (
+            <View style={styles.eventsList}>
+              {selectedDateEvents.map((event) => (
                 <EventCard
                   key={event.id}
                   event={event}
-                  index={index}
                   onPress={() => onEventPress?.(event)}
                   color={event.color || eventColors[event.type]}
                 />
               ))}
-            </ScrollView>
+            </View>
           )}
-        </Animated.View>
+        </View>
       )}
     </View>
   );
@@ -98,12 +97,11 @@ export function TrainingCalendar({
 
 interface EventCardProps {
   event: CalendarEvent;
-  index: number;
   onPress?: () => void;
   color: string;
 }
 
-function EventCard({ event, index, onPress, color }: EventCardProps) {
+function EventCard({ event, onPress, color }: EventCardProps) {
   const colors = useColors();
 
   const typeLabels = {
@@ -115,119 +113,91 @@ function EventCard({ event, index, onPress, color }: EventCardProps) {
   };
 
   return (
-    <Animated.View
-      entering={FadeIn.delay(index * 100).duration(300)}
+    <TouchableOpacity
+      onPress={onPress}
+      style={ [
+        styles.eventCard,
+        { 
+          backgroundColor: colors.card,
+          borderLeftColor: color,
+        },
+      ]}
     >
-      <Pressable
-        onPress={onPress}
-        style={({ pressed }) => [
-          styles.eventCard,
-          { 
-            backgroundColor: colors.card,
-            borderLeftColor: color,
-            opacity: pressed ? 0.7 : 1,
-          },
-        ]}
-      >
-        <View style={styles.eventContent}>
-          <View style={[styles.eventIndicator, { backgroundColor: color }]} />
-          
-          <View style={styles.eventInfo}>
-            <Text style={[styles.eventTitle, { color: colors.text }]}>
-              {event.title}
-            </Text>
-            <Text style={[styles.eventType, { color: colors.textMuted }]}>
-              {typeLabels[event.type]}
-            </Text>
-          </View>
+      <View style={[styles.eventDot, { backgroundColor: color }]} />
+      
+      <View style={styles.eventInfo}>
+        <Text style={[styles.eventTitle, { color: colors.text }]} numberOfLines={1}>
+          {event.title}
+        </Text>
+        <Text style={[styles.eventType, { color: colors.textMuted }]}>
+          {typeLabels[event.type]}
+        </Text>
+      </View>
 
-          <View style={styles.eventArrow}>
-            <Text style={[styles.arrowIcon, { color: colors.textMuted }]}>
-              ›
-            </Text>
-          </View>
-        </View>
-      </Pressable>
-    </Animated.View>
+      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    gap: 24,
+    gap: 20,
   },
   eventsSection: {
-    gap: 16,
+    gap: 12,
   },
   eventsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  eventsTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 4,
+  eventsDate: {
+    fontSize: 17,
+    fontWeight: '600',
+    marginBottom: 2,
+    letterSpacing: -0.3,
   },
   eventsCount: {
-    fontSize: 14,
+    fontSize: 13,
+    fontWeight: '500',
   },
   createButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 12,
-    shadowColor: '#E76925',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  createButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   eventsList: {
-    maxHeight: 300,
+    gap: 8,
   },
   eventCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  eventContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 12,
+    borderRadius: 10,
+    borderLeftWidth: 3,
     gap: 12,
   },
-  eventIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  eventDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   eventInfo: {
     flex: 1,
-    gap: 4,
+    gap: 2,
   },
   eventTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
+    letterSpacing: -0.2,
   },
   eventType: {
-    fontSize: 13,
+    fontSize: 12,
+    fontWeight: '500',
     textTransform: 'capitalize',
-  },
-  eventArrow: {
-    paddingLeft: 8,
-  },
-  arrowIcon: {
-    fontSize: 24,
-    fontWeight: '300',
   },
 });
 

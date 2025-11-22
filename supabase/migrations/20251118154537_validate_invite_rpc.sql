@@ -165,4 +165,3 @@ COMMENT ON FUNCTION validate_invite_code IS
 'Securely validates an invite code with comprehensive security checks. 
 Returns JSON with valid flag and invitation details or error message.
 Bypasses RLS for consistent validation across all users.';
-

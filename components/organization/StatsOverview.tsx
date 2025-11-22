@@ -1,7 +1,7 @@
 import { useColors } from '@/hooks/ui/useColors';
 import { Team } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 interface StatsOverviewProps {
@@ -12,7 +12,7 @@ interface StatsOverviewProps {
   loading?: boolean;
 }
 
-export default function StatsOverview({ 
+const StatsOverview = memo(function StatsOverview({ 
   totalSessions, 
   activeSessions, 
   completedSessions, 
@@ -22,121 +22,103 @@ export default function StatsOverview({
   const colors = useColors();
 
   const stats = useMemo(() => [{
-    icon: 'calendar-outline',
+    icon: 'calendar' as const,
     value: totalSessions,
-    label: 'Total Sessions',
+    label: 'Sessions',
+    color: colors.blue,
   }, {
-    icon: 'play-circle-outline',
+    icon: 'play' as const,
     value: activeSessions,
-    label: 'Active Now',
+    label: 'Active',
+    color: colors.orange,
   }, {
-    icon: 'checkmark-circle-outline',
-    value: completedSessions,
-    label: 'Completed',
-  }, {
-    icon: 'people-outline',
+    icon: 'people' as const,
     value: teams.length,
     label: 'Teams',
-  }], [totalSessions, activeSessions, completedSessions, teams]);
-
-  const skeletonStyle = useMemo(() => [
-    styles.skeleton,
-    { backgroundColor: colors.secondary }
-  ], [colors.secondary]);
+    color: colors.green,
+  }], [totalSessions, activeSessions, teams.length, colors]);
 
   return (
-    <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <Text style={[styles.cardTitle, { color: colors.text }]}>Stats Overview</Text>
-
-      <View style={styles.statsGrid}>
+    <View style={styles.container}>
+      <View style={styles.grid}>
         {stats.map((stat) => (
-          <View key={stat.icon} style={styles.statItem}>
-            <View style={[styles.statIconContainer, { backgroundColor: colors.muted + '15' }]}>
-              <Ionicons name={stat.icon as keyof typeof Ionicons.glyphMap} size={20} color={colors.muted} />
+          <View 
+            key={stat.label} 
+            style={[
+              styles.card, 
+              { 
+                backgroundColor: colors.card, 
+                borderColor: colors.border,
+                // Subtle shadow
+                shadowColor: colors.text,
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.03,
+                shadowRadius: 8,
+                elevation: 2,
+              }
+            ]}
+          >
+            <View style={[styles.iconContainer, { backgroundColor: stat.color + '15' }]}>
+              <Ionicons name={stat.icon} size={18} color={stat.color} />
             </View>
-            <View style={styles.statContent}>
-              {loading ? (
-                <>
-                  <View style={[skeletonStyle, styles.skeletonValue]} />
-                  <View style={[skeletonStyle, styles.skeletonLabel]} />
-                </>
-              ) : (
-                <>
-                  <Text style={[styles.statValue, { color: colors.text }]}>{stat.value}</Text>
-                  <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{stat.label}</Text>
-                </>
-              )}
+            <View>
+              <Text style={[styles.value, { color: colors.text }]}>
+                {loading ? '-' : stat.value}
+              </Text>
+              <Text style={[styles.label, { color: colors.textMuted }]}>
+                {stat.label}
+              </Text>
             </View>
           </View>
         ))}
       </View>
     </View>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison for better performance
+  return (
+    prevProps.totalSessions === nextProps.totalSessions &&
+    prevProps.activeSessions === nextProps.activeSessions &&
+    prevProps.completedSessions === nextProps.completedSessions &&
+    prevProps.teams.length === nextProps.teams.length &&
+    prevProps.loading === nextProps.loading
+  );
+});
 
 const styles = StyleSheet.create({
-  // Stats Card
-  statsCard: {
-    padding: 20,
-    borderRadius: 20,
-    borderWidth: 1,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
+  container: {
+    marginBottom: 8,
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 20,
-    letterSpacing: -0.3,
-  },
-  statsGrid: {
+  grid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-  },
-  statItem: {
-    flex: 1,
-    minWidth: '45%',
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 12,
   },
-  statIconContainer: {
-    width: 40,
-    height: 40,
+  card: {
+    flex: 1,
+    padding: 16,
     borderRadius: 20,
+    borderWidth: 1,
+    gap: 12,
+    alignItems: 'flex-start',
+  },
+  iconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  statContent: {
-    flex: 1,
-  },
-  statValue: {
-    fontSize: 22,
+  value: {
+    fontSize: 24,
     fontWeight: '700',
+    letterSpacing: -0.5,
     marginBottom: 2,
-    letterSpacing: -0.3,
   },
-  statLabel: {
-    fontSize: 12,
+  label: {
+    fontSize: 13,
     fontWeight: '500',
     letterSpacing: -0.1,
   },
-  skeleton: {
-    borderRadius: 6,
-    opacity: 0.6,
-  },
-  skeletonValue: {
-    width: 50,
-    height: 26,
-    marginBottom: 4,
-  },
-  skeletonLabel: {
-    width: 90,
-    height: 14,
-  },
 });
+
+export default StatsOverview;
