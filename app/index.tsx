@@ -4,10 +4,11 @@ import { Redirect } from "expo-router";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 export default function Index() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const colors = useColors();
-  
-  if (loading) {
+
+  // Show loading while checking auth
+  if (authLoading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -15,11 +16,13 @@ export default function Index() {
     );
   }
 
-  if (user && user.id) {
-    return <Redirect href="/(protected)" />;
+  // Not authenticated - send to sign in
+  if (!user) {
+    return <Redirect href="/auth/sign-in" />;
   }
 
-  return <Redirect href="/auth/sign-in" />;
+  // User is authenticated - send to app (regardless of org status)
+  return <Redirect href="/(protected)/workspace" />;
 }
 
 const styles = StyleSheet.create({

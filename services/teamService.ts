@@ -4,7 +4,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
-import type { Team, TeamMember, TeamMemberDetails, TeamMemberShip, TeamWithMembers } from '@/types/workspace';
+import type { Team, TeamMember, TeamMemberShip, TeamWithMembers } from '@/types/workspace';
 
 export interface CreateTeamInput {
   workspace_type: 'personal' | 'org';
@@ -26,7 +26,7 @@ export interface AddTeamMemberInput {
   team_id: string;
   user_id: string;
   role: TeamMemberShip;
-  details?: TeamMemberDetails; // NEW
+  details?: any; // NEW
 }
 
 /**
@@ -152,70 +152,81 @@ export async function deleteTeam(teamId: string): Promise<void> {
 }
 
 /**
- * Add a member to a team
+ * Add a member to a team (uses RPC to avoid RLS recursion)
  */
 export async function addTeamMember(input: AddTeamMemberInput): Promise<TeamMember> {
-  const { data, error } = await supabase
-    .from('team_members')
-    .insert({
-      team_id: input.team_id,
-      user_id: input.user_id,
-      role: input.role,
-      details: input.details || {}, // NEW
-    })
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc('add_team_member', {
+    p_team_id: input.team_id,
+    p_user_id: input.user_id,
+    p_role: input.role,
+    p_details: input.details || null,
+  });
 
   if (error) {
     console.error('Failed to add team member:', error);
     throw new Error(error.message || 'Failed to add team member');
   }
 
-  return data as TeamMember;
+  // RPC returns JSONB, extract the team member data
+  const result = data as any;
+  return {
+    team_id: result.team_id,
+    user_id: result.user_id,
+    role: result.role,
+    details: result.details,
+    joined_at: result.joined_at,
+  } as TeamMember;
 }
 
 /**
- * Remove a member from a team
+ * Remove a member from a team (uses RPC to avoid RLS recursion)
  */
 export async function removeTeamMember(teamId: string, userId: string): Promise<void> {
-  const { error } = await supabase
-    .from('team_members')
-    .delete()
-    .eq('team_id', teamId)
-    .eq('user_id', userId);
+  const { data, error } = await supabase.rpc('remove_team_member', {
+    p_team_id: teamId,
+    p_user_id: userId,
+  });
 
   if (error) {
     console.error('Failed to remove team member:', error);
     throw new Error(error.message || 'Failed to remove team member');
   }
+
+  if (!data) {
+    throw new Error('Failed to remove team member');
+  }
 }
 
 /**
- * Update team member role & details
+ * Update team member role & details (uses RPC to avoid RLS recursion)
  */
 export async function updateTeamMemberRole(
   teamId: string,
   userId: string,
   role: TeamMemberShip,
-  details?: TeamMemberDetails // NEW
+  details?: any // NEW
 ): Promise<TeamMember> {
-  const updates: any = { role };
-  if (details) updates.details = details;
-
-  const { data, error } = await supabase
-    .from('team_members')
-    .update(updates)
-    .eq('team_id', teamId)
-    .eq('user_id', userId)
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc('update_team_member_role', {
+    p_team_id: teamId,
+    p_user_id: userId,
+    p_role: role,
+    p_details: details || null,
+  });
 
   if (error) {
     console.error('Failed to update team member role:', error);
     throw new Error(error.message || 'Failed to update team member role');
   }
 
-  return data as TeamMember;
+  // RPC returns JSONB, extract the team member data
+  const result = data as any;
+  return {
+    team_id: result.team_id,
+    user_id: result.user_id,
+    role: result.role,
+    details: result.details,
+    joined_at: result.joined_at,
+  } as TeamMember;
 }
 
 /**

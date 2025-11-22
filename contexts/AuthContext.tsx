@@ -3,7 +3,6 @@ import { supabase } from '@/lib/supabase'
 import { AuthenticatedClient } from '@/services/authenticatedClient'
 import { useWorkspaceStore } from '@/store/useWorkspaceStore'
 import { Session, User } from '@supabase/supabase-js'
-import { router } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
 import React, { createContext, useContext, useEffect, useState } from 'react'
 
@@ -33,45 +32,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // ═══════════════════════════════════════════════════
 
   /**
-   * Handle user sign out - clear state and redirect to login
+   * Handle user sign out - clear state
    */
   const handleSignOut = () => {
-    router.replace("/auth/sign-in")
+    // Just clear state, index.tsx will handle redirect
+    setUser(null)
+    setSession(null)
   }
 
   /**
    * Handle initial session (app startup with existing session)
-   * Redirect to protected area and load workspaces in background
+   * Load workspaces but DON'T navigate - let root index.tsx handle routing
    */
   const handleInitialSession = async (session: Session | null) => {
     if (!session?.user) {
       setLoading(false)
-      router.replace("/auth/sign-in")
       return
     }
 
-    setLoading(false)
-    router.replace("/(protected)")
+    // Load workspaces in background
+    try {
+      await useWorkspaceStore.getState().loadWorkspaces();
+    } catch (err) {
+      console.error("Workspace load error:", err)
+    }
     
-    // Load workspaces in background (non-blocking)
-    useWorkspaceStore.getState().loadWorkspaces().catch(err => 
-      console.error("Background workspace load error:", err)
-    )
+    setLoading(false)
+    // Don't navigate here - let index.tsx handle routing based on state
   }
 
   /**
-   * Handle new sign in - redirect to protected area and load workspaces
+   * Handle new sign in
+   * Load workspaces but DON'T navigate - let root index.tsx handle routing
    */
   const handleSignIn = async (session: Session | null) => {
     if (!session?.user) return
 
-    setLoading(false)
-    router.replace("/(protected)")
+    // Load workspaces in background
+    try {
+      await useWorkspaceStore.getState().loadWorkspaces();
+    } catch (err) {
+      console.error("Workspace load error:", err)
+    }
     
-    // Load workspaces in background (non-blocking)
-    useWorkspaceStore.getState().loadWorkspaces().catch(err => 
-      console.error("Background workspace load error:", err)
-    )
+    setLoading(false)
+    // Don't navigate here - let index.tsx handle routing based on state
   }
 
   /**
@@ -260,7 +265,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut()
     setUser(null)
     setSession(null)
-    router.replace('/auth/sign-in')
+    // Don't navigate here - index.tsx will handle redirect
   }
 
   return (

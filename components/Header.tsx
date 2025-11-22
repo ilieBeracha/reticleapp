@@ -1,7 +1,7 @@
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
-import { BellIcon, ChevronDownIcon } from 'lucide-react-native';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { BellIcon } from 'lucide-react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { BaseAvatar } from './BaseAvatar';
 
 interface HeaderProps {
@@ -17,11 +17,11 @@ export function Header({ notificationCount = 0, onNotificationPress, onUserPress
 
   const fallbackInitial = email?.charAt(0)?.toUpperCase() ?? '?';
   const workspaceName =
-    activeWorkspace?.workspace_type === 'personal' ? 'Personal' : activeWorkspace?.workspace_name || 'Workspace';
+    activeWorkspace?.workspace_name || 'Workspace';
 
   return (
     <View style={styles.wrapper}>
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container]}>
         {/* Left Section */}
         <View style={styles.left}>
           <Pressable onPress={onUserPress} style={({ pressed }) => [styles.avatar, { opacity: pressed ? 0.6 : 1 }]}>
@@ -35,7 +35,7 @@ export function Header({ notificationCount = 0, onNotificationPress, onUserPress
             </View>
           </Pressable>
 
-          <Pressable
+          {/* <Pressable
             onPress={onWorkspacePress}
             style={({ pressed }) => [styles.workspace, { backgroundColor: pressed ? colors.secondary : 'transparent' }]}
           >
@@ -44,7 +44,7 @@ export function Header({ notificationCount = 0, onNotificationPress, onUserPress
             </Text>
 
             <ChevronDownIcon size={16} color={colors.tint} strokeWidth={2.5} />
-          </Pressable>
+          </Pressable> */}
         </View>
 
         {/* Right Section */}
@@ -56,7 +56,7 @@ export function Header({ notificationCount = 0, onNotificationPress, onUserPress
         </Pressable>
       </View>
 
-      <View style={[styles.divider, { backgroundColor: colors.border }]} />
+      <View style={[styles.divider]} />
     </View>
   );
 }
@@ -69,8 +69,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 10,
-    height: 60,
+
+
+    display: 'flex',
+    width: '100%',
   },
   divider: {
     height: 0.5,

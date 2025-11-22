@@ -14,7 +14,11 @@ import { useWorkspaceData } from '@/hooks/useWorkspaceData';
 import { memo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
-const OrganizationWorkspacePage = memo(function OrganizationWorkspacePage() {
+/**
+ * ADMIN OVERVIEW
+ * Full organization dashboard for owners, admins, and instructors
+ */
+const AdminOverview = memo(function AdminOverview() {
   const colors = useColors();
   const { activeWorkspace } = useAppContext();
   const permissions = useWorkspacePermissions();
@@ -100,4 +104,5 @@ const styles = StyleSheet.create({
   },
 });
 
-export default OrganizationWorkspacePage;
+export default AdminOverview;
+

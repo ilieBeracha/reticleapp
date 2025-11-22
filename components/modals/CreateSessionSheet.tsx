@@ -11,10 +11,7 @@ interface CreateSessionSheetProps {
   onSessionCreated?: () => void;
 }
 
-type SessionMode = 'solo' | 'group';
-
 interface SessionFormData {
-  session_mode: SessionMode;
   training_id?: string;
   drill_id?: string;
   team_id?: string;
@@ -30,12 +27,11 @@ interface SessionFormData {
 export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSheetProps>(
   ({ onSessionCreated }, ref) => {
     const colors = useColors();
-    const { activeWorkspaceId, isMyWorkspace, userId } = useAppContext();
+    const { activeWorkspaceId, userId } = useAppContext();
     
     const [step, setStep] = useState(1);
     const [isCreating, setIsCreating] = useState(false);
     const [formData, setFormData] = useState<SessionFormData>({
-      session_mode: isMyWorkspace ? 'solo' : 'group',
       environment: {},
     });
 
@@ -49,7 +45,7 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
     const handleNext = () => {
       if (step < 3) {
         // Skip step 2 for personal workspace
-        if (isMyWorkspace && step === 1) {
+        if (step === 1) {
           setStep(3);
         } else {
           setStep(step + 1);
@@ -60,7 +56,7 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
     const handleBack = () => {
       if (step > 1) {
         // Skip step 2 for personal workspace
-        if (isMyWorkspace && step === 3) {
+        if (step === 3) {
           setStep(1);
         } else {
           setStep(step - 1);
@@ -71,13 +67,13 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
     const handleCreateSession = async () => {
       setIsCreating(true);
       try {
-        if (isMyWorkspace && !userId) {
+        if (!userId) {
           Alert.alert("Error", "User information is still loading. Please try again in a moment.");
           setIsCreating(false);
           return;
         }
 
-        if (!isMyWorkspace && !activeWorkspaceId) {
+        if (!!activeWorkspaceId) {
           Alert.alert("Error", "Workspace not found. Please select a workspace and try again.");
           setIsCreating(false);
           return;
@@ -102,12 +98,10 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
         }
 
         await createSession({
-          workspace_type: isMyWorkspace ? 'personal' : 'org',
-          workspace_owner_id: isMyWorkspace ? userId || undefined : undefined,
-          org_workspace_id: !isMyWorkspace ? activeWorkspaceId || undefined : undefined,
-          team_id: !isMyWorkspace ? formData.team_id || undefined : undefined,
-          session_mode: formData.session_mode,
-          session_data: Object.keys(sessionData).length > 0 ? sessionData : undefined,
+          org_workspace_id: activeWorkspaceId || '',
+          team_id: formData.team_id || '',
+          session_mode: formData.team_id ? 'group' : 'solo',
+          session_data: Object.keys(sessionData).length > 0 ? sessionData : {},
         });
         
         Alert.alert("Success", "Session started successfully!");
@@ -115,7 +109,6 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
         // Reset form
         setStep(1);
         setFormData({
-          session_mode: isMyWorkspace ? 'solo' : 'group',
           environment: {},
         });
         setWeather('');
@@ -134,8 +127,8 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
     };
 
     // Personal workspace has 2 steps (skip step 2), org workspace has 3 steps
-    const totalSteps = isMyWorkspace ? 2 : 3;
-    const currentStep = isMyWorkspace && step === 3 ? 2 : step;
+    const totalSteps = 3;
+    const currentStep = step === 3 ? 2 : step;
     const progressWidth = (currentStep / totalSteps) * 100;
 
     return (
@@ -154,7 +147,7 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
               Start New Session
             </Text>
             <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-              {isMyWorkspace ? 'Personal Training' : 'Team Training'}
+              Team Training
             </Text>
           </View>
 
@@ -173,90 +166,9 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
             </Text>
           </View>
 
-          {/* Step 1: Session Type */}
-          {step === 1 && (
-            <View style={styles.stepContainer}>
-              <Text style={[styles.stepTitle, { color: colors.text }]}>Session Type</Text>
-              <Text style={[styles.stepSubtitle, { color: colors.textMuted }]}>
-                Choose how you'll be training
-              </Text>
-
-              <View style={styles.optionsGrid}>
-                {/* Show Solo only for personal workspace */}
-                {isMyWorkspace && (
-                  <TouchableOpacity
-                    style={[
-                      styles.optionCard,
-                      styles.optionCardFull,
-                      { 
-                        backgroundColor: colors.card,
-                        borderColor: colors.primary,
-                        borderWidth: 2,
-                      }
-                    ]}
-                    onPress={() => setFormData({ ...formData, session_mode: 'solo' })}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[
-                      styles.optionIcon,
-                      { backgroundColor: colors.primary + '20' }
-                    ]}>
-                      <Ionicons 
-                        name="person" 
-                        size={28} 
-                        color={colors.primary} 
-                      />
-                    </View>
-                    <Text style={[styles.optionTitle, { color: colors.text }]}>Solo Training</Text>
-                    <Text style={[styles.optionDescription, { color: colors.textMuted }]}>
-                      Individual practice session
-                    </Text>
-                    <View style={[styles.checkmark, { backgroundColor: colors.primary }]}>
-                      <Ionicons name="checkmark" size={16} color="#fff" />
-                    </View>
-                  </TouchableOpacity>
-                )}
-
-                {/* Show Group only for org workspace */}
-                {!isMyWorkspace && (
-                  <TouchableOpacity
-                    style={[
-                      styles.optionCard,
-                      styles.optionCardFull,
-                      { 
-                        backgroundColor: colors.card,
-                        borderColor: colors.primary,
-                        borderWidth: 2,
-                      }
-                    ]}
-                    onPress={() => setFormData({ ...formData, session_mode: 'group' })}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[
-                      styles.optionIcon,
-                      { backgroundColor: colors.primary + '20' }
-                    ]}>
-                      <Ionicons 
-                        name="people" 
-                        size={28} 
-                        color={colors.primary} 
-                      />
-                    </View>
-                    <Text style={[styles.optionTitle, { color: colors.text }]}>Group Training</Text>
-                    <Text style={[styles.optionDescription, { color: colors.textMuted }]}>
-                      Team practice session
-                    </Text>
-                    <View style={[styles.checkmark, { backgroundColor: colors.primary }]}>
-                      <Ionicons name="checkmark" size={16} color="#fff" />
-                    </View>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          )}
+         
 
           {/* Step 2: Training Details */}
-          {step === 2 && (
             <View style={styles.stepContainer}>
               <Text style={[styles.stepTitle, { color: colors.text }]}>Training Details</Text>
               <Text style={[styles.stepSubtitle, { color: colors.textMuted }]}>
@@ -293,7 +205,6 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
                 </View>
               </View>
 
-              {!isMyWorkspace && (
                 <View style={styles.inputContainer}>
                   <Text style={[styles.inputLabel, { color: colors.text }]}>
                     <Ionicons name="people-outline" size={14} color={colors.text} /> Team ID (Optional)
@@ -308,7 +219,6 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
                     />
                   </View>
                 </View>
-              )}
 
               <View style={[styles.infoCard, { backgroundColor: colors.secondary }]}>
                 <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
@@ -317,10 +227,8 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
                 </Text>
               </View>
             </View>
-          )}
 
           {/* Step 3: Environment */}
-          {step === 3 && (
             <View style={styles.stepContainer}>
               <Text style={[styles.stepTitle, { color: colors.text }]}>Environment</Text>
               <Text style={[styles.stepSubtitle, { color: colors.textMuted }]}>
@@ -409,11 +317,9 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
                 </View>
               </View>
             </View>
-          )}
 
           {/* Actions */}
           <View style={styles.actions}>
-            {step > 1 && (
               <TouchableOpacity
                 style={[styles.secondaryButton, { borderColor: colors.border }]}
                 onPress={handleBack}
@@ -422,9 +328,7 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
                 <Ionicons name="arrow-back" size={18} color={colors.text} />
                 <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Back</Text>
               </TouchableOpacity>
-            )}
 
-            {step < 3 ? (
               <TouchableOpacity
                 style={[styles.primaryButton, { backgroundColor: colors.primary }]}
                 onPress={handleNext}
@@ -433,22 +337,17 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
                 <Text style={styles.primaryButtonText}>Next</Text>
                 <Ionicons name="arrow-forward" size={18} color="#fff" />
               </TouchableOpacity>
-            ) : (
               <TouchableOpacity
                 style={[
                   styles.primaryButton,
-                  { backgroundColor: isCreating ? colors.secondary : colors.primary }
+                    { backgroundColor: colors.primary },
                 ]}
                 onPress={handleCreateSession}
-                disabled={isCreating}
                 activeOpacity={0.8}
               >
                 <Ionicons name="play" size={18} color="#fff" />
-                <Text style={styles.primaryButtonText}>
-                  {isCreating ? "Starting..." : "Start Session"}
-                </Text>
+                <Text style={styles.primaryButtonText}>Start Session</Text>
               </TouchableOpacity>
-            )}
           </View>
         </BottomSheetScrollView>
       </BaseBottomSheet>

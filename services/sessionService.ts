@@ -1,14 +1,12 @@
 /**
  * SESSION SERVICE
- * Handles session creation and management for both personal and org workspaces
+ * Simplified for org-only workspaces
  */
 
 import { AuthenticatedClient } from './authenticatedClient';
 
 export interface CreateSessionParams {
-  workspace_type: 'personal' | 'org';
-  workspace_owner_id?: string;
-  org_workspace_id?: string;
+  org_workspace_id: string;  // Always required now
   team_id?: string;
   session_mode?: 'solo' | 'group';
   session_data?: Record<string, any>;
@@ -16,9 +14,7 @@ export interface CreateSessionParams {
 
 export interface SessionWithDetails {
   id: string;
-  workspace_type: 'personal' | 'org';
-  workspace_owner_id: string | null;
-  org_workspace_id: string | null;
+  org_workspace_id: string;
   workspace_name?: string | null;
   user_id: string;
   user_full_name?: string | null;
@@ -43,10 +39,8 @@ function mapSession(row: any): SessionWithDetails {
 
   return {
     id: row.id,
-    workspace_type: row.workspace_type,
-    workspace_owner_id: row.workspace_owner_id ?? null,
-    org_workspace_id: row.org_workspace_id ?? null,
-    workspace_name: row.workspace_name ?? profiles.workspace_name ?? null,
+    org_workspace_id: row.org_workspace_id,
+    workspace_name: row.workspace_name ?? null,
     user_id: row.user_id,
     user_full_name: row.user_full_name ?? profiles.full_name ?? null,
     team_id: row.team_id ?? null,
@@ -62,15 +56,15 @@ function mapSession(row: any): SessionWithDetails {
 }
 
 /**
- * Create a new session (personal or org)
+ * Create a new session (simplified - always org workspace)
  */
 export async function createSession(params: CreateSessionParams) {
   const client = await AuthenticatedClient.getClient();
   const { data, error } = await client
     .rpc('create_session', {
-      p_workspace_type: params.workspace_type,
-      p_workspace_owner_id: params.workspace_owner_id ?? null,
-      p_org_workspace_id: params.org_workspace_id ?? null,
+      p_workspace_type: 'org',  // Always 'org' now
+      p_workspace_owner_id: null,  // Not used anymore
+      p_org_workspace_id: params.org_workspace_id,
       p_team_id: params.team_id ?? null,
       p_session_mode: params.session_mode ?? 'solo',
       p_session_data: params.session_data ?? null,
@@ -82,58 +76,15 @@ export async function createSession(params: CreateSessionParams) {
 }
 
 /**
- * Get personal sessions for the authenticated user
- */
-export async function getPersonalSessions(): Promise<SessionWithDetails[]> {
-  const client = await AuthenticatedClient.getClient();
-
-  const { data: userResult, error: userError } = await client.auth.getUser();
-  if (userError) throw userError;
-  const userId = userResult.user?.id;
-
-  if (!userId) {
-    throw new Error('Not authenticated');
-  }
-  
-  const { data, error } = await client
-    .from('sessions')
-    .select(`
-      id,
-      workspace_type,
-      workspace_owner_id,
-      org_workspace_id,
-      user_id,
-      team_id,
-      session_mode,
-      status,
-      started_at,
-      ended_at,
-      session_data,
-      created_at,
-      updated_at,
-      profiles:user_id(full_name, workspace_name),
-      teams:team_id(name)
-    `)
-    .eq('workspace_type', 'personal')
-    .eq('workspace_owner_id', userId)
-    .order('started_at', { ascending: false });
-
-  if (error) throw error;
-  return (data ?? []).map(mapSession);
-}
-
-/**
  * Get sessions for a specific workspace
  */
-export async function getWorkspaceSessions(workspaceId: string): Promise<SessionWithDetails[]> {
+export async function getWorkspaceSessions(orgWorkspaceId: string): Promise<SessionWithDetails[]> {
   const client = await AuthenticatedClient.getClient();
   
   const { data, error } = await client
     .from('sessions')
     .select(`
       id,
-      workspace_type,
-      workspace_owner_id,
       org_workspace_id,
       user_id,
       team_id,
@@ -144,10 +95,10 @@ export async function getWorkspaceSessions(workspaceId: string): Promise<Session
       session_data,
       created_at,
       updated_at,
-      profiles:user_id(full_name, workspace_name),
+      profiles:user_id(full_name),
       teams:team_id(name)
     `)
-    .or(`workspace_owner_id.eq.${workspaceId},org_workspace_id.eq.${workspaceId}`)
+    .eq('org_workspace_id', orgWorkspaceId)
     .order('started_at', { ascending: false });
 
   if (error) throw error;

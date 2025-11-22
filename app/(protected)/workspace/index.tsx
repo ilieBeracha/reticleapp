@@ -1,65 +1,62 @@
+import EmptyState from '@/components/shared/EmptyState';
+import GroupedList from '@/components/shared/GroupedList';
+import QuickActionCard from '@/components/shared/QuickActionCard';
+import SessionCard from '@/components/shared/SessionCard';
+import TrainingChart from '@/components/shared/TrainingChart';
+import WelcomeCard from '@/components/shared/WelcomeCard';
 import { useModals } from '@/contexts/ModalContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
-import { useSessionStore } from '@/store/sessionStore';
+import { useWorkspacePermissions } from '@/hooks/usePermissions';
+import { useSessionStats } from '@/hooks/useSessionStats';
+import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
+import { useWorkspaceData } from '@/hooks/useWorkspaceData';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
-import EmptyState from '../../../components/shared/EmptyState';
-import GroupedList from '../../../components/shared/GroupedList';
-import QuickActionCard from '../../../components/shared/QuickActionCard';
-import SessionCard from '../../../components/shared/SessionCard';
-import TrainingChart from '../../../components/shared/TrainingChart';
-import WelcomeCard from '../../../components/shared/WelcomeCard';
 
-export default function PersonalWorkspacePage() {
+export default function HomePage() {
   const colors = useColors();
-  const { fullName } = useAppContext();
-  const { chartDetailsSheetRef, createSessionSheetRef, setOnSessionCreated } = useModals();
-  const { sessions, loading, error, loadPersonalSessions } = useSessionStore();
-  const totalSessions = sessions.length;
-  const totalCompletedSessions = sessions.filter((session) => session.status === 'completed').length;
-  const totalAbg = 0;
-
-  useEffect(() => {
-    loadPersonalSessions();
-  }, []);
-
-  const refreshSessions = useMemo(
-    () => () => {
-      loadPersonalSessions();
-    },
-    [loadPersonalSessions]
-  );
+  const router = useRouter();
+  const { fullName, activeWorkspace, workspaces } = useAppContext();
+  const permissions = useWorkspacePermissions();
+  const { chartDetailsSheetRef, createSessionSheetRef, createTeamSheetRef, setOnSessionCreated, setOnTeamCreated } = useModals();
+  const { teams, loadingTeams, sessions, sessionsLoading, sessionsError, loadTeams, refreshSessions } = useWorkspaceData();
+  
+  // Show "no organization" state if user has no workspaces
+  const hasNoOrganization = workspaces.length === 0;
+  
+  // Computed stats
+  const stats = useSessionStats(sessions);
 
   useEffect(() => {
     setOnSessionCreated(() => refreshSessions);
-    return () => setOnSessionCreated(null);
-  }, [refreshSessions, setOnSessionCreated]);
+    setOnTeamCreated(() => loadTeams);
+    return () => {
+      setOnSessionCreated(null);
+      setOnTeamCreated(null);
+    };
+  }, [refreshSessions, loadTeams, setOnSessionCreated, setOnTeamCreated]);
+
+  // Actions
+  const { onStartSession, onCreateTeam } = useWorkspaceActions();
 
   // Memoized callbacks for quick actions
   const handleStartSession = useCallback(() => {
-    createSessionSheetRef.current?.open();
-  }, [createSessionSheetRef]);
+    onStartSession();
+  }, [onStartSession]);
 
   const handleViewProgress = useCallback(() => {
     chartDetailsSheetRef.current?.open();
   }, [chartDetailsSheetRef]);
 
-  const handleScheduleTraining = useCallback(() => {
-    chartDetailsSheetRef.current?.open();
-  }, [chartDetailsSheetRef]);
+  const handleCreateTeam = useCallback(() => {
+    onCreateTeam();
+  }, [onCreateTeam]);
 
   const handleChartDoubleTap = useCallback(() => {
     chartDetailsSheetRef.current?.open();
   }, [chartDetailsSheetRef]);
-
-  // Memoize stats object
-  const stats = useMemo(() => ({
-    totalSessions,
-    totalAbg,
-    totalCompletedSessions,
-    totalTime: '0h',
-  }), [totalSessions, totalAbg, totalCompletedSessions]);
 
   // Pie chart data - elegant muted tones with depth
   const pieData = useMemo(() => [
@@ -86,29 +83,34 @@ export default function PersonalWorkspacePage() {
     },
   ], []);
 
-  const quickActions = useMemo(() => [
-    { 
-      icon: 'add-circle' as const, 
-      title: 'Start New Session', 
-      subtitle: 'Begin your training', 
-      onPress: handleStartSession
-    },
-    { 
-      icon: 'bar-chart-outline' as const, 
-      title: 'View Progress', 
-      subtitle: 'Track your stats', 
-      color: '#5B7A8C',
-      onPress: handleViewProgress
-    },
-    { 
-      icon: 'calendar' as const, 
-      title: 'Schedule Training', 
-      subtitle: 'Plan your sessions', 
-      color: '#5A8473',
-      onPress: handleScheduleTraining
-    },
-  ], [handleStartSession, handleViewProgress, handleScheduleTraining]);
+  const quickActions = useMemo(() => {
+    const actions = [
+      { 
+        icon: 'add-circle' as const, 
+        title: 'Start New Session', 
+        subtitle: 'Begin training', 
+        onPress: handleStartSession
+      },
+      { 
+        icon: 'bar-chart-outline' as const, 
+        title: 'View Progress', 
+        subtitle: 'Track stats', 
+        color: '#5B7A8C',
+        onPress: handleViewProgress
+      },
+    ];
 
+    // Only show create team if user has permission
+    if (permissions.canManageTeams) {
+      actions.push({ 
+        icon: 'add-circle' as const, 
+        title: 'Create Team', 
+        subtitle: 'Manage teams', 
+        onPress: handleCreateTeam
+      });
+    }
+    return actions;
+  }, [handleStartSession, handleViewProgress, handleCreateTeam, permissions.canManageTeams]);
   // Memoize all dynamic styles
   const containerStyle = useMemo(() => [
     styles.container,
@@ -125,6 +127,14 @@ export default function PersonalWorkspacePage() {
     { color: colors.textMuted }
   ], [colors.textMuted]);
 
+  // Memoize stats for welcome card
+  const welcomeStats = useMemo(() => ({
+    totalSessions: stats.totalSessions,
+    totalAbg: 0,
+    totalCompletedSessions: stats.completedSessions,
+    totalTime: '0h',
+  }), [stats.totalSessions, stats.completedSessions]);
+
   return (
     <View style={containerStyle}>
       <ScrollView 
@@ -134,12 +144,14 @@ export default function PersonalWorkspacePage() {
         contentContainerStyle={styles.content}
         removeClippedSubviews={true}
       >
-        {/* User Welcome Card */}
-        <WelcomeCard 
-          fullName={fullName || ''}
-          stats={stats}
-          loading={loading}
-        />
+       
+          <>
+            {/* User Welcome Card */}
+            <WelcomeCard 
+              fullName={fullName || ''}
+              stats={welcomeStats}
+              loading={sessionsLoading}
+            />
 
         {/* Training Distribution Chart */}
         <TrainingChart 
@@ -176,16 +188,16 @@ export default function PersonalWorkspacePage() {
             <Text style={sectionTitleStyle}>Recent Activity</Text>
           </View>
 
-          {loading ? (
+          {sessionsLoading ? (
             <View style={styles.loadingState}>
               <ActivityIndicator color={colors.primary} />
               <Text style={loadingTextStyle}>Loading sessions...</Text>
             </View>
-          ) : error ? (
+          ) : sessionsError ? (
             <EmptyState
               icon="warning-outline"
               title="Unable to load sessions"
-              subtitle={error}
+              subtitle={sessionsError}
               size="small"
             />
           ) : sessions.length === 0 ? (
@@ -206,6 +218,8 @@ export default function PersonalWorkspacePage() {
             </View>
           )}
         </View>
+          </>
+
       </ScrollView>
     </View>
   );
@@ -249,5 +263,21 @@ const styles = StyleSheet.create({
     letterSpacing: -0.1,
   },
   sessionList: {},
+  noOrgContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  createOrgButton: {
+    marginTop: 24,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 12,
+  },
+  createOrgButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });
-

@@ -1,37 +1,26 @@
 // =====================================================
-// HYBRID WORKSPACE TYPES
-// Personal Workspace (user profile) + Org Workspaces (created)
+// ORGANIZATION-ONLY WORKSPACE TYPES
+// Users must create or join organizations
 // =====================================================
 
 export type WorkspaceRole = 'owner' | 'admin' | 'instructor' | 'member';
-export type WorkspaceType = 'personal' | 'org';
 export type TeamMemberShip =
   | "commander"        // One per team - full control
   | "squad_commander"  // Manages a squad
   | "soldier";         // Regular team member
 
-// UNIFIED WORKSPACE INTERFACE
-// Can be either a personal workspace (profile) or org workspace
+// ORGANIZATION WORKSPACE
 export interface Workspace {
   id: string;
-  personal_workspace_id?: string | null;
-  workspace_type: WorkspaceType;
-  workspace_name?: string | null;
+  workspace_name: string;
   workspace_slug?: string | null;
+  description?: string | null;
+  created_by: string;
   created_at: string;
   updated_at: string;
   
-  // Personal workspace fields (when workspace_type = 'personal')
-  email?: string;
-  full_name?: string | null;
-  avatar_url?: string | null;
-  
-  // Org workspace fields (when workspace_type = 'org')
-  description?: string | null;
-  created_by?: string;
-  
   // Access info
-  access_role?: WorkspaceRole;
+  access_role: WorkspaceRole;
 }
 
 // Organization workspace (user-created)
@@ -47,10 +36,8 @@ export interface OrgWorkspace {
 
 export interface WorkspaceAccess {
   id: string;
-  workspace_type: WorkspaceType;
-  workspace_owner_id: string | null;  // For personal: profile.id, for org: null
-  org_workspace_id?: string | null;   // For org: org_workspaces.id, for personal: null
-  member_id: string;                   // user who has access
+  org_workspace_id: string;  // Required - always org workspace
+  member_id: string;
   role: WorkspaceRole;
   joined_at: string;
 }
@@ -85,7 +72,7 @@ export type TeamType = "field" | "back_office";
 
 export interface Team {
   id: string;
-  workspace_owner_id: string;  // profile.id (workspace owner)
+  org_workspace_id: string;  // Always org workspace
   name: string;
   team_type?: TeamType | null;
   description?: string | null;
@@ -119,4 +106,42 @@ export interface TeamWithMembers extends Team {
     };
   })[];
   member_count?: number;
+}
+
+// =====================================================
+// ENHANCED MEMBER TYPES WITH TEAM CONTEXT
+// =====================================================
+
+/**
+ * Team membership info embedded in workspace member data
+ */
+export interface TeamMembership {
+  team_id: string;
+  team_name: string;
+  team_role: TeamMemberShip;
+  team_type: TeamType | null;
+  squads?: string[] | null;
+  joined_team_at: string;
+}
+
+/**
+ * Organization member with complete profile and team context
+ * This is returned by the optimized get_org_workspace_members RPC
+ */
+export interface WorkspaceMemberWithTeams {
+  // Workspace access fields
+  id: string;
+  org_workspace_id: string;
+  member_id: string;
+  role: WorkspaceRole;
+  joined_at: string;
+  
+  // Profile fields (flattened for easier access)
+  profile_id: string;
+  profile_email: string;
+  profile_full_name: string | null;
+  profile_avatar_url: string | null;
+  
+  // Team assignments (aggregated)
+  teams: TeamMembership[];
 }

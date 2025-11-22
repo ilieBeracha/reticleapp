@@ -55,6 +55,7 @@
           }
         }
       ],
+      ["react-native-bottom-tabs"],
       [
         "expo-camera",
         {

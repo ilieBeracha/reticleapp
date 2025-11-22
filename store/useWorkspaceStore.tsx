@@ -1,11 +1,9 @@
 // store/useWorkspaceStore.ts
 import {
   getAccessibleWorkspaces,
-  getMyWorkspace,
   getWorkspaceMembers,
-  updateMyWorkspace
 } from "@/services/workspaceService";
-import { Workspace, WorkspaceAccess } from "@/types/workspace";
+import { Workspace, WorkspaceMemberWithTeams } from "@/types/workspace";
 import { create } from "zustand";
 
 interface WorkspaceStore {
@@ -13,29 +11,25 @@ interface WorkspaceStore {
   activeWorkspaceId: string | null;  // Currently viewing workspace
   loading: boolean;
   error: string | null;
-  workspaceMembers: (WorkspaceAccess & { profile?: any })[];
+  workspaceMembers: WorkspaceMemberWithTeams[];
   loadWorkspaceMembers: () => Promise<void>;
   loadWorkspaces: () => Promise<void>;
   setActiveWorkspace: (workspaceId: string | null) => void;
-  updateWorkspace: (input: {
-    workspace_name?: string;
-    full_name?: string;
-    avatar_url?: string;
-  }) => Promise<void>;
   reset: () => void;
 }
 
 /**
- * ✨ SIMPLIFIED WORKSPACE STORE ✨
+ * ✨ ORG-ONLY WORKSPACE STORE ✨
  * 
- * Simplified Model: User = Workspace
- * - Each user's profile IS their workspace
- * - Can view own workspace or other workspaces they have access to
- * - activeWorkspaceId tracks which workspace is currently being viewed
+ * Simplified Model: Users must belong to organizations
+ * - No personal workspaces
+ * - Can view different orgs they have access to
+ * - activeWorkspaceId tracks which org is currently being viewed
+ * - If user has no orgs, they need to create or join one
  * 
  * Source of truth:
- * - workspaces: list of accessible workspaces (mine + others I have access to)
- * - activeWorkspaceId: currently viewing workspace ID (defaults to my workspace)
+ * - workspaces: list of accessible org workspaces
+ * - activeWorkspaceId: currently viewing workspace ID (defaults to first org)
  */
 export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   workspaces: [],
@@ -43,9 +37,9 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   loading: true,
   error: null,
   workspaceMembers: [],
+  
   /**
-   * Load all workspaces user has access to
-   * Includes: their own workspace + any workspaces they have been granted access to
+   * Load all organization workspaces user has access to
    */
   loadWorkspaces: async () => {
     try {
@@ -63,12 +57,12 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       
       const workspaces = await getAccessibleWorkspaces();
       
-      // Set active workspace to user's own workspace by default
-      const myWorkspace = await getMyWorkspace();
+      // Set active workspace to first org by default
+      const defaultWorkspace = workspaces[0];
       
       set({
         workspaces,
-        activeWorkspaceId: myWorkspace?.id || null,
+        activeWorkspaceId: defaultWorkspace?.id || null,
         loading: false,
       });
     } catch (error: any) {
@@ -83,15 +77,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   loadWorkspaceMembers: async () => {
-    const { activeWorkspaceId, workspaces } = get();
+    const { activeWorkspaceId } = get();
     if (!activeWorkspaceId) return;
-    
-    // Only load members for organization workspaces
-    const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId);
-    if (!activeWorkspace || activeWorkspace.workspace_type !== 'org') {
-      set({ workspaceMembers: [] });
-      return;
-    }
     
     try {
       const members = await getWorkspaceMembers(activeWorkspaceId);
@@ -107,33 +94,6 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   setActiveWorkspace: (workspaceId: string | null) => {
     console.log('🔄 Setting active workspace:', workspaceId);
     set({ activeWorkspaceId: workspaceId });
-  },
-
-  /**
-   * Update my workspace (profile)
-   */
-  updateWorkspace: async (input: {
-    workspace_name?: string;
-    full_name?: string;
-    avatar_url?: string;
-  }) => {
-    try {
-      set({ loading: true, error: null });
-      
-      const updated = await updateMyWorkspace(input);
-      
-      // Update in workspaces list
-      set((state) => ({
-        workspaces: state.workspaces.map((w) =>
-          w.id === updated.id ? updated : w
-        ),
-        loading: false,
-      }));
-    } catch (error: any) {
-      console.error("Failed to update workspace:", error);
-      set({ error: error.message, loading: false });
-      throw error;
-    }
   },
 
   /**

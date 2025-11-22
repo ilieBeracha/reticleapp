@@ -7,10 +7,10 @@ import * as Haptics from 'expo-haptics';
 import { useMemo, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
-  FadeInDown,
-  FadeInLeft,
-  LayoutAnimationConfig,
-  LinearTransition
+    FadeInDown,
+    FadeInLeft,
+    LayoutAnimationConfig,
+    LinearTransition
 } from 'react-native-reanimated';
 
 type EventFilter = 'all' | 'training' | 'session' | 'assessment' | 'briefing' | 'qualification';

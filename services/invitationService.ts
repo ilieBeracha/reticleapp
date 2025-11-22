@@ -1,4 +1,4 @@
-import type { TeamMemberDetails, TeamMemberShip, WorkspaceInvitation, WorkspaceInvitationWithDetails, WorkspaceRole } from '@/types/workspace';
+import type { TeamMemberShip, WorkspaceInvitation, WorkspaceInvitationWithDetails, WorkspaceRole } from '@/types/workspace';
 import { AuthenticatedClient } from './authenticatedClient';
 
 /**
@@ -21,7 +21,7 @@ export async function createInvitation(
     role: WorkspaceRole = 'member',
     teamId?: string | null,
     teamRole?: TeamMemberShip | null,
-    teamDetails?: TeamMemberDetails
+    teamDetails?: Record<string, any>
   ): Promise<WorkspaceInvitation> {
   const supabase = await AuthenticatedClient.getClient();
 

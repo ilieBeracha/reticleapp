@@ -39,12 +39,9 @@ export const CreateTeamSheet = forwardRef<BaseBottomSheetRef, CreateTeamSheetPro
 
       try {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        const isOrgWorkspace = activeWorkspace?.workspace_type === 'org';
         
         await createTeam({
-          workspace_type: isOrgWorkspace ? 'org' : 'personal',
-          workspace_owner_id: isOrgWorkspace ? undefined : activeWorkspaceId,
-          org_workspace_id: isOrgWorkspace ? activeWorkspaceId : undefined,
+          org_workspace_id: activeWorkspaceId,  // Simplified - always org
           name: teamName.trim(),
           description: teamDescription.trim() || undefined,
           squads: squads.length > 0 ? squads : undefined,

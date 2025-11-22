@@ -35,11 +35,10 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
     const { acceptInviteSheetRef, setOnInviteAccepted } = useModals();
     
     const { 
-      myWorkspaceId, 
+      userId, 
       activeWorkspaceId, 
       workspaces,
       switchWorkspace,
-      switchToMyWorkspace,
       loading 
     } = useAppContext();
 
@@ -53,14 +52,14 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
 
     // Group workspaces: My workspace first, then others
     const groupedWorkspaces = useMemo(() => {
-      const myWorkspace = workspaces.find(w => w.id === myWorkspaceId);
-      const otherWorkspaces = workspaces.filter(w => w.id !== myWorkspaceId);
+      const myWorkspace = workspaces.find(w => w.created_by === userId);
+      const otherWorkspaces = workspaces.filter(w => w.created_by !== userId);
 
       return {
         myWorkspace: myWorkspace ? [myWorkspace] : [],
         otherWorkspaces
       };
-    }, [workspaces, myWorkspaceId]);
+    }, [workspaces, userId]);
 
     const handleSelectWorkspace = useCallback(async (workspace: Workspace) => {
       try {
@@ -71,16 +70,6 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
         Alert.alert("Error", "Failed to switch workspace");
       }
     }, [switchWorkspace]);
-
-    const handleSelectMyWorkspace = useCallback(async () => {
-      try {
-        await switchToMyWorkspace();
-        bottomSheetRef.current?.close();
-      } catch (error: any) {
-        console.error("Failed to switch to my workspace:", error);
-        Alert.alert("Error", "Failed to switch to my workspace");
-      }
-    }, [switchToMyWorkspace]);
 
     const handleOpenCreateWorkspace = useCallback(() => {
       setWorkspaceName("");  // Clear for new workspace
@@ -190,7 +179,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
                     key={workspace.id}
                     workspace={workspace}
                     isActive={workspace.id === activeWorkspaceId}
-                    isMyWorkspace={workspace.id === myWorkspaceId}
+                    isMyWorkspace={workspace.created_by === userId}
                     onSelect={handleSelectWorkspace}
                   />
                 ))}
@@ -210,7 +199,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
                     key={workspace.id}
                     workspace={workspace}
                     isActive={workspace.id === activeWorkspaceId}
-                    isMyWorkspace={workspace.id === myWorkspaceId}
+                    isMyWorkspace={workspace.created_by === userId}
                     onSelect={handleSelectWorkspace}
                   />
                 ))}

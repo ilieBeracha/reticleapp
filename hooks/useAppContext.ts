@@ -11,21 +11,15 @@ export interface AppContext {
   fullName: string | null;
   avatarUrl: string | null;
   
-  // Workspace (user IS a workspace)
-  myWorkspaceId: string | null;  // Always my profile.id
-  activeWorkspaceId: string | null;  // Currently viewing workspace (could be mine or someone else's)
+  // Workspace (org-only)
+  activeWorkspaceId: string | null;  // Currently viewing organization
   activeWorkspace: Workspace | null;
   
-  // Context type
-  isMyWorkspace: boolean;  // Viewing my own workspace
-  isOtherWorkspace: boolean;  // Viewing someone else's workspace
-  
-  // All accessible workspaces
+  // All accessible organizations
   workspaces: Workspace[];
   
   // Actions
-  switchWorkspace: (workspaceId: string | null) => Promise<void>;
-  switchToMyWorkspace: () => Promise<void>;
+  switchWorkspace: (workspaceId: string) => Promise<void>;
   
   // Loading states
   loading: boolean;
@@ -38,13 +32,14 @@ export interface AppContext {
  * Use this hook in ALL components to get user and workspace context.
  * NEVER access user or workspace data directly from other sources.
  * 
- * Simplified Model: User = Workspace
- * - Every user's profile IS their workspace
- * - Can view own workspace or other workspaces they have access to
+ * Org-Only Model: Users must belong to organizations
+ * - No personal workspaces
+ * - Can view different orgs they have access to
+ * - If user has no orgs, they need to create or join one
  * 
  * Examples:
  * ```
- * const { userId, myWorkspaceId, activeWorkspaceId, isMyWorkspace } = useAppContext()
+ * const { userId, activeWorkspaceId, activeWorkspace } = useAppContext()
  * ```
  */
 export function useAppContext(): AppContext {
@@ -52,9 +47,9 @@ export function useAppContext(): AppContext {
   const router = useRouter();
   const { 
     workspaces, 
-    activeWorkspaceId, 
-    setActiveWorkspace,
-    loading: workspacesLoading 
+    activeWorkspaceId,    
+    loading: workspacesLoading,
+    setActiveWorkspace
   } = useWorkspaceStore();
 
   // Calculate derived values with memoization
@@ -68,20 +63,14 @@ export function useAppContext(): AppContext {
         avatarUrl: null,
         
         // Workspace
-        myWorkspaceId: null,
         activeWorkspaceId: null,
         activeWorkspace: null,
-        
-        // Context type
-        isMyWorkspace: true,
-        isOtherWorkspace: false,
         
         // All workspaces
         workspaces: [],
         
         // Actions
         switchWorkspace: async () => {},
-        switchToMyWorkspace: async () => {},
         
         // Loading
         loading: authLoading,
@@ -89,16 +78,8 @@ export function useAppContext(): AppContext {
       };
     }
 
-    // In simplified model: user.id IS their workspace ID
-    const myWorkspaceId = user.id;
-    
-    // Active workspace could be mine or someone else's
-    const currentActiveId = activeWorkspaceId || myWorkspaceId;
-    const activeWorkspace = workspaces.find(w => w.id === currentActiveId) || null;
-    
-    // Check if viewing my workspace
-    const isMyWorkspace = currentActiveId === myWorkspaceId;
-    const isOtherWorkspace = !isMyWorkspace;
+    // Active workspace
+    const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0] || null;
 
     return {
       // User
@@ -108,45 +89,16 @@ export function useAppContext(): AppContext {
       avatarUrl: user.user_metadata?.avatar_url ?? null,
       
       // Workspace
-      myWorkspaceId,
-      activeWorkspaceId: currentActiveId,
+      activeWorkspaceId: activeWorkspace?.id || null,
       activeWorkspace,
-      
-      // Context type
-      isMyWorkspace,
-      isOtherWorkspace,
       
       // All workspaces
       workspaces,
       
       // Actions
-      switchWorkspace: async (workspaceId: string | null) => {
-        const targetId = workspaceId || myWorkspaceId;
-        const isPersonal = targetId === myWorkspaceId;
-        const targetWorkspace = workspaces.find(w => w.id === targetId);
-        
-        console.log('🔄 Switching workspace:', {
-          from: currentActiveId,
-          to: targetId,
-          isPersonal,
-          workspaceType: targetWorkspace?.workspace_type,
-          workspaceName: targetWorkspace?.workspace_name || targetWorkspace?.full_name
-        });
-        
-        // Update store
-        setActiveWorkspace(targetId);
-        
-        // Navigate to the correct workspace route
-        const targetRoute = isPersonal ? '/(protected)/workspace/personal' : '/(protected)/workspace/organization';
-        console.log('🚀 Navigating to:', targetRoute);
-        router.replace(targetRoute);
-      },
-      switchToMyWorkspace: async () => {
-        console.log('🏠 Switching to my workspace:', myWorkspaceId);
-        setActiveWorkspace(myWorkspaceId);
-        
-        // Navigate to personal workspace route
-        router.replace('/(protected)/workspace/personal');
+      switchWorkspace: async (workspaceId: string) => {
+        setActiveWorkspace(workspaceId);
+        router.replace('/(protected)/workspace');
       },
       
       // Loading

@@ -25,7 +25,7 @@ interface TeamStore {
   error: string | null;
 
   // Actions
-  loadTeams: (workspaceType: 'personal' | 'org', workspaceId: string) => Promise<void>;
+  loadTeams: (orgWorkspaceId: string) => Promise<void>;  // Simplified - always org
   createTeam: (input: CreateTeamInput) => Promise<Team>;
   loadTeam: (teamId: string) => Promise<void>;
   updateTeam: (input: UpdateTeamInput) => Promise<void>;
@@ -42,12 +42,12 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
   error: null,
 
   /**
-   * Load teams for a workspace
+   * Load teams for a workspace (simplified - always org)
    */
-  loadTeams: async (workspaceType: 'personal' | 'org', workspaceId: string) => {
+  loadTeams: async (orgWorkspaceId: string) => {
     try {
       set({ loading: true, error: null });
-      const teams = await getWorkspaceTeams(workspaceType, workspaceId);
+      const teams = await getWorkspaceTeams(orgWorkspaceId);
       set({ teams, loading: false });
     } catch (error: any) {
       console.error('Failed to load teams:', error);

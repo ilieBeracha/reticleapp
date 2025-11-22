@@ -72,16 +72,14 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
 
     // Load pending invitations
     const loadInvitations = useCallback(async () => {
-      if (!activeWorkspaceId || activeWorkspace?.workspace_type !== 'org') return;
+      if (!activeWorkspaceId) return;
       
       setLoadingInvites(true);
-      try {
+      try { 
         const invites = await getPendingInvitations(activeWorkspaceId);
         setPendingInvites(invites);
-      } catch (error: any) {
+      } catch (error) {
         console.error('Failed to load invitations:', error);
-      } finally {
-        setLoadingInvites(false);
       }
     }, [activeWorkspaceId, activeWorkspace]);
 

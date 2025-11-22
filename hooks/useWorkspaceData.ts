@@ -22,9 +22,8 @@ export function useWorkspaceData(): UseWorkspaceDataReturn {
   // Load teams
   const loadTeams = useCallback(async () => {
     if (!activeWorkspaceId) return;
-    const workspaceType = activeWorkspace?.workspace_type === 'org' ? 'org' : 'personal';
-    await loadTeamsStore(workspaceType, activeWorkspaceId);
-  }, [activeWorkspaceId, activeWorkspace, loadTeamsStore]);
+    await loadTeamsStore(activeWorkspaceId);  // Simplified - always org
+  }, [activeWorkspaceId, loadTeamsStore]);
 
   // Load sessions
   useEffect(() => {
