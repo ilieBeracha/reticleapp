@@ -1,31 +1,24 @@
-import { useAuth } from "@/contexts/AuthContext";
-import { useColors } from "@/hooks/ui/useColors";
-import { Redirect } from "expo-router";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { useAuth } from '@/contexts/AuthContext';
+import { Redirect } from 'expo-router';
+import { useEffect } from 'react';
 
-export default function Index() {
+/**
+ * Root redirect based on auth state
+ */
+export default function RootPage() {
   const { user, loading } = useAuth();
-  const colors = useColors();
-  
+
+  useEffect(() => {
+    console.log('🏠 Root page - Auth state:', { user: !!user, loading });
+  }, [user, loading]);
+
   if (loading) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
+    return null; // Let auth context handle loading
   }
 
-  if (user && user.id) {
-    return <Redirect href="/(protected)" />;
+  if (!user) {
+    return <Redirect href="/auth/sign-in" />;
   }
 
-  return <Redirect href="/auth/sign-in" />;
+  return <Redirect href="/(protected)" />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-});

@@ -1,12 +1,12 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useModals } from "@/contexts/ModalContext";
+import { useProfile, type ProfileWithOrg } from "@/contexts/ProfileContext";
 import { useColors } from "@/hooks/ui/useColors";
-import { useProfileStore, type ProfileWithOrg } from "@/store/useProfileStore";
-import { Ionicons } from "@expo/vector-icons";
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { BaseBottomSheet, type BaseBottomSheetRef } from "./BaseBottomSheet";
 import { supabase } from "@/lib/supabase";
+import { Ionicons } from "@expo/vector-icons";
+import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { BaseBottomSheet, type BaseBottomSheetRef } from "./BaseBottomSheet";
 
 export interface WorkspaceSwitcherRef {
   open: () => void;
@@ -21,11 +21,12 @@ interface WorkspaceSwitcherBottomSheetProps {
 interface ProfileItemProps {
   profile: ProfileWithOrg;
   isActive: boolean;
+  isLoading?: boolean;
   colors: any;
   onSelect: () => void;
 }
 
-function ProfileItem({ profile, isActive, colors, onSelect }: ProfileItemProps) {
+function ProfileItem({ profile, isActive, isLoading = false, colors, onSelect }: ProfileItemProps) {
   const isPersonal = profile.org?.org_type === 'personal';
   
   const getRoleColor = (role: string) => {
@@ -41,10 +42,12 @@ function ProfileItem({ profile, isActive, colors, onSelect }: ProfileItemProps) 
     <TouchableOpacity
       style={[
         styles.workspaceItem,
-        isActive && styles.workspaceItemActive
+        isActive && styles.workspaceItemActive,
+        isLoading && styles.workspaceItemLoading
       ]}
       onPress={onSelect}
       activeOpacity={0.7}
+      disabled={isLoading}
     >
       <View style={styles.workspaceItemContent}>
         {/* Icon */}
@@ -83,8 +86,12 @@ function ProfileItem({ profile, isActive, colors, onSelect }: ProfileItemProps) 
           </View>
         </View>
 
-        {/* Active Indicator */}
-        {isActive && (
+        {/* Loading/Active Indicator */}
+        {isLoading ? (
+          <View style={[styles.checkmarkContainer, { backgroundColor: `${colors.primary}20` }]}>
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+        ) : isActive && (
           <View style={[styles.checkmarkContainer, { backgroundColor: `${colors.primary}20` }]}>
             <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
           </View>
@@ -109,16 +116,14 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
     const createSheetRef = useRef<BaseBottomSheetRef>(null);
     const { acceptInviteSheetRef, setOnInviteAccepted } = useModals();
     
-    const { activeProfileId, switchProfile } = useAuth();
-    const { profiles, activeProfile, loadProfiles, loading } = useProfileStore();
+    const { activeProfileId } = useAuth();
+    const { allProfiles, activeProfile, loading, switchToProfile, reloadProfiles } = useProfile();
 
     const [orgName, setOrgName] = useState("");
     const [isCreating, setIsCreating] = useState(false);
+    const [switchingProfileId, setSwitchingProfileId] = useState<string | null>(null);
     
-    // Load profiles on mount
-    useEffect(() => {
-      loadProfiles();
-    }, [loadProfiles]);
+  
 
     useImperativeHandle(ref, () => ({
       open: () => bottomSheetRef.current?.open(),
@@ -127,24 +132,33 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
 
     // Group profiles: Personal first, then organizations
     const groupedProfiles = useMemo(() => {
-      const personalProfiles = profiles.filter(p => p.org?.org_type === 'personal');
-      const orgProfiles = profiles.filter(p => p.org?.org_type === 'organization');
+      const personalProfiles = allProfiles.filter((p: ProfileWithOrg) => p.org?.org_type === 'personal');
+      const orgProfiles = allProfiles.filter((p: ProfileWithOrg) => p.org?.org_type === 'organization');
 
       return {
         personalProfiles,
         orgProfiles
       };
-    }, [profiles]);
+    }, [allProfiles]);
 
     const handleSelectProfile = useCallback(async (profile: ProfileWithOrg) => {
       try {
-        await switchProfile(profile.id);
+        // Show loading immediately
+        setSwitchingProfileId(profile.id);
+        console.log('🔄 UI: Starting profile switch to:', profile.org.name);
+        
+        await switchToProfile(profile.id);
+        
+        console.log('✅ UI: Profile switch completed, closing modal');
         bottomSheetRef.current?.close();
       } catch (error: any) {
         console.error("Failed to switch profile:", error);
         Alert.alert("Error", "Failed to switch profile");
+      } finally {
+        // Clear loading state
+        setSwitchingProfileId(null);
       }
-    }, [switchProfile]);
+    }, [switchToProfile]);
 
     const handleOpenCreateOrg = useCallback(() => {
       setOrgName("");
@@ -159,6 +173,8 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
 
       setIsCreating(true);
       try {
+        console.log('🏢 Creating new organization:', orgName.trim());
+        
         // Create new org using RPC
         const { data, error } = await supabase.rpc('create_org_workspace', {
           p_name: orgName.trim(),
@@ -167,13 +183,24 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
 
         if (error) throw error;
         
-        // Reload profiles to show the new one
-        await loadProfiles();
+        console.log('✅ Organization created:', data[0]);
+        
+        // Reload profiles to get the newly created profile
+        await reloadProfiles();
+        
+        // Small delay to ensure profiles are loaded
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         // Find the new profile and switch to it
-        const newProfile = profiles.find(p => p.org_id === data[0].id);
-        if (newProfile) {
-          await switchProfile(newProfile.id);
+        // Get fresh profile data since allProfiles might not be updated yet
+        const { data: profileData, error: profileError } = await supabase
+          .rpc('get_my_profiles');
+          
+        if (!profileError && profileData) {
+          const newProfile = profileData.find((p: any) => p.org_id === data[0].id);
+          if (newProfile) {
+            await switchToProfile(newProfile.profile_id);
+          }
         }
         
         setOrgName("");
@@ -183,11 +210,11 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
         Alert.alert("Success", `Organization "${data[0].name}" created!`);
       } catch (error: any) {
         console.error("Failed to create organization:", error);
-        Alert.alert("Error", "Failed to create organization");
+        Alert.alert("Error", `Failed to create organization: ${error.message}`);
       } finally {
         setIsCreating(false);
       }
-    }, [orgName, switchProfile, loadProfiles, profiles]);
+    }, [orgName, switchToProfile, reloadProfiles]);
 
     const handleJoinOrg = useCallback(() => {
       // Close this sheet and open the accept invite sheet
@@ -195,14 +222,13 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
       
       // Set callback to reload profiles when invite is accepted
       setOnInviteAccepted(() => async () => {
-        await loadProfiles();
       });
       
       // Open the accept invite sheet
       setTimeout(() => {
         acceptInviteSheetRef.current?.open();
       }, 300);
-    }, [acceptInviteSheetRef, setOnInviteAccepted, loadProfiles]);
+    }, [acceptInviteSheetRef, setOnInviteAccepted]);
 
     return (
       <>
@@ -211,7 +237,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
       
           ref={bottomSheetRef}
 
-          snapPoints={['60%','92%']}
+          snapPoints={['92%']}
           enableDynamicSizing={false}
         >
             {/* Header */}
@@ -221,7 +247,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
                   <Text style={[styles.title, { color: colors.text }]}>Profiles</Text>
                   <View style={[styles.countBadge, { backgroundColor: '#FF6B351A' }]}>
                     <Text style={[styles.countBadgeText, { color: '#FF6B35' }]}>
-                      {profiles.length}
+                      {allProfiles.length}
                     </Text>
                   </View>
                 </View>
@@ -258,6 +284,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
                     key={profile.id}
                     profile={profile}
                     isActive={profile.id === activeProfileId}
+                    isLoading={switchingProfileId === profile.id}
                     colors={colors}
                     onSelect={() => handleSelectProfile(profile)}
                   />
@@ -278,6 +305,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
                     key={profile.id}
                     profile={profile}
                     isActive={profile.id === activeProfileId}
+                    isLoading={switchingProfileId === profile.id}
                     colors={colors}
                     onSelect={() => handleSelectProfile(profile)}
                   />
@@ -286,7 +314,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
             )}
 
             {/* Empty state */}
-            {profiles.length === 0 && (
+            {allProfiles.length === 0 && (
               <View style={styles.emptyState}>
                 <View style={[styles.emptyIconContainer, { backgroundColor: colors.card }]}>
                   <Ionicons name="person-outline" size={48} color={colors.textMuted} />
@@ -475,6 +503,9 @@ const styles = StyleSheet.create({
   },
   workspaceItemActive: {
     backgroundColor: 'rgba(231, 105, 37, 0.08)',
+  },
+  workspaceItemLoading: {
+    opacity: 0.7,
   },
   workspaceItemContent: {
     flexDirection: "row",

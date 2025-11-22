@@ -1,5 +1,5 @@
+import { useProfile } from "@/contexts/ProfileContext";
 import { useColors } from "@/hooks/ui/useColors";
-import { useProfileContext } from "@/hooks/useProfileContext";
 import { createSession } from "@/services/sessionService";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetScrollView, BottomSheetTextInput } from "@gorhom/bottom-sheet";
@@ -30,7 +30,7 @@ interface SessionFormData {
 export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSheetProps>(
   ({ onSessionCreated }, ref) => {
     const colors = useColors();
-    const { currentOrgId, activeProfileId, isPersonalOrg } = useProfileContext();
+    const { currentOrg, activeProfile, isPersonalOrg } = useProfile();
     
     const [step, setStep] = useState(1);
     const [isCreating, setIsCreating] = useState(false);
@@ -71,7 +71,7 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
     const handleCreateSession = async () => {
       setIsCreating(true);
       try {
-        if (!currentOrgId || !activeProfileId) {
+        if (!currentOrg?.id || !activeProfile?.id) {
           Alert.alert("Error", "No active organization. Please select a profile.");
           setIsCreating(false);
           return;
@@ -96,8 +96,8 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
         }
 
         await createSession({
-          org_id: currentOrgId,
-          profile_id: activeProfileId,
+          org_id: currentOrg?.id,
+          profile_id: activeProfile?.id,
           team_id: !isPersonalOrg ? formData.team_id : undefined,
           session_mode: formData.session_mode,
           session_data: Object.keys(sessionData).length > 0 ? sessionData : undefined,

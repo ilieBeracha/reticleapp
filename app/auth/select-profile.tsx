@@ -1,4 +1,4 @@
-import { ProfileSelector, ProfileOption } from "@/components/auth/ProfileSelector";
+import { ProfileOption, ProfileSelector } from "@/components/auth/ProfileSelector";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { router } from "expo-router";
@@ -30,11 +30,11 @@ export default function SelectProfilePage() {
 
       if (error) throw error;
 
-      setProfiles(data || []);
+      setProfiles((data as ProfileOption[]) || []);
 
       // If user has only one profile, auto-select it
-      if (data && data.length === 1) {
-        handleSelectProfile(data[0].profile_id);
+      if (data && (data as ProfileOption[]).length === 1) {
+        handleSelectProfile((data as ProfileOption[])[0]?.profile_id || '');
       }
     } catch (error: any) {
       console.error('Error loading profiles:', error);

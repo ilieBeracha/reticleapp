@@ -1,286 +1,167 @@
-import type { TeamMemberDetails, TeamMemberShip, WorkspaceInvitation, WorkspaceInvitationWithDetails, WorkspaceRole } from '@/types/workspace';
-import { AuthenticatedClient } from './authenticatedClient';
-
 /**
- * Generate a unique 8-character invite code
+ * 💌 INVITATION SERVICE
+ * 
+ * Handles organization invitations - creating, managing, and accepting invites
  */
-function generateInviteCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed ambiguous chars
-  let code = '';
-  for (let i = 0; i < 8; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return code;
+
+import { supabase } from '@/lib/supabase';
+
+export interface OrgInvitation {
+  id: string;
+  invite_code: string;
+  role: 'member' | 'instructor' | 'admin';
+  status: 'pending' | 'accepted' | 'cancelled' | 'expired';
+  expires_at: string;
+  team_id: string | null;
+  team_role: 'commander' | 'squad_commander' | 'soldier' | null;
+  created_at: string;
+  inviter_name: string | null;
+  team_name: string | null;
+}
+
+export interface CreateInvitationParams {
+  orgId: string;
+  role: 'member' | 'instructor' | 'admin';
+  teamId?: string;
+  teamRole?: 'commander' | 'squad_commander' | 'soldier';
+  expiresHours?: number; // Default: 168 (7 days)
 }
 
 /**
- * Create a new workspace invitation
+ * Create a new organization invitation
  */
-export async function createInvitation(
-    orgWorkspaceId: string,
-    role: WorkspaceRole = 'member',
-    teamId?: string | null,
-    teamRole?: TeamMemberShip | null,
-    teamDetails?: TeamMemberDetails
-  ): Promise<WorkspaceInvitation> {
-  const supabase = await AuthenticatedClient.getClient();
-
-  // Generate unique invite code
-  let inviteCode = generateInviteCode();
-  let isUnique = false;
-  let attempts = 0;
-
-  // Ensure code is unique (max 5 attempts)
-  while (!isUnique && attempts < 5) {
-    const { data: existing } = await supabase
-      .from('workspace_invitations')
-      .select('id')
-      .eq('invite_code', inviteCode)
-      .single();
-
-    if (!existing) {
-      isUnique = true;
-    } else {
-      inviteCode = generateInviteCode();
-      attempts++;
-    }
-  }
-
-  if (!isUnique) {
-    throw new Error('Failed to generate unique invite code. Please try again.');
-  }
-
-  // Set expiration to 7 days from now
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 7);
-
-  // Get current user ID
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    throw new Error('You must be logged in to create an invitation');
-  }
-
-  // Enforce rule: Only members can be assigned to teams via invite
-  const finalTeamId = role === 'member' ? teamId : null;
-  const finalTeamRole = role === 'member' ? teamRole : null;
-  const finalTeamDetails = role === 'member' && teamDetails ? teamDetails : {};
-
-  // Create invitation with squad details
-  const { data, error } = await supabase
-    .from('workspace_invitations')
-    .insert({
-      org_workspace_id: orgWorkspaceId,
-      invite_code: inviteCode,
-      role,
-      team_id: finalTeamId,
-      team_role: finalTeamRole,
-      details: finalTeamDetails,
-      status: 'pending',
-      invited_by: user.id,
-      expires_at: expiresAt.toISOString(),
-    })
-    .select()
-    .single();
+export async function createOrgInvitation(params: CreateInvitationParams): Promise<OrgInvitation> {
+  const { data, error } = await supabase.rpc('create_org_invite', {
+    p_org_id: params.orgId,
+    p_role: params.role,
+    p_team_id: params.teamId || null,
+    p_team_role: params.teamRole || null,
+    p_expires_hours: params.expiresHours || 168
+  });
 
   if (error) {
-    console.error('Error creating invitation:', error);
-    throw new Error(error.message || 'Failed to create invitation');
+    throw new Error(error.message);
   }
 
-  return data;
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to create invitation');
+  }
+
+  const invitation = data.invitation;
+  return {
+    id: invitation.id,
+    invite_code: invitation.invite_code,
+    role: invitation.role,
+    status: 'pending',
+    expires_at: invitation.expires_at,
+    team_id: invitation.team_id,
+    team_role: invitation.team_role,
+    created_at: new Date().toISOString(),
+    inviter_name: null,
+    team_name: null
+  };
 }
 
 /**
- * Get all invitations for a workspace
+ * Get all pending invitations for an organization
  */
-export async function getWorkspaceInvitations(orgWorkspaceId: string): Promise<WorkspaceInvitationWithDetails[]> {
-  const supabase = await AuthenticatedClient.getClient();
-
-  const { data, error } = await supabase
-  .from('workspace_invitations')
-  .select(
-    `
-    *,
-    invited_by_profile:profiles!workspace_invitations_invited_by_fkey(full_name, email),
-    accepted_by_profile:profiles!workspace_invitations_accepted_by_fkey(full_name, email),
-    workspace:org_workspaces!workspace_invitations_org_workspace_fkey(name),
-    team:teams!workspace_invitations_team_id_fkey(name)
-  `
-  )
-    .eq('org_workspace_id', orgWorkspaceId)
-    .order('created_at', { ascending: false });
+export async function getOrgInvitations(orgId: string): Promise<OrgInvitation[]> {
+  const { data, error } = await supabase.rpc('get_org_invitations', {
+    p_org_id: orgId
+  });
 
   if (error) {
-    console.error('Error fetching invitations:', error);
-    throw new Error(error.message || 'Failed to fetch invitations');
+    console.error('❌ getOrgInvitations RPC Error:', {
+      orgId,
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+    });
+    throw new Error(error.message);
   }
 
-  // Transform data to include friendly names
-  return data.map((inv: any) => ({
-    id: inv.id,
-    org_workspace_id: inv.org_workspace_id,
-    invite_code: inv.invite_code,
-    role: inv.role,
-    status: inv.status,
-    invited_by: inv.invited_by,
-    accepted_by: inv.accepted_by,
-    accepted_at: inv.accepted_at,
-    expires_at: inv.expires_at,
-    created_at: inv.created_at,
-    updated_at: inv.updated_at,
-    workspace_name: inv.workspace?.name,
-    invited_by_name: inv.invited_by_profile?.full_name || inv.invited_by_profile?.email,
-    accepted_by_name: inv.accepted_by_profile?.full_name || inv.accepted_by_profile?.email,
-    team_id: inv.team_id,
-    team_role: inv.team_role,
-    team_name: inv.team?.name, // NEW
-  }));
-}
-
-/**
- * Get pending invitations for a workspace (not expired, not accepted, not cancelled)
- */
-export async function getPendingInvitations(orgWorkspaceId: string): Promise<WorkspaceInvitationWithDetails[]> {
-  const invitations = await getWorkspaceInvitations(orgWorkspaceId);
-  const now = new Date();
-
-  return invitations.filter((inv) => inv.status === 'pending' && new Date(inv.expires_at) > now);
+  return data || [];
 }
 
 /**
  * Cancel an invitation
  */
-export async function cancelInvitation(invitationId: string): Promise<void> {
-  const supabase = await AuthenticatedClient.getClient();
-
-  const { error } = await supabase
-    .from('workspace_invitations')
-    .update({
-      status: 'cancelled',
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', invitationId)
-    .eq('status', 'pending'); // Only cancel pending invitations
+export async function cancelOrgInvitation(inviteId: string): Promise<void> {
+  const { data, error } = await supabase.rpc('cancel_org_invite', {
+    p_invite_id: inviteId
+  });
 
   if (error) {
-    console.error('Error cancelling invitation:', error);
-    throw new Error(error.message || 'Failed to cancel invitation');
+    throw new Error(error.message);
+  }
+
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to cancel invitation');
   }
 }
 
 /**
- * Validate an invite code using RPC (bypasses RLS)
+ * Accept an invitation (this already exists in the schema)
  */
-export async function validateInviteCode(inviteCode: string): Promise<WorkspaceInvitationWithDetails | null> {
-  const supabase = await AuthenticatedClient.getClient();
-
-  // Get current user
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    throw new Error('You must be logged in to validate an invitation');
-  }
-
-  // Call RPC function
-  const { data, error } = await supabase.rpc('validate_invite_code', {
-    p_invite_code: inviteCode.toUpperCase().trim(),
-    p_user_id: user.id,
+export async function acceptOrgInvitation(inviteCode: string): Promise<void> {
+  const { data, error } = await supabase.rpc('accept_org_invite', {
+    p_invite_code: inviteCode
   });
 
   if (error) {
-    console.error('RPC error validating invite:', error);
-    throw new Error('Failed to validate invitation code');
+    throw new Error(error.message);
   }
 
-  // Check response
-  if (!data || !data.valid) {
-    throw new Error(data?.error || 'Invalid invitation code');
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to accept invitation');
+  }
+}
+
+/**
+ * Validate an invitation code (check if it exists and is valid)
+ */
+export async function validateInviteCode(inviteCode: string): Promise<{
+  valid: boolean;
+  orgName?: string;
+  role?: string;
+  expiresAt?: string;
+}> {
+  console.log('🔍 Validating invite code:', inviteCode);
+  
+  // Use the simple RPC function to avoid RLS and JOIN issues
+  const { data, error } = await supabase.rpc('validate_invite_simple', {
+    p_invite_code: inviteCode
+  });
+
+  if (error) {
+    console.error('❌ Invite validation RPC error:', error);
+    return { valid: false };
   }
 
-  // Return transformed invitation data
+  if (!data || data.length === 0) {
+    console.log('❌ No invitation data returned');
+    return { valid: false };
+  }
+
+  const result = data[0];
+  console.log('🔍 Validation result:', result);
+  
+  if (!result || !result.is_valid) {
+    console.log('❌ Invitation is invalid or expired');
+    return { valid: false };
+  }
+
+  console.log('✅ Invitation validated successfully:', {
+    orgName: result.organization_name,
+    role: result.invitation_role,
+    expiresAt: result.expiration_time
+  });
+
   return {
-    id: data.invitation.id,
-    org_workspace_id: data.invitation.org_workspace_id,
-    invite_code: data.invitation.invite_code,
-    role: data.invitation.role,
-    status: 'pending',
-    invited_by: data.invitation.invited_by,
-    invited_by_name: data.invitation.invited_by_name,
-    expires_at: data.invitation.expires_at,
-    created_at: data.invitation.created_at,
-    updated_at: data.invitation.created_at,
-    workspace_name: data.invitation.workspace_name,
+    valid: true,
+    orgName: result.organization_name,
+    role: result.invitation_role,
+    expiresAt: result.expiration_time
   };
-}
-
-/**
- * Accept an invitation and add user to workspace using RPC (atomic operation)
- */
-export async function acceptInvitation(inviteCode: string): Promise<void> {
-  const supabase = await AuthenticatedClient.getClient();
-
-  // Get current user
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    throw new Error('You must be logged in to accept an invitation');
-  }
-
-  // Call RPC function to accept invitation (includes validation)
-  const { data, error } = await supabase.rpc('accept_invite_code', {
-    p_invite_code: inviteCode.toUpperCase().trim(),
-    p_user_id: user.id,
-  });
-
-  if (error) {
-    console.error('RPC error accepting invite:', error);
-    throw new Error('Failed to accept invitation');
-  }
-
-  // Check response
-  if (!data || !data.success) {
-    throw new Error(data?.error || 'Failed to accept invitation');
-  }
-}
-
-/**
- * Delete an invitation (hard delete)
- */
-export async function deleteInvitation(invitationId: string): Promise<void> {
-  const supabase = await AuthenticatedClient.getClient();
-
-  const { error } = await supabase.from('workspace_invitations').delete().eq('id', invitationId);
-
-  if (error) {
-    console.error('Error deleting invitation:', error);
-    throw new Error(error.message || 'Failed to delete invitation');
-  }
-}
-
-/**
- * Expire old invitations (utility function)
- */
-export async function expireOldInvitations(): Promise<number> {
-  const supabase = await AuthenticatedClient.getClient();
-
-  const { data, error } = await supabase
-    .from('workspace_invitations')
-    .update({
-      status: 'expired',
-      updated_at: new Date().toISOString(),
-    })
-    .eq('status', 'pending')
-    .lt('expires_at', new Date().toISOString())
-    .select();
-
-  if (error) {
-    console.error('Error expiring invitations:', error);
-    return 0;
-  }
-
-  return data?.length || 0;
 }

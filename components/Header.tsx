@@ -1,5 +1,6 @@
+import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/contexts/ProfileContext';
 import { useColors } from '@/hooks/ui/useColors';
-import { useAppContext } from '@/hooks/useAppContext';
 import { BellIcon, ChevronDownIcon } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { BaseAvatar } from './BaseAvatar';
@@ -12,12 +13,12 @@ interface HeaderProps {
 }
 
 export function Header({ notificationCount = 0, onNotificationPress, onUserPress, onWorkspacePress }: HeaderProps) {
-  const { email, avatarUrl, activeWorkspace } = useAppContext();
+  const { activeProfile } = useProfile();
+  const { user } = useAuth();
   const colors = useColors();
 
-  const fallbackInitial = email?.charAt(0)?.toUpperCase() ?? '?';
-  const workspaceName =
-    activeWorkspace?.workspace_type === 'personal' ? 'Personal' : activeWorkspace?.workspace_name || 'Workspace';
+  const fallbackInitial = user?.email?.charAt(0)?.toUpperCase() ?? '?';
+    const workspaceName = activeProfile?.org?.name || 'Workspace';
 
   return (
     <View style={styles.wrapper}>
@@ -27,7 +28,7 @@ export function Header({ notificationCount = 0, onNotificationPress, onUserPress
           <Pressable onPress={onUserPress} style={({ pressed }) => [styles.avatar, { opacity: pressed ? 0.6 : 1 }]}>
             <View style={[styles.avatarRing, { borderColor: colors.primary + '20' }]}>
               <BaseAvatar
-                source={avatarUrl ? { uri: avatarUrl } : undefined}
+                source={activeProfile?.avatar_url ? { uri: activeProfile?.avatar_url } : undefined}
                 fallbackText={fallbackInitial}
                 size="sm"
                 borderWidth={0}

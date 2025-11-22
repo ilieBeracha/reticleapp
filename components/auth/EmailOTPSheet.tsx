@@ -9,12 +9,13 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  SafeAreaView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View
 } from "react-native";
-import { InputField } from "../ui/input";
 
 interface EmailOTPSheetProps {
   visible: boolean;
@@ -59,8 +60,8 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
   };
 
   const handleVerifyOTP = async () => {
-    if (!otp.trim() || otp.length !== 6) {
-      Alert.alert("Error", "Please enter the 6-digit code");
+    if (!otp.trim() || otp.length !== 8) {
+      Alert.alert("Error", "Please enter the 8-digit code");
       return;
     }
 
@@ -103,10 +104,13 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
     <Modal
       visible={visible}
       onRequestClose={handleClose}
+      animationType="slide"
+      presentationStyle="pageSheet"
     >
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.content}>
+          {/* Header */}
+          <View style={styles.header}>
           <TouchableOpacity
             onPress={handleBack}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -127,8 +131,8 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
         {step === "email" ? (
           /* Email Entry Step */
           <>
-            <View style={[styles.iconBox, { backgroundColor: colors.tint + "15" }]}>
-              <Ionicons name="mail" size={32} color={colors.tint} />
+            <View style={[styles.iconBox, { backgroundColor: colors.primary + "15" }]}>
+              <Ionicons name="mail" size={32} color={colors.primary} />
             </View>
 
             <Text style={[styles.subtitle, { color: colors.textMuted }]}>
@@ -140,16 +144,20 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
                 <Text style={[styles.label, { color: colors.text }]}>
                   Email Address
                 </Text> 
-                  <InputField
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="your@email.com"
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoComplete="email"
-                  autoFocus
-                />
+                <View style={[styles.inputContainer, { borderColor: colors.border, backgroundColor: colors.cardBackground }]}>
+                  <Ionicons name="mail-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
+                  <TextInput
+                    style={[styles.textInput, { color: colors.text }]}
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="your@email.com"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    autoFocus
+                  />
+                </View>
               </View>
             </View>
 
@@ -157,12 +165,13 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
               style={[
                 styles.button,
                 {
-                  backgroundColor: email.trim() ? colors.tint : colors.border,
-                  opacity: email.trim() ? 1 : 0.5,
+                  backgroundColor: email.trim() ? colors.primary : colors.border,
+                  opacity: email.trim() ? 1 : 0.6,
                 },
               ]}
               onPress={handleSendOTP}
               disabled={!email.trim() || loading}
+              activeOpacity={0.8}
             >
               {loading ? (
                 <ActivityIndicator color="#fff" />
@@ -177,12 +186,12 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
         ) : (
           /* OTP Entry Step */
           <>
-            <View style={[styles.iconBox, { backgroundColor: colors.green + "15" }]}>
-              <Ionicons name="shield-checkmark" size={32} color={colors.green} />
+            <View style={[styles.iconBox, { backgroundColor: colors.primary + "15" }]}>
+              <Ionicons name="shield-checkmark" size={32} color={colors.primary} />
             </View>
 
             <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-              Enter the 6-digit code sent to
+              Enter the 8-digit code sent to
             </Text>
             <Text style={[styles.emailDisplay, { color: colors.text }]}>
               {email}
@@ -193,15 +202,19 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
                 <Text style={[styles.label, { color: colors.text }]}>
                   Verification Code
                 </Text>
-                  <InputField
+                <View style={[styles.inputContainer, { borderColor: colors.border, backgroundColor: colors.cardBackground }]}>
+                  <Ionicons name="key-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
+                  <TextInput
+                    style={[styles.otpInput, { color: colors.text }]}
                     value={otp}
                     onChangeText={setOtp}
-                    placeholder="000000"
+                    placeholder="e.g. 12345678"
                     placeholderTextColor={colors.textMuted}
                     keyboardType="number-pad"
-                    maxLength={6}
+                    maxLength={8}
                     autoFocus
                   />
+                </View>
               </View>
             </View>
 
@@ -209,12 +222,13 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
               style={[
                 styles.button,
                 {
-                  backgroundColor: otp.length === 6 ? colors.green : colors.border,
-                  opacity: otp.length === 6 ? 1 : 0.5,
+                  backgroundColor: otp.length === 8 ? colors.primary : colors.border,
+                  opacity: otp.length === 8 ? 1 : 0.6,
                 },
               ]}
               onPress={handleVerifyOTP}
-              disabled={otp.length !== 6 || loading}
+              disabled={otp.length !== 8 || loading}
+              activeOpacity={0.8}
             >
               {loading ? (
                 <ActivityIndicator color="#fff" />
@@ -230,14 +244,16 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
               style={styles.resendButton}
               onPress={handleSendOTP}
               disabled={loading}
+              activeOpacity={0.7}
             >
-              <Text style={[styles.resendText, { color: colors.tint }]}>
+              <Text style={[styles.resendText, { color: colors.primary }]}>
                 Resend Code
               </Text>
             </TouchableOpacity>
           </>
         )}
-      </View>
+        </View>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -245,13 +261,18 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    // paddingHorizontal: 16,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 16,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 32,
+    paddingBottom: 16,
   },
   title: {
     fontSize: 20,
@@ -280,28 +301,39 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   form: {
-    marginTop: 16,
-    marginBottom: 24,
+    marginTop: 24,
+    marginBottom: 32,
   },
   field: {
-    gap: 8,
+    gap: 12,
   },
   label: {
     fontSize: 14,
     fontWeight: "600",
   },
-  input: {
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderRadius: 12,
     borderWidth: 1.5,
+    minHeight: 52,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  textInput: {
+    flex: 1,
     fontSize: 16,
+    fontWeight: '500',
   },
   otpInput: {
+    flex: 1,
     textAlign: "center",
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "700",
-    letterSpacing: 8,
+    letterSpacing: 6,
   },
   button: {
     flexDirection: "row",
@@ -309,7 +341,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     paddingVertical: 16,
+    paddingHorizontal: 24,
     borderRadius: 12,
+    marginHorizontal: 8,
   },
   buttonText: {
     fontSize: 16,

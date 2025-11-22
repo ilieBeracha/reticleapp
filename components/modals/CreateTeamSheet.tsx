@@ -1,5 +1,5 @@
+import { useProfile } from "@/contexts/ProfileContext";
 import { useColors } from "@/hooks/ui/useColors";
-import { useProfileContext } from "@/hooks/useProfileContext";
 import { createTeam } from "@/services/teamService";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
@@ -15,7 +15,7 @@ interface CreateTeamSheetProps {
 export const CreateTeamSheet = forwardRef<BaseBottomSheetRef, CreateTeamSheetProps>(
   ({ onTeamCreated }, ref) => {
     const colors = useColors();
-    const { currentOrgId, isPersonalOrg } = useProfileContext();
+    const { currentOrg, isPersonalOrg } = useProfile();
     const sheetRef = useRef<BaseBottomSheetRef>(null);
     
     const [teamName, setTeamName] = useState("");
@@ -31,7 +31,7 @@ export const CreateTeamSheet = forwardRef<BaseBottomSheetRef, CreateTeamSheetPro
         return;
       }
 
-      if (!currentOrgId) {
+      if (!currentOrg?.id) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         Alert.alert("Error", "No active organization");
         return;
@@ -42,7 +42,7 @@ export const CreateTeamSheet = forwardRef<BaseBottomSheetRef, CreateTeamSheetPro
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         
         await createTeam({
-          org_id: currentOrgId,
+          org_id: currentOrg?.id,
           name: teamName.trim(),
           team_type: 'field',
           description: teamDescription.trim() || undefined,

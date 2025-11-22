@@ -1,40 +1,31 @@
 import { Header } from '@/components/Header';
 import { AcceptInviteSheet } from '@/components/modals/AcceptInviteSheet';
-import { ComingSoonSheet } from '@/components/modals/ComingSoonSheet';
 import { CreateSessionSheet } from '@/components/modals/CreateSessionSheet';
-import { CreateTeamSheet } from '@/components/modals/CreateTeamSheet';
+import { ProfessionalTeamSheet } from '@/components/modals/ProfessionalTeamSheet';
 import { InviteMembersSheet } from '@/components/modals/InviteMembersSheet';
 import { UserMenuBottomSheet, UserMenuBottomSheetRef } from '@/components/modals/UserMenuBottomSheet';
 import { WorkspaceSwitcherBottomSheet, WorkspaceSwitcherRef } from '@/components/modals/WorkspaceSwitcherBottomSheet';
 import { ModalProvider, useModals } from '@/contexts/ModalContext';
 import { useColors } from '@/hooks/ui/useColors';
-import { useAppContext } from '@/hooks/useAppContext';
 import { Stack } from 'expo-router';
 import { useRef } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 function ProtectedLayoutContent() {
   const { background, text } = useColors();
-  const { activeWorkspaceId } = useAppContext();
+  const { 
+    createSessionSheetRef, 
+    createTeamSheetRef, 
+    inviteMembersSheetRef, 
+    acceptInviteSheetRef 
+  } = useModals();
   const userMenuRef = useRef<UserMenuBottomSheetRef>(null);
   const workspaceSwitcherRef = useRef<WorkspaceSwitcherRef>(null);
-  const { 
-    chartDetailsSheetRef, 
-    createSessionSheetRef, 
-    createTeamSheetRef,
-    inviteMembersSheetRef,
-    acceptInviteSheetRef,
-    onSessionCreated,
-    onTeamCreated,
-    onMemberInvited,
-    onInviteAccepted,
-  } = useModals();
 
   return (
     <>
-      <Stack 
-        initialRouteName="index"
+      <Stack
         screenOptions={{
-          animation: 'none',
           headerStyle: { backgroundColor: background },
           headerShadowVisible: false,
           headerTitle: () => (
@@ -48,94 +39,41 @@ function ProtectedLayoutContent() {
           headerTintColor: text,
         }}
       >
-        <Stack.Screen name="modal" options={{ headerShown: false, presentation: 'modal', headerBlurEffect: 'light' }} />
+        <Stack.Screen name="index" options={{ headerShown: true }} />
         <Stack.Screen 
-          name="index" 
-          options={{ headerShown: true }} 
-
-          />
-        <Stack.Screen 
-          name="workspace/personal" 
-          options={{ headerShown: true, animation: 'none' }} 
-        />
-        <Stack.Screen 
-          name="workspace/organization" 
-          options={{ headerShown: true, animation: 'none' }} 
+          name="org/[profileId]" 
+          options={{ 
+            headerShown: true,
+            title: "Organization",
+            animation: 'slide_from_right'
+          }} 
         />
       </Stack>
 
-      {/* USER MENU */}
+      {/* Global Modals */}
       <UserMenuBottomSheet
         ref={userMenuRef}
         onSwitchOrgPress={() => workspaceSwitcherRef.current?.open()}
       />
-
-      {/* WORKSPACE SWITCHER */}
       <WorkspaceSwitcherBottomSheet ref={workspaceSwitcherRef} />
-
-      {/* CHART DETAILS */}
-      <ComingSoonSheet
-        ref={chartDetailsSheetRef}
-        title="Detailed Analytics"
-        subtitle="Get insights into your training patterns"
-        icon="bar-chart"
-      />
-
-      {/* CREATE SESSION */}
-      <CreateSessionSheet
-        ref={createSessionSheetRef}
-        onSessionCreated={() => {
-          createSessionSheetRef.current?.close();
-          // Call the registered callback if it exists
-          if (onSessionCreated) {
-            onSessionCreated();
-          }
-        }}
-      />
-
-      {/* CREATE TEAM */}
-      <CreateTeamSheet
-        ref={createTeamSheetRef}
-        onTeamCreated={() => {
-          createTeamSheetRef.current?.close();
-          // Call the registered callback if it exists
-          if (onTeamCreated) {
-            onTeamCreated();
-          }
-        }}
-      />
-
-      {/* INVITE MEMBERS */}
-      <InviteMembersSheet
-        ref={inviteMembersSheetRef}
-        onMemberInvited={() => {
-          // Don't close the sheet - let user see the generated code
-          // Call the registered callback if it exists
-          if (onMemberInvited) {
-            onMemberInvited();
-          }
-        }}
-      />
-
-      {/* ACCEPT INVITE */}
-      <AcceptInviteSheet
-        ref={acceptInviteSheetRef}
-        onInviteAccepted={() => {
-          acceptInviteSheetRef.current?.close();
-          // Call the registered callback if it exists
-          if (onInviteAccepted) {
-            onInviteAccepted();
-          }
-        }}
-      />
+      <CreateSessionSheet ref={createSessionSheetRef} />
+      <ProfessionalTeamSheet ref={createTeamSheetRef} />
+      <InviteMembersSheet ref={inviteMembersSheetRef} />
+      <AcceptInviteSheet ref={acceptInviteSheetRef} />
     </>
   );
 }
 
 export default function ProtectedLayout() {
   return (
-    <ModalProvider>
-      <ProtectedLayoutContent />
-    </ModalProvider>
+
+      <GestureHandlerRootView
+        style={{ flex: 1 }}
+      >
+        <ModalProvider>
+          <ProtectedLayoutContent />
+        </ModalProvider>
+      </GestureHandlerRootView>
+
   );
 }

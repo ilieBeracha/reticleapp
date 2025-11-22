@@ -1,6 +1,5 @@
 // contexts/AuthContext.tsx
 import { supabase } from '@/lib/supabase'
-import { AuthenticatedClient } from '@/services/authenticatedClient'
 import { Session, User } from '@supabase/supabase-js'
 import { router } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
@@ -17,31 +16,36 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signInWithOAuth: (provider: 'google' | 'apple') => Promise<void>;
   signOut: () => Promise<void>;
-  switchProfile: (profileId: string) => Promise<void>;
+  switchProfile: (profileId: string, skipNavigation?: boolean) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/**
+ * ✨ SIMPLIFIED AUTH CONTEXT ✨
+ * 
+ * Handles ONLY global authentication (auth.users)
+ * - Login/logout
+ * - Profile selection (which profile is active)
+ * - Global user data (email, name from auth.users)
+ * 
+ * All org-related data is handled by ProfileContext!
+ */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null)
 
-  // ═══════════════════════════════════════════════════
-  // AUTH EVENT HANDLERS
-  // ═══════════════════════════════════════════════════
-
   /**
-   * Handle user sign out - clear state and redirect to login
+   * Handle user sign out
    */
   const handleSignOut = () => {
     router.replace("/auth/sign-in")
   }
 
   /**
-   * Handle initial session (app startup with existing session)
-   * Check if user has selected a profile, otherwise show profile selector
+   * Handle initial session (app startup)
    */
   const handleInitialSession = async (session: Session | null) => {
     if (!session?.user) {
@@ -50,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    // Check if user has an active profile selected
+    // Check if user has selected a profile
     const savedProfileId = session.user.user_metadata?.active_profile_id
     
     if (savedProfileId) {
@@ -65,39 +69,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   /**
-   * Handle new sign in - redirect to profile selector
+   * Handle new sign in
    */
   const handleSignIn = async (session: Session | null) => {
     if (!session?.user) return
-
     setLoading(false)
-    
-    // Redirect to profile selector
     router.replace("/auth/select-profile")
   }
 
   /**
-   * Switch active profile
-   * Updates user.user_metadata.active_profile_id (SINGLE SOURCE OF TRUTH)
+   * Switch active profile (THE MAIN USER OF THE APP)
+   * @param profileId - The profile to switch to
+   * @param skipNavigation - If true, don't navigate (useful for org page switches)
    */
-  const switchProfile = async (profileId: string) => {
+  const switchProfile = async (profileId: string, skipNavigation: boolean = false) => {
     if (!user) return
 
     try {
-      // Update user metadata
+      console.log('🔄 AUTH: Switching to profile:', profileId);
+      
+      // Update metadata (source of truth)
       await supabase.auth.updateUser({
         data: { active_profile_id: profileId }
       })
 
-      // Refresh user to get updated metadata
+      // IMMEDIATELY update local state
+      setActiveProfileId(profileId);
+      
+      // Refresh user object
       const { data: { user: updatedUser } } = await supabase.auth.getUser()
       if (updatedUser) {
         setUser(updatedUser)
-        setActiveProfileId(profileId)
       }
 
-      // Redirect to home to refresh with new profile context
-      router.replace("/(protected)")
+      console.log('✅ AUTH: Profile switched - app will transform');
+      
+      // Only navigate if requested (prevents unwanted redirects from org pages)
+      if (!skipNavigation) {
+        router.replace("/(protected)")
+      }
     } catch (error) {
       console.error("Switch profile error:", error)
       throw error
@@ -105,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   /**
-   * Main auth state change handler - routes to specific handlers
+   * Auth state change handler
    */
   const handleAuthStateChange = async (
     event: string,
@@ -116,7 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(session)
     setUser(session?.user ?? null)
     
-    // Update active profile from user metadata
+    // Update active profile from metadata
     if (session?.user?.user_metadata?.active_profile_id) {
       setActiveProfileId(session.user.user_metadata.active_profile_id)
     } else {
@@ -139,23 +149,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         break
 
       default:
-        // Handle other events (TOKEN_REFRESHED, etc.)
         setLoading(false)
         break
     }
   }
 
-  // ═══════════════════════════════════════════════════
-  // SETUP AUTH LISTENER
-  // ═══════════════════════════════════════════════════
-
+  // Setup auth listener
   useEffect(() => {
-    // Initialize session on mount
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
       
-      // Set active profile from metadata
       if (session?.user?.user_metadata?.active_profile_id) {
         setActiveProfileId(session.user.user_metadata.active_profile_id)
       }
@@ -163,54 +167,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false)
     })
 
-    // Subscribe to auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       handleAuthStateChange
     )
 
     return () => subscription.unsubscribe()
   }, [])
-
-  // Initialize AuthenticatedClient ONCE when component mounts
-  useEffect(() => {
-    AuthenticatedClient.initialize(
-      // Token provider
-      async () => {
-        const { data: { session } } = await supabase.auth.getSession()
-        return session?.access_token ?? ""
-      },
-      // Context provider - provides active profile ID
-      () => {
-        if (!user) return null
-        
-        return {
-          userId: user.id,
-          profileId: activeProfileId  // Currently active profile
-        }
-      }
-    )
-  }, []) // Only initialize ONCE
-
-  // Update context when user or profile changes
-  useEffect(() => {
-    if (user) {
-      // Re-initialize with fresh context provider
-      AuthenticatedClient.initialize(
-        async () => {
-          const { data: { session } } = await supabase.auth.getSession()
-          return session?.access_token ?? ""
-        },
-        () => {
-          if (!user) return null
-          
-          return {
-            userId: user.id,
-            profileId: activeProfileId
-          }
-        }
-      )
-    }
-  }, [user?.id, activeProfileId]) // When user or active profile changes
 
   const signUp = async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email, password })
@@ -249,6 +211,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut()
     setUser(null)
     setSession(null)
+    setActiveProfileId(null)
     router.replace('/auth/sign-in')
   }
 

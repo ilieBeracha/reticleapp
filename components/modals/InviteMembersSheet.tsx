@@ -1,6 +1,6 @@
+import { useProfile } from "@/contexts/ProfileContext";
 import { useColors } from "@/hooks/ui/useColors";
-import { useProfileContext } from "@/hooks/useProfileContext";
-import { cancelOrgInvitation, createOrgInvitation, getPendingOrgInvitations, type OrgRole } from "@/services/orgInvitationService";
+import { cancelOrgInvitation, createOrgInvitation, getOrgInvitations, type OrgInvitation } from "@/services/invitationService";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import * as Clipboard from 'expo-clipboard';
@@ -13,7 +13,7 @@ interface InviteMembersSheetProps {
 }
 
 interface RoleOption {
-  value: OrgRole;
+  value: 'member' | 'instructor' | 'admin';
   label: string;
   description: string;
   icon: keyof typeof Ionicons.glyphMap;
@@ -47,34 +47,87 @@ const ROLE_OPTIONS: RoleOption[] = [
 export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSheetProps>(
   ({ onMemberInvited }, ref) => {
     const colors = useColors();
-    const { currentOrgId, isPersonalOrg, canManageMembers } = useProfileContext();
-    
-    const [selectedRole, setSelectedRole] = useState<OrgRole>('member');
+    const { currentOrg, isPersonalOrg, canManageMembers } = useProfile();
+
+    const [selectedRole, setSelectedRole] = useState<'member' | 'instructor' | 'admin'>('member');
     const [isCreating, setIsCreating] = useState(false);
-    const [pendingInvites, setPendingInvites] = useState<any[]>([]);
+    const [pendingInvites, setPendingInvites] = useState<OrgInvitation[]>([]);
     const [loadingInvites, setLoadingInvites] = useState(false);
+    const [lastLoadedOrgId, setLastLoadedOrgId] = useState<string | null>(null);
 
     // Load pending invitations
     const loadInvitations = useCallback(async () => {
-      if (!currentOrgId || isPersonalOrg) return;
+      console.log('📋 InviteMembersSheet loadInvitations called:', {
+        currentOrgId: currentOrg?.id,
+        orgName: currentOrg?.name,
+        orgType: currentOrg?.org_type,
+        isPersonalOrg,
+        canManageMembers,
+        lastLoadedOrgId,
+        isLoading: loadingInvites,
+      });
+      
+      if (!currentOrg?.id) {
+        console.log('❌ No currentOrg.id, skipping invitation load');
+        return;
+      }
+      
+      if (isPersonalOrg) {
+        console.log('❌ Personal org detected, skipping invitation load');
+        return;
+      }
+      
+      // Prevent duplicate calls for the same org
+      if (currentOrg.id === lastLoadedOrgId) {
+        console.log('⏭️ Already loaded invitations for this org, skipping');
+        return;
+      }
+      
+      // Prevent multiple simultaneous calls
+      if (loadingInvites) {
+        console.log('⏳ Already loading invitations, skipping duplicate call');
+        return;
+      }
       
       setLoadingInvites(true);
       try {
-        const invites = await getPendingOrgInvitations(currentOrgId);
+        console.log('🔍 Loading invitations for org:', currentOrg.id);
+        const invites = await getOrgInvitations(currentOrg.id);
         setPendingInvites(invites);
+        setLastLoadedOrgId(currentOrg.id);
+        console.log('✅ Successfully loaded invitations:', invites.length);
       } catch (error: any) {
-        console.error('Failed to load invitations:', error);
+        console.error('❌ Failed to load invitations:', error);
+        // Only show alert for non-permission errors to avoid spam
+        if (!error.message.includes('Access denied')) {
+          Alert.alert('Error', 'Failed to load invitations: ' + error.message);
+        }
       } finally {
         setLoadingInvites(false);
       }
-    }, [currentOrgId, isPersonalOrg]);
+    }, [currentOrg?.id, isPersonalOrg, canManageMembers, lastLoadedOrgId, loadingInvites]);
+
+    // Clear last loaded org ID when org changes
+    useEffect(() => {
+      if (currentOrg?.id && currentOrg.id !== lastLoadedOrgId) {
+        setLastLoadedOrgId(null);
+        setPendingInvites([]); // Clear old invites
+      }
+    }, [currentOrg?.id, lastLoadedOrgId]);
 
     useEffect(() => {
-      loadInvitations();
-    }, [loadInvitations]);
+      // Add a small delay to ensure profile context is fully loaded
+      const timer = setTimeout(() => {
+        if (currentOrg?.id && !isPersonalOrg && canManageMembers) {
+          loadInvitations();
+        }
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }, [currentOrg?.id, isPersonalOrg, canManageMembers, loadInvitations]);
 
     const handleCreateInvite = async () => {
-      if (!currentOrgId) {
+      if (!currentOrg?.id) {
         Alert.alert("Error", "No organization selected");
         return;
       }
@@ -86,28 +139,29 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
 
       setIsCreating(true);
       try {
-        const invitation = await createOrgInvitation(
-          currentOrgId,
-          selectedRole,
-          null, // team_id - simplified for now
-          null, // team_role
-          undefined // details
-        );
+        const invitation = await createOrgInvitation({
+          orgId: currentOrg.id,
+          role: selectedRole,
+          // For now, we're not assigning to teams directly in invites
+          // Users can be assigned to teams after they join
+        });
         
         // Copy to clipboard
         await Clipboard.setStringAsync(invitation.invite_code);
         
-        // Reload invitations
+        // Show success message
+        Alert.alert(
+          "Invitation Created!",
+          `Invite code ${invitation.invite_code} has been copied to your clipboard.`,
+          [{ text: "OK" }]
+        );
+        
+        // Reload invitations by resetting the cache first
+        setLastLoadedOrgId(null);
         await loadInvitations();
         
         // Callback
         onMemberInvited?.();
-        
-        Alert.alert(
-          "Invitation Created!",
-          `Code ${invitation.invite_code} copied to clipboard.\n\nShare this code with the person you want to invite.`,
-          [{ text: "OK" }]
-        );
       } catch (error: any) {
         console.error("Failed to create invitation:", error);
         Alert.alert("Error", error.message || "Failed to create invitation");
@@ -119,11 +173,13 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
     const handleCancelInvite = async (inviteId: string) => {
       try {
         await cancelOrgInvitation(inviteId);
+        // Reset cache and reload invitations
+        setLastLoadedOrgId(null);
         await loadInvitations();
         Alert.alert("Success", "Invitation cancelled");
       } catch (error: any) {
         console.error("Failed to cancel invitation:", error);
-        Alert.alert("Error", "Failed to cancel invitation");
+        Alert.alert("Error", error.message || "Failed to cancel invitation");
       }
     };
 

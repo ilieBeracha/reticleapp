@@ -1,11 +1,18 @@
+import { useProfile } from "@/contexts/ProfileContext";
 import { useColors } from "@/hooks/ui/useColors";
-import { acceptInvitation, validateInviteCode } from "@/services/invitationService";
-import type { WorkspaceInvitationWithDetails } from "@/types/workspace";
+import { acceptOrgInvitation, validateInviteCode } from "@/services/invitationService";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetScrollView, BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import { forwardRef, useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { BaseBottomSheet, type BaseBottomSheetRef } from "./BaseBottomSheet";
+
+interface ValidatedInvite {
+  valid: boolean;
+  orgName?: string;
+  role?: string;
+  expiresAt?: string;
+}
 
 interface AcceptInviteSheetProps {
   onInviteAccepted?: () => void;
@@ -14,71 +21,75 @@ interface AcceptInviteSheetProps {
 export const AcceptInviteSheet = forwardRef<BaseBottomSheetRef, AcceptInviteSheetProps>(
   ({ onInviteAccepted }, ref) => {
     const colors = useColors();
+    const { reloadProfiles } = useProfile();
     
     const [inviteCode, setInviteCode] = useState("");
-    const [validatedInvite, setValidatedInvite] = useState<WorkspaceInvitationWithDetails | null>(null);
+    const [validatedInvite, setValidatedInvite] = useState<ValidatedInvite | null>(null);
     const [isValidating, setIsValidating] = useState(false);
     const [isAccepting, setIsAccepting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const handleValidate = async () => {
-      const code = inviteCode.trim().toUpperCase();
-      
-      if (!code) {
-        setError("Please enter an invite code");
-        return;
-      }
+    const resetForm = () => {
+      setInviteCode("");
+      setValidatedInvite(null);
+      setError(null);
+      setIsValidating(false);
+      setIsAccepting(false);
+    };
 
-      if (code.length !== 8) {
-        setError("Invite code must be 8 characters");
+    const handleValidate = async () => {
+      if (!inviteCode.trim()) {
+        setError("Please enter an invite code");
         return;
       }
 
       setIsValidating(true);
       setError(null);
-      
+
       try {
-        const invite = await validateInviteCode(code);
-        if (invite) {
-          setValidatedInvite(invite);
+        const result = await validateInviteCode(inviteCode.trim());
+        
+        if (result.valid) {
+          setValidatedInvite(result);
         } else {
-          setError("Invalid invite code");
+          setError("Invalid or expired invite code");
         }
       } catch (error: any) {
-        console.error("Failed to validate invite:", error);
-        setError(error.message || "Invalid or expired invite code");
-        setValidatedInvite(null);
+        console.error("Validation error:", error);
+        setError("Failed to validate invite code");
       } finally {
         setIsValidating(false);
       }
     };
 
     const handleAccept = async () => {
-      if (!validatedInvite) return;
+      if (!inviteCode.trim()) return;
 
       setIsAccepting(true);
+      
       try {
-        await acceptInvitation(validatedInvite.invite_code);
+        await acceptOrgInvitation(inviteCode.trim());
+        
+        // Reload profiles to get the new organization
+        await reloadProfiles();
         
         Alert.alert(
-          "Welcome!",
-          `You've successfully joined ${validatedInvite.workspace_name || 'the workspace'}!`,
+          "Success!",
+          `Welcome to ${validatedInvite?.orgName || 'the organization'}!`,
           [
             {
               text: "OK",
               onPress: () => {
-                // Reset form
-                setInviteCode("");
-                setValidatedInvite(null);
-                setError(null);
+                resetForm();
                 onInviteAccepted?.();
-              },
-            },
+                (ref as any)?.current?.close();
+              }
+            }
           ]
         );
       } catch (error: any) {
-        console.error("Failed to accept invitation:", error);
-        Alert.alert("Error", error.message || "Failed to join workspace");
+        console.error("Accept error:", error);
+        Alert.alert("Error", error.message || "Failed to accept invitation");
       } finally {
         setIsAccepting(false);
       }
@@ -87,16 +98,14 @@ export const AcceptInviteSheet = forwardRef<BaseBottomSheetRef, AcceptInviteShee
     const handleDecline = () => {
       Alert.alert(
         "Decline Invitation",
-        "Are you sure you don't want to join this workspace?",
+        "Are you sure you don't want to join this organization?",
         [
           { text: "Cancel", style: "cancel" },
           {
             text: "Decline",
             style: "destructive",
             onPress: () => {
-              setInviteCode("");
-              setValidatedInvite(null);
-              setError(null);
+              resetForm();
             },
           },
         ]
@@ -136,7 +145,7 @@ export const AcceptInviteSheet = forwardRef<BaseBottomSheetRef, AcceptInviteShee
               <Ionicons name="enter" size={24} color={colors.primary} />
             </View>
             <Text style={[styles.title, { color: colors.text }]}>
-              Join Workspace
+              Join Organization
             </Text>
             <Text style={[styles.subtitle, { color: colors.textMuted }]}>
               Enter the invite code you received
@@ -163,7 +172,6 @@ export const AcceptInviteSheet = forwardRef<BaseBottomSheetRef, AcceptInviteShee
                     autoCapitalize="characters"
                     maxLength={8}
                     returnKeyType="go"
-                    onSubmitEditing={handleValidate}
                   />
                 </View>
                 {error && (
@@ -179,11 +187,11 @@ export const AcceptInviteSheet = forwardRef<BaseBottomSheetRef, AcceptInviteShee
                   styles.validateButton,
                   { 
                     backgroundColor: isValidating ? colors.secondary : colors.primary,
-                    opacity: isValidating ? 0.7 : 1,
+                    opacity: isValidating || !inviteCode.trim() ? 0.7 : 1,
                   }
                 ]}
+                disabled={isValidating || !inviteCode.trim()}
                 onPress={handleValidate}
-                disabled={isValidating}
                 activeOpacity={0.8}
               >
                 {isValidating ? (
@@ -204,7 +212,7 @@ export const AcceptInviteSheet = forwardRef<BaseBottomSheetRef, AcceptInviteShee
                     How to get an invite code?
                   </Text>
                   <Text style={[styles.helpText, { color: colors.textMuted }]}>
-                    Ask a workspace owner or admin to generate an invite code for you. They can share it via any messaging app.
+                    Ask an organization owner or admin to generate an invite code for you. They can share it via any messaging app.
                   </Text>
                 </View>
               </View>
@@ -218,35 +226,28 @@ export const AcceptInviteSheet = forwardRef<BaseBottomSheetRef, AcceptInviteShee
                 </View>
                 
                 <Text style={[styles.workspaceName, { color: colors.text }]}>
-                  {validatedInvite.workspace_name || 'Workspace'}
+                  {validatedInvite.orgName || 'Organization'}
                 </Text>
                 
-                <View style={[styles.roleIndicator, { backgroundColor: getRoleColor(validatedInvite.role) + '20' }]}>
+                <View style={[styles.roleIndicator, { backgroundColor: getRoleColor(validatedInvite.role!) + '20' }]}>
                   <Ionicons 
-                    name={getRoleIcon(validatedInvite.role) as any} 
+                    name={getRoleIcon(validatedInvite.role!) as any} 
                     size={18} 
-                    color={getRoleColor(validatedInvite.role)} 
+                    color={getRoleColor(validatedInvite.role!)} 
                   />
-                  <Text style={[styles.roleText, { color: getRoleColor(validatedInvite.role) }]}>
-                    You'll join as {validatedInvite.role.charAt(0).toUpperCase() + validatedInvite.role.slice(1)}
+                  <Text style={[styles.roleText, { color: getRoleColor(validatedInvite.role!) }]}>
+                    You'll join as {validatedInvite.role!.charAt(0).toUpperCase() + validatedInvite.role!.slice(1)}
                   </Text>
                 </View>
 
-                {validatedInvite.invited_by_name && (
-                  <View style={styles.invitedByContainer}>
-                    <Ionicons name="person-outline" size={14} color={colors.textMuted} />
-                    <Text style={[styles.invitedByText, { color: colors.textMuted }]}>
-                      Invited by {validatedInvite.invited_by_name}
+                {validatedInvite.expiresAt && (
+                  <View style={styles.expiryContainer}>
+                    <Ionicons name="time-outline" size={14} color={colors.textMuted} />
+                    <Text style={[styles.expiryText, { color: colors.textMuted }]}>
+                      Expires {new Date(validatedInvite.expiresAt).toLocaleDateString()}
                     </Text>
                   </View>
                 )}
-
-                <View style={styles.expiryContainer}>
-                  <Ionicons name="time-outline" size={14} color={colors.textMuted} />
-                  <Text style={[styles.expiryText, { color: colors.textMuted }]}>
-                    Expires {new Date(validatedInvite.expires_at).toLocaleDateString()}
-                  </Text>
-                </View>
               </View>
 
               {/* Accept/Decline Buttons */}
@@ -271,8 +272,8 @@ export const AcceptInviteSheet = forwardRef<BaseBottomSheetRef, AcceptInviteShee
                       opacity: isAccepting ? 0.7 : 1,
                     }
                   ]}
-                  onPress={handleAccept}
                   disabled={isAccepting}
+                  onPress={handleAccept}
                   activeOpacity={0.8}
                 >
                   {isAccepting ? (
