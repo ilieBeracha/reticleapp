@@ -9,10 +9,10 @@ import {
   deleteTeam as deleteTeamService,
   getTeamWithMembers,
   getWorkspaceTeams,
+  OrgCreateTeamInput,
   removeTeamMember as removeTeamMemberService,
   updateTeam as updateTeamService,
   type AddTeamMemberInput,
-  type CreateTeamInput,
   type UpdateTeamInput
 } from '@/services/teamService';
 import type { Team, TeamWithMembers } from '@/types/workspace';
@@ -26,7 +26,7 @@ interface TeamStore {
 
   // Actions
   loadTeams: (orgWorkspaceId: string) => Promise<void>;  // Simplified - always org
-  createTeam: (input: CreateTeamInput) => Promise<Team>;
+  createTeam: (input: OrgCreateTeamInput) => Promise<Team>;
   loadTeam: (teamId: string) => Promise<void>;
   updateTeam: (input: UpdateTeamInput) => Promise<void>;
   deleteTeam: (teamId: string) => Promise<void>;
@@ -59,7 +59,7 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
   /**
    * Create a new team
    */
-  createTeam: async (input: CreateTeamInput) => {
+  createTeam: async (input: OrgCreateTeamInput) => {
     try {
       set({ loading: true, error: null });
       const newTeam = await createTeamService(input);
