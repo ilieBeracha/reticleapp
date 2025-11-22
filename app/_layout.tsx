@@ -1,16 +1,17 @@
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ModalProvider } from '@/contexts/ModalContext';
 import { useColorScheme } from '@/hooks/ui/useColorScheme';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import * as Sentry from '@sentry/react-native';
 import { useFonts } from 'expo-font';
 import { Slot } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import '../global.css';
-import * as Sentry from '@sentry/react-native';
 
 Sentry.init({
   dsn: 'https://6b988aab11e9428cfd2db3c3cc4521aa@o4510334793744384.ingest.de.sentry.io/4510370355675216',
@@ -52,16 +53,18 @@ function RootLayoutInner() {
   const mode = colorScheme === 'dark' ? 'dark' : 'light';
   return (
     <GluestackUIProvider mode={mode as 'dark' | 'light' | 'system'}>
-      <AuthProvider>
-        <SafeAreaProvider>
-          <BottomSheetModalProvider>
-            <GestureHandlerRootView>
-              <Slot />
-              <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-            </GestureHandlerRootView>
-          </BottomSheetModalProvider>
-        </SafeAreaProvider>
-      </AuthProvider>
+      <ModalProvider>
+        <AuthProvider>
+          <SafeAreaProvider>
+            <BottomSheetModalProvider>
+              <GestureHandlerRootView>
+                <Slot />
+                <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+              </GestureHandlerRootView>
+            </BottomSheetModalProvider>
+          </SafeAreaProvider>
+        </AuthProvider>
+      </ModalProvider>
     </GluestackUIProvider>
   );
 }

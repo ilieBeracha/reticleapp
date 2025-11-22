@@ -56,19 +56,14 @@ export async function createTeam(input: CreateTeamInput): Promise<Team> {
  * Get teams for a workspace with member count
  */
 export async function getWorkspaceTeams(
-  workspaceType: 'personal' | 'org',
-  workspaceId: string
+  orgWorkspaceId: string
 ): Promise<(Team & { member_count?: number })[]> {
   let query = supabase
     .from('teams')
     .select('*, team_members(count)')
     .order('created_at', { ascending: false });
 
-  if (workspaceType === 'personal') {
-    query = query.eq('workspace_owner_id', workspaceId);
-  } else {
-    query = query.eq('org_workspace_id', workspaceId);
-  }
+    query = query.eq('org_workspace_id', orgWorkspaceId);
 
   const { data, error } = await query;
 

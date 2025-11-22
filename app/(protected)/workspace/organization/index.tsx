@@ -241,8 +241,6 @@ const HomeScreen = () => {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} />
-      
-      
 
       <ScrollView
         style={styles.content}

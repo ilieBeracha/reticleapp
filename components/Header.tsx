@@ -1,9 +1,10 @@
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BellIcon } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { BaseAvatar } from './BaseAvatar';
-
+  
 interface HeaderProps {
   notificationCount?: number;
   onNotificationPress?: () => void;
@@ -19,6 +20,14 @@ export function Header({ notificationCount = 0, onNotificationPress, onUserPress
   const workspaceName =
     activeWorkspace?.workspace_name || 'Workspace';
 
+  const getWorkspaceIcon = (workspaceType: string) => {
+    switch (workspaceType) {
+      case 'org':
+        return 'office-building';
+      case 'personal':
+        return 'account';
+    }
+  };
   return (
     <View style={styles.wrapper}>
       <View style={[styles.container]}>
@@ -35,16 +44,16 @@ export function Header({ notificationCount = 0, onNotificationPress, onUserPress
             </View>
           </Pressable>
 
-          {/* <Pressable
+          <Pressable
             onPress={onWorkspacePress}
             style={({ pressed }) => [styles.workspace, { backgroundColor: pressed ? colors.secondary : 'transparent' }]}
           >
-            <Text style={[styles.workspaceText, { color: colors.text }]} numberOfLines={1}>
-              {workspaceName}
-            </Text>
-
-            <ChevronDownIcon size={16} color={colors.tint} strokeWidth={2.5} />
-          </Pressable> */}
+            <MaterialCommunityIcons name={getWorkspaceIcon(!activeWorkspace?.id ? 'personal' : 'org')} size={24} color={colors.text} >
+              {
+                activeWorkspace?.id ? workspaceName : 'Profile'
+              }
+            </MaterialCommunityIcons>
+          </Pressable>
         </View>
 
         {/* Right Section */}

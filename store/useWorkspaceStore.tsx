@@ -16,7 +16,7 @@ interface WorkspaceStore {
   loadWorkspaces: () => Promise<void>;
   setActiveWorkspace: (workspaceId: string | null) => void;
   reset: () => void;
-}
+} 
 
 /**
  * ✨ ORG-ONLY WORKSPACE STORE ✨
