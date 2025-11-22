@@ -12,17 +12,21 @@ interface ModalContextType {
   createSessionSheetRef: React.RefObject<BaseBottomSheetRef | null>;
   createTeamSheetRef: React.RefObject<BaseBottomSheetRef | null>;
   inviteMembersSheetRef: React.RefObject<BaseBottomSheetRef | null>;
+  createWorkspaceSheetRef: React.RefObject<BaseBottomSheetRef | null>;
   acceptInviteSheetRef: React.RefObject<BaseBottomSheetRef | null>;
   workspaceSwitcherSheetRef: React.RefObject<BaseBottomSheetRef | null>;
   onSessionCreated: (() => void) | null;
   onTeamCreated: (() => void) | null;
   onMemberInvited: (() => void) | null;
   onInviteAccepted: (() => void) | null;
+  onWorkspaceCreated: (() => void) | null;
   onWorkspaceSwitched: (() => void) | null;
   setOnSessionCreated: (callback: (() => void) | null) => void;
   setOnTeamCreated: (callback: (() => void) | null) => void;
   setOnMemberInvited: (callback: (() => void) | null) => void;
   setOnInviteAccepted: (callback: (() => void) | null) => void;
+  setOnWorkspaceCreated: (callback: (() => void) | null) => void;
+  setOnWorkspaceSwitched: (callback: (() => void) | null) => void;
 }
 
 const ModalContext = createContext<ModalContextType | null>(null);
@@ -32,6 +36,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
   const createSessionSheetRef = useRef<BaseBottomSheetRef>(null);
   const createTeamSheetRef = useRef<BaseBottomSheetRef>(null);
   const inviteMembersSheetRef = useRef<BaseBottomSheetRef>(null);
+  const createWorkspaceSheetRef = useRef<BaseBottomSheetRef>(null);
   const acceptInviteSheetRef = useRef<BaseBottomSheetRef>(null);
   const workspaceSwitcherSheetRef = useRef<BaseBottomSheetRef>(null);
   const [onWorkspaceSwitched, setOnWorkspaceSwitched] = useState<(() => void) | null>(null);
@@ -39,6 +44,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
   const [onTeamCreated, setOnTeamCreated] = useState<(() => void) | null>(null);
   const [onMemberInvited, setOnMemberInvited] = useState<(() => void) | null>(null);
   const [onInviteAccepted, setOnInviteAccepted] = useState<(() => void) | null>(null);
+  const [onWorkspaceCreated, setOnWorkspaceCreated] = useState<(() => void) | null>(null);
 
 
   return (
@@ -48,6 +54,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
         createSessionSheetRef,
         createTeamSheetRef,
         inviteMembersSheetRef,
+        createWorkspaceSheetRef,
         acceptInviteSheetRef,
         workspaceSwitcherSheetRef,
         onSessionCreated,
@@ -55,11 +62,14 @@ export function ModalProvider({ children }: { children: ReactNode }) {
         onMemberInvited,
         onInviteAccepted,
         onWorkspaceSwitched,
+        onWorkspaceCreated,
         setOnSessionCreated,
         setOnTeamCreated,
         setOnMemberInvited,
         setOnInviteAccepted,
-      }}
+        setOnWorkspaceCreated,
+        setOnWorkspaceSwitched,
+        }}
     >
       {children}
     </ModalContext.Provider>

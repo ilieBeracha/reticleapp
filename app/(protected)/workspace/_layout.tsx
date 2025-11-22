@@ -1,7 +1,3 @@
-import { AcceptInviteSheet } from '@/components/modals/AcceptInviteSheet';
-import { ComingSoonSheet } from '@/components/modals/ComingSoonSheet';
-import { CreateSessionSheet } from '@/components/modals/CreateSessionSheet';
-import { CreateTeamSheet } from '@/components/modals/CreateTeamSheet';
 import Tabs from '@/components/withLayoutContext';
 import { useModals } from '@/contexts/ModalContext';
 import { OrgRoleProvider } from '@/contexts/OrgRoleContext';
@@ -10,21 +6,20 @@ import { useNavigation } from 'expo-router';
 import { useEffect } from 'react';
 
 function ProtectedLayoutContent() {
-  const { primary, accent, background } = useColors();
+  const { primary } = useColors();
   
   const navigation = useNavigation();
   const {
     chartDetailsSheetRef,
     createSessionSheetRef,
     createTeamSheetRef,
-    inviteMembersSheetRef,
     acceptInviteSheetRef,
     workspaceSwitcherSheetRef,
     onSessionCreated,
     onTeamCreated,
-    onMemberInvited,
     onInviteAccepted,
-    onWorkspaceSwitched,
+    onWorkspaceCreated,
+    createWorkspaceSheetRef,
     } = useModals();
 
   // Listen for navigation to organizations tab and open switcher
@@ -77,49 +72,7 @@ function ProtectedLayoutContent() {
         />
       </Tabs>
 
-      {/* CHART DETAILS */}
-      <ComingSoonSheet
-        ref={chartDetailsSheetRef}
-        title="Detailed Analytics"
-        subtitle="Get insights into your training patterns"
-        icon="bar-chart"
-      />
-
-      {/* CREATE SESSION */}
-      <CreateSessionSheet
-        ref={createSessionSheetRef}
-        onSessionCreated={() => {
-          createSessionSheetRef.current?.close();
-          // Call the registered callback if it exists
-          if (onSessionCreated) {
-            onSessionCreated();
-          }
-        }}
-      />
-
-      {/* CREATE TEAM */}
-      <CreateTeamSheet
-        ref={createTeamSheetRef}
-        onTeamCreated={() => {
-          createTeamSheetRef.current?.close();
-          // Call the registered callback if it exists
-          if (onTeamCreated) {
-            onTeamCreated();
-          }
-        }}
-      />
-
-      {/* ACCEPT INVITE */}
-      <AcceptInviteSheet
-        ref={acceptInviteSheetRef}
-        onInviteAccepted={() => {
-          acceptInviteSheetRef.current?.close();
-          // Call the registered callback if it exists
-          if (onInviteAccepted) {
-            onInviteAccepted();
-          }
-        }}
-      />
+     
     </>
   );
 }

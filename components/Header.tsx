@@ -1,9 +1,11 @@
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { BellIcon } from 'lucide-react-native';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { BaseAvatar } from './BaseAvatar';
+import { Text } from './ui/text';
   
 interface HeaderProps {
   notificationCount?: number;
@@ -48,21 +50,23 @@ export function Header({ notificationCount = 0, onNotificationPress, onUserPress
             onPress={onWorkspacePress}
             style={({ pressed }) => [styles.workspace, { backgroundColor: pressed ? colors.secondary : 'transparent' }]}
           >
-            <MaterialCommunityIcons name={getWorkspaceIcon(!activeWorkspace?.id ? 'personal' : 'org')} size={24} color={colors.text} >
-              {
-                activeWorkspace?.id ? workspaceName : 'Profile'
-              }
-            </MaterialCommunityIcons>
+              <Text style={[styles.workspaceText, { color: colors.textMuted}]}>
+                {activeWorkspace?.id ? workspaceName : 'Profile'}
+              </Text>
+          </Pressable>
+
+          <Pressable onPress={() => router.push('/(protected)/workspace')} style={({ pressed }) => [styles.workspace , { backgroundColor: pressed ? colors.secondary : 'transparent' }]}>
+            <MaterialCommunityIcons name="chevron-right" size={20} color={colors.text} />
           </Pressable>
         </View>
 
         {/* Right Section */}
-        <Pressable
+        <TouchableOpacity
           onPress={onNotificationPress}
-          style={({ pressed }) => [styles.notification, pressed && { opacity: 0.8 }]}
+          style={styles.notification}
         >
           <BellIcon size={18} color={colors.tint} strokeWidth={2} />
-        </Pressable>
+        </TouchableOpacity>
       </View>
 
       <View style={[styles.divider]} />
@@ -72,12 +76,16 @@ export function Header({ notificationCount = 0, onNotificationPress, onUserPress
 
 const styles = StyleSheet.create({
   wrapper: {
-    flex: 1,
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
   },
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+
 
 
     display: 'flex',
@@ -114,6 +122,7 @@ const styles = StyleSheet.create({
   },
   workspaceText: {
     fontSize: 17,
+    lineHeight: 24,
     fontWeight: '600',
     letterSpacing: -0.5,
     flexShrink: 1,
@@ -122,7 +131,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     display: 'flex',
     flexDirection: 'row',
-    alignItems: 'center',
+
     gap: 2,
   },
   badge: {
@@ -149,10 +158,6 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
   notification: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 10,
   },
 });

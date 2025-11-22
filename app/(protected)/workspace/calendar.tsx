@@ -1,16 +1,17 @@
 import { TrainingCalendar } from '@/components/ui/TrainingCalendar';
-import { CalendarEvent, getTodayString } from '@/hooks/ui/useCalendar';
+import { CalendarEvent } from '@/hooks/ui/useCalendar';
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
+import { getSessions, SessionWithDetails } from '@/services/sessionService';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useMemo, useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
-    FadeInDown,
-    FadeInLeft,
-    LayoutAnimationConfig,
-    LinearTransition
+  FadeInDown,
+  FadeInLeft,
+  LayoutAnimationConfig,
+  LinearTransition
 } from 'react-native-reanimated';
 
 type EventFilter = 'all' | 'training' | 'session' | 'assessment' | 'briefing' | 'qualification';
@@ -61,7 +62,7 @@ function DayEventsGroup({ dateString, events, selectedWeekDate, onEventPress }: 
               },
             ]}
           >
-            <View style={[styles.eventDotWeek, { backgroundColor: colors.accent }]} />
+            <View style={[styles.eventDotWeek, { backgroundColor: event.color || colors.accent }]} />
             <View style={styles.eventContent}>
               <Text style={[styles.eventTitleWeek, { color: colors.text }]} numberOfLines={1}>
                 {event.title}
@@ -76,123 +77,96 @@ function DayEventsGroup({ dateString, events, selectedWeekDate, onEventPress }: 
   );
 }
 
-export default function CalendarDemoScreen() {
+export default function CalendarScreen() {
   const colors = useColors();
   const { activeWorkspace } = useAppContext();
   const [filter, setFilter] = useState<EventFilter>('all');
   const [viewMode, setViewMode] = useState<CalendarViewMode>('week');
   const [selectedWeekDate, setSelectedWeekDate] = useState<string>('');
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Generate more realistic sample events
-  const generateSampleEvents = (): CalendarEvent[] => {
-    const events: CalendarEvent[] = [];
-    const today = new Date();
+  // Fetch events
+  useEffect(() => {
+    let isMounted = true;
+    
+    const loadEvents = async () => {
+      setIsLoading(true);
+      try {
+        // Fetch sessions based on workspace context (or all if none selected)
+        const sessions = await getSessions(activeWorkspace?.id);
+        
+        if (!isMounted) return;
 
-    // Past events (last 2 weeks)
-    for (let i = 14; i > 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
-
-      if (i % 3 === 0) {
-        events.push({
-          id: `past-${i}`,
-          date: dateStr,
-          title: 'Live Fire Training',
-          type: 'training',
+        // Map sessions to calendar events
+        const mappedEvents: CalendarEvent[] = sessions.map((session: SessionWithDetails) => {
+            // Try to determine a better type or title based on session data
+            const title = session.session_data?.name || 
+                          (session.team_name ? `${session.team_name} Session` : 'Training Session');
+            
+            return {
+                id: session.id,
+                date: session.started_at.split('T')[0],
+                title: title,
+                type: 'session', // Default type for now
+                // Optional: Color code based on status or other attributes
+                color: session.status === 'completed' ? colors.green : 
+                       session.status === 'active' ? colors.blue : colors.muted
+            };
         });
+
+        setEvents(mappedEvents);
+      } catch (error) {
+        console.error('Failed to load calendar events:', error);
+        if (isMounted) {
+          Alert.alert('Error', 'Failed to load calendar events');
+        }
+      } finally {
+        if (isMounted) {
+            setIsLoading(false);
+        }
       }
-      if (i % 5 === 0) {
-        events.push({
-          id: `past-session-${i}`,
-          date: dateStr,
-          title: 'Range Session',
-          type: 'session',
-        });
-      }
-    }
+    };
 
-    // Today's events
-    events.push({
-      id: '1',
-      date: getTodayString(),
-      title: 'Sniper Qualification',
-      type: 'qualification',
-    });
-    events.push({
-      id: '2',
-      date: getTodayString(),
-      title: 'Team Coordination Drill',
-      type: 'training',
-    });
+    loadEvents();
 
-    // Upcoming events (next 3 weeks)
-    const upcomingEvents = [
-      { days: 1, title: 'Equipment Safety Briefing', type: 'briefing' as const },
-      { days: 2, title: 'Marksmanship Assessment', type: 'assessment' as const },
-      { days: 3, title: 'Squad Training Exercise', type: 'training' as const },
-      { days: 4, title: 'Tactical Movement Session', type: 'session' as const },
-      { days: 5, title: 'Leadership Team Briefing', type: 'briefing' as const },
-      { days: 7, title: 'Advanced Rifle Qualification', type: 'qualification' as const },
-      { days: 7, title: 'Close Quarter Combat Training', type: 'training' as const },
-      { days: 9, title: 'Night Operations Session', type: 'session' as const },
-      { days: 11, title: 'Mid-Month Skills Assessment', type: 'assessment' as const },
-      { days: 14, title: 'Multi-Team Field Exercise', type: 'training' as const },
-      { days: 14, title: 'Strategy Planning Briefing', type: 'briefing' as const },
-      { days: 16, title: 'Weapons Maintenance Session', type: 'session' as const },
-      { days: 18, title: 'Physical Fitness Assessment', type: 'assessment' as const },
-      { days: 20, title: 'Specialist Qualification', type: 'qualification' as const },
-      { days: 21, title: 'Full Battalion Training', type: 'training' as const },
-    ];
-
-    upcomingEvents.forEach((event, index) => {
-      const date = new Date(today);
-      date.setDate(date.getDate() + event.days);
-      events.push({
-        id: `future-${index}`,
-        date: date.toISOString().split('T')[0],
-        title: event.title,
-        type: event.type,
-      });
-    });
-
-    return events;
-  };
-
-  const allEvents = useMemo(() => generateSampleEvents(), []);
+    return () => {
+      isMounted = false;
+    };
+  }, [activeWorkspace?.id]);
 
   const filteredEvents = useMemo(() => {
-    if (filter === 'all') return allEvents;
-    return allEvents.filter((event) => event.type === filter);
-  }, [allEvents, filter]);
+    if (filter === 'all') return events;
+    return events.filter((event) => event.type === filter);
+  }, [events, filter]);
 
   const stats = useMemo(() => {
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
-    const thisMonthEvents = allEvents.filter((event) => {
+    const thisMonthEvents = events.filter((event) => {
       const eventDate = new Date(event.date);
       return eventDate.getMonth() === currentMonth && eventDate.getFullYear() === currentYear;
     });
 
-    const upcomingEvents = allEvents.filter((event) => new Date(event.date) >= now);
+    const upcomingEvents = events.filter((event) => new Date(event.date) >= now);
 
     const eventsByType = {
-      training: allEvents.filter((e) => e.type === 'training').length,
-      session: allEvents.filter((e) => e.type === 'session').length,
-      assessment: allEvents.filter((e) => e.type === 'assessment').length,
-      briefing: allEvents.filter((e) => e.type === 'briefing').length,
-      qualification: allEvents.filter((e) => e.type === 'qualification').length,
+      training: events.filter((e) => e.type === 'training').length,
+      session: events.filter((e) => e.type === 'session').length,
+      assessment: events.filter((e) => e.type === 'assessment').length,
+      briefing: events.filter((e) => e.type === 'briefing').length,
+      qualification: events.filter((e) => e.type === 'qualification').length,
     };
 
     return {
-      total: allEvents.length,
+      total: events.length,
       thisMonth: thisMonthEvents.length,
       upcoming: upcomingEvents.length,
       byType: eventsByType,
     };
-  }, [allEvents]);
+  }, [events]);
 
   const handleEventPress = (event: CalendarEvent) => {
     Alert.alert(
@@ -214,23 +188,8 @@ export default function CalendarDemoScreen() {
   };
 
   const handleCreateTraining = (date: string) => {
-    Alert.alert(
-      'Create Training Event',
-      `Schedule a new training event for ${new Date(date).toLocaleDateString('en-US', {
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric',
-      })}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Create',
-          onPress: () => {
-            console.log('Creating training for:', date);
-          },
-        },
-      ]
-    );
+    // Implementation depends on create capability
+    console.log('Create training for', date);
   };
 
   const handleFilterChange = (newFilter: EventFilter) => {
@@ -239,18 +198,6 @@ export default function CalendarDemoScreen() {
       setFilter(newFilter);
     }
   };
-
-  // Generate marked dates for WeekCalendar
-  const markedDates = useMemo(() => {
-    return filteredEvents.reduce((acc, event) => {
-      if (!acc[event.date]) {
-        acc[event.date] = { dots: [] };
-      }
-      const eventColor = event.color || colors.accent;
-      acc[event.date].dots.push({ color: eventColor });
-      return acc;
-    }, {} as any);
-  }, [filteredEvents, colors]);
 
   // Get current week date range (Monday to Sunday)
   const currentWeekDates = useMemo(() => {
@@ -277,12 +224,6 @@ export default function CalendarDemoScreen() {
       .sort((a, b) => a.date.localeCompare(b.date));
   }, [filteredEvents, currentWeekDates]);
 
-  // Get events for selected week date (if any selected)
-  const selectedDateEvents = useMemo(() => {
-    if (!selectedWeekDate) return [];
-    return filteredEvents.filter((event) => event.date === selectedWeekDate);
-  }, [selectedWeekDate, filteredEvents]);
-
   // Group current week events by date
   const groupedWeekEvents = useMemo(() => {
     const grouped: { [date: string]: CalendarEvent[] } = {};
@@ -297,11 +238,12 @@ export default function CalendarDemoScreen() {
 
   const filterOptions: { id: EventFilter; label: string; icon: string }[] = [
     { id: 'all', label: 'All', icon: 'grid-outline' },
-    { id: 'training', label: 'Training', icon: 'fitness-outline' },
     { id: 'session', label: 'Session', icon: 'time-outline' },
-    { id: 'assessment', label: 'Assessment', icon: 'clipboard-outline' },
-    { id: 'briefing', label: 'Briefing', icon: 'document-text-outline' },
-    { id: 'qualification', label: 'Qualification', icon: 'ribbon-outline' },
+    // Only show other filters if they have counts > 0 to avoid clutter
+    ...(stats.byType.training > 0 ? [{ id: 'training' as const, label: 'Training', icon: 'fitness-outline' }] : []),
+    ...(stats.byType.assessment > 0 ? [{ id: 'assessment' as const, label: 'Assessment', icon: 'clipboard-outline' }] : []),
+    ...(stats.byType.briefing > 0 ? [{ id: 'briefing' as const, label: 'Briefing', icon: 'document-text-outline' }] : []),
+    ...(stats.byType.qualification > 0 ? [{ id: 'qualification' as const, label: 'Qualification', icon: 'ribbon-outline' }] : []),
   ];
 
   return (
@@ -315,9 +257,11 @@ export default function CalendarDemoScreen() {
         <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.header}>
           <View style={styles.headerTop}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.headerTitle, { color: colors.text }]}>Training Calendar</Text>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>
+                {activeWorkspace ? activeWorkspace.workspace_name : 'My Calendar'}
+              </Text>
               <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
-                {stats.upcoming} upcoming • {stats.thisMonth} this month
+                {isLoading ? 'Loading...' : `${stats.upcoming} upcoming • ${stats.thisMonth} this month`}
               </Text>
             </View>
 
@@ -378,83 +322,89 @@ export default function CalendarDemoScreen() {
           </View>
         </Animated.View>
 
-        {/* Enhanced Filter Chips */}
-        <Animated.View entering={FadeInDown.delay(400).springify()} style={styles.segmentContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.segmentScroll}>
-            {filterOptions.map((option, index) => {
-              const count =
-                option.id === 'all' ? stats.total : stats.byType[option.id as keyof typeof stats.byType] || 0;
-
-              return (
-                <FilterChip
-                  key={option.id}
-                  option={option}
-                  isActive={filter === option.id}
-                  count={count}
-                  onPress={() => handleFilterChange(option.id)}
-                  delay={450 + index * 50}
-                />
-              );
-            })}
-          </ScrollView>
-        </Animated.View>
-
-        {/* Calendar Views */}
-        {viewMode === 'week' ? (
-          <Animated.View
-            entering={FadeInDown.delay(600).springify()}
-            layout={LinearTransition.springify().damping(20)}
-            style={styles.weekViewContainer}
-          >
-          
-
-            {/* Current Week Events - Grouped by Day */}
-            {currentWeekEvents.length > 0 ? (
-              <View style={[styles.weekEventsContainer, { backgroundColor: colors.card }]}>
-                <Text style={[styles.weekEventsHeader, { color: colors.text }]}>This Week's Events</Text>
-                {currentWeekDates.map((dateString) => {
-                  const dayEvents = groupedWeekEvents[dateString] || [];
-                  return (
-                    <DayEventsGroup
-                      key={dateString}
-                      dateString={dateString}
-                      events={dayEvents}
-                      selectedWeekDate={selectedWeekDate}
-                      onEventPress={handleEventPress}
-                    />
-                  );
-                })}
-              </View>
-            ) : (
-              <View style={[styles.emptyWeekState, { backgroundColor: colors.card }]}>
-                <Ionicons name="calendar-outline" size={40} color={colors.textMuted} />
-                <Text style={[styles.emptyWeekText, { color: colors.textMuted }]}>No events this week</Text>
-              </View>
-            )}
-          </Animated.View>
+        {isLoading ? (
+            <View style={{ padding: 40, alignItems: 'center' }}>
+                <ActivityIndicator size="large" color={colors.accent} />
+            </View>
         ) : (
-          <Animated.View entering={FadeInDown.delay(600).springify()} layout={LinearTransition.springify().damping(20)}>
-            <TrainingCalendar
-              events={filteredEvents}
-              onEventPress={handleEventPress}
-              onCreateTraining={handleCreateTraining}
-              viewMode="month"
-            />
-          </Animated.View>
-        )}
+            <>
+                {/* Enhanced Filter Chips */}
+                <Animated.View entering={FadeInDown.delay(400).springify()} style={styles.segmentContainer}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.segmentScroll}>
+                    {filterOptions.map((option, index) => {
+                    const count =
+                        option.id === 'all' ? stats.total : stats.byType[option.id as keyof typeof stats.byType] || 0;
 
-        {/* Empty State when filtered */}
-        {filteredEvents.length === 0 && filter !== 'all' && (
-          <Animated.View
-            entering={FadeInDown.delay(100).springify()}
-            style={[styles.emptyState, { backgroundColor: colors.card }]}
-          >
-            <Ionicons name="calendar-outline" size={48} color={colors.textMuted} />
-            <Text style={[styles.emptyStateTitle, { color: colors.text }]}>No {filter} events</Text>
-            <Text style={[styles.emptyStateText, { color: colors.textMuted }]}>
-              Try selecting a different filter or create a new event
-            </Text>
-          </Animated.View>
+                    return (
+                        <FilterChip
+                        key={option.id}
+                        option={option}
+                        isActive={filter === option.id}
+                        count={count}
+                        onPress={() => handleFilterChange(option.id)}
+                        delay={450 + index * 50}
+                        />
+                    );
+                    })}
+                </ScrollView>
+                </Animated.View>
+
+                {/* Calendar Views */}
+                {viewMode === 'week' ? (
+                <Animated.View
+                    entering={FadeInDown.delay(600).springify()}
+                    layout={LinearTransition.springify().damping(20)}
+                    style={styles.weekViewContainer}
+                >
+                    {/* Current Week Events - Grouped by Day */}
+                    {currentWeekEvents.length > 0 ? (
+                    <View style={[styles.weekEventsContainer, { backgroundColor: colors.card }]}>
+                        <Text style={[styles.weekEventsHeader, { color: colors.text }]}>This Week's Events</Text>
+                        {currentWeekDates.map((dateString) => {
+                        const dayEvents = groupedWeekEvents[dateString] || [];
+                        return (
+                            <DayEventsGroup
+                            key={dateString}
+                            dateString={dateString}
+                            events={dayEvents}
+                            selectedWeekDate={selectedWeekDate}
+                            onEventPress={handleEventPress}
+                            />
+                        );
+                        })}
+                    </View>
+                    ) : (
+                    <View style={[styles.emptyWeekState, { backgroundColor: colors.card }]}>
+                        <Ionicons name="calendar-outline" size={40} color={colors.textMuted} />
+                        <Text style={[styles.emptyWeekText, { color: colors.textMuted }]}>No events this week</Text>
+                    </View>
+                    )}
+                </Animated.View>
+                ) : (
+                <Animated.View entering={FadeInDown.delay(600).springify()} layout={LinearTransition.springify().damping(20)}>
+                    <TrainingCalendar
+                    events={filteredEvents}
+                    onEventPress={handleEventPress}
+                    onCreateTraining={handleCreateTraining}
+                    viewMode="month"
+                    />
+                </Animated.View>
+                )}
+
+                {/* Empty State when filtered */}
+                {filteredEvents.length === 0 && filter !== 'all' && (
+                <Animated.View
+                    entering={FadeInDown.delay(100).springify()}
+                    style={[styles.emptyState, { backgroundColor: colors.card }]}
+                >
+                    <Ionicons name="calendar-outline" size={48} color={colors.textMuted} />
+                    <Text style={[styles.emptyStateTitle, { color: colors.text }]}>No {filter} events</Text>
+                    <Text style={[styles.emptyStateText, { color: colors.textMuted }]}>
+                    Try selecting a different filter or create a new event
+                    </Text>
+                </Animated.View>
+                )}
+            </>
         )}
       </LayoutAnimationConfig>
     </ScrollView>

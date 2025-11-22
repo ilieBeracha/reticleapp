@@ -50,13 +50,13 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
       close: () => bottomSheetRef.current?.close(),
     }));
 
-    // Group workspaces: My workspace first, then others
+    // Group workspaces: My workspaces first, then others
     const groupedWorkspaces = useMemo(() => {
-      const myWorkspace = workspaces.find(w => w.created_by === userId);
+      const myWorkspaces = workspaces.filter(w => w.created_by === userId);
       const otherWorkspaces = workspaces.filter(w => w.created_by !== userId);
 
       return {
-        myWorkspace: myWorkspace ? [myWorkspace] : [],
+        myWorkspaces,
         otherWorkspaces
       };
     }, [workspaces, userId]);
@@ -163,17 +163,58 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
                 </View>
               </View>
               <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-                Switch between your workspaces
+                Switch between your workspaces or work without one
               </Text>
             </View>
 
-            {/* My Workspace Section */}
-            {groupedWorkspaces.myWorkspace.length > 0 && (
+            {/* Personal Mode - No Workspace */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>No Workspace</Text>
+              </View>
+              <TouchableOpacity 
+                style={[
+                  styles.workspaceItem,
+                  !activeWorkspaceId && styles.workspaceItemActive,
+                ]}
+                onPress={() => {
+                  switchWorkspace(null);
+                  bottomSheetRef.current?.close();
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.workspaceItemContent}>
+                  <View style={[styles.workspaceIcon, { backgroundColor: colors.card }]}>
+                    <Ionicons name="person-outline" size={20} color={colors.text} />
+                  </View>
+                  <View style={styles.workspaceDetails}>
+                    <Text style={[
+                      styles.workspaceName, 
+                      { color: colors.text },
+                      !activeWorkspaceId && styles.workspaceNameActive,
+                    ]}>
+                      Personal Mode
+                    </Text>
+                    <Text style={[styles.workspaceMeta, { color: colors.textMuted, fontSize: 13 }]}>
+                      Work independently without a workspace
+                    </Text>
+                  </View>
+                  {!activeWorkspaceId && (
+                    <View style={[styles.checkmarkContainer, { backgroundColor: colors.primary + '1A' }]}>
+                      <Ionicons name="checkmark" size={16} color={colors.primary} />
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* My Workspaces Section */}
+            {groupedWorkspaces.myWorkspaces.length > 0 && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Personal</Text>
+                  <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>My Workspaces</Text>
                 </View>
-                {groupedWorkspaces.myWorkspace.map((workspace) => (
+                {groupedWorkspaces.myWorkspaces.map((workspace) => (
                   <WorkspaceItem
                     key={workspace.id}
                     workspace={workspace}
@@ -206,7 +247,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
             )}
 
             {/* Empty state */}
-            {groupedWorkspaces.myWorkspace.length === 0 && groupedWorkspaces.otherWorkspaces.length === 0 && (
+            {groupedWorkspaces.myWorkspaces.length === 0 && groupedWorkspaces.otherWorkspaces.length === 0 && (
               <View style={styles.emptyState}>
                 <View style={[styles.emptyIconContainer, { backgroundColor: colors.card }]}>
                   <Ionicons name="briefcase-outline" size={48} color={colors.textMuted} />

@@ -19,7 +19,7 @@ export interface AppContext {
   workspaces: Workspace[];
   
   // Actions
-  switchWorkspace: (workspaceId: string) => Promise<void>;
+  switchWorkspace: (workspaceId: string | null) => Promise<void>;
   
   // Loading states
   loading: boolean;
@@ -78,8 +78,10 @@ export function useAppContext(): AppContext {
       };
     }
 
-    // Active workspace
-    const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0] || null;
+    // Active workspace (only if activeWorkspaceId is not null)
+    const activeWorkspace = activeWorkspaceId 
+      ? workspaces.find(w => w.id === activeWorkspaceId) || null
+      : null;
 
     return {
       // User
@@ -89,14 +91,14 @@ export function useAppContext(): AppContext {
       avatarUrl: user.user_metadata?.avatar_url ?? null,
       
       // Workspace
-      activeWorkspaceId: activeWorkspace?.id || null,
+      activeWorkspaceId: activeWorkspaceId,
       activeWorkspace,
       
       // All workspaces
       workspaces,
       
       // Actions
-      switchWorkspace: async (workspaceId: string) => {
+      switchWorkspace: async (workspaceId: string | null) => {
         setActiveWorkspace(workspaceId);
         router.replace('/(protected)/workspace');
       },

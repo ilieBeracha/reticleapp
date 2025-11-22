@@ -1,6 +1,11 @@
 import { Header } from '@/components/Header';
-import { WorkspaceSwitcherBottomSheet } from '@/components/modals';
+import { AcceptInviteSheet } from '@/components/modals/AcceptInviteSheet';
+import { ComingSoonSheet } from '@/components/modals/ComingSoonSheet';
+import { CreateSessionSheet } from '@/components/modals/CreateSessionSheet';
+import { CreateTeamSheet } from '@/components/modals/CreateTeamSheet';
+import { CreateWorkspaceSheet } from '@/components/modals/CreateWorkspaceSheet';
 import { UserMenuBottomSheet, UserMenuBottomSheetRef } from '@/components/modals/UserMenuBottomSheet';
+import { WorkspaceSwitcherBottomSheet } from '@/components/modals/WorkspaceSwitcherBottomSheet';
 import { useModals } from '@/contexts/ModalContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { useColors } from '@/hooks/ui/useColors';
@@ -9,7 +14,7 @@ import { useRef } from 'react';
 
 export default function ProtectedLayout() {
   const userMenuSheetRef = useRef<UserMenuBottomSheetRef>(null);
-  const { workspaceSwitcherSheetRef, onWorkspaceSwitched } = useModals();
+  const { workspaceSwitcherSheetRef, onWorkspaceSwitched, onWorkspaceCreated, createWorkspaceSheetRef, acceptInviteSheetRef, onInviteAccepted, createTeamSheetRef, onTeamCreated, createSessionSheetRef, onSessionCreated, chartDetailsSheetRef } = useModals();
   const colors = useColors();
   return (
     <ThemeProvider>
@@ -41,6 +46,60 @@ export default function ProtectedLayout() {
         ref={workspaceSwitcherSheetRef}
         onSettingsPress={() => {
           onWorkspaceSwitched?.();
+        }}
+      />
+      <CreateWorkspaceSheet
+        ref={createWorkspaceSheetRef}
+        onWorkspaceCreated={() => {
+          createWorkspaceSheetRef?.current?.close();
+          // Call the registered callback if it exists
+          if (onWorkspaceCreated) {
+            onWorkspaceCreated();
+          }
+        }}
+      />
+
+       {/* CHART DETAILS */}
+       <ComingSoonSheet
+        ref={chartDetailsSheetRef}
+        title="Detailed Analytics"
+        subtitle="Get insights into your training patterns"
+        icon="bar-chart"
+      />
+
+      {/* CREATE SESSION */}
+      <CreateSessionSheet
+        ref={createSessionSheetRef}
+        onSessionCreated={() => {
+          createSessionSheetRef?.current?.close();
+          // Call the registered callback if it exists
+          if (onSessionCreated) {
+            onSessionCreated();
+          }
+        }}
+      />
+
+      {/* CREATE TEAM */}
+      <CreateTeamSheet
+        ref={createTeamSheetRef}
+        onTeamCreated={() => {
+          createTeamSheetRef?.current?.close();
+          // Call the registered callback if it exists
+          if (onTeamCreated) {
+            onTeamCreated();
+          }
+        }}
+      />
+
+      {/* ACCEPT INVITE */}
+      <AcceptInviteSheet
+        ref={acceptInviteSheetRef}
+        onInviteAccepted={() => {
+          acceptInviteSheetRef?.current?.close();
+          // Call the registered callback if it exists
+          if (onInviteAccepted) {
+            onInviteAccepted();
+          }
         }}
       />
 

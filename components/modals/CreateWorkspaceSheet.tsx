@@ -72,7 +72,7 @@ export const CreateWorkspaceSheet = forwardRef<BaseBottomSheetRef, CreateWorkspa
     };
 
     return (
-      <BaseBottomSheet ref={sheetRef} snapPoints={['60%']} backdropOpacity={0.6}>
+      <BaseBottomSheet ref={sheetRef} snapPoints={['90%']} backdropOpacity={0.6}>
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>

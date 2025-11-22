@@ -6,10 +6,8 @@
 import { supabase } from '@/lib/supabase';
 import type { Team, TeamMember, TeamMemberShip, TeamWithMembers } from '@/types/workspace';
 
-export interface CreateTeamInput {
-  workspace_type: 'personal' | 'org';
-  workspace_owner_id?: string;  // For personal workspace
-  org_workspace_id?: string;    // For org workspace
+export interface OrgCreateTeamInput {
+  org_workspace_id: string;    // For org workspace
   name: string;
   description?: string;
   squads?: string[];  // Optional array of squad names
@@ -25,19 +23,17 @@ export interface UpdateTeamInput {
 export interface AddTeamMemberInput {
   team_id: string;
   user_id: string;
-  role: TeamMemberShip;
+  role: TeamMemberShip; 
   details?: any; // NEW
 }
 
 /**
  * Create a new team
  */
-export async function createTeam(input: CreateTeamInput): Promise<Team> {
+export async function createTeam(input: OrgCreateTeamInput): Promise<Team> {
   const { data, error } = await supabase
     .rpc('create_team', {
-      p_workspace_type: input.workspace_type,
       p_name: input.name,
-      p_workspace_owner_id: input.workspace_owner_id || null,
       p_org_workspace_id: input.org_workspace_id || null,
       p_description: input.description || null,
       p_squads: input.squads || [],

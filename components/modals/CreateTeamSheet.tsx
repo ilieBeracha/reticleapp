@@ -42,6 +42,7 @@ export const CreateTeamSheet = forwardRef<BaseBottomSheetRef, CreateTeamSheetPro
         
         await createTeam({
           org_workspace_id: activeWorkspaceId,  // Simplified - always org
+
           name: teamName.trim(),
           description: teamDescription.trim() || undefined,
           squads: squads.length > 0 ? squads : undefined,

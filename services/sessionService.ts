@@ -14,7 +14,7 @@ export interface CreateSessionParams {
 
 export interface SessionWithDetails {
   id: string;
-  org_workspace_id: string;
+  org_workspace_id: string | null; // Nullable in DB schema, but practically usually set
   workspace_name?: string | null;
   user_id: string;
   user_full_name?: string | null;
@@ -36,11 +36,12 @@ function mapSession(row: any): SessionWithDetails {
 
   const profiles = row.profiles ?? {};
   const teams = row.teams ?? {};
+  const orgs = row.org_workspaces ?? {};
 
   return {
     id: row.id,
     org_workspace_id: row.org_workspace_id,
-    workspace_name: row.workspace_name ?? null,
+    workspace_name: row.workspace_name ?? orgs.name ?? null,
     user_id: row.user_id,
     user_full_name: row.user_full_name ?? profiles.full_name ?? null,
     team_id: row.team_id ?? null,
@@ -76,12 +77,14 @@ export async function createSession(params: CreateSessionParams) {
 }
 
 /**
- * Get sessions for a specific workspace
+ * Get sessions.
+ * If workspaceId is provided, filters by that workspace.
+ * If not, fetches all sessions accessible to the user (assuming RLS).
  */
-export async function getWorkspaceSessions(orgWorkspaceId: string): Promise<SessionWithDetails[]> {
+export async function getSessions(workspaceId?: string): Promise<SessionWithDetails[]> {
   const client = await AuthenticatedClient.getClient();
   
-  const { data, error } = await client
+  let query = client
     .from('sessions')
     .select(`
       id,
@@ -96,13 +99,26 @@ export async function getWorkspaceSessions(orgWorkspaceId: string): Promise<Sess
       created_at,
       updated_at,
       profiles:user_id(full_name),
-      teams:team_id(name)
+      teams:team_id(name),
+      org_workspaces:org_workspace_id(name)
     `)
-    .eq('org_workspace_id', orgWorkspaceId)
     .order('started_at', { ascending: false });
+
+  if (workspaceId) {
+    query = query.eq('org_workspace_id', workspaceId);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
   return (data ?? []).map(mapSession);
+}
+
+/**
+ * Get sessions for a specific workspace (Legacy alias)
+ */
+export async function getWorkspaceSessions(orgWorkspaceId: string): Promise<SessionWithDetails[]> {
+  return getSessions(orgWorkspaceId);
 }
 
 /**
