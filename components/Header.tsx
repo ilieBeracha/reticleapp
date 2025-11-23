@@ -1,7 +1,6 @@
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import { BellIcon } from 'lucide-react-native';
 import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { BaseAvatar } from './BaseAvatar';
@@ -46,19 +45,14 @@ export function Header({ notificationCount = 0, onNotificationPress, onUserPress
             </View>
           </Pressable>
 
-          <Pressable
-            onPress={onWorkspacePress}
-            style={({ pressed }) => [styles.workspace, { backgroundColor: pressed ? colors.secondary : 'transparent' }]}
-          >
-              <Text style={[styles.workspaceText, { color: colors.textMuted}]}>
-                {activeWorkspace?.id ? workspaceName : 'Profile'}
-              </Text>
-          </Pressable>
+      <TouchableOpacity style={styles.workspaceContainer} onPress={onWorkspacePress}  > 
+          <Text style={[styles.workspaceText, { color: colors.text}]}>
+            {activeWorkspace?.id ? workspaceName : 'Profile'}
+          </Text> 
+          <MaterialCommunityIcons name="chevron-right" size={20} color={colors.text} />
+        </TouchableOpacity> 
+      </View>
 
-          <Pressable onPress={() => router.push('/(protected)/workspace')} style={({ pressed }) => [styles.workspace , { backgroundColor: pressed ? colors.secondary : 'transparent' }]}>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={colors.text} />
-          </Pressable>
-        </View>
 
         {/* Right Section */}
         <TouchableOpacity
@@ -159,5 +153,12 @@ const styles = StyleSheet.create({
   },
   notification: {
     padding: 10,
+  },
+
+  workspaceContainer: {
+    flexDirection: 'row',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
