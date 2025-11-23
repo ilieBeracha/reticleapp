@@ -22,32 +22,26 @@ interface RoleOption {
   color: string;
 }
 
-const ROLE_OPTIONS: RoleOption[] = [
-  {
-    value: 'member',
-    label: 'Member',
-    description: 'Can participate in sessions and view team activities',
-    icon: 'person',
-    color: '#6B8FA3',
-  },
+// Org-level roles (for non-team invites)
+const ORG_ROLE_OPTIONS: RoleOption[] = [
   {
     value: 'instructor',
     label: 'Instructor',
-    description: 'Can create trainings and manage sessions',
+    description: 'Create trainings and manage sessions',
     icon: 'school',
     color: '#E76925',
   },
   {
     value: 'admin',
     label: 'Admin',
-    description: 'Can manage teams and invite members',
+    description: 'Manage teams and invite members',
     icon: 'shield-half',
     color: '#5B7A8C',
   },
   {
     value: 'owner',
     label: 'Owner',
-    description: 'Full access to workspace settings',
+    description: 'Full workspace access',
     icon: 'shield-checkmark',
     color: '#FF6B35',
   },
@@ -61,10 +55,16 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
     const { activeWorkspaceId, activeWorkspace } = useAppContext();
     const { teams } = useWorkspaceData();
     
-    const [selectedRole, setSelectedRole] = useState<WorkspaceRole>('member');
-    const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+    // Invite type: 'team' or 'org'
+    const [inviteType, setInviteType] = useState<'team' | 'org'>(teams.length > 0 ? 'team' : 'org');
+    
+    // Team invite states
+    const [selectedTeamId, setSelectedTeamId] = useState<string | null>(teams.length > 0 ? teams[0].id : null);
     const [selectedTeamRole, setSelectedTeamRole] = useState<TeamMemberShip>('soldier');
     const [selectedSquadName, setSelectedSquadName] = useState<string>('');
+    
+    // Org invite states
+    const [selectedOrgRole, setSelectedOrgRole] = useState<WorkspaceRole>('instructor');
 
     const [isCreating, setIsCreating] = useState(false);
     const [pendingInvites, setPendingInvites] = useState<WorkspaceInvitationWithDetails[]>([]);
@@ -80,6 +80,8 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
         setPendingInvites(invites);
       } catch (error) {
         console.error('Failed to load invitations:', error);
+      } finally {
+        setLoadingInvites(false);
       }
     }, [activeWorkspaceId, activeWorkspace]);
 
@@ -88,41 +90,47 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
       loadInvitations();
     }, [loadInvitations]);
 
-    // Reset team selection if role changes from member
-    useEffect(() => {
-      if (selectedRole !== 'member') {
-        setSelectedTeamId(null);
-      }
-    }, [selectedRole]);
-
     const handleCreateInvite = async () => {
       if (!activeWorkspaceId) {
         Alert.alert("Error", "No active workspace");
         return;
       }
 
-      // Validate squad name for soldiers and squad commanders
-      if (selectedTeamId && (selectedTeamRole === 'soldier' || selectedTeamRole === 'squad_commander')) {
-        if (!selectedSquadName.trim()) {
-          Alert.alert(
-            "Squad Required",
-            selectedTeamRole === 'soldier' 
-              ? "Soldiers must be assigned to a squad. Please enter a squad name."
-              : "Squad commanders must be assigned to a squad to command. Please enter a squad name."
-          );
+      // Validate based on invite type
+      if (inviteType === 'team') {
+        if (!selectedTeamId) {
+          Alert.alert("Team Required", "Please select a team to invite to.");
           return;
+        }
+        
+        // Validate squad name for soldiers and squad commanders
+        if (selectedTeamRole === 'soldier' || selectedTeamRole === 'squad_commander') {
+          if (!selectedSquadName.trim()) {
+            Alert.alert(
+              "Squad Required",
+              selectedTeamRole === 'soldier' 
+                ? "Soldiers must be assigned to a squad. Please enter a squad name."
+                : "Squad commanders must be assigned to a squad to command. Please enter a squad name."
+            );
+            return;
+          }
         }
       }
 
       setIsCreating(true);
       try {
-        // Pass team info if selected
+        // Determine role and team info based on invite type
+        const role = inviteType === 'team' ? 'member' : selectedOrgRole;
+        const teamId = inviteType === 'team' ? selectedTeamId : null;
+        const teamRole = inviteType === 'team' ? selectedTeamRole : null;
+        const metadata = inviteType === 'team' && selectedSquadName ? { squad_id: selectedSquadName } : undefined;
+        
         const invitation = await createInvitation(
           activeWorkspaceId, 
-          selectedRole, 
-          selectedTeamId, 
-          selectedTeamId ? selectedTeamRole : null,
-          selectedTeamId && selectedSquadName ? { squad_id: selectedSquadName } : undefined
+          role, 
+          teamId, 
+          teamRole,
+          metadata
         );
         
         // Copy to clipboard automatically
@@ -136,8 +144,7 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
         await loadInvitations();
         onMemberInvited?.();
         
-        // Reset selection
-        setSelectedTeamId(null);
+        // Reset selections
         setSelectedSquadName('');
       } catch (error: any) {
         console.error("Failed to create invitation:", error);
@@ -175,7 +182,8 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
     };
 
     const getRoleColor = (role: WorkspaceRole) => {
-      return ROLE_OPTIONS.find(r => r.value === role)?.color || '#6B8FA3';
+      if (role === 'member') return '#6B8FA3';
+      return ORG_ROLE_OPTIONS.find(r => r.value === role)?.color || '#6B8FA3';
     };
 
     const getTimeRemaining = (expiresAt: string) => {
@@ -204,204 +212,270 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
               Invite Member
             </Text>
             <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-              Create a temporary code to join {activeWorkspace?.workspace_name}
+              Create a code to join {activeWorkspace?.workspace_name}
             </Text>
           </View>
 
-          {/* Role Selection */}
+          {/* Invite Type Selector */}
           <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>ORG ROLE</Text>
-            <View style={styles.rolesGrid}>
-              {ROLE_OPTIONS.map((role) => {
-                const isSelected = selectedRole === role.value;
-                return (
-                  <TouchableOpacity
-                    key={role.value}
-                    style={[
-                      styles.roleCard,
-                      {
-                        backgroundColor: colors.card,
-                        borderColor: isSelected ? role.color : 'transparent',
-                        borderWidth: isSelected ? 2 : 0,
-                        shadowColor: "#000",
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.05,
-                        shadowRadius: 8,
-                        elevation: 2,
-                      }
-                    ]}
-                    onPress={() => setSelectedRole(role.value)}
-                    activeOpacity={0.9}
-                  >
-                    <View style={styles.roleCardHeader}>
-                       <View style={[
-                        styles.roleIconContainer,
-                        { backgroundColor: isSelected ? role.color + '20' : colors.secondary }
-                      ]}>
-                        <Ionicons name={role.icon} size={18} color={isSelected ? role.color : colors.textMuted} />
-                      </View>
-                      {isSelected && (
-                        <Ionicons name="checkmark-circle" size={20} color={role.color} />
-                      )}
-                    </View>
-                    
-                    <Text style={[
-                      styles.roleLabel, 
-                      { color: colors.text }
-                    ]}>
-                      {role.label}
-                    </Text>
-                    <Text style={[styles.roleDescription, { color: colors.textMuted }]}>
-                      {role.description}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>INVITE TO</Text>
+            <View style={styles.inviteTypeContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.inviteTypeButton,
+                  {
+                    backgroundColor: inviteType === 'team' ? colors.primary : colors.card,
+                    borderColor: inviteType === 'team' ? colors.primary : colors.border,
+                  }
+                ]}
+                onPress={() => setInviteType('team')}
+                disabled={teams.length === 0}
+              >
+                <Ionicons 
+                  name="people" 
+                  size={22} 
+                  color={inviteType === 'team' ? colors.primaryForeground : colors.text} 
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={[
+                    styles.inviteTypeLabel,
+                    { color: inviteType === 'team' ? colors.primaryForeground : colors.text }
+                  ]}>
+                    Team
+                  </Text>
+                  <Text style={[
+                    styles.inviteTypeDesc,
+                    { color: inviteType === 'team' ? colors.primaryForeground + 'CC' : colors.textMuted }
+                  ]}>
+                    Member with team role
+                  </Text>
+                </View>
+                {inviteType === 'team' && (
+                  <Ionicons name="checkmark-circle" size={24} color={colors.primaryForeground} />
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.inviteTypeButton,
+                  {
+                    backgroundColor: inviteType === 'org' ? colors.primary : colors.card,
+                    borderColor: inviteType === 'org' ? colors.primary : colors.border,
+                  }
+                ]}
+                onPress={() => setInviteType('org')}
+              >
+                <Ionicons 
+                  name="business" 
+                  size={22} 
+                  color={inviteType === 'org' ? colors.primaryForeground : colors.text} 
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={[
+                    styles.inviteTypeLabel,
+                    { color: inviteType === 'org' ? colors.primaryForeground : colors.text }
+                  ]}>
+                    Organization
+                  </Text>
+                  <Text style={[
+                    styles.inviteTypeDesc,
+                    { color: inviteType === 'org' ? colors.primaryForeground + 'CC' : colors.textMuted }
+                  ]}>
+                    Instructor, admin, or owner
+                  </Text>
+                </View>
+                {inviteType === 'org' && (
+                  <Ionicons name="checkmark-circle" size={24} color={colors.primaryForeground} />
+                )}
+              </TouchableOpacity>
             </View>
           </View>
 
-          {/* Team Selection (Optional) */}
-          {teams.length > 0 && selectedRole === 'member' && (
-            <View style={styles.section}>
-              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>ASSIGN TO TEAM (OPTIONAL)</Text>
-              
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 24, gap: 8 }}>
-                <TouchableOpacity
-                  key="no-team"
-                  style={[
-                    styles.teamChip,
-                    { 
-                      backgroundColor: selectedTeamId === null ? colors.primary : colors.card,
-                      borderColor: selectedTeamId === null ? 'transparent' : colors.border,
-                      borderWidth: 1
-                    }
-                  ]}
-                  onPress={() => setSelectedTeamId(null)}
-                >
-                  <Text style={[styles.teamChipText, { color: selectedTeamId === null ? colors.primaryForeground : colors.text }]}>
-                    No Team
-                  </Text>
-                </TouchableOpacity>
+          {/* Team Invite Flow */}
+          {inviteType === 'team' && teams.length > 0 && (
+            <>
+              {/* Team Selection */}
+              <View style={styles.section}>
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>SELECT TEAM</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                  {teams.map(team => (
+                    <TouchableOpacity
+                      key={team.id}
+                      style={[
+                        styles.teamChip,
+                        { 
+                          backgroundColor: selectedTeamId === team.id ? colors.primary : colors.card,
+                          borderColor: selectedTeamId === team.id ? colors.primary : colors.border,
+                        }
+                      ]}
+                      onPress={() => setSelectedTeamId(team.id)}
+                    >
+                      <Ionicons 
+                        name="shield" 
+                        size={16} 
+                        color={selectedTeamId === team.id ? colors.primaryForeground : colors.text} 
+                      />
+                      <Text style={[
+                        styles.teamChipText, 
+                        { color: selectedTeamId === team.id ? colors.primaryForeground : colors.text }
+                      ]}>
+                        {team.name}
+                      </Text>
+                      {selectedTeamId === team.id && (
+                        <Ionicons name="checkmark" size={16} color={colors.primaryForeground} />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              {/* Team Role Selection */}
+              <View style={styles.section}>
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>TEAM ROLE</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                  {TEAM_ROLE_OPTIONS.map((role) => (
+                    <TouchableOpacity
+                      key={role}
+                      style={[
+                        styles.roleChip, 
+                        { 
+                          backgroundColor: selectedTeamRole === role ? colors.primary + '20' : colors.card,
+                          borderWidth: 1,
+                          borderColor: selectedTeamRole === role ? colors.primary : colors.border
+                        }
+                      ]}
+                      onPress={() => setSelectedTeamRole(role)}
+                    >
+                      <Text style={{ 
+                        fontSize: 14,
+                        fontWeight: '600',
+                        color: selectedTeamRole === role ? colors.primary : colors.text
+                      }}>
+                        {role.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                      </Text>
+                      {selectedTeamRole === role && (
+                        <Ionicons name="checkmark" size={16} color={colors.primary} />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              {/* Squad Selection - Only for soldiers and squad commanders */}
+              {(selectedTeamRole === 'soldier' || selectedTeamRole === 'squad_commander') && (() => {
+                const selectedTeam = teams.find(t => t.id === selectedTeamId);
+                const availableSquads = selectedTeam?.squads || [];
                 
-                {teams.map(team => (
-                  <TouchableOpacity
-                    key={team.id}
-                    style={[
-                      styles.teamChip,
-                      { 
-                        backgroundColor: selectedTeamId === team.id ? colors.primary : colors.card,
-                        borderColor: selectedTeamId === team.id ? 'transparent' : colors.border,
-                        borderWidth: 1,
-                      }
-                    ]}
-                    onPress={() => setSelectedTeamId(team.id)}
-                  >
-                    <Text style={[styles.teamChipText, { color: selectedTeamId === team.id ? colors.primaryForeground : colors.text }]}>
-                      {team.name}
+                return (
+                  <View style={styles.section}>
+                    <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+                      {selectedTeamRole === 'soldier' ? 'SQUAD (REQUIRED)' : 'SQUAD TO COMMAND (REQUIRED)'}
                     </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              {/* Team Role Selection (only if team selected) */}
-              {selectedTeamId && (
-                <View style={{ marginTop: 16 }}>
-                  <Text style={[styles.sectionLabel, { color: colors.textMuted, fontSize: 11 }]}>
-                    TEAM ROLE & SQUAD
-                  </Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                    {TEAM_ROLE_OPTIONS.map((role) => (
-                       <TouchableOpacity
-                          key={role}
-                          style={[
-                            styles.teamRoleChip, 
-                            { 
-                              backgroundColor: selectedTeamRole === role ? colors.primary + '20' : colors.card,
-                              borderWidth: 1,
-                              borderColor: selectedTeamRole === role ? colors.primary : colors.border
-                            }
-                          ]}
-                          onPress={() => setSelectedTeamRole(role)}
-                       >
-                         <Text style={{ 
-                           fontSize: 13,
-                           fontWeight: '600',
-                           color: selectedTeamRole === role ? colors.primary : colors.text
-                         }}>
-                           {role.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                         </Text>
-                       </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-
-                  {/* Squad Selection - Only for soldiers and squad commanders */}
-                  {(selectedTeamRole === 'soldier' || selectedTeamRole === 'squad_commander') && (() => {
-                    const selectedTeam = teams.find(t => t.id === selectedTeamId);
-                    const availableSquads = selectedTeam?.squads || [];
                     
-                    return (
-                      <View style={{ marginTop: 12 }}>
-                        <Text style={[styles.inputLabel, { color: colors.textMuted }]}>
-                          {selectedTeamRole === 'soldier' ? 'SQUAD NAME (REQUIRED FOR SOLDIER)' : 'SQUAD TO COMMAND (REQUIRED)'}
-                        </Text>
-                        
-                        {/* Show available squads as chips */}
-                        {availableSquads.length > 0 && (
-                          <ScrollView 
-                            horizontal 
-                            showsHorizontalScrollIndicator={false}
-                            style={{ marginBottom: 8 }}
-                            contentContainerStyle={{ gap: 8, paddingVertical: 4 }}
+                    {/* Show available squads as chips */}
+                    {availableSquads.length > 0 && (
+                      <ScrollView 
+                        horizontal 
+                        showsHorizontalScrollIndicator={false}
+                        style={{ marginBottom: 10 }}
+                        contentContainerStyle={{ gap: 8 }}
+                      >
+                        {availableSquads.map((squad) => (
+                          <TouchableOpacity
+                            key={squad}
+                            style={[
+                              styles.squadChip,
+                              {
+                                backgroundColor: selectedSquadName === squad ? colors.primary : colors.card,
+                                borderColor: selectedSquadName === squad ? colors.primary : colors.border,
+                              }
+                            ]}
+                            onPress={() => setSelectedSquadName(squad)}
                           >
-                            {availableSquads.map((squad) => (
-                              <TouchableOpacity
-                                key={squad}
-                                style={[
-                                  styles.squadChip,
-                                  {
-                                    backgroundColor: selectedSquadName === squad ? colors.primary : colors.card,
-                                    borderColor: selectedSquadName === squad ? colors.primary : colors.border,
-                                  }
-                                ]}
-                                onPress={() => setSelectedSquadName(squad)}
-                              >
-                                <Ionicons 
-                                  name="shield" 
-                                  size={14} 
-                                  color={selectedSquadName === squad ? '#fff' : colors.primary} 
-                                />
-                                <Text style={{ 
-                                  fontSize: 13,
-                                  fontWeight: '600',
-                                  color: selectedSquadName === squad ? '#fff' : colors.text
-                                }}>
-                                  {squad}
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </ScrollView>
+                            <Ionicons 
+                              name="shield" 
+                              size={14} 
+                              color={selectedSquadName === squad ? colors.primaryForeground : colors.primary} 
+                            />
+                            <Text style={{ 
+                              fontSize: 13,
+                              fontWeight: '600',
+                              color: selectedSquadName === squad ? colors.primaryForeground : colors.text
+                            }}>
+                              {squad}
+                            </Text>
+                            {selectedSquadName === squad && (
+                              <Ionicons name="checkmark" size={14} color={colors.primaryForeground} />
+                            )}
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    )}
+                    
+                    {/* Input for custom squad name */}
+                    <TextInput
+                      style={[
+                        styles.input,
+                        { 
+                          backgroundColor: colors.card, 
+                          color: colors.text,
+                          borderColor: colors.border
+                        }
+                      ]}
+                      placeholder={availableSquads.length > 0 ? "Or enter new squad name..." : "e.g. Alpha, Bravo, Squad 1"}
+                      placeholderTextColor={colors.textMuted}
+                      value={selectedSquadName}
+                      onChangeText={setSelectedSquadName}
+                    />
+                  </View>
+                );
+              })()}
+            </>
+          )}
+
+          {/* Org Invite Flow */}
+          {inviteType === 'org' && (
+            <View style={styles.section}>
+              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>ORGANIZATION ROLE</Text>
+              <View style={styles.orgRolesGrid}>
+                {ORG_ROLE_OPTIONS.map((role) => {
+                  const isSelected = selectedOrgRole === role.value;
+                  return (
+                    <TouchableOpacity
+                      key={role.value}
+                      style={[
+                        styles.orgRoleCard,
+                        {
+                          backgroundColor: colors.card,
+                          borderColor: isSelected ? role.color : colors.border,
+                          borderWidth: isSelected ? 2 : 1,
+                        }
+                      ]}
+                      onPress={() => setSelectedOrgRole(role.value)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.orgRoleHeader}>
+                        <View style={[
+                          styles.orgRoleIcon,
+                          { backgroundColor: isSelected ? role.color + '20' : colors.secondary }
+                        ]}>
+                          <Ionicons name={role.icon} size={20} color={isSelected ? role.color : colors.textMuted} />
+                        </View>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={22} color={role.color} />
                         )}
-                        
-                        {/* Input for custom squad name */}
-                        <TextInput
-                          style={[
-                            styles.input,
-                            { 
-                              backgroundColor: colors.card, 
-                              color: colors.text,
-                              borderColor: colors.border
-                            }
-                          ]}
-                          placeholder={availableSquads.length > 0 ? "Or enter a new squad name..." : "e.g. Alpha, Bravo, Squad 1"}
-                          placeholderTextColor={colors.textMuted}
-                          value={selectedSquadName}
-                          onChangeText={setSelectedSquadName}
-                        />
                       </View>
-                    );
-                  })()}
-                </View>
-              )}
+                      
+                      <Text style={[styles.orgRoleLabel, { color: colors.text }]}>
+                        {role.label}
+                      </Text>
+                      <Text style={[styles.orgRoleDesc, { color: colors.textMuted }]}>
+                        {role.description}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
           )}
 
@@ -422,10 +496,10 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
                 <ActivityIndicator color={colors.primaryForeground} size="small" />
               ) : (
                 <>
+                  <Ionicons name="ticket" size={18} color={colors.primaryForeground} />
                   <Text style={[styles.generateButtonText, { color: colors.primaryForeground }]}>
                     Generate Invite Code
                   </Text>
-                  <Ionicons name="arrow-forward" size={18} color={colors.primaryForeground} />
                 </>
               )}
             </TouchableOpacity>
@@ -433,18 +507,17 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
 
           {/* Pending Invitations */}
           <View style={styles.pendingSection}>
-            <View style={styles.pendingHeader}>
-              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-                PENDING INVITES ({pendingInvites.length})
-              </Text>
-            </View>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted, marginBottom: 12 }]}>
+              PENDING INVITES ({pendingInvites.length})
+            </Text>
 
             {loadingInvites ? (
-              <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
+              <ActivityIndicator color={colors.primary} style={{ marginTop: 12 }} />
             ) : pendingInvites.length === 0 ? (
               <View style={[styles.emptyState, { backgroundColor: colors.secondary + '50' }]}>
+                <Ionicons name="mail-outline" size={20} color={colors.textMuted} style={{ marginBottom: 4 }} />
                 <Text style={[styles.emptyStateText, { color: colors.textMuted }]}>
-                  No active invite codes
+                  No active codes
                 </Text>
               </View>
             ) : (
@@ -456,11 +529,7 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
                       styles.inviteRow, 
                       { 
                         backgroundColor: colors.card,
-                        shadowColor: "#000",
-                        shadowOffset: { width: 0, height: 1 },
-                        shadowOpacity: 0.05,
-                        shadowRadius: 4,
-                        elevation: 1,
+                        borderColor: colors.border,
                       }
                     ]}
                   >
@@ -474,17 +543,15 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
                             {invite.invite_code}
                           </Text>
                         </View>
-                        <View style={styles.inviteMeta}>
-                          <Text style={[styles.roleMetaText, { color: colors.text }]}>
-                            {invite.role.charAt(0).toUpperCase() + invite.role.slice(1)}
-                            {invite.team_name && (
-                              <Text style={{ color: colors.textMuted }}> • {invite.team_name} ({invite.team_role})</Text>
-                            )}
-                          </Text>
-                          <Text style={[styles.expiryText, { color: colors.textMuted }]}>
-                             • {getTimeRemaining(invite.expires_at)}
-                          </Text>
-                        </View>
+                        <Text style={[styles.roleMetaText, { color: colors.text }]}>
+                          {invite.role.charAt(0).toUpperCase() + invite.role.slice(1)}
+                          {invite.team_name && (
+                            <Text style={{ color: colors.textMuted, fontWeight: '500' }}> • {invite.team_name}</Text>
+                          )}
+                        </Text>
+                        <Text style={[styles.expiryText, { color: colors.textMuted }]}>
+                          {getTimeRemaining(invite.expires_at)}
+                        </Text>
                       </View>
                     </View>
                     
@@ -508,7 +575,7 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
             )}
           </View>
           
-          <View style={{ height: 20 }} />
+          <View style={{ height: 12 }} />
         </BottomSheetScrollView>
       </BaseBottomSheet>
     );
@@ -526,111 +593,125 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   header: {
-    marginTop: 8,
-    marginBottom: 32,
+    marginTop: 4,
+    marginBottom: 24,
   },
   title: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '700',
     letterSpacing: -0.5,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   subtitle: {
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 20,
     letterSpacing: -0.2,
   },
   section: {
-    marginBottom: 32,
+    marginBottom: 24,
   },
   sectionLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,
-    marginBottom: 16,
+    marginBottom: 12,
     textTransform: 'uppercase',
   },
-  rolesGrid: {
+  inviteTypeContainer: {
+    gap: 10,
+  },
+  inviteTypeButton: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
     gap: 12,
   },
-  roleCard: {
-    width: '48%',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 0,
+  inviteTypeLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
   },
-  roleCardHeader: {
+  inviteTypeDesc: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  orgRolesGrid: {
+    gap: 10,
+  },
+  orgRoleCard: {
+    padding: 16,
+    borderRadius: 14,
+  },
+  orgRoleHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 12,
   },
-  roleIconContainer: {
-    width: 36,
-    height: 36,
+  orgRoleIcon: {
+    width: 40,
+    height: 40,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  roleLabel: {
+  orgRoleLabel: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
     letterSpacing: -0.2,
   },
-  roleDescription: {
+  orgRoleDesc: {
     fontSize: 12,
     lineHeight: 16,
   },
   teamChip: {
-    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 20,
+    borderWidth: 1,
     minWidth: 80,
-    alignItems: 'center',
   },
   teamChipText: {
     fontWeight: '600',
     fontSize: 14,
   },
-  teamRoleChip: {
+  roleChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 12,
     minWidth: 70,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   actionContainer: {
-    marginBottom: 32,
+    marginBottom: 16,
   },
   generateButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 18,
-    borderRadius: 16,
+    paddingVertical: 16,
+    borderRadius: 14,
     gap: 8,
   },
   generateButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     letterSpacing: -0.2,
   },
   pendingSection: {
     marginBottom: 20,
   },
-  pendingHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
   emptyState: {
-    padding: 24,
-    borderRadius: 16,
+    padding: 20,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     borderStyle: 'dashed',
@@ -638,58 +719,55 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(150,150,150,0.2)',
   },
   emptyStateText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
   },
   invitesList: {
-    gap: 12,
+    gap: 8,
   },
   inviteRow: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    borderRadius: 16,
+    borderRadius: 14,
     justifyContent: 'space-between',
+    borderWidth: 1,
   },
   inviteInfo: {
     flex: 1,
-    marginRight: 12,
+    marginRight: 10,
   },
   inviteMain: {
-    gap: 6,
+    gap: 4,
   },
   codeContainer: {
     alignSelf: 'flex-start',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 7,
   },
   codeText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    fontFamily: 'SpaceMono', // Using the mono font for the code if available
+    fontFamily: 'SpaceMono',
     letterSpacing: 1,
-  },
-  inviteMeta: {
-    flexDirection: 'column', // Stacked meta info
-    alignItems: 'flex-start',
   },
   roleMetaText: {
     fontSize: 13,
     fontWeight: '600',
   },
   expiryText: {
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 11,
+    marginTop: 1,
   },
   inviteActions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
   actionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },

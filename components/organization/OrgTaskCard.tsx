@@ -25,7 +25,7 @@ export interface OrgTaskCardProps {
 }
 
 /**
- * Organization task card component - displays task details with progress.
+ * Organization session card component - displays training session details with progress.
  * Extracted from OrganizationHomePage for reusability and performance.
  */
 export const OrgTaskCard = React.memo(function OrgTaskCard({

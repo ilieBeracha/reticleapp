@@ -4,6 +4,7 @@ import { ComingSoonSheet } from '@/components/modals/ComingSoonSheet';
 import { CreateSessionSheet } from '@/components/modals/CreateSessionSheet';
 import { CreateTeamSheet } from '@/components/modals/CreateTeamSheet';
 import { CreateWorkspaceSheet } from '@/components/modals/CreateWorkspaceSheet';
+import { InviteMembersSheet } from '@/components/modals/InviteMembersSheet';
 import { UserMenuBottomSheet, UserMenuBottomSheetRef } from '@/components/modals/UserMenuBottomSheet';
 import { WorkspaceSwitcherBottomSheet } from '@/components/modals/WorkspaceSwitcherBottomSheet';
 import { useModals } from '@/contexts/ModalContext';
@@ -14,7 +15,7 @@ import { useRef } from 'react';
 
 export default function ProtectedLayout() {
   const userMenuSheetRef = useRef<UserMenuBottomSheetRef>(null);
-  const { workspaceSwitcherSheetRef, onWorkspaceSwitched, onWorkspaceCreated, createWorkspaceSheetRef, acceptInviteSheetRef, onInviteAccepted, createTeamSheetRef, onTeamCreated, createSessionSheetRef, onSessionCreated, chartDetailsSheetRef } = useModals();
+  const { workspaceSwitcherSheetRef, onWorkspaceSwitched, onWorkspaceCreated, createWorkspaceSheetRef, acceptInviteSheetRef, onInviteAccepted, createTeamSheetRef, onTeamCreated, createSessionSheetRef, onSessionCreated, chartDetailsSheetRef, inviteMembersSheetRef, onMemberInvited } = useModals();
   const colors = useColors();
   return (
     <ThemeProvider>
@@ -99,6 +100,17 @@ export default function ProtectedLayout() {
           // Call the registered callback if it exists
           if (onInviteAccepted) {
             onInviteAccepted();
+          }
+        }}
+      />
+
+      {/* INVITE MEMBERS */}
+      <InviteMembersSheet
+        ref={inviteMembersSheetRef}
+        onMemberInvited={() => {
+          // Call the registered callback if it exists
+          if (onMemberInvited) {
+            onMemberInvited();
           }
         }}
       />

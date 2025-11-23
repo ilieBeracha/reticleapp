@@ -24,7 +24,7 @@ const CENTER = 90;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 /**
- * Donut chart component for displaying KPI data.
+ * Donut chart component for displaying training session data.
  * Memoizes arc calculations for performance.
  */
 export const OrgDonutChart = React.memo(function OrgDonutChart({
@@ -66,8 +66,8 @@ export const OrgDonutChart = React.memo(function OrgDonutChart({
         </G>
       </Svg>
       <View style={styles.center}>
-        <Text style={[styles.centerLabel, { color: colors.textMuted }]}>Task Done</Text>
-        <Text style={[styles.centerValue, { color: colors.text }]}>{totalTasks} Tasks</Text>
+        <Text style={[styles.centerLabel, { color: colors.textMuted }]}>Sessions Done</Text>
+        <Text style={[styles.centerValue, { color: colors.text }]}>{totalTasks} Sessions</Text>
       </View>
     </View>
   );

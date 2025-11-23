@@ -144,6 +144,7 @@ export async function getWorkspaceInvitations(orgWorkspaceId: string): Promise<W
  */
 export async function getPendingInvitations(orgWorkspaceId: string): Promise<WorkspaceInvitationWithDetails[]> {
   const invitations = await getWorkspaceInvitations(orgWorkspaceId);
+  console.log('invitations', invitations);
   const now = new Date();
 
   return invitations.filter((inv) => inv.status === 'pending' && new Date(inv.expires_at) > now);

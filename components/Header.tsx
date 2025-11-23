@@ -21,14 +21,7 @@ export function Header({ notificationCount = 0, onNotificationPress, onUserPress
   const workspaceName =
     activeWorkspace?.workspace_name || 'Workspace';
 
-  const getWorkspaceIcon = (workspaceType: string) => {
-    switch (workspaceType) {
-      case 'org':
-        return 'office-building';
-      case 'personal':
-        return 'account';
-    }
-  };
+
   return (
     <View style={styles.wrapper}>
       <View style={[styles.container]}>

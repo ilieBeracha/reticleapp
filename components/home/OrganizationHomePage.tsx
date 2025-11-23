@@ -1,63 +1,91 @@
-import { OrgDonutChart, KPIItem } from '@/components/organization/OrgDonutChart';
+import { KPIItem, OrgDonutChart } from '@/components/organization/OrgDonutChart';
 import { OrgStatCard } from '@/components/organization/OrgStatCard';
 import { OrgTaskCard, OrgTaskCardProps } from '@/components/organization/OrgTaskCard';
 import { ThemedStatusBar } from '@/components/shared/ThemedStatusBar';
 import { Colors } from '@/constants/Colors';
+import { useOrgRole } from '@/contexts/OrgRoleContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAppContext } from '@/hooks/useAppContext';
 import { Feather } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 /**
- * Organization mode home page - displays team stats, KPIs, and tasks.
+ * Organization mode home page - displays team training stats, session overview, and active sessions.
  * Extracted from workspace/index.tsx for better code organization.
  */
 export const OrganizationHomePage = React.memo(function OrganizationHomePage() {
   const { theme } = useTheme();
   const colors = Colors[theme];
+  const { activeWorkspace } = useAppContext();
+  const { orgRole, hasTeam, teamInfo } = useOrgRole();
   const [selectedPeriod, _setSelectedPeriod] = useState('Weekly');
+
+  // Role descriptions (3-4 words)
+  const roleDescriptions: Record<string, string> = {
+    owner: 'Full workspace control',
+    admin: 'Manage teams & members',
+    instructor: 'Create training sessions',
+    member: 'Participate in activities',
+  };
+
+  // Build subtitle dynamically
+  const subtitle = useMemo(() => {
+    const roleDesc = roleDescriptions[orgRole] || 'Member';
+    
+    if (hasTeam && teamInfo) {
+      // Show team name and role
+      const teamRoleDisplay = teamInfo.teamRole.split('_').map(w => 
+        w.charAt(0).toUpperCase() + w.slice(1)
+      ).join(' ');
+      return `${teamRoleDisplay} • ${teamInfo.teamName}`;
+    }
+    
+    // Just show role description
+    return roleDesc;
+  }, [orgRole, hasTeam, teamInfo]);
 
   // KPI Data - memoized to avoid recreation on every render
   const kpiData = useMemo<KPIItem[]>(
     () => [
-      { label: 'Stuck', value: 2, color: colors.red, percentage: 8 },
-      { label: 'In Progress', value: 3, color: colors.yellow, percentage: 26 },
-      { label: 'In Review', value: 3, color: colors.blue, percentage: 12 },
-      { label: 'Done', value: 3, color: colors.green, percentage: 54 },
+      { label: 'Not Started', value: 2, color: colors.red, percentage: 8 },
+      { label: 'Active', value: 3, color: colors.yellow, percentage: 26 },
+      { label: 'Resting', value: 3, color: colors.blue, percentage: 12 },
+      { label: 'Completed', value: 3, color: colors.green, percentage: 54 },
     ],
     [colors.red, colors.yellow, colors.blue, colors.green]
   );
 
-  const totalTasks = 250;
+  const totalSessions = 250;
 
-  // Today's Tasks - memoized to avoid recreation
-  const tasks = useMemo<Omit<OrgTaskCardProps, 'colors'>[]>(
+  // Today's Sessions - memoized to avoid recreation
+  const sessions = useMemo<Omit<OrgTaskCardProps, 'colors'>[]>(
     () => [
       {
-        title: 'Create mood boards and visual references mobile apps.',
+        title: 'Morning cardio and strength training session',
         date: '12/06/2024',
-        hours: '09 hrs',
-        progress: 26,
-        status: 'On Progress',
+        hours: '02 hrs',
+        progress: 75,
+        status: 'In Progress',
         statusColor: '#FFD93D',
-        percentage: 26,
-        attachments: 2,
-        subtasks: '02 / 12',
-        comments: 2,
-        likes: 12,
+        percentage: 75,
+        attachments: 3,
+        subtasks: '08 / 12',
+        comments: 5,
+        likes: 18,
         teamMembers: ['A', 'B', '10+'],
       },
       {
-        title: 'Create mood boards and visual references mobile apps.',
+        title: 'Team combat drills and tactical exercises',
         date: '12/06/2024',
-        hours: '09 hrs',
-        progress: 26,
-        status: 'On Progress',
-        statusColor: '#FFD93D',
-        percentage: 26,
+        hours: '03 hrs',
+        progress: 45,
+        status: 'Active',
+        statusColor: '#10B981',
+        percentage: 45,
         attachments: 2,
-        subtasks: '02 / 12',
-        comments: 2,
+        subtasks: '04 / 10',
+        comments: 3,
         likes: 12,
         teamMembers: ['A', 'B'],
       },
@@ -68,10 +96,10 @@ export const OrganizationHomePage = React.memo(function OrganizationHomePage() {
   // Stat cards data - memoized
   const statCards = useMemo(
     () => [
-      { icon: 'file-text', title: 'Recent Task', count: '08 tasks', iconFamily: 'feather' as const },
-      { icon: 'hourglass-half', title: 'Due Projects', count: '03 Projects', iconFamily: 'material' as const },
-      { icon: 'at', title: 'Discussions', count: '04 Messages', iconFamily: 'feather' as const },
-      { icon: 'message-circle', title: 'Comments', count: '03 Comments', iconFamily: 'feather' as const },
+      { icon: 'activity', title: 'Active Sessions', count: '08 sessions', iconFamily: 'feather' as const },
+      { icon: 'clock-outline', title: 'Scheduled', count: '03 upcoming', iconFamily: 'ionicons' as const },
+      { icon: 'users', title: 'Team Members', count: '24 active', iconFamily: 'feather' as const },
+      { icon: 'trending-up', title: 'Progress', count: '+12% growth', iconFamily: 'feather' as const },
     ],
     []
   );
@@ -101,6 +129,16 @@ export const OrganizationHomePage = React.memo(function OrganizationHomePage() {
       <ThemedStatusBar />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            {activeWorkspace?.workspace_name || 'Organization'}
+          </Text>
+          <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
+            {subtitle}
+          </Text>
+        </View>
+
         {/* Stat Cards */}
         <ScrollView horizontal style={styles.statsGrid} showsHorizontalScrollIndicator={false}>
           {statCards.map((stat, index) => (
@@ -118,7 +156,7 @@ export const OrganizationHomePage = React.memo(function OrganizationHomePage() {
         {/* Productivity KPIs */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Productivity KPIs</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Training Overview</Text>
             <TouchableOpacity style={[styles.periodSelector, { backgroundColor: colors.secondary }]}>
               <Text style={[styles.periodText, { color: colors.text }]}>{selectedPeriod}</Text>
               <Feather name="chevron-down" size={16} color={colors.text} />
@@ -126,7 +164,7 @@ export const OrganizationHomePage = React.memo(function OrganizationHomePage() {
           </View>
 
           <View style={[styles.kpiContent, { backgroundColor: colors.card }]}>
-            <OrgDonutChart data={kpiData} totalTasks={totalTasks} colors={chartColors} />
+            <OrgDonutChart data={kpiData} totalTasks={totalSessions} colors={chartColors} />
 
             <View style={styles.kpiLegend}>
               {kpiData.map((item, index) => (
@@ -142,17 +180,17 @@ export const OrganizationHomePage = React.memo(function OrganizationHomePage() {
           </View>
         </View>
 
-        {/* Today Task */}
+        {/* Today Sessions */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Today Task</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Today's Training</Text>
             <TouchableOpacity>
               <Text style={[styles.seeAllText, { color: colors.indigo }]}>See all</Text>
             </TouchableOpacity>
           </View>
 
-          {tasks.map((task, index) => (
-            <OrgTaskCard key={index} {...task} colors={cardColors} />
+          {sessions.map((session, index) => (
+            <OrgTaskCard key={index} {...session} colors={cardColors} />
           ))}
         </View>
 
@@ -169,6 +207,23 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 15,
+    fontWeight: '400',
+    letterSpacing: -0.1,
+    opacity: 0.7,
   },
   statsGrid: {
     flexDirection: 'row',
