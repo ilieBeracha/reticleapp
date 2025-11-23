@@ -2,11 +2,15 @@ import Tabs from '@/components/withLayoutContext';
 import { useModals } from '@/contexts/ModalContext';
 import { OrgRoleProvider } from '@/contexts/OrgRoleContext';
 import { useColors } from '@/hooks/ui/useColors';
+import { useAppContext } from '@/hooks/useAppContext';
 import { useNavigation } from 'expo-router';
 import { useEffect } from 'react';
 
 function ProtectedLayoutContent() {
   const { primary } = useColors();
+  const { activeWorkspace } = useAppContext();
+  
+  // Check if organization is selected
   
   const navigation = useNavigation();
   const {
@@ -61,17 +65,31 @@ function ProtectedLayoutContent() {
             tabBarIcon: () => ({ sfSymbol: 'calendar' }),
           }}
         />
-        <Tabs.Screen
-          name="organization"  
-          options={{
-            role:'search',
-            title: 'Organization',
-            tabBarIcon: () => ({ sfSymbol: 'building.2' }),
-          }}
-          
-        />
+        {/* Only show Training tab when organization is selected */}
+          <Tabs.Screen
+            name="trainings"  
+            options={{
+              sceneStyle: {
+                display: activeWorkspace?.id ? 'flex' : 'none',
+              },
+              title: 'Trainings',
+              tabBarItemHidden: !activeWorkspace?.id,
+              tabBarIcon: () => ({ sfSymbol: 'target' }),
+            }}
+          />
+          <Tabs.Screen
+            name="members"  
+            options={{
+              sceneStyle: {
+                display: activeWorkspace?.id ? 'flex' : 'none',
+              },
+              title: 'Members',
+              tabBarItemHidden: !activeWorkspace?.id,
+              tabBarIcon: () => ({ sfSymbol: 'person.2' }),
+            }}
+          />
       </Tabs>
-
+            
      
     </>
   );
