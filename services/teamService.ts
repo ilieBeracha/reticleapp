@@ -32,12 +32,14 @@ export interface AddTeamMemberInput {
  */
 export async function createTeam(input: OrgCreateTeamInput): Promise<Team> {
   const { data, error } = await supabase
-    .rpc('create_team', {
-      p_name: input.name,
-      p_org_workspace_id: input.org_workspace_id || null,
-      p_description: input.description || null,
-      p_squads: input.squads || [],
+    .from('teams')
+    .insert({
+      org_workspace_id: input.org_workspace_id,
+      name: input.name,
+      description: input.description || null,
+      squads: input.squads || [],
     })
+    .select()
     .single();
 
   if (error) {

@@ -60,7 +60,7 @@ export default function TeamMemberDashboard() {
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color="#FF6B35" style={{ marginTop: 100 }} />
+        <ActivityIndicator size="large" color="#7C3AED" style={{ marginTop: 100 }} />
       </View>
     );
   }
@@ -90,13 +90,13 @@ export default function TeamMemberDashboard() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FF6B35" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#7C3AED" />}
       >
         {/* Team Header Card */}
         <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.headerCardTop}>
-            <View style={[styles.teamIconLarge, { backgroundColor: '#FF6B35' + '15' }]}>
-              <Ionicons name="people" size={32} color="#FF6B35" />
+            <View style={[styles.teamIconLarge, { backgroundColor: '#7C3AED' + '15' }]}>
+              <Ionicons name="people" size={32} color="#7C3AED" />
             </View>
             <View style={styles.headerInfo}>
               <Text style={[styles.teamName, { color: colors.text }]}>{team.name}</Text>
@@ -180,8 +180,8 @@ export default function TeamMemberDashboard() {
                 {member.profile?.avatar_url ? (
                   <Image source={{ uri: member.profile.avatar_url }} style={styles.teammateAvatar} />
                 ) : (
-                  <View style={[styles.teammateAvatarPlaceholder, { backgroundColor: '#FF6B35' + '20' }]}>
-                    <Text style={[styles.teammateAvatarText, { color: '#FF6B35' }]}>
+                  <View style={[styles.teammateAvatarPlaceholder, { backgroundColor: '#7C3AED' + '20' }]}>
+                    <Text style={[styles.teammateAvatarText, { color: '#7C3AED' }]}>
                       {member.profile?.full_name?.charAt(0)?.toUpperCase() || '?'}
                     </Text>
                   </View>
@@ -220,7 +220,7 @@ function formatRole(role: string): string {
 
 function getRoleColor(role: string) {
   const colors = {
-    commander: { color: '#FF6B35', bg: '#FF6B3515' },
+    commander: { color: '#5B6B8C', bg: '#5B6B8C15' },
     squad_commander: { color: '#5B7A8C', bg: '#5B7A8C15' },
     soldier: { color: '#666', bg: '#66666615' },
   };

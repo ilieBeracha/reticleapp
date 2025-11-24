@@ -59,7 +59,7 @@ const StatsGrid = memo(function StatsGrid({
     },
     {
       icon: 'trophy-outline' as const,
-      iconColor: '#E76925',
+      iconColor: '#7C3AED',
       value: stats.totalAbg,
       label: 'Total ABG',
     },

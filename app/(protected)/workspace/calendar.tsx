@@ -20,7 +20,7 @@ const CalendarScreen = React.memo(function CalendarScreen() {
   const { activeWorkspace } = useAppContext();
   const [filter, setFilter] = useState<EventFilter>('all');
   const [viewMode, setViewMode] = useState<CalendarViewMode>('week');
-  const [selectedWeekDate, _setSelectedWeekDate] = useState<string>('');
+  const [selectedWeekDate] = useState<string>('');
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -197,19 +197,87 @@ const CalendarScreen = React.memo(function CalendarScreen() {
 
   const filterChipColors = useMemo(
     () => ({
-      accent: colors.accent,
-      accentForeground: colors.accentForeground,
+      primary: colors.primary,
+      primaryForeground: colors.primaryForeground,
       card: colors.card,
       border: colors.border,
       textMuted: colors.textMuted,
       text: colors.text,
+      secondary: colors.secondary,
     }),
-    [colors.accent, colors.accentForeground, colors.card, colors.border, colors.textMuted, colors.text]
+    [colors.primary, colors.primaryForeground, colors.card, colors.border, colors.textMuted, colors.text, colors.secondary]
   );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ThemedStatusBar />
+
+      {/* Header & Tabs - Fixed at top */}
+      <View style={[styles.headerContainer, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Calendar</Text>
+            <View style={styles.statsRow}>
+              <View style={[styles.statItem, { backgroundColor: colors.primary + '18', borderColor: colors.primary + '25' }]}>
+                <Ionicons name="calendar" size={16} color={colors.primary} style={styles.statIcon} />
+                <Text style={[styles.statValue, { color: colors.primary }]}>
+                  {isLoading ? '...' : stats.thisMonth}
+                </Text>
+                <Text style={[styles.statLabel, { color: colors.primary }]}>This Month</Text>
+              </View>
+              <View style={[styles.statItem, { backgroundColor: colors.green + '18', borderColor: colors.green + '25' }]}>
+                <Ionicons name="trending-up" size={16} color={colors.green} style={styles.statIcon} />
+                <Text style={[styles.statValue, { color: colors.green }]}>
+                  {isLoading ? '...' : stats.upcoming}
+                </Text>
+                <Text style={[styles.statLabel, { color: colors.green }]}>Upcoming</Text>
+              </View>
+              <View style={[styles.statItem, { backgroundColor: colors.textMuted + '15', borderColor: colors.textMuted + '20' }]}>
+                <Ionicons name="albums" size={16} color={colors.textMuted} style={styles.statIcon} />
+                <Text style={[styles.statValue, { color: colors.textMuted }]}>
+                  {isLoading ? '...' : stats.total}
+                </Text>
+                <Text style={[styles.statLabel, { color: colors.textMuted }]}>Total</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* View Mode Toggle */}
+        <View style={[styles.tabsContainer, { backgroundColor: colors.secondary }]}>
+          <TouchableOpacity
+            style={[styles.tab, viewMode === 'week' && { backgroundColor: colors.card, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 2, shadowOffset: {width: 0, height: 1} }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setViewMode('week');
+            }}
+            activeOpacity={0.9}
+          >
+            <Ionicons
+              name="calendar-outline"
+              size={16}
+              color={viewMode === 'week' ? colors.text : colors.textMuted}
+            />
+            <Text style={[styles.tabText, { color: viewMode === 'week' ? colors.text : colors.textMuted }]}>Week</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tab, viewMode === 'month' && { backgroundColor: colors.card, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 2, shadowOffset: {width: 0, height: 1} }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setViewMode('month');
+            }}
+            activeOpacity={0.9}
+          >
+            <Ionicons
+              name="grid-outline"
+              size={16}
+              color={viewMode === 'month' ? colors.text : colors.textMuted}
+            />
+            <Text style={[styles.tabText, { color: viewMode === 'month' ? colors.text : colors.textMuted }]}>Month</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       <ScrollView
         style={styles.scrollView}
@@ -217,70 +285,6 @@ const CalendarScreen = React.memo(function CalendarScreen() {
         showsVerticalScrollIndicator={false}
         removeClippedSubviews={true}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Calendar</Text>
-          <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
-            {isLoading ? 'Loading events...' : `${stats.thisMonth} this month • ${stats.upcoming} upcoming`}
-          </Text>
-        </View>
-
-        {/* View Mode Toggle */}
-        <View style={styles.viewModeSection}>
-          <View style={[styles.viewToggle, { backgroundColor: colors.card }]}>
-            <TouchableOpacity
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setViewMode('week');
-              }}
-              style={[
-                styles.viewToggleButton,
-                viewMode === 'week' && [styles.viewToggleButtonActive, { backgroundColor: colors.primary }],
-              ]}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name="calendar-outline"
-                size={18}
-                color={viewMode === 'week' ? colors.primaryForeground : colors.textMuted}
-              />
-              <Text
-                style={[
-                  styles.viewToggleText,
-                  { color: viewMode === 'week' ? colors.primaryForeground : colors.text },
-                ]}
-              >
-                Week
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setViewMode('month');
-              }}
-              style={[
-                styles.viewToggleButton,
-                viewMode === 'month' && [styles.viewToggleButtonActive, { backgroundColor: colors.primary }],
-              ]}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name="grid-outline"
-                size={18}
-                color={viewMode === 'month' ? colors.primaryForeground : colors.textMuted}
-              />
-              <Text
-                style={[
-                  styles.viewToggleText,
-                  { color: viewMode === 'month' ? colors.primaryForeground : colors.text },
-                ]}
-              >
-                Month
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
 
         {isLoading ? (
           <View style={styles.loadingContainer}>
@@ -316,30 +320,41 @@ const CalendarScreen = React.memo(function CalendarScreen() {
             {viewMode === 'week' ? (
               <View style={styles.section}>
                 {currentWeekEvents.length > 0 ? (
-                  <View style={[styles.weekEventsCard, { backgroundColor: colors.card }]}>
+                  <>
                     <View style={styles.sectionHeader}>
-                      <Text style={[styles.sectionTitle, { color: colors.text }]}>This Week</Text>
-                      <Text style={[styles.sectionCount, { color: colors.textMuted }]}>
-                        {currentWeekEvents.length} {currentWeekEvents.length === 1 ? 'event' : 'events'}
-                      </Text>
+                      <View style={styles.sectionHeaderLeft}>
+                        <View style={[styles.sectionIconBox, { backgroundColor: colors.primary + '15' }]}>
+                          <Ionicons name="calendar" size={16} color={colors.primary} />
+                        </View>
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>This Week</Text>
+                      </View>
+                      <View style={[styles.eventCount, { backgroundColor: colors.secondary }]}>
+                        <Text style={[styles.eventCountText, { color: colors.text }]}>
+                          {currentWeekEvents.length}
+                        </Text>
+                      </View>
                     </View>
-                    {currentWeekDates.map((dateString) => {
-                      const dayEvents = groupedWeekEvents[dateString] || [];
-                      return (
-                        <DayEventsGroup
-                          key={dateString}
-                          dateString={dateString}
-                          events={dayEvents}
-                          selectedWeekDate={selectedWeekDate}
-                          onEventPress={handleEventPress}
-                          colors={dayEventsColors}
-                        />
-                      );
-                    })}
-                  </View>
+                    <View style={[styles.weekEventsCard, { backgroundColor: colors.background + '15', borderColor: colors.border }]}>
+                      {currentWeekDates.map((dateString) => {
+                        const dayEvents = groupedWeekEvents[dateString] || [];
+                        return (
+                          <DayEventsGroup
+                            key={dateString}
+                            dateString={dateString}
+                            events={dayEvents}
+                            selectedWeekDate={selectedWeekDate}
+                            onEventPress={handleEventPress}
+                            colors={dayEventsColors}
+                          />
+                        );
+                      })}
+                    </View>
+                  </>
                 ) : (
-                  <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
-                    <Ionicons name="calendar-outline" size={48} color={colors.textMuted} style={styles.emptyIcon} />
+                  <View style={[styles.emptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <View style={[styles.emptyIconCircle, { backgroundColor: colors.secondary }]}>
+                      <Ionicons name="calendar-outline" size={32} color={colors.textMuted} />
+                    </View>
                     <Text style={[styles.emptyStateTitle, { color: colors.text }]}>No events this week</Text>
                     <Text style={[styles.emptyStateText, { color: colors.textMuted }]}>
                       Your week is clear. Start planning your trainings!
@@ -360,8 +375,10 @@ const CalendarScreen = React.memo(function CalendarScreen() {
 
             {/* Empty State when filtered */}
             {filteredEvents.length === 0 && filter !== 'all' && (
-              <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
-                <Ionicons name="funnel-outline" size={48} color={colors.textMuted} style={styles.emptyIcon} />
+              <View style={[styles.emptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={[styles.emptyIconCircle, { backgroundColor: colors.secondary }]}>
+                  <Ionicons name="funnel-outline" size={32} color={colors.textMuted} />
+                </View>
                 <Text style={[styles.emptyStateTitle, { color: colors.text }]}>No {filter} events</Text>
                 <Text style={[styles.emptyStateText, { color: colors.textMuted }]}>
                   Try selecting a different filter to see more events
@@ -381,6 +398,78 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  headerContainer: {
+    paddingTop: Platform.OS === 'ios' ? 16 : 20,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  headerTop: {
+    marginBottom: 16,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+    marginBottom: 12,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  statItem: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+    gap: 3,
+    borderWidth: 1,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+      },
+      android: {
+        elevation: 1,
+      },
+    }),
+  },
+  statIcon: {
+    marginBottom: 2,
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  statLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    opacity: 0.85,
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    padding: 3,
+    borderRadius: 10,
+    height: 36,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: 8,
+  },
+  tabText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
   scrollView: {
     flex: 1,
   },
@@ -388,68 +477,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 32,
-  },
-  header: {
-    marginBottom: 20,
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-    marginBottom: 6,
-  },
-  headerSubtitle: {
-    fontSize: 15,
-    fontWeight: '400',
-    letterSpacing: -0.1,
-    opacity: 0.7,
-  },
-  viewModeSection: {
-    marginBottom: 16,
-  },
-  viewToggle: {
-    flexDirection: 'row',
-    borderRadius: 12,
-    padding: 4,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
-  },
-  viewToggleButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-  },
-  viewToggleButtonActive: {
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
-  },
-  viewToggleText: {
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: -0.1,
   },
   loadingContainer: {
     paddingVertical: 60,
@@ -471,43 +498,65 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
+  },
+  sectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  sectionIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
     letterSpacing: -0.3,
   },
-  sectionCount: {
-    fontSize: 14,
-    fontWeight: '500',
+  eventCount: {
+    minWidth: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  eventCountText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   weekEventsCard: {
     borderRadius: 16,
     padding: 16,
+    borderWidth: StyleSheet.hairlineWidth,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
       },
       android: {
-        elevation: 2,
+        elevation: 1,
       },
     }),
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 48,
+    padding: 40,
     borderRadius: 16,
-    gap: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 16,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
+        shadowOpacity: 0.03,
         shadowRadius: 4,
       },
       android: {
@@ -515,12 +564,16 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  emptyIcon: {
-    opacity: 0.5,
+  emptyIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyStateTitle: {
     fontSize: 17,
-    fontWeight: '600',
+    fontWeight: '700',
     letterSpacing: -0.2,
   },
   emptyStateText: {
@@ -529,7 +582,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     letterSpacing: 0,
     maxWidth: 260,
-    opacity: 0.8,
+    opacity: 0.7,
     lineHeight: 20,
   },
 });

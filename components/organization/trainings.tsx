@@ -113,94 +113,82 @@ const TrainingsPage = React.memo(function TrainingsPage() {
   }, []);
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      removeClippedSubviews={true}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Training Sessions</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          {teamInfo?.teamName || 'Your Team'} • {teamRole === 'squad_commander' ? 'Squad Commander' : 'Soldier'}
-        </Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Header & Tabs - Fixed at top */}
+      <View style={[styles.headerContainer, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Training Sessions</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
+              {teamInfo?.teamName || 'Organization'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Filter Tabs */}
+        <View style={[styles.tabsContainer, { backgroundColor: colors.secondary }]}>
+          <TouchableOpacity
+            style={[styles.tab, filter === 'upcoming' && { backgroundColor: colors.card, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 2, shadowOffset: {width: 0, height: 1} }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setFilter('upcoming');
+            }}
+            activeOpacity={0.9}
+          >
+            <Ionicons 
+              name="time" 
+              size={16} 
+              color={filter === 'upcoming' ? colors.text : colors.textMuted} 
+            />
+            <Text style={[styles.tabText, { color: filter === 'upcoming' ? colors.text : colors.textMuted }]}>
+              Upcoming
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tab, filter === 'completed' && { backgroundColor: colors.card, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 2, shadowOffset: {width: 0, height: 1} }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setFilter('completed');
+            }}
+            activeOpacity={0.9}
+          >
+            <Ionicons 
+              name="checkmark-circle" 
+              size={16} 
+              color={filter === 'completed' ? colors.text : colors.textMuted} 
+            />
+            <Text style={[styles.tabText, { color: filter === 'completed' ? colors.text : colors.textMuted }]}>
+              Completed
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tab, filter === 'missed' && { backgroundColor: colors.card, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 2, shadowOffset: {width: 0, height: 1} }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setFilter('missed');
+            }}
+            activeOpacity={0.9}
+          >
+            <Ionicons 
+              name="close-circle" 
+              size={16} 
+              color={filter === 'missed' ? colors.text : colors.textMuted} 
+            />
+            <Text style={[styles.tabText, { color: filter === 'missed' ? colors.text : colors.textMuted }]}>
+              Missed
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Filter Tabs */}
-      <View style={[styles.filterTabs, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <TouchableOpacity
-          style={[
-            styles.filterTab,
-            filter === 'upcoming' && { backgroundColor: '#FF6B35' + '15' }
-          ]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setFilter('upcoming');
-          }}
-          activeOpacity={0.7}
-        >
-          <Ionicons 
-            name="time" 
-            size={16} 
-            color={filter === 'upcoming' ? '#FF6B35' : colors.textMuted} 
-          />
-          <Text style={[
-            styles.filterTabText,
-            { color: filter === 'upcoming' ? '#FF6B35' : colors.textMuted }
-          ]}>
-            Upcoming
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.filterTab,
-            filter === 'completed' && { backgroundColor: '#34C759' + '15' }
-          ]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setFilter('completed');
-          }}
-          activeOpacity={0.7}
-        >
-          <Ionicons 
-            name="checkmark-circle" 
-            size={16} 
-            color={filter === 'completed' ? '#34C759' : colors.textMuted} 
-          />
-          <Text style={[
-            styles.filterTabText,
-            { color: filter === 'completed' ? '#34C759' : colors.textMuted }
-          ]}>
-            Completed
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.filterTab,
-            filter === 'missed' && { backgroundColor: '#FF3B30' + '15' }
-          ]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setFilter('missed');
-          }}
-          activeOpacity={0.7}
-        >
-          <Ionicons 
-            name="close-circle" 
-            size={16} 
-            color={filter === 'missed' ? '#FF3B30' : colors.textMuted} 
-          />
-          <Text style={[
-            styles.filterTabText,
-            { color: filter === 'missed' ? '#FF3B30' : colors.textMuted }
-          ]}>
-            Missed
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        removeClippedSubviews={true}
+      >
 
       {/* Sessions List */}
       {filteredSessions.length === 0 ? (
@@ -225,7 +213,8 @@ const TrainingsPage = React.memo(function TrainingsPage() {
           ))}
         </View>
       )}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 });
 
@@ -255,47 +244,49 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  content: {
+  headerContainer: {
+    paddingTop: Platform.OS === 'ios' ? 16 : 20,
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 40,
+    paddingBottom: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-
-  // Header
-  header: {
-    marginBottom: 20,
+  headerTop: {
+    marginBottom: 16,
   },
-  title: {
+  headerTitle: {
     fontSize: 28,
     fontWeight: '700',
     letterSpacing: -0.5,
   },
-  subtitle: {
+  headerSubtitle: {
     fontSize: 14,
     marginTop: 4,
   },
-
-  // Filter Tabs
-  filterTabs: {
+  tabsContainer: {
     flexDirection: 'row',
-    padding: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 20,
-    gap: 4,
+    padding: 3,
+    borderRadius: 10,
+    height: 36,
   },
-  filterTab: {
+  tab: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    gap: 6,
     borderRadius: 8,
-    gap: 4,
   },
-  filterTabText: {
+  tabText: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 40,
   },
 
   // Sessions List

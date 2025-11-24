@@ -82,7 +82,7 @@ export default function TrainingSessionsView() {
         <TouchableOpacity
           style={[
             styles.filterTab,
-            filter === 'upcoming' && { backgroundColor: '#FF6B35' + '15' }
+            filter === 'upcoming' && { backgroundColor: '#7C3AED' + '15' }
           ]}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -93,11 +93,11 @@ export default function TrainingSessionsView() {
           <Ionicons 
             name="time" 
             size={16} 
-            color={filter === 'upcoming' ? '#FF6B35' : colors.textMuted} 
+            color={filter === 'upcoming' ? '#7C3AED' : colors.textMuted} 
           />
           <Text style={[
             styles.filterTabText,
-            { color: filter === 'upcoming' ? '#FF6B35' : colors.textMuted }
+            { color: filter === 'upcoming' ? '#7C3AED' : colors.textMuted }
           ]}>
             Upcoming
           </Text>
@@ -221,7 +221,7 @@ function getTypeIcon(type: string) {
 
 function getTypeColor(type: string) {
   const colors = {
-    range: { color: '#FF6B35', bg: '#FF6B3515' },
+    range: { color: '#7C3AED', bg: '#7C3AED15' },
     tactical: { color: '#5B7A8C', bg: '#5B7A8C15' },
     qualification: { color: '#FFD60A', bg: '#FFD60A15' },
     drill: { color: '#34C759', bg: '#34C75915' },

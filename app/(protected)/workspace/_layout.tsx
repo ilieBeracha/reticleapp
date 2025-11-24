@@ -13,18 +13,7 @@ function ProtectedLayoutContent() {
   // Check if organization is selected
   
   const navigation = useNavigation();
-  const {
-    chartDetailsSheetRef,
-    createSessionSheetRef,
-    createTeamSheetRef,
-    acceptInviteSheetRef,
-    workspaceSwitcherSheetRef,
-    onSessionCreated,
-    onTeamCreated,
-    onInviteAccepted,
-    onWorkspaceCreated,
-    createWorkspaceSheetRef,
-    } = useModals();
+  const { workspaceSwitcherSheetRef } = useModals();
 
   // Listen for navigation to organizations tab and open switcher
   useEffect(() => {
@@ -78,14 +67,14 @@ function ProtectedLayoutContent() {
             }}
           />
           <Tabs.Screen
-            name="members"  
+            name="manage"  
             options={{
               sceneStyle: {
                 display: activeWorkspace?.id ? 'flex' : 'none',
               },
-              title: 'Members',
+              title: 'Manage',
               tabBarItemHidden: !activeWorkspace?.id,
-              tabBarIcon: () => ({ sfSymbol: 'person.2' }),
+              tabBarIcon: () => ({ sfSymbol: 'gear' }),
             }}
           />
       </Tabs>

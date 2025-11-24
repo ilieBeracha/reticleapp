@@ -105,9 +105,9 @@ export const AcceptInviteSheet = forwardRef<BaseBottomSheetRef, AcceptInviteShee
 
     const getRoleColor = (role: string) => {
       const colors = {
-        owner: '#FF6B35',
+        owner: '#5B6B8C',
         admin: '#5B7A8C',
-        instructor: '#E76925',
+        instructor: '#7C3AED',
         member: '#6B8FA3',
       };
       return colors[role as keyof typeof colors] || '#6B8FA3';

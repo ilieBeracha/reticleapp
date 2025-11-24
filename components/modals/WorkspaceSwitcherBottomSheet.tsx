@@ -63,11 +63,9 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
 
     const handleSelectWorkspace = useCallback(async (workspace: Workspace) => {
       try {
-        console.log("handleSelectWorkspace", workspace.id)
         await switchWorkspace(workspace.id);
         bottomSheetRef.current?.close();
       } catch (error: any) {
-        console.error("Failed to switch workspace:", error);
         Alert.alert("Error", "Failed to switch workspace");
       }
     }, [switchWorkspace]);
@@ -140,8 +138,8 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
               <View style={styles.headerTop}>
                 <View style={styles.headerContent}>
                   <Text style={[styles.title, { color: colors.text }]}>Workspaces</Text>
-                  <View style={[styles.countBadge, { backgroundColor: '#FF6B351A' }]}>
-                    <Text style={[styles.countBadgeText, { color: '#FF6B35' }]}>
+                  <View style={[styles.countBadge, { backgroundColor: colors.secondary }]}>
+                    <Text style={[styles.countBadgeText, { color: colors.secondaryForeground }]}>
                       {workspaces.length}
                     </Text>
                   </View>

@@ -29,7 +29,7 @@ const ORG_ROLE_OPTIONS: RoleOption[] = [
     label: 'Instructor',
     description: 'Create trainings and manage sessions',
     icon: 'school',
-    color: '#E76925',
+    color: '#7C3AED',
   },
   {
     value: 'admin',
@@ -43,7 +43,7 @@ const ORG_ROLE_OPTIONS: RoleOption[] = [
     label: 'Owner',
     description: 'Full workspace access',
     icon: 'shield-checkmark',
-    color: '#FF6B35',
+    color: '#5B6B8C',
   },
 ];
 

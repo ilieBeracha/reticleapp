@@ -10,12 +10,13 @@ interface FilterChipProps {
   count: number;
   onPress: () => void;
   colors: {
-    accent: string;
-    accentForeground: string;
+    primary: string;
+    primaryForeground: string;
     card: string;
     border: string;
     textMuted: string;
     text: string;
+    secondary: string;
   };
 }
 
@@ -37,28 +38,28 @@ export const FilterChip = React.memo(function FilterChip({
       style={[
         styles.chip,
         {
-          backgroundColor: isActive ? colors.accent : colors.card,
-          borderColor: isActive ? colors.accent : colors.border,
+          backgroundColor: isActive ? colors.primary : colors.card,
+          borderColor: isActive ? colors.primary : colors.border,
         },
       ]}
     >
       <Ionicons
         name={option.icon as any}
         size={16}
-        color={isActive ? colors.accentForeground : colors.textMuted}
+        color={isActive ? colors.primaryForeground : colors.textMuted}
       />
-      <Text style={[styles.chipText, { color: isActive ? colors.accentForeground : colors.text }]}>
+      <Text style={[styles.chipText, { color: isActive ? colors.primaryForeground : colors.text }]}>
         {option.label}
       </Text>
       <View
         style={[
           styles.chipBadge,
           {
-            backgroundColor: isActive ? colors.accentForeground + '20' : colors.accent + '15',
+            backgroundColor: isActive ? colors.primaryForeground + '20' : colors.secondary,
           },
         ]}
       >
-        <Text style={[styles.chipBadgeText, { color: isActive ? colors.accentForeground : colors.accent }]}>
+        <Text style={[styles.chipBadgeText, { color: isActive ? colors.primaryForeground : colors.primary }]}>
           {count}
         </Text>
       </View>

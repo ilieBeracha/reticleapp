@@ -7,9 +7,9 @@ interface RoleBadgeProps {
 }
 
 const ROLE_CONFIG = {
-  owner: { icon: 'shield-checkmark' as const, color: '#FF6B35', bg: '#FF6B3515' },
+  owner: { icon: 'shield-checkmark' as const, color: '#5B6B8C', bg: '#5B6B8C15' },
   admin: { icon: 'shield-half' as const, color: '#5B7A8C', bg: '#5B7A8C15' },
-  instructor: { icon: 'school' as const, color: '#E76925', bg: '#E7692515' },
+  instructor: { icon: 'school' as const, color: '#7C3AED', bg: '#7C3AED15' },
   member: { icon: 'person' as const, color: '#666', bg: '#E0E0E0' },
 };
 

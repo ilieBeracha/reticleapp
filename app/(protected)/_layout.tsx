@@ -5,6 +5,8 @@ import { CreateSessionSheet } from '@/components/modals/CreateSessionSheet';
 import { CreateTeamSheet } from '@/components/modals/CreateTeamSheet';
 import { CreateWorkspaceSheet } from '@/components/modals/CreateWorkspaceSheet';
 import { InviteMembersSheet } from '@/components/modals/InviteMembersSheet';
+import { MemberPreviewSheet } from '@/components/modals/MemberPreviewSheet';
+import { TeamPreviewSheet } from '@/components/modals/TeamPreviewSheet';
 import { UserMenuBottomSheet, UserMenuBottomSheetRef } from '@/components/modals/UserMenuBottomSheet';
 import { WorkspaceSwitcherBottomSheet } from '@/components/modals/WorkspaceSwitcherBottomSheet';
 import { useModals } from '@/contexts/ModalContext';
@@ -15,7 +17,7 @@ import { useRef } from 'react';
 
 export default function ProtectedLayout() {
   const userMenuSheetRef = useRef<UserMenuBottomSheetRef>(null);
-  const { workspaceSwitcherSheetRef, onWorkspaceSwitched, onWorkspaceCreated, createWorkspaceSheetRef, acceptInviteSheetRef, onInviteAccepted, createTeamSheetRef, onTeamCreated, createSessionSheetRef, onSessionCreated, chartDetailsSheetRef, inviteMembersSheetRef, onMemberInvited } = useModals();
+  const { workspaceSwitcherSheetRef, onWorkspaceSwitched, onWorkspaceCreated, createWorkspaceSheetRef, acceptInviteSheetRef, onInviteAccepted, createTeamSheetRef, onTeamCreated, createSessionSheetRef, onSessionCreated, chartDetailsSheetRef, inviteMembersSheetRef, onMemberInvited, teamPreviewSheetRef, selectedTeam, memberPreviewSheetRef, selectedMember } = useModals();
   const colors = useColors();
   return (
     <ThemeProvider>
@@ -113,6 +115,18 @@ export default function ProtectedLayout() {
             onMemberInvited();
           }
         }}
+      />
+
+      {/* TEAM PREVIEW */}
+      <TeamPreviewSheet
+        ref={teamPreviewSheetRef}
+        team={selectedTeam}
+      />
+
+      {/* MEMBER PREVIEW */}
+      <MemberPreviewSheet
+        ref={memberPreviewSheetRef}
+        member={selectedMember}
       />
 
     </ThemeProvider>

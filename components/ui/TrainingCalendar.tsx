@@ -68,11 +68,11 @@ export function TrainingCalendar({
                 style={ [
                   styles.createButton,
                   { 
-                    backgroundColor: colors.accent,
+                    backgroundColor: colors.primary,
                   },
                 ]}
               >
-                <Ionicons name="add" size={20} color={colors.accentForeground} />
+                <Ionicons name="add" size={20} color={colors.primaryForeground} />
               </TouchableOpacity>
             )}
           </View>

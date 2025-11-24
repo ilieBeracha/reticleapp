@@ -14,7 +14,6 @@ interface WorkspaceItemProps {
 const WorkspaceItem = memo(({ workspace, isActive, isMyWorkspace, onSelect }: WorkspaceItemProps) => {
   const colors = useColors();
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const isOrgWorkspace = workspace.workspace_type === 'org';
 
   const animatePressIn = useCallback(() => {
     Animated.spring(scaleAnim, {
@@ -41,7 +40,7 @@ const WorkspaceItem = memo(({ workspace, isActive, isMyWorkspace, onSelect }: Wo
   // Memoize styles
   const itemStyle = useMemo(() => [
     styles.workspaceItem,
-    isActive && styles.workspaceItemActive,
+    isActive && { backgroundColor: colors.foreground + '15' },
   ], [isActive]);
 
   const iconStyle = useMemo(() => [
@@ -62,17 +61,17 @@ const WorkspaceItem = memo(({ workspace, isActive, isMyWorkspace, onSelect }: Wo
 
   const roleTextStyle = useMemo(() => [
     styles.roleBadgeText,
-    { color: isMyWorkspace ? '#FF6B35' : colors.textMuted }
+    { color: isMyWorkspace ? colors.foreground : colors.textMuted }
   ], [isMyWorkspace, colors.textMuted]);
 
   const checkmarkStyle = useMemo(() => [
     styles.checkmarkContainer,
-    { backgroundColor: colors.primary }
+    { backgroundColor: colors.foreground }
   ], [colors.primary]);
 
   const iconName = useMemo(() => 
-    isMyWorkspace ? "person" : isOrgWorkspace ? "business" : "people"
-  , [isMyWorkspace, isOrgWorkspace]);
+    isMyWorkspace ? "person" : "business"
+  , [isMyWorkspace]);
 
   const iconColor = useMemo(() => 
     isActive ? '#fff' : colors.textMuted
@@ -94,7 +93,7 @@ const WorkspaceItem = memo(({ workspace, isActive, isMyWorkspace, onSelect }: Wo
 
           <View style={styles.workspaceDetails}>
             <Text style={nameStyle}>
-              {workspace.workspace_name || workspace.full_name || workspace.email}
+              {workspace.workspace_name || workspace.workspace_slug}
             </Text>
 
             <View style={styles.workspaceMeta}>
@@ -126,9 +125,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
   },
-  workspaceItemActive: {
-    backgroundColor: 'rgba(231, 105, 37, 0.08)',
-  },
+ 
   workspaceItemContent: {
     flexDirection: "row",
     alignItems: "center",

@@ -95,9 +95,9 @@ export default function TeamCommanderDashboard() {
 
         {/* Team Header */}
         <View style={styles.header}>
-          <View style={[styles.commanderBadge, { backgroundColor: '#FF6B35' + '15' }]}>
-            <Ionicons name="star" size={16} color="#FF6B35" />
-            <Text style={[styles.commanderText, { color: '#FF6B35' }]}>Team Commander</Text>
+          <View style={[styles.commanderBadge, { backgroundColor: '#5B6B8C' + '15' }]}>
+            <Ionicons name="star" size={16} color="#5B6B8C" />
+            <Text style={[styles.commanderText, { color: '#5B6B8C' }]}>Team Commander</Text>
           </View>
           <Text style={[styles.teamTitle, { color: colors.text }]}>{team.name}</Text>
           {team.description && (
@@ -244,7 +244,7 @@ function formatRole(role: string): string {
 
 function getRoleColor(role: string) {
   const colors = {
-    commander: { color: '#FF6B35', bg: '#FF6B3515' },
+    commander: { color: '#5B6B8C', bg: '#5B6B8C15' },
     squad_commander: { color: '#5B7A8C', bg: '#5B7A8C15' },
     soldier: { color: '#666', bg: '#66666615' },
   };

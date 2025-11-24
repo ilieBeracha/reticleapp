@@ -23,12 +23,12 @@ export default function TeamCard({ team, memberCount = 0, onPress, isFirst, isLa
     >
       <View style={[
         styles.icon,
-        { backgroundColor: isFieldTeam ? '#5B7A8C15' : '#E7692515' }
+        { backgroundColor: isFieldTeam ? '#5B7A8C15' : '#7C3AED15' }
       ]}>
         <Ionicons 
           name={isFieldTeam ? 'shield' : 'desktop'} 
           size={20} 
-          color={isFieldTeam ? '#5B7A8C' : '#E76925'} 
+          color={isFieldTeam ? '#5B7A8C' : '#7C3AED'} 
         />
       </View>
       <View style={styles.info}>
