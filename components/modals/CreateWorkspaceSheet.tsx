@@ -107,7 +107,6 @@ export const CreateWorkspaceSheet = forwardRef<BaseBottomSheetRef, CreateWorkspa
                   value={workspaceName}
                   onChangeText={setWorkspaceName}
                   returnKeyType="next"
-                  autoFocus
                 />
               </View>
             </View>
