@@ -21,8 +21,10 @@ import type {
  * Get all organization workspaces I have access to
  */
 export async function getAccessibleWorkspaces(): Promise<Workspace[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
+  // Use getSession instead of getUser - getUser can hang during auth state transitions
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("Not authenticated");
+  const user = session.user;
 
   // Get all org workspaces I have access to
   const { data: orgWorkspaces } = await supabase
@@ -285,8 +287,8 @@ export async function updateWorkspaceMemberRole(
  * Check if user is workspace admin
  */
 export async function isWorkspaceAdmin(orgWorkspaceId: string, userId?: string): Promise<boolean> {
-  const { data: { user } } = await supabase.auth.getUser();
-  const checkUserId = userId || user?.id;
+  const { data: { session } } = await supabase.auth.getSession();
+  const checkUserId = userId || session?.user?.id;
   if (!checkUserId) return false;
 
   const { data } = await supabase
@@ -303,8 +305,8 @@ export async function isWorkspaceAdmin(orgWorkspaceId: string, userId?: string):
  * Check if user is team leader
  */
 export async function isTeamLeader(teamId: string, userId?: string): Promise<boolean> {
-  const { data: { user } } = await supabase.auth.getUser();
-  const checkUserId = userId || user?.id;
+  const { data: { session } } = await supabase.auth.getSession();
+  const checkUserId = userId || session?.user?.id;
   if (!checkUserId) return false;
 
   const { data } = await supabase

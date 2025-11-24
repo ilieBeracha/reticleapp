@@ -2,7 +2,6 @@ import { BaseAvatar } from '@/components/BaseAvatar';
 import { BaseBottomSheet, type BaseBottomSheetRef } from '@/components/modals/BaseBottomSheet';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
-import { router } from 'expo-router';
 import {
   BuildingIcon,
   ChevronRightIcon,
@@ -42,9 +41,8 @@ export const UserMenuBottomSheet = forwardRef<UserMenuBottomSheetRef, UserMenuBo
 
     const handleSignOut = useCallback(async () => {
       try {
-        bottomSheetRef.current?.close();
         await signOut();
-        router.replace('/auth/sign-in');
+        // Navigation handled by AuthContext
       } catch (error) {
         console.error('Sign out error:', error);
       }

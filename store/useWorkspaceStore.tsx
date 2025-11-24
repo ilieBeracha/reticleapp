@@ -19,21 +19,21 @@ interface WorkspaceStore {
 } 
 
 /**
- * ✨ ORG-ONLY WORKSPACE STORE ✨
+ * ✨ WORKSPACE STORE ✨
  * 
- * Simplified Model: Users must belong to organizations
- * - No personal workspaces
- * - Can view different orgs they have access to
- * - activeWorkspaceId tracks which org is currently being viewed
- * - If user has no orgs, they need to create or join one
+ * IMPORTANT: Users ALWAYS start in personal mode
+ * - activeWorkspaceId = null means personal mode
+ * - activeWorkspaceId = UUID means viewing an organization
+ * - Users can switch to organizations when they choose
+ * - On app start/sign in, ALWAYS reset to personal mode (null)
  * 
  * Source of truth:
  * - workspaces: list of accessible org workspaces
- * - activeWorkspaceId: currently viewing workspace ID (defaults to first org)
+ * - activeWorkspaceId: currently viewing workspace ID (ALWAYS starts null)
  */
 export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   workspaces: [],
-  activeWorkspaceId: null,
+  activeWorkspaceId: null,  // ALWAYS start in personal mode
   loading: true,
   error: null,
   workspaceMembers: [],
@@ -44,25 +44,24 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   loadWorkspaces: async () => {
     try {
       set({ loading: true, error: null });
-      
-      // Check if user is authenticated first
+
+      // Check if user is authenticated first (use getSession, not getUser - getUser can hang during auth transitions)
       const { supabase } = await import("@/lib/supabase");
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session?.user) {
         console.log("📦 Workspace Store: User not authenticated yet, skipping load");
         set({ loading: false, workspaces: [], activeWorkspaceId: null });
         return;
       }
-      
+
       const workspaces = await getAccessibleWorkspaces();
       
-      // Set active workspace to first org by default
-      const defaultWorkspace = workspaces[0];
-      
+      // DON'T auto-select a workspace - user starts in personal mode
+      // They can switch to an org if they want
       set({
         workspaces,
-        activeWorkspaceId: defaultWorkspace?.id || null,
+        activeWorkspaceId: null,  // Start in personal mode
         loading: false,
       });
     } catch (error: any) {

@@ -2,7 +2,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import type { Workspace } from "@/types/workspace";
 import { useRouter } from "expo-router";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 export interface AppContext {
   // User
@@ -52,6 +52,12 @@ export function useAppContext(): AppContext {
     setActiveWorkspace
   } = useWorkspaceStore();
 
+  // Stable switchWorkspace callback
+  const handleSwitchWorkspace = useCallback(async (workspaceId: string | null) => {
+    setActiveWorkspace(workspaceId);
+    router.replace('/(protected)/workspace');
+  }, [setActiveWorkspace, router]);
+
   // Calculate derived values with memoization
   const context = useMemo<AppContext>(() => {
     if (!user) {
@@ -70,7 +76,7 @@ export function useAppContext(): AppContext {
         workspaces: [],
         
         // Actions
-        switchWorkspace: async () => {},
+        switchWorkspace: handleSwitchWorkspace,
         
         // Loading
         loading: authLoading,
@@ -98,10 +104,7 @@ export function useAppContext(): AppContext {
       workspaces,
       
       // Actions
-      switchWorkspace: async (workspaceId: string | null) => {
-        setActiveWorkspace(workspaceId);
-        router.replace('/(protected)/workspace');
-      },
+      switchWorkspace: handleSwitchWorkspace,
       
       // Loading
       loading: authLoading || workspacesLoading,
@@ -113,8 +116,7 @@ export function useAppContext(): AppContext {
     activeWorkspaceId,
     authLoading,
     workspacesLoading,
-    setActiveWorkspace,
-    router
+    handleSwitchWorkspace
   ]);
 
   return context;

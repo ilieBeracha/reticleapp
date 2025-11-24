@@ -63,6 +63,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
 
     const handleSelectWorkspace = useCallback(async (workspace: Workspace) => {
       try {
+        console.log("handleSelectWorkspace", workspace.id)
         await switchWorkspace(workspace.id);
         bottomSheetRef.current?.close();
       } catch (error: any) {

@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { AuthenticatedClient } from '@/services/authenticatedClient'
 import { useWorkspaceStore } from '@/store/useWorkspaceStore'
 import { Session, User } from '@supabase/supabase-js'
+import { router } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
 import React, { createContext, useContext, useEffect, useState } from 'react'
 
@@ -12,6 +13,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  transitioning: boolean;  // New: true during auth transitions (sign in/out)
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithOAuth: (provider: 'google' | 'apple') => Promise<void>;
@@ -26,57 +28,86 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [transitioning, setTransitioning] = useState(false)
 
   // ═══════════════════════════════════════════════════
   // AUTH EVENT HANDLERS
   // ═══════════════════════════════════════════════════
 
   /**
-   * Handle user sign out - clear state
+   * Handle user sign out - clear state and redirect to login
    */
   const handleSignOut = () => {
-    // Just clear state, index.tsx will handle redirect
-    setUser(null)
-    setSession(null)
+    // Clear workspace store
+    useWorkspaceStore.getState().reset()
+    
+    // Show transition loading
+    setTransitioning(true)
+    
+    // Small delay for smooth transition, then navigate
+    setTimeout(() => {
+      router.replace("/auth/sign-in")
+      setTransitioning(false)
+    }, 500)
   }
 
   /**
    * Handle initial session (app startup with existing session)
-   * Load workspaces but DON'T navigate - let root index.tsx handle routing
+   * Redirect to protected area and load workspaces in background
    */
   const handleInitialSession = async (session: Session | null) => {
     if (!session?.user) {
       setLoading(false)
+      router.replace("/auth/sign-in")
       return
     }
 
-    // Load workspaces in background
-    try {
-      await useWorkspaceStore.getState().loadWorkspaces();
-    } catch (err) {
-      console.error("Workspace load error:", err)
-    }
-    
+    // Show transition loading
+    setTransitioning(true)
     setLoading(false)
-    // Don't navigate here - let index.tsx handle routing based on state
+    
+    // ALWAYS clear the stored workspace ID on app start to force personal mode
+    // This ensures users ALWAYS start with their personal profile
+    await supabase.auth.updateUser({
+      data: { active_workspace_id: null }
+    }).catch(err => console.error("Failed to clear workspace ID:", err))
+    
+    // Force workspace store to personal mode
+    useWorkspaceStore.getState().setActiveWorkspace(null)
+    
+    // Load workspaces in background (non-blocking)
+    // This will also set activeWorkspaceId to null
+    useWorkspaceStore.getState().loadWorkspaces().catch(err => 
+      console.error("Background workspace load error:", err)
+    )
+    
+    // Navigate with smooth transition
+    setTimeout(() => {
+      router.replace("/(protected)/workspace")
+      setTransitioning(false)
+    }, 800)
   }
 
   /**
-   * Handle new sign in
-   * Load workspaces but DON'T navigate - let root index.tsx handle routing
+   * Handle new sign in - redirect to protected area and load workspaces
    */
   const handleSignIn = async (session: Session | null) => {
     if (!session?.user) return
 
-    // Load workspaces in background
-    try {
-      await useWorkspaceStore.getState().loadWorkspaces();
-    } catch (err) {
-      console.error("Workspace load error:", err)
-    }
-    
+    // Show transition loading
+    setTransitioning(true)
     setLoading(false)
-    // Don't navigate here - let index.tsx handle routing based on state
+    
+    // Load workspaces in background (non-blocking)
+    useWorkspaceStore.getState().loadWorkspaces().catch(err => 
+      console.error("Background workspace load error:", err)
+    )
+    
+    // Navigate with smooth transition
+    setTimeout(() => {
+      router.replace("/(protected)/workspace")
+      setTransitioning(false)
+    }, 800)
   }
 
   /**
@@ -84,8 +115,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Updates user.user_metadata.active_workspace_id (SINGLE SOURCE OF TRUTH)
    */
   const switchWorkspace = async (workspaceId: string | null) => {
-    if (!user) return
-
+    console.log("switchWorkspace", workspaceId)
+    
     try {
       // Update user metadata (SINGLE SOURCE OF TRUTH)
       await supabase.auth.updateUser({
@@ -98,9 +129,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(updatedUser)
       }
 
-      // ✨ No need to update workspace store!
-      // workspaceStore is just a cache of available workspaces
-      // Active workspace is determined by user.user_metadata.active_workspace_id
+      // Update workspace store to reflect the change
+      useWorkspaceStore.getState().setActiveWorkspace(workspaceId)
     } catch (error) {
       console.error("Switch workspace error:", error)
       throw error
@@ -111,7 +141,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Switch to personal mode
    */
   const switchToPersonal = async () => {
+    console.log("switchToPersonal")
     await switchWorkspace(null)
+    console.log("switchToPersonal done")
   }
 
   /**
@@ -262,10 +294,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
+    // Clear workspace store FIRST
+    useWorkspaceStore.getState().reset()
+    
+    // Sign out from Supabase (triggers SIGNED_OUT event)
     await supabase.auth.signOut()
+    
+    // Clear local state
     setUser(null)
     setSession(null)
-    // Don't navigate here - index.tsx will handle redirect
+    
+    // Navigation will be handled by handleSignOut via SIGNED_OUT event
   }
 
   return (
@@ -273,6 +312,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       session,
       loading,
+      transitioning,
       signUp,
       signIn,
       signInWithOAuth,

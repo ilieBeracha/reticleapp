@@ -1,5 +1,6 @@
+import { LoadingScreen } from '@/components/LoadingScreen';
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
-import { AuthProvider } from '@/contexts/AuthContext';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ModalProvider } from '@/contexts/ModalContext';
 import { useColorScheme } from '@/hooks/ui/useColorScheme';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
@@ -55,16 +56,29 @@ function RootLayoutInner() {
     <GluestackUIProvider mode={mode as 'dark' | 'light' | 'system'}>
       <ModalProvider>
         <AuthProvider>
-          <SafeAreaProvider>
-            <BottomSheetModalProvider>
-              <GestureHandlerRootView>
-                <Slot />
-                <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-              </GestureHandlerRootView>
-            </BottomSheetModalProvider>
-          </SafeAreaProvider>
+          <LayoutWithLoadingOverlay colorScheme={colorScheme} />
         </AuthProvider>
       </ModalProvider>
     </GluestackUIProvider>
+  );
+}
+
+function LayoutWithLoadingOverlay({ colorScheme }: { colorScheme: 'light' | 'dark' | null }) {
+  const { transitioning } = useAuth();
+  
+  return (
+    <SafeAreaProvider>
+      <BottomSheetModalProvider>
+        <GestureHandlerRootView>
+          <Slot />
+          <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+          
+          {/* Global loading overlay for auth transitions */}
+          {transitioning && (
+            <LoadingScreen overlay />
+          )}
+        </GestureHandlerRootView>
+      </BottomSheetModalProvider>
+    </SafeAreaProvider>
   );
 }
