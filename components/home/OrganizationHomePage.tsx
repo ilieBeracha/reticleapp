@@ -128,7 +128,7 @@ export const OrganizationHomePage = React.memo(function OrganizationHomePage() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ThemedStatusBar />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false} removeClippedSubviews={true}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
@@ -140,7 +140,7 @@ export const OrganizationHomePage = React.memo(function OrganizationHomePage() {
         </View>
 
         {/* Stat Cards */}
-        <ScrollView horizontal style={styles.statsGrid} showsHorizontalScrollIndicator={false}>
+        <ScrollView horizontal style={styles.statsGrid} showsHorizontalScrollIndicator={false} removeClippedSubviews={true}>
           {statCards.map((stat, index) => (
             <OrgStatCard
               key={index}

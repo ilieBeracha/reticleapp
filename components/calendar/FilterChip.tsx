@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeInLeft } from 'react-native-reanimated';
 
 type EventFilter = 'all' | 'training' | 'session' | 'assessment' | 'briefing' | 'qualification';
 
@@ -10,7 +9,6 @@ interface FilterChipProps {
   isActive: boolean;
   count: number;
   onPress: () => void;
-  delay: number;
   colors: {
     accent: string;
     accentForeground: string;
@@ -22,51 +20,49 @@ interface FilterChipProps {
 }
 
 /**
- * Animated filter chip component for calendar event filtering.
+ * Filter chip component for calendar event filtering.
  * Uses React.memo for performance optimization.
+ * Removed expensive entering animations for better scroll performance.
  */
 export const FilterChip = React.memo(function FilterChip({
   option,
   isActive,
   count,
   onPress,
-  delay,
   colors,
 }: FilterChipProps) {
   return (
-    <Animated.View entering={FadeInLeft.delay(delay).springify()}>
-      <Pressable
-        onPress={onPress}
+    <Pressable
+      onPress={onPress}
+      style={[
+        styles.chip,
+        {
+          backgroundColor: isActive ? colors.accent : colors.card,
+          borderColor: isActive ? colors.accent : colors.border,
+        },
+      ]}
+    >
+      <Ionicons
+        name={option.icon as any}
+        size={16}
+        color={isActive ? colors.accentForeground : colors.textMuted}
+      />
+      <Text style={[styles.chipText, { color: isActive ? colors.accentForeground : colors.text }]}>
+        {option.label}
+      </Text>
+      <View
         style={[
-          styles.chip,
+          styles.chipBadge,
           {
-            backgroundColor: isActive ? colors.accent : colors.card,
-            borderColor: isActive ? colors.accent : colors.border,
+            backgroundColor: isActive ? colors.accentForeground + '20' : colors.accent + '15',
           },
         ]}
       >
-        <Ionicons
-          name={option.icon as any}
-          size={16}
-          color={isActive ? colors.accentForeground : colors.textMuted}
-        />
-        <Text style={[styles.chipText, { color: isActive ? colors.accentForeground : colors.text }]}>
-          {option.label}
+        <Text style={[styles.chipBadgeText, { color: isActive ? colors.accentForeground : colors.accent }]}>
+          {count}
         </Text>
-        <View
-          style={[
-            styles.chipBadge,
-            {
-              backgroundColor: isActive ? colors.accentForeground + '20' : colors.accent + '15',
-            },
-          ]}
-        >
-          <Text style={[styles.chipBadgeText, { color: isActive ? colors.accentForeground : colors.accent }]}>
-            {count}
-          </Text>
-        </View>
-      </Pressable>
-    </Animated.View>
+      </View>
+    </Pressable>
   );
 });
 
@@ -79,6 +75,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     gap: 6,
     borderWidth: 1,
+    marginRight: 8,
     ...Platform.select({
       ios: {
         shadowColor: '#000',

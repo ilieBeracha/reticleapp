@@ -5,11 +5,13 @@ import { useModals } from '@/contexts/ModalContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAppContext } from '@/hooks/useAppContext';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import { WorkspaceMemberWithTeams } from '@/types/workspace';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import { useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,10 +21,117 @@ import {
 
 const { width } = Dimensions.get('window');
 
+// Memoized stat card component
+const StatCard = React.memo(function StatCard({
+  icon,
+  label,
+  value,
+  color,
+  cardBg,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: number;
+  color: string;
+  cardBg: string;
+}) {
+  return (
+    <View style={[styles.statCard, { backgroundColor: cardBg }]}>
+      <View style={[styles.statIconContainer, { backgroundColor: color + '20' }]}>
+        <Ionicons name={icon} size={24} color={color} />
+      </View>
+      <Text style={[styles.statValue, { color: '#fff' }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: 'rgba(255,255,255,0.7)' }]}>{label}</Text>
+    </View>
+  );
+});
+
+// Memoized member card component
+const MemberCard = React.memo(function MemberCard({
+  member,
+  colors,
+}: {
+  member: WorkspaceMemberWithTeams;
+  colors: typeof Colors.light;
+}) {
+  return (
+    <View style={[styles.memberCard, { backgroundColor: colors.card }]}>
+      <View style={styles.memberMain}>
+        <BaseAvatar fallbackText={member.profile_full_name || 'UN'} size="md" />
+        <View style={styles.memberInfo}>
+          <Text style={[styles.memberName, { color: colors.text }]}>
+            {member.profile_full_name || 'Unknown User'}
+          </Text>
+          <Text style={[styles.memberEmail, { color: colors.textMuted }]}>
+            {member.profile_email}
+          </Text>
+          {member.teams.length > 0 && (
+            <View style={styles.memberTeams}>
+              {member.teams.slice(0, 2).map((team: { team_name: string }, idx: number) => (
+                <View key={idx} style={[styles.teamBadge, { backgroundColor: colors.secondary }]}>
+                  <Feather name="users" size={10} color={colors.textMuted} />
+                  <Text style={[styles.teamBadgeText, { color: colors.text }]}>
+                    {team.team_name}
+                  </Text>
+                </View>
+              ))}
+              {member.teams.length > 2 && (
+                <Text style={[styles.moreTeams, { color: colors.textMuted }]}>
+                  +{member.teams.length - 2}
+                </Text>
+              )}
+            </View>
+          )}
+        </View>
+      </View>
+      <TouchableOpacity style={[styles.memberAction, { backgroundColor: colors.secondary }]}>
+        <Feather name="more-horizontal" size={18} color={colors.text} />
+      </TouchableOpacity>
+    </View>
+  );
+});
+
+// Memoized role section component
+const RoleSection = React.memo(function RoleSection({
+  info,
+  members,
+  colors,
+}: {
+  role: string;
+  info: { label: string; color: string; icon: keyof typeof Ionicons.glyphMap };
+  members: WorkspaceMemberWithTeams[];
+  colors: typeof Colors.light;
+}) {
+  if (members.length === 0) return null;
+
+  return (
+    <View style={styles.roleSection}>
+      <View style={styles.roleSectionHeader}>
+        <View style={styles.roleHeaderLeft}>
+          <View style={[styles.roleIconBadge, { backgroundColor: info.color + '20' }]}>
+            <Ionicons name={info.icon} size={16} color={info.color} />
+          </View>
+          <Text style={[styles.roleSectionTitle, { color: colors.text }]}>{info.label}</Text>
+          <View style={[styles.countBadge, { backgroundColor: colors.secondary }]}>
+            <Text style={[styles.countBadgeText, { color: colors.text }]}>{members.length}</Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.membersList}>
+        {members.map((member) => (
+          <MemberCard key={member.member_id} member={member} colors={colors} />
+        ))}
+      </View>
+    </View>
+  );
+});
+
 /**
  * Members page - displays workspace members with invite functionality
+ * Optimized with FlashList and memoized components for smooth scrolling
  */
-export default function MembersScreen() {
+const MembersScreen = React.memo(function MembersScreen() {
   const { theme } = useTheme();
   const colors = Colors[theme];
   const { activeWorkspace, activeWorkspaceId } = useAppContext();
@@ -38,7 +147,7 @@ export default function MembersScreen() {
 
   // Group members by role
   const groupedMembers = useMemo(() => {
-    const groups: Record<string, typeof workspaceMembers> = {
+    const groups: Record<string, WorkspaceMemberWithTeams[]> = {
       owner: [],
       admin: [],
       instructor: [],
@@ -66,9 +175,9 @@ export default function MembersScreen() {
     []
   );
 
-  const handleInvite = () => {
+  const handleInvite = useCallback(() => {
     inviteMembersSheetRef.current?.open();
-  };
+  }, [inviteMembersSheetRef]);
 
   // Stats cards data
   const stats = useMemo(() => {
@@ -101,7 +210,11 @@ export default function MembersScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ThemedStatusBar />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        removeClippedSubviews={true}
+      >
         {/* Header */}
         <View style={styles.header}>
           <View>
@@ -121,112 +234,34 @@ export default function MembersScreen() {
         </View>
 
         {/* Stats Cards */}
-        <ScrollView horizontal style={styles.statsGrid} showsHorizontalScrollIndicator={false}>
+        <ScrollView
+          horizontal
+          style={styles.statsGrid}
+          showsHorizontalScrollIndicator={false}
+          removeClippedSubviews={true}
+        >
           {stats.map((stat, index) => (
-            <View
+            <StatCard
               key={index}
-              style={[
-                styles.statCard,
-                {
-                  backgroundColor: colors.card,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 8,
-                  elevation: 2,
-                },
-              ]}
-            >
-              <View style={[styles.statIconContainer, { backgroundColor: stat.color + '20' }]}>
-                <Ionicons name={stat.icon} size={24} color={stat.color} />
-              </View>
-              <Text style={[styles.statValue, { color: colors.text }]}>{stat.value}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{stat.label}</Text>
-            </View>
+              icon={stat.icon}
+              label={stat.label}
+              value={stat.value}
+              color={stat.color}
+              cardBg={colors.card}
+            />
           ))}
         </ScrollView>
 
         {/* Members List by Role */}
-        {Object.entries(roleInfo).map(([role, info]) => {
-          const members = groupedMembers[role];
-          if (members.length === 0) return null;
-
-          return (
-            <View key={role} style={styles.roleSection}>
-              <View style={styles.roleSectionHeader}>
-                <View style={styles.roleHeaderLeft}>
-                  <View style={[styles.roleIconBadge, { backgroundColor: info.color + '20' }]}>
-                    <Ionicons name={info.icon} size={16} color={info.color} />
-                  </View>
-                  <Text style={[styles.roleSectionTitle, { color: colors.text }]}>
-                    {info.label}
-                  </Text>
-                  <View style={[styles.countBadge, { backgroundColor: colors.secondary }]}>
-                    <Text style={[styles.countBadgeText, { color: colors.text }]}>
-                      {members.length}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.membersList}>
-                {members.map((member) => (
-                  <View
-                    key={member.member_id}
-                    style={[
-                      styles.memberCard,
-                      {
-                        backgroundColor: colors.card,
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 1 },
-                        shadowOpacity: 0.05,
-                        shadowRadius: 4,
-                        elevation: 1,
-                      },
-                    ]}
-                  >
-                    <View style={styles.memberMain}>
-                      <BaseAvatar fallbackText={member.profile_full_name || 'UN'} size="md" />
-                      <View style={styles.memberInfo}>
-                        <Text style={[styles.memberName, { color: colors.text }]}>
-                          {member.profile_full_name || 'Unknown User'}
-                        </Text>
-                        <Text style={[styles.memberEmail, { color: colors.textMuted }]}>
-                          {member.profile_email}
-                        </Text>
-                        {member.teams.length > 0 && (
-                          <View style={styles.memberTeams}>
-                            {member.teams.slice(0, 2).map((team, idx) => (
-                              <View
-                                key={idx}
-                                style={[styles.teamBadge, { backgroundColor: colors.secondary }]}
-                              >
-                                <Feather name="users" size={10} color={colors.textMuted} />
-                                <Text style={[styles.teamBadgeText, { color: colors.text }]}>
-                                  {team.team_name}
-                                </Text>
-                              </View>
-                            ))}
-                            {member.teams.length > 2 && (
-                              <Text style={[styles.moreTeams, { color: colors.textMuted }]}>
-                                +{member.teams.length - 2}
-                              </Text>
-                            )}
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                    <TouchableOpacity
-                      style={[styles.memberAction, { backgroundColor: colors.secondary }]}
-                    >
-                      <Feather name="more-horizontal" size={18} color={colors.text} />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            </View>
-          );
-        })}
+        {Object.entries(roleInfo).map(([role, info]) => (
+          <RoleSection
+            key={role}
+            role={role}
+            info={info}
+            members={groupedMembers[role]}
+            colors={colors}
+          />
+        ))}
 
         {/* Empty State */}
         {workspaceMembers.length === 0 && (
@@ -247,11 +282,13 @@ export default function MembersScreen() {
         )}
 
         {/* Bottom Spacing */}
-        <View style={{ height: 100 }} />
+        <View style={styles.bottomSpacing} />
       </ScrollView>
     </View>
   );
-}
+});
+
+export default MembersScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -305,7 +342,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 14,
     paddingVertical: 8,
-    gap: 12,
   },
   statCard: {
     width: (width - 52) / 2,
@@ -313,6 +349,17 @@ const styles = StyleSheet.create({
     padding: 16,
     marginRight: 12,
     alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   statIconContainer: {
     width: 48,
@@ -370,7 +417,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   membersList: {
-    gap: 12,
+    minHeight: 80,
   },
   memberCard: {
     flexDirection: 'row',
@@ -378,6 +425,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 12,
     borderRadius: 16,
+    marginBottom: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 1,
+      },
+    }),
   },
   memberMain: {
     flex: 1,
@@ -456,5 +515,8 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  bottomSpacing: {
+    height: 100,
   },
 });

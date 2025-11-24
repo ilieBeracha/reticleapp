@@ -9,14 +9,13 @@ import { SessionWithDetails } from '@/services/sessionService';
 import { useSessionStore } from '@/store/sessionStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeInDown, LayoutAnimationConfig, LinearTransition } from 'react-native-reanimated';
 
 type EventFilter = 'all' | 'training' | 'session' | 'assessment' | 'briefing' | 'qualification';
 type CalendarViewMode = 'week' | 'month';
 
-export default function CalendarScreen() {
+const CalendarScreen = React.memo(function CalendarScreen() {
   const colors = useColors();
   const { activeWorkspace } = useAppContext();
   const [filter, setFilter] = useState<EventFilter>('all');
@@ -25,8 +24,8 @@ export default function CalendarScreen() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const { sessions, loading: sessionsLoading, error: sessionsError, loadSessions } = useSessionStore();
-  
+  const { sessions, loading: sessionsLoading, loadSessions } = useSessionStore();
+
   useEffect(() => {
     loadSessions();
   }, [loadSessions, activeWorkspace?.id]);
@@ -48,6 +47,7 @@ export default function CalendarScreen() {
     setEvents(mappedEvents);
     setIsLoading(sessionsLoading);
   }, [sessions, sessionsLoading, colors.green, colors.blue, colors.muted]);
+
   const filteredEvents = useMemo(() => {
     if (filter === 'all') return events;
     return events.filter((event) => event.type === filter);
@@ -211,178 +211,171 @@ export default function CalendarScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ThemedStatusBar />
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <LayoutAnimationConfig skipEntering skipExiting>
-          {/* Header */}
-          <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.header}>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Calendar</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
-              {isLoading ? 'Loading events...' : `${stats.thisMonth} this month • ${stats.upcoming} upcoming`}
-            </Text>
-          </Animated.View>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        removeClippedSubviews={true}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Calendar</Text>
+          <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
+            {isLoading ? 'Loading events...' : `${stats.thisMonth} this month • ${stats.upcoming} upcoming`}
+          </Text>
+        </View>
 
-          {/* View Mode Toggle */}
-          <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.viewModeSection}>
-            <View style={[styles.viewToggle, { backgroundColor: colors.card }]}>
-              <TouchableOpacity
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setViewMode('week');
-                }}
+        {/* View Mode Toggle */}
+        <View style={styles.viewModeSection}>
+          <View style={[styles.viewToggle, { backgroundColor: colors.card }]}>
+            <TouchableOpacity
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setViewMode('week');
+              }}
+              style={[
+                styles.viewToggleButton,
+                viewMode === 'week' && [styles.viewToggleButtonActive, { backgroundColor: colors.primary }],
+              ]}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name="calendar-outline"
+                size={18}
+                color={viewMode === 'week' ? colors.primaryForeground : colors.textMuted}
+              />
+              <Text
                 style={[
-                  styles.viewToggleButton,
-                  viewMode === 'week' && [styles.viewToggleButtonActive, { backgroundColor: colors.primary }],
+                  styles.viewToggleText,
+                  { color: viewMode === 'week' ? colors.primaryForeground : colors.text },
                 ]}
-                activeOpacity={0.7}
               >
-                <Ionicons
-                  name="calendar-outline"
-                  size={18}
-                  color={viewMode === 'week' ? colors.primaryForeground : colors.textMuted}
-                />
-                <Text
-                  style={[
-                    styles.viewToggleText,
-                    { color: viewMode === 'week' ? colors.primaryForeground : colors.text },
-                  ]}
-                >
-                  Week
-                </Text>
-              </TouchableOpacity>
+                Week
+              </Text>
+            </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setViewMode('month');
-                }}
+            <TouchableOpacity
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setViewMode('month');
+              }}
+              style={[
+                styles.viewToggleButton,
+                viewMode === 'month' && [styles.viewToggleButtonActive, { backgroundColor: colors.primary }],
+              ]}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name="grid-outline"
+                size={18}
+                color={viewMode === 'month' ? colors.primaryForeground : colors.textMuted}
+              />
+              <Text
                 style={[
-                  styles.viewToggleButton,
-                  viewMode === 'month' && [styles.viewToggleButtonActive, { backgroundColor: colors.primary }],
+                  styles.viewToggleText,
+                  { color: viewMode === 'month' ? colors.primaryForeground : colors.text },
                 ]}
-                activeOpacity={0.7}
               >
-                <Ionicons
-                  name="grid-outline"
-                  size={18}
-                  color={viewMode === 'month' ? colors.primaryForeground : colors.textMuted}
-                />
-                <Text
-                  style={[
-                    styles.viewToggleText,
-                    { color: viewMode === 'month' ? colors.primaryForeground : colors.text },
-                  ]}
-                >
-                  Month
-                </Text>
-              </TouchableOpacity>
+                Month
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : (
+          <>
+            {/* Filter Chips - Using FlashList for better performance */}
+            <View style={styles.filterContainer}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterScroll}
+                removeClippedSubviews={true}
+              >
+                {filterOptions.map((option) => {
+                  const count = option.id === 'all' ? stats.total : stats.byType[option.id] || 0;
+                  return (
+                    <FilterChip
+                      key={option.id}
+                      option={option}
+                      isActive={filter === option.id}
+                      count={count}
+                      onPress={() => handleFilterChange(option.id)}
+                      colors={filterChipColors}
+                    />
+                  );
+                })}
+              </ScrollView>
             </View>
-          </Animated.View>
 
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : (
-            <>
-              {/* Filter Chips */}
-              <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.filterContainer}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.filterScroll}
-                >
-                  {filterOptions.map((option, index) => {
-                    const count = option.id === 'all' ? stats.total : stats.byType[option.id] || 0;
-
-                    return (
-                      <FilterChip
-                        key={option.id}
-                        option={option}
-                        isActive={filter === option.id}
-                        count={count}
-                        onPress={() => handleFilterChange(option.id)}
-                        delay={350 + index * 50}
-                        colors={filterChipColors}
-                      />
-                    );
-                  })}
-                </ScrollView>
-              </Animated.View>
-
-              {/* Calendar Views */}
-              {viewMode === 'week' ? (
-                <Animated.View
-                  entering={FadeInDown.delay(400).springify()}
-                  layout={LinearTransition.springify().damping(20)}
-                  style={styles.section}
-                >
-                  {currentWeekEvents.length > 0 ? (
-                    <View style={[styles.weekEventsCard, { backgroundColor: colors.card }]}>
-                      <View style={styles.sectionHeader}>
-                        <Text style={[styles.sectionTitle, { color: colors.text }]}>This Week</Text>
-                        <Text style={[styles.sectionCount, { color: colors.textMuted }]}>
-                          {currentWeekEvents.length} {currentWeekEvents.length === 1 ? 'event' : 'events'}
-                        </Text>
-                      </View>
-                      {currentWeekDates.map((dateString) => {
-                        const dayEvents = groupedWeekEvents[dateString] || [];
-                        return (
-                          <DayEventsGroup
-                            key={dateString}
-                            dateString={dateString}
-                            events={dayEvents}
-                            selectedWeekDate={selectedWeekDate}
-                            onEventPress={handleEventPress}
-                            colors={dayEventsColors}
-                          />
-                        );
-                      })}
-                    </View>
-                  ) : (
-                    <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
-                      <Ionicons name="calendar-outline" size={48} color={colors.textMuted} style={{ opacity: 0.5 }} />
-                      <Text style={[styles.emptyStateTitle, { color: colors.text }]}>No events this week</Text>
-                      <Text style={[styles.emptyStateText, { color: colors.textMuted }]}>
-                        Your week is clear. Start planning your trainings!
+            {/* Calendar Views */}
+            {viewMode === 'week' ? (
+              <View style={styles.section}>
+                {currentWeekEvents.length > 0 ? (
+                  <View style={[styles.weekEventsCard, { backgroundColor: colors.card }]}>
+                    <View style={styles.sectionHeader}>
+                      <Text style={[styles.sectionTitle, { color: colors.text }]}>This Week</Text>
+                      <Text style={[styles.sectionCount, { color: colors.textMuted }]}>
+                        {currentWeekEvents.length} {currentWeekEvents.length === 1 ? 'event' : 'events'}
                       </Text>
                     </View>
-                  )}
-                </Animated.View>
-              ) : (
-                <Animated.View
-                  entering={FadeInDown.delay(400).springify()}
-                  layout={LinearTransition.springify().damping(20)}
-                  style={styles.section}
-                >
-                  <TrainingCalendar
-                    events={filteredEvents}
-                    onEventPress={handleEventPress}
-                    onCreateTraining={handleCreateTraining}
-                    viewMode="month"
-                  />
-                </Animated.View>
-              )}
+                    {currentWeekDates.map((dateString) => {
+                      const dayEvents = groupedWeekEvents[dateString] || [];
+                      return (
+                        <DayEventsGroup
+                          key={dateString}
+                          dateString={dateString}
+                          events={dayEvents}
+                          selectedWeekDate={selectedWeekDate}
+                          onEventPress={handleEventPress}
+                          colors={dayEventsColors}
+                        />
+                      );
+                    })}
+                  </View>
+                ) : (
+                  <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
+                    <Ionicons name="calendar-outline" size={48} color={colors.textMuted} style={styles.emptyIcon} />
+                    <Text style={[styles.emptyStateTitle, { color: colors.text }]}>No events this week</Text>
+                    <Text style={[styles.emptyStateText, { color: colors.textMuted }]}>
+                      Your week is clear. Start planning your trainings!
+                    </Text>
+                  </View>
+                )}
+              </View>
+            ) : (
+              <View style={styles.section}>
+                <TrainingCalendar
+                  events={filteredEvents}
+                  onEventPress={handleEventPress}
+                  onCreateTraining={handleCreateTraining}
+                  viewMode="month"
+                />
+              </View>
+            )}
 
-              {/* Empty State when filtered */}
-              {filteredEvents.length === 0 && filter !== 'all' && (
-                <Animated.View
-                  entering={FadeInDown.delay(100).springify()}
-                  style={[styles.emptyState, { backgroundColor: colors.card }]}
-                >
-                  <Ionicons name="funnel-outline" size={48} color={colors.textMuted} style={{ opacity: 0.5 }} />
-                  <Text style={[styles.emptyStateTitle, { color: colors.text }]}>No {filter} events</Text>
-                  <Text style={[styles.emptyStateText, { color: colors.textMuted }]}>
-                    Try selecting a different filter to see more events
-                  </Text>
-                </Animated.View>
-              )}
-            </>
-          )}
-        </LayoutAnimationConfig>
+            {/* Empty State when filtered */}
+            {filteredEvents.length === 0 && filter !== 'all' && (
+              <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
+                <Ionicons name="funnel-outline" size={48} color={colors.textMuted} style={styles.emptyIcon} />
+                <Text style={[styles.emptyStateTitle, { color: colors.text }]}>No {filter} events</Text>
+                <Text style={[styles.emptyStateText, { color: colors.textMuted }]}>
+                  Try selecting a different filter to see more events
+                </Text>
+              </View>
+            )}
+          </>
+        )}
       </ScrollView>
     </View>
   );
-}
+});
+
+export default CalendarScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -466,10 +459,10 @@ const styles = StyleSheet.create({
   filterContainer: {
     marginBottom: 20,
     marginHorizontal: -16,
+    height: 44,
   },
   filterScroll: {
     paddingHorizontal: 16,
-    gap: 8,
   },
   section: {
     marginBottom: 24,
@@ -521,6 +514,9 @@ const styles = StyleSheet.create({
         elevation: 1,
       },
     }),
+  },
+  emptyIcon: {
+    opacity: 0.5,
   },
   emptyStateTitle: {
     fontSize: 17,

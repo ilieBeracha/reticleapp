@@ -2,7 +2,7 @@ import { useOrgRole } from '@/contexts/OrgRoleContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   Platform,
@@ -25,11 +25,60 @@ interface TrainingSession {
   location?: string;
 }
 
+// Memoized session card component
+const SessionCard = React.memo(function SessionCard({
+  session,
+  onPress,
+  colors,
+}: {
+  session: TrainingSession;
+  onPress: (session: TrainingSession) => void;
+  colors: ReturnType<typeof useColors>;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.sessionCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+      onPress={() => onPress(session)}
+      activeOpacity={0.7}
+    >
+      <View style={[styles.sessionIcon, { backgroundColor: getTypeColor(session.type).bg }]}>
+        <Ionicons name={getTypeIcon(session.type)} size={24} color={getTypeColor(session.type).color} />
+      </View>
+
+      <View style={styles.sessionInfo}>
+        <Text style={[styles.sessionTitle, { color: colors.text }]}>{session.title}</Text>
+        <View style={styles.sessionMeta}>
+          <View style={styles.sessionMetaItem}>
+            <Ionicons name="calendar-outline" size={12} color={colors.textMuted} />
+            <Text style={[styles.sessionMetaText, { color: colors.textMuted }]}>{session.date}</Text>
+          </View>
+          <View style={styles.sessionMetaItem}>
+            <Ionicons name="time-outline" size={12} color={colors.textMuted} />
+            <Text style={[styles.sessionMetaText, { color: colors.textMuted }]}>{session.time}</Text>
+          </View>
+          {session.location && (
+            <View style={styles.sessionMetaItem}>
+              <Ionicons name="location-outline" size={12} color={colors.textMuted} />
+              <Text style={[styles.sessionMetaText, { color: colors.textMuted }]}>{session.location}</Text>
+            </View>
+          )}
+        </View>
+      </View>
+
+      <View style={[styles.sessionTypeBadge, { backgroundColor: getTypeColor(session.type).bg }]}>
+        <Text style={[styles.sessionTypeText, { color: getTypeColor(session.type).color }]}>
+          {session.type}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 /**
  * TRAINING SESSIONS VIEW
  * For Squad Commanders and Soldiers - shooting-focused operational view
  */
-export default function TrainingsPage() {
+const TrainingsPage = React.memo(function TrainingsPage() {
   const colors = useColors();
   const { teamInfo, teamRole } = useOrgRole();
   const [filter, setFilter] = useState<SessionType>('upcoming');
@@ -58,16 +107,17 @@ export default function TrainingsPage() {
 
   const filteredSessions = sessions.filter(s => s.status === filter);
 
-  const handleSessionPress = (session: TrainingSession) => {
+  const handleSessionPress = useCallback((session: TrainingSession) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert(session.title, `${session.date} at ${session.time}\n${session.location || ''}`);
-  };
+  }, []);
 
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
+      removeClippedSubviews={true}
     >
       {/* Header */}
       <View style={styles.header}>
@@ -155,7 +205,7 @@ export default function TrainingsPage() {
       {/* Sessions List */}
       {filteredSessions.length === 0 ? (
         <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
-          <Ionicons name="calendar-outline" size={48} color={colors.textMuted} style={{ opacity: 0.4 }} />
+          <Ionicons name="calendar-outline" size={48} color={colors.textMuted} style={styles.emptyIcon} />
           <Text style={[styles.emptyTitle, { color: colors.text }]}>No {filter} sessions</Text>
           <Text style={[styles.emptyText, { color: colors.textMuted }]}>
             {filter === 'upcoming' && 'No training sessions scheduled'}
@@ -165,49 +215,21 @@ export default function TrainingsPage() {
         </View>
       ) : (
         <View style={styles.sessionsList}>
-          {filteredSessions.map((session, index) => (
-            <TouchableOpacity
+          {filteredSessions.map((session) => (
+            <SessionCard
               key={session.id}
-              style={[styles.sessionCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={() => handleSessionPress(session)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.sessionIcon, { backgroundColor: getTypeColor(session.type).bg }]}>
-                <Ionicons name={getTypeIcon(session.type)} size={24} color={getTypeColor(session.type).color} />
-              </View>
-
-              <View style={styles.sessionInfo}>
-                <Text style={[styles.sessionTitle, { color: colors.text }]}>{session.title}</Text>
-                <View style={styles.sessionMeta}>
-                  <View style={styles.sessionMetaItem}>
-                    <Ionicons name="calendar-outline" size={12} color={colors.textMuted} />
-                    <Text style={[styles.sessionMetaText, { color: colors.textMuted }]}>{session.date}</Text>
-                  </View>
-                  <View style={styles.sessionMetaItem}>
-                    <Ionicons name="time-outline" size={12} color={colors.textMuted} />
-                    <Text style={[styles.sessionMetaText, { color: colors.textMuted }]}>{session.time}</Text>
-                  </View>
-                  {session.location && (
-                    <View style={styles.sessionMetaItem}>
-                      <Ionicons name="location-outline" size={12} color={colors.textMuted} />
-                      <Text style={[styles.sessionMetaText, { color: colors.textMuted }]}>{session.location}</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-
-              <View style={[styles.sessionTypeBadge, { backgroundColor: getTypeColor(session.type).bg }]}>
-                <Text style={[styles.sessionTypeText, { color: getTypeColor(session.type).color }]}>
-                  {session.type}
-                </Text>
-              </View>
-            </TouchableOpacity>
+              session={session}
+              onPress={handleSessionPress}
+              colors={colors}
+            />
           ))}
         </View>
       )}
     </ScrollView>
   );
-}
+});
+
+export default TrainingsPage;
 
 function getTypeIcon(type: string) {
   const icons: Record<string, any> = {
@@ -345,6 +367,9 @@ const styles = StyleSheet.create({
     padding: 40,
     borderRadius: 16,
     gap: 12,
+  },
+  emptyIcon: {
+    opacity: 0.4,
   },
   emptyTitle: {
     fontSize: 18,
