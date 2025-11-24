@@ -34,7 +34,7 @@ const defaultCategories: Category[] = [
 const TrainingChart = memo(function TrainingChart({ 
   data, 
   categories = defaultCategories,
-  centerValue = '0',
+  centerValue = 0,
   centerLabel = 'Sessions',
   centerSubtext = 'This Week',
   onDoubleTap 

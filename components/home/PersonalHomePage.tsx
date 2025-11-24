@@ -11,6 +11,7 @@ import { useWorkspacePermissions } from '@/hooks/usePermissions';
 import { useSessionStats } from '@/hooks/useSessionStats';
 import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/hooks/useWorkspaceData';
+import { useSessionStore } from '@/store/sessionStore';
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -24,18 +25,24 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
   const permissions = useWorkspacePermissions();
   const { chartDetailsSheetRef, setOnSessionCreated, setOnTeamCreated } = useModals();
   const { sessions, sessionsLoading, sessionsError, loadTeams, refreshSessions } = useWorkspaceData();
+  const { loadSessions } = useSessionStore();
+
+  // Load sessions on mount
+  useEffect(() => {
+    loadSessions();
+  }, []);
 
   // Computed stats
   const stats = useSessionStats(sessions);
 
   useEffect(() => {
-    setOnSessionCreated(() => refreshSessions);
+    setOnSessionCreated(() => loadSessions);
     setOnTeamCreated(() => loadTeams);
     return () => {
       setOnSessionCreated(null);
       setOnTeamCreated(null);
     };
-  }, [refreshSessions, loadTeams, setOnSessionCreated, setOnTeamCreated]);
+  }, [loadSessions, loadTeams, setOnSessionCreated, setOnTeamCreated])
 
   // Actions
   const { onStartSession, onCreateTeam } = useWorkspaceActions();
@@ -138,7 +145,7 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
         <WelcomeCard fullName={fullName || ''} stats={welcomeStats} loading={sessionsLoading} />
 
         {/* Training Distribution Chart */}
-        <TrainingChart data={pieData} onDoubleTap={handleChartDoubleTap} />
+        <TrainingChart data={pieData} onDoubleTap={handleChartDoubleTap} centerValue={sessions.length}/>
 
         {/* Quick Actions */}
         <View style={styles.section}>

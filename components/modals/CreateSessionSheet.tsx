@@ -1,68 +1,40 @@
 import { useColors } from "@/hooks/ui/useColors";
 import { useAppContext } from "@/hooks/useAppContext";
-import { createSession } from "@/services/sessionService";
+import { useSessionStore } from "@/store/sessionStore";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetScrollView, BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import { forwardRef, useState } from "react";
-import { Alert, Animated, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { BaseBottomSheet, type BaseBottomSheetRef } from "./BaseBottomSheet";
+
+const WEATHER_OPTIONS = ["Clear", "Cloudy", "Rainy", "Windy", "Stormy"];
+const TEMPERATURE_OPTIONS = ["<0°C", "0-10°C", "10-20°C", "20-30°C", ">30°C"];
+const WIND_OPTIONS = ["Calm", "Light", "Moderate", "Strong", "Very Strong"];
+const VISIBILITY_OPTIONS = ["Excellent", "Good", "Fair", "Poor", "Very Poor"];
 
 interface CreateSessionSheetProps {
   onSessionCreated?: () => void;
 }
 
-interface SessionFormData {
-  training_id?: string;
-  drill_id?: string;
-  team_id?: string;
-  environment: {
-    weather?: string;
-    temperature?: number;
-    wind?: number;
-    visibility?: string;
-    notes?: string;
-  };
-}
-
 export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSheetProps>(
   ({ onSessionCreated }, ref) => {
     const colors = useColors();
+    const { createSession, loading } = useSessionStore();
     const { activeWorkspaceId, userId } = useAppContext();
-    
-    const [step, setStep] = useState(1);
+    const isPersonalMode = !activeWorkspaceId;
+
     const [isCreating, setIsCreating] = useState(false);
-    const [formData, setFormData] = useState<SessionFormData>({
-      environment: {},
-    });
+    const [showEnvironment, setShowEnvironment] = useState(false);
 
-    // Environment state
-    const [weather, setWeather] = useState('');
-    const [temperature, setTemperature] = useState('');
-    const [wind, setWind] = useState('');
-    const [visibility, setVisibility] = useState('');
-    const [notes, setNotes] = useState('');
+    // Core fields
+    const [teamId, setTeamId] = useState("");
 
-    const handleNext = () => {
-      if (step < 3) {
-        // Skip step 2 for personal workspace
-        if (step === 1) {
-          setStep(3);
-        } else {
-          setStep(step + 1);
-        }
-      }
-    };
-
-    const handleBack = () => {
-      if (step > 1) {
-        // Skip step 2 for personal workspace
-        if (step === 3) {
-          setStep(1);
-        } else {
-          setStep(step - 1);
-        }
-      }
-    };
+    // Environment fields (collapsible)
+    const [weather, setWeather] = useState("");
+    const [temperature, setTemperature] = useState("");
+    const [wind, setWind] = useState("");
+    const [visibility, setVisibility] = useState("");
+    const [notes, setNotes] = useState("");
 
     const handleCreateSession = async () => {
       setIsCreating(true);
@@ -73,12 +45,7 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
           return;
         }
 
-        if (!!activeWorkspaceId) {
-          Alert.alert("Error", "Workspace not found. Please select a workspace and try again.");
-          setIsCreating(false);
-          return;
-        }
-
+        // Build environment data
         const environment: Record<string, any> = {};
         if (weather) environment.weather = weather;
         if (temperature) environment.temperature = parseFloat(temperature);
@@ -90,33 +57,26 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
         if (Object.keys(environment).length > 0) {
           sessionData.environment = environment;
         }
-        if (formData.training_id) {
-          sessionData.training_id = formData.training_id;
-        }
-        if (formData.drill_id) {
-          sessionData.drill_id = formData.drill_id;
-        }
 
+        // Use store's createSession
         await createSession({
-          org_workspace_id: activeWorkspaceId || '',
-          team_id: formData.team_id || '',
-          session_mode: formData.team_id ? 'group' : 'solo',
-          session_data: Object.keys(sessionData).length > 0 ? sessionData : {},
+          org_workspace_id: activeWorkspaceId,
+          team_id: teamId || undefined,
+          session_mode: teamId ? "group" : "solo",
+          session_data: Object.keys(sessionData).length > 0 ? sessionData : undefined,
         });
-        
+
         Alert.alert("Success", "Session started successfully!");
-        
+
         // Reset form
-        setStep(1);
-        setFormData({
-          environment: {},
-        });
-        setWeather('');
-        setTemperature('');
-        setWind('');
-        setVisibility('');
-        setNotes('');
-        
+        setTeamId("");
+        setWeather("");
+        setTemperature("");
+        setWind("");
+        setVisibility("");
+        setNotes("");
+        setShowEnvironment(false);
+
         onSessionCreated?.();
       } catch (error: any) {
         console.error("Failed to create session:", error);
@@ -126,456 +86,365 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
       }
     };
 
-    // Personal workspace has 2 steps (skip step 2), org workspace has 3 steps
-    const totalSteps = 3;
-    const currentStep = step === 3 ? 2 : step;
-    const progressWidth = (currentStep / totalSteps) * 100;
-
     return (
-      <BaseBottomSheet ref={ref} snapPoints={['92%']} backdropOpacity={0.8}>
-        <BottomSheetScrollView 
-          style={styles.scrollView}
+      <BaseBottomSheet ref={ref} snapPoints={["92%"]} backdropOpacity={0.4}>
+        <BottomSheetScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.content}
         >
           {/* Header */}
           <View style={styles.header}>
-            <View style={[styles.icon, { backgroundColor: colors.primary + '15' }]}>
-              <Ionicons name="fitness" size={24} color={colors.primary} />
-            </View>
-            <Text style={[styles.title, { color: colors.text }]}>
-              Start New Session
-            </Text>
+            <Text style={[styles.title, { color: colors.text }]}>Start Session</Text>
             <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-              Team Training
+              {isPersonalMode ? "Personal training" : "Team training"}
             </Text>
           </View>
 
-          {/* Progress Bar */}
-          <View style={styles.progressContainer}>
-            <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-              <Animated.View 
-                style={[
-                  styles.progressFill,
-                  { backgroundColor: colors.primary, width: `${progressWidth}%` }
-                ]} 
+          {/* Main Content */}
+          <View style={styles.form}>
+            {/* Team ID - Only in org mode */}
+            {!isPersonalMode && (
+              <View style={styles.field}>
+                <Text style={[styles.label, { color: colors.text }]}>Team (optional)</Text>
+                <View style={[styles.inputWrapper, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <BottomSheetTextInput
+                    style={[styles.input, { color: colors.text }]}
+                    placeholder="Leave empty for solo session"
+                    placeholderTextColor={colors.textMuted}
+                    value={teamId}
+                    onChangeText={setTeamId}
+                  />
+                </View>
+              </View>
+            )}
+
+            {/* Environment Section - Collapsible */}
+            <TouchableOpacity
+              style={[styles.collapsibleHeader, { backgroundColor: colors.card }]}
+              onPress={() => setShowEnvironment(!showEnvironment)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.collapsibleTitle}>
+                <Ionicons name="cloud-outline" size={20} color={colors.textMuted} />
+                <Text style={[styles.collapsibleText, { color: colors.text }]}>
+                  Environment details
+                </Text>
+                <Text style={[styles.optional, { color: colors.textMuted }]}>optional</Text>
+              </View>
+              <Ionicons
+                name={showEnvironment ? "chevron-up" : "chevron-down"}
+                size={20}
+                color={colors.textMuted}
               />
-            </View>
-            <Text style={[styles.progressText, { color: colors.textMuted }]}>
-              Step {currentStep} of {totalSteps}
-            </Text>
-          </View>
+            </TouchableOpacity>
 
-         
-
-          {/* Step 2: Training Details */}
-            <View style={styles.stepContainer}>
-              <Text style={[styles.stepTitle, { color: colors.text }]}>Training Details</Text>
-              <Text style={[styles.stepSubtitle, { color: colors.textMuted }]}>
-                Optional - Link to a training plan or drill
-              </Text>
-
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>
-                  <Ionicons name="document-text-outline" size={14} color={colors.text} /> Training ID (Optional)
-                </Text>
-                <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                  <BottomSheetTextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="Enter training UUID..."
-                    placeholderTextColor={colors.textMuted + 'CC'}
-                    value={formData.training_id}
-                    onChangeText={(text) => setFormData({ ...formData, training_id: text })}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>
-                  <Ionicons name="barbell-outline" size={14} color={colors.text} /> Drill ID (Optional)
-                </Text>
-                <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                  <BottomSheetTextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="Enter drill UUID..."
-                    placeholderTextColor={colors.textMuted + 'CC'}
-                    value={formData.drill_id}
-                    onChangeText={(text) => setFormData({ ...formData, drill_id: text })}
-                  />
-                </View>
-              </View>
-
-                <View style={styles.inputContainer}>
-                  <Text style={[styles.inputLabel, { color: colors.text }]}>
-                    <Ionicons name="people-outline" size={14} color={colors.text} /> Team ID (Optional)
-                  </Text>
-                  <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                    <BottomSheetTextInput
-                      style={[styles.input, { color: colors.text }]}
-                      placeholder="Enter team UUID..."
-                      placeholderTextColor={colors.textMuted + 'CC'}
-                      value={formData.team_id}
-                      onChangeText={(text) => setFormData({ ...formData, team_id: text })}
-                    />
+            {showEnvironment && (
+              <View style={[styles.collapsibleContent, { backgroundColor: colors.card }]}>
+                {/* Weather */}
+                <View style={styles.field}>
+                  <Text style={[styles.label, { color: colors.text }]}>Weather</Text>
+                  <View style={styles.optionsGrid}>
+                    {WEATHER_OPTIONS.map((option) => {
+                      const isActive = weather === option;
+                      return (
+                        <TouchableOpacity
+                          key={option}
+                          style={[
+                            styles.optionButton,
+                            {
+                              backgroundColor: isActive ? colors.accent : colors.background,
+                              borderColor: isActive ? colors.accent : colors.border,
+                            },
+                          ]}
+                          onPress={() => setWeather(option)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.optionText,
+                              { color: isActive ? colors.accentForeground : colors.text },
+                            ]}
+                          >
+                            {option}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 </View>
 
-              <View style={[styles.infoCard, { backgroundColor: colors.secondary }]}>
-                <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
-                <Text style={[styles.infoText, { color: colors.textMuted }]}>
-                  You can skip these fields and start a free session
-                </Text>
-              </View>
-            </View>
-
-          {/* Step 3: Environment */}
-            <View style={styles.stepContainer}>
-              <Text style={[styles.stepTitle, { color: colors.text }]}>Environment</Text>
-              <Text style={[styles.stepSubtitle, { color: colors.textMuted }]}>
-                Optional - Record conditions for this session
-              </Text>
-
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>
-                  <Ionicons name="cloud-outline" size={14} color={colors.text} /> Weather
-                </Text>
-                <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                  <BottomSheetTextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="e.g. Clear, Cloudy, Rainy"
-                    placeholderTextColor={colors.textMuted + 'CC'}
-                    value={weather}
-                    onChangeText={setWeather}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.inputRow}>
-                <View style={[styles.inputContainer, { flex: 1 }]}>
-                  <Text style={[styles.inputLabel, { color: colors.text }]}>
-                    <Ionicons name="thermometer-outline" size={14} color={colors.text} /> Temp (°C)
-                  </Text>
-                  <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                    <BottomSheetTextInput
-                      style={[styles.input, { color: colors.text }]}
-                      placeholder="22"
-                      placeholderTextColor={colors.textMuted + 'CC'}
-                      value={temperature}
-                      onChangeText={setTemperature}
-                      keyboardType="numeric"
-                    />
+                {/* Temperature */}
+                <View style={styles.field}>
+                  <Text style={[styles.label, { color: colors.text }]}>Temperature</Text>
+                  <View style={styles.optionsGrid}>
+                    {TEMPERATURE_OPTIONS.map((option) => {
+                      const isActive = temperature === option;
+                      return (
+                        <TouchableOpacity
+                          key={option}
+                          style={[
+                            styles.optionButton,
+                            {
+                              backgroundColor: isActive ? colors.accent : colors.background,
+                              borderColor: isActive ? colors.accent : colors.border,
+                            },
+                          ]}
+                          onPress={() => setTemperature(option)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.optionText,
+                              { color: isActive ? colors.accentForeground : colors.text },
+                            ]}
+                          >
+                            {option}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 </View>
 
-                <View style={[styles.inputContainer, { flex: 1 }]}>
-                  <Text style={[styles.inputLabel, { color: colors.text }]}>
-                    <Ionicons name="flag-outline" size={14} color={colors.text} /> Wind (m/s)
-                  </Text>
-                  <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                    <BottomSheetTextInput
-                      style={[styles.input, { color: colors.text }]}
-                      placeholder="5"
-                      placeholderTextColor={colors.textMuted + 'CC'}
-                      value={wind}
-                      onChangeText={setWind}
-                      keyboardType="numeric"
-                    />
+                {/* Wind */}
+                <View style={styles.field}>
+                  <Text style={[styles.label, { color: colors.text }]}>Wind</Text>
+                  <View style={styles.optionsGrid}>
+                    {WIND_OPTIONS.map((option) => {
+                      const isActive = wind === option;
+                      return (
+                        <TouchableOpacity
+                          key={option}
+                          style={[
+                            styles.optionButton,
+                            {
+                              backgroundColor: isActive ? colors.accent : colors.background,
+                              borderColor: isActive ? colors.accent : colors.border,
+                            },
+                          ]}
+                          onPress={() => setWind(option)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.optionText,
+                              { color: isActive ? colors.accentForeground : colors.text },
+                            ]}
+                          >
+                            {option}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Visibility */}
+                <View style={styles.field}>
+                  <Text style={[styles.label, { color: colors.text }]}>Visibility</Text>
+                  <View style={styles.optionsGrid}>
+                    {VISIBILITY_OPTIONS.map((option) => {
+                      const isActive = visibility === option;
+                      return (
+                        <TouchableOpacity
+                          key={option}
+                          style={[
+                            styles.optionButton,
+                            {
+                              backgroundColor: isActive ? colors.accent : colors.background,
+                              borderColor: isActive ? colors.accent : colors.border,
+                            },
+                          ]}
+                          onPress={() => setVisibility(option)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.optionText,
+                              { color: isActive ? colors.accentForeground : colors.text },
+                            ]}
+                          >
+                            {option}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 </View>
               </View>
+            )}
 
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>
-                  <Ionicons name="eye-outline" size={14} color={colors.text} /> Visibility
-                </Text>
-                <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                  <BottomSheetTextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="e.g. Good, Poor, Excellent"
-                    placeholderTextColor={colors.textMuted + 'CC'}
-                    value={visibility}
-                    onChangeText={setVisibility}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>
-                  <Ionicons name="document-text-outline" size={14} color={colors.text} /> Notes
-                </Text>
-                <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                  <BottomSheetTextInput
-                    style={[styles.textArea, { color: colors.text }]}
-                    placeholder="Any additional notes about conditions..."
-                    placeholderTextColor={colors.textMuted + 'CC'}
-                    value={notes}
-                    onChangeText={setNotes}
-                    multiline
-                    numberOfLines={3}
-                    textAlignVertical="top"
-                  />
-                </View>
+            {/* Notes - Always visible, below collapse */}
+            <View style={styles.field}>
+              <Text style={[styles.label, { color: colors.text }]}>Notes</Text>
+              <View style={[styles.inputWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <BottomSheetTextInput
+                  style={[styles.textArea, { color: colors.text }]}
+                  placeholder="Session notes..."
+                  placeholderTextColor={colors.textMuted}
+                  value={notes}
+                  onChangeText={setNotes}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                />
               </View>
             </View>
-
-          {/* Actions */}
-          <View style={styles.actions}>
-              <TouchableOpacity
-                style={[styles.secondaryButton, { borderColor: colors.border }]}
-                onPress={handleBack}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="arrow-back" size={18} color={colors.text} />
-                <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Back</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.primaryButton, { backgroundColor: colors.primary }]}
-                onPress={handleNext}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.primaryButtonText}>Next</Text>
-                <Ionicons name="arrow-forward" size={18} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.primaryButton,
-                    { backgroundColor: colors.primary },
-                ]}
-                onPress={handleCreateSession}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="play" size={18} color="#fff" />
-                <Text style={styles.primaryButtonText}>Start Session</Text>
-              </TouchableOpacity>
           </View>
         </BottomSheetScrollView>
+
+        {/* Footer */}
+        <View style={[styles.footer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
+          <TouchableOpacity
+            style={[
+              styles.button,
+              { backgroundColor: colors.accent },
+              (isCreating || loading) && styles.buttonDisabled,
+            ]}
+            onPress={handleCreateSession}
+            disabled={isCreating || loading}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="play-circle" size={22} color="#FFF" />
+            <Text style={styles.buttonText}>
+              {isCreating || loading ? "Starting..." : "Start Session"}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </BaseBottomSheet>
     );
   }
 );
 
-CreateSessionSheet.displayName = 'CreateSessionSheet';
+CreateSessionSheet.displayName = "CreateSessionSheet";
 
 const styles = StyleSheet.create({
-  scrollView: {
-    flex: 1,
+  content: {
+    paddingBottom: 160,
   },
   header: {
-    alignItems: 'center',
+    paddingTop: 24,
     paddingHorizontal: 20,
-    paddingTop: 8,
     paddingBottom: 20,
   },
-  icon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
   title: {
-    fontSize: 22,
-    fontWeight: '700',
-    marginBottom: 4,
-    textAlign: 'center',
-    letterSpacing: -0.3,
+    fontSize: 26,
+    fontWeight: "800",
+    marginBottom: 6,
   },
   subtitle: {
     fontSize: 14,
-    fontWeight: '400',
-    textAlign: 'center',
-    letterSpacing: -0.2,
+    fontWeight: "500",
   },
-
-  // Progress
-  progressContainer: {
+  form: {
     paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  progressBar: {
-    height: 4,
-    borderRadius: 2,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  progressText: {
-    fontSize: 12,
-    fontWeight: '500',
-    textAlign: 'center',
-    letterSpacing: -0.1,
-  },
-
-  // Steps
-  stepContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  stepTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 6,
-    letterSpacing: -0.3,
-  },
-  stepSubtitle: {
-    fontSize: 14,
-    fontWeight: '400',
-    marginBottom: 20,
-    letterSpacing: -0.2,
-  },
-
-  // Options Grid
-  optionsGrid: {
-    flexDirection: 'row',
     gap: 12,
   },
-  optionCard: {
-    flex: 1,
-    padding: 20,
-    borderRadius: 12,
-    alignItems: 'center',
-    position: 'relative',
+  field: {
+    gap: 10,
   },
-  optionCardFull: {
+  half: {
     flex: 1,
   },
-  optionIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  optionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-    letterSpacing: -0.2,
-  },
-  optionDescription: {
-    fontSize: 12,
-    fontWeight: '400',
-    textAlign: 'center',
-    letterSpacing: -0.1,
-  },
-  checkmark: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  lockBadge: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Input
-  inputContainer: {
-    marginBottom: 16,
-  },
-  inputRow: {
-    flexDirection: 'row',
+  row: {
+    flexDirection: "row",
     gap: 12,
   },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
-    letterSpacing: -0.2,
+  label: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
   },
   inputWrapper: {
-    borderRadius: 10,
+    borderRadius: 14,
     borderWidth: 1,
-    overflow: "hidden",
   },
   input: {
-    height: 44,
-    paddingHorizontal: 14,
+    height: 48,
+    paddingHorizontal: 16,
     fontSize: 15,
-    fontWeight: "400",
-    backgroundColor: 'transparent',
+    fontWeight: "500",
   },
   textArea: {
     minHeight: 72,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 15,
-    fontWeight: "400",
-    backgroundColor: 'transparent',
+    fontWeight: "500",
   },
-
-  // Info Card
-  infoCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 12,
-    borderRadius: 10,
-    marginTop: 8,
+  collapsibleHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 14,
   },
-  infoText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '500',
-    letterSpacing: -0.1,
-  },
-
-  // Actions
-  actions: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+  collapsibleTitle: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
-  },
-  primaryButton: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    height: 48,
-    borderRadius: 12,
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 2,
   },
-  primaryButtonText: {
-    color: '#fff',
+  collapsibleText: {
     fontSize: 15,
-    fontWeight: "600",
-    letterSpacing: -0.2,
-  },
-  secondaryButton: {
+    fontWeight: "700",
     flex: 1,
+  },
+  optional: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  collapsibleContent: {
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 14,
+    marginTop: -2,
+  },
+  optionsGrid: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    height: 48,
-    borderRadius: 12,
+    flexWrap: "wrap",
     gap: 8,
+  },
+  optionButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
     borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  secondaryButtonText: {
-    fontSize: 15,
+  optionText: {
+    fontSize: 13,
     fontWeight: "600",
-    letterSpacing: -0.2,
+    textAlign: "center",
+  },
+  footer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+  },
+  button: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 56,
+    borderRadius: 14,
+    gap: 10,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  buttonText: {
+    color: "#FFF",
+    fontSize: 17,
+    fontWeight: "800",
   },
 });

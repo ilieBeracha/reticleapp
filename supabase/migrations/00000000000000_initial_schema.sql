@@ -1,28 +1,3 @@
-
-
-
-SET statement_timeout = 0;
-SET lock_timeout = 0;
-SET idle_in_transaction_session_timeout = 0;
-SET client_encoding = 'UTF8';
-SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', false);
-SET check_function_bodies = false;
-SET xmloption = content;
-SET client_min_messages = warning;
-SET row_security = off;
-
-
-CREATE SCHEMA IF NOT EXISTS "public";
-
-
-ALTER SCHEMA "public" OWNER TO "pg_database_owner";
-
-
-COMMENT ON SCHEMA "public" IS 'standard public schema';
-
-
-
 CREATE OR REPLACE FUNCTION "public"."accept_invite_code"("p_invite_code" "text", "p_user_id" "uuid") RETURNS json
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -773,7 +748,7 @@ BEGIN
     'g'
   )) || '-' || SUBSTRING(NEW.id::text, 1, 8);
   
-  -- 1. Create profile (user IS a workspace)
+  -- Create profile ONLY (no workspace access)
   INSERT INTO public.profiles (
     id,
     email,
@@ -792,10 +767,8 @@ BEGIN
   )
   ON CONFLICT (id) DO NOTHING;
 
-  -- 2. Grant user access to their own workspace (personal workspace)
-  INSERT INTO public.workspace_access (workspace_type, workspace_owner_id, member_id, role)
-  VALUES ('personal', NEW.id, NEW.id, 'owner')
-  ON CONFLICT (workspace_owner_id, member_id) DO NOTHING;
+  -- NO automatic workspace creation!
+  -- User must create or join an organization
 
   RETURN NEW;
 END;
@@ -1143,6 +1116,7 @@ Bypasses RLS for consistent validation across all users.';
 
 
 
+
 CREATE TABLE IF NOT EXISTS "public"."org_workspaces" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "name" "text" NOT NULL,
@@ -1329,6 +1303,9 @@ ALTER TABLE ONLY "public"."workspace_access"
 
 
 
+
+
+
 ALTER TABLE ONLY "public"."workspace_invitations"
     ADD CONSTRAINT "workspace_invitations_invite_code_key" UNIQUE ("invite_code");
 
@@ -1375,11 +1352,17 @@ CREATE INDEX "idx_teams_org_workspace" ON "public"."teams" USING "btree" ("org_w
 
 
 
+
+
+
 CREATE INDEX "idx_workspace_access_member" ON "public"."workspace_access" USING "btree" ("member_id");
 
 
 
 CREATE INDEX "idx_workspace_access_org" ON "public"."workspace_access" USING "btree" ("org_workspace_id");
+
+
+
 
 
 
@@ -1467,6 +1450,9 @@ ALTER TABLE ONLY "public"."teams"
 
 
 
+
+
+
 ALTER TABLE ONLY "public"."workspace_access"
     ADD CONSTRAINT "workspace_access_member_fkey" FOREIGN KEY ("member_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
@@ -1474,6 +1460,9 @@ ALTER TABLE ONLY "public"."workspace_access"
 
 ALTER TABLE ONLY "public"."workspace_access"
     ADD CONSTRAINT "workspace_access_org_fkey" FOREIGN KEY ("org_workspace_id") REFERENCES "public"."org_workspaces"("id") ON DELETE CASCADE;
+
+
+
 
 
 
@@ -1885,6 +1874,16 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TAB
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "service_role";
+
+-- =========================================================
+-- CRITICAL: AUTH TRIGGER FOR USER CREATION
+-- =========================================================
+-- This was missing - needed to create profiles when users sign up
+
+CREATE TRIGGER on_auth_user_created 
+  AFTER INSERT ON auth.users 
+  FOR EACH ROW 
+  EXECUTE FUNCTION public.handle_new_user();
 
 
 

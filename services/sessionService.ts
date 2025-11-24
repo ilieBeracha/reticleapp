@@ -1,20 +1,21 @@
 /**
  * SESSION SERVICE
- * Simplified for org-only workspaces
+ * Supports both personal and organization sessions
  */
 
+import { supabase } from '@/lib/supabase';
 import { AuthenticatedClient } from './authenticatedClient';
 
 export interface CreateSessionParams {
-  org_workspace_id: string;  // Always required now
-  team_id?: string;
+  org_workspace_id?: string | null;  // NULL for personal, UUID for org
+  team_id?: string | null;
   session_mode?: 'solo' | 'group';
   session_data?: Record<string, any>;
 }
 
 export interface SessionWithDetails {
   id: string;
-  org_workspace_id: string | null; // Nullable in DB schema, but practically usually set
+  org_workspace_id: string | null;
   workspace_name?: string | null;
   user_id: string;
   user_full_name?: string | null;
@@ -41,7 +42,7 @@ function mapSession(row: any): SessionWithDetails {
   return {
     id: row.id,
     org_workspace_id: row.org_workspace_id,
-    workspace_name: row.workspace_name ?? orgs.name ?? null,
+    workspace_name: row.workspace_name ?? orgs.name ?? 'Personal',
     user_id: row.user_id,
     user_full_name: row.user_full_name ?? profiles.full_name ?? null,
     team_id: row.team_id ?? null,
@@ -57,14 +58,56 @@ function mapSession(row: any): SessionWithDetails {
 }
 
 /**
- * Create a new session (simplified - always org workspace)
+ * Create a new session - supports both personal and org sessions
  */
-export async function createSession(params: CreateSessionParams) {
+export async function createSession(params: CreateSessionParams): Promise<SessionWithDetails> {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    throw new Error('Not authenticated');
+  }
+
+  // If no org_workspace_id, it's a personal session - use direct insert
+  if (!params.org_workspace_id) {
+    const { data, error } = await supabase
+      .from('sessions')
+      .insert({
+        user_id: user.id,
+        org_workspace_id: null,
+        team_id: params.team_id ?? null,
+        session_mode: params.session_mode ?? 'solo',
+        status: 'active',
+        started_at: new Date().toISOString(),
+        session_data: params.session_data ?? null,
+      })
+      .select(`
+        id,
+        org_workspace_id,
+        user_id,
+        team_id,
+        session_mode,
+        status,
+        started_at,
+        ended_at,
+        session_data,
+        created_at,
+        updated_at,
+        profiles:user_id(full_name),
+        teams:team_id(name),
+        org_workspaces:org_workspace_id(name)
+      `)
+      .single();
+
+    if (error) throw error;
+    return mapSession(data);
+  }
+
+  // Organization session - use RPC function
   const client = await AuthenticatedClient.getClient();
   const { data, error } = await client
     .rpc('create_session', {
-      p_workspace_type: 'org',  // Always 'org' now
-      p_workspace_owner_id: null,  // Not used anymore
+      p_workspace_type: 'org',
+      p_workspace_owner_id: null,
       p_org_workspace_id: params.org_workspace_id,
       p_team_id: params.team_id ?? null,
       p_session_mode: params.session_mode ?? 'solo',
@@ -77,11 +120,10 @@ export async function createSession(params: CreateSessionParams) {
 }
 
 /**
- * Get sessions.
- * If workspaceId is provided, filters by that workspace.
- * If not, fetches all sessions accessible to the user (assuming RLS).
+ * Get sessions - fetches all sessions accessible to the user
+ * Includes both personal sessions and org sessions
  */
-export async function getSessions(workspaceId?: string): Promise<SessionWithDetails[]> {
+export async function getSessions(workspaceId?: string | null): Promise<SessionWithDetails[]> {
   const client = await AuthenticatedClient.getClient();
   
   let query = client
@@ -104,9 +146,17 @@ export async function getSessions(workspaceId?: string): Promise<SessionWithDeta
     `)
     .order('started_at', { ascending: false });
 
-  if (workspaceId) {
-    query = query.eq('org_workspace_id', workspaceId);
+  // Filter by workspace if provided
+  if (workspaceId !== undefined) {
+    if (workspaceId === null) {
+      // Get personal sessions only
+      query = query.is('org_workspace_id', null);
+    } else {
+      // Get org sessions only
+      query = query.eq('org_workspace_id', workspaceId);
+    }
   }
+  // Otherwise, get ALL sessions (personal + org)
 
   const { data, error } = await query;
 
@@ -115,9 +165,9 @@ export async function getSessions(workspaceId?: string): Promise<SessionWithDeta
 }
 
 /**
- * Get sessions for a specific workspace (Legacy alias)
+ * Get sessions for a specific workspace
  */
-export async function getWorkspaceSessions(orgWorkspaceId: string): Promise<SessionWithDetails[]> {
+export async function getWorkspaceSessions(orgWorkspaceId: string | null): Promise<SessionWithDetails[]> {
   return getSessions(orgWorkspaceId);
 }
 

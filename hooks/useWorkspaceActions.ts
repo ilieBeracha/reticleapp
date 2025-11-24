@@ -1,5 +1,5 @@
-import { useCallback } from 'react';
 import { useModals } from '@/contexts/ModalContext';
+import { useCallback } from 'react';
 
 interface UseWorkspaceActionsReturn {
   onStartSession: () => void;

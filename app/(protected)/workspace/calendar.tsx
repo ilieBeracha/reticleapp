@@ -5,7 +5,8 @@ import { TrainingCalendar } from '@/components/ui/TrainingCalendar';
 import { CalendarEvent } from '@/hooks/ui/useCalendar';
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
-import { getSessions, SessionWithDetails } from '@/services/sessionService';
+import { SessionWithDetails } from '@/services/sessionService';
+import { useSessionStore } from '@/store/sessionStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -24,51 +25,29 @@ export default function CalendarScreen() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch events
+  const { sessions, loading: sessionsLoading, error: sessionsError, loadSessions } = useSessionStore();
+  
   useEffect(() => {
-    let isMounted = true;
+    loadSessions();
+  }, [loadSessions, activeWorkspace?.id]);
 
-    const loadEvents = async () => {
-      setIsLoading(true);
-      try {
-        const sessions = await getSessions(activeWorkspace?.id);
+  useEffect(() => {
+    const mappedEvents: CalendarEvent[] = sessions.map((session: SessionWithDetails) => {
+      const title =
+        session.session_data?.name || (session.team_name ? `${session.team_name} Session` : 'Training Session');
 
-        if (!isMounted) return;
+      return {
+        id: session.id,
+        date: session.started_at.split('T')[0],
+        title: title,
+        type: 'session',
+        color: session.status === 'completed' ? colors.green : session.status === 'active' ? colors.blue : colors.muted,
+      };
+    });
 
-        // Map sessions to calendar events
-        const mappedEvents: CalendarEvent[] = sessions.map((session: SessionWithDetails) => {
-          const title =
-            session.session_data?.name || (session.team_name ? `${session.team_name} Session` : 'Training Session');
-
-          return {
-            id: session.id,
-            date: session.started_at.split('T')[0],
-            title: title,
-            type: 'session',
-            color: session.status === 'completed' ? colors.green : session.status === 'active' ? colors.blue : colors.muted,
-          };
-        });
-
-        setEvents(mappedEvents);
-      } catch (error) {
-        console.error('Failed to load calendar events:', error);
-        if (isMounted) {
-          Alert.alert('Error', 'Failed to load calendar events');
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadEvents();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [activeWorkspace?.id, colors.green, colors.blue, colors.muted]);
-
+    setEvents(mappedEvents);
+    setIsLoading(sessionsLoading);
+  }, [sessions, sessionsLoading, colors.green, colors.blue, colors.muted]);
   const filteredEvents = useMemo(() => {
     if (filter === 'all') return events;
     return events.filter((event) => event.type === filter);
@@ -231,12 +210,8 @@ export default function CalendarScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ThemedStatusBar />
-      
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
+
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <LayoutAnimationConfig skipEntering skipExiting>
           {/* Header */}
           <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.header}>
@@ -311,7 +286,11 @@ export default function CalendarScreen() {
             <>
               {/* Filter Chips */}
               <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.filterContainer}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.filterScroll}
+                >
                   {filterOptions.map((option, index) => {
                     const count = option.id === 'all' ? stats.total : stats.byType[option.id] || 0;
 
@@ -370,8 +349,8 @@ export default function CalendarScreen() {
                   )}
                 </Animated.View>
               ) : (
-                <Animated.View 
-                  entering={FadeInDown.delay(400).springify()} 
+                <Animated.View
+                  entering={FadeInDown.delay(400).springify()}
                   layout={LinearTransition.springify().damping(20)}
                   style={styles.section}
                 >
