@@ -14,7 +14,7 @@ export default function HomePage() {
 
   // If activeWorkspace is null, show Personal mode
   // If activeWorkspace exists, show Organization mode
-  const isOrganizationMode = activeWorkspace !== null;
+  
 
-  return isOrganizationMode ? <OrganizationHomePage /> : <PersonalHomePage />;
+  return activeWorkspace !== null ? <OrganizationHomePage /> : <PersonalHomePage />;
 }

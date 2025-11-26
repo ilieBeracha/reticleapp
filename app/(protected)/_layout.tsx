@@ -67,6 +67,21 @@ export default function ProtectedLayout() {
         }}
       >
         <Stack.Screen name="workspace" />
+        
+        {/* Liquid Glass Sheet - iOS 26+ native form sheet */}
+        <Stack.Screen
+          name="liquidGlassSheet"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: "transparent" },
+            sheetAllowedDetents: [0.25, 0.5, 1], // 25%, 50%, 100%
+            sheetInitialDetentIndex: 0, // Start at smallest (25%)
+            sheetLargestUndimmedDetentIndex: 0, // Background not dimmed at smallest
+          }}
+        />
       </Stack>
       <UserMenuBottomSheet
         ref={userMenuSheetRef}

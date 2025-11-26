@@ -16,8 +16,9 @@ import { useTrainingStore } from '@/store/trainingStore';
 import type { TrainingWithDetails } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
 import { format, isToday, isTomorrow } from 'date-fns';
+import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Button, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 /**
  * Personal mode home page - displays personal training stats, quick actions, and recent sessions.
@@ -30,7 +31,6 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
   const { chartDetailsSheetRef, setOnSessionCreated, setOnTeamCreated, trainingDetailSheetRef } = useModals();
   const { sessions, sessionsLoading, sessionsError, loadTeams, refreshSessions } = useWorkspaceData();
   const { loadSessions } = useSessionStore();
-  
   // Training data
   const { 
     myUpcomingTrainings, 
@@ -207,6 +207,7 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
           <TrainingChart data={pieData} onDoubleTap={handleChartDoubleTap} centerValue={sessions.length} />
         </View>
 
+        <Button title="Go to Liquid Glass Sheet" onPress={() => router.push('/(protected)/liquidGlassSheet')} />
         {/* Upcoming Trainings Section */}
         {myUpcomingTrainings.length > 0 && (
           <View style={styles.section}>

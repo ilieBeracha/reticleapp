@@ -101,6 +101,7 @@ export default function WorkspaceLayout() {
         }}
       />
       
+      
       {/* INSIGHTS - Personal mode only */}
       <Tabs.Screen
         name="insights"
