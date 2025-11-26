@@ -1,3 +1,4 @@
+import { useOrgRole } from "@/contexts/OrgRoleContext";
 import { useColors } from "@/hooks/ui/useColors";
 import { useAppContext } from "@/hooks/useAppContext";
 import { useWorkspaceData } from "@/hooks/useWorkspaceData";
@@ -6,7 +7,7 @@ import type { TeamMemberShip, WorkspaceInvitationWithDetails, WorkspaceRole } fr
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import * as Clipboard from 'expo-clipboard';
-import { forwardRef, useCallback, useEffect, useState } from "react";
+import React, { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { BaseBottomSheet, type BaseBottomSheetRef } from "./BaseBottomSheet";
 
@@ -54,17 +55,69 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
     const colors = useColors();
     const { activeWorkspaceId, activeWorkspace } = useAppContext();
     const { teams } = useWorkspaceData();
+    const { orgRole, isCommander, teamInfo, allTeams } = useOrgRole();
     
-    // Invite type: 'team' or 'org'
-    const [inviteType, setInviteType] = useState<'team' | 'org'>(teams.length > 0 ? 'team' : 'org');
+    // Permission checks
+    const isAdminOrOwner = orgRole === 'owner' || orgRole === 'admin';
     
-    // Team invite states
-    const [selectedTeamId, setSelectedTeamId] = useState<string | null>(teams.length > 0 ? teams[0].id : null);
-    const [selectedTeamRole, setSelectedTeamRole] = useState<TeamMemberShip>('soldier');
+    // Team commanders can only invite to their team
+    const availableTeams = useMemo(() => {
+      if (isAdminOrOwner) {
+        return teams; // Admin/Owner can invite to any team
+      }
+      if (isCommander && allTeams.length > 0) {
+        // Team commander can only see their teams
+        return teams.filter(t => allTeams.some(ut => ut.teamId === t.id && ut.teamRole === 'commander'));
+      }
+      return []; // Others can't invite
+    }, [teams, isAdminOrOwner, isCommander, allTeams]);
+    
+    // Team commanders can only invite squad_commander or soldier (not commander)
+    const availableTeamRoles = useMemo((): TeamMemberShip[] => {
+      if (isAdminOrOwner) {
+        return ['commander', 'squad_commander', 'soldier']; // Full access
+      }
+      if (isCommander) {
+        return ['squad_commander', 'soldier']; // Can't invite other commanders
+      }
+      return [];
+    }, [isAdminOrOwner, isCommander]);
+    
+    // Team commanders can't create org-level invites
+    const canCreateOrgInvites = isAdminOrOwner;
+    
+    // Invite type: 'team' or 'org' - team commanders default to team
+    const [inviteType, setInviteType] = useState<'team' | 'org'>(
+      availableTeams.length > 0 ? 'team' : (canCreateOrgInvites ? 'org' : 'team')
+    );
+    
+    // Team invite states - default to commander's team if they're a commander
+    const [selectedTeamId, setSelectedTeamId] = useState<string | null>(
+      isCommander && teamInfo ? teamInfo.teamId : (availableTeams.length > 0 ? availableTeams[0]?.id : null)
+    );
+    const [selectedTeamRole, setSelectedTeamRole] = useState<TeamMemberShip>(
+      availableTeamRoles.includes('soldier') ? 'soldier' : availableTeamRoles[0] || 'soldier'
+    );
     const [selectedSquadName, setSelectedSquadName] = useState<string>('');
     
     // Org invite states
     const [selectedOrgRole, setSelectedOrgRole] = useState<WorkspaceRole>('instructor');
+    
+    // Ensure team commanders stay on 'team' mode
+    useEffect(() => {
+      if (isCommander && !isAdminOrOwner) {
+        setInviteType('team');
+      }
+    }, [isCommander, isAdminOrOwner]);
+
+    // Update selected team when available teams change
+    useEffect(() => {
+      if (isCommander && teamInfo) {
+        setSelectedTeamId(teamInfo.teamId);
+      } else if (availableTeams.length > 0 && !selectedTeamId) {
+        setSelectedTeamId(availableTeams[0].id);
+      }
+    }, [availableTeams, isCommander, teamInfo, selectedTeamId]);
 
     const [isCreating, setIsCreating] = useState(false);
     const [pendingInvites, setPendingInvites] = useState<WorkspaceInvitationWithDetails[]>([]);
@@ -216,124 +269,164 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
             </Text>
           </View>
 
-          {/* Invite Type Selector */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>INVITE TO</Text>
-            <View style={styles.inviteTypeContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.inviteTypeButton,
-                  {
-                    backgroundColor: inviteType === 'team' ? colors.primary : colors.card,
-                    borderColor: inviteType === 'team' ? colors.primary : colors.border,
-                  }
-                ]}
-                onPress={() => setInviteType('team')}
-                disabled={teams.length === 0}
-              >
-                <Ionicons 
-                  name="people" 
-                  size={22} 
-                  color={inviteType === 'team' ? colors.primaryForeground : colors.text} 
-                />
-                <View style={{ flex: 1 }}>
-                  <Text style={[
-                    styles.inviteTypeLabel,
-                    { color: inviteType === 'team' ? colors.primaryForeground : colors.text }
-                  ]}>
-                    Team
-                  </Text>
-                  <Text style={[
-                    styles.inviteTypeDesc,
-                    { color: inviteType === 'team' ? colors.primaryForeground + 'CC' : colors.textMuted }
-                  ]}>
-                    Member with team role
-                  </Text>
-                </View>
-                {inviteType === 'team' && (
-                  <Ionicons name="checkmark-circle" size={24} color={colors.primaryForeground} />
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.inviteTypeButton,
-                  {
-                    backgroundColor: inviteType === 'org' ? colors.primary : colors.card,
-                    borderColor: inviteType === 'org' ? colors.primary : colors.border,
-                  }
-                ]}
-                onPress={() => setInviteType('org')}
-              >
-                <Ionicons 
-                  name="business" 
-                  size={22} 
-                  color={inviteType === 'org' ? colors.primaryForeground : colors.text} 
-                />
-                <View style={{ flex: 1 }}>
-                  <Text style={[
-                    styles.inviteTypeLabel,
-                    { color: inviteType === 'org' ? colors.primaryForeground : colors.text }
-                  ]}>
-                    Organization
-                  </Text>
-                  <Text style={[
-                    styles.inviteTypeDesc,
-                    { color: inviteType === 'org' ? colors.primaryForeground + 'CC' : colors.textMuted }
-                  ]}>
-                    Instructor, admin, or owner
-                  </Text>
-                </View>
-                {inviteType === 'org' && (
-                  <Ionicons name="checkmark-circle" size={24} color={colors.primaryForeground} />
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Team Invite Flow */}
-          {inviteType === 'team' && teams.length > 0 && (
-            <>
-              {/* Team Selection */}
-              <View style={styles.section}>
-                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>SELECT TEAM</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                  {teams.map(team => (
-                    <TouchableOpacity
-                      key={team.id}
-                      style={[
-                        styles.teamChip,
-                        { 
-                          backgroundColor: selectedTeamId === team.id ? colors.primary : colors.card,
-                          borderColor: selectedTeamId === team.id ? colors.primary : colors.border,
-                        }
-                      ]}
-                      onPress={() => setSelectedTeamId(team.id)}
-                    >
-                      <Ionicons 
-                        name="shield" 
-                        size={16} 
-                        color={selectedTeamId === team.id ? colors.primaryForeground : colors.text} 
-                      />
-                      <Text style={[
-                        styles.teamChipText, 
-                        { color: selectedTeamId === team.id ? colors.primaryForeground : colors.text }
-                      ]}>
-                        {team.name}
-                      </Text>
-                      {selectedTeamId === team.id && (
-                        <Ionicons name="checkmark" size={16} color={colors.primaryForeground} />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+          {/* Role-based Permission Banner */}
+          {isCommander && !isAdminOrOwner && (
+            <View style={[styles.permissionBanner, { backgroundColor: '#F59E0B15', borderColor: '#F59E0B30' }]}>
+              <Ionicons name="star" size={18} color="#F59E0B" />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.permissionTitle, { color: '#F59E0B' }]}>
+                  Team Commander Access
+                </Text>
+                <Text style={[styles.permissionDesc, { color: colors.textMuted }]}>
+                  You can invite squad commanders and soldiers to your team
+                </Text>
               </View>
+            </View>
+          )}
+
+          {/* Invite Type Selector - Only show both options for admins/owners */}
+          {canCreateOrgInvites && (
+            <View style={styles.section}>
+              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>INVITE TO</Text>
+              <View style={styles.inviteTypeContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.inviteTypeButton,
+                    {
+                      backgroundColor: inviteType === 'team' ? colors.primary : colors.card,
+                      borderColor: inviteType === 'team' ? colors.primary : colors.border,
+                    }
+                  ]}
+                  onPress={() => setInviteType('team')}
+                  disabled={availableTeams.length === 0}
+                >
+                  <Ionicons 
+                    name="people" 
+                    size={22} 
+                    color={inviteType === 'team' ? colors.primaryForeground : colors.text} 
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[
+                      styles.inviteTypeLabel,
+                      { color: inviteType === 'team' ? colors.primaryForeground : colors.text }
+                    ]}>
+                      Team
+                    </Text>
+                    <Text style={[
+                      styles.inviteTypeDesc,
+                      { color: inviteType === 'team' ? colors.primaryForeground + 'CC' : colors.textMuted }
+                    ]}>
+                      Member with team role
+                    </Text>
+                  </View>
+                  {inviteType === 'team' && (
+                    <Ionicons name="checkmark-circle" size={24} color={colors.primaryForeground} />
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.inviteTypeButton,
+                    {
+                      backgroundColor: inviteType === 'org' ? colors.primary : colors.card,
+                      borderColor: inviteType === 'org' ? colors.primary : colors.border,
+                    }
+                  ]}
+                  onPress={() => setInviteType('org')}
+                >
+                  <Ionicons 
+                    name="business" 
+                    size={22} 
+                    color={inviteType === 'org' ? colors.primaryForeground : colors.text} 
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[
+                      styles.inviteTypeLabel,
+                      { color: inviteType === 'org' ? colors.primaryForeground : colors.text }
+                    ]}>
+                      Organization
+                    </Text>
+                    <Text style={[
+                      styles.inviteTypeDesc,
+                      { color: inviteType === 'org' ? colors.primaryForeground + 'CC' : colors.textMuted }
+                    ]}>
+                      Instructor, admin, or owner
+                    </Text>
+                  </View>
+                  {inviteType === 'org' && (
+                    <Ionicons name="checkmark-circle" size={24} color={colors.primaryForeground} />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* Team Invite Flow - Show for commanders even if loading */}
+          {inviteType === 'team' && (availableTeams.length > 0 || (isCommander && !isAdminOrOwner)) && (
+            <>
+              {/* Loading state when teams haven't loaded */}
+              {availableTeams.length === 0 && isCommander && (
+                <View style={styles.section}>
+                  <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>LOADING TEAM...</Text>
+                  <ActivityIndicator color={colors.primary} style={{ marginTop: 8 }} />
+                </View>
+              )}
+              
+              {/* Team Selection - Only show if multiple teams available */}
+              {availableTeams.length > 1 && (
+                <View style={styles.section}>
+                  <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>SELECT TEAM</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                    {availableTeams.map(team => (
+                      <TouchableOpacity
+                        key={team.id}
+                        style={[
+                          styles.teamChip,
+                          { 
+                            backgroundColor: selectedTeamId === team.id ? colors.primary : colors.card,
+                            borderColor: selectedTeamId === team.id ? colors.primary : colors.border,
+                          }
+                        ]}
+                        onPress={() => setSelectedTeamId(team.id)}
+                      >
+                        <Ionicons 
+                          name="shield" 
+                          size={16} 
+                          color={selectedTeamId === team.id ? colors.primaryForeground : colors.text} 
+                        />
+                        <Text style={[
+                          styles.teamChipText, 
+                          { color: selectedTeamId === team.id ? colors.primaryForeground : colors.text }
+                        ]}>
+                          {team.name}
+                        </Text>
+                        {selectedTeamId === team.id && (
+                          <Ionicons name="checkmark" size={16} color={colors.primaryForeground} />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+              
+              {/* Show selected team if only one available (e.g., for team commanders) */}
+              {availableTeams.length === 1 && (
+                <View style={styles.section}>
+                  <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>TEAM</Text>
+                  <View style={[styles.selectedTeamBanner, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <Ionicons name="shield" size={20} color={colors.primary} />
+                    <Text style={[styles.selectedTeamName, { color: colors.text }]}>
+                      {availableTeams[0].name}
+                    </Text>
+                  </View>
+                </View>
+              )}
 
               {/* Team Role Selection */}
               <View style={styles.section}>
                 <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>TEAM ROLE</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                  {TEAM_ROLE_OPTIONS.map((role) => (
+                  {availableTeamRoles.map((role) => (
                     <TouchableOpacity
                       key={role}
                       style={[
@@ -346,6 +439,12 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
                       ]}
                       onPress={() => setSelectedTeamRole(role)}
                     >
+                      <Ionicons 
+                        name={role === 'commander' ? 'star' : role === 'squad_commander' ? 'star-half' : 'person'}
+                        size={14}
+                        color={selectedTeamRole === role ? colors.primary : colors.textMuted}
+                        style={{ marginRight: 4 }}
+                      />
                       <Text style={{ 
                         fontSize: 14,
                         fontWeight: '600',
@@ -433,8 +532,8 @@ export const InviteMembersSheet = forwardRef<BaseBottomSheetRef, InviteMembersSh
             </>
           )}
 
-          {/* Org Invite Flow */}
-          {inviteType === 'org' && (
+          {/* Org Invite Flow - ONLY for admin/owner */}
+          {inviteType === 'org' && canCreateOrgInvites && (
             <View style={styles.section}>
               <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>ORGANIZATION ROLE</Text>
               <View style={styles.orgRolesGrid}>
@@ -791,5 +890,34 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
+  },
+  permissionBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 16,
+    gap: 12,
+  },
+  permissionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  permissionDesc: {
+    fontSize: 12,
+  },
+  selectedTeamBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 10,
+  },
+  selectedTeamName: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

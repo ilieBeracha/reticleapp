@@ -1,7 +1,10 @@
+import { useTheme } from '@/contexts/ThemeContext';
 import { useColors } from '@/hooks/ui/useColors';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { memo, useMemo, useRef } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { PieChart } from 'react-native-gifted-charts';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 interface ChartDataPoint {
   value: number;
@@ -40,7 +43,11 @@ const TrainingChart = memo(function TrainingChart({
   onDoubleTap 
 }: TrainingChartProps) {
   const colors = useColors();
+  const { theme } = useTheme();
   const lastTap = useRef(0);
+
+  const isGlassAvailable = isLiquidGlassAvailable();
+  const glassStyle = theme === 'dark' ? 'clear' : 'regular';
 
   const handleChartPress = () => {
     if (!onDoubleTap) return;
@@ -53,12 +60,22 @@ const TrainingChart = memo(function TrainingChart({
     lastTap.current = now;
   };
 
-  // Memoize dynamic styles
-  const heroStyle = useMemo(() => [
-    styles.hero,
-    { backgroundColor: colors.card }
-  ], [colors.card]);
+  const GlassCard = ({ children, style }: { children: React.ReactNode; style?: any }) => {
+    if (isGlassAvailable) {
+      return (
+        <GlassView style={[styles.glassCard, style]} glassEffectStyle={glassStyle}>
+          {children}
+        </GlassView>
+      );
+    }
+    return (
+      <View style={[styles.fallbackCard, { backgroundColor: colors.card, borderColor: colors.border }, style]}>
+        {children}
+      </View>
+    );
+  };
 
+  // Memoize dynamic styles
   const heroTitleStyle = useMemo(() => [
     styles.heroTitle,
     { color: colors.text }
@@ -94,111 +111,124 @@ const TrainingChart = memo(function TrainingChart({
   ), [centerValue, centerLabel, centerSubtext, centerValueTextStyle, centerLabelTextStyle, centerSubtextTextStyle]);
 
   return (
-    <View style={heroStyle}>
-      <View style={styles.heroHeader}>
-        <Text style={heroTitleStyle}>Training Distribution</Text>
-        <Text style={heroSubtitleStyle}>
-          Track your workout categories
-        </Text>
-      </View>
+    <Animated.View entering={FadeIn.duration(400)}>
+      <GlassCard>
+        <View style={styles.heroHeader}>
+          <Text style={heroTitleStyle}>Training Overview</Text>
+          <Text style={heroSubtitleStyle}>
+            Track your workout categories
+          </Text>
+        </View>
 
-      {/* Category Tabs */}
-      <View style={styles.categoryTabs}>
-        {categories.map((category, index) => (
-          <TouchableOpacity
-            key={index}
-            style={[
-              styles.categoryTab,
-              index === 0 && styles.categoryTabActive,
-              { 
-                backgroundColor: index === 0 ? category.color + '15' : 'transparent',
-                borderColor: index === 0 ? category.color : colors.border
-              }
-            ]}
-            activeOpacity={0.7}
-          >
-            <Text style={[
-              styles.categoryTabText,
-              { color: index === 0 ? category.color : colors.textMuted }
-            ]}>
-              {category.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+        {/* Category Tabs */}
+        <View style={styles.categoryTabs}>
+          {categories.map((category, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[
+                styles.categoryTab,
+                index === 0 && styles.categoryTabActive,
+                { 
+                  backgroundColor: index === 0 ? category.color + '12' : 'transparent',
+                  borderColor: index === 0 ? category.color : colors.border
+                }
+              ]}
+              activeOpacity={0.7}
+            >
+              <Text style={[
+                styles.categoryTabText,
+                { color: index === 0 ? category.color : colors.textMuted }
+              ]}>
+                {category.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-      <TouchableOpacity 
-        style={styles.chartContainer}
-        onPress={handleChartPress}
-        activeOpacity={0.9}
-      >
-        <PieChart
-          data={data}
-          donut
-          showGradient
-          sectionAutoFocus
-          radius={120}
-          innerRadius={85}
-          innerCircleColor={colors.card}
-          centerLabelComponent={centerLabelComponent}
-          focusOnPress
-          toggleFocusOnPress
-        />
-      </TouchableOpacity>
-    </View>
+        <TouchableOpacity 
+          style={styles.chartContainer}
+          onPress={handleChartPress}
+          activeOpacity={0.9}
+        >
+          <PieChart
+            data={data}
+            donut
+            sectionAutoFocus
+            radius={110}
+            innerRadius={80}
+            innerCircleColor={colors.card}
+            centerLabelComponent={centerLabelComponent}
+            focusOnPress
+            toggleFocusOnPress
+          />
+        </TouchableOpacity>
+      </GlassCard>
+    </Animated.View>
   );
 });
 
 export default TrainingChart;
 
 const styles = StyleSheet.create({
-  hero: {
-    marginBottom: 32,
-    paddingVertical: 24,
-    paddingHorizontal: 20,
+  glassCard: {
     borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    overflow: 'hidden',
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+  },
+  fallbackCard: {
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 1,
+      },
+    }),
   },
   heroHeader: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   heroTitle: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: '700',
     marginBottom: 4,
-    letterSpacing: -0.4,
+    letterSpacing: -0.3,
   },
   heroSubtitle: {
-    fontSize: 15,
-    fontWeight: '400',
-    letterSpacing: -0.2,
+    fontSize: 14,
+    fontWeight: '500',
+    letterSpacing: -0.1,
+    opacity: 0.7,
   },
   categoryTabs: {
     flexDirection: 'row',
     gap: 8,
     marginBottom: 20,
-    paddingHorizontal: 4,
   },
   categoryTab: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
   },
   categoryTabActive: {
     borderWidth: 1,
   },
   categoryTabText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     letterSpacing: -0.1,
   },
   chartContainer: {
-    paddingVertical: 10,
+    paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -207,21 +237,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   centerLabelValue: {
-    fontSize: 40,
-    fontWeight: '700',
-    letterSpacing: -0.6,
+    fontSize: 36,
+    fontWeight: '800',
+    letterSpacing: -1.2,
     marginBottom: 2,
   },
   centerLabelText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     letterSpacing: -0.1,
   },
   centerLabelSubtext: {
-    fontSize: 12,
-    fontWeight: '400',
+    fontSize: 11,
+    fontWeight: '500',
     marginTop: 2,
     letterSpacing: -0.1,
+    opacity: 0.7,
   },
 });
 

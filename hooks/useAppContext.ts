@@ -1,7 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import type { Workspace } from "@/types/workspace";
-import { useRouter } from "expo-router";
+import { router } from "expo-router";
 import { useCallback, useMemo } from "react";
 
 export interface AppContext {
@@ -44,7 +44,6 @@ export interface AppContext {
  */
 export function useAppContext(): AppContext {
   const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
   const { 
     workspaces, 
     activeWorkspaceId,    
@@ -52,11 +51,15 @@ export function useAppContext(): AppContext {
     setActiveWorkspace
   } = useWorkspaceStore();
 
-  // Stable switchWorkspace callback
+  // Switch workspace - ALWAYS navigate to index first, then update state
   const handleSwitchWorkspace = useCallback(async (workspaceId: string | null) => {
+    // 1. Navigate to index FIRST (before state changes)
+    router.replace('/(protected)/workspace/' as any);
+    // 2. Small delay to let navigation complete
+    await new Promise(resolve => setTimeout(resolve, 50));
+    // 3. Then update workspace state
     setActiveWorkspace(workspaceId);
-    router.replace('/(protected)/workspace');
-  }, [setActiveWorkspace, router]);
+  }, [setActiveWorkspace]);
 
   // Calculate derived values with memoization
   const context = useMemo<AppContext>(() => {

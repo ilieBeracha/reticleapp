@@ -145,3 +145,96 @@ export interface WorkspaceMemberWithTeams {
   // Team assignments (aggregated)
   teams: TeamMembership[];
 }
+
+// =====================================================
+// TRAINING TYPES
+// =====================================================
+
+export type TrainingStatus = 'planned' | 'ongoing' | 'finished' | 'cancelled';
+export type TargetType = 'paper' | 'tactical';
+
+/**
+ * Training - A scheduled training event for an organization
+ * Must include at least one team
+ */
+export interface Training {
+  id: string;
+  org_workspace_id: string;
+  team_id: string | null;  // Primary team (optional, can have multiple via sessions)
+  title: string;
+  description?: string | null;
+  scheduled_at: string;
+  status: TrainingStatus;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Training with related data
+ */
+export interface TrainingWithDetails extends Training {
+  team?: Team | null;
+  drills?: TrainingDrill[];
+  drill_count?: number;
+  creator?: {
+    id: string;
+    full_name: string | null;
+    avatar_url: string | null;
+  };
+}
+
+/**
+ * TrainingDrill - Individual drill within a training
+ */
+export interface TrainingDrill {
+  id: string;
+  training_id: string;
+  order_index: number;
+  name: string;
+  target_type: TargetType;
+  distance_m: number;
+  rounds_per_shooter: number;
+  time_limit_seconds?: number | null;
+  position?: string | null;  // e.g. 'prone', 'kneeling', 'standing'
+  weapon_category?: string | null;  // e.g. 'rifle', 'pistol'
+  notes?: string | null;
+  created_at: string;
+}
+
+/**
+ * Input for creating a new training
+ */
+export interface CreateTrainingInput {
+  org_workspace_id: string;
+  team_id: string;  // Required - at least one team
+  title: string;
+  description?: string;
+  scheduled_at: string;
+  drills?: CreateDrillInput[];
+}
+
+/**
+ * Input for creating a drill
+ */
+export interface CreateDrillInput {
+  name: string;
+  target_type: TargetType;
+  distance_m: number;
+  rounds_per_shooter: number;
+  time_limit_seconds?: number;
+  position?: string;
+  weapon_category?: string;
+  notes?: string;
+}
+
+/**
+ * Input for updating a training
+ */
+export interface UpdateTrainingInput {
+  title?: string;
+  description?: string;
+  scheduled_at?: string;
+  status?: TrainingStatus;
+  team_id?: string;
+}

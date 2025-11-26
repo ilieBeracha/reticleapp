@@ -3,13 +3,16 @@ import { AcceptInviteSheet } from '@/components/modals/AcceptInviteSheet';
 import { ComingSoonSheet } from '@/components/modals/ComingSoonSheet';
 import { CreateSessionSheet } from '@/components/modals/CreateSessionSheet';
 import { CreateTeamSheet } from '@/components/modals/CreateTeamSheet';
+import { CreateTrainingSheet } from '@/components/modals/CreateTrainingSheet';
 import { CreateWorkspaceSheet } from '@/components/modals/CreateWorkspaceSheet';
 import { InviteMembersSheet } from '@/components/modals/InviteMembersSheet';
 import { MemberPreviewSheet } from '@/components/modals/MemberPreviewSheet';
 import { TeamPreviewSheet } from '@/components/modals/TeamPreviewSheet';
+import { TrainingDetailSheet } from '@/components/modals/TrainingDetailSheet';
 import { UserMenuBottomSheet, UserMenuBottomSheetRef } from '@/components/modals/UserMenuBottomSheet';
 import { WorkspaceSwitcherBottomSheet } from '@/components/modals/WorkspaceSwitcherBottomSheet';
 import { useModals } from '@/contexts/ModalContext';
+import { OrgRoleProvider } from '@/contexts/OrgRoleContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { Stack } from 'expo-router';
@@ -17,10 +20,36 @@ import { useRef } from 'react';
 
 export default function ProtectedLayout() {
   const userMenuSheetRef = useRef<UserMenuBottomSheetRef>(null);
-  const { workspaceSwitcherSheetRef, onWorkspaceSwitched, onWorkspaceCreated, createWorkspaceSheetRef, acceptInviteSheetRef, onInviteAccepted, createTeamSheetRef, onTeamCreated, createSessionSheetRef, onSessionCreated, chartDetailsSheetRef, inviteMembersSheetRef, onMemberInvited, teamPreviewSheetRef, selectedTeam, memberPreviewSheetRef, selectedMember } = useModals();
+  const { 
+    // Sheet refs
+    workspaceSwitcherSheetRef, 
+    createWorkspaceSheetRef, 
+    acceptInviteSheetRef, 
+    createTeamSheetRef, 
+    createSessionSheetRef, 
+    chartDetailsSheetRef, 
+    inviteMembersSheetRef, 
+    teamPreviewSheetRef, 
+    memberPreviewSheetRef,
+    createTrainingSheetRef,
+    trainingDetailSheetRef,
+    // Selected items
+    selectedTeam, 
+    selectedMember,
+    // Callback getters - use these to get current callback value
+    getOnWorkspaceSwitched, 
+    getOnWorkspaceCreated, 
+    getOnInviteAccepted, 
+    getOnTeamCreated, 
+    getOnSessionCreated, 
+    getOnMemberInvited,
+    getOnTrainingCreated,
+    getOnTrainingUpdated,
+  } = useModals();
   const colors = useColors();
   return (
     <ThemeProvider>
+      <OrgRoleProvider>
       <Stack
         screenOptions={{
           headerShown: true,
@@ -38,7 +67,6 @@ export default function ProtectedLayout() {
         }}
       >
         <Stack.Screen name="workspace" />
-        <Stack.Screen name="settings" />
       </Stack>
       <UserMenuBottomSheet
         ref={userMenuSheetRef}
@@ -48,17 +76,15 @@ export default function ProtectedLayout() {
       <WorkspaceSwitcherBottomSheet
         ref={workspaceSwitcherSheetRef}
         onSettingsPress={() => {
-          onWorkspaceSwitched?.();
+          getOnWorkspaceSwitched()?.();
         }}
       />
       <CreateWorkspaceSheet
         ref={createWorkspaceSheetRef}
         onWorkspaceCreated={() => {
+          // Call callback FIRST to trigger refresh
+          getOnWorkspaceCreated()?.();
           createWorkspaceSheetRef?.current?.close();
-          // Call the registered callback if it exists
-          if (onWorkspaceCreated) {
-            onWorkspaceCreated();
-          }
         }}
       />
 
@@ -74,11 +100,9 @@ export default function ProtectedLayout() {
       <CreateSessionSheet
         ref={createSessionSheetRef}
         onSessionCreated={() => {
+          // Call callback FIRST to trigger refresh
+          getOnSessionCreated()?.();
           createSessionSheetRef?.current?.close();
-          // Call the registered callback if it exists
-          if (onSessionCreated) {
-            onSessionCreated();
-          }
         }}
       />
 
@@ -86,11 +110,9 @@ export default function ProtectedLayout() {
       <CreateTeamSheet
         ref={createTeamSheetRef}
         onTeamCreated={() => {
+          // Call callback FIRST to trigger refresh
+          getOnTeamCreated()?.();
           createTeamSheetRef?.current?.close();
-          // Call the registered callback if it exists
-          if (onTeamCreated) {
-            onTeamCreated();
-          }
         }}
       />
 
@@ -98,11 +120,9 @@ export default function ProtectedLayout() {
       <AcceptInviteSheet
         ref={acceptInviteSheetRef}
         onInviteAccepted={() => {
+          // Call callback FIRST to trigger refresh
+          getOnInviteAccepted()?.();
           acceptInviteSheetRef?.current?.close();
-          // Call the registered callback if it exists
-          if (onInviteAccepted) {
-            onInviteAccepted();
-          }
         }}
       />
 
@@ -111,9 +131,7 @@ export default function ProtectedLayout() {
         ref={inviteMembersSheetRef}
         onMemberInvited={() => {
           // Call the registered callback if it exists
-          if (onMemberInvited) {
-            onMemberInvited();
-          }
+          getOnMemberInvited()?.();
         }}
       />
 
@@ -129,6 +147,26 @@ export default function ProtectedLayout() {
         member={selectedMember}
       />
 
+      {/* CREATE TRAINING */}
+      <CreateTrainingSheet
+        ref={createTrainingSheetRef}
+        onTrainingCreated={() => {
+          // Call callback FIRST to trigger refresh
+          getOnTrainingCreated()?.();
+          createTrainingSheetRef?.current?.close();
+        }}
+      />
+
+      {/* TRAINING DETAIL */}
+      <TrainingDetailSheet
+        ref={trainingDetailSheetRef}
+        onTrainingUpdated={() => {
+          // Call callback to trigger refresh
+          getOnTrainingUpdated()?.();
+        }}
+      />
+
+      </OrgRoleProvider>
     </ThemeProvider>
   );
 }

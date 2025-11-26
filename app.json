@@ -42,6 +42,18 @@
       "favicon": "./assets/images/icon.jpg"
     },
     "plugins": [
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow $(PRODUCT_NAME) to use Face ID."
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Allow $(PRODUCT_NAME) to access your device motion"
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",

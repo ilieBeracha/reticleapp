@@ -4,11 +4,12 @@
  */
 
 import { supabase } from '@/lib/supabase';
-import { AuthenticatedClient } from './authenticatedClient';
 
 export interface CreateSessionParams {
   org_workspace_id?: string | null;  // NULL for personal, UUID for org
   team_id?: string | null;
+  training_id?: string | null;  // Link session to a training
+  drill_id?: string | null;     // Link session to a specific drill
   session_mode?: 'solo' | 'group';
   session_data?: Record<string, any>;
 }
@@ -21,6 +22,10 @@ export interface SessionWithDetails {
   user_full_name?: string | null;
   team_id: string | null;
   team_name?: string | null;
+  training_id: string | null;
+  training_title?: string | null;
+  drill_id: string | null;
+  drill_name?: string | null;
   session_mode: 'solo' | 'group';
   status: 'active' | 'completed' | 'cancelled';
   started_at: string;
@@ -38,6 +43,8 @@ function mapSession(row: any): SessionWithDetails {
   const profiles = row.profiles ?? {};
   const teams = row.teams ?? {};
   const orgs = row.org_workspaces ?? {};
+  const trainings = row.trainings ?? {};
+  const drills = row.training_drills ?? {};
 
   return {
     id: row.id,
@@ -47,6 +54,10 @@ function mapSession(row: any): SessionWithDetails {
     user_full_name: row.user_full_name ?? profiles.full_name ?? null,
     team_id: row.team_id ?? null,
     team_name: row.team_name ?? teams.name ?? null,
+    training_id: row.training_id ?? null,
+    training_title: row.training_title ?? trainings.title ?? null,
+    drill_id: row.drill_id ?? null,
+    drill_name: row.drill_name ?? drills.name ?? null,
     session_mode: row.session_mode,
     status: row.status,
     started_at: row.started_at,
@@ -59,6 +70,7 @@ function mapSession(row: any): SessionWithDetails {
 
 /**
  * Create a new session - supports both personal and org sessions
+ * Can be linked to a training and/or drill
  */
 export async function createSession(params: CreateSessionParams): Promise<SessionWithDetails> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -67,72 +79,27 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
     throw new Error('Not authenticated');
   }
 
-  // If no org_workspace_id, it's a personal session - use direct insert
-  if (!params.org_workspace_id) {
-    const { data, error } = await supabase
-      .from('sessions')
-      .insert({
-        user_id: user.id,
-        org_workspace_id: null,
-        team_id: params.team_id ?? null,
-        session_mode: params.session_mode ?? 'solo',
-        status: 'active',
-        started_at: new Date().toISOString(),
-        session_data: params.session_data ?? null,
-      })
-      .select(`
-        id,
-        org_workspace_id,
-        user_id,
-        team_id,
-        session_mode,
-        status,
-        started_at,
-        ended_at,
-        session_data,
-        created_at,
-        updated_at,
-        profiles:user_id(full_name),
-        teams:team_id(name),
-        org_workspaces:org_workspace_id(name)
-      `)
-      .single();
-
-    if (error) throw error;
-    return mapSession(data);
-  }
-
-  // Organization session - use RPC function
-  const client = await AuthenticatedClient.getClient();
-  const { data, error } = await client
-    .rpc('create_session', {
-      p_workspace_type: 'org',
-      p_workspace_owner_id: null,
-      p_org_workspace_id: params.org_workspace_id,
-      p_team_id: params.team_id ?? null,
-      p_session_mode: params.session_mode ?? 'solo',
-      p_session_data: params.session_data ?? null,
-    })
-    .single();
-
-  if (error) throw error;
-  return mapSession(data);
-}
-
-/**
- * Get sessions - fetches all sessions accessible to the user
- * Includes both personal sessions and org sessions
- */
-export async function getSessions(workspaceId?: string | null): Promise<SessionWithDetails[]> {
-  const client = await AuthenticatedClient.getClient();
-  
-  let query = client
+  // Direct insert for all sessions (RLS handles permissions)
+  const { data, error } = await supabase
     .from('sessions')
+    .insert({
+      user_id: user.id,
+      org_workspace_id: params.org_workspace_id ?? null,
+      team_id: params.team_id ?? null,
+      training_id: params.training_id ?? null,
+      drill_id: params.drill_id ?? null,
+      session_mode: params.session_mode ?? 'solo',
+      status: 'active',
+      started_at: new Date().toISOString(),
+      session_data: params.session_data ?? null,
+    })
     .select(`
       id,
       org_workspace_id,
       user_id,
       team_id,
+      training_id,
+      drill_id,
       session_mode,
       status,
       started_at,
@@ -142,7 +109,73 @@ export async function getSessions(workspaceId?: string | null): Promise<SessionW
       updated_at,
       profiles:user_id(full_name),
       teams:team_id(name),
-      org_workspaces:org_workspace_id(name)
+      org_workspaces:org_workspace_id(name),
+      trainings:training_id(title),
+      training_drills:drill_id(name)
+    `)
+    .single();
+
+  if (error) throw error;
+  return mapSession(data);
+}
+
+/**
+ * Create a session for a specific training
+ * Used by team members (commander, squad_commander, soldier) to log their training sessions
+ */
+export async function createTrainingSession(params: {
+  training_id: string;
+  drill_id?: string | null;
+  session_mode?: 'solo' | 'group';
+  session_data?: Record<string, any>;
+}): Promise<SessionWithDetails> {
+  // First, get the training to know the org_workspace_id and team_id
+  const { data: training, error: trainingError } = await supabase
+    .from('trainings')
+    .select('org_workspace_id, team_id')
+    .eq('id', params.training_id)
+    .single();
+
+  if (trainingError || !training) {
+    throw new Error('Training not found');
+  }
+
+  return createSession({
+    org_workspace_id: training.org_workspace_id,
+    team_id: training.team_id,
+    training_id: params.training_id,
+    drill_id: params.drill_id ?? null,
+    session_mode: params.session_mode ?? 'solo',
+    session_data: params.session_data,
+  });
+}
+
+/**
+ * Get sessions - fetches all sessions accessible to the user
+ * Includes both personal sessions and org sessions
+ */
+export async function getSessions(workspaceId?: string | null): Promise<SessionWithDetails[]> {
+  let query = supabase
+    .from('sessions')
+    .select(`
+      id,
+      org_workspace_id,
+      user_id,
+      team_id,
+      training_id,
+      drill_id,
+      session_mode,
+      status,
+      started_at,
+      ended_at,
+      session_data,
+      created_at,
+      updated_at,
+      profiles:user_id(full_name),
+      teams:team_id(name),
+      org_workspaces:org_workspace_id(name),
+      trainings:training_id(title),
+      training_drills:drill_id(name)
     `)
     .order('started_at', { ascending: false });
 
@@ -159,6 +192,39 @@ export async function getSessions(workspaceId?: string | null): Promise<SessionW
   // Otherwise, get ALL sessions (personal + org)
 
   const { data, error } = await query;
+
+  if (error) throw error;
+  return (data ?? []).map(mapSession);
+}
+
+/**
+ * Get sessions for a specific training
+ */
+export async function getTrainingSessions(trainingId: string): Promise<SessionWithDetails[]> {
+  const { data, error } = await supabase
+    .from('sessions')
+    .select(`
+      id,
+      org_workspace_id,
+      user_id,
+      team_id,
+      training_id,
+      drill_id,
+      session_mode,
+      status,
+      started_at,
+      ended_at,
+      session_data,
+      created_at,
+      updated_at,
+      profiles:user_id(full_name),
+      teams:team_id(name),
+      org_workspaces:org_workspace_id(name),
+      trainings:training_id(title),
+      training_drills:drill_id(name)
+    `)
+    .eq('training_id', trainingId)
+    .order('started_at', { ascending: false });
 
   if (error) throw error;
   return (data ?? []).map(mapSession);
@@ -182,8 +248,6 @@ export async function updateSession(
     session_data?: Record<string, any>;
   }
 ) {
-  const client = await AuthenticatedClient.getClient();
-
   const updatePayload: Record<string, any> = {
     updated_at: new Date().toISOString(),
   };
@@ -200,7 +264,7 @@ export async function updateSession(
     updatePayload.session_data = updates.session_data;
   }
   
-  const { data, error } = await client
+  const { data, error } = await supabase
     .from('sessions')
     .update(updatePayload)
     .eq('id', sessionId)
@@ -215,9 +279,7 @@ export async function updateSession(
  * Delete (cancel) a session
  */
 export async function deleteSession(sessionId: string): Promise<boolean> {
-  const client = await AuthenticatedClient.getClient();
-  
-  const { error } = await client
+  const { error } = await supabase
     .from('sessions')
     .delete()
     .eq('id', sessionId);

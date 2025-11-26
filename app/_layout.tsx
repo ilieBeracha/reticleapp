@@ -10,9 +10,21 @@ import { Slot } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { LogBox, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import '../global.css';
+
+// Suppress non-critical warnings on Android
+// SF Symbols warning: Tab icons fall back to default on Android - proper icons should be added later
+// ExpoUI warning: Swift UI components are iOS-only, fallback components are used on Android
+if (Platform.OS === 'android') {
+  LogBox.ignoreLogs([
+    'SF Symbols are not supported on Android',
+    'Unable to get the view config for',
+    'SafeAreaView has been deprecated',
+  ]);
+}
 
 Sentry.init({
   dsn: 'https://6b988aab11e9428cfd2db3c3cc4521aa@o4510334793744384.ingest.de.sentry.io/4510370355675216',

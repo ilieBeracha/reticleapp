@@ -1,8 +1,8 @@
+import { LoadingScreen } from "@/components/LoadingScreen";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/ui/useColors";
 import { Stack, useRouter } from "expo-router";
 import { useEffect } from "react";
-import { ActivityIndicator } from "react-native";
 
 export default function AuthRoutesLayout() {
   const { user, loading } = useAuth();
@@ -10,16 +10,23 @@ export default function AuthRoutesLayout() {
   const colors = useColors();
 
   useEffect(() => {
-    if (user && user.id) {
+    if (user?.id) {
       router.replace('/(protected)/workspace');
     }
-  }, [user]);
+  }, [user, router]);
 
   if (loading) {
-    return <ActivityIndicator size="large" color={colors.text} />;
+    return <LoadingScreen />;
   }
+
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack 
+      screenOptions={{ 
+        headerShown: false,
+        contentStyle: { backgroundColor: colors.background },
+        animation: 'fade',
+      }}
+    >
       <Stack.Screen name="sign-in" />
     </Stack>
   );

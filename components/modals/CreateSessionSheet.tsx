@@ -1,10 +1,13 @@
 import { useColors } from "@/hooks/ui/useColors";
 import { useAppContext } from "@/hooks/useAppContext";
+import { getTrainingDrills } from "@/services/trainingService";
 import { useSessionStore } from "@/store/sessionStore";
+import { useTrainingStore } from "@/store/trainingStore";
+import type { TrainingDrill, TrainingWithDetails } from "@/types/workspace";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetScrollView, BottomSheetTextInput } from "@gorhom/bottom-sheet";
-import { forwardRef, useState, useCallback } from "react";
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { forwardRef, useState, useCallback, useEffect } from "react";
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { BaseBottomSheet, type BaseBottomSheetRef } from "./BaseBottomSheet";
 
 // Environment configuration
@@ -117,6 +120,85 @@ const EnvironmentField = ({
   );
 };
 
+// Training Selection Card
+const TrainingCard = ({
+  training,
+  isSelected,
+  onPress,
+  colors,
+}: {
+  training: TrainingWithDetails;
+  isSelected: boolean;
+  onPress: () => void;
+  colors: any;
+}) => {
+  const statusColor = training.status === 'ongoing' ? '#7AA493' : colors.primary;
+  
+  return (
+    <TouchableOpacity
+      style={[
+        styles.trainingCard,
+        {
+          backgroundColor: isSelected ? colors.primary + '15' : colors.card,
+          borderColor: isSelected ? colors.primary : colors.border,
+        },
+      ]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={styles.trainingCardHeader}>
+        <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+        <Text style={[styles.trainingCardTitle, { color: colors.text }]} numberOfLines={1}>
+          {training.title}
+        </Text>
+        {isSelected && (
+          <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+        )}
+      </View>
+      <Text style={[styles.trainingCardMeta, { color: colors.textMuted }]}>
+        {training.team?.name || 'Unknown Team'} • {training.drill_count || 0} drills
+      </Text>
+    </TouchableOpacity>
+  );
+};
+
+// Drill Selection Card
+const DrillCard = ({
+  drill,
+  isSelected,
+  onPress,
+  colors,
+}: {
+  drill: TrainingDrill;
+  isSelected: boolean;
+  onPress: () => void;
+  colors: any;
+}) => (
+  <TouchableOpacity
+    style={[
+      styles.drillCard,
+      {
+        backgroundColor: isSelected ? colors.primary + '15' : colors.background,
+        borderColor: isSelected ? colors.primary : colors.border,
+      },
+    ]}
+    onPress={onPress}
+    activeOpacity={0.7}
+  >
+    <View style={styles.drillCardContent}>
+      <Text style={[styles.drillCardTitle, { color: colors.text }]} numberOfLines={1}>
+        {drill.name}
+      </Text>
+      <Text style={[styles.drillCardMeta, { color: colors.textMuted }]}>
+        {drill.distance_m}m • {drill.rounds_per_shooter} rounds
+      </Text>
+    </View>
+    {isSelected && (
+      <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
+    )}
+  </TouchableOpacity>
+);
+
 interface CreateSessionSheetProps {
   onSessionCreated?: () => void;
 }
@@ -140,15 +222,48 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
     const colors = useColors();
     const { createSession, loading } = useSessionStore();
     const { activeWorkspaceId, userId } = useAppContext();
+    const { myUpcomingTrainings, loadMyUpcomingTrainings, loadingMyTrainings } = useTrainingStore();
     const isPersonalMode = !activeWorkspaceId;
 
     const [isCreating, setIsCreating] = useState(false);
     const [showEnvironment, setShowEnvironment] = useState(false);
-    const [teamId, setTeamId] = useState("");
-    const [environment, setEnvironment] = useState<EnvironmentState>(
-      INITIAL_ENVIRONMENT_STATE
-    );
+    const [showTrainingLink, setShowTrainingLink] = useState(false);
+    const [environment, setEnvironment] = useState<EnvironmentState>(INITIAL_ENVIRONMENT_STATE);
     const [notes, setNotes] = useState("");
+    
+    // Training/drill selection
+    const [selectedTraining, setSelectedTraining] = useState<TrainingWithDetails | null>(null);
+    const [selectedDrill, setSelectedDrill] = useState<TrainingDrill | null>(null);
+    const [drills, setDrills] = useState<TrainingDrill[]>([]);
+    const [loadingDrills, setLoadingDrills] = useState(false);
+
+    // Load trainings when sheet opens
+    useEffect(() => {
+      loadMyUpcomingTrainings();
+    }, []);
+
+    // Load drills when training is selected
+    useEffect(() => {
+      if (selectedTraining) {
+        loadDrills(selectedTraining.id);
+      } else {
+        setDrills([]);
+        setSelectedDrill(null);
+      }
+    }, [selectedTraining]);
+
+    const loadDrills = async (trainingId: string) => {
+      setLoadingDrills(true);
+      try {
+        const data = await getTrainingDrills(trainingId);
+        setDrills(data);
+      } catch (error) {
+        console.error('Failed to load drills:', error);
+        setDrills([]);
+      } finally {
+        setLoadingDrills(false);
+      }
+    };
 
     const handleEnvironmentChange = useCallback(
       (field: keyof EnvironmentState, value: string) => {
@@ -167,11 +282,32 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
     }, [environment, notes]);
 
     const resetForm = useCallback(() => {
-      setTeamId("");
       setEnvironment(INITIAL_ENVIRONMENT_STATE);
       setNotes("");
       setShowEnvironment(false);
+      setShowTrainingLink(false);
+      setSelectedTraining(null);
+      setSelectedDrill(null);
+      setDrills([]);
     }, []);
+
+    const handleTrainingSelect = useCallback((training: TrainingWithDetails) => {
+      if (selectedTraining?.id === training.id) {
+        setSelectedTraining(null);
+        setSelectedDrill(null);
+      } else {
+        setSelectedTraining(training);
+        setSelectedDrill(null);
+      }
+    }, [selectedTraining]);
+
+    const handleDrillSelect = useCallback((drill: TrainingDrill) => {
+      if (selectedDrill?.id === drill.id) {
+        setSelectedDrill(null);
+      } else {
+        setSelectedDrill(drill);
+      }
+    }, [selectedDrill]);
 
     const handleCreateSession = async () => {
       if (!userId) {
@@ -191,11 +327,12 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
         }
 
         await createSession({
-          org_workspace_id: activeWorkspaceId,
-          team_id: teamId || undefined,
-          session_mode: teamId ? "group" : "solo",
-          session_data:
-            Object.keys(sessionData).length > 0 ? sessionData : undefined,
+          org_workspace_id: selectedTraining?.org_workspace_id || activeWorkspaceId,
+          team_id: selectedTraining?.team_id || undefined,
+          training_id: selectedTraining?.id || undefined,
+          drill_id: selectedDrill?.id || undefined,
+          session_mode: selectedTraining ? "group" : "solo",
+          session_data: Object.keys(sessionData).length > 0 ? sessionData : undefined,
         });
 
         Alert.alert("Success", "Session started successfully!");
@@ -208,6 +345,11 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
         setIsCreating(false);
       }
     };
+
+    // Filter trainings to only show ongoing/planned
+    const availableTrainings = myUpcomingTrainings.filter(
+      t => t.status === 'ongoing' || t.status === 'planned'
+    );
 
     return (
       <BaseBottomSheet
@@ -226,36 +368,110 @@ export const CreateSessionSheet = forwardRef<BaseBottomSheetRef, CreateSessionSh
               Start Session
             </Text>
             <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-              {isPersonalMode ? "Personal training" : "Team training"}
+              {selectedTraining ? `Training: ${selectedTraining.title}` : (isPersonalMode ? "Personal training" : "Team training")}
             </Text>
           </View>
 
           {/* Main Content */}
           <View style={styles.form}>
-            {/* Team ID - Only in org mode */}
-            {!isPersonalMode && (
-              <View style={styles.field}>
-                <Text style={[styles.label, { color: colors.text }]}>
-                  Team (optional)
-                </Text>
-                <View
+            
+            {/* Training Link Section - Show if user has trainings */}
+            {availableTrainings.length > 0 && (
+              <>
+                <TouchableOpacity
                   style={[
-                    styles.inputWrapper,
-                    {
-                      backgroundColor: colors.card,
-                      borderColor: colors.border,
+                    styles.collapsibleHeader,
+                    { 
+                      backgroundColor: selectedTraining ? colors.primary + '15' : colors.card,
+                      borderColor: selectedTraining ? colors.primary : 'transparent',
+                      borderWidth: selectedTraining ? 1 : 0,
                     },
                   ]}
+                  onPress={() => setShowTrainingLink(!showTrainingLink)}
+                  activeOpacity={0.7}
                 >
-                  <BottomSheetTextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="Leave empty for solo session"
-                    placeholderTextColor={colors.textMuted}
-                    value={teamId}
-                    onChangeText={setTeamId}
+                  <View style={styles.collapsibleTitle}>
+                    <Ionicons
+                      name="fitness-outline"
+                      size={20}
+                      color={selectedTraining ? colors.primary : colors.textMuted}
+                    />
+                    <Text style={[styles.collapsibleText, { color: colors.text }]}>
+                      {selectedTraining ? selectedTraining.title : "Link to Training"}
+                    </Text>
+                    {!selectedTraining && (
+                      <Text style={[styles.optional, { color: colors.textMuted }]}>
+                        optional
+                      </Text>
+                    )}
+                  </View>
+                  <Ionicons
+                    name={showTrainingLink ? "chevron-up" : "chevron-down"}
+                    size={20}
+                    color={colors.textMuted}
                   />
-                </View>
-              </View>
+                </TouchableOpacity>
+
+                {showTrainingLink && (
+                  <View style={[styles.trainingSection, { backgroundColor: colors.card }]}>
+                    {loadingMyTrainings ? (
+                      <ActivityIndicator color={colors.primary} style={{ padding: 20 }} />
+                    ) : (
+                      <>
+                        <Text style={[styles.trainingSectionLabel, { color: colors.textMuted }]}>
+                          Select a training to log your session
+                        </Text>
+                        
+                        {availableTrainings.map((training) => (
+                          <TrainingCard
+                            key={training.id}
+                            training={training}
+                            isSelected={selectedTraining?.id === training.id}
+                            onPress={() => handleTrainingSelect(training)}
+                            colors={colors}
+                          />
+                        ))}
+
+                        {/* Drill Selection (if training selected) */}
+                        {selectedTraining && drills.length > 0 && (
+                          <View style={styles.drillsSection}>
+                            <Text style={[styles.trainingSectionLabel, { color: colors.textMuted }]}>
+                              Select a specific drill (optional)
+                            </Text>
+                            {loadingDrills ? (
+                              <ActivityIndicator color={colors.primary} />
+                            ) : (
+                              drills.map((drill) => (
+                                <DrillCard
+                                  key={drill.id}
+                                  drill={drill}
+                                  isSelected={selectedDrill?.id === drill.id}
+                                  onPress={() => handleDrillSelect(drill)}
+                                  colors={colors}
+                                />
+                              ))
+                            )}
+                          </View>
+                        )}
+
+                        {selectedTraining && (
+                          <TouchableOpacity
+                            style={styles.clearButton}
+                            onPress={() => {
+                              setSelectedTraining(null);
+                              setSelectedDrill(null);
+                            }}
+                          >
+                            <Text style={[styles.clearButtonText, { color: colors.red }]}>
+                              Clear Selection
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </>
+                    )}
+                  </View>
+                )}
+              </>
             )}
 
             {/* Environment Section - Collapsible */}
@@ -425,12 +641,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
   },
-  input: {
-    height: 48,
-    paddingHorizontal: 16,
-    fontSize: 15,
-    fontWeight: "500",
-  },
   textArea: {
     minHeight: 72,
     paddingHorizontal: 16,
@@ -490,6 +700,72 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
     letterSpacing: 0.1,
+  },
+  // Training section styles
+  trainingSection: {
+    borderRadius: 14,
+    padding: 16,
+    gap: 12,
+    marginTop: -2,
+  },
+  trainingSectionLabel: {
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  trainingCard: {
+    borderRadius: 12,
+    borderWidth: 1.5,
+    padding: 14,
+  },
+  trainingCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  trainingCardTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    flex: 1,
+  },
+  trainingCardMeta: {
+    fontSize: 12,
+    marginTop: 6,
+    marginLeft: 16,
+  },
+  drillsSection: {
+    marginTop: 8,
+    gap: 8,
+  },
+  drillCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 12,
+  },
+  drillCardContent: {
+    flex: 1,
+  },
+  drillCardTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  drillCardMeta: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  clearButton: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  clearButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   footer: {
     paddingTop: 16,

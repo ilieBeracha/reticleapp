@@ -115,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Updates user.user_metadata.active_workspace_id (SINGLE SOURCE OF TRUTH)
    */
   const switchWorkspace = async (workspaceId: string | null) => {
-    console.log("switchWorkspace", workspaceId)
+    if (__DEV__) console.log("switchWorkspace", workspaceId)
     
     try {
       // Update user metadata (SINGLE SOURCE OF TRUTH)
@@ -141,9 +141,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Switch to personal mode
    */
   const switchToPersonal = async () => {
-    console.log("switchToPersonal")
+    if (__DEV__) console.log("switchToPersonal")
     await switchWorkspace(null)
-    console.log("switchToPersonal done")
+    if (__DEV__) console.log("switchToPersonal done")
   }
 
   /**
@@ -153,7 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     event: string,
     session: Session | null
   ) => {
-    console.log("Auth event:", event)
+    if (__DEV__) console.log("Auth event:", event)
 
     setSession(session)
     setUser(session?.user ?? null)
@@ -207,58 +207,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // Initialize AuthenticatedClient ONCE when component mounts
+  // The context provider function reads from refs/stores at call time,
+  // so it always gets fresh values without needing re-initialization
   useEffect(() => {
     AuthenticatedClient.initialize(
-      // Token provider
+      // Token provider - always gets fresh session
       async () => {
         const { data: { session } } = await supabase.auth.getSession()
         return session?.access_token ?? ""
       },
-      // Context provider - gets LATEST user from closure
+      // Context provider - reads fresh values each time it's called
       () => {
-        // This function is called fresh each time getContext() is called
-        // So it always has the latest user state
-        if (!user) return null
+        // Get current user from Supabase (not from closure to avoid stale values)
+        // Note: This is synchronous, so we rely on the user state being updated first
+        const currentUser = user
+        if (!currentUser) return null
         
         const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
-        
-        // ✅ In new model: user.id is MY workspace
-        // activeWorkspaceId is the workspace I'm currently viewing (mine or someone else's)
-        const isMyWorkspace = activeWorkspaceId === user.id || !activeWorkspaceId
+        const isMyWorkspace = activeWorkspaceId === currentUser.id || !activeWorkspaceId
         
         return {
-          userId: user.id,
-          workspaceId: isMyWorkspace ? null : activeWorkspaceId  // null = my workspace, else = viewing someone else's
+          userId: currentUser.id,
+          workspaceId: isMyWorkspace ? null : activeWorkspaceId
         }
       }
     )
-  }, []) // Only initialize ONCE
-
-  // Update context when user changes (for workspace switches)
-  useEffect(() => {
-    if (user) {
-      // Re-initialize with fresh context provider
-      AuthenticatedClient.initialize(
-        async () => {
-          const { data: { session } } = await supabase.auth.getSession()
-          return session?.access_token ?? ""
-        },
-        () => {
-          if (!user) return null
-          
-          const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
-          
-          // ✅ In new model: user.id is MY workspace
-          const isMyWorkspace = activeWorkspaceId === user.id || !activeWorkspaceId
-        
-          return {
-            userId: user.id,
-            workspaceId: isMyWorkspace ? null : activeWorkspaceId
-          }
-        }
-      )
-    }
-  }, [user?.id, useWorkspaceStore.getState().activeWorkspaceId]) // When user or active workspace changes
+  }, [user]) // Re-initialize when user changes
 
   const signUp = async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email, password })

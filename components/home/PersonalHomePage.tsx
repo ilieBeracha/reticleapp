@@ -12,24 +12,40 @@ import { useSessionStats } from '@/hooks/useSessionStats';
 import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/hooks/useWorkspaceData';
 import { useSessionStore } from '@/store/sessionStore';
+import { useTrainingStore } from '@/store/trainingStore';
+import type { TrainingWithDetails } from '@/types/workspace';
+import { Ionicons } from '@expo/vector-icons';
+import { format, isToday, isTomorrow } from 'date-fns';
 import React, { useCallback, useEffect, useMemo } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 /**
  * Personal mode home page - displays personal training stats, quick actions, and recent sessions.
- * Extracted from workspace/index.tsx for better code organization.
+ * Now with REAL DATA from trainings and sessions.
  */
 export const PersonalHomePage = React.memo(function PersonalHomePage() {
   const colors = useColors();
   const { fullName } = useAppContext();
   const permissions = useWorkspacePermissions();
-  const { chartDetailsSheetRef, setOnSessionCreated, setOnTeamCreated } = useModals();
+  const { chartDetailsSheetRef, setOnSessionCreated, setOnTeamCreated, trainingDetailSheetRef } = useModals();
   const { sessions, sessionsLoading, sessionsError, loadTeams, refreshSessions } = useWorkspaceData();
   const { loadSessions } = useSessionStore();
+  
+  // Training data
+  const { 
+    myUpcomingTrainings, 
+    myStats, 
+    loadingMyTrainings,
+    loadMyUpcomingTrainings,
+    loadMyStats,
+  } = useTrainingStore();
 
-  // Load sessions on mount
+  // Load data on mount - empty deps is intentional (one-time load)
   useEffect(() => {
     loadSessions();
+    loadMyUpcomingTrainings();
+    loadMyStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Computed stats
@@ -42,7 +58,7 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
       setOnSessionCreated(null);
       setOnTeamCreated(null);
     };
-  }, [loadSessions, loadTeams, setOnSessionCreated, setOnTeamCreated])
+  }, [loadSessions, loadTeams, setOnSessionCreated, setOnTeamCreated]);
 
   // Actions
   const { onStartSession, onCreateTeam } = useWorkspaceActions();
@@ -64,33 +80,53 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
     chartDetailsSheetRef.current?.open();
   }, [chartDetailsSheetRef]);
 
-  // Pie chart data - memoized to avoid recreation
-  const pieData = useMemo(
-    () => [
-      {
-        value: 40,
-        color: '#6B8FA3',
-        gradientCenterColor: '#8BADC1',
-        focused: true,
-      },
-      {
-        value: 30,
-        color: '#FF8A5C',
-        gradientCenterColor: '#FFA880',
-      },
-      {
-        value: 20,
-        color: '#7AA493',
+  const handleTrainingPress = useCallback((training: TrainingWithDetails) => {
+    trainingDetailSheetRef.current?.open(training.id);
+  }, [trainingDetailSheetRef]);
+
+  // REAL pie chart data based on session status
+  const pieData = useMemo(() => {
+    const completed = stats.completedSessions;
+    const active = stats.activeSessions;
+    const total = stats.totalSessions;
+    const cancelled = total - completed - active;
+
+    // If no data, show placeholder
+    if (total === 0) {
+      return [
+        { value: 1, color: colors.border, gradientCenterColor: colors.border },
+      ];
+    }
+
+    const data = [];
+    
+    if (completed > 0) {
+      data.push({
+        value: completed,
+        color: '#7AA493', // Green for completed
         gradientCenterColor: '#98C2B1',
-      },
-      {
-        value: 10,
-        color: '#8A8A8A',
-        gradientCenterColor: '#A8A8A8',
-      },
-    ],
-    []
-  );
+        focused: true,
+      });
+    }
+    
+    if (active > 0) {
+      data.push({
+        value: active,
+        color: '#6B8FA3', // Blue for active
+        gradientCenterColor: '#8BADC1',
+      });
+    }
+    
+    if (cancelled > 0) {
+      data.push({
+        value: cancelled,
+        color: '#FF8A5C', // Orange for cancelled
+        gradientCenterColor: '#FFA880',
+      });
+    }
+
+    return data.length > 0 ? data : [{ value: 1, color: colors.border, gradientCenterColor: colors.border }];
+  }, [stats, colors.border]);
 
   const quickActions = useMemo(() => {
     const actions = [
@@ -121,16 +157,37 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
     return actions;
   }, [handleStartSession, handleViewProgress, handleCreateTeam, permissions.canManageTeams]);
 
-  // Memoize stats for welcome card
-  const welcomeStats = useMemo(
-    () => ({
+  // REAL stats for welcome card
+  const welcomeStats = useMemo(() => {
+    // Calculate total training time from sessions
+    const totalMinutes = sessions.reduce((acc, session) => {
+      if (session.started_at && session.ended_at) {
+        const start = new Date(session.started_at);
+        const end = new Date(session.ended_at);
+        return acc + (end.getTime() - start.getTime()) / (1000 * 60);
+      }
+      return acc;
+    }, 0);
+
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = Math.round(totalMinutes % 60);
+    const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+
+    return {
       totalSessions: stats.totalSessions,
-      totalAbg: 0,
+      totalAbg: myStats.upcoming, // Upcoming trainings count
       totalCompletedSessions: stats.completedSessions,
-      totalTime: '0h',
-    }),
-    [stats.totalSessions, stats.completedSessions]
-  );
+      totalTime: timeStr,
+    };
+  }, [stats, myStats, sessions]);
+
+  // Format training date
+  const formatTrainingDate = useCallback((dateStr: string) => {
+    const date = new Date(dateStr);
+    if (isToday(date)) return `Today, ${format(date, 'HH:mm')}`;
+    if (isTomorrow(date)) return `Tomorrow, ${format(date, 'HH:mm')}`;
+    return format(date, 'MMM d, HH:mm');
+  }, []);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -138,21 +195,67 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.content}
         removeClippedSubviews={true}
       >
         {/* User Welcome Card */}
-        <WelcomeCard fullName={fullName || ''} stats={welcomeStats} loading={sessionsLoading} />
+        <View style={styles.welcomeSection}>
+          <WelcomeCard fullName={fullName || ''} stats={welcomeStats} loading={sessionsLoading} />
+        </View>
 
         {/* Training Distribution Chart */}
-        <TrainingChart data={pieData} onDoubleTap={handleChartDoubleTap} centerValue={sessions.length}/>
+        <View style={styles.chartSection}>
+          <TrainingChart data={pieData} onDoubleTap={handleChartDoubleTap} centerValue={sessions.length} />
+        </View>
+
+        {/* Upcoming Trainings Section */}
+        {myUpcomingTrainings.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Upcoming Trainings</Text>
+            <View style={styles.trainingsList}>
+              {myUpcomingTrainings.slice(0, 3).map((training) => (
+                <Pressable
+                  key={training.id}
+                  style={[styles.trainingCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  onPress={() => handleTrainingPress(training)}
+                >
+                  <View style={styles.trainingHeader}>
+                    <View style={[styles.statusDot, { 
+                      backgroundColor: training.status === 'ongoing' ? '#7AA493' : colors.primary 
+                    }]} />
+                    <Text style={[styles.trainingTitle, { color: colors.text }]} numberOfLines={1}>
+                      {training.title}
+                    </Text>
+                  </View>
+                  <View style={styles.trainingMeta}>
+                    <View style={styles.trainingMetaItem}>
+                      <Ionicons name="time-outline" size={14} color={colors.textMuted} />
+                      <Text style={[styles.trainingMetaText, { color: colors.textMuted }]}>
+                        {formatTrainingDate(training.scheduled_at)}
+                      </Text>
+                    </View>
+                    <View style={styles.trainingMetaItem}>
+                      <Ionicons name="people-outline" size={14} color={colors.textMuted} />
+                      <Text style={[styles.trainingMetaText, { color: colors.textMuted }]}>
+                        {training.team?.name || 'Unknown Team'}
+                      </Text>
+                    </View>
+                  </View>
+                  {(training.drill_count ?? 0) > 0 && (
+                    <View style={[styles.drillBadge, { backgroundColor: colors.primary + '20' }]}>
+                      <Text style={[styles.drillBadgeText, { color: colors.primary }]}>
+                        {training.drill_count} drill{(training.drill_count ?? 0) !== 1 ? 's' : ''}
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Quick Actions */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Quick Actions</Text>
-          </View>
-
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Quick Actions</Text>
           <GroupedList
             data={quickActions}
             renderItem={(action, isFirst, isLast) => (
@@ -172,10 +275,7 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
 
         {/* Recent Activity */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Activity</Text>
-          </View>
-
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Activity</Text>
           {sessionsLoading ? (
             <View style={styles.loadingState}>
               <ActivityIndicator color={colors.primary} />
@@ -191,13 +291,16 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
               size="small"
             />
           ) : (
-            <View>
+            <View style={styles.sessionsList}>
               {sessions.map((session) => (
                 <SessionCard key={session.id} session={session} />
               ))}
             </View>
           )}
         </View>
+
+        {/* Bottom Spacing */}
+        <View style={{ height: 100 }} />
       </ScrollView>
     </View>
   );
@@ -210,27 +313,79 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  content: {
-    paddingHorizontal: 15,
-    paddingTop: 12,
-    paddingBottom: 32,
+  welcomeSection: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  chartSection: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
   },
   section: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    paddingBottom: 8,
+    paddingHorizontal: 20,
+    paddingTop: 24,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    marginBottom: 12,
+    marginBottom: 16,
     letterSpacing: -0.3,
+  },
+  sessionsList: {
+    gap: 12,
+  },
+  trainingsList: {
+    gap: 12,
+  },
+  trainingCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 16,
+  },
+  trainingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  trainingTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
+  },
+  trainingMeta: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 8,
+  },
+  trainingMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  trainingMetaText: {
+    fontSize: 13,
+  },
+  drillBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  drillBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   loadingState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 24,
+    paddingVertical: 32,
   },
   loadingText: {
     marginTop: 12,

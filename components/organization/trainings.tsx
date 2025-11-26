@@ -1,11 +1,16 @@
+import { useModals } from '@/contexts/ModalContext';
 import { useOrgRole } from '@/contexts/OrgRoleContext';
 import { useColors } from '@/hooks/ui/useColors';
+import { useAppContext } from '@/hooks/useAppContext';
+import { getOrgTrainings } from '@/services/trainingService';
+import type { TrainingStatus, TrainingWithDetails } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
+  ActivityIndicator,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,61 +18,111 @@ import {
   View
 } from 'react-native';
 
-type SessionType = 'upcoming' | 'completed' | 'missed';
+type FilterType = 'upcoming' | 'ongoing' | 'completed';
 
-interface TrainingSession {
-  id: string;
-  title: string;
-  date: string;
-  time: string;
-  type: 'range' | 'tactical' | 'qualification' | 'drill';
-  status: SessionType;
-  location?: string;
+// Map filter to status
+const FILTER_TO_STATUS: Record<FilterType, TrainingStatus[]> = {
+  upcoming: ['planned'],
+  ongoing: ['ongoing'],
+  completed: ['finished', 'cancelled'],
+};
+
+// Get icon for training type based on drills
+function getTrainingIcon(training: TrainingWithDetails): keyof typeof Ionicons.glyphMap {
+  if (training.drill_count === 0) return 'calendar';
+  // Could be extended based on drill types
+  return 'fitness';
 }
 
-// Memoized session card component
-const SessionCard = React.memo(function SessionCard({
-  session,
+// Get color scheme for training status
+function getStatusColor(status: TrainingStatus) {
+  const colors = {
+    planned: { color: '#3B82F6', bg: '#3B82F615' },     // Blue
+    ongoing: { color: '#22C55E', bg: '#22C55E15' },     // Green
+    finished: { color: '#6B7280', bg: '#6B728015' },    // Gray
+    cancelled: { color: '#EF4444', bg: '#EF444415' },   // Red
+  };
+  return colors[status] || colors.planned;
+}
+
+// Format date for display
+function formatTrainingDate(dateString: string): string {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function formatTrainingTime(dateString: string): string {
+  const date = new Date(dateString);
+  return date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+// Memoized training card component
+const TrainingCard = React.memo(function TrainingCard({
+  training,
   onPress,
   colors,
 }: {
-  session: TrainingSession;
-  onPress: (session: TrainingSession) => void;
+  training: TrainingWithDetails;
+  onPress: (training: TrainingWithDetails) => void;
   colors: ReturnType<typeof useColors>;
 }) {
+  const statusColor = getStatusColor(training.status);
+  
   return (
     <TouchableOpacity
-      style={[styles.sessionCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-      onPress={() => onPress(session)}
+      style={[styles.trainingCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+      onPress={() => onPress(training)}
       activeOpacity={0.7}
     >
-      <View style={[styles.sessionIcon, { backgroundColor: getTypeColor(session.type).bg }]}>
-        <Ionicons name={getTypeIcon(session.type)} size={24} color={getTypeColor(session.type).color} />
+      <View style={[styles.trainingIcon, { backgroundColor: statusColor.bg }]}>
+        <Ionicons name={getTrainingIcon(training)} size={24} color={statusColor.color} />
       </View>
 
-      <View style={styles.sessionInfo}>
-        <Text style={[styles.sessionTitle, { color: colors.text }]}>{session.title}</Text>
-        <View style={styles.sessionMeta}>
-          <View style={styles.sessionMetaItem}>
+      <View style={styles.trainingInfo}>
+        <Text style={[styles.trainingTitle, { color: colors.text }]} numberOfLines={1}>
+          {training.title}
+        </Text>
+        <View style={styles.trainingMeta}>
+          <View style={styles.trainingMetaItem}>
             <Ionicons name="calendar-outline" size={12} color={colors.textMuted} />
-            <Text style={[styles.sessionMetaText, { color: colors.textMuted }]}>{session.date}</Text>
+            <Text style={[styles.trainingMetaText, { color: colors.textMuted }]}>
+              {formatTrainingDate(training.scheduled_at)}
+            </Text>
           </View>
-          <View style={styles.sessionMetaItem}>
+          <View style={styles.trainingMetaItem}>
             <Ionicons name="time-outline" size={12} color={colors.textMuted} />
-            <Text style={[styles.sessionMetaText, { color: colors.textMuted }]}>{session.time}</Text>
+            <Text style={[styles.trainingMetaText, { color: colors.textMuted }]}>
+              {formatTrainingTime(training.scheduled_at)}
+            </Text>
           </View>
-          {session.location && (
-            <View style={styles.sessionMetaItem}>
-              <Ionicons name="location-outline" size={12} color={colors.textMuted} />
-              <Text style={[styles.sessionMetaText, { color: colors.textMuted }]}>{session.location}</Text>
+          {training.team && (
+            <View style={styles.trainingMetaItem}>
+              <Ionicons name="people-outline" size={12} color={colors.textMuted} />
+              <Text style={[styles.trainingMetaText, { color: colors.textMuted }]}>
+                {training.team.name}
+              </Text>
             </View>
           )}
         </View>
+        {Boolean(training.drill_count) && (
+          <View style={styles.drillsInfo}>
+            <Text style={[styles.drillsText, { color: colors.textMuted }]}>
+              {training.drill_count} drill{training.drill_count !== 1 ? 's' : ''}
+            </Text>
+          </View>
+        )}
       </View>
 
-      <View style={[styles.sessionTypeBadge, { backgroundColor: getTypeColor(session.type).bg }]}>
-        <Text style={[styles.sessionTypeText, { color: getTypeColor(session.type).color }]}>
-          {session.type}
+      <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
+        <Text style={[styles.statusText, { color: statusColor.color }]}>
+          {training.status}
         </Text>
       </View>
     </TouchableOpacity>
@@ -75,60 +130,142 @@ const SessionCard = React.memo(function SessionCard({
 });
 
 /**
- * TRAINING SESSIONS VIEW
- * For Squad Commanders and Soldiers - shooting-focused operational view
+ * TRAININGS PAGE
+ * Organization training management - view, create, and manage trainings
  */
 const TrainingsPage = React.memo(function TrainingsPage() {
   const colors = useColors();
-  const { teamInfo, teamRole } = useOrgRole();
-  const [filter, setFilter] = useState<SessionType>('upcoming');
+  const { activeWorkspaceId } = useAppContext();
+  const { teamInfo, orgRole } = useOrgRole();
+  const { 
+    createTrainingSheetRef, 
+    trainingDetailSheetRef,
+    setOnTrainingCreated,
+    setOnTrainingUpdated,
+  } = useModals();
+  
+  const [filter, setFilter] = useState<FilterType>('upcoming');
+  const [trainings, setTrainings] = useState<TrainingWithDetails[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // TODO: Fetch real training sessions
-  const sessions: TrainingSession[] = useMemo(() => [
-    {
-      id: '1',
-      title: 'Live Fire Qualification',
-      date: 'Nov 25, 2025',
-      time: '08:00 AM',
-      type: 'qualification',
-      status: 'upcoming',
-      location: 'Range A',
-    },
-    {
-      id: '2',
-      title: 'CQB Tactics Training',
-      date: 'Nov 26, 2025',
-      time: '10:00 AM',
-      type: 'tactical',
-      status: 'upcoming',
-      location: 'Training Facility',
-    },
-  ], []);
+  // Can user create trainings? (owner, admin, instructor, or team commander)
+  const canCreateTraining = useMemo(() => {
+    // Workspace roles that can create
+    if (['owner', 'admin', 'instructor'].includes(orgRole || '')) {
+      return true;
+    }
+    // Team commanders can also create trainings
+    if (teamInfo?.teamRole === 'commander') {
+      return true;
+    }
+    return false;
+  }, [orgRole, teamInfo?.teamRole]);
 
-  const filteredSessions = sessions.filter(s => s.status === filter);
+  // Fetch trainings
+  const fetchTrainings = useCallback(async (showRefresh = false) => {
+    if (!activeWorkspaceId) return;
+    
+    if (showRefresh) setRefreshing(true);
+    else setLoading(true);
+    
+    try {
+      const data = await getOrgTrainings(activeWorkspaceId);
+      setTrainings(data);
+    } catch (error) {
+      console.error('Failed to fetch trainings:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [activeWorkspaceId]);
 
-  const handleSessionPress = useCallback((session: TrainingSession) => {
+  useEffect(() => {
+    fetchTrainings();
+  }, [fetchTrainings]);
+
+  // Register callbacks for modal context
+  useEffect(() => {
+    setOnTrainingCreated(() => fetchTrainings);
+    setOnTrainingUpdated(() => fetchTrainings);
+    
+    return () => {
+      setOnTrainingCreated(null);
+      setOnTrainingUpdated(null);
+    };
+  }, [fetchTrainings, setOnTrainingCreated, setOnTrainingUpdated]);
+
+  // Filter trainings based on selected filter
+  const filteredTrainings = useMemo(() => {
+    const statuses = FILTER_TO_STATUS[filter];
+    
+    return trainings.filter(t => {
+      const matchesStatus = statuses.includes(t.status);
+      return matchesStatus;
+    }).sort((a, b) => {
+      // Sort by scheduled_at
+      const dateA = new Date(a.scheduled_at);
+      const dateB = new Date(b.scheduled_at);
+      
+      // Upcoming: ascending (soonest first)
+      // Completed: descending (most recent first)
+      return filter === 'completed' 
+        ? dateB.getTime() - dateA.getTime()
+        : dateA.getTime() - dateB.getTime();
+    });
+  }, [trainings, filter]);
+
+  const handleTrainingPress = useCallback((training: TrainingWithDetails) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert(session.title, `${session.date} at ${session.time}\n${session.location || ''}`);
-  }, []);
+    trainingDetailSheetRef.current?.open(training.id);
+  }, [trainingDetailSheetRef]);
+
+  const handleCreateTraining = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    createTrainingSheetRef.current?.open();
+  }, [createTrainingSheetRef]);
+
+  const handleRefresh = useCallback(() => {
+    fetchTrainings(true);
+  }, [fetchTrainings]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header & Tabs - Fixed at top */}
+      {/* Header & Tabs */}
       <View style={[styles.headerContainer, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <View style={styles.headerTop}>
-          <View>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Training Sessions</Text>
+          <View style={styles.headerTitleContainer}>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Trainings</Text>
             <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
               {teamInfo?.teamName || 'Organization'}
             </Text>
           </View>
+          
+          {canCreateTraining && (
+            <TouchableOpacity
+              style={[styles.createButton, { backgroundColor: colors.primary }]}
+              onPress={handleCreateTraining}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add" size={20} color="#fff" />
+              <Text style={styles.createButtonText}>New</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Filter Tabs */}
         <View style={[styles.tabsContainer, { backgroundColor: colors.secondary }]}>
           <TouchableOpacity
-            style={[styles.tab, filter === 'upcoming' && { backgroundColor: colors.card, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 2, shadowOffset: {width: 0, height: 1} }]}
+            style={[
+              styles.tab, 
+              filter === 'upcoming' && { 
+                backgroundColor: colors.card, 
+                shadowColor: '#000', 
+                shadowOpacity: 0.05, 
+                shadowRadius: 2, 
+                shadowOffset: { width: 0, height: 1 } 
+              }
+            ]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               setFilter('upcoming');
@@ -136,7 +273,7 @@ const TrainingsPage = React.memo(function TrainingsPage() {
             activeOpacity={0.9}
           >
             <Ionicons 
-              name="time" 
+              name="calendar" 
               size={16} 
               color={filter === 'upcoming' ? colors.text : colors.textMuted} 
             />
@@ -146,7 +283,43 @@ const TrainingsPage = React.memo(function TrainingsPage() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.tab, filter === 'completed' && { backgroundColor: colors.card, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 2, shadowOffset: {width: 0, height: 1} }]}
+            style={[
+              styles.tab, 
+              filter === 'ongoing' && { 
+                backgroundColor: colors.card, 
+                shadowColor: '#000', 
+                shadowOpacity: 0.05, 
+                shadowRadius: 2, 
+                shadowOffset: { width: 0, height: 1 } 
+              }
+            ]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setFilter('ongoing');
+            }}
+            activeOpacity={0.9}
+          >
+            <Ionicons 
+              name="play-circle" 
+              size={16} 
+              color={filter === 'ongoing' ? colors.text : colors.textMuted} 
+            />
+            <Text style={[styles.tabText, { color: filter === 'ongoing' ? colors.text : colors.textMuted }]}>
+              Ongoing
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.tab, 
+              filter === 'completed' && { 
+                backgroundColor: colors.card, 
+                shadowColor: '#000', 
+                shadowOpacity: 0.05, 
+                shadowRadius: 2, 
+                shadowOffset: { width: 0, height: 1 } 
+              }
+            ]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               setFilter('completed');
@@ -162,83 +335,74 @@ const TrainingsPage = React.memo(function TrainingsPage() {
               Completed
             </Text>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.tab, filter === 'missed' && { backgroundColor: colors.card, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 2, shadowOffset: {width: 0, height: 1} }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setFilter('missed');
-            }}
-            activeOpacity={0.9}
-          >
-            <Ionicons 
-              name="close-circle" 
-              size={16} 
-              color={filter === 'missed' ? colors.text : colors.textMuted} 
-            />
-            <Text style={[styles.tabText, { color: filter === 'missed' ? colors.text : colors.textMuted }]}>
-              Missed
-            </Text>
-          </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        removeClippedSubviews={true}
-      >
-
-      {/* Sessions List */}
-      {filteredSessions.length === 0 ? (
-        <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
-          <Ionicons name="calendar-outline" size={48} color={colors.textMuted} style={styles.emptyIcon} />
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>No {filter} sessions</Text>
-          <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-            {filter === 'upcoming' && 'No training sessions scheduled'}
-            {filter === 'completed' && 'Complete your first training session'}
-            {filter === 'missed' && 'Great job! No missed sessions'}
-          </Text>
+      {/* Content */}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
-        <View style={styles.sessionsList}>
-          {filteredSessions.map((session) => (
-            <SessionCard
-              key={session.id}
-              session={session}
-              onPress={handleSessionPress}
-              colors={colors}
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
             />
-          ))}
-        </View>
+          }
+        >
+          {filteredTrainings.length === 0 ? (
+            <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
+              <Ionicons 
+                name={filter === 'upcoming' ? 'calendar-outline' : filter === 'ongoing' ? 'play-circle-outline' : 'checkmark-circle-outline'} 
+                size={48} 
+                color={colors.textMuted} 
+                style={styles.emptyIcon} 
+              />
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                No {filter} trainings
+              </Text>
+              <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+                {filter === 'upcoming' && 'Schedule a new training to get started'}
+                {filter === 'ongoing' && 'No trainings are currently in progress'}
+                {filter === 'completed' && 'Completed trainings will appear here'}
+              </Text>
+              {filter === 'upcoming' && canCreateTraining && (
+                <TouchableOpacity
+                  style={[styles.emptyButton, { backgroundColor: colors.primary }]}
+                  onPress={handleCreateTraining}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="add" size={18} color="#fff" />
+                  <Text style={styles.emptyButtonText}>Schedule Training</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <View style={styles.trainingsList}>
+              {filteredTrainings.map((training) => (
+                <TrainingCard
+                  key={training.id}
+                  training={training}
+                  onPress={handleTrainingPress}
+                  colors={colors}
+                />
+              ))}
+            </View>
+          )}
+        </ScrollView>
       )}
-      </ScrollView>
     </View>
   );
 });
 
 export default TrainingsPage;
-
-function getTypeIcon(type: string) {
-  const icons: Record<string, any> = {
-    range: 'radio-button-on',
-    tactical: 'shield',
-    qualification: 'ribbon',
-    drill: 'fitness',
-  };
-  return icons[type] || 'calendar';
-}
-
-function getTypeColor(type: string) {
-  const colors = {
-    range: { color: '#FF6B35', bg: '#FF6B3515' },
-    tactical: { color: '#5B7A8C', bg: '#5B7A8C15' },
-    qualification: { color: '#FFD60A', bg: '#FFD60A15' },
-    drill: { color: '#34C759', bg: '#34C75915' },
-  };
-  return colors[type as keyof typeof colors] || colors.range;
-}
 
 const styles = StyleSheet.create({
   container: {
@@ -251,7 +415,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
     marginBottom: 16,
+  },
+  headerTitleContainer: {
+    flex: 1,
   },
   headerTitle: {
     fontSize: 28,
@@ -261,6 +431,19 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
     marginTop: 4,
+  },
+  createButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  createButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
   },
   tabsContainer: {
     flexDirection: 'row',
@@ -280,6 +463,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  
+  // Loading
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  
   scrollView: {
     flex: 1,
   },
@@ -289,11 +480,11 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
 
-  // Sessions List
-  sessionsList: {
+  // Training List
+  trainingsList: {
     gap: 12,
   },
-  sessionCard: {
+  trainingCard: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 14,
@@ -312,44 +503,51 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  sessionIcon: {
+  trainingIcon: {
     width: 48,
     height: 48,
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sessionInfo: {
+  trainingInfo: {
     flex: 1,
-    gap: 6,
+    gap: 4,
   },
-  sessionTitle: {
+  trainingTitle: {
     fontSize: 15,
     fontWeight: '600',
   },
-  sessionMeta: {
+  trainingMeta: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  sessionMetaItem: {
+  trainingMetaItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
   },
-  sessionMetaText: {
+  trainingMetaText: {
     fontSize: 12,
     fontWeight: '500',
   },
-  sessionTypeBadge: {
+  drillsInfo: {
+    marginTop: 2,
+  },
+  drillsText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
   },
-  sessionTypeText: {
+  statusText: {
     fontSize: 11,
     fontWeight: '700',
-    textTransform: 'uppercase',
+    textTransform: 'capitalize',
   },
 
   // Empty State
@@ -370,5 +568,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
+  emptyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  emptyButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
 });
-

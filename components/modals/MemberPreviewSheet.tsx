@@ -93,9 +93,16 @@ export const MemberPreviewSheet = forwardRef<BaseDetachedBottomSheetRef, MemberP
               <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Teams</Text>
               <View style={styles.teamsList}>
                 {member.teams.map((team: any, index: number) => (
-                  <View key={index} style={[styles.teamBadge, { backgroundColor: colors.secondary }]}>
+                  <View key={team.team_id || index} style={[styles.teamBadge, { backgroundColor: colors.secondary }]}>
                     <Ionicons name="people" size={14} color={colors.text} style={{ marginRight: 4 }} />
-                    <Text style={[styles.teamText, { color: colors.text }]}>{team.name || team}</Text>
+                    <Text style={[styles.teamText, { color: colors.text }]}>
+                      {team.team_name || 'Unknown Team'}
+                    </Text>
+                    {team.team_role && (
+                      <Text style={[styles.teamRoleText, { color: colors.textMuted }]}>
+                        {' • '}{team.team_role}
+                      </Text>
+                    )}
                   </View>
                 ))}
               </View>
@@ -241,6 +248,10 @@ const styles = StyleSheet.create({
   teamText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  teamRoleText: {
+    fontSize: 12,
+    fontWeight: '400',
   },
   actionsList: {
     gap: 0,

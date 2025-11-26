@@ -50,7 +50,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session?.user) {
-        console.log("📦 Workspace Store: User not authenticated yet, skipping load");
+        if (__DEV__) console.log("📦 Workspace Store: User not authenticated yet, skipping load");
         set({ loading: false, workspaces: [], activeWorkspaceId: null });
         return;
       }
@@ -91,7 +91,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
    * Set which workspace is currently active (viewing)
    */
   setActiveWorkspace: (workspaceId: string | null) => {
-    console.log('🔄 Setting active workspace:', workspaceId);
+    if (__DEV__) console.log('🔄 Setting active workspace:', workspaceId);
     set({ activeWorkspaceId: workspaceId });
   },
 

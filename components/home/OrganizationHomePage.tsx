@@ -97,7 +97,7 @@ export const OrganizationHomePage = React.memo(function OrganizationHomePage() {
   const statCards = useMemo(
     () => [
       { icon: 'activity', title: 'Active Sessions', count: '08 sessions', iconFamily: 'feather' as const },
-      { icon: 'clock-outline', title: 'Scheduled', count: '03 upcoming', iconFamily: 'ionicons' as const },
+      { icon: 'time-outline', title: 'Scheduled', count: '03 upcoming', iconFamily: 'ionicons' as const },
       { icon: 'users', title: 'Team Members', count: '24 active', iconFamily: 'feather' as const },
       { icon: 'trending-up', title: 'Progress', count: '+12% growth', iconFamily: 'feather' as const },
     ],

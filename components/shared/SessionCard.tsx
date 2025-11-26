@@ -1,5 +1,6 @@
 import { useColors } from '@/hooks/ui/useColors';
 import { SessionWithDetails } from '@/services/sessionService';
+import { Ionicons } from '@expo/vector-icons';
 import { memo, useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -9,16 +10,51 @@ function formatDateTime(value?: string | null) {
   }
 
   try {
-    return new Date(value).toLocaleString();
+    const date = new Date(value);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    // Show relative time for recent sessions
+    if (diffMins < 60) {
+      return `${diffMins} min${diffMins !== 1 ? 's' : ''} ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+    } else if (diffDays < 7) {
+      return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+    }
+    
+    return date.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   } catch {
     return value;
   }
 }
 
-function formatLabel(label: string) {
-  return label
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+function formatDuration(startedAt: string, endedAt?: string | null) {
+  if (!endedAt) return null;
+  
+  try {
+    const start = new Date(startedAt);
+    const end = new Date(endedAt);
+    const diffMs = end.getTime() - start.getTime();
+    const mins = Math.floor(diffMs / (1000 * 60));
+    
+    if (mins < 60) {
+      return `${mins}m`;
+    }
+    const hours = Math.floor(mins / 60);
+    const remainingMins = mins % 60;
+    return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`;
+  } catch {
+    return null;
+  }
 }
 
 interface SessionCardProps {
@@ -30,116 +66,120 @@ const SessionCard = memo(({ session }: SessionCardProps) => {
   
   const sessionPayload = session.session_data as Record<string, any> | null;
   const environment = sessionPayload?.environment ?? null;
-  const trainingId = sessionPayload?.training_id ?? null;
-  const drillId = sessionPayload?.drill_id ?? null;
+
+  // Get training info from actual fields (not session_data)
+  const hasTraining = !!session.training_id;
+  const trainingTitle = session.training_title;
+  const drillName = session.drill_name;
 
   // Memoize status colors based on session status
   const statusColor = useMemo(() => {
-    const statusColors: Record<string, { bg: string; text: string }> = {
-      active: { bg: colors.blue + '20', text: colors.blue },
-      completed: { bg: colors.green + '25', text: colors.green },
-      cancelled: { bg: colors.red + '20', text: colors.red },
+    const statusColors: Record<string, { bg: string; text: string; icon: string }> = {
+      active: { bg: colors.blue + '20', text: colors.blue, icon: 'radio-button-on' },
+      completed: { bg: colors.green + '25', text: colors.green, icon: 'checkmark-circle' },
+      cancelled: { bg: colors.red + '20', text: colors.red, icon: 'close-circle' },
     };
-    return statusColors[session.status] ?? { bg: colors.muted + '20', text: colors.mutedForeground };
+    return statusColors[session.status] ?? { bg: colors.muted + '20', text: colors.mutedForeground, icon: 'help-circle' };
   }, [session.status, colors]);
 
-  // Memoize card styles
-  const cardStyle = useMemo(() => [
-    styles.sessionCard,
-    { backgroundColor: colors.card, borderColor: colors.border }
-  ], [colors.card, colors.border]);
-
-  const statusBadgeStyle = useMemo(() => [
-    styles.sessionStatusBadge,
-    { backgroundColor: statusColor.bg }
-  ], [statusColor.bg]);
+  const duration = formatDuration(session.started_at, session.ended_at);
 
   return (
-    <View style={cardStyle}>
+    <View style={[styles.sessionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      {/* Header Row */}
       <View style={styles.sessionHeader}>
-        <View>
-          <Text style={[styles.sessionTitle, { color: colors.text }]}>
-            {session.session_mode === 'group' ? 'Group Session' : 'Solo Session'}
-          </Text>
-          <Text style={[styles.sessionSubtitle, { color: colors.textMuted }]}>
-            {formatDateTime(session.started_at)}
-          </Text>
-        </View>
-
-        <View style={statusBadgeStyle}>
-          <Text style={[styles.sessionStatusText, { color: statusColor.text }]}>
-            {formatLabel(session.status)}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.sessionMetaRow}>
-        <Text style={[styles.sessionMetaLabel, { color: colors.textMuted }]}>
-          Mode
-        </Text>
-        <Text style={[styles.sessionMetaValue, { color: colors.text }]}>
-          {formatLabel(session.session_mode)}
-        </Text>
-      </View>
-
-      {session.ended_at && (
-        <View style={styles.sessionMetaRow}>
-          <Text style={[styles.sessionMetaLabel, { color: colors.textMuted }]}>
-            Ended
-          </Text>
-          <Text style={[styles.sessionMetaValue, { color: colors.text }]}>
-            {formatDateTime(session.ended_at)}
-          </Text>
-        </View>
-      )}
-
-      {session.team_name && (
-        <View style={styles.sessionMetaRow}>
-          <Text style={[styles.sessionMetaLabel, { color: colors.textMuted }]}>
-            Team
-          </Text>
-          <Text style={[styles.sessionMetaValue, { color: colors.text }]}>
-            {session.team_name}
-          </Text>
-        </View>
-      )}
-
-      {trainingId && (
-        <View style={styles.sessionMetaRow}>
-          <Text style={[styles.sessionMetaLabel, { color: colors.textMuted }]}>
-            Training ID
-          </Text>
-          <Text style={[styles.sessionMetaValue, { color: colors.text }]}>
-            {trainingId}
-          </Text>
-        </View>
-      )}
-
-      {drillId && (
-        <View style={styles.sessionMetaRow}>
-          <Text style={[styles.sessionMetaLabel, { color: colors.textMuted }]}>
-            Drill ID
-          </Text>
-          <Text style={[styles.sessionMetaValue, { color: colors.text }]}>
-            {drillId}
-          </Text>
-        </View>
-      )}
-
-      {environment && Object.keys(environment).length > 0 && (
-        <View style={styles.sessionEnvironment}>
-          <Text style={[styles.environmentTitle, { color: colors.text }]}>
-            Environment
-          </Text>
-          {Object.entries(environment).map(([key, value]) => (
-            <Text
-              key={key}
-              style={[styles.environmentItem, { color: colors.textMuted }]}
-            >
-              {formatLabel(key)}: {String(value)}
+        <View style={styles.headerLeft}>
+          <View style={[styles.statusIndicator, { backgroundColor: statusColor.bg }]}>
+            <Ionicons name={statusColor.icon as any} size={14} color={statusColor.text} />
+          </View>
+          <View>
+            <Text style={[styles.sessionTitle, { color: colors.text }]}>
+              {hasTraining ? 'Training Session' : (session.session_mode === 'group' ? 'Group Session' : 'Solo Session')}
             </Text>
-          ))}
+            <Text style={[styles.sessionTime, { color: colors.textMuted }]}>
+              {formatDateTime(session.started_at)}
+            </Text>
+          </View>
         </View>
+        
+        <View style={styles.headerRight}>
+          {duration && (
+            <View style={[styles.durationBadge, { backgroundColor: colors.secondary }]}>
+              <Ionicons name="time-outline" size={12} color={colors.textMuted} />
+              <Text style={[styles.durationText, { color: colors.textMuted }]}>
+                {duration}
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+
+      {/* Training Info - If linked to a training */}
+      {hasTraining && (
+        <View style={[styles.trainingInfo, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
+          <View style={styles.trainingRow}>
+            <Ionicons name="fitness" size={16} color={colors.primary} />
+            <Text style={[styles.trainingTitle, { color: colors.primary }]} numberOfLines={1}>
+              {trainingTitle || 'Unknown Training'}
+            </Text>
+          </View>
+          {drillName && (
+            <Text style={[styles.drillName, { color: colors.textMuted }]}>
+              Drill: {drillName}
+            </Text>
+          )}
+        </View>
+      )}
+
+      {/* Meta Info Row */}
+      <View style={styles.metaRow}>
+        {session.team_name && (
+          <View style={styles.metaItem}>
+            <Ionicons name="people-outline" size={14} color={colors.textMuted} />
+            <Text style={[styles.metaText, { color: colors.textMuted }]}>
+              {session.team_name}
+            </Text>
+          </View>
+        )}
+        
+        {session.workspace_name && session.workspace_name !== 'Personal' && (
+          <View style={styles.metaItem}>
+            <Ionicons name="business-outline" size={14} color={colors.textMuted} />
+            <Text style={[styles.metaText, { color: colors.textMuted }]}>
+              {session.workspace_name}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Environment Info (collapsed by default) */}
+      {environment && Object.keys(environment).filter(k => k !== 'notes').length > 0 && (
+        <View style={[styles.environmentSection, { borderTopColor: colors.border }]}>
+          <View style={styles.environmentHeader}>
+            <Ionicons name="cloud-outline" size={14} color={colors.textMuted} />
+            <Text style={[styles.environmentLabel, { color: colors.textMuted }]}>
+              Environment
+            </Text>
+          </View>
+          <View style={styles.environmentTags}>
+            {Object.entries(environment)
+              .filter(([key]) => key !== 'notes')
+              .map(([key, value]) => (
+                <View key={key} style={[styles.envTag, { backgroundColor: colors.secondary }]}>
+                  <Text style={[styles.envTagText, { color: colors.text }]}>
+                    {String(value)}
+                  </Text>
+                </View>
+              ))}
+          </View>
+        </View>
+      )}
+
+      {/* Notes */}
+      {environment?.notes && (
+        <Text style={[styles.notes, { color: colors.textMuted }]} numberOfLines={2}>
+          {environment.notes}
+        </Text>
       )}
     </View>
   );
@@ -151,67 +191,121 @@ const styles = StyleSheet.create({
   sessionCard: {
     borderRadius: 14,
     padding: 16,
-    marginBottom: 12,
     borderWidth: 1,
   },
   sessionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  headerLeft: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  headerRight: {
+    alignItems: 'flex-end',
+  },
+  statusIndicator: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sessionTitle: {
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: -0.2,
   },
-  sessionSubtitle: {
+  sessionTime: {
+    fontSize: 12,
+    marginTop: 2,
+    letterSpacing: -0.1,
+  },
+  durationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  durationText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  trainingInfo: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  trainingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  trainingTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1,
+  },
+  drillName: {
     fontSize: 12,
     marginTop: 4,
-    letterSpacing: -0.1,
+    marginLeft: 24,
   },
-  sessionStatusBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  sessionStatusText: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: -0.1,
-    textTransform: 'uppercase',
-  },
-  sessionMetaRow: {
+  metaRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
+    flexWrap: 'wrap',
+    gap: 16,
+    marginTop: 12,
   },
-  sessionMetaLabel: {
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  metaText: {
     fontSize: 13,
-    letterSpacing: -0.1,
   },
-  sessionMetaValue: {
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: -0.1,
-  },
-  sessionEnvironment: {
-    marginTop: 14,
+  environmentSection: {
+    marginTop: 12,
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(0, 0, 0, 0.1)',
   },
-  environmentTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: -0.1,
-    marginBottom: 6,
+  environmentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
   },
-  environmentItem: {
+  environmentLabel: {
     fontSize: 12,
+    fontWeight: '600',
+  },
+  environmentTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  envTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  envTagText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  notes: {
+    marginTop: 10,
+    fontSize: 13,
+    fontStyle: 'italic',
     lineHeight: 18,
-    letterSpacing: -0.1,
   },
 });
 
 export default SessionCard;
-
