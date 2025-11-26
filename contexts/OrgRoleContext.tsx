@@ -12,6 +12,10 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState 
  * - Memoized values to prevent unnecessary re-renders
  * - Single async operation for user ID
  * - Derived values computed only when dependencies change
+ * 
+ * NOTE: useOrgRole() now returns a default "personal mode" value when
+ * used outside OrgRoleProvider. This allows global modals to render
+ * without crashing.
  */
 
 interface TeamRoleInfo {
@@ -45,7 +49,32 @@ interface OrgRoleContextValue {
   
   // Loading state
   loading: boolean;
+  
+  // Is this a real org context or default personal mode?
+  isInOrgMode: boolean;
 }
+
+/**
+ * Default value for when useOrgRole is used outside OrgRoleProvider
+ * This represents "personal mode" - no org permissions
+ */
+const DEFAULT_ORG_ROLE_VALUE: OrgRoleContextValue = {
+  orgRole: 'member',
+  isAdmin: false,
+  canManageWorkspace: false,
+  canManageTeams: false,
+  canInviteMembers: false,
+  hasTeam: false,
+  teamRole: null,
+  teamInfo: null,
+  allTeams: [],
+  isCommander: false,
+  isSquadCommander: false,
+  isSoldier: false,
+  currentUserId: null,
+  loading: false,
+  isInOrgMode: false, // Indicates we're NOT in org mode
+};
 
 const OrgRoleContext = createContext<OrgRoleContextValue | undefined>(undefined);
 
@@ -139,6 +168,9 @@ export function OrgRoleProvider({ children }: { children: React.ReactNode }) {
       
       // State
       loading,
+      
+      // We ARE in org mode since we're inside the provider
+      isInOrgMode: true,
     };
   }, [
     permissions.role,
@@ -172,14 +204,29 @@ export function OrgRoleProvider({ children }: { children: React.ReactNode }) {
 
 /**
  * Hook to use org role context
- * Provides all role information in one place
+ * 
+ * IMPORTANT: This hook now returns a default "personal mode" value
+ * when used outside OrgRoleProvider. Check `isInOrgMode` to know
+ * if you're actually in an org context.
  */
-export function useOrgRole() {
+export function useOrgRole(): OrgRoleContextValue {
   const context = useContext(OrgRoleContext);
+  
+  // Return default value when outside provider (personal mode)
   if (context === undefined) {
-    throw new Error('useOrgRole must be used within OrgRoleProvider');
+    return DEFAULT_ORG_ROLE_VALUE;
   }
+  
   return context;
+}
+
+/**
+ * Hook that returns null when outside OrgRoleProvider
+ * Use this when you need to explicitly check if org context exists
+ */
+export function useOrgRoleOptional(): OrgRoleContextValue | null {
+  const context = useContext(OrgRoleContext);
+  return context ?? null;
 }
 
 /**

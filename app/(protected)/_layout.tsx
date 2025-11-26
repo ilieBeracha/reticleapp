@@ -12,12 +12,23 @@ import { TrainingDetailSheet } from '@/components/modals/TrainingDetailSheet';
 import { UserMenuBottomSheet, UserMenuBottomSheetRef } from '@/components/modals/UserMenuBottomSheet';
 import { WorkspaceSwitcherBottomSheet } from '@/components/modals/WorkspaceSwitcherBottomSheet';
 import { useModals } from '@/contexts/ModalContext';
-import { OrgRoleProvider } from '@/contexts/OrgRoleContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { Stack } from 'expo-router';
 import { useRef } from 'react';
 
+/**
+ * Protected Layout
+ * 
+ * This layout wraps all authenticated routes.
+ * 
+ * Route Structure:
+ * - /(protected)/personal/* - Personal mode (no workspace)
+ * - /(protected)/org/[workspaceId]/* - Organization mode (with workspace)
+ * 
+ * NOTE: OrgRoleProvider is now in org/_layout.tsx, NOT here.
+ * This prevents unnecessary org-related code running in personal mode.
+ */
 export default function ProtectedLayout() {
   const userMenuSheetRef = useRef<UserMenuBottomSheetRef>(null);
   const { 
@@ -36,7 +47,7 @@ export default function ProtectedLayout() {
     // Selected items
     selectedTeam, 
     selectedMember,
-    // Callback getters - use these to get current callback value
+    // Callback getters
     getOnWorkspaceSwitched, 
     getOnWorkspaceCreated, 
     getOnInviteAccepted, 
@@ -47,9 +58,9 @@ export default function ProtectedLayout() {
     getOnTrainingUpdated,
   } = useModals();
   const colors = useColors();
+
   return (
     <ThemeProvider>
-      <OrgRoleProvider>
       <Stack
         screenOptions={{
           headerShown: true,
@@ -66,7 +77,17 @@ export default function ProtectedLayout() {
           headerTintColor: colors.text,
         }}
       >
-        <Stack.Screen name="workspace" />
+        {/* Personal Mode Routes */}
+        <Stack.Screen name="personal" options={{ headerShown: true }} />
+        
+        {/* Organization Mode Routes */}
+        <Stack.Screen name="org" options={{ headerShown: true }} />
+        
+        {/* Legacy workspace routes - redirect to new structure */}
+        <Stack.Screen 
+          name="workspace" 
+          options={{ headerShown: true }} 
+        />
         
         {/* Liquid Glass Sheet - iOS 26+ native form sheet */}
         <Stack.Screen
@@ -77,12 +98,14 @@ export default function ProtectedLayout() {
             gestureEnabled: true,
             sheetGrabberVisible: true,
             contentStyle: { backgroundColor: "transparent" },
-            sheetAllowedDetents: [0.25, 0.5, 1], // 25%, 50%, 100%
-            sheetInitialDetentIndex: 0, // Start at smallest (25%)
-            sheetLargestUndimmedDetentIndex: 0, // Background not dimmed at smallest
+            sheetAllowedDetents: [0.25, 0.5, 1],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: 0,
           }}
         />
       </Stack>
+
+      {/* Global Sheets - Available in both modes */}
       <UserMenuBottomSheet
         ref={userMenuSheetRef}
         onSettingsPress={() => {}}
@@ -97,91 +120,64 @@ export default function ProtectedLayout() {
       <CreateWorkspaceSheet
         ref={createWorkspaceSheetRef}
         onWorkspaceCreated={() => {
-          // Call callback FIRST to trigger refresh
           getOnWorkspaceCreated()?.();
           createWorkspaceSheetRef?.current?.close();
         }}
       />
-
-       {/* CHART DETAILS */}
-       <ComingSoonSheet
+      <ComingSoonSheet
         ref={chartDetailsSheetRef}
         title="Detailed Analytics"
         subtitle="Get insights into your training patterns"
         icon="bar-chart"
       />
-
-      {/* CREATE SESSION */}
       <CreateSessionSheet
         ref={createSessionSheetRef}
         onSessionCreated={() => {
-          // Call callback FIRST to trigger refresh
           getOnSessionCreated()?.();
           createSessionSheetRef?.current?.close();
         }}
       />
-
-      {/* CREATE TEAM */}
       <CreateTeamSheet
         ref={createTeamSheetRef}
         onTeamCreated={() => {
-          // Call callback FIRST to trigger refresh
           getOnTeamCreated()?.();
           createTeamSheetRef?.current?.close();
         }}
       />
-
-      {/* ACCEPT INVITE */}
       <AcceptInviteSheet
         ref={acceptInviteSheetRef}
         onInviteAccepted={() => {
-          // Call callback FIRST to trigger refresh
           getOnInviteAccepted()?.();
           acceptInviteSheetRef?.current?.close();
         }}
       />
-
-      {/* INVITE MEMBERS */}
       <InviteMembersSheet
         ref={inviteMembersSheetRef}
         onMemberInvited={() => {
-          // Call the registered callback if it exists
           getOnMemberInvited()?.();
         }}
       />
-
-      {/* TEAM PREVIEW */}
       <TeamPreviewSheet
         ref={teamPreviewSheetRef}
         team={selectedTeam}
       />
-
-      {/* MEMBER PREVIEW */}
       <MemberPreviewSheet
         ref={memberPreviewSheetRef}
         member={selectedMember}
       />
-
-      {/* CREATE TRAINING */}
       <CreateTrainingSheet
         ref={createTrainingSheetRef}
         onTrainingCreated={() => {
-          // Call callback FIRST to trigger refresh
           getOnTrainingCreated()?.();
           createTrainingSheetRef?.current?.close();
         }}
       />
-
-      {/* TRAINING DETAIL */}
       <TrainingDetailSheet
         ref={trainingDetailSheetRef}
         onTrainingUpdated={() => {
-          // Call callback to trigger refresh
           getOnTrainingUpdated()?.();
         }}
       />
-
-      </OrgRoleProvider>
     </ThemeProvider>
   );
 }

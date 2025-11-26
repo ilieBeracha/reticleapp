@@ -5,6 +5,7 @@ import { createOrgWorkspace } from "@/services/workspaceService";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import type { Workspace } from "@/types/workspace";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { BaseBottomSheet, type BaseBottomSheetRef } from "./BaseBottomSheet";
@@ -20,12 +21,11 @@ interface WorkspaceSwitcherBottomSheetProps {
 }
 
 /**
- * SIMPLIFIED WORKSPACE SWITCHER
+ * WORKSPACE SWITCHER
  * 
- * Model: User = Workspace
- * - Shows user's own workspace
- * - Shows other workspaces they have access to
- * - Each workspace is a profile (user)
+ * Now navigates to proper routes:
+ * - Personal Mode: /(protected)/personal
+ * - Org Mode: /(protected)/org/[workspaceId]
  */
 export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, WorkspaceSwitcherBottomSheetProps>(
   (props, ref) => {
@@ -38,7 +38,6 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
       userId, 
       activeWorkspaceId, 
       workspaces,
-      switchWorkspace,
       loading 
     } = useAppContext();
 
@@ -50,7 +49,7 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
       close: () => bottomSheetRef.current?.close(),
     }));
 
-    // Group workspaces: My workspaces first, then others
+    // Group workspaces
     const groupedWorkspaces = useMemo(() => {
       const myWorkspaces = workspaces.filter(w => w.created_by === userId);
       const otherWorkspaces = workspaces.filter(w => w.created_by !== userId);
@@ -61,17 +60,40 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
       };
     }, [workspaces, userId]);
 
+    /**
+     * Switch to an organization workspace
+     * Navigates to /(protected)/org/[workspaceId]
+     */
     const handleSelectWorkspace = useCallback(async (workspace: Workspace) => {
       try {
-        await switchWorkspace(workspace.id);
+        // Update store
+        useWorkspaceStore.getState().setActiveWorkspace(workspace.id);
+        
+        // Navigate to org route with workspace ID
+        router.replace(`/(protected)/org/${workspace.id}` as any);
+        
         bottomSheetRef.current?.close();
       } catch (error: any) {
         Alert.alert("Error", "Failed to switch workspace");
       }
-    }, [switchWorkspace]);
+    }, []);
+
+    /**
+     * Switch to personal mode
+     * Navigates to /(protected)/personal
+     */
+    const handleSwitchToPersonal = useCallback(() => {
+      // Update store
+      useWorkspaceStore.getState().setActiveWorkspace(null);
+      
+      // Navigate to personal route
+      router.replace('/(protected)/personal' as any);
+      
+      bottomSheetRef.current?.close();
+    }, []);
 
     const handleOpenCreateWorkspace = useCallback(() => {
-      setWorkspaceName("");  // Clear for new workspace
+      setWorkspaceName("");
       createSheetRef.current?.open();
     }, []);
 
@@ -83,17 +105,18 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
 
       setIsCreating(true);
       try {
-        // Create new org workspace
         const newWorkspace = await createOrgWorkspace({
           name: workspaceName.trim(),
           description: undefined,
         });
         
-        // Reload workspaces to show the new one
         await useWorkspaceStore.getState().loadWorkspaces();
         
-        // Switch to the newly created workspace
-        await switchWorkspace(newWorkspace.id);
+        // Update store
+        useWorkspaceStore.getState().setActiveWorkspace(newWorkspace.id);
+        
+        // Navigate to the new workspace
+        router.replace(`/(protected)/org/${newWorkspace.id}` as any);
         
         setWorkspaceName("");
         createSheetRef.current?.close();
@@ -106,19 +129,15 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
       } finally {
         setIsCreating(false);
       }
-    }, [workspaceName, switchWorkspace]);
+    }, [workspaceName]);
 
     const handleJoinWorkspace = useCallback(() => {
-      // Close this sheet and open the accept invite sheet
       bottomSheetRef.current?.close();
       
-      // Set callback to reload workspaces when invite is accepted
-      // Wrap in arrow function so React stores the function, not calls it
       setOnInviteAccepted(() => async () => {
         await useWorkspaceStore.getState().loadWorkspaces();
       });
       
-      // Open the accept invite sheet
       setTimeout(() => {
         acceptInviteSheetRef.current?.open();
       }, 300);
@@ -169,17 +188,14 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
             {/* Personal Mode - No Workspace */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>No Workspace</Text>
+                <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Personal</Text>
               </View>
               <TouchableOpacity 
                 style={[
                   styles.workspaceItem,
                   !activeWorkspaceId && styles.workspaceItemActive,
                 ]}
-                onPress={() => {
-                  switchWorkspace(null);
-                  bottomSheetRef.current?.close();
-                }}
+                onPress={handleSwitchToPersonal}
                 activeOpacity={0.7}
               >
                 <View style={styles.workspaceItemContent}>
@@ -266,7 +282,6 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
         <BaseBottomSheet
           snapPoints={['90%']}
           ref={createSheetRef}
-
           enableDynamicSizing={false}
         >
             <View style={styles.createHeader}>
@@ -341,7 +356,6 @@ export const WorkspaceSwitcherBottomSheet = forwardRef<WorkspaceSwitcherRef, Wor
 WorkspaceSwitcherBottomSheet.displayName = 'WorkspaceSwitcherBottomSheet';
 
 const styles = StyleSheet.create({
-
   // Header
   header: {
     paddingHorizontal: 20,
@@ -467,20 +481,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  roleBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  roleBadgeOwner: {
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
-  },
-  roleBadgeText: {
-    fontSize: 11,
-    fontWeight: "500",
-    textTransform: "capitalize",
-    letterSpacing: -0.1,
-  },
   checkmarkContainer: {
     width: 24,
     height: 24,
@@ -518,6 +518,8 @@ const styles = StyleSheet.create({
     maxWidth: 280,
     letterSpacing: -0.1,
   },
+
+  // Create Workspace
   createHeader: {
     paddingHorizontal: 20,
     paddingTop: 12,
@@ -547,8 +549,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     letterSpacing: -0.1,
   },
-
-  // Input
   inputContainer: {
     paddingHorizontal: 20,
     marginBottom: 32,
@@ -582,8 +582,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     letterSpacing: -0.1,
   },
-
-  // Create Actions
   createActions: {
     paddingHorizontal: 20,
     gap: 12,

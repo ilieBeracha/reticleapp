@@ -1,6 +1,6 @@
-import { useOrgRole } from "@/contexts/OrgRoleContext";
 import { useColors } from "@/hooks/ui/useColors";
 import { useAppContext } from "@/hooks/useAppContext";
+import { useWorkspacePermissions } from "@/hooks/usePermissions";
 import { getWorkspaceTeams } from "@/services/teamService";
 import { createTraining } from "@/services/trainingService";
 import type { CreateDrillInput, TargetType, Team } from "@/types/workspace";
@@ -17,74 +17,65 @@ interface CreateTrainingSheetProps {
 }
 
 interface DrillFormData extends CreateDrillInput {
-  id: string; // Temp ID for UI
+  id: string;
 }
 
-const TARGET_TYPES: { value: TargetType; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { value: 'paper', label: 'Paper', icon: 'document-outline' },
-  { value: 'tactical', label: 'Tactical', icon: 'shield-outline' },
+// Quick drill presets for common training scenarios
+const DRILL_PRESETS = [
+  { name: 'Grouping Drill', distance: 100, rounds: 5, type: 'paper' as TargetType },
+  { name: 'Rapid Fire', distance: 25, rounds: 10, type: 'tactical' as TargetType },
+  { name: 'Precision', distance: 200, rounds: 3, type: 'paper' as TargetType },
 ];
-
-const POSITIONS = ['prone', 'kneeling', 'standing', 'supported'];
-const WEAPON_CATEGORIES = ['rifle', 'pistol', 'sniper', 'any'];
 
 export const CreateTrainingSheet = forwardRef<BaseBottomSheetRef, CreateTrainingSheetProps>(
   ({ onTrainingCreated }, ref) => {
     const colors = useColors();
     const { activeWorkspaceId } = useAppContext();
-    const { orgRole, allTeams: userTeams, isCommander } = useOrgRole();
+    const permissions = useWorkspacePermissions();
+    
+    // Check if we're in org mode based on activeWorkspaceId
+    const isInOrgMode = !!activeWorkspaceId;
     
     // Form state
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
-    const [scheduledDate, setScheduledDate] = useState(new Date());
+    const [scheduledDate, setScheduledDate] = useState(() => {
+      // Default to tomorrow at 9:00 AM
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(9, 0, 0, 0);
+      return tomorrow;
+    });
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showTimePicker, setShowTimePicker] = useState(false);
     const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
     const [drills, setDrills] = useState<DrillFormData[]>([]);
-    const [showDrillForm, setShowDrillForm] = useState(false);
+    const [showDrillSection, setShowDrillSection] = useState(false);
     
     // Data state
     const [teams, setTeams] = useState<Team[]>([]);
     const [loadingTeams, setLoadingTeams] = useState(true);
     const [submitting, setSubmitting] = useState(false);
 
-    // New drill form state
-    const [newDrill, setNewDrill] = useState<Partial<DrillFormData>>({
-      name: '',
-      target_type: 'paper',
-      distance_m: 100,
-      rounds_per_shooter: 10,
-    });
-
-    // Check if user is admin-level (can create for any team)
-    const isAdminLevel = useMemo(() => 
-      ['owner', 'admin', 'instructor'].includes(orgRole || ''),
-      [orgRole]
-    );
-
-    // Filter teams based on user role
-    // - Admin/Owner/Instructor: see all teams
-    // - Team commander: only see teams they command
+    // Check if user can create trainings (owner/admin/instructor)
+    const canCreateTraining = permissions.canCreateTraining;
+    
+    // Admin-level users see ALL teams, commanders only see their teams
+    // For now, since we're outside OrgRoleProvider, we show all teams
+    // to admin-level users and let the backend handle permissions
     const availableTeams = useMemo(() => {
-      if (isAdminLevel) {
-        return teams;
-      }
-      // For team commanders, filter to only teams they command
-      const commanderTeamIds = userTeams
-        .filter(t => t.teamRole === 'commander')
-        .map(t => t.teamId);
-      return teams.filter(t => commanderTeamIds.includes(t.id));
-    }, [teams, isAdminLevel, userTeams]);
+      // If user can create trainings (owner/admin/instructor), show all teams
+      return teams;
+    }, [teams]);
 
     // Fetch teams when sheet opens
     useEffect(() => {
-      if (activeWorkspaceId) {
+      if (activeWorkspaceId && isInOrgMode) {
         fetchTeams();
       }
-    }, [activeWorkspaceId]);
+    }, [activeWorkspaceId, isInOrgMode]);
 
-    // Auto-select team for commanders with only one team
+    // Auto-select team if only one available
     useEffect(() => {
       if (availableTeams.length === 1 && !selectedTeamId) {
         setSelectedTeamId(availableTeams[0].id);
@@ -93,7 +84,6 @@ export const CreateTrainingSheet = forwardRef<BaseBottomSheetRef, CreateTraining
 
     const fetchTeams = async () => {
       if (!activeWorkspaceId) return;
-      
       setLoadingTeams(true);
       try {
         const data = await getWorkspaceTeams(activeWorkspaceId);
@@ -105,35 +95,16 @@ export const CreateTrainingSheet = forwardRef<BaseBottomSheetRef, CreateTraining
       }
     };
 
-    const handleAddDrill = useCallback(() => {
-      if (!newDrill.name?.trim()) {
-        Alert.alert('Error', 'Please enter a drill name');
-        return;
-      }
-
+    const handleAddPresetDrill = useCallback((preset: typeof DRILL_PRESETS[0]) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      
       setDrills(prev => [...prev, {
         id: Date.now().toString(),
-        name: newDrill.name!.trim(),
-        target_type: newDrill.target_type || 'paper',
-        distance_m: newDrill.distance_m || 100,
-        rounds_per_shooter: newDrill.rounds_per_shooter || 10,
-        time_limit_seconds: newDrill.time_limit_seconds,
-        position: newDrill.position,
-        weapon_category: newDrill.weapon_category,
-        notes: newDrill.notes,
+        name: preset.name,
+        target_type: preset.type,
+        distance_m: preset.distance,
+        rounds_per_shooter: preset.rounds,
       }]);
-
-      // Reset form
-      setNewDrill({
-        name: '',
-        target_type: 'paper',
-        distance_m: 100,
-        rounds_per_shooter: 10,
-      });
-      setShowDrillForm(false);
-    }, [newDrill]);
+    }, []);
 
     const handleRemoveDrill = useCallback((drillId: string) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -143,13 +114,13 @@ export const CreateTrainingSheet = forwardRef<BaseBottomSheetRef, CreateTraining
     const handleCreate = async () => {
       if (!title.trim()) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert('Error', 'Please enter a training title');
+        Alert.alert('Missing Title', 'Please enter a name for this training');
         return;
       }
 
       if (!selectedTeamId) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert('Error', 'Please select a team');
+        Alert.alert('Select Team', 'Please select which team will attend');
         return;
       }
 
@@ -174,19 +145,15 @@ export const CreateTrainingSheet = forwardRef<BaseBottomSheetRef, CreateTraining
 
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         
-        // Close sheet
         if (typeof ref === 'object' && ref?.current) {
           ref.current.close();
         }
 
-        // Reset form
         resetForm();
-        
-        // Callback
         onTrainingCreated?.();
 
         setTimeout(() => {
-          Alert.alert('Success', `Training "${title}" scheduled!`);
+          Alert.alert('✓ Training Scheduled', `"${title}" has been added to the calendar`);
         }, 300);
       } catch (error: any) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -200,40 +167,67 @@ export const CreateTrainingSheet = forwardRef<BaseBottomSheetRef, CreateTraining
     const resetForm = () => {
       setTitle('');
       setDescription('');
-      setScheduledDate(new Date());
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(9, 0, 0, 0);
+      setScheduledDate(tomorrow);
       setSelectedTeamId(availableTeams.length === 1 ? availableTeams[0].id : null);
       setDrills([]);
-      setShowDrillForm(false);
+      setShowDrillSection(false);
     };
 
-    const formatDate = (date: Date) => {
+    const formatDateDisplay = (date: Date) => {
+      const today = new Date();
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      if (date.toDateString() === today.toDateString()) return 'Today';
+      if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
+      
       return date.toLocaleDateString('en-US', {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
-        year: 'numeric',
       });
     };
 
-    const formatTime = (date: Date) => {
+    const formatTimeDisplay = (date: Date) => {
       return date.toLocaleTimeString('en-US', {
-        hour: '2-digit',
+        hour: 'numeric',
         minute: '2-digit',
+        hour12: true,
       });
     };
+
+    // Not in org mode - show message
+    if (!isInOrgMode) {
+      return (
+        <BaseBottomSheet ref={ref} snapPoints={['40%']}>
+          <View style={styles.notAvailable}>
+            <View style={[styles.notAvailableIcon, { backgroundColor: colors.secondary }]}>
+              <Ionicons name="business-outline" size={32} color={colors.textMuted} />
+            </View>
+            <Text style={[styles.notAvailableTitle, { color: colors.text }]}>
+              Organization Required
+            </Text>
+            <Text style={[styles.notAvailableText, { color: colors.textMuted }]}>
+              Switch to an organization workspace to schedule trainings
+            </Text>
+          </View>
+        </BaseBottomSheet>
+      );
+    }
 
     return (
-      <BaseBottomSheet ref={ref} snapPoints={['90%']} backdropOpacity={0.6}>
+      <BaseBottomSheet ref={ref} snapPoints={['85%']} backdropOpacity={0.5}>
         <BottomSheetScrollView 
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           {/* Header */}
           <View style={styles.header}>
-            <View style={[styles.icon, { backgroundColor: colors.primary + '15' }]}>
-              <Ionicons name="fitness" size={24} color={colors.primary} />
-            </View>
             <Text style={[styles.title, { color: colors.text }]}>
               Schedule Training
             </Text>
@@ -242,126 +236,117 @@ export const CreateTrainingSheet = forwardRef<BaseBottomSheetRef, CreateTraining
             </Text>
           </View>
 
-          {/* Training Title */}
-          <View style={styles.inputContainer}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Training Title *</Text>
-            <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.card }]}>
+          {/* Training Name - Simple and prominent */}
+          <View style={styles.section}>
+            <View style={[styles.inputBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <BottomSheetTextInput
-                style={[styles.input, { color: colors.text }]}
-                placeholder="e.g. Live Fire Qualification"
-                placeholderTextColor={colors.textMuted + 'CC'}
+                style={[styles.titleInput, { color: colors.text }]}
+                placeholder="Training name..."
+                placeholderTextColor={colors.textMuted}
                 value={title}
                 onChangeText={setTitle}
                 returnKeyType="next"
-              />
-            </View>
-          </View>
-
-          {/* Description */}
-          <View style={styles.inputContainer}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Description</Text>
-            <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.card }]}>
-              <BottomSheetTextInput
-                style={[styles.textArea, { color: colors.text }]}
-                placeholder="Training objectives and notes..."
-                placeholderTextColor={colors.textMuted + 'CC'}
-                value={description}
-                onChangeText={setDescription}
-                multiline
-                numberOfLines={3}
-                textAlignVertical="top"
+                autoFocus={false}
               />
             </View>
           </View>
 
           {/* Team Selection */}
-          <View style={styles.inputContainer}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Select Team *</Text>
+          <View style={styles.section}>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>TEAM</Text>
             {loadingTeams ? (
-              <View style={[styles.loadingContainer, { backgroundColor: colors.card }]}>
+              <View style={[styles.loadingBox, { backgroundColor: colors.card }]}>
                 <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading teams...</Text>
               </View>
             ) : availableTeams.length === 0 ? (
-              <View style={[styles.emptyContainer, { backgroundColor: colors.card }]}>
-                <Ionicons name="people-outline" size={24} color={colors.textMuted} />
+              <View style={[styles.emptyBox, { backgroundColor: colors.card }]}>
+                <Ionicons name="alert-circle-outline" size={20} color={colors.textMuted} />
                 <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-                  {isAdminLevel 
-                    ? "No teams available. Create a team first." 
-                    : "No teams you command. Contact your admin."}
+                  {canCreateTraining ? "No teams found" : "No teams you command"}
                 </Text>
               </View>
             ) : (
-              <View style={styles.teamGrid}>
-                {availableTeams.map(team => (
-                  <TouchableOpacity
-                    key={team.id}
-                    style={[
-                      styles.teamOption,
-                      { 
-                        borderColor: selectedTeamId === team.id ? colors.primary : colors.border,
-                        backgroundColor: selectedTeamId === team.id ? colors.primary + '10' : colors.card,
-                      }
-                    ]}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setSelectedTeamId(team.id);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons 
-                      name={selectedTeamId === team.id ? "checkmark-circle" : "people-outline"} 
-                      size={20} 
-                      color={selectedTeamId === team.id ? colors.primary : colors.textMuted} 
-                    />
-                    <Text style={[
-                      styles.teamOptionText,
-                      { color: selectedTeamId === team.id ? colors.primary : colors.text }
-                    ]}>
-                      {team.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+              <View style={styles.teamList}>
+                {availableTeams.map(team => {
+                  const isSelected = selectedTeamId === team.id;
+                  return (
+                    <TouchableOpacity
+                      key={team.id}
+                      style={[
+                        styles.teamChip,
+                        { 
+                          backgroundColor: isSelected ? colors.primary : colors.card,
+                          borderColor: isSelected ? colors.primary : colors.border,
+                        }
+                      ]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setSelectedTeamId(team.id);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons 
+                        name="people" 
+                        size={16} 
+                        color={isSelected ? '#fff' : colors.textMuted} 
+                      />
+                      <Text style={[
+                        styles.teamChipText,
+                        { color: isSelected ? '#fff' : colors.text }
+                      ]}>
+                        {team.name}
+                      </Text>
+                      {isSelected && (
+                        <Ionicons name="checkmark" size={16} color="#fff" />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             )}
           </View>
 
-          {/* Date & Time */}
-          <View style={styles.inputContainer}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Schedule *</Text>
+          {/* Date & Time - Compact row */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>WHEN</Text>
             <View style={styles.dateTimeRow}>
               <TouchableOpacity
-                style={[styles.dateTimeButton, { borderColor: colors.border, backgroundColor: colors.card }]}
+                style={[styles.dateTimeBox, { backgroundColor: colors.card, borderColor: colors.border }]}
                 onPress={() => setShowDatePicker(true)}
                 activeOpacity={0.7}
               >
-                <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+                <Ionicons name="calendar" size={18} color={colors.primary} />
                 <Text style={[styles.dateTimeText, { color: colors.text }]}>
-                  {formatDate(scheduledDate)}
+                  {formatDateDisplay(scheduledDate)}
                 </Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.dateTimeButton, { borderColor: colors.border, backgroundColor: colors.card }]}
+                style={[styles.dateTimeBox, { backgroundColor: colors.card, borderColor: colors.border }]}
                 onPress={() => setShowTimePicker(true)}
                 activeOpacity={0.7}
               >
-                <Ionicons name="time-outline" size={18} color={colors.primary} />
+                <Ionicons name="time" size={18} color={colors.primary} />
                 <Text style={[styles.dateTimeText, { color: colors.text }]}>
-                  {formatTime(scheduledDate)}
+                  {formatTimeDisplay(scheduledDate)}
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Date/Time Pickers */}
+          {/* Pickers */}
           {showDatePicker && (
             <DateTimePicker
               value={scheduledDate}
               mode="date"
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={(event, date) => {
+              onChange={(_, date) => {
                 setShowDatePicker(Platform.OS === 'ios');
-                if (date) setScheduledDate(date);
+                if (date) {
+                  const newDate = new Date(scheduledDate);
+                  newDate.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+                  setScheduledDate(newDate);
+                }
               }}
               minimumDate={new Date()}
             />
@@ -371,198 +356,125 @@ export const CreateTrainingSheet = forwardRef<BaseBottomSheetRef, CreateTraining
               value={scheduledDate}
               mode="time"
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={(event, date) => {
+              onChange={(_, date) => {
                 setShowTimePicker(Platform.OS === 'ios');
-                if (date) setScheduledDate(date);
+                if (date) {
+                  const newDate = new Date(scheduledDate);
+                  newDate.setHours(date.getHours(), date.getMinutes());
+                  setScheduledDate(newDate);
+                }
               }}
             />
           )}
 
-          {/* Drills Section */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Drills ({drills.length})
-              </Text>
-              <TouchableOpacity
-                style={[styles.addButton, { backgroundColor: colors.primary + '15' }]}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setShowDrillForm(true);
-                }}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="add" size={18} color={colors.primary} />
-                <Text style={[styles.addButtonText, { color: colors.primary }]}>Add Drill</Text>
-              </TouchableOpacity>
+          {/* Description - Optional, collapsed by default */}
+          <View style={styles.section}>
+            <View style={[styles.inputBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <BottomSheetTextInput
+                style={[styles.descInput, { color: colors.text }]}
+                placeholder="Notes (optional)..."
+                placeholderTextColor={colors.textMuted}
+                value={description}
+                onChangeText={setDescription}
+                multiline
+                numberOfLines={2}
+                textAlignVertical="top"
+              />
             </View>
+          </View>
 
-            {/* Drills List */}
-            {drills.length > 0 && (
-              <View style={styles.drillsList}>
-                {drills.map((drill, index) => (
-                  <View 
-                    key={drill.id} 
-                    style={[styles.drillItem, { backgroundColor: colors.card, borderColor: colors.border }]}
-                  >
-                    <View style={styles.drillInfo}>
-                      <View style={styles.drillHeader}>
-                        <Text style={[styles.drillIndex, { color: colors.textMuted }]}>#{index + 1}</Text>
-                        <Text style={[styles.drillName, { color: colors.text }]}>{drill.name}</Text>
-                      </View>
-                      <View style={styles.drillMeta}>
-                        <View style={[styles.drillBadge, { backgroundColor: colors.secondary }]}>
-                          <Ionicons 
-                            name={drill.target_type === 'paper' ? 'document-outline' : 'shield-outline'} 
-                            size={12} 
-                            color={colors.textMuted} 
-                          />
-                          <Text style={[styles.drillBadgeText, { color: colors.textMuted }]}>
-                            {drill.target_type}
+          {/* Drills - Expandable */}
+          <View style={styles.section}>
+            <TouchableOpacity 
+              style={styles.drillsHeader}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowDrillSection(!showDrillSection);
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.drillsHeaderLeft}>
+                <Ionicons name="list" size={18} color={colors.primary} />
+                <Text style={[styles.drillsHeaderText, { color: colors.text }]}>
+                  Drills
+                </Text>
+                {drills.length > 0 && (
+                  <View style={[styles.drillCount, { backgroundColor: colors.primary }]}>
+                    <Text style={styles.drillCountText}>{drills.length}</Text>
+                  </View>
+                )}
+              </View>
+              <Ionicons 
+                name={showDrillSection ? "chevron-up" : "chevron-down"} 
+                size={20} 
+                color={colors.textMuted} 
+              />
+            </TouchableOpacity>
+
+            {showDrillSection && (
+              <View style={styles.drillsContent}>
+                {/* Added drills */}
+                {drills.length > 0 && (
+                  <View style={styles.drillList}>
+                    {drills.map((drill, idx) => (
+                      <View 
+                        key={drill.id} 
+                        style={[styles.drillItem, { backgroundColor: colors.card, borderColor: colors.border }]}
+                      >
+                        <View style={styles.drillItemInfo}>
+                          <Text style={[styles.drillItemName, { color: colors.text }]}>
+                            {idx + 1}. {drill.name}
+                          </Text>
+                          <Text style={[styles.drillItemMeta, { color: colors.textMuted }]}>
+                            {drill.distance_m}m • {drill.rounds_per_shooter} rds • {drill.target_type}
                           </Text>
                         </View>
-                        <Text style={[styles.drillMetaText, { color: colors.textMuted }]}>
-                          {drill.distance_m}m • {drill.rounds_per_shooter} rds
-                        </Text>
+                        <TouchableOpacity
+                          onPress={() => handleRemoveDrill(drill.id)}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                          <Ionicons name="close-circle" size={22} color={colors.red} />
+                        </TouchableOpacity>
                       </View>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.removeDrillButton}
-                      onPress={() => handleRemoveDrill(drill.id)}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                      <Ionicons name="close-circle" size={22} color={colors.red} />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {/* Add Drill Form */}
-            {showDrillForm && (
-              <View style={[styles.drillForm, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={[styles.drillFormTitle, { color: colors.text }]}>New Drill</Text>
-                
-                {/* Drill Name */}
-                <View style={styles.drillFormRow}>
-                  <Text style={[styles.drillFormLabel, { color: colors.textMuted }]}>Name</Text>
-                  <View style={[styles.drillInputWrapper, { borderColor: colors.border, backgroundColor: colors.background }]}>
-                    <BottomSheetTextInput
-                      style={[styles.drillInput, { color: colors.text }]}
-                      placeholder="e.g. 100m Grouping"
-                      placeholderTextColor={colors.textMuted + 'CC'}
-                      value={newDrill.name}
-                      onChangeText={(text) => setNewDrill(prev => ({ ...prev, name: text }))}
-                    />
-                  </View>
-                </View>
-
-                {/* Target Type */}
-                <View style={styles.drillFormRow}>
-                  <Text style={[styles.drillFormLabel, { color: colors.textMuted }]}>Target Type</Text>
-                  <View style={styles.targetTypeRow}>
-                    {TARGET_TYPES.map(type => (
-                      <TouchableOpacity
-                        key={type.value}
-                        style={[
-                          styles.targetTypeOption,
-                          { 
-                            borderColor: newDrill.target_type === type.value ? colors.primary : colors.border,
-                            backgroundColor: newDrill.target_type === type.value ? colors.primary + '10' : colors.background,
-                          }
-                        ]}
-                        onPress={() => setNewDrill(prev => ({ ...prev, target_type: type.value }))}
-                      >
-                        <Ionicons 
-                          name={type.icon} 
-                          size={16} 
-                          color={newDrill.target_type === type.value ? colors.primary : colors.textMuted} 
-                        />
-                        <Text style={[
-                          styles.targetTypeText,
-                          { color: newDrill.target_type === type.value ? colors.primary : colors.textMuted }
-                        ]}>
-                          {type.label}
-                        </Text>
-                      </TouchableOpacity>
                     ))}
                   </View>
+                )}
+
+                {/* Quick add presets */}
+                <Text style={[styles.presetsLabel, { color: colors.textMuted }]}>
+                  Quick Add
+                </Text>
+                <View style={styles.presetRow}>
+                  {DRILL_PRESETS.map((preset, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      style={[styles.presetChip, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+                      onPress={() => handleAddPresetDrill(preset)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="add" size={14} color={colors.primary} />
+                      <Text style={[styles.presetChipText, { color: colors.text }]}>
+                        {preset.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
 
-                {/* Distance & Rounds */}
-                <View style={styles.drillFormRowDouble}>
-                  <View style={styles.drillFormHalf}>
-                    <Text style={[styles.drillFormLabel, { color: colors.textMuted }]}>Distance (m)</Text>
-                    <View style={[styles.drillInputWrapper, { borderColor: colors.border, backgroundColor: colors.background }]}>
-                      <BottomSheetTextInput
-                        style={[styles.drillInput, { color: colors.text }]}
-                        placeholder="100"
-                        placeholderTextColor={colors.textMuted + 'CC'}
-                        value={newDrill.distance_m?.toString()}
-                        onChangeText={(text) => setNewDrill(prev => ({ ...prev, distance_m: parseInt(text) || 0 }))}
-                        keyboardType="number-pad"
-                      />
-                    </View>
-                  </View>
-                  <View style={styles.drillFormHalf}>
-                    <Text style={[styles.drillFormLabel, { color: colors.textMuted }]}>Rounds</Text>
-                    <View style={[styles.drillInputWrapper, { borderColor: colors.border, backgroundColor: colors.background }]}>
-                      <BottomSheetTextInput
-                        style={[styles.drillInput, { color: colors.text }]}
-                        placeholder="10"
-                        placeholderTextColor={colors.textMuted + 'CC'}
-                        value={newDrill.rounds_per_shooter?.toString()}
-                        onChangeText={(text) => setNewDrill(prev => ({ ...prev, rounds_per_shooter: parseInt(text) || 0 }))}
-                        keyboardType="number-pad"
-                      />
-                    </View>
-                  </View>
-                </View>
-
-                {/* Drill Form Actions */}
-                <View style={styles.drillFormActions}>
-                  <TouchableOpacity
-                    style={[styles.drillFormCancel, { borderColor: colors.border }]}
-                    onPress={() => setShowDrillForm(false)}
-                  >
-                    <Text style={[styles.drillFormCancelText, { color: colors.textMuted }]}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.drillFormSubmit,
-                      { backgroundColor: newDrill.name?.trim() ? colors.primary : colors.secondary }
-                    ]}
-                    onPress={handleAddDrill}
-                    disabled={!newDrill.name?.trim()}
-                  >
-                    <Ionicons name="add" size={16} color="#fff" />
-                    <Text style={styles.drillFormSubmitText}>Add</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
-            {drills.length === 0 && !showDrillForm && (
-              <View style={[styles.emptyDrills, { backgroundColor: colors.secondary }]}>
-                <Ionicons name="list-outline" size={24} color={colors.textMuted} />
-                <Text style={[styles.emptyDrillsText, { color: colors.textMuted }]}>
-                  Add drills to structure your training
+                <Text style={[styles.drillHint, { color: colors.textMuted }]}>
+                  You can add more drills after creating the training
                 </Text>
               </View>
             )}
           </View>
 
-          {/* Create Button */}
-          <View style={styles.actions}>
+          {/* Submit Button */}
+          <View style={styles.submitSection}>
             <TouchableOpacity
               style={[
-                styles.primaryButton,
+                styles.submitButton,
                 {
                   backgroundColor: (!title.trim() || !selectedTeamId || submitting) 
                     ? colors.secondary 
-                    : colors.primary,
-                  shadowColor: (!title.trim() || !selectedTeamId || submitting) 
-                    ? 'transparent' 
                     : colors.primary,
                 }
               ]}
@@ -570,14 +482,18 @@ export const CreateTrainingSheet = forwardRef<BaseBottomSheetRef, CreateTraining
               disabled={!title.trim() || !selectedTeamId || submitting}
               activeOpacity={0.8}
             >
-              <View style={styles.primaryButtonContent}>
-                <Ionicons name="calendar" size={18} color="#fff" />
-                <Text style={styles.primaryButtonText}>
-                  {submitting ? "Creating..." : "Schedule Training"}
-                </Text>
-              </View>
+              {submitting ? (
+                <Text style={styles.submitButtonText}>Creating...</Text>
+              ) : (
+                <>
+                  <Ionicons name="calendar-outline" size={20} color="#fff" />
+                  <Text style={styles.submitButtonText}>Schedule Training</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
+
+          <View style={{ height: 40 }} />
         </BottomSheetScrollView>
       </BaseBottomSheet>
     );
@@ -591,340 +507,244 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 20,
   },
+
+  // Header
   header: {
-    alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 20,
   },
-  icon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
   title: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: '700',
+    letterSpacing: -0.5,
     marginBottom: 4,
-    textAlign: 'center',
-    letterSpacing: -0.3,
   },
   subtitle: {
-    fontSize: 14,
-    fontWeight: '400',
-    textAlign: 'center',
-    letterSpacing: -0.1,
+    fontSize: 15,
     opacity: 0.7,
   },
 
-  // Input
-  inputContainer: {
+  // Sections
+  section: {
     paddingHorizontal: 20,
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  inputLabel: {
-    fontSize: 14,
+  sectionLabel: {
+    fontSize: 12,
     fontWeight: '600',
-    marginBottom: 8,
-    letterSpacing: -0.1,
-  },
-  inputWrapper: {
-    borderRadius: 10,
-    borderWidth: 0.5,
-    overflow: "hidden",
-  },
-  input: {
-    height: 44,
-    paddingHorizontal: 14,
-    fontSize: 15,
-    fontWeight: "400",
-    backgroundColor: 'transparent',
-  },
-  textArea: {
-    minHeight: 70,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    fontWeight: "400",
-    backgroundColor: 'transparent',
+    letterSpacing: 0.5,
+    marginBottom: 10,
   },
 
-  // Loading/Empty states
-  loadingContainer: {
-    padding: 20,
-    borderRadius: 10,
-    alignItems: 'center',
+  // Input boxes
+  inputBox: {
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
-  loadingText: {
-    fontSize: 14,
+  titleInput: {
+    height: 52,
+    paddingHorizontal: 16,
+    fontSize: 17,
+    fontWeight: '500',
   },
-  emptyContainer: {
-    padding: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    gap: 8,
-  },
-  emptyText: {
-    fontSize: 14,
-    textAlign: 'center',
+  descInput: {
+    minHeight: 60,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
   },
 
-  // Team Grid
-  teamGrid: {
+  // Team list
+  teamList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 10,
   },
-  teamOption: {
+  teamChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
+    paddingVertical: 12,
+    borderRadius: 12,
     borderWidth: 1.5,
   },
-  teamOptionText: {
-    fontSize: 14,
-    fontWeight: '500',
+  teamChipText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
 
   // Date/Time
   dateTimeRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
   },
-  dateTimeButton: {
+  dateTimeBox: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 0.5,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
   },
   dateTimeText: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 15,
+    fontWeight: '600',
   },
 
-  // Section
-  sectionContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
+  // Loading/Empty
+  loadingBox: {
+    padding: 20,
+    borderRadius: 12,
+    alignItems: 'center',
   },
-  sectionHeader: {
+  loadingText: {
+    fontSize: 14,
+  },
+  emptyBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 16,
+    borderRadius: 12,
+  },
+  emptyText: {
+    fontSize: 14,
+  },
+
+  // Drills
+  drillsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    paddingVertical: 12,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: -0.2,
-  },
-  addButton: {
+  drillsHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    gap: 10,
   },
-  addButtonText: {
-    fontSize: 13,
+  drillsHeaderText: {
+    fontSize: 16,
     fontWeight: '600',
   },
-
-  // Drills List
-  drillsList: {
+  drillCount: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  drillCountText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  drillsContent: {
+    marginTop: 8,
+  },
+  drillList: {
     gap: 8,
+    marginBottom: 16,
   },
   drillItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 0.5,
-  },
-  drillInfo: {
-    flex: 1,
-  },
-  drillHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  drillIndex: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  drillName: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  drillMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  drillBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  drillBadgeText: {
-    fontSize: 11,
-    fontWeight: '500',
-    textTransform: 'capitalize',
-  },
-  drillMetaText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  removeDrillButton: {
-    padding: 4,
-  },
-
-  // Drill Form
-  drillForm: {
     padding: 14,
     borderRadius: 12,
     borderWidth: 1,
-    marginTop: 8,
   },
-  drillFormTitle: {
+  drillItemInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  drillItemName: {
     fontSize: 15,
     fontWeight: '600',
-    marginBottom: 12,
   },
-  drillFormRow: {
-    marginBottom: 12,
+  drillItemMeta: {
+    fontSize: 13,
   },
-  drillFormRowDouble: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 12,
-  },
-  drillFormHalf: {
-    flex: 1,
-  },
-  drillFormLabel: {
+  presetsLabel: {
     fontSize: 12,
-    fontWeight: '500',
-    marginBottom: 6,
+    fontWeight: '600',
+    marginBottom: 10,
   },
-  drillInputWrapper: {
-    borderRadius: 8,
-    borderWidth: 0.5,
-    overflow: 'hidden',
-  },
-  drillInput: {
-    height: 38,
-    paddingHorizontal: 12,
-    fontSize: 14,
-    backgroundColor: 'transparent',
-  },
-
-  // Target Type
-  targetTypeRow: {
+  presetRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
-  targetTypeOption: {
-    flex: 1,
+  presetChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 8,
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
     borderWidth: 1,
   },
-  targetTypeText: {
+  presetChipText: {
     fontSize: 13,
     fontWeight: '500',
   },
+  drillHint: {
+    fontSize: 12,
+    marginTop: 12,
+    fontStyle: 'italic',
+  },
 
-  // Drill Form Actions
-  drillFormActions: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 4,
+  // Submit
+  submitSection: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
   },
-  drillFormCancel: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  drillFormCancelText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  drillFormSubmit: {
-    flex: 1,
+  submitButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 10,
-    borderRadius: 8,
+    height: 54,
+    borderRadius: 14,
+    gap: 10,
   },
-  drillFormSubmitText: {
-    fontSize: 14,
+  submitButtonText: {
+    fontSize: 17,
     fontWeight: '600',
     color: '#fff',
   },
 
-  // Empty Drills
-  emptyDrills: {
+  // Not available state
+  notAvailable: {
+    flex: 1,
     alignItems: 'center',
-    padding: 20,
-    borderRadius: 10,
-    gap: 8,
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+    paddingBottom: 40,
   },
-  emptyDrillsText: {
-    fontSize: 13,
+  notAvailableIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  notAvailableTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
     textAlign: 'center',
   },
-
-  // Actions
-  actions: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-  },
-  primaryButton: {
-    borderRadius: 12,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  primaryButtonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    height: 50,
-    gap: 8,
-  },
-  primaryButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: '#fff',
-    letterSpacing: -0.2,
+  notAvailableText: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
-

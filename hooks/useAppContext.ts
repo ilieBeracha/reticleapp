@@ -20,6 +20,7 @@ export interface AppContext {
   
   // Actions
   switchWorkspace: (workspaceId: string | null) => Promise<void>;
+  navigateToWorkspace: (workspaceId: string | null) => void;
   
   // Loading states
   loading: boolean;
@@ -32,15 +33,11 @@ export interface AppContext {
  * Use this hook in ALL components to get user and workspace context.
  * NEVER access user or workspace data directly from other sources.
  * 
- * Org-Only Model: Users must belong to organizations
- * - No personal workspaces
- * - Can view different orgs they have access to
- * - If user has no orgs, they need to create or join one
+ * NEW ROUTING MODEL:
+ * - Personal mode: /(protected)/personal/*
+ * - Org mode: /(protected)/org/[workspaceId]/*
  * 
- * Examples:
- * ```
- * const { userId, activeWorkspaceId, activeWorkspace } = useAppContext()
- * ```
+ * switchWorkspace now navigates to the appropriate route!
  */
 export function useAppContext(): AppContext {
   const { user, loading: authLoading } = useAuth();
@@ -51,15 +48,31 @@ export function useAppContext(): AppContext {
     setActiveWorkspace
   } = useWorkspaceStore();
 
-  // Switch workspace - ALWAYS navigate to index first, then update state
+  /**
+   * Navigate to a workspace or personal mode
+   * This just does navigation, no state changes
+   */
+  const navigateToWorkspace = useCallback((workspaceId: string | null) => {
+    if (workspaceId) {
+      // Navigate to org mode with workspace ID in URL
+      router.replace(`/(protected)/org/${workspaceId}` as any);
+    } else {
+      // Navigate to personal mode
+      router.replace('/(protected)/personal' as any);
+    }
+  }, []);
+
+  /**
+   * Switch workspace - Updates state AND navigates
+   * Use this from UI actions (like workspace switcher)
+   */
   const handleSwitchWorkspace = useCallback(async (workspaceId: string | null) => {
-    // 1. Navigate to index FIRST (before state changes)
-    router.replace('/(protected)/workspace/' as any);
-    // 2. Small delay to let navigation complete
-    await new Promise(resolve => setTimeout(resolve, 50));
-    // 3. Then update workspace state
+    // Update state
     setActiveWorkspace(workspaceId);
-  }, [setActiveWorkspace]);
+    
+    // Navigate to the appropriate route
+    navigateToWorkspace(workspaceId);
+  }, [setActiveWorkspace, navigateToWorkspace]);
 
   // Calculate derived values with memoization
   const context = useMemo<AppContext>(() => {
@@ -80,6 +93,7 @@ export function useAppContext(): AppContext {
         
         // Actions
         switchWorkspace: handleSwitchWorkspace,
+        navigateToWorkspace,
         
         // Loading
         loading: authLoading,
@@ -108,6 +122,7 @@ export function useAppContext(): AppContext {
       
       // Actions
       switchWorkspace: handleSwitchWorkspace,
+      navigateToWorkspace,
       
       // Loading
       loading: authLoading || workspacesLoading,
@@ -119,7 +134,8 @@ export function useAppContext(): AppContext {
     activeWorkspaceId,
     authLoading,
     workspacesLoading,
-    handleSwitchWorkspace
+    handleSwitchWorkspace,
+    navigateToWorkspace
   ]);
 
   return context;

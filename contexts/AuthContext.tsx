@@ -13,7 +13,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  transitioning: boolean;  // New: true during auth transitions (sign in/out)
+  transitioning: boolean;
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithOAuth: (provider: 'google' | 'apple') => Promise<void>;
@@ -38,13 +38,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Handle user sign out - clear state and redirect to login
    */
   const handleSignOut = () => {
-    // Clear workspace store
     useWorkspaceStore.getState().reset()
-    
-    // Show transition loading
     setTransitioning(true)
-    
-    // Small delay for smooth transition, then navigate
     setTimeout(() => {
       router.replace("/auth/sign-in")
       setTransitioning(false)
@@ -53,7 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   /**
    * Handle initial session (app startup with existing session)
-   * Redirect to protected area and load workspaces in background
+   * ALWAYS starts in personal mode - navigates to /(protected)/personal
    */
   const handleInitialSession = async (session: Session | null) => {
     if (!session?.user) {
@@ -62,65 +57,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    // Show transition loading
     setTransitioning(true)
     setLoading(false)
     
-    // ALWAYS clear the stored workspace ID on app start to force personal mode
-    // This ensures users ALWAYS start with their personal profile
+    // Clear workspace ID to ensure personal mode
     await supabase.auth.updateUser({
       data: { active_workspace_id: null }
     }).catch(err => console.error("Failed to clear workspace ID:", err))
     
-    // Force workspace store to personal mode
+    // Force personal mode in store
     useWorkspaceStore.getState().setActiveWorkspace(null)
     
-    // Load workspaces in background (non-blocking)
-    // This will also set activeWorkspaceId to null
+    // Load workspaces in background
     useWorkspaceStore.getState().loadWorkspaces().catch(err => 
       console.error("Background workspace load error:", err)
     )
     
-    // Navigate with smooth transition
+    // Navigate to personal mode
     setTimeout(() => {
-      router.replace("/(protected)/workspace")
+      router.replace("/(protected)/personal" as any)
       setTransitioning(false)
     }, 800)
   }
 
   /**
-   * Handle new sign in - redirect to protected area and load workspaces
+   * Handle new sign in - redirect to personal mode
    */
   const handleSignIn = async (session: Session | null) => {
     if (!session?.user) return
 
-    // Show transition loading
     setTransitioning(true)
     setLoading(false)
     
-    // Load workspaces in background (non-blocking)
+    // Load workspaces in background
     useWorkspaceStore.getState().loadWorkspaces().catch(err => 
       console.error("Background workspace load error:", err)
     )
     
-    // Navigate with smooth transition
+    // Navigate to personal mode
     setTimeout(() => {
-      router.replace("/(protected)/workspace")
+      router.replace("/(protected)/personal" as any)
       setTransitioning(false)
     }, 800)
   }
 
   /**
-   * Switch active workspace
-   * Updates user.user_metadata.active_workspace_id (SINGLE SOURCE OF TRUTH)
+   * Switch active workspace - updates user metadata and navigates
    */
   const switchWorkspace = async (workspaceId: string | null) => {
     if (__DEV__) console.log("switchWorkspace", workspaceId)
     
     try {
-      // Update user metadata (SINGLE SOURCE OF TRUTH)
+      // Update user metadata
       await supabase.auth.updateUser({
-        data: { active_workspace_id: workspaceId }  // null = personal mode
+        data: { active_workspace_id: workspaceId }
       })
 
       // Refresh user to get updated metadata
@@ -129,8 +119,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(updatedUser)
       }
 
-      // Update workspace store to reflect the change
+      // Update workspace store
       useWorkspaceStore.getState().setActiveWorkspace(workspaceId)
+      
+      // Navigate to appropriate route
+      if (workspaceId) {
+        router.replace(`/(protected)/org/${workspaceId}` as any)
+      } else {
+        router.replace("/(protected)/personal" as any)
+      }
     } catch (error) {
       console.error("Switch workspace error:", error)
       throw error
@@ -147,7 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   /**
-   * Main auth state change handler - routes to specific handlers
+   * Main auth state change handler
    */
   const handleAuthStateChange = async (
     event: string,
@@ -173,7 +170,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         break
 
       default:
-        // Handle other events (TOKEN_REFRESHED, etc.)
         setLoading(false)
         break
     }
@@ -184,13 +180,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // ═══════════════════════════════════════════════════
 
   useEffect(() => {
-    // Initialize session on mount
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
       
-      // Load workspaces in background (non-blocking)
       if (session?.user) {
         useWorkspaceStore.getState().loadWorkspaces().catch((err: Error) => 
           console.error("Background workspace load error:", err)
@@ -198,7 +192,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })
 
-    // Subscribe to auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       handleAuthStateChange
     )
@@ -206,20 +199,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Initialize AuthenticatedClient ONCE when component mounts
-  // The context provider function reads from refs/stores at call time,
-  // so it always gets fresh values without needing re-initialization
+  // Initialize AuthenticatedClient
   useEffect(() => {
     AuthenticatedClient.initialize(
-      // Token provider - always gets fresh session
       async () => {
         const { data: { session } } = await supabase.auth.getSession()
         return session?.access_token ?? ""
       },
-      // Context provider - reads fresh values each time it's called
       () => {
-        // Get current user from Supabase (not from closure to avoid stale values)
-        // Note: This is synchronous, so we rely on the user state being updated first
         const currentUser = user
         if (!currentUser) return null
         
@@ -232,7 +219,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
     )
-  }, [user]) // Re-initialize when user changes
+  }, [user])
 
   const signUp = async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email, password })
@@ -268,17 +255,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
-    // Clear workspace store FIRST
     useWorkspaceStore.getState().reset()
-    
-    // Sign out from Supabase (triggers SIGNED_OUT event)
     await supabase.auth.signOut()
-    
-    // Clear local state
     setUser(null)
     setSession(null)
-    
-    // Navigation will be handled by handleSignOut via SIGNED_OUT event
   }
 
   return (
