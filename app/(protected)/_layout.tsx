@@ -117,6 +117,36 @@ export default function ProtectedLayout() {
             sheetLargestUndimmedDetentIndex: 0,
           }}
         />
+        
+        {/* Accept Invite - Native Form Sheet */}
+        <Stack.Screen
+          name="acceptInvite"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.background + '44' },
+            sheetAllowedDetents: [0.6, 0.85],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: 0,
+          }}
+        />
+        
+        {/* Create Workspace - Native Form Sheet */}
+        <Stack.Screen
+          name="createWorkspace"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.background + '44' },
+            sheetAllowedDetents: [0.7, 0.9],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: 0,
+          }}
+        />
       </Stack>
 
       {/* Global Sheets - Available in both modes */}

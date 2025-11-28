@@ -1,18 +1,14 @@
-import { useModals } from "@/contexts/ModalContext";
 import { useColors } from "@/hooks/ui/useColors";
 import { useAppContext } from "@/hooks/useAppContext";
-import { createOrgWorkspace } from "@/services/workspaceService";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from 'expo-haptics';
 import { router } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo } from "react";
 import {
-    Alert,
     ScrollView,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
     View,
 } from "react-native";
@@ -20,17 +16,15 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 
 /**
  * WORKSPACE SWITCHER - Native Form Sheet
+ * 
+ * Lists workspaces and allows switching.
+ * + button → separate createWorkspace sheet
+ * Enter button → separate acceptInvite sheet
  */
 export default function WorkspaceSwitcherSheet() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { acceptInviteSheetRef, setOnInviteAccepted } = useModals();
-  
   const { userId, activeWorkspaceId, workspaces, loading } = useAppContext();
-
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [workspaceName, setWorkspaceName] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
 
   const groupedWorkspaces = useMemo(() => {
     const myWorkspaces = workspaces.filter(w => w.created_by === userId);
@@ -40,15 +34,11 @@ export default function WorkspaceSwitcherSheet() {
 
   const handleSelectWorkspace = useCallback((workspaceId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
-    // Show full-screen loader
     useWorkspaceStore.getState().setIsSwitching(true);
-
     
     setTimeout(() => {
       useWorkspaceStore.getState().setActiveWorkspace(workspaceId);
       router.replace('/(protected)/org' as any);
-      // Hide loader after navigation starts
       setTimeout(() => {
         useWorkspaceStore.getState().setIsSwitching(false);
       }, 300);
@@ -57,73 +47,34 @@ export default function WorkspaceSwitcherSheet() {
 
   const handleSwitchToPersonal = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
-    // Show full-screen loader
     useWorkspaceStore.getState().setIsSwitching(true);
     
     setTimeout(() => {
       useWorkspaceStore.getState().setActiveWorkspace(null);
       router.replace('/(protected)/personal' as any);
-      // Hide loader after navigation starts
       setTimeout(() => {
         useWorkspaceStore.getState().setIsSwitching(false);
       }, 300);
     }, 200);
   }, []);
 
-  const handleCreateWorkspace = useCallback(async () => {
-    if (!workspaceName.trim()) {
-      Alert.alert("Error", "Please enter a workspace name");
-      return;
-    }
-
-    setIsCreating(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    
-    try {
-      const newWorkspace = await createOrgWorkspace({
-        name: workspaceName.trim(),
-        description: undefined,
-      });
-      
-      await useWorkspaceStore.getState().loadWorkspaces();
-      
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Show loader, set workspace and navigate
-      useWorkspaceStore.getState().setIsSwitching(true);
-      useWorkspaceStore.getState().setActiveWorkspace(newWorkspace.id);
-      setTimeout(() => {
-        router.replace('/(protected)/org' as any);
-        setTimeout(() => {
-          useWorkspaceStore.getState().setIsSwitching(false);
-        }, 300);
-      }, 200);
-    } catch (error: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Error", "Failed to create workspace");
-    } finally {
-      setIsCreating(false);
-    }
-  }, [workspaceName]);
+  const handleCreateWorkspace = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Opens separate sheet
+    router.push('/(protected)/createWorkspace' as any);
+  }, []);
 
   const handleJoinWorkspace = useCallback(() => {
-    if (router.canGoBack()) {
-      router.back();
-    }
-    setOnInviteAccepted(() => async () => {
-      await useWorkspaceStore.getState().loadWorkspaces();
-    });
-    setTimeout(() => {
-      acceptInviteSheetRef.current?.open();
-    }, 300);
-  }, [acceptInviteSheetRef, setOnInviteAccepted]);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Opens separate sheet
+    router.push('/(protected)/acceptInvite' as any);
+  }, []);
 
   return (
     <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card + '44' }]} edges={['bottom']}>
-      {/* Native grabber takes ~20pt, add spacing */}
       <View style={styles.grabberSpacer} />
       
-      {/* Fixed Header */}
+      {/* Header */}
       <View style={[styles.headerContainer, { borderBottomColor: colors.border }]}>
         <View style={styles.headerContent}>
           <Text style={[styles.title, { color: colors.text }]}>Workspaces</Text>
@@ -142,51 +93,20 @@ export default function WorkspaceSwitcherSheet() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.iconBtn, styles.primaryBtn, { backgroundColor: colors.primary }]}
-            onPress={() => {
-              setShowCreateForm(!showCreateForm);
-              setWorkspaceName("");
-            }}
+            onPress={handleCreateWorkspace}
             activeOpacity={0.7}
           >
-            <Ionicons name={showCreateForm ? "close" : "add"} size={20} color="#fff" />
+            <Ionicons name="add" size={20} color="#fff" />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Scrollable Content */}
+      {/* Content */}
       <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
       >
-        {/* Create Form */}
-        {showCreateForm && (
-          <View style={[styles.createCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.createLabel, { color: colors.text }]}>New Organization</Text>
-            <View style={[styles.inputWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                placeholder="Organization name..."
-                placeholderTextColor={colors.textMuted}
-                value={workspaceName}
-                onChangeText={setWorkspaceName}
-                autoFocus
-                returnKeyType="done"
-                onSubmitEditing={handleCreateWorkspace}
-              />
-            </View>
-            <TouchableOpacity
-              style={[styles.createBtn, { backgroundColor: workspaceName.trim() ? colors.primary : colors.muted }]}
-              onPress={handleCreateWorkspace}
-              disabled={!workspaceName.trim() || isCreating}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.createBtnText}>{isCreating ? "Creating..." : "Create"}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
         {/* Personal Mode */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>PERSONAL</Text>
@@ -315,13 +235,9 @@ const styles = StyleSheet.create({
   sheet: {
     flex: 1,
   },
-  
-  // Space below native grabber
   grabberSpacer: {
     height: 12,
   },
-
-  // Header - Fixed at top
   headerContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -365,8 +281,6 @@ const styles = StyleSheet.create({
   primaryBtn: {
     borderWidth: 0,
   },
-
-  // Scroll
   scrollView: {
     flex: 1,
   },
@@ -374,41 +288,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
   },
-
-  // Create Card
-  createCard: {
-    marginBottom: 20,
-    padding: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 12,
-  },
-  createLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  inputWrapper: {
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  input: {
-    height: 44,
-    paddingHorizontal: 14,
-    fontSize: 15,
-  },
-  createBtn: {
-    height: 44,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  createBtnText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
-  // Sections
   section: {
     marginBottom: 24,
   },
@@ -419,8 +298,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginLeft: 2,
   },
-
-  // Row
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -475,8 +352,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginLeft: 8,
   },
-
-  // Empty State
   emptyState: {
     alignItems: 'center',
     paddingVertical: 48,
