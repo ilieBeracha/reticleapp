@@ -1,5 +1,6 @@
+import { router } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { useCallback } from 'react';
-import { useModals } from '@/contexts/ModalContext';
 
 interface UseWorkspaceActionsReturn {
   onStartSession: () => void;
@@ -8,15 +9,15 @@ interface UseWorkspaceActionsReturn {
 }
 
 export function useWorkspaceActions(): UseWorkspaceActionsReturn {
-  const { createTeamSheetRef, createSessionSheetRef } = useModals();
-
   const onStartSession = useCallback(() => {
-    createSessionSheetRef.current?.open();
-  }, [createSessionSheetRef]);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push('/(protected)/createSession' as any);
+  }, []);
 
   const onCreateTeam = useCallback(() => {
-    createTeamSheetRef.current?.open();
-  }, [createTeamSheetRef]);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push('/(protected)/createTeam' as any);
+  }, []);
 
   const onSettingsPress = useCallback(() => {
     // TODO: Navigate to settings or show settings modal

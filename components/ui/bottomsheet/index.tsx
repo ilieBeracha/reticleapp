@@ -232,7 +232,7 @@ export const BottomSheetContent = ({ ...props }: IBottomSheetContent) => {
         })}
       >
         {visible && (
-          <FocusScope contain={visible} autoFocus={true} restoreFocus={true}>
+          <FocusScope contain={visible} restoreFocus={true}>
             {props.children}
           </FocusScope>
         )}

@@ -9,10 +9,10 @@ import {
   deleteTeam as deleteTeamService,
   getTeamWithMembers,
   getWorkspaceTeams,
+  OrgCreateTeamInput,
   removeTeamMember as removeTeamMemberService,
   updateTeam as updateTeamService,
   type AddTeamMemberInput,
-  type CreateTeamInput,
   type UpdateTeamInput
 } from '@/services/teamService';
 import type { Team, TeamWithMembers } from '@/types/workspace';
@@ -25,8 +25,8 @@ interface TeamStore {
   error: string | null;
 
   // Actions
-  loadTeams: (workspaceType: 'personal' | 'org', workspaceId: string) => Promise<void>;
-  createTeam: (input: CreateTeamInput) => Promise<Team>;
+  loadTeams: (orgWorkspaceId: string) => Promise<void>;  // Simplified - always org
+  createTeam: (input: OrgCreateTeamInput) => Promise<Team>;
   loadTeam: (teamId: string) => Promise<void>;
   updateTeam: (input: UpdateTeamInput) => Promise<void>;
   deleteTeam: (teamId: string) => Promise<void>;
@@ -42,12 +42,12 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
   error: null,
 
   /**
-   * Load teams for a workspace
+   * Load teams for a workspace (simplified - always org)
    */
-  loadTeams: async (workspaceType: 'personal' | 'org', workspaceId: string) => {
+  loadTeams: async (orgWorkspaceId: string) => {
     try {
       set({ loading: true, error: null });
-      const teams = await getWorkspaceTeams(workspaceType, workspaceId);
+      const teams = await getWorkspaceTeams(orgWorkspaceId);
       set({ teams, loading: false });
     } catch (error: any) {
       console.error('Failed to load teams:', error);
@@ -59,7 +59,7 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
   /**
    * Create a new team
    */
-  createTeam: async (input: CreateTeamInput) => {
+  createTeam: async (input: OrgCreateTeamInput) => {
     try {
       set({ loading: true, error: null });
       const newTeam = await createTeamService(input);

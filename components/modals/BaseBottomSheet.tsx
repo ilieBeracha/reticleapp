@@ -15,10 +15,12 @@ interface BaseBottomSheetProps {
   enableDynamicSizing?: boolean;
   backdropOpacity?: number;
   scrollToRefresh?: boolean;
+  enablePanDownToClose?: boolean;
+  closeOnBackdropPress?: boolean;
 }
 
 export const BaseBottomSheet = forwardRef<BaseBottomSheetRef, BaseBottomSheetProps>(
-  ({ children, snapPoints, enableDynamicSizing = false, backdropOpacity = 0.8, scrollToRefresh = false }, ref) => {
+  ({ children, snapPoints, enableDynamicSizing = false, backdropOpacity = 0.8, scrollToRefresh = false, enablePanDownToClose = true, closeOnBackdropPress = true }, ref) => {
     const colors = useColors();
     const bottomSheetRef = useRef<BottomSheet>(null);
 
@@ -49,7 +51,7 @@ export const BaseBottomSheet = forwardRef<BaseBottomSheetRef, BaseBottomSheetPro
         index={-1}
         snapPoints={enableDynamicSizing ? undefined : defaultSnapPoints}
         enableDynamicSizing={enableDynamicSizing}
-        enablePanDownToClose={true}
+        enablePanDownToClose={enablePanDownToClose}
         backdropComponent={renderBackdrop}
         backgroundStyle={[styles.bottomSheetBackground, { backgroundColor: colors.background + 'F2' }]}
         handleIndicatorStyle={[styles.handleIndicator, { backgroundColor: colors.textMuted + '4D' }]}
