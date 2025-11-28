@@ -1,9 +1,11 @@
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
-import { BellIcon, ChevronDownIcon } from 'lucide-react-native';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { BellIcon } from 'lucide-react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { BaseAvatar } from './BaseAvatar';
-
+import { Text } from './ui/text';
+  
 interface HeaderProps {
   notificationCount?: number;
   onNotificationPress?: () => void;
@@ -17,14 +19,15 @@ export function Header({ notificationCount = 0, onNotificationPress, onUserPress
 
   const fallbackInitial = email?.charAt(0)?.toUpperCase() ?? '?';
   const workspaceName =
-    activeWorkspace?.workspace_type === 'personal' ? 'Personal' : activeWorkspace?.workspace_name || 'Workspace';
+    activeWorkspace?.workspace_name || 'Workspace';
+
 
   return (
     <View style={styles.wrapper}>
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container]}>
         {/* Left Section */}
         <View style={styles.left}>
-          <Pressable onPress={onUserPress} style={({ pressed }) => [styles.avatar, { opacity: pressed ? 0.6 : 1 }]}>
+          <TouchableOpacity onPress={onUserPress} style={[styles.avatar, { opacity:1 }]}>
             <View style={[styles.avatarRing, { borderColor: colors.primary + '20' }]}>
               <BaseAvatar
                 source={avatarUrl ? { uri: avatarUrl } : undefined}
@@ -33,44 +36,44 @@ export function Header({ notificationCount = 0, onNotificationPress, onUserPress
                 borderWidth={0}
               />
             </View>
-          </Pressable>
+          </TouchableOpacity>
 
-          <Pressable
-            onPress={onWorkspacePress}
-            style={({ pressed }) => [styles.workspace, { backgroundColor: pressed ? colors.secondary : 'transparent' }]}
-          >
-            <Text style={[styles.workspaceText, { color: colors.text }]} numberOfLines={1}>
-              {workspaceName}
-            </Text>
-
-            <ChevronDownIcon size={16} color={colors.tint} strokeWidth={2.5} />
-          </Pressable>
-        </View>
-
-        {/* Right Section */}
-        <Pressable
-          onPress={onNotificationPress}
-          style={({ pressed }) => [styles.notification, pressed && { opacity: 0.8 }]}
-        >
-          <BellIcon size={18} color={colors.tint} strokeWidth={2} />
-        </Pressable>
+      <TouchableOpacity style={styles.workspaceContainer} onPress={onWorkspacePress}  > 
+          <Text style={[styles.workspaceText, { color: colors.text}]}>
+            {activeWorkspace?.id ? workspaceName : 'Profile'}
+          </Text> 
+          <MaterialCommunityIcons name="chevron-right" size={20} color={colors.text} />
+        </TouchableOpacity> 
       </View>
 
-      <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+        {/* Right Section */}
+        <TouchableOpacity
+          onPress={onNotificationPress}
+          style={styles.notification}
+        >
+          <BellIcon size={18} color={colors.tint} strokeWidth={2} />
+        </TouchableOpacity>
+      </View>
+
+      <View style={[styles.divider]} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrapper: {
-    flex: 1,
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
   },
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 10,
-    height: 60,
+    display: 'flex',
+    width: '100%',
   },
   divider: {
     height: 0.5,
@@ -103,6 +106,7 @@ const styles = StyleSheet.create({
   },
   workspaceText: {
     fontSize: 17,
+    lineHeight: 24,
     fontWeight: '600',
     letterSpacing: -0.5,
     flexShrink: 1,
@@ -111,7 +115,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     display: 'flex',
     flexDirection: 'row',
-    alignItems: 'center',
+
     gap: 2,
   },
   badge: {
@@ -138,10 +142,13 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
   notification: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
+    padding: 10,
+  },
+
+  workspaceContainer: {
+    flexDirection: 'row',
+    display: 'flex',
     alignItems: 'center',
+    justifyContent: 'center',
   },
 });

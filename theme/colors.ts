@@ -23,8 +23,8 @@ const lightColors = {
   muted: "#B0B0B0",
   mutedForeground: "#6A6A6A",
 
-  // Accent colors - Logo orange
-  accent: "#E76925",
+  // Accent colors - Professional indigo
+  accent: "#5B6B8C",
   accentForeground: "#FFFFFF",
 
   // Destructive colors - Clean red
@@ -34,7 +34,7 @@ const lightColors = {
   // Border and input
   border: "#E0E0E0",
   input: "#F5F5F5",
-  ring: "#E76925",
+  ring: "#5B6B8C",
 
   // Text colors
   text: "#2A2A2A",
@@ -83,8 +83,8 @@ const darkColors = {
   muted: "#505050",
   mutedForeground: "#A0A0A0",
 
-  // Accent colors - Brand orange (slightly lighter for dark mode)
-  accent: "#FF7A3D",
+  // Accent colors - Professional indigo (lighter for dark mode)
+  accent: "#7A8BAD",
   accentForeground: "#FFFFFF",
 
   // Destructive colors - Soft red
@@ -93,8 +93,8 @@ const darkColors = {
 
   // Border and input
   border: "#3A3A3A",
-  input: "rgba(255, 122, 61, 0.15)",
-  ring: "#FF7A3D",
+  input: "rgba(122, 139, 173, 0.15)",
+  ring: "#7A8BAD",
 
   // Text colors
   text: "#E8E8E8",

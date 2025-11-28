@@ -1,141 +1,233 @@
 import { Header } from '@/components/Header';
-import { AcceptInviteSheet } from '@/components/modals/AcceptInviteSheet';
-import { ComingSoonSheet } from '@/components/modals/ComingSoonSheet';
-import { CreateSessionSheet } from '@/components/modals/CreateSessionSheet';
-import { CreateTeamSheet } from '@/components/modals/CreateTeamSheet';
-import { InviteMembersSheet } from '@/components/modals/InviteMembersSheet';
-import { UserMenuBottomSheet, UserMenuBottomSheetRef } from '@/components/modals/UserMenuBottomSheet';
-import { WorkspaceSwitcherBottomSheet, WorkspaceSwitcherRef } from '@/components/modals/WorkspaceSwitcherBottomSheet';
-import { ModalProvider, useModals } from '@/contexts/ModalContext';
+import { LoadingScreen } from '@/components/LoadingScreen';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import { useColors } from '@/hooks/ui/useColors';
-import { useAppContext } from '@/hooks/useAppContext';
-import { Stack } from 'expo-router';
-import { useRef } from 'react';
+import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import { router, Stack } from 'expo-router';
 
-function ProtectedLayoutContent() {
-  const { background, text } = useColors();
-  const { activeWorkspaceId } = useAppContext();
-  const userMenuRef = useRef<UserMenuBottomSheetRef>(null);
-  const workspaceSwitcherRef = useRef<WorkspaceSwitcherRef>(null);
-  const { 
-    chartDetailsSheetRef, 
-    createSessionSheetRef, 
-    createTeamSheetRef,
-    inviteMembersSheetRef,
-    acceptInviteSheetRef,
-    onSessionCreated,
-    onTeamCreated,
-    onMemberInvited,
-    onInviteAccepted,
-  } = useModals();
+/**
+ * Protected Layout
+ * 
+ * This layout wraps all authenticated routes.
+ * All sheets are now native form sheets via Stack.Screen.
+ * 
+ * Route Structure:
+ * - /(protected)/personal/* - Personal mode (no workspace)
+ * - /(protected)/org/* - Organization mode (store has activeWorkspaceId)
+ */
+export default function ProtectedLayout() {
+  const colors = useColors();
+  const isSwitching = useWorkspaceStore(state => state.isSwitching);
+
+  // Show full-screen loader when switching workspaces
+  if (isSwitching) {
+    return <LoadingScreen />;
+  }
 
   return (
-    <>
-      <Stack 
-        initialRouteName="index"
+    <ThemeProvider>
+      <Stack
         screenOptions={{
-          animation: 'none',
-          headerStyle: { backgroundColor: background },
+          headerShown: true,
+          headerStyle: { backgroundColor: colors.background },
           headerShadowVisible: false,
           headerTitle: () => (
             <Header
               onNotificationPress={() => {}}
-              onUserPress={() => userMenuRef.current?.open()}
-              onWorkspacePress={() => workspaceSwitcherRef.current?.open()}
+              onUserPress={() => router.push('/(protected)/userMenu')}
+              onWorkspacePress={() => router.push('/(protected)/workspaceSwitcher')}
             />
           ),
           headerTitleAlign: 'left',
-          headerTintColor: text,
+          headerTintColor: colors.text,
         }}
       >
-        <Stack.Screen name="modal" options={{ headerShown: false, presentation: 'modal', headerBlurEffect: 'light' }} />
-        <Stack.Screen 
-          name="index" 
-          options={{ headerShown: true }} 
-
-          />
-        <Stack.Screen 
-          name="workspace/personal" 
-          options={{ headerShown: true, animation: 'none' }} 
+        {/* Personal Mode Routes */}
+        <Stack.Screen name="personal" />
+        
+        {/* Organization Mode Routes */}
+        <Stack.Screen name="org" />
+        
+        {/* Liquid Glass Sheet - iOS 26+ */}
+        <Stack.Screen
+          name="liquidGlassSheet"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: "transparent" },
+            sheetAllowedDetents: [0.25, 0.5, 1],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: 0,
+          }}
         />
-        <Stack.Screen 
-          name="workspace/organization" 
-          options={{ headerShown: true, animation: 'none' }} 
+        
+        {/* Workspace Switcher */}
+        <Stack.Screen
+          name="workspaceSwitcher"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.5, 0.85, 1],
+            sheetInitialDetentIndex: 1,
+            sheetLargestUndimmedDetentIndex: -1,
+          }}
         />
+        
+        {/* Accept Invite */}
+        <Stack.Screen
+          name="acceptInvite"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.6, 0.85],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+          }}
+      />
+        
+        {/* Create Workspace */}
+        <Stack.Screen
+          name="createWorkspace"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.7, 0.9],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+        }}
+      />
+        
+        {/* User Menu */}
+        <Stack.Screen
+          name="userMenu"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.5, 0.7],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+          }}
+        />
+        
+        {/* Create Team */}
+        <Stack.Screen
+          name="createTeam"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.8, 0.95],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+        }}
+      />
+        
+        {/* Create Training */}
+        <Stack.Screen
+          name="createTraining"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.85, 0.95],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+        }}
+      />
+        
+        {/* Create Session */}
+        <Stack.Screen
+          name="createSession"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.9, 1],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+        }}
+      />
+        
+        {/* Invite Members */}
+        <Stack.Screen
+          name="inviteMembers"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.85, 0.95],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+        }}
+      />
+        
+        {/* Team Preview */}
+        <Stack.Screen
+          name="teamPreview"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.5, 0.7],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+          }}
+      />
+        
+        {/* Member Preview */}
+        <Stack.Screen
+          name="memberPreview"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.6, 0.8],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+        }}
+      />
+        
+        {/* Training Detail */}
+        <Stack.Screen
+          name="trainingDetail"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.85, 0.95],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+        }}
+      />
       </Stack>
-
-      {/* USER MENU */}
-      <UserMenuBottomSheet
-        ref={userMenuRef}
-        onSwitchOrgPress={() => workspaceSwitcherRef.current?.open()}
-      />
-
-      {/* WORKSPACE SWITCHER */}
-      <WorkspaceSwitcherBottomSheet ref={workspaceSwitcherRef} />
-
-      {/* CHART DETAILS */}
-      <ComingSoonSheet
-        ref={chartDetailsSheetRef}
-        title="Detailed Analytics"
-        subtitle="Get insights into your training patterns"
-        icon="bar-chart"
-      />
-
-      {/* CREATE SESSION */}
-      <CreateSessionSheet
-        ref={createSessionSheetRef}
-        onSessionCreated={() => {
-          createSessionSheetRef.current?.close();
-          // Call the registered callback if it exists
-          if (onSessionCreated) {
-            onSessionCreated();
-          }
-        }}
-      />
-
-      {/* CREATE TEAM */}
-      <CreateTeamSheet
-        ref={createTeamSheetRef}
-        onTeamCreated={() => {
-          createTeamSheetRef.current?.close();
-          // Call the registered callback if it exists
-          if (onTeamCreated) {
-            onTeamCreated();
-          }
-        }}
-      />
-
-      {/* INVITE MEMBERS */}
-      <InviteMembersSheet
-        ref={inviteMembersSheetRef}
-        onMemberInvited={() => {
-          // Don't close the sheet - let user see the generated code
-          // Call the registered callback if it exists
-          if (onMemberInvited) {
-            onMemberInvited();
-          }
-        }}
-      />
-
-      {/* ACCEPT INVITE */}
-      <AcceptInviteSheet
-        ref={acceptInviteSheetRef}
-        onInviteAccepted={() => {
-          acceptInviteSheetRef.current?.close();
-          // Call the registered callback if it exists
-          if (onInviteAccepted) {
-            onInviteAccepted();
-          }
-        }}
-      />
-    </>
-  );
-}
-
-export default function ProtectedLayout() {
-  return (
-    <ModalProvider>
-      <ProtectedLayoutContent />
-    </ModalProvider>
+    </ThemeProvider>
   );
 }

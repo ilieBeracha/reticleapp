@@ -4,12 +4,10 @@
  */
 
 import { supabase } from '@/lib/supabase';
-import type { Team, TeamMember, TeamMemberDetails, TeamMemberShip, TeamWithMembers } from '@/types/workspace';
+import type { Team, TeamMember, TeamMemberShip, TeamWithMembers } from '@/types/workspace';
 
-export interface CreateTeamInput {
-  workspace_type: 'personal' | 'org';
-  workspace_owner_id?: string;  // For personal workspace
-  org_workspace_id?: string;    // For org workspace
+export interface OrgCreateTeamInput {
+  org_workspace_id: string;    // For org workspace
   name: string;
   description?: string;
   squads?: string[];  // Optional array of squad names
@@ -25,23 +23,23 @@ export interface UpdateTeamInput {
 export interface AddTeamMemberInput {
   team_id: string;
   user_id: string;
-  role: TeamMemberShip;
-  details?: TeamMemberDetails; // NEW
+  role: TeamMemberShip; 
+  details?: any; // NEW
 }
 
 /**
  * Create a new team
  */
-export async function createTeam(input: CreateTeamInput): Promise<Team> {
+export async function createTeam(input: OrgCreateTeamInput): Promise<Team> {
   const { data, error } = await supabase
-    .rpc('create_team', {
-      p_workspace_type: input.workspace_type,
-      p_name: input.name,
-      p_workspace_owner_id: input.workspace_owner_id || null,
-      p_org_workspace_id: input.org_workspace_id || null,
-      p_description: input.description || null,
-      p_squads: input.squads || [],
+    .from('teams')
+    .insert({
+      org_workspace_id: input.org_workspace_id,
+      name: input.name,
+      description: input.description || null,
+      squads: input.squads || [],
     })
+    .select()
     .single();
 
   if (error) {
@@ -56,19 +54,14 @@ export async function createTeam(input: CreateTeamInput): Promise<Team> {
  * Get teams for a workspace with member count
  */
 export async function getWorkspaceTeams(
-  workspaceType: 'personal' | 'org',
-  workspaceId: string
+  orgWorkspaceId: string
 ): Promise<(Team & { member_count?: number })[]> {
   let query = supabase
     .from('teams')
     .select('*, team_members(count)')
     .order('created_at', { ascending: false });
 
-  if (workspaceType === 'personal') {
-    query = query.eq('workspace_owner_id', workspaceId);
-  } else {
-    query = query.eq('org_workspace_id', workspaceId);
-  }
+    query = query.eq('org_workspace_id', orgWorkspaceId);
 
   const { data, error } = await query;
 
@@ -152,70 +145,81 @@ export async function deleteTeam(teamId: string): Promise<void> {
 }
 
 /**
- * Add a member to a team
+ * Add a member to a team (uses RPC to avoid RLS recursion)
  */
 export async function addTeamMember(input: AddTeamMemberInput): Promise<TeamMember> {
-  const { data, error } = await supabase
-    .from('team_members')
-    .insert({
-      team_id: input.team_id,
-      user_id: input.user_id,
-      role: input.role,
-      details: input.details || {}, // NEW
-    })
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc('add_team_member', {
+    p_team_id: input.team_id,
+    p_user_id: input.user_id,
+    p_role: input.role,
+    p_details: input.details || null,
+  });
 
   if (error) {
     console.error('Failed to add team member:', error);
     throw new Error(error.message || 'Failed to add team member');
   }
 
-  return data as TeamMember;
+  // RPC returns JSONB, extract the team member data
+  const result = data as any;
+  return {
+    team_id: result.team_id,
+    user_id: result.user_id,
+    role: result.role,
+    details: result.details,
+    joined_at: result.joined_at,
+  } as TeamMember;
 }
 
 /**
- * Remove a member from a team
+ * Remove a member from a team (uses RPC to avoid RLS recursion)
  */
 export async function removeTeamMember(teamId: string, userId: string): Promise<void> {
-  const { error } = await supabase
-    .from('team_members')
-    .delete()
-    .eq('team_id', teamId)
-    .eq('user_id', userId);
+  const { data, error } = await supabase.rpc('remove_team_member', {
+    p_team_id: teamId,
+    p_user_id: userId,
+  });
 
   if (error) {
     console.error('Failed to remove team member:', error);
     throw new Error(error.message || 'Failed to remove team member');
   }
+
+  if (!data) {
+    throw new Error('Failed to remove team member');
+  }
 }
 
 /**
- * Update team member role & details
+ * Update team member role & details (uses RPC to avoid RLS recursion)
  */
 export async function updateTeamMemberRole(
   teamId: string,
   userId: string,
   role: TeamMemberShip,
-  details?: TeamMemberDetails // NEW
+  details?: any // NEW
 ): Promise<TeamMember> {
-  const updates: any = { role };
-  if (details) updates.details = details;
-
-  const { data, error } = await supabase
-    .from('team_members')
-    .update(updates)
-    .eq('team_id', teamId)
-    .eq('user_id', userId)
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc('update_team_member_role', {
+    p_team_id: teamId,
+    p_user_id: userId,
+    p_role: role,
+    p_details: details || null,
+  });
 
   if (error) {
     console.error('Failed to update team member role:', error);
     throw new Error(error.message || 'Failed to update team member role');
   }
 
-  return data as TeamMember;
+  // RPC returns JSONB, extract the team member data
+  const result = data as any;
+  return {
+    team_id: result.team_id,
+    user_id: result.user_id,
+    role: result.role,
+    details: result.details,
+    joined_at: result.joined_at,
+  } as TeamMember;
 }
 
 /**
@@ -237,4 +241,33 @@ export async function getTeamMembers(teamId: string): Promise<(TeamMember & { pr
   }
 
   return data || [];
+}
+
+/**
+ * Commander status for a team - shows availability of commander roles
+ */
+export interface TeamCommanderStatus {
+  has_commander: boolean;
+  has_pending_commander: boolean;
+  commander_name: string | null;
+  squads: string[];
+  squads_with_commanders: string[];
+  squads_available: string[];
+}
+
+/**
+ * Get commander status for a team
+ * Used to show which roles are available when creating invitations
+ */
+export async function getTeamCommanderStatus(teamId: string): Promise<TeamCommanderStatus> {
+  const { data, error } = await supabase.rpc('get_team_commander_status', {
+    p_team_id: teamId,
+  });
+
+  if (error) {
+    console.error('Failed to get team commander status:', error);
+    throw new Error(error.message || 'Failed to get team commander status');
+  }
+
+  return data as TeamCommanderStatus;
 }

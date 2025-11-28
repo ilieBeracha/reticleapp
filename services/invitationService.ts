@@ -1,4 +1,4 @@
-import type { TeamMemberDetails, TeamMemberShip, WorkspaceInvitation, WorkspaceInvitationWithDetails, WorkspaceRole } from '@/types/workspace';
+import type { TeamMemberShip, WorkspaceInvitation, WorkspaceInvitationWithDetails, WorkspaceRole } from '@/types/workspace';
 import { AuthenticatedClient } from './authenticatedClient';
 
 /**
@@ -21,7 +21,7 @@ export async function createInvitation(
     role: WorkspaceRole = 'member',
     teamId?: string | null,
     teamRole?: TeamMemberShip | null,
-    teamDetails?: TeamMemberDetails
+    teamDetails?: Record<string, any>
   ): Promise<WorkspaceInvitation> {
   const supabase = await AuthenticatedClient.getClient();
 
@@ -144,6 +144,7 @@ export async function getWorkspaceInvitations(orgWorkspaceId: string): Promise<W
  */
 export async function getPendingInvitations(orgWorkspaceId: string): Promise<WorkspaceInvitationWithDetails[]> {
   const invitations = await getWorkspaceInvitations(orgWorkspaceId);
+  if (__DEV__) console.log('invitations', invitations);
   const now = new Date();
 
   return invitations.filter((inv) => inv.status === 'pending' && new Date(inv.expires_at) > now);

@@ -28,8 +28,8 @@ export const Colors = {
     mutedForeground: "#6A6A6A",
     textMuted: "#6A6A6A",
     
-    // Accent colors - Logo orange
-    accent: "#E76925",
+    // Accent colors - Professional indigo
+    accent: "#5B6B8C",
     accentForeground: "#FFFFFF",
     
     // Destructive colors - Clean red
@@ -39,7 +39,7 @@ export const Colors = {
     // Border and input
     border: "#E0E0E0",
     input: "#F5F5F5",
-    ring: "#E76925",
+    ring: "#5B6B8C",
     
     // Legacy support
     icon: "#6A6A6A",
@@ -93,8 +93,8 @@ export const Colors = {
     mutedForeground: "#A0A0A0",
     textMuted: "#A0A0A0",
     
-    // Accent colors - Brand orange (slightly lighter for dark mode)
-    accent: "#FF7A3D",
+    // Accent colors - Professional indigo (lighter for dark mode)
+    accent: "#7A8BAD",
     accentForeground: "#FFFFFF",
     
     // Destructive colors - Soft red
@@ -103,8 +103,8 @@ export const Colors = {
     
     // Border and input
     border: "#3A3A3A",
-    input: "rgba(255, 122, 61, 0.15)",
-    ring: "#FF7A3D",
+    input: "rgba(122, 139, 173, 0.15)",
+    ring: "#7A8BAD",
     
     // Legacy support
     icon: "#A0A0A0",

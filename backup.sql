@@ -25,7 +25,6 @@ COMMENT ON SCHEMA "public" IS 'standard public schema';
 
 CREATE OR REPLACE FUNCTION "public"."accept_invite_code"("p_invite_code" "text", "p_user_id" "uuid") RETURNS json
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public'
     AS $$
 DECLARE
   v_validation json;
@@ -33,95 +32,64 @@ DECLARE
   v_org_workspace_id uuid;
   v_role text;
   v_invitation_id uuid;
+  v_team_id uuid;
+  v_team_role text;
+  v_details jsonb;
 BEGIN
-  -- ============================================
-  -- 1. VALIDATE THE INVITATION
-  -- ============================================
-  
-  -- Call validate_invite_code to perform all security checks
+  -- 1. VALIDATE
   v_validation := validate_invite_code(p_invite_code, p_user_id);
   
-  -- Check if validation passed
   IF NOT (v_validation->>'valid')::boolean THEN
-    RETURN json_build_object(
-      'success', false,
-      'error', v_validation->>'error'
-    );
+    RETURN json_build_object('success', false, 'error', v_validation->>'error');
   END IF;
   
-  -- Extract invitation details from validation result
   v_invitation := v_validation->'invitation';
   v_org_workspace_id := (v_invitation->>'org_workspace_id')::uuid;
   v_role := v_invitation->>'role';
   v_invitation_id := (v_invitation->>'id')::uuid;
+  
+  -- Extract team info (handle nulls safely)
+  IF (v_invitation->>'team_id') IS NOT NULL THEN
+    v_team_id := (v_invitation->>'team_id')::uuid;
+    v_team_role := v_invitation->>'team_role';
+    -- Extract details safely
+    IF (v_invitation->>'details') IS NOT NULL THEN
+        v_details := (v_invitation->'details');
+    ELSE 
+        v_details := '{}'::jsonb;
+    END IF;
+  END IF;
 
-  -- ============================================
-  -- 2. ADD USER TO WORKSPACE (ATOMIC)
-  -- ============================================
+  -- 2. ADD TO WORKSPACE (removed non-existent workspace_type column)
+  INSERT INTO workspace_access (org_workspace_id, member_id, role)
+  VALUES (v_org_workspace_id, p_user_id, v_role)
+  ON CONFLICT (org_workspace_id, member_id) DO NOTHING;
   
-  -- Insert workspace access
-  INSERT INTO workspace_access (
-    workspace_type,
-    org_workspace_id,
-    member_id,
-    role
-  ) VALUES (
-    'org',
-    v_org_workspace_id,
-    p_user_id,
-    v_role
-  );
+  -- 3. ADD TO TEAM (if applicable)
+  IF v_team_id IS NOT NULL THEN
+    INSERT INTO team_members (team_id, user_id, role, details)
+    VALUES (v_team_id, p_user_id, v_team_role, COALESCE(v_details, '{}'::jsonb))
+    ON CONFLICT (team_id, user_id) DO UPDATE 
+    SET role = v_team_role,
+        details = COALESCE(v_details, team_members.details);
+  END IF;
   
-  -- ============================================
-  -- 3. UPDATE INVITATION STATUS (ATOMIC)
-  -- ============================================
-  
-  -- Mark invitation as accepted
+  -- 4. UPDATE INVITATION
   UPDATE workspace_invitations
-  SET 
-    status = 'accepted',
-    accepted_by = p_user_id,
-    accepted_at = now(),
-    updated_at = now()
-  WHERE id = v_invitation_id
-    AND status = 'pending'; -- Extra safety check
-  
-  -- ============================================
-  -- RETURN SUCCESS
-  -- ============================================
+  SET status = 'accepted', accepted_by = p_user_id, accepted_at = now(), updated_at = now()
+  WHERE id = v_invitation_id AND status = 'pending';
   
   RETURN json_build_object(
     'success', true,
     'workspace_id', v_org_workspace_id,
     'workspace_name', v_invitation->>'workspace_name',
-    'role', v_role
+    'role', v_role,
+    'team_id', v_team_id
   );
-
-
 EXCEPTION
-  -- Handle duplicate membership (shouldn't happen due to validation, but safety check)
-  WHEN unique_violation THEN
-    RETURN json_build_object(
-      'success', false,
-      'error', 'You are already a member of this workspace'
-    );
-  
-  -- Handle foreign key violations
-  WHEN foreign_key_violation THEN
-    RETURN json_build_object(
-      'success', false,
-      'error', 'Invalid workspace or user reference'
-    );
-  
-  -- Handle any other errors
   WHEN OTHERS THEN
-    -- Log error for debugging (will show in Supabase logs)
     RAISE WARNING 'Error accepting invitation: %', SQLERRM;
-    
-    RETURN json_build_object(
-      'success', false,
-      'error', 'Failed to accept invitation. Please try again.'
-    );
+    RETURN json_build_object('success', false, 'error', 'Failed to accept invitation.');
 END;
 $$;
 
@@ -135,11 +103,157 @@ Returns JSON with success flag and workspace details or error message.';
 
 
 
-CREATE OR REPLACE FUNCTION "public"."create_org_workspace"("p_name" "text", "p_description" "text" DEFAULT NULL::"text") RETURNS TABLE("id" "uuid", "name" "text", "description" "text", "workspace_slug" "text", "created_by" "uuid", "created_at" timestamp with time zone)
+CREATE OR REPLACE FUNCTION "public"."add_team_member"("p_team_id" "uuid", "p_user_id" "uuid", "p_role" "text", "p_details" "jsonb" DEFAULT NULL::"jsonb") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
 DECLARE
+  v_team record;
+  v_has_permission boolean := false;
+  v_result jsonb;
+BEGIN
+  -- Get team info
+  SELECT * INTO v_team FROM teams WHERE id = p_team_id;
+  
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Team not found';
+  END IF;
+
+  -- Check permissions: must be workspace admin/owner OR team commander
+  -- For org workspaces
+  IF v_team.org_workspace_id IS NOT NULL THEN
+    SELECT EXISTS (
+      SELECT 1 FROM workspace_access
+      WHERE org_workspace_id = v_team.org_workspace_id
+        AND member_id = auth.uid()
+        AND role IN ('owner', 'admin')
+    ) INTO v_has_permission;
+    
+    -- Also allow team commanders (but use SECURITY DEFINER to avoid recursion)
+    IF NOT v_has_permission THEN
+      -- Direct query without triggering RLS
+      PERFORM 1 FROM team_members
+      WHERE team_id = p_team_id
+        AND user_id = auth.uid()
+        AND role IN ('commander', 'squad_commander');
+      
+      v_has_permission := FOUND;
+    END IF;
+  -- For personal workspaces
+  ELSIF v_team.workspace_owner_id IS NOT NULL THEN
+    SELECT EXISTS (
+      SELECT 1 FROM workspace_access
+      WHERE workspace_owner_id = v_team.workspace_owner_id
+        AND member_id = auth.uid()
+        AND role IN ('owner', 'admin')
+    ) INTO v_has_permission;
+    
+    IF NOT v_has_permission THEN
+      PERFORM 1 FROM team_members
+      WHERE team_id = p_team_id
+        AND user_id = auth.uid()
+        AND role IN ('commander', 'squad_commander');
+      
+      v_has_permission := FOUND;
+    END IF;
+  END IF;
+
+  IF NOT v_has_permission THEN
+    RAISE EXCEPTION 'Permission denied: must be workspace admin or team commander';
+  END IF;
+
+  -- Verify user exists
+  IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_user_id) THEN
+    RAISE EXCEPTION 'User not found';
+  END IF;
+
+  -- Insert team member (with SECURITY DEFINER, bypasses RLS)
+  INSERT INTO team_members (team_id, user_id, role, details)
+  VALUES (p_team_id, p_user_id, p_role, p_details)
+  ON CONFLICT (team_id, user_id) 
+  DO UPDATE SET 
+    role = EXCLUDED.role,
+    details = EXCLUDED.details;
+
+  -- Return the created/updated member with profile info
+  SELECT jsonb_build_object(
+    'team_id', tm.team_id,
+    'user_id', tm.user_id,
+    'role', tm.role,
+    'details', tm.details,
+    'joined_at', tm.joined_at,
+    'profile', jsonb_build_object(
+      'id', p.id,
+      'email', p.email,
+      'full_name', p.full_name,
+      'avatar_url', p.avatar_url
+    )
+  ) INTO v_result
+  FROM team_members tm
+  JOIN profiles p ON p.id = tm.user_id
+  WHERE tm.team_id = p_team_id AND tm.user_id = p_user_id;
+
+  RETURN v_result;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."add_team_member"("p_team_id" "uuid", "p_user_id" "uuid", "p_role" "text", "p_details" "jsonb") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."add_team_member"("p_team_id" "uuid", "p_user_id" "uuid", "p_role" "text", "p_details" "jsonb") IS 'Safely adds a team member with permission checks, bypassing RLS recursion. Can be called by workspace admins or team commanders.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."check_team_member_is_workspace_member"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+DECLARE
+  v_org_workspace_id UUID;
+  v_user_role TEXT;
+BEGIN
+  -- Get the org workspace id for this team
+  SELECT org_workspace_id
+  INTO v_org_workspace_id
+  FROM teams
+  WHERE id = NEW.team_id;
+
+  -- Only check for org workspaces (personal workspaces won't have org_workspace_id)
+  IF v_org_workspace_id IS NOT NULL THEN
+    -- Check if user is a member of the organization and get their role
+    SELECT role INTO v_user_role
+    FROM workspace_access
+    WHERE org_workspace_id = v_org_workspace_id
+      AND member_id = NEW.user_id;
+
+    -- User must exist in the org
+    IF v_user_role IS NULL THEN
+      RAISE EXCEPTION 'User must be a member of the organization before being added to a team';
+    END IF;
+
+    -- User must have 'member' role (not admin/owner/instructor)
+    IF v_user_role != 'member' THEN
+      RAISE EXCEPTION 'Only users with "member" role can be assigned to teams. Admins, owners, and instructors cannot be team members.';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."check_team_member_is_workspace_member"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."check_team_member_is_workspace_member"() IS 'Ensures only workspace members with "member" role can be added to teams';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."create_org_workspace"("p_name" "text", "p_description" "text" DEFAULT NULL::"text") RETURNS TABLE("id" "uuid", "name" "text", "description" "text", "workspace_slug" "text", "created_by" "uuid", "created_at" timestamp with time zone)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$DECLARE
   v_user_id uuid;
   v_workspace_id uuid;
   v_slug text;
@@ -159,16 +273,15 @@ BEGIN
   RETURNING org_workspaces.id INTO v_workspace_id;
 
   -- Grant owner access
-  INSERT INTO workspace_access (workspace_type, org_workspace_id, member_id, role)
-  VALUES ('org', v_workspace_id, v_user_id, 'owner');
+  INSERT INTO workspace_access (org_workspace_id, member_id, role)
+  VALUES (v_workspace_id, v_user_id, 'owner');
 
   -- Return created workspace
   RETURN QUERY
   SELECT ow.id, ow.name, ow.description, ow.workspace_slug, ow.created_by, ow.created_at
   FROM org_workspaces ow
   WHERE ow.id = v_workspace_id;
-END;
-$$;
+END;$$;
 
 
 ALTER FUNCTION "public"."create_org_workspace"("p_name" "text", "p_description" "text") OWNER TO "postgres";
@@ -180,8 +293,6 @@ SET default_table_access_method = "heap";
 
 CREATE TABLE IF NOT EXISTS "public"."sessions" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "workspace_type" "text" DEFAULT 'personal'::"text" NOT NULL,
-    "workspace_owner_id" "uuid",
     "org_workspace_id" "uuid",
     "user_id" "uuid" NOT NULL,
     "team_id" "uuid",
@@ -192,10 +303,10 @@ CREATE TABLE IF NOT EXISTS "public"."sessions" (
     "session_data" "jsonb" DEFAULT '{}'::"jsonb",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "training_id" "uuid",
+    "drill_id" "uuid",
     CONSTRAINT "sessions_session_mode_check" CHECK (("session_mode" = ANY (ARRAY['solo'::"text", 'group'::"text"]))),
-    CONSTRAINT "sessions_status_check" CHECK (("status" = ANY (ARRAY['active'::"text", 'completed'::"text", 'cancelled'::"text"]))),
-    CONSTRAINT "sessions_valid_workspace_refs" CHECK (((("workspace_type" = 'personal'::"text") AND ("workspace_owner_id" IS NOT NULL) AND ("org_workspace_id" IS NULL)) OR (("workspace_type" = 'org'::"text") AND ("org_workspace_id" IS NOT NULL) AND ("workspace_owner_id" IS NULL)))),
-    CONSTRAINT "sessions_workspace_type_check" CHECK (("workspace_type" = ANY (ARRAY['personal'::"text", 'org'::"text"])))
+    CONSTRAINT "sessions_status_check" CHECK (("status" = ANY (ARRAY['active'::"text", 'completed'::"text", 'cancelled'::"text"])))
 );
 
 
@@ -278,7 +389,7 @@ $$;
 ALTER FUNCTION "public"."create_session"("p_workspace_type" "text", "p_workspace_owner_id" "uuid", "p_org_workspace_id" "uuid", "p_team_id" "uuid", "p_session_mode" "text", "p_session_data" "jsonb") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."create_team"("p_workspace_type" "text", "p_name" "text", "p_workspace_owner_id" "uuid" DEFAULT NULL::"uuid", "p_org_workspace_id" "uuid" DEFAULT NULL::"uuid", "p_description" "text" DEFAULT NULL::"text") RETURNS TABLE("team_id" "uuid", "team_workspace_type" "text", "team_workspace_owner_id" "uuid", "team_org_workspace_id" "uuid", "team_name" "text", "team_description" "text", "team_created_at" timestamp with time zone, "team_updated_at" timestamp with time zone)
+CREATE OR REPLACE FUNCTION "public"."create_team"("p_workspace_type" "text", "p_name" "text", "p_workspace_owner_id" "uuid" DEFAULT NULL::"uuid", "p_org_workspace_id" "uuid" DEFAULT NULL::"uuid", "p_description" "text" DEFAULT NULL::"text", "p_squads" "text"[] DEFAULT ARRAY[]::"text"[]) RETURNS TABLE("team_id" "uuid", "team_workspace_type" "text", "team_workspace_owner_id" "uuid", "team_org_workspace_id" "uuid", "team_name" "text", "team_description" "text", "team_squads" "text"[], "team_created_at" timestamp with time zone, "team_updated_at" timestamp with time zone)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
@@ -316,26 +427,28 @@ BEGIN
       WHERE workspace_type = 'org'
         AND workspace_access.org_workspace_id = p_org_workspace_id 
         AND member_id = auth.uid()
-        AND role IN ('owner', 'admin', 'instructor')
+        AND role IN ('owner', 'admin')
     ) THEN
       RAISE EXCEPTION 'Insufficient permissions to create team in org workspace';
     END IF;
   END IF;
 
-  -- Insert team
+  -- Insert team with squads
   INSERT INTO teams (
     workspace_type,
     workspace_owner_id,
     org_workspace_id,
     name,
-    description
+    description,
+    squads
   )
   VALUES (
     p_workspace_type,
     p_workspace_owner_id,
     p_org_workspace_id,
     p_name,
-    p_description
+    p_description,
+    p_squads
   )
   RETURNING id INTO v_team_id;
 
@@ -348,6 +461,7 @@ BEGIN
     t.org_workspace_id AS team_org_workspace_id,
     t.name AS team_name,
     t.description AS team_description,
+    t.squads AS team_squads,
     t.created_at AS team_created_at,
     t.updated_at AS team_updated_at
   FROM teams t
@@ -356,10 +470,10 @@ END;
 $$;
 
 
-ALTER FUNCTION "public"."create_team"("p_workspace_type" "text", "p_name" "text", "p_workspace_owner_id" "uuid", "p_org_workspace_id" "uuid", "p_description" "text") OWNER TO "postgres";
+ALTER FUNCTION "public"."create_team"("p_workspace_type" "text", "p_name" "text", "p_workspace_owner_id" "uuid", "p_org_workspace_id" "uuid", "p_description" "text", "p_squads" "text"[]) OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."create_team"("p_workspace_type" "text", "p_name" "text", "p_workspace_owner_id" "uuid", "p_org_workspace_id" "uuid", "p_description" "text") IS 'Create a new team in a workspace with proper permission checks';
+COMMENT ON FUNCTION "public"."create_team"("p_workspace_type" "text", "p_name" "text", "p_workspace_owner_id" "uuid", "p_org_workspace_id" "uuid", "p_description" "text", "p_squads" "text"[]) IS 'Create a new team in a workspace with optional squads';
 
 
 
@@ -482,16 +596,23 @@ $$;
 ALTER FUNCTION "public"."get_my_sessions"("p_limit" integer, "p_offset" integer) OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."get_org_workspace_members"("p_org_workspace_id" "uuid") RETURNS TABLE("id" "uuid", "workspace_type" "text", "workspace_owner_id" "uuid", "org_workspace_id" "uuid", "member_id" "uuid", "role" "text", "joined_at" timestamp with time zone, "profile_id" "uuid", "profile_email" "text", "profile_full_name" "text", "profile_avatar_url" "text")
+CREATE OR REPLACE FUNCTION "public"."get_org_workspace_members"("p_org_workspace_id" "uuid") RETURNS TABLE("id" "uuid", "org_workspace_id" "uuid", "member_id" "uuid", "role" "text", "joined_at" timestamp with time zone, "profile_id" "uuid", "profile_email" "text", "profile_full_name" "text", "profile_avatar_url" "text", "teams" "jsonb")
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
 BEGIN
+  -- Security check: verify caller has access to this workspace
+  IF NOT EXISTS (
+    SELECT 1 FROM workspace_access wa_check
+    WHERE wa_check.org_workspace_id = p_org_workspace_id
+      AND wa_check.member_id = auth.uid()
+  ) THEN
+    RAISE EXCEPTION 'Access denied to workspace';
+  END IF;
+
   RETURN QUERY
   SELECT 
     wa.id,
-    wa.workspace_type,
-    wa.workspace_owner_id,
     wa.org_workspace_id,
     wa.member_id,
     wa.role,
@@ -499,11 +620,33 @@ BEGIN
     p.id as profile_id,
     p.email as profile_email,
     p.full_name as profile_full_name,
-    p.avatar_url as profile_avatar_url
+    p.avatar_url as profile_avatar_url,
+    
+    -- Aggregate teams for this user in this workspace
+    COALESCE(
+      (
+        SELECT jsonb_agg(
+          jsonb_build_object(
+            'team_id', t.id,
+            'team_name', t.name,
+            'team_role', tm.role,
+            'team_type', t.team_type,
+            'squads', t.squads,
+            'joined_team_at', tm.joined_at
+          )
+          ORDER BY t.name
+        )
+        FROM team_members tm
+        JOIN teams t ON t.id = tm.team_id
+        WHERE tm.user_id = wa.member_id
+          AND t.org_workspace_id = p_org_workspace_id
+      ),
+      '[]'::jsonb
+    ) as teams
+    
   FROM workspace_access wa
   INNER JOIN profiles p ON p.id = wa.member_id
   WHERE wa.org_workspace_id = p_org_workspace_id
-    AND wa.workspace_type = 'org'
   ORDER BY wa.joined_at DESC;
 END;
 $$;
@@ -512,7 +655,112 @@ $$;
 ALTER FUNCTION "public"."get_org_workspace_members"("p_org_workspace_id" "uuid") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."get_team_members"("p_team_id" "uuid") RETURNS TABLE("user_id" "uuid", "email" "text", "full_name" "text", "role" "text")
+CREATE OR REPLACE FUNCTION "public"."get_sniper_best_performance"("p_user_id" "uuid", "p_org_workspace_id" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("best_paper_accuracy" numeric, "best_tactical_accuracy" numeric, "best_overall_accuracy" numeric, "tightest_grouping_cm" numeric, "fastest_engagement_sec" numeric, "most_targets_cleared" integer, "longest_session_minutes" integer, "total_sessions" bigint)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        MAX(avg_paper_accuracy_pct) as best_paper_accuracy,
+        MAX(avg_tactical_accuracy_pct) as best_tactical_accuracy,
+        MAX(overall_accuracy_pct) as best_overall_accuracy,
+        MIN(best_grouping_cm) as tightest_grouping_cm,
+        MIN(fastest_engagement_time_sec) as fastest_engagement_sec,
+        MAX(stages_cleared) as most_targets_cleared,
+        MAX(session_duration_seconds / 60) as longest_session_minutes,
+        COUNT(*) as total_sessions
+    FROM session_stats_sniper sss
+    WHERE sss.user_id = p_user_id
+    AND (p_org_workspace_id IS NULL OR sss.org_workspace_id = p_org_workspace_id);
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_sniper_best_performance"("p_user_id" "uuid", "p_org_workspace_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."get_sniper_progression"("p_user_id" "uuid", "p_org_workspace_id" "uuid" DEFAULT NULL::"uuid", "p_days_back" integer DEFAULT 30) RETURNS TABLE("session_date" "date", "avg_accuracy" numeric, "avg_grouping" numeric, "sessions_count" bigint, "total_rounds" integer, "improvement_trend" "text")
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+BEGIN
+    RETURN QUERY
+    WITH daily_stats AS (
+        SELECT 
+            DATE(started_at) as session_date,
+            AVG(overall_accuracy_pct) as daily_accuracy,
+            AVG(avg_grouping_cm) as daily_grouping,
+            COUNT(*) as daily_sessions,
+            SUM(total_rounds_on_target) as daily_rounds
+        FROM session_stats_sniper
+        WHERE user_id = p_user_id
+        AND (p_org_workspace_id IS NULL OR org_workspace_id = p_org_workspace_id)
+        AND started_at >= CURRENT_DATE - INTERVAL '1 day' * p_days_back
+        GROUP BY DATE(started_at)
+        ORDER BY session_date
+    ),
+    with_trends AS (
+        SELECT *,
+            CASE 
+                WHEN LAG(daily_accuracy) OVER (ORDER BY session_date) IS NULL THEN 'baseline'
+                WHEN daily_accuracy > LAG(daily_accuracy) OVER (ORDER BY session_date) THEN 'improving'
+                WHEN daily_accuracy < LAG(daily_accuracy) OVER (ORDER BY session_date) THEN 'declining'
+                ELSE 'stable'
+            END as trend
+        FROM daily_stats
+    )
+    SELECT 
+        session_date,
+        ROUND(daily_accuracy, 2) as avg_accuracy,
+        ROUND(daily_grouping, 2) as avg_grouping,
+        daily_sessions as sessions_count,
+        daily_rounds::INTEGER as total_rounds,
+        trend as improvement_trend
+    FROM with_trends;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_sniper_progression"("p_user_id" "uuid", "p_org_workspace_id" "uuid", "p_days_back" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."get_team_leaderboard"("p_team_id" "uuid", "p_days_back" integer DEFAULT 30) RETURNS TABLE("user_id" "uuid", "user_name" "text", "sessions_completed" bigint, "avg_accuracy" numeric, "best_accuracy" numeric, "avg_grouping" numeric, "total_rounds" integer, "rank_position" integer)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+BEGIN
+    RETURN QUERY
+    WITH team_performance AS (
+        SELECT 
+            sss.user_id,
+            sss.user_name,
+            COUNT(*) as sessions,
+            AVG(sss.overall_accuracy_pct) as avg_acc,
+            MAX(sss.overall_accuracy_pct) as best_acc,
+            AVG(sss.avg_grouping_cm) as avg_group,
+            SUM(sss.total_rounds_on_target) as rounds
+        FROM session_stats_sniper sss
+        WHERE sss.team_id = p_team_id
+        AND sss.started_at >= CURRENT_DATE - INTERVAL '1 day' * p_days_back
+        GROUP BY sss.user_id, sss.user_name
+    )
+    SELECT 
+        user_id,
+        user_name,
+        sessions as sessions_completed,
+        ROUND(avg_acc, 2) as avg_accuracy,
+        ROUND(best_acc, 2) as best_accuracy,
+        ROUND(avg_group, 2) as avg_grouping,
+        rounds::INTEGER as total_rounds,
+        RANK() OVER (ORDER BY avg_acc DESC, avg_group ASC) as rank_position
+    FROM team_performance
+    ORDER BY rank_position;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_team_leaderboard"("p_team_id" "uuid", "p_days_back" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."get_team_members"("p_team_id" "uuid") RETURNS TABLE("user_id" "uuid", "email" "text", "full_name" "text", "role" "text", "details" "jsonb", "joined_at" timestamp with time zone)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
@@ -523,16 +771,14 @@ BEGIN
   SELECT workspace_owner_id INTO v_workspace_id
   FROM teams WHERE id = p_team_id;
   
-  IF NOT has_workspace_access(v_workspace_id) THEN
-    RAISE EXCEPTION 'Access denied to team %', p_team_id;
-  END IF;
-
   RETURN QUERY
   SELECT 
     p.id,
     p.email,
     p.full_name,
-    tm.role
+    tm.role,
+    tm.details,
+    tm.joined_at
   FROM team_members tm
   JOIN profiles p ON p.id = tm.user_id
   WHERE tm.team_id = p_team_id
@@ -633,7 +879,7 @@ BEGIN
     'g'
   )) || '-' || SUBSTRING(NEW.id::text, 1, 8);
   
-  -- 1. Create profile (user IS a workspace)
+  -- Create profile ONLY (no workspace access)
   INSERT INTO public.profiles (
     id,
     email,
@@ -652,10 +898,8 @@ BEGIN
   )
   ON CONFLICT (id) DO NOTHING;
 
-  -- 2. Grant user access to their own workspace (personal workspace)
-  INSERT INTO public.workspace_access (workspace_type, workspace_owner_id, member_id, role)
-  VALUES ('personal', NEW.id, NEW.id, 'owner')
-  ON CONFLICT (workspace_owner_id, member_id) DO NOTHING;
+  -- NO automatic workspace creation!
+  -- User must create or join an organization
 
   RETURN NEW;
 END;
@@ -680,6 +924,42 @@ $$;
 
 
 ALTER FUNCTION "public"."has_workspace_access"("p_workspace_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."insert_sample_session_data"("p_user_id" "uuid") RETURNS "uuid"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+    new_session_id UUID;
+BEGIN
+    -- Create a sample session
+    INSERT INTO public.sessions (
+        user_id, session_mode, status, started_at, ended_at, session_data
+    ) VALUES (
+        p_user_id, 'solo', 'completed', 
+        NOW() - INTERVAL '1 hour', NOW(),
+        '{"weather": "clear", "wind": "5mph", "temperature": "72F"}'::jsonb
+    ) RETURNING id INTO new_session_id;
+    
+    -- Add simple session stats
+    INSERT INTO public.session_stats (
+        session_id, user_id, shots_fired, hits, accuracy_pct,
+        grouping_cm, weapon_used, position, distance_m, target_type
+    ) VALUES (
+        new_session_id, p_user_id, 20, 18, 90.0,
+        4.5, 'M24 SWS', 'prone', 300, 'paper'
+    );
+    
+    RETURN new_session_id;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."insert_sample_session_data"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."insert_sample_session_data"("p_user_id" "uuid") IS 'Creates sample session data for testing purposes';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."is_team_leader"("p_team_id" "uuid", "p_user_id" "uuid") RETURNS boolean
@@ -716,12 +996,180 @@ $$;
 ALTER FUNCTION "public"."is_workspace_admin"("p_workspace_id" "uuid", "p_user_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."remove_team_member"("p_team_id" "uuid", "p_user_id" "uuid") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+DECLARE
+  v_team record;
+  v_has_permission boolean := false;
+BEGIN
+  -- Get team info
+  SELECT * INTO v_team FROM teams WHERE id = p_team_id;
+  
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Team not found';
+  END IF;
+
+  -- Check permissions: can remove self OR be workspace admin OR be team commander
+  IF p_user_id = auth.uid() THEN
+    v_has_permission := true;
+  ELSIF v_team.org_workspace_id IS NOT NULL THEN
+    SELECT EXISTS (
+      SELECT 1 FROM workspace_access
+      WHERE org_workspace_id = v_team.org_workspace_id
+        AND member_id = auth.uid()
+        AND role IN ('owner', 'admin')
+    ) INTO v_has_permission;
+    
+    IF NOT v_has_permission THEN
+      PERFORM 1 FROM team_members
+      WHERE team_id = p_team_id
+        AND user_id = auth.uid()
+        AND role IN ('commander', 'squad_commander');
+      
+      v_has_permission := FOUND;
+    END IF;
+  ELSIF v_team.workspace_owner_id IS NOT NULL THEN
+    SELECT EXISTS (
+      SELECT 1 FROM workspace_access
+      WHERE workspace_owner_id = v_team.workspace_owner_id
+        AND member_id = auth.uid()
+        AND role IN ('owner', 'admin')
+    ) INTO v_has_permission;
+    
+    IF NOT v_has_permission THEN
+      PERFORM 1 FROM team_members
+      WHERE team_id = p_team_id
+        AND user_id = auth.uid()
+        AND role IN ('commander', 'squad_commander');
+      
+      v_has_permission := FOUND;
+    END IF;
+  END IF;
+
+  IF NOT v_has_permission THEN
+    RAISE EXCEPTION 'Permission denied: must be the user, workspace admin, or team commander';
+  END IF;
+
+  -- Delete team member
+  DELETE FROM team_members
+  WHERE team_id = p_team_id AND user_id = p_user_id;
+
+  RETURN FOUND;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."remove_team_member"("p_team_id" "uuid", "p_user_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."remove_team_member"("p_team_id" "uuid", "p_user_id" "uuid") IS 'Safely removes a team member with permission checks, bypassing RLS recursion.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."update_team_member_role"("p_team_id" "uuid", "p_user_id" "uuid", "p_role" "text", "p_details" "jsonb" DEFAULT NULL::"jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+DECLARE
+  v_team record;
+  v_has_permission boolean := false;
+  v_result jsonb;
+BEGIN
+  -- Get team info
+  SELECT * INTO v_team FROM teams WHERE id = p_team_id;
+  
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Team not found';
+  END IF;
+
+  -- Check permissions
+  IF v_team.org_workspace_id IS NOT NULL THEN
+    SELECT EXISTS (
+      SELECT 1 FROM workspace_access
+      WHERE org_workspace_id = v_team.org_workspace_id
+        AND member_id = auth.uid()
+        AND role IN ('owner', 'admin')
+    ) INTO v_has_permission;
+    
+    IF NOT v_has_permission THEN
+      PERFORM 1 FROM team_members
+      WHERE team_id = p_team_id
+        AND user_id = auth.uid()
+        AND role IN ('commander', 'squad_commander');
+      
+      v_has_permission := FOUND;
+    END IF;
+  ELSIF v_team.workspace_owner_id IS NOT NULL THEN
+    SELECT EXISTS (
+      SELECT 1 FROM workspace_access
+      WHERE workspace_owner_id = v_team.workspace_owner_id
+        AND member_id = auth.uid()
+        AND role IN ('owner', 'admin')
+    ) INTO v_has_permission;
+    
+    IF NOT v_has_permission THEN
+      PERFORM 1 FROM team_members
+      WHERE team_id = p_team_id
+        AND user_id = auth.uid()
+        AND role IN ('commander', 'squad_commander');
+      
+      v_has_permission := FOUND;
+    END IF;
+  END IF;
+
+  IF NOT v_has_permission THEN
+    RAISE EXCEPTION 'Permission denied: must be workspace admin or team commander';
+  END IF;
+
+  -- Update team member
+  UPDATE team_members
+  SET 
+    role = p_role,
+    details = COALESCE(p_details, details)
+  WHERE team_id = p_team_id AND user_id = p_user_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Team member not found';
+  END IF;
+
+  -- Return updated member with profile
+  SELECT jsonb_build_object(
+    'team_id', tm.team_id,
+    'user_id', tm.user_id,
+    'role', tm.role,
+    'details', tm.details,
+    'joined_at', tm.joined_at,
+    'profile', jsonb_build_object(
+      'id', p.id,
+      'email', p.email,
+      'full_name', p.full_name,
+      'avatar_url', p.avatar_url
+    )
+  ) INTO v_result
+  FROM team_members tm
+  JOIN profiles p ON p.id = tm.user_id
+  WHERE tm.team_id = p_team_id AND tm.user_id = p_user_id;
+
+  RETURN v_result;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."update_team_member_role"("p_team_id" "uuid", "p_user_id" "uuid", "p_role" "text", "p_details" "jsonb") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."update_team_member_role"("p_team_id" "uuid", "p_user_id" "uuid", "p_role" "text", "p_details" "jsonb") IS 'Safely updates a team member role with permission checks, bypassing RLS recursion.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."update_updated_at_column"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     AS $$
 BEGIN
-  NEW.updated_at = now();
-  RETURN NEW;
+    NEW.updated_at = NOW();
+    RETURN NEW;
 END;
 $$;
 
@@ -736,71 +1184,44 @@ CREATE OR REPLACE FUNCTION "public"."validate_invite_code"("p_invite_code" "text
 DECLARE
   v_invitation record;
   v_is_member boolean;
+  v_team_name text;
 BEGIN
-  -- ============================================
   -- 1. INPUT VALIDATION
-  -- ============================================
-  
-  -- Validate invite code format
   IF p_invite_code IS NULL OR length(trim(p_invite_code)) != 8 THEN
-    RETURN json_build_object(
-      'valid', false,
-      'error', 'Invalid invite code format'
-    );
+    RETURN json_build_object('valid', false, 'error', 'Invalid invite code format');
   END IF;
 
-  -- Validate user authentication
   IF p_user_id IS NULL THEN
-    RETURN json_build_object(
-      'valid', false,
-      'error', 'You must be logged in to validate an invitation'
-    );
+    RETURN json_build_object('valid', false, 'error', 'You must be logged in to validate an invitation');
   END IF;
 
-  -- ============================================
   -- 2. CODE EXISTENCE CHECK
-  -- ============================================
-  
-  -- Get invitation details with related data
   SELECT 
     inv.*,
     org.name as workspace_name,
+    t.name as team_name,
     prof.full_name as inviter_name,
     prof.email as inviter_email
   INTO v_invitation
   FROM workspace_invitations inv
   LEFT JOIN org_workspaces org ON org.id = inv.org_workspace_id
+  LEFT JOIN teams t ON t.id = inv.team_id
   LEFT JOIN profiles prof ON prof.id = inv.invited_by
   WHERE inv.invite_code = upper(trim(p_invite_code));
 
-  -- Check if invitation exists
   IF NOT FOUND THEN
-    RETURN json_build_object(
-      'valid', false,
-      'error', 'Invalid invitation code'
-    );
+    RETURN json_build_object('valid', false, 'error', 'Invalid invitation code');
   END IF;
 
-  -- ============================================
   -- 3. SELF-INVITATION PREVENTION
-  -- ============================================
-  
-  -- Check if user is trying to use their own invitation
   IF v_invitation.invited_by = p_user_id THEN
-    RETURN json_build_object(
-      'valid', false,
-      'error', 'You cannot use your own invitation code'
-    );
+    RETURN json_build_object('valid', false, 'error', 'You cannot use your own invitation code');
   END IF;
 
-  -- ============================================
   -- 4. STATUS VALIDATION
-  -- ============================================
-  
-  -- Check invitation status
   IF v_invitation.status != 'pending' THEN
     RETURN json_build_object(
-      'valid', false,
+      'valid', false, 
       'error', CASE v_invitation.status
         WHEN 'accepted' THEN 'This invitation has already been used'
         WHEN 'cancelled' THEN 'This invitation has been cancelled'
@@ -810,53 +1231,35 @@ BEGIN
     );
   END IF;
 
-  -- ============================================
-  -- 5. EXPIRATION CHECK WITH AUTO-EXPIRATION
-  -- ============================================
-  
-  -- Check if invitation has expired
+  -- 5. EXPIRATION CHECK
   IF v_invitation.expires_at <= now() THEN
-    -- Auto-expire the invitation
-    UPDATE workspace_invitations
-    SET 
-      status = 'expired',
-      updated_at = now()
-    WHERE id = v_invitation.id;
-    
-    RETURN json_build_object(
-      'valid', false,
-      'error', 'This invitation has expired'
-    );
+    UPDATE workspace_invitations SET status = 'expired', updated_at = now() WHERE id = v_invitation.id;
+    RETURN json_build_object('valid', false, 'error', 'This invitation has expired');
   END IF;
 
-  -- ============================================
   -- 6. DUPLICATE MEMBERSHIP PREVENTION
-  -- ============================================
-  
   -- Check if user is already a member of this workspace
   SELECT EXISTS (
-    SELECT 1 
-    FROM workspace_access
-    WHERE org_workspace_id = v_invitation.org_workspace_id
-      AND member_id = p_user_id
+    SELECT 1 FROM workspace_access
+    WHERE org_workspace_id = v_invitation.org_workspace_id AND member_id = p_user_id
   ) INTO v_is_member;
 
   IF v_is_member THEN
-    RETURN json_build_object(
-      'valid', false,
-      'error', 'You are already a member of this workspace'
-    );
+    -- We might want to allow invites for existing members to join teams, 
+    -- but for now we stick to the original logic of blocking it.
+    -- If we wanted to support it, we'd check if they are in the TEAM, not just workspace.
+    RETURN json_build_object('valid', false, 'error', 'You are already a member of this workspace');
   END IF;
 
-  -- ============================================
-  -- ALL CHECKS PASSED - RETURN VALID INVITATION
-  -- ============================================
-  
   RETURN json_build_object(
     'valid', true,
     'invitation', json_build_object(
       'id', v_invitation.id,
       'org_workspace_id', v_invitation.org_workspace_id,
+      'team_id', v_invitation.team_id,
+      'team_role', v_invitation.team_role,
+      'team_name', v_invitation.team_name,
+      'details', v_invitation.details,
       'invite_code', v_invitation.invite_code,
       'role', v_invitation.role,
       'status', v_invitation.status,
@@ -864,8 +1267,7 @@ BEGIN
       'invited_by', v_invitation.invited_by,
       'invited_by_name', COALESCE(v_invitation.inviter_name, v_invitation.inviter_email),
       'expires_at', v_invitation.expires_at,
-      'created_at', v_invitation.created_at,
-      'updated_at', v_invitation.updated_at
+      'created_at', v_invitation.created_at
     )
   );
 END;
@@ -899,6 +1301,25 @@ COMMENT ON TABLE "public"."org_workspaces" IS 'User-created organization workspa
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."paper_target_results" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "session_target_id" "uuid" NOT NULL,
+    "paper_type" "text" NOT NULL,
+    "bullets_fired" integer NOT NULL,
+    "hits_total" integer,
+    "hits_inside_scoring" integer,
+    "dispersion_cm" numeric,
+    "offset_right_cm" numeric,
+    "offset_up_cm" numeric,
+    "scanned_image_url" "text",
+    "notes" "text",
+    CONSTRAINT "paper_target_results_paper_type_check" CHECK (("paper_type" = ANY (ARRAY['achievement'::"text", 'grouping'::"text"])))
+);
+
+
+ALTER TABLE "public"."paper_target_results" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."profiles" (
     "id" "uuid" NOT NULL,
     "email" "text" NOT NULL,
@@ -918,12 +1339,233 @@ COMMENT ON TABLE "public"."profiles" IS 'Users (each user is also a workspace)';
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."session_participants" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "session_id" "uuid" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "role" "text" NOT NULL,
+    "weapon_id" "uuid",
+    "sight_id" "uuid",
+    "position" "text",
+    "shots_fired" integer DEFAULT 0,
+    "notes" "text",
+    CONSTRAINT "session_participants_role_check" CHECK (("role" = ANY (ARRAY['sniper'::"text", 'spotter'::"text", 'pistol'::"text", 'observer'::"text", 'instructor'::"text"])))
+);
+
+
+ALTER TABLE "public"."session_participants" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."session_stats" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "session_id" "uuid" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "shots_fired" integer DEFAULT 0,
+    "hits" integer DEFAULT 0,
+    "accuracy_pct" numeric(5,2),
+    "headshots" integer DEFAULT 0,
+    "long_range_hits" integer DEFAULT 0,
+    "grouping_cm" numeric(8,2),
+    "weapon_used" "text",
+    "position" "text",
+    "distance_m" integer,
+    "target_type" "text",
+    "engagement_time_sec" numeric(8,2),
+    "score" integer DEFAULT 0,
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"()
+);
+
+
+ALTER TABLE "public"."session_stats" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."session_stats" IS 'Simple session statistics table for quick sniper performance tracking';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."session_targets" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "session_id" "uuid" NOT NULL,
+    "target_type" "text" NOT NULL,
+    "sequence_in_session" integer,
+    "distance_m" integer,
+    "lane_number" integer,
+    "notes" "text",
+    CONSTRAINT "session_targets_target_type_check" CHECK (("target_type" = ANY (ARRAY['paper'::"text", 'tactical'::"text"])))
+);
+
+
+ALTER TABLE "public"."session_targets" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."tactical_target_results" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "session_target_id" "uuid" NOT NULL,
+    "bullets_fired" integer NOT NULL,
+    "hits" integer NOT NULL,
+    "is_stage_cleared" boolean DEFAULT false,
+    "time_seconds" numeric,
+    "notes" "text"
+);
+
+
+ALTER TABLE "public"."tactical_target_results" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."teams" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "org_workspace_id" "uuid" NOT NULL,
+    "name" "text" NOT NULL,
+    "team_type" "text",
+    "description" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "squads" "text"[] DEFAULT ARRAY[]::"text"[],
+    CONSTRAINT "teams_team_type_check" CHECK (("team_type" = ANY (ARRAY['field'::"text", 'back_office'::"text"])))
+);
+
+
+ALTER TABLE "public"."teams" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."teams" IS 'Teams within organizations';
+
+
+
+COMMENT ON COLUMN "public"."teams"."org_workspace_id" IS 'The organization this team belongs to (required)';
+
+
+
+COMMENT ON COLUMN "public"."teams"."squads" IS 'Optional array of squad names within this team. Users can create squads on-demand.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."training_drills" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "training_id" "uuid" NOT NULL,
+    "order_index" integer NOT NULL,
+    "name" "text" NOT NULL,
+    "target_type" "text" NOT NULL,
+    "distance_m" integer NOT NULL,
+    "rounds_per_shooter" integer NOT NULL,
+    "time_limit_seconds" integer,
+    "position" "text",
+    "weapon_category" "text",
+    "notes" "text",
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    CONSTRAINT "training_drills_target_type_check" CHECK (("target_type" = ANY (ARRAY['paper'::"text", 'tactical'::"text"])))
+);
+
+
+ALTER TABLE "public"."training_drills" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."trainings" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "org_workspace_id" "uuid" NOT NULL,
+    "team_id" "uuid",
+    "title" "text" NOT NULL,
+    "description" "text",
+    "scheduled_at" timestamp with time zone NOT NULL,
+    "status" "text" DEFAULT 'planned'::"text" NOT NULL,
+    "created_by" "uuid" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"(),
+    CONSTRAINT "trainings_status_check" CHECK (("status" = ANY (ARRAY['planned'::"text", 'ongoing'::"text", 'finished'::"text", 'cancelled'::"text"])))
+);
+
+
+ALTER TABLE "public"."trainings" OWNER TO "postgres";
+
+
+CREATE OR REPLACE VIEW "public"."session_stats_sniper" AS
+ SELECT "s"."id" AS "session_id",
+    "s"."org_workspace_id",
+    "s"."training_id",
+    "s"."team_id",
+    "s"."drill_id",
+    "s"."session_mode",
+    "s"."status",
+    "s"."started_at",
+    "s"."ended_at",
+    (EXTRACT(epoch FROM ("s"."ended_at" - "s"."started_at")))::integer AS "session_duration_seconds",
+    "sp"."user_id",
+    "sp"."role",
+    "sp"."weapon_id",
+    "sp"."sight_id",
+    "sp"."position",
+    "sp"."shots_fired" AS "total_shots_fired",
+    "count"("st"."id") AS "targets_engaged",
+    "count"(
+        CASE
+            WHEN ("st"."target_type" = 'paper'::"text") THEN 1
+            ELSE NULL::integer
+        END) AS "paper_targets",
+    "count"(
+        CASE
+            WHEN ("st"."target_type" = 'tactical'::"text") THEN 1
+            ELSE NULL::integer
+        END) AS "tactical_targets",
+    COALESCE("avg"(((("ptr"."hits_total")::numeric / (NULLIF("ptr"."bullets_fired", 0))::numeric) * (100)::numeric)), (0)::numeric) AS "avg_paper_accuracy_pct",
+    "avg"("ptr"."dispersion_cm") AS "avg_grouping_cm",
+    "min"("ptr"."dispersion_cm") AS "best_grouping_cm",
+    "sum"("ptr"."hits_inside_scoring") AS "total_scoring_hits",
+    "sum"("ptr"."bullets_fired") AS "total_paper_rounds",
+    "sum"("ttr"."hits") AS "total_tactical_hits",
+    "sum"("ttr"."bullets_fired") AS "total_tactical_rounds",
+    COALESCE("avg"(((("ttr"."hits")::numeric / (NULLIF("ttr"."bullets_fired", 0))::numeric) * (100)::numeric)), (0)::numeric) AS "avg_tactical_accuracy_pct",
+    "count"(
+        CASE
+            WHEN ("ttr"."is_stage_cleared" = true) THEN 1
+            ELSE NULL::integer
+        END) AS "stages_cleared",
+    "avg"("ttr"."time_seconds") AS "avg_engagement_time_sec",
+    "min"("ttr"."time_seconds") AS "fastest_engagement_time_sec",
+    (COALESCE("sum"("ptr"."hits_total"), (0)::bigint) + COALESCE("sum"("ttr"."hits"), (0)::bigint)) AS "total_hits",
+    (COALESCE("sum"("ptr"."bullets_fired"), (0)::bigint) + COALESCE("sum"("ttr"."bullets_fired"), (0)::bigint)) AS "total_rounds_on_target",
+        CASE
+            WHEN ((COALESCE("sum"("ptr"."bullets_fired"), (0)::bigint) + COALESCE("sum"("ttr"."bullets_fired"), (0)::bigint)) > 0) THEN "round"(((((COALESCE("sum"("ptr"."hits_total"), (0)::bigint) + COALESCE("sum"("ttr"."hits"), (0)::bigint)))::numeric / ((COALESCE("sum"("ptr"."bullets_fired"), (0)::bigint) + COALESCE("sum"("ttr"."bullets_fired"), (0)::bigint)))::numeric) * (100)::numeric), 2)
+            ELSE (0)::numeric
+        END AS "overall_accuracy_pct",
+    "t"."title" AS "training_title",
+    "td"."name" AS "drill_name",
+    "td"."distance_m" AS "planned_distance",
+    "td"."weapon_category",
+    "p"."full_name" AS "user_name",
+    "p"."email" AS "user_email",
+    "ow"."name" AS "org_name",
+    "tm"."name" AS "team_name",
+    "s"."session_data"
+   FROM ((((((((("public"."sessions" "s"
+     LEFT JOIN "public"."session_participants" "sp" ON (("s"."id" = "sp"."session_id")))
+     LEFT JOIN "public"."session_targets" "st" ON (("s"."id" = "st"."session_id")))
+     LEFT JOIN "public"."paper_target_results" "ptr" ON (("st"."id" = "ptr"."session_target_id")))
+     LEFT JOIN "public"."tactical_target_results" "ttr" ON (("st"."id" = "ttr"."session_target_id")))
+     LEFT JOIN "public"."trainings" "t" ON (("s"."training_id" = "t"."id")))
+     LEFT JOIN "public"."training_drills" "td" ON (("s"."drill_id" = "td"."id")))
+     LEFT JOIN "public"."profiles" "p" ON (("sp"."user_id" = "p"."id")))
+     LEFT JOIN "public"."org_workspaces" "ow" ON (("s"."org_workspace_id" = "ow"."id")))
+     LEFT JOIN "public"."teams" "tm" ON (("s"."team_id" = "tm"."id")))
+  WHERE ("sp"."role" = ANY (ARRAY['sniper'::"text", 'pistol'::"text"]))
+  GROUP BY "s"."id", "s"."org_workspace_id", "s"."training_id", "s"."team_id", "s"."drill_id", "s"."session_mode", "s"."status", "s"."started_at", "s"."ended_at", "sp"."user_id", "sp"."role", "sp"."weapon_id", "sp"."sight_id", "sp"."position", "sp"."shots_fired", "t"."title", "td"."name", "td"."distance_m", "td"."weapon_category", "p"."full_name", "p"."email", "ow"."name", "tm"."name", "s"."session_data";
+
+
+ALTER VIEW "public"."session_stats_sniper" OWNER TO "postgres";
+
+
+COMMENT ON VIEW "public"."session_stats_sniper" IS 'Comprehensive sniper performance analytics built from session data';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."team_members" (
     "team_id" "uuid" NOT NULL,
     "user_id" "uuid" NOT NULL,
     "role" "text" NOT NULL,
     "joined_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "team_members_role_check" CHECK (("role" = ANY (ARRAY['sniper'::"text", 'pistol'::"text", 'manager'::"text", 'commander'::"text", 'instructor'::"text", 'staff'::"text"])))
+    "details" "jsonb" DEFAULT '{}'::"jsonb",
+    CONSTRAINT "team_members_role_check" CHECK (("role" = ANY (ARRAY['commander'::"text", 'squad_commander'::"text", 'soldier'::"text"]))),
+    CONSTRAINT "team_members_squad_requirement" CHECK ((("role" = 'commander'::"text") OR (("role" = ANY (ARRAY['soldier'::"text", 'squad_commander'::"text"])) AND ("details" ? 'squad_id'::"text") AND (("details" ->> 'squad_id'::"text") IS NOT NULL) AND (("details" ->> 'squad_id'::"text") <> ''::"text"))))
 );
 
 
@@ -934,44 +1576,28 @@ COMMENT ON TABLE "public"."team_members" IS 'Team membership';
 
 
 
-CREATE TABLE IF NOT EXISTS "public"."teams" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "workspace_owner_id" "uuid",
-    "org_workspace_id" "uuid",
-    "name" "text" NOT NULL,
-    "description" "text",
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "workspace_type" "text" DEFAULT 'org'::"text" NOT NULL,
-    "team_type" "text" DEFAULT 'field'::"text"
-);
-
-
-ALTER TABLE "public"."teams" OWNER TO "postgres";
-
-
-COMMENT ON TABLE "public"."teams" IS 'Teams within workspaces (supports personal and org workspaces)';
+COMMENT ON CONSTRAINT "team_members_squad_requirement" ON "public"."team_members" IS 'Ensures that soldiers and squad_commanders must have a non-empty squad_id in their details. Commanders do not need a squad_id.';
 
 
 
 CREATE TABLE IF NOT EXISTS "public"."workspace_access" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "workspace_type" "text" DEFAULT 'personal'::"text" NOT NULL,
-    "workspace_owner_id" "uuid",
-    "org_workspace_id" "uuid",
+    "org_workspace_id" "uuid" NOT NULL,
     "member_id" "uuid" NOT NULL,
     "role" "text" DEFAULT 'member'::"text" NOT NULL,
     "joined_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "workspace_access_role_check" CHECK (("role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'member'::"text"]))),
-    CONSTRAINT "workspace_access_type_check" CHECK (("workspace_type" = ANY (ARRAY['personal'::"text", 'org'::"text"]))),
-    CONSTRAINT "workspace_access_valid_refs" CHECK (((("workspace_type" = 'personal'::"text") AND ("workspace_owner_id" IS NOT NULL) AND ("org_workspace_id" IS NULL)) OR (("workspace_type" = 'org'::"text") AND ("org_workspace_id" IS NOT NULL) AND ("workspace_owner_id" IS NULL))))
+    CONSTRAINT "workspace_access_role_check" CHECK (("role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text", 'member'::"text"])))
 );
 
 
 ALTER TABLE "public"."workspace_access" OWNER TO "postgres";
 
 
-COMMENT ON TABLE "public"."workspace_access" IS 'Workspace membership (supports personal and org workspaces)';
+COMMENT ON TABLE "public"."workspace_access" IS 'Organization membership table - users must belong to at least one organization';
+
+
+
+COMMENT ON COLUMN "public"."workspace_access"."org_workspace_id" IS 'The organization (required - no personal workspaces)';
 
 
 
@@ -987,8 +1613,12 @@ CREATE TABLE IF NOT EXISTS "public"."workspace_invitations" (
     "expires_at" timestamp with time zone NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "team_id" "uuid",
+    "team_role" "text",
+    "details" "jsonb" DEFAULT '{}'::"jsonb",
     CONSTRAINT "workspace_invitations_role_check" CHECK (("role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text", 'member'::"text"]))),
-    CONSTRAINT "workspace_invitations_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'accepted'::"text", 'cancelled'::"text", 'expired'::"text"])))
+    CONSTRAINT "workspace_invitations_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'accepted'::"text", 'cancelled'::"text", 'expired'::"text"]))),
+    CONSTRAINT "workspace_invitations_team_role_check" CHECK (("team_role" = ANY (ARRAY['commander'::"text", 'squad_commander'::"text", 'soldier'::"text"])))
 );
 
 
@@ -1009,6 +1639,16 @@ ALTER TABLE ONLY "public"."org_workspaces"
 
 
 
+ALTER TABLE ONLY "public"."paper_target_results"
+    ADD CONSTRAINT "paper_target_results_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."paper_target_results"
+    ADD CONSTRAINT "paper_target_results_session_target_id_key" UNIQUE ("session_target_id");
+
+
+
 ALTER TABLE ONLY "public"."profiles"
     ADD CONSTRAINT "profiles_email_key" UNIQUE ("email");
 
@@ -1024,8 +1664,43 @@ ALTER TABLE ONLY "public"."profiles"
 
 
 
+ALTER TABLE ONLY "public"."session_participants"
+    ADD CONSTRAINT "session_participants_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."session_participants"
+    ADD CONSTRAINT "session_participants_session_id_user_id_key" UNIQUE ("session_id", "user_id");
+
+
+
+ALTER TABLE ONLY "public"."session_stats"
+    ADD CONSTRAINT "session_stats_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."session_stats"
+    ADD CONSTRAINT "session_stats_session_id_user_id_key" UNIQUE ("session_id", "user_id");
+
+
+
+ALTER TABLE ONLY "public"."session_targets"
+    ADD CONSTRAINT "session_targets_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."sessions"
     ADD CONSTRAINT "sessions_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."tactical_target_results"
+    ADD CONSTRAINT "tactical_target_results_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."tactical_target_results"
+    ADD CONSTRAINT "tactical_target_results_session_target_id_key" UNIQUE ("session_target_id");
 
 
 
@@ -1039,6 +1714,16 @@ ALTER TABLE ONLY "public"."teams"
 
 
 
+ALTER TABLE ONLY "public"."training_drills"
+    ADD CONSTRAINT "training_drills_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."trainings"
+    ADD CONSTRAINT "trainings_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."workspace_access"
     ADD CONSTRAINT "workspace_access_pkey" PRIMARY KEY ("id");
 
@@ -1046,11 +1731,6 @@ ALTER TABLE ONLY "public"."workspace_access"
 
 ALTER TABLE ONLY "public"."workspace_access"
     ADD CONSTRAINT "workspace_access_unique_org" UNIQUE ("org_workspace_id", "member_id");
-
-
-
-ALTER TABLE ONLY "public"."workspace_access"
-    ADD CONSTRAINT "workspace_access_unique_personal" UNIQUE ("workspace_owner_id", "member_id");
 
 
 
@@ -1068,7 +1748,35 @@ CREATE INDEX "idx_org_workspaces_created_by" ON "public"."org_workspaces" USING 
 
 
 
+CREATE INDEX "idx_session_participants_role" ON "public"."session_participants" USING "btree" ("role");
+
+
+
+CREATE INDEX "idx_session_participants_session" ON "public"."session_participants" USING "btree" ("session_id");
+
+
+
+CREATE INDEX "idx_session_participants_user" ON "public"."session_participants" USING "btree" ("user_id");
+
+
+
+CREATE INDEX "idx_session_targets_session" ON "public"."session_targets" USING "btree" ("session_id");
+
+
+
+CREATE INDEX "idx_session_targets_type" ON "public"."session_targets" USING "btree" ("target_type");
+
+
+
+CREATE INDEX "idx_sessions_drill" ON "public"."sessions" USING "btree" ("drill_id");
+
+
+
 CREATE INDEX "idx_sessions_org_workspace" ON "public"."sessions" USING "btree" ("org_workspace_id");
+
+
+
+CREATE INDEX "idx_sessions_started" ON "public"."sessions" USING "btree" ("started_at");
 
 
 
@@ -1084,11 +1792,11 @@ CREATE INDEX "idx_sessions_team" ON "public"."sessions" USING "btree" ("team_id"
 
 
 
+CREATE INDEX "idx_sessions_training" ON "public"."sessions" USING "btree" ("training_id");
+
+
+
 CREATE INDEX "idx_sessions_user" ON "public"."sessions" USING "btree" ("user_id");
-
-
-
-CREATE INDEX "idx_sessions_workspace_owner" ON "public"."sessions" USING "btree" ("workspace_owner_id");
 
 
 
@@ -1104,7 +1812,27 @@ CREATE INDEX "idx_teams_org_workspace" ON "public"."teams" USING "btree" ("org_w
 
 
 
-CREATE INDEX "idx_teams_workspace_owner" ON "public"."teams" USING "btree" ("workspace_owner_id");
+CREATE INDEX "idx_training_drills_order" ON "public"."training_drills" USING "btree" ("training_id", "order_index");
+
+
+
+CREATE INDEX "idx_training_drills_training" ON "public"."training_drills" USING "btree" ("training_id");
+
+
+
+CREATE INDEX "idx_trainings_created_by" ON "public"."trainings" USING "btree" ("created_by");
+
+
+
+CREATE INDEX "idx_trainings_org_workspace" ON "public"."trainings" USING "btree" ("org_workspace_id");
+
+
+
+CREATE INDEX "idx_trainings_scheduled" ON "public"."trainings" USING "btree" ("scheduled_at");
+
+
+
+CREATE INDEX "idx_trainings_team" ON "public"."trainings" USING "btree" ("team_id");
 
 
 
@@ -1116,11 +1844,11 @@ CREATE INDEX "idx_workspace_access_org" ON "public"."workspace_access" USING "bt
 
 
 
-CREATE INDEX "idx_workspace_access_owner" ON "public"."workspace_access" USING "btree" ("workspace_owner_id");
+CREATE INDEX "idx_workspace_invitations_team" ON "public"."workspace_invitations" USING "btree" ("team_id");
 
 
 
-CREATE INDEX "idx_workspace_access_type" ON "public"."workspace_access" USING "btree" ("workspace_type");
+CREATE UNIQUE INDEX "team_members_one_commander_per_team" ON "public"."team_members" USING "btree" ("team_id") WHERE ("role" = 'commander'::"text");
 
 
 
@@ -1140,11 +1868,19 @@ CREATE INDEX "workspace_invitations_status_idx" ON "public"."workspace_invitatio
 
 
 
+CREATE OR REPLACE TRIGGER "enforce_team_member_workspace_role" BEFORE INSERT OR UPDATE ON "public"."team_members" FOR EACH ROW EXECUTE FUNCTION "public"."check_team_member_is_workspace_member"();
+
+
+
 CREATE OR REPLACE TRIGGER "update_org_workspaces_updated_at" BEFORE UPDATE ON "public"."org_workspaces" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
 
 
 CREATE OR REPLACE TRIGGER "update_profiles_updated_at" BEFORE UPDATE ON "public"."profiles" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
+
+
+
+CREATE OR REPLACE TRIGGER "update_session_stats_updated_at" BEFORE UPDATE ON "public"."session_stats" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
 
 
@@ -1156,13 +1892,52 @@ CREATE OR REPLACE TRIGGER "update_teams_updated_at" BEFORE UPDATE ON "public"."t
 
 
 
+CREATE OR REPLACE TRIGGER "update_trainings_updated_at" BEFORE UPDATE ON "public"."trainings" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
+
+
+
 ALTER TABLE ONLY "public"."org_workspaces"
     ADD CONSTRAINT "org_workspaces_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
 
 
+ALTER TABLE ONLY "public"."paper_target_results"
+    ADD CONSTRAINT "paper_target_results_session_target_id_fkey" FOREIGN KEY ("session_target_id") REFERENCES "public"."session_targets"("id");
+
+
+
 ALTER TABLE ONLY "public"."profiles"
     ADD CONSTRAINT "profiles_id_fkey" FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."session_participants"
+    ADD CONSTRAINT "session_participants_session_id_fkey" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."session_participants"
+    ADD CONSTRAINT "session_participants_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id");
+
+
+
+ALTER TABLE ONLY "public"."session_stats"
+    ADD CONSTRAINT "session_stats_session_id_fkey" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."session_stats"
+    ADD CONSTRAINT "session_stats_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id");
+
+
+
+ALTER TABLE ONLY "public"."session_targets"
+    ADD CONSTRAINT "session_targets_session_id_fkey" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."sessions"
+    ADD CONSTRAINT "sessions_drill_id_fkey" FOREIGN KEY ("drill_id") REFERENCES "public"."training_drills"("id");
 
 
 
@@ -1177,12 +1952,17 @@ ALTER TABLE ONLY "public"."sessions"
 
 
 ALTER TABLE ONLY "public"."sessions"
-    ADD CONSTRAINT "sessions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "sessions_training_id_fkey" FOREIGN KEY ("training_id") REFERENCES "public"."trainings"("id");
 
 
 
 ALTER TABLE ONLY "public"."sessions"
-    ADD CONSTRAINT "sessions_workspace_owner_fkey" FOREIGN KEY ("workspace_owner_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "sessions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."tactical_target_results"
+    ADD CONSTRAINT "tactical_target_results_session_target_id_fkey" FOREIGN KEY ("session_target_id") REFERENCES "public"."session_targets"("id");
 
 
 
@@ -1201,8 +1981,23 @@ ALTER TABLE ONLY "public"."teams"
 
 
 
-ALTER TABLE ONLY "public"."teams"
-    ADD CONSTRAINT "teams_workspace_owner_fkey" FOREIGN KEY ("workspace_owner_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+ALTER TABLE ONLY "public"."training_drills"
+    ADD CONSTRAINT "training_drills_training_id_fkey" FOREIGN KEY ("training_id") REFERENCES "public"."trainings"("id");
+
+
+
+ALTER TABLE ONLY "public"."trainings"
+    ADD CONSTRAINT "trainings_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id");
+
+
+
+ALTER TABLE ONLY "public"."trainings"
+    ADD CONSTRAINT "trainings_org_workspace_id_fkey" FOREIGN KEY ("org_workspace_id") REFERENCES "public"."org_workspaces"("id");
+
+
+
+ALTER TABLE ONLY "public"."trainings"
+    ADD CONSTRAINT "trainings_team_id_fkey" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id");
 
 
 
@@ -1213,11 +2008,6 @@ ALTER TABLE ONLY "public"."workspace_access"
 
 ALTER TABLE ONLY "public"."workspace_access"
     ADD CONSTRAINT "workspace_access_org_fkey" FOREIGN KEY ("org_workspace_id") REFERENCES "public"."org_workspaces"("id") ON DELETE CASCADE;
-
-
-
-ALTER TABLE ONLY "public"."workspace_access"
-    ADD CONSTRAINT "workspace_access_owner_fkey" FOREIGN KEY ("workspace_owner_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
 
 
@@ -1233,6 +2023,23 @@ ALTER TABLE ONLY "public"."workspace_invitations"
 
 ALTER TABLE ONLY "public"."workspace_invitations"
     ADD CONSTRAINT "workspace_invitations_org_workspace_fkey" FOREIGN KEY ("org_workspace_id") REFERENCES "public"."org_workspaces"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."workspace_invitations"
+    ADD CONSTRAINT "workspace_invitations_team_id_fkey" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE SET NULL;
+
+
+
+CREATE POLICY "Users can insert own session stats" ON "public"."session_stats" FOR INSERT WITH CHECK (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can update own session stats" ON "public"."session_stats" FOR UPDATE USING (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can view own session stats" ON "public"."session_stats" FOR SELECT USING (("user_id" = "auth"."uid"()));
 
 
 
@@ -1257,6 +2064,9 @@ CREATE POLICY "org_workspaces_update" ON "public"."org_workspaces" FOR UPDATE US
 
 
 
+ALTER TABLE "public"."paper_target_results" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY;
 
 
@@ -1264,9 +2074,11 @@ CREATE POLICY "profiles_delete_self" ON "public"."profiles" FOR DELETE USING (("
 
 
 
-CREATE POLICY "profiles_select" ON "public"."profiles" FOR SELECT USING ((("auth"."uid"() = "id") OR ("id" IN ( SELECT "workspace_access"."workspace_owner_id"
-   FROM "public"."workspace_access"
-  WHERE ("workspace_access"."member_id" = "auth"."uid"())))));
+CREATE POLICY "profiles_select" ON "public"."profiles" FOR SELECT USING ((("id" = "auth"."uid"()) OR (EXISTS ( SELECT 1
+   FROM "public"."workspace_access" "wa1"
+  WHERE (("wa1"."member_id" = "auth"."uid"()) AND (EXISTS ( SELECT 1
+           FROM "public"."workspace_access" "wa2"
+          WHERE (("wa2"."org_workspace_id" = "wa1"."org_workspace_id") AND ("wa2"."member_id" = "profiles"."id")))))))));
 
 
 
@@ -1274,24 +2086,41 @@ CREATE POLICY "profiles_update_self" ON "public"."profiles" FOR UPDATE USING (("
 
 
 
+ALTER TABLE "public"."session_participants" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."session_stats" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."session_targets" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."sessions" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "sessions_delete" ON "public"."sessions" FOR DELETE USING ((("user_id" = "auth"."uid"()) OR ("workspace_owner_id" = "auth"."uid"()) OR (EXISTS ( SELECT 1
+CREATE POLICY "sessions_delete" ON "public"."sessions" FOR DELETE USING ((("user_id" = "auth"."uid"()) OR (("org_workspace_id" IS NOT NULL) AND (EXISTS ( SELECT 1
    FROM "public"."workspace_access" "wa"
-  WHERE (("wa"."org_workspace_id" = "sessions"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text"])))))));
+  WHERE (("wa"."org_workspace_id" = "sessions"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text"]))))))));
 
 
 
-CREATE POLICY "sessions_insert" ON "public"."sessions" FOR INSERT WITH CHECK ((("user_id" = "auth"."uid"()) AND (("workspace_owner_id" = "auth"."uid"()) OR (EXISTS ( SELECT 1
+CREATE POLICY "sessions_insert" ON "public"."sessions" FOR INSERT WITH CHECK ((("user_id" = "auth"."uid"()) AND (("org_workspace_id" IS NULL) OR (EXISTS ( SELECT 1
    FROM "public"."workspace_access" "wa"
-  WHERE (("wa"."org_workspace_id" = "sessions"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"())))))));
+  WHERE (("wa"."org_workspace_id" = "sessions"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"()))))) AND (("training_id" IS NULL) OR (EXISTS ( SELECT 1
+   FROM "public"."trainings" "t"
+  WHERE (("t"."id" = "sessions"."training_id") AND ((EXISTS ( SELECT 1
+           FROM "public"."team_members" "tm"
+          WHERE (("tm"."team_id" = "t"."team_id") AND ("tm"."user_id" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
+           FROM "public"."workspace_access" "wa"
+          WHERE (("wa"."org_workspace_id" = "t"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"]))))))))))));
 
 
 
-CREATE POLICY "sessions_select" ON "public"."sessions" FOR SELECT USING ((("user_id" = "auth"."uid"()) OR ("workspace_owner_id" = "auth"."uid"()) OR (EXISTS ( SELECT 1
+CREATE POLICY "sessions_select" ON "public"."sessions" FOR SELECT USING ((("user_id" = "auth"."uid"()) OR (("org_workspace_id" IS NOT NULL) AND (EXISTS ( SELECT 1
    FROM "public"."workspace_access" "wa"
-  WHERE ((("wa"."workspace_owner_id" = "sessions"."workspace_owner_id") OR ("wa"."org_workspace_id" = "sessions"."org_workspace_id")) AND ("wa"."member_id" = "auth"."uid"()))))));
+  WHERE (("wa"."org_workspace_id" = "sessions"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"()) AND (("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"])) OR (("wa"."role" = 'member'::"text") AND (("sessions"."team_id" IS NULL) OR (EXISTS ( SELECT 1
+           FROM "public"."team_members" "tm"
+          WHERE (("tm"."team_id" = "sessions"."team_id") AND ("tm"."user_id" = "auth"."uid"())))))))))))));
 
 
 
@@ -1299,143 +2128,194 @@ CREATE POLICY "sessions_update" ON "public"."sessions" FOR UPDATE USING (("user_
 
 
 
+ALTER TABLE "public"."tactical_target_results" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."team_members" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "team_members_delete" ON "public"."team_members" FOR DELETE USING ((("user_id" = "auth"."uid"()) OR (EXISTS ( SELECT 1
-   FROM "public"."team_members" "tm"
-  WHERE (("tm"."team_id" = "team_members"."team_id") AND ("tm"."user_id" = "auth"."uid"()) AND ("tm"."role" = ANY (ARRAY['manager'::"text", 'commander'::"text"]))))) OR (EXISTS ( SELECT 1
-   FROM "public"."teams" "t"
-  WHERE (("t"."id" = "team_members"."team_id") AND ((("t"."workspace_type" = 'personal'::"text") AND (EXISTS ( SELECT 1
-           FROM "public"."workspace_access" "wa"
-          WHERE (("wa"."workspace_type" = 'personal'::"text") AND ("wa"."workspace_owner_id" = "t"."workspace_owner_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"])))))) OR (("t"."workspace_type" = 'org'::"text") AND (EXISTS ( SELECT 1
-           FROM "public"."workspace_access" "wa"
-          WHERE (("wa"."workspace_type" = 'org'::"text") AND ("wa"."org_workspace_id" = "t"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"]))))))))))));
+CREATE POLICY "team_members_delete" ON "public"."team_members" FOR DELETE USING ((EXISTS ( SELECT 1
+   FROM ("public"."teams"
+     JOIN "public"."workspace_access" ON (("workspace_access"."org_workspace_id" = "teams"."org_workspace_id")))
+  WHERE (("teams"."id" = "team_members"."team_id") AND ("workspace_access"."member_id" = "auth"."uid"()) AND ("workspace_access"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"]))))));
 
 
 
-CREATE POLICY "team_members_insert" ON "public"."team_members" FOR INSERT WITH CHECK (((EXISTS ( SELECT 1
-   FROM "public"."team_members" "tm"
-  WHERE (("tm"."team_id" = "team_members"."team_id") AND ("tm"."user_id" = "auth"."uid"()) AND ("tm"."role" = ANY (ARRAY['manager'::"text", 'commander'::"text"]))))) OR (EXISTS ( SELECT 1
-   FROM "public"."teams" "t"
-  WHERE (("t"."id" = "team_members"."team_id") AND ((("t"."workspace_type" = 'personal'::"text") AND (EXISTS ( SELECT 1
-           FROM "public"."workspace_access" "wa"
-          WHERE (("wa"."workspace_type" = 'personal'::"text") AND ("wa"."workspace_owner_id" = "t"."workspace_owner_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"])))))) OR (("t"."workspace_type" = 'org'::"text") AND (EXISTS ( SELECT 1
-           FROM "public"."workspace_access" "wa"
-          WHERE (("wa"."workspace_type" = 'org'::"text") AND ("wa"."org_workspace_id" = "t"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"]))))))))))));
+CREATE POLICY "team_members_insert" ON "public"."team_members" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
+   FROM ("public"."teams"
+     JOIN "public"."workspace_access" ON (("workspace_access"."org_workspace_id" = "teams"."org_workspace_id")))
+  WHERE (("teams"."id" = "team_members"."team_id") AND ("workspace_access"."member_id" = "auth"."uid"()) AND ("workspace_access"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"]))))));
 
 
 
 CREATE POLICY "team_members_select" ON "public"."team_members" FOR SELECT USING ((("user_id" = "auth"."uid"()) OR (EXISTS ( SELECT 1
-   FROM "public"."teams" "t"
-  WHERE (("t"."id" = "team_members"."team_id") AND ((("t"."workspace_type" = 'personal'::"text") AND (EXISTS ( SELECT 1
-           FROM "public"."workspace_access" "wa"
-          WHERE (("wa"."workspace_type" = 'personal'::"text") AND ("wa"."workspace_owner_id" = "t"."workspace_owner_id") AND ("wa"."member_id" = "auth"."uid"()))))) OR (("t"."workspace_type" = 'org'::"text") AND (EXISTS ( SELECT 1
-           FROM "public"."workspace_access" "wa"
-          WHERE (("wa"."workspace_type" = 'org'::"text") AND ("wa"."org_workspace_id" = "t"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"())))))))))));
+   FROM ("public"."teams"
+     JOIN "public"."workspace_access" ON (("workspace_access"."org_workspace_id" = "teams"."org_workspace_id")))
+  WHERE (("teams"."id" = "team_members"."team_id") AND ("workspace_access"."member_id" = "auth"."uid"()))))));
 
 
 
-CREATE POLICY "team_members_update" ON "public"."team_members" FOR UPDATE USING ((("user_id" = "auth"."uid"()) OR (EXISTS ( SELECT 1
-   FROM "public"."team_members" "tm"
-  WHERE (("tm"."team_id" = "team_members"."team_id") AND ("tm"."user_id" = "auth"."uid"()) AND ("tm"."role" = ANY (ARRAY['manager'::"text", 'commander'::"text"]))))) OR (EXISTS ( SELECT 1
-   FROM "public"."teams" "t"
-  WHERE (("t"."id" = "team_members"."team_id") AND ((("t"."workspace_type" = 'personal'::"text") AND (EXISTS ( SELECT 1
-           FROM "public"."workspace_access" "wa"
-          WHERE (("wa"."workspace_type" = 'personal'::"text") AND ("wa"."workspace_owner_id" = "t"."workspace_owner_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"])))))) OR (("t"."workspace_type" = 'org'::"text") AND (EXISTS ( SELECT 1
-           FROM "public"."workspace_access" "wa"
-          WHERE (("wa"."workspace_type" = 'org'::"text") AND ("wa"."org_workspace_id" = "t"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"]))))))))))));
+CREATE POLICY "team_members_update" ON "public"."team_members" FOR UPDATE USING ((EXISTS ( SELECT 1
+   FROM ("public"."teams"
+     JOIN "public"."workspace_access" ON (("workspace_access"."org_workspace_id" = "teams"."org_workspace_id")))
+  WHERE (("teams"."id" = "team_members"."team_id") AND ("workspace_access"."member_id" = "auth"."uid"()) AND ("workspace_access"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"]))))));
 
 
 
 ALTER TABLE "public"."teams" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "teams_delete" ON "public"."teams" FOR DELETE USING (((("workspace_type" = 'personal'::"text") AND (EXISTS ( SELECT 1
+CREATE POLICY "teams_delete" ON "public"."teams" FOR DELETE USING ((EXISTS ( SELECT 1
+   FROM "public"."workspace_access"
+  WHERE (("workspace_access"."org_workspace_id" = "teams"."org_workspace_id") AND ("workspace_access"."member_id" = "auth"."uid"()) AND ("workspace_access"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text"]))))));
+
+
+
+CREATE POLICY "teams_insert" ON "public"."teams" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
+   FROM "public"."workspace_access"
+  WHERE (("workspace_access"."org_workspace_id" = "teams"."org_workspace_id") AND ("workspace_access"."member_id" = "auth"."uid"()) AND ("workspace_access"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"]))))));
+
+
+
+CREATE POLICY "teams_select" ON "public"."teams" FOR SELECT USING ((EXISTS ( SELECT 1
+   FROM "public"."workspace_access"
+  WHERE (("workspace_access"."org_workspace_id" = "teams"."org_workspace_id") AND ("workspace_access"."member_id" = "auth"."uid"())))));
+
+
+
+CREATE POLICY "teams_update" ON "public"."teams" FOR UPDATE USING ((EXISTS ( SELECT 1
+   FROM "public"."workspace_access"
+  WHERE (("workspace_access"."org_workspace_id" = "teams"."org_workspace_id") AND ("workspace_access"."member_id" = "auth"."uid"()) AND ("workspace_access"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"]))))));
+
+
+
+ALTER TABLE "public"."training_drills" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "training_drills_delete" ON "public"."training_drills" FOR DELETE USING ((EXISTS ( SELECT 1
+   FROM ("public"."trainings" "t"
+     JOIN "public"."workspace_access" "wa" ON (("wa"."org_workspace_id" = "t"."org_workspace_id")))
+  WHERE (("t"."id" = "training_drills"."training_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text"]))))));
+
+
+
+CREATE POLICY "training_drills_insert" ON "public"."training_drills" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
+   FROM ("public"."trainings" "t"
+     JOIN "public"."workspace_access" "wa" ON (("wa"."org_workspace_id" = "t"."org_workspace_id")))
+  WHERE (("t"."id" = "training_drills"."training_id") AND ("wa"."member_id" = "auth"."uid"()) AND (("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"])) OR (("wa"."role" = 'member'::"text") AND ("t"."team_id" IS NOT NULL) AND (EXISTS ( SELECT 1
+           FROM "public"."team_members" "tm"
+          WHERE (("tm"."team_id" = "t"."team_id") AND ("tm"."user_id" = "auth"."uid"()) AND ("tm"."role" = 'commander'::"text"))))))))));
+
+
+
+CREATE POLICY "training_drills_select" ON "public"."training_drills" FOR SELECT USING ((EXISTS ( SELECT 1
+   FROM ("public"."trainings" "t"
+     JOIN "public"."workspace_access" "wa" ON (("wa"."org_workspace_id" = "t"."org_workspace_id")))
+  WHERE (("t"."id" = "training_drills"."training_id") AND ("wa"."member_id" = "auth"."uid"()) AND (("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"])) OR (("wa"."role" = 'member'::"text") AND ("t"."team_id" IS NOT NULL) AND (EXISTS ( SELECT 1
+           FROM "public"."team_members" "tm"
+          WHERE (("tm"."team_id" = "t"."team_id") AND ("tm"."user_id" = "auth"."uid"()))))))))));
+
+
+
+CREATE POLICY "training_drills_update" ON "public"."training_drills" FOR UPDATE USING ((EXISTS ( SELECT 1
+   FROM ("public"."trainings" "t"
+     JOIN "public"."workspace_access" "wa" ON (("wa"."org_workspace_id" = "t"."org_workspace_id")))
+  WHERE (("t"."id" = "training_drills"."training_id") AND ("wa"."member_id" = "auth"."uid"()) AND (("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"])) OR (("wa"."role" = 'member'::"text") AND ("t"."team_id" IS NOT NULL) AND (EXISTS ( SELECT 1
+           FROM "public"."team_members" "tm"
+          WHERE (("tm"."team_id" = "t"."team_id") AND ("tm"."user_id" = "auth"."uid"()) AND ("tm"."role" = 'commander'::"text"))))))))));
+
+
+
+ALTER TABLE "public"."trainings" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "trainings_delete" ON "public"."trainings" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM "public"."workspace_access" "wa"
-  WHERE (("wa"."workspace_type" = 'personal'::"text") AND ("wa"."workspace_owner_id" = "teams"."workspace_owner_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text"])))))) OR (("workspace_type" = 'org'::"text") AND (EXISTS ( SELECT 1
+  WHERE (("wa"."org_workspace_id" = "trainings"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text"]))))));
+
+
+
+CREATE POLICY "trainings_insert" ON "public"."trainings" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
    FROM "public"."workspace_access" "wa"
-  WHERE (("wa"."workspace_type" = 'org'::"text") AND ("wa"."org_workspace_id" = "teams"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text"]))))))));
+  WHERE (("wa"."org_workspace_id" = "trainings"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"()) AND (("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"])) OR (("wa"."role" = 'member'::"text") AND ("trainings"."team_id" IS NOT NULL) AND (EXISTS ( SELECT 1
+           FROM "public"."team_members" "tm"
+          WHERE (("tm"."team_id" = "trainings"."team_id") AND ("tm"."user_id" = "auth"."uid"()) AND ("tm"."role" = 'commander'::"text"))))))))));
 
 
 
-CREATE POLICY "teams_insert" ON "public"."teams" FOR INSERT WITH CHECK (((("workspace_type" = 'personal'::"text") AND (EXISTS ( SELECT 1
+CREATE POLICY "trainings_select" ON "public"."trainings" FOR SELECT USING ((EXISTS ( SELECT 1
    FROM "public"."workspace_access" "wa"
-  WHERE (("wa"."workspace_type" = 'personal'::"text") AND ("wa"."workspace_owner_id" = "teams"."workspace_owner_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"])))))) OR (("workspace_type" = 'org'::"text") AND (EXISTS ( SELECT 1
+  WHERE (("wa"."org_workspace_id" = "trainings"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"()) AND (("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"])) OR (("wa"."role" = 'member'::"text") AND ("trainings"."team_id" IS NOT NULL) AND (EXISTS ( SELECT 1
+           FROM "public"."team_members" "tm"
+          WHERE (("tm"."team_id" = "trainings"."team_id") AND ("tm"."user_id" = "auth"."uid"()))))))))));
+
+
+
+CREATE POLICY "trainings_update" ON "public"."trainings" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM "public"."workspace_access" "wa"
-  WHERE (("wa"."workspace_type" = 'org'::"text") AND ("wa"."org_workspace_id" = "teams"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"]))))))));
-
-
-
-CREATE POLICY "teams_select" ON "public"."teams" FOR SELECT USING (((("workspace_type" = 'personal'::"text") AND (("workspace_owner_id" = "auth"."uid"()) OR (EXISTS ( SELECT 1
-   FROM "public"."workspace_access" "wa"
-  WHERE (("wa"."workspace_type" = 'personal'::"text") AND ("wa"."workspace_owner_id" = "teams"."workspace_owner_id") AND ("wa"."member_id" = "auth"."uid"())))))) OR (("workspace_type" = 'org'::"text") AND (EXISTS ( SELECT 1
-   FROM "public"."workspace_access" "wa"
-  WHERE (("wa"."workspace_type" = 'org'::"text") AND ("wa"."org_workspace_id" = "teams"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"())))))));
-
-
-
-CREATE POLICY "teams_update" ON "public"."teams" FOR UPDATE USING (((("workspace_type" = 'personal'::"text") AND (EXISTS ( SELECT 1
-   FROM "public"."workspace_access" "wa"
-  WHERE (("wa"."workspace_type" = 'personal'::"text") AND ("wa"."workspace_owner_id" = "teams"."workspace_owner_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"])))))) OR (("workspace_type" = 'org'::"text") AND (EXISTS ( SELECT 1
-   FROM "public"."workspace_access" "wa"
-  WHERE (("wa"."workspace_type" = 'org'::"text") AND ("wa"."org_workspace_id" = "teams"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"]))))))));
+  WHERE (("wa"."org_workspace_id" = "trainings"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"()) AND (("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text", 'instructor'::"text"])) OR (("wa"."role" = 'member'::"text") AND ("trainings"."team_id" IS NOT NULL) AND (EXISTS ( SELECT 1
+           FROM "public"."team_members" "tm"
+          WHERE (("tm"."team_id" = "trainings"."team_id") AND ("tm"."user_id" = "auth"."uid"()) AND ("tm"."role" = 'commander'::"text"))))))))));
 
 
 
 ALTER TABLE "public"."workspace_access" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "workspace_access_delete" ON "public"."workspace_access" FOR DELETE USING ((("member_id" = "auth"."uid"()) OR ("workspace_owner_id" = "auth"."uid"()) OR (EXISTS ( SELECT 1
-   FROM "public"."org_workspaces" "ow"
-  WHERE (("ow"."id" = "workspace_access"."org_workspace_id") AND ("ow"."created_by" = "auth"."uid"()))))));
+CREATE POLICY "workspace_access_delete" ON "public"."workspace_access" FOR DELETE USING ((EXISTS ( SELECT 1
+   FROM "public"."workspace_access" "wa"
+  WHERE (("wa"."org_workspace_id" = "workspace_access"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = 'owner'::"text")))));
 
 
 
-CREATE POLICY "workspace_access_insert" ON "public"."workspace_access" FOR INSERT WITH CHECK (("workspace_owner_id" = "auth"."uid"()));
+CREATE POLICY "workspace_access_insert" ON "public"."workspace_access" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
+   FROM "public"."workspace_access" "wa"
+  WHERE (("wa"."org_workspace_id" = "workspace_access"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text"]))))));
 
 
 
-CREATE POLICY "workspace_access_select" ON "public"."workspace_access" FOR SELECT USING ((("member_id" = "auth"."uid"()) OR ("workspace_owner_id" = "auth"."uid"())));
+CREATE POLICY "workspace_access_select" ON "public"."workspace_access" FOR SELECT USING (("member_id" = "auth"."uid"()));
 
 
 
-CREATE POLICY "workspace_access_update" ON "public"."workspace_access" FOR UPDATE USING (("workspace_owner_id" = "auth"."uid"()));
+CREATE POLICY "workspace_access_update" ON "public"."workspace_access" FOR UPDATE USING ((EXISTS ( SELECT 1
+   FROM "public"."workspace_access" "wa"
+  WHERE (("wa"."org_workspace_id" = "workspace_access"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text"]))))));
 
 
 
 ALTER TABLE "public"."workspace_invitations" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "workspace_invitations_accept" ON "public"."workspace_invitations" FOR UPDATE USING ((("auth"."uid"() IS NOT NULL) AND ("status" = 'pending'::"text") AND ("expires_at" > "now"())));
+CREATE POLICY "workspace_invitations_delete" ON "public"."workspace_invitations" FOR DELETE USING (((EXISTS ( SELECT 1
+   FROM "public"."workspace_access" "wa"
+  WHERE (("wa"."org_workspace_id" = "workspace_invitations"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text"]))))) OR (("team_id" IS NOT NULL) AND (EXISTS ( SELECT 1
+   FROM "public"."team_members" "tm"
+  WHERE (("tm"."team_id" = "workspace_invitations"."team_id") AND ("tm"."user_id" = "auth"."uid"()) AND ("tm"."role" = 'commander'::"text"))))) OR ("invited_by" = "auth"."uid"())));
 
 
 
-CREATE POLICY "workspace_invitations_delete_by_workspace_admin" ON "public"."workspace_invitations" FOR DELETE USING ((EXISTS ( SELECT 1
-   FROM "public"."workspace_access"
-  WHERE (("workspace_access"."org_workspace_id" = "workspace_invitations"."org_workspace_id") AND ("workspace_access"."member_id" = "auth"."uid"()) AND ("workspace_access"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text"]))))));
+CREATE POLICY "workspace_invitations_insert" ON "public"."workspace_invitations" FOR INSERT WITH CHECK (((EXISTS ( SELECT 1
+   FROM "public"."workspace_access" "wa"
+  WHERE (("wa"."org_workspace_id" = "workspace_invitations"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text"]))))) OR (("team_id" IS NOT NULL) AND ("role" = 'member'::"text") AND ("team_role" = ANY (ARRAY['squad_commander'::"text", 'soldier'::"text"])) AND (EXISTS ( SELECT 1
+   FROM "public"."team_members" "tm"
+  WHERE (("tm"."team_id" = "workspace_invitations"."team_id") AND ("tm"."user_id" = "auth"."uid"()) AND ("tm"."role" = 'commander'::"text")))))));
 
 
 
-CREATE POLICY "workspace_invitations_insert_by_workspace_admin" ON "public"."workspace_invitations" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
-   FROM "public"."workspace_access"
-  WHERE (("workspace_access"."org_workspace_id" = "workspace_invitations"."org_workspace_id") AND ("workspace_access"."member_id" = "auth"."uid"()) AND ("workspace_access"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text"]))))));
+CREATE POLICY "workspace_invitations_select" ON "public"."workspace_invitations" FOR SELECT USING ((("auth"."uid"() IS NOT NULL) AND ((EXISTS ( SELECT 1
+   FROM "public"."workspace_access" "wa"
+  WHERE (("wa"."org_workspace_id" = "workspace_invitations"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text"]))))) OR (("team_id" IS NOT NULL) AND (EXISTS ( SELECT 1
+   FROM "public"."team_members" "tm"
+  WHERE (("tm"."team_id" = "workspace_invitations"."team_id") AND ("tm"."user_id" = "auth"."uid"()) AND ("tm"."role" = 'commander'::"text"))))) OR ("invited_by" = "auth"."uid"()) OR ("status" = 'pending'::"text"))));
 
 
 
-CREATE POLICY "workspace_invitations_select_by_code" ON "public"."workspace_invitations" FOR SELECT USING (("auth"."uid"() IS NOT NULL));
-
-
-
-CREATE POLICY "workspace_invitations_select_by_workspace_admin" ON "public"."workspace_invitations" FOR SELECT USING ((EXISTS ( SELECT 1
-   FROM "public"."workspace_access"
-  WHERE (("workspace_access"."org_workspace_id" = "workspace_invitations"."org_workspace_id") AND ("workspace_access"."member_id" = "auth"."uid"()) AND ("workspace_access"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text"]))))));
-
-
-
-CREATE POLICY "workspace_invitations_update_by_workspace_admin" ON "public"."workspace_invitations" FOR UPDATE USING ((EXISTS ( SELECT 1
-   FROM "public"."workspace_access"
-  WHERE (("workspace_access"."org_workspace_id" = "workspace_invitations"."org_workspace_id") AND ("workspace_access"."member_id" = "auth"."uid"()) AND ("workspace_access"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text"]))))));
+CREATE POLICY "workspace_invitations_update" ON "public"."workspace_invitations" FOR UPDATE USING (((EXISTS ( SELECT 1
+   FROM "public"."workspace_access" "wa"
+  WHERE (("wa"."org_workspace_id" = "workspace_invitations"."org_workspace_id") AND ("wa"."member_id" = "auth"."uid"()) AND ("wa"."role" = ANY (ARRAY['owner'::"text", 'admin'::"text"]))))) OR (("team_id" IS NOT NULL) AND (EXISTS ( SELECT 1
+   FROM "public"."team_members" "tm"
+  WHERE (("tm"."team_id" = "workspace_invitations"."team_id") AND ("tm"."user_id" = "auth"."uid"()) AND ("tm"."role" = 'commander'::"text"))))) OR (("status" = 'pending'::"text") AND ("expires_at" > "now"()))));
 
 
 
@@ -1449,6 +2329,18 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 GRANT ALL ON FUNCTION "public"."accept_invite_code"("p_invite_code" "text", "p_user_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."accept_invite_code"("p_invite_code" "text", "p_user_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."accept_invite_code"("p_invite_code" "text", "p_user_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."add_team_member"("p_team_id" "uuid", "p_user_id" "uuid", "p_role" "text", "p_details" "jsonb") TO "anon";
+GRANT ALL ON FUNCTION "public"."add_team_member"("p_team_id" "uuid", "p_user_id" "uuid", "p_role" "text", "p_details" "jsonb") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."add_team_member"("p_team_id" "uuid", "p_user_id" "uuid", "p_role" "text", "p_details" "jsonb") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."check_team_member_is_workspace_member"() TO "anon";
+GRANT ALL ON FUNCTION "public"."check_team_member_is_workspace_member"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."check_team_member_is_workspace_member"() TO "service_role";
 
 
 
@@ -1470,9 +2362,9 @@ GRANT ALL ON FUNCTION "public"."create_session"("p_workspace_type" "text", "p_wo
 
 
 
-GRANT ALL ON FUNCTION "public"."create_team"("p_workspace_type" "text", "p_name" "text", "p_workspace_owner_id" "uuid", "p_org_workspace_id" "uuid", "p_description" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."create_team"("p_workspace_type" "text", "p_name" "text", "p_workspace_owner_id" "uuid", "p_org_workspace_id" "uuid", "p_description" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."create_team"("p_workspace_type" "text", "p_name" "text", "p_workspace_owner_id" "uuid", "p_org_workspace_id" "uuid", "p_description" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."create_team"("p_workspace_type" "text", "p_name" "text", "p_workspace_owner_id" "uuid", "p_org_workspace_id" "uuid", "p_description" "text", "p_squads" "text"[]) TO "anon";
+GRANT ALL ON FUNCTION "public"."create_team"("p_workspace_type" "text", "p_name" "text", "p_workspace_owner_id" "uuid", "p_org_workspace_id" "uuid", "p_description" "text", "p_squads" "text"[]) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."create_team"("p_workspace_type" "text", "p_name" "text", "p_workspace_owner_id" "uuid", "p_org_workspace_id" "uuid", "p_description" "text", "p_squads" "text"[]) TO "service_role";
 
 
 
@@ -1506,6 +2398,24 @@ GRANT ALL ON FUNCTION "public"."get_org_workspace_members"("p_org_workspace_id" 
 
 
 
+GRANT ALL ON FUNCTION "public"."get_sniper_best_performance"("p_user_id" "uuid", "p_org_workspace_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_sniper_best_performance"("p_user_id" "uuid", "p_org_workspace_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_sniper_best_performance"("p_user_id" "uuid", "p_org_workspace_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."get_sniper_progression"("p_user_id" "uuid", "p_org_workspace_id" "uuid", "p_days_back" integer) TO "anon";
+GRANT ALL ON FUNCTION "public"."get_sniper_progression"("p_user_id" "uuid", "p_org_workspace_id" "uuid", "p_days_back" integer) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_sniper_progression"("p_user_id" "uuid", "p_org_workspace_id" "uuid", "p_days_back" integer) TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."get_team_leaderboard"("p_team_id" "uuid", "p_days_back" integer) TO "anon";
+GRANT ALL ON FUNCTION "public"."get_team_leaderboard"("p_team_id" "uuid", "p_days_back" integer) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_team_leaderboard"("p_team_id" "uuid", "p_days_back" integer) TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."get_team_members"("p_team_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_team_members"("p_team_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_team_members"("p_team_id" "uuid") TO "service_role";
@@ -1536,6 +2446,12 @@ GRANT ALL ON FUNCTION "public"."has_workspace_access"("p_workspace_id" "uuid") T
 
 
 
+GRANT ALL ON FUNCTION "public"."insert_sample_session_data"("p_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."insert_sample_session_data"("p_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."insert_sample_session_data"("p_user_id" "uuid") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."is_team_leader"("p_team_id" "uuid", "p_user_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."is_team_leader"("p_team_id" "uuid", "p_user_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."is_team_leader"("p_team_id" "uuid", "p_user_id" "uuid") TO "service_role";
@@ -1545,6 +2461,18 @@ GRANT ALL ON FUNCTION "public"."is_team_leader"("p_team_id" "uuid", "p_user_id" 
 GRANT ALL ON FUNCTION "public"."is_workspace_admin"("p_workspace_id" "uuid", "p_user_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."is_workspace_admin"("p_workspace_id" "uuid", "p_user_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."is_workspace_admin"("p_workspace_id" "uuid", "p_user_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."remove_team_member"("p_team_id" "uuid", "p_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."remove_team_member"("p_team_id" "uuid", "p_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."remove_team_member"("p_team_id" "uuid", "p_user_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."update_team_member_role"("p_team_id" "uuid", "p_user_id" "uuid", "p_role" "text", "p_details" "jsonb") TO "anon";
+GRANT ALL ON FUNCTION "public"."update_team_member_role"("p_team_id" "uuid", "p_user_id" "uuid", "p_role" "text", "p_details" "jsonb") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_team_member_role"("p_team_id" "uuid", "p_user_id" "uuid", "p_role" "text", "p_details" "jsonb") TO "service_role";
 
 
 
@@ -1566,21 +2494,69 @@ GRANT ALL ON TABLE "public"."org_workspaces" TO "service_role";
 
 
 
+GRANT ALL ON TABLE "public"."paper_target_results" TO "anon";
+GRANT ALL ON TABLE "public"."paper_target_results" TO "authenticated";
+GRANT ALL ON TABLE "public"."paper_target_results" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."profiles" TO "anon";
 GRANT ALL ON TABLE "public"."profiles" TO "authenticated";
 GRANT ALL ON TABLE "public"."profiles" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."team_members" TO "anon";
-GRANT ALL ON TABLE "public"."team_members" TO "authenticated";
-GRANT ALL ON TABLE "public"."team_members" TO "service_role";
+GRANT ALL ON TABLE "public"."session_participants" TO "anon";
+GRANT ALL ON TABLE "public"."session_participants" TO "authenticated";
+GRANT ALL ON TABLE "public"."session_participants" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."session_stats" TO "anon";
+GRANT ALL ON TABLE "public"."session_stats" TO "authenticated";
+GRANT ALL ON TABLE "public"."session_stats" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."session_targets" TO "anon";
+GRANT ALL ON TABLE "public"."session_targets" TO "authenticated";
+GRANT ALL ON TABLE "public"."session_targets" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."tactical_target_results" TO "anon";
+GRANT ALL ON TABLE "public"."tactical_target_results" TO "authenticated";
+GRANT ALL ON TABLE "public"."tactical_target_results" TO "service_role";
 
 
 
 GRANT ALL ON TABLE "public"."teams" TO "anon";
 GRANT ALL ON TABLE "public"."teams" TO "authenticated";
 GRANT ALL ON TABLE "public"."teams" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."training_drills" TO "anon";
+GRANT ALL ON TABLE "public"."training_drills" TO "authenticated";
+GRANT ALL ON TABLE "public"."training_drills" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."trainings" TO "anon";
+GRANT ALL ON TABLE "public"."trainings" TO "authenticated";
+GRANT ALL ON TABLE "public"."trainings" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."session_stats_sniper" TO "anon";
+GRANT ALL ON TABLE "public"."session_stats_sniper" TO "authenticated";
+GRANT ALL ON TABLE "public"."session_stats_sniper" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."team_members" TO "anon";
+GRANT ALL ON TABLE "public"."team_members" TO "authenticated";
+GRANT ALL ON TABLE "public"."team_members" TO "service_role";
 
 
 

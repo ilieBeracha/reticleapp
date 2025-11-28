@@ -58,10 +58,10 @@ const StatsGrid = memo(function StatsGrid({
       label: 'Total Sessions',
     },
     {
-      icon: 'trophy-outline' as const,
-      iconColor: '#E76925',
+      icon: 'fitness-outline' as const,
+      iconColor: '#7C3AED',
       value: stats.totalAbg,
-      label: 'Total ABG',
+      label: 'Upcoming',
     },
     {
       icon: 'time-outline' as const,

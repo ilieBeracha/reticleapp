@@ -5,7 +5,7 @@ import { useWorkspaceStore } from '@/store/useWorkspaceStore'
 import { Session, User } from '@supabase/supabase-js'
 import { router } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react'
 
 WebBrowser.maybeCompleteAuthSession()
 
@@ -13,6 +13,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  transitioning: boolean;
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithOAuth: (provider: 'google' | 'apple') => Promise<void>;
@@ -27,6 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [transitioning, setTransitioning] = useState(false)
 
   // ═══════════════════════════════════════════════════
   // AUTH EVENT HANDLERS
@@ -36,12 +38,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Handle user sign out - clear state and redirect to login
    */
   const handleSignOut = () => {
-    router.replace("/auth/sign-in")
+    useWorkspaceStore.getState().reset()
+    setTransitioning(true)
+    setTimeout(() => {
+      router.replace("/auth/sign-in")
+      setTransitioning(false)
+    }, 500)
   }
+
+  // Track if we've handled initial session to prevent re-triggers
+  const initialSessionHandledRef = useRef(false)
 
   /**
    * Handle initial session (app startup with existing session)
-   * Redirect to protected area and load workspaces in background
+   * Only runs ONCE on true app startup, not on re-triggers
    */
   const handleInitialSession = async (session: Session | null) => {
     if (!session?.user) {
@@ -50,41 +60,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
+    // Skip if already handled (prevents re-triggers from resetting state)
+    if (initialSessionHandledRef.current) {
+      if (__DEV__) console.log("📱 Auth: Initial session already handled, skipping")
+      setLoading(false)
+      return
+    }
+    initialSessionHandledRef.current = true
+
+    setTransitioning(true)
     setLoading(false)
-    router.replace("/(protected)")
     
-    // Load workspaces in background (non-blocking)
+    // Load workspaces in background (don't reset activeWorkspace - let store preserve it)
     useWorkspaceStore.getState().loadWorkspaces().catch(err => 
       console.error("Background workspace load error:", err)
     )
+    
+    // Navigate to personal mode ONLY if no active workspace is set
+    const currentActiveWorkspace = useWorkspaceStore.getState().activeWorkspaceId
+    
+    setTimeout(() => {
+      if (currentActiveWorkspace) {
+        // User was in an org, stay there
+        if (__DEV__) console.log("📱 Auth: Preserving active workspace:", currentActiveWorkspace)
+      } else {
+        // No active workspace, go to personal
+        router.replace("/(protected)/personal" as any)
+      }
+      setTransitioning(false)
+    }, 100) // Reduced delay since we're not always navigating
   }
 
   /**
-   * Handle new sign in - redirect to protected area and load workspaces
+   * Handle new sign in - redirect to personal mode
    */
   const handleSignIn = async (session: Session | null) => {
     if (!session?.user) return
 
+    setTransitioning(true)
     setLoading(false)
-    router.replace("/(protected)")
     
-    // Load workspaces in background (non-blocking)
+    // Load workspaces in background
     useWorkspaceStore.getState().loadWorkspaces().catch(err => 
       console.error("Background workspace load error:", err)
     )
+    
+    // Navigate to personal mode
+    setTimeout(() => {
+      router.replace("/(protected)/personal" as any)
+      setTransitioning(false)
+    }, 800)
   }
 
   /**
-   * Switch active workspace
-   * Updates user.user_metadata.active_workspace_id (SINGLE SOURCE OF TRUTH)
+   * Switch active workspace - updates user metadata and navigates
    */
   const switchWorkspace = async (workspaceId: string | null) => {
-    if (!user) return
-
+    if (__DEV__) console.log("switchWorkspace", workspaceId)
+    
     try {
-      // Update user metadata (SINGLE SOURCE OF TRUTH)
+      // Update user metadata
       await supabase.auth.updateUser({
-        data: { active_workspace_id: workspaceId }  // null = personal mode
+        data: { active_workspace_id: workspaceId }
       })
 
       // Refresh user to get updated metadata
@@ -93,9 +130,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(updatedUser)
       }
 
-      // ✨ No need to update workspace store!
-      // workspaceStore is just a cache of available workspaces
-      // Active workspace is determined by user.user_metadata.active_workspace_id
+      // Update workspace store
+      useWorkspaceStore.getState().setActiveWorkspace(workspaceId)
+      
+      // Navigate to appropriate route
+      if (workspaceId) {
+        router.replace('/(protected)/org' as any)
+      } else {
+        router.replace('/(protected)/personal' as any)
+      }
     } catch (error) {
       console.error("Switch workspace error:", error)
       throw error
@@ -106,17 +149,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Switch to personal mode
    */
   const switchToPersonal = async () => {
+    if (__DEV__) console.log("switchToPersonal")
     await switchWorkspace(null)
+    if (__DEV__) console.log("switchToPersonal done")
   }
 
   /**
-   * Main auth state change handler - routes to specific handlers
+   * Main auth state change handler
    */
   const handleAuthStateChange = async (
     event: string,
     session: Session | null
   ) => {
-    console.log("Auth event:", event)
+    if (__DEV__) console.log("Auth event:", event)
 
     setSession(session)
     setUser(session?.user ?? null)
@@ -136,7 +181,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         break
 
       default:
-        // Handle other events (TOKEN_REFRESHED, etc.)
         setLoading(false)
         break
     }
@@ -147,13 +191,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // ═══════════════════════════════════════════════════
 
   useEffect(() => {
-    // Initialize session on mount
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
       
-      // Load workspaces in background (non-blocking)
       if (session?.user) {
         useWorkspaceStore.getState().loadWorkspaces().catch((err: Error) => 
           console.error("Background workspace load error:", err)
@@ -161,7 +203,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })
 
-    // Subscribe to auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       handleAuthStateChange
     )
@@ -169,59 +210,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Initialize AuthenticatedClient ONCE when component mounts
+  // Initialize AuthenticatedClient
   useEffect(() => {
     AuthenticatedClient.initialize(
-      // Token provider
       async () => {
         const { data: { session } } = await supabase.auth.getSession()
         return session?.access_token ?? ""
       },
-      // Context provider - gets LATEST user from closure
       () => {
-        // This function is called fresh each time getContext() is called
-        // So it always has the latest user state
-        if (!user) return null
+        const currentUser = user
+        if (!currentUser) return null
         
         const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
-        
-        // ✅ In new model: user.id is MY workspace
-        // activeWorkspaceId is the workspace I'm currently viewing (mine or someone else's)
-        const isMyWorkspace = activeWorkspaceId === user.id || !activeWorkspaceId
+        const isMyWorkspace = activeWorkspaceId === currentUser.id || !activeWorkspaceId
         
         return {
-          userId: user.id,
-          workspaceId: isMyWorkspace ? null : activeWorkspaceId  // null = my workspace, else = viewing someone else's
+          userId: currentUser.id,
+          workspaceId: isMyWorkspace ? null : activeWorkspaceId
         }
       }
     )
-  }, []) // Only initialize ONCE
-
-  // Update context when user changes (for workspace switches)
-  useEffect(() => {
-    if (user) {
-      // Re-initialize with fresh context provider
-      AuthenticatedClient.initialize(
-        async () => {
-          const { data: { session } } = await supabase.auth.getSession()
-          return session?.access_token ?? ""
-        },
-        () => {
-          if (!user) return null
-          
-          const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
-          
-          // ✅ In new model: user.id is MY workspace
-          const isMyWorkspace = activeWorkspaceId === user.id || !activeWorkspaceId
-        
-          return {
-            userId: user.id,
-            workspaceId: isMyWorkspace ? null : activeWorkspaceId
-          }
-        }
-      )
-    }
-  }, [user?.id, useWorkspaceStore.getState().activeWorkspaceId]) // When user or active workspace changes
+  }, [user])
 
   const signUp = async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email, password })
@@ -257,10 +266,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
+    useWorkspaceStore.getState().reset()
     await supabase.auth.signOut()
     setUser(null)
     setSession(null)
-    router.replace('/auth/sign-in')
   }
 
   return (
@@ -268,6 +277,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       session,
       loading,
+      transitioning,
       signUp,
       signIn,
       signInWithOAuth,
