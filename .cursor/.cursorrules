@@ -1,0 +1,128 @@
+# =====================================================================
+# SUPABASE SCHEMA + MIGRATION RULES
+# =====================================================================
+
+You MUST follow these rules when generating SQL, migrations, or modifying
+anything under /supabase or interacting with the database schema.
+
+These are HARD RULES. Do not break them.
+
+----------------------------------------------------------------------
+# REMOTE POSTGRES IS THE SINGLE SOURCE OF TRUTH
+----------------------------------------------------------------------
+1. NEVER generate a full schema dump.
+2. NEVER rewrite the baseline migration.
+3. NEVER regenerate tables, constraints, or indexes unless explicitly asked.
+4. NEVER assume the content of tables or columns unless provided.
+
+----------------------------------------------------------------------
+# MIGRATION SAFETY RULES
+----------------------------------------------------------------------
+5. NEVER modify or reorder existing migration files.
+6. NEVER generate destructive migrations unless the user explicitly requests it.
+7. ALWAYS generate *PATCH-ONLY* SQL for schema changes:
+   - ALTER TABLE ... ADD COLUMN
+   - ALTER TABLE ... DROP COLUMN
+   - ALTER TABLE ... ALTER COLUMN
+   - CREATE INDEX
+   - DROP INDEX
+   - ADD CONSTRAINT
+   - DROP CONSTRAINT
+
+8. NEVER generate:
+   - CREATE TABLE for an existing table
+   - DROP TABLE for an existing table (unless explicitly ordered)
+   - CREATE UNIQUE INDEX CONCURRENTLY inside diff-based migrations
+   - Changes to RLS policies unless explicitly asked
+
+----------------------------------------------------------------------
+# EXTENSION + INTERNAL SUPABASE RULES
+----------------------------------------------------------------------
+9. NEVER output SQL that touches ANY of these:
+
+   - `extensions.*` schema
+   - `pg_net` extension or any of its functions
+   - `supabase_functions_admin` role
+   - internal extension event triggers
+   - internal Supabase auth triggers
+   - anything under `auth.*` except allowed SELECT statements
+
+10. NEVER output:
+    DROP EXTENSION pg_net;
+    CREATE EXTENSION pg_net;
+    CREATE OR REPLACE FUNCTION extensions.grant_pg_net_access(...)
+
+These are system-owned and must NEVER be modified.
+
+----------------------------------------------------------------------
+# BASELINE MIGRATION PROTECTION
+----------------------------------------------------------------------
+11. NEVER modify the existing baseline migration file.
+12. NEVER add new functions or triggers inside the baseline.
+13. ALL new functions must be generated into a NEW migration file.
+
+----------------------------------------------------------------------
+# FUNCTION + TRIGGER RULES
+----------------------------------------------------------------------
+14. When generating PL/pgSQL functions:
+    - ALWAYS put them in the `public` schema unless explicitly told otherwise.
+    - NEVER depend on tables or types that do not yet exist.
+    - NEVER return a table type unless the table already exists.
+
+15. DO NOT create triggers unless the table exists AND user requests it.
+
+----------------------------------------------------------------------
+# DIFF FLOW (CRITICAL)
+----------------------------------------------------------------------
+16. Cursor DOES NOT run migrations.
+17. Cursor NEVER runs `supabase db push`.
+18. Cursor NEVER runs `supabase db pull`.
+19. Cursor NEVER runs `supabase db diff`.
+
+ONLY the user manually runs these commands.
+
+Cursor must generate SQL only.
+
+----------------------------------------------------------------------
+# ALLOWED OPERATIONS
+----------------------------------------------------------------------
+Cursor MAY generate:
+
+- Small, isolated SQL patches
+- New tables when requested
+- New functions when requested
+- RLS policies only when explicitly asked
+- Views that depend only on existing schema
+
+----------------------------------------------------------------------
+# FORBIDDEN OUTPUT
+----------------------------------------------------------------------
+Cursor MUST NOT output:
+
+- Full schema files
+- Full diffs
+- Complete rebuild of tables
+- Unordered blocks of many CREATE statements
+- Any extension or system-object changes
+- Anything under extensions.*, pg_catalog.*, net.*, or pg_net
+
+----------------------------------------------------------------------
+# WHEN UNSURE
+----------------------------------------------------------------------
+If you are uncertain whether a requested change is safe:
+- Ask the user for clarification instead of guessing.
+- NEVER output unsafe SQL automatically.
+
+----------------------------------------------------------------------
+# SUMMARY
+----------------------------------------------------------------------
+Cursor must operate ONLY on small, safe, isolated SQL diffs and NEVER
+rewrite or regenerate the entire Supabase schema.
+
+Cursor must protect:
+- The baseline migration
+- All existing migrations
+- All internal Supabase system objects
+- Any extension-owned functions
+
+FOLLOW THESE RULES STRICTLY AND EXACTLY.
