@@ -91,7 +91,7 @@ export default function ProtectedLayout() {
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
           }}
-        />
+      />
         
         {/* Create Workspace */}
         <Stack.Screen
@@ -105,8 +105,8 @@ export default function ProtectedLayout() {
             sheetAllowedDetents: [0.7, 0.9],
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
-          }}
-        />
+        }}
+      />
         
         {/* User Menu */}
         <Stack.Screen
@@ -135,8 +135,8 @@ export default function ProtectedLayout() {
             sheetAllowedDetents: [0.8, 0.95],
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
-          }}
-        />
+        }}
+      />
         
         {/* Create Training */}
         <Stack.Screen
@@ -150,8 +150,8 @@ export default function ProtectedLayout() {
             sheetAllowedDetents: [0.85, 0.95],
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
-          }}
-        />
+        }}
+      />
         
         {/* Create Session */}
         <Stack.Screen
@@ -165,8 +165,8 @@ export default function ProtectedLayout() {
             sheetAllowedDetents: [0.9, 1],
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
-          }}
-        />
+        }}
+      />
         
         {/* Invite Members */}
         <Stack.Screen
@@ -180,8 +180,8 @@ export default function ProtectedLayout() {
             sheetAllowedDetents: [0.85, 0.95],
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
-          }}
-        />
+        }}
+      />
         
         {/* Team Preview */}
         <Stack.Screen
@@ -196,7 +196,7 @@ export default function ProtectedLayout() {
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
           }}
-        />
+      />
         
         {/* Member Preview */}
         <Stack.Screen
@@ -210,8 +210,8 @@ export default function ProtectedLayout() {
             sheetAllowedDetents: [0.6, 0.8],
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
-          }}
-        />
+        }}
+      />
         
         {/* Training Detail */}
         <Stack.Screen
@@ -225,8 +225,8 @@ export default function ProtectedLayout() {
             sheetAllowedDetents: [0.85, 0.95],
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
-          }}
-        />
+        }}
+      />
       </Stack>
     </ThemeProvider>
   );

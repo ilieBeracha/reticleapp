@@ -1,9 +1,8 @@
 import { useColors } from '@/hooks/ui/useColors';
-import React from 'react';
 import { Image, ImageStyle, StyleSheet, Text, TextStyle, View, ViewStyle } from 'react-native';
 
 export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-export type UserRole = 'owner' | 'admin' | 'instructor' | 'member';
+export type UserRole = 'owner' | 'admin' | 'instructor' | 'member' | 'attached';
 
 interface BaseAvatarProps {
   /** Image source URI or require() */
@@ -36,6 +35,7 @@ const ROLE_COLORS: Record<UserRole, { bg: string; text: string }> = {
   admin: { bg: '#5B7A8C', text: '#FFFFFF' },      // Blue-gray
   instructor: { bg: '#34C759', text: '#FFFFFF' }, // Green
   member: { bg: '#8E8E93', text: '#FFFFFF' },     // Gray
+  attached: { bg: '#10B981', text: '#FFFFFF' },   // Emerald/Green (for external users)
 };
 
 const SIZE_MAP: Record<AvatarSize, number> = {

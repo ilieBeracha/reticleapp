@@ -8,22 +8,23 @@ import type { TeamMemberShip, WorkspaceInvitationWithDetails, WorkspaceRole } fr
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 // ============================================================================
-// ROLE CONFIGURATIONS
+// CONFIGURATIONS
 // ============================================================================
 interface RoleConfig {
   value: string;
@@ -38,14 +39,14 @@ const ORG_ROLES: RoleConfig[] = [
   { value: 'admin', label: 'Admin', description: 'Full management access', icon: 'shield-half', color: '#3B82F6' },
 ];
 
+// Simplified team roles - Commander or Member
 const TEAM_ROLES: RoleConfig[] = [
-  { value: 'commander', label: 'Commander', description: 'Leads the team', icon: 'star', color: '#F59E0B' },
-  { value: 'squad_commander', label: 'Squad Leader', description: 'Leads a squad', icon: 'star-half', color: '#10B981' },
-  { value: 'soldier', label: 'Member', description: 'Team member', icon: 'person', color: '#6B7280' },
+  { value: 'commander', label: 'Team Commander', description: 'Leads the entire team', icon: 'star', color: '#F59E0B' },
+  { value: 'soldier', label: 'Team Member', description: 'Regular team member', icon: 'person', color: '#6B7280' },
 ];
 
 // ============================================================================
-// STEP INDICATOR
+// COMPONENTS
 // ============================================================================
 const StepIndicator = React.memo(function StepIndicator({
   currentStep,
@@ -74,9 +75,6 @@ const StepIndicator = React.memo(function StepIndicator({
   );
 });
 
-// ============================================================================
-// ROLE CARD
-// ============================================================================
 const RoleCard = React.memo(function RoleCard({
   role,
   isSelected,
@@ -91,7 +89,7 @@ const RoleCard = React.memo(function RoleCard({
   takenBy?: string | null;
 }) {
   const isTaken = !!takenBy;
-  
+
   return (
     <TouchableOpacity
       style={[
@@ -124,9 +122,6 @@ const RoleCard = React.memo(function RoleCard({
   );
 });
 
-// ============================================================================
-// TEAM CHIP
-// ============================================================================
 const TeamChip = React.memo(function TeamChip({
   team,
   isSelected,
@@ -156,9 +151,6 @@ const TeamChip = React.memo(function TeamChip({
   );
 });
 
-// ============================================================================
-// PENDING INVITE ROW
-// ============================================================================
 const PendingInviteRow = React.memo(function PendingInviteRow({
   invite,
   colors,
@@ -214,24 +206,30 @@ export default function InviteMembersSheet() {
   const { activeWorkspaceId, activeWorkspace } = useAppContext();
   const { teams } = useWorkspaceData();
   const permissions = useWorkspacePermissions();
+  const params = useLocalSearchParams<{ type?: string }>();
 
   const isAdminOrOwner = permissions.isOwner || permissions.isAdmin;
   const isInstructor = permissions.isInstructor;
   const availableTeams = useMemo(() => (isAdminOrOwner || isInstructor) ? teams : [], [teams, isAdminOrOwner, isInstructor]);
-  const availableTeamRoles = useMemo((): RoleConfig[] => {
-    if (isAdminOrOwner) return TEAM_ROLES;
-    if (isInstructor) return TEAM_ROLES.filter(r => r.value !== 'commander');
-    return TEAM_ROLES.filter(r => r.value === 'soldier');
-  }, [isAdminOrOwner, isInstructor]);
   const canCreateOrgInvites = isAdminOrOwner;
+  const canAssignCommander = isAdminOrOwner; // Only admin/owner can assign team commander
+
+  // Pre-select type from route params (e.g., ?type=attached)
+  const initialType = params.type === 'attached' ? 'attached' : 'team';
+  const initialStep = params.type === 'attached' ? 1 : 0; // Skip to confirm for attached
 
   // State
-  const [step, setStep] = useState(0);
-  const [inviteType, setInviteType] = useState<'team' | 'org'>('team');
+  const [step, setStep] = useState(initialStep);
+  const [inviteType, setInviteType] = useState<'team' | 'org' | 'attached'>(initialType);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-  const [selectedTeamRole, setSelectedTeamRole] = useState<string>('soldier');
+  const [selectedTeamRole, setSelectedTeamRole] = useState<string>('soldier'); // 'commander' or 'soldier'
   const [selectedOrgRole, setSelectedOrgRole] = useState<string>('instructor');
+  
+  // Squad options (for members only)
+  const [assignToSquad, setAssignToSquad] = useState(false);
+  const [makeSquadCommander, setMakeSquadCommander] = useState(false);
   const [squadName, setSquadName] = useState('');
+  
   const [isCreating, setIsCreating] = useState(false);
   const [pendingInvites, setPendingInvites] = useState<WorkspaceInvitationWithDetails[]>([]);
   const [loadingInvites, setLoadingInvites] = useState(false);
@@ -257,6 +255,7 @@ export default function InviteMembersSheet() {
       try {
         const status = await getTeamCommanderStatus(selectedTeamId);
         setCommanderStatus(status);
+        // If commander is taken and user selected commander, switch to soldier
         if ((status.has_commander || status.has_pending_commander) && selectedTeamRole === 'commander') {
           setSelectedTeamRole('soldier');
         }
@@ -268,6 +267,15 @@ export default function InviteMembersSheet() {
     };
     fetchStatus();
   }, [selectedTeamId]);
+
+  // Reset squad options when role changes
+  useEffect(() => {
+    if (selectedTeamRole === 'commander') {
+      setAssignToSquad(false);
+      setMakeSquadCommander(false);
+      setSquadName('');
+    }
+  }, [selectedTeamRole]);
 
   // Load pending invitations
   const loadInvitations = useCallback(async () => {
@@ -287,6 +295,37 @@ export default function InviteMembersSheet() {
     loadInvitations();
   }, [loadInvitations]);
 
+  // Computed values
+  const selectedTeam = useMemo(() => availableTeams.find(t => t.id === selectedTeamId), [availableTeams, selectedTeamId]);
+  // Attached: 2 steps (type + confirm), Org: 2 steps (type + role), Team: 3 steps (type + role + confirm)
+  const totalSteps = inviteType === 'attached' ? 2 : inviteType === 'team' ? 3 : 2;
+  const isMemberRole = selectedTeamRole === 'soldier';
+  
+  // Determine final team role for API
+  const finalTeamRole = useMemo((): TeamMemberShip => {
+    if (selectedTeamRole === 'commander') return 'commander';
+    if (isMemberRole && assignToSquad && makeSquadCommander) return 'squad_commander';
+    return 'soldier';
+  }, [selectedTeamRole, isMemberRole, assignToSquad, makeSquadCommander]);
+
+  const selectedRoleConfig = useMemo(() => {
+    if (inviteType === 'attached') {
+      return { value: 'attached', label: 'Attached Member', description: 'External user who logs own sessions', icon: 'link' as const, color: '#10B981' };
+    }
+    if (inviteType === 'org') return ORG_ROLES.find(r => r.value === selectedOrgRole);
+    if (selectedTeamRole === 'commander') return TEAM_ROLES.find(r => r.value === 'commander');
+    if (finalTeamRole === 'squad_commander') {
+      return { value: 'squad_commander', label: 'Squad Commander', description: `Leads squad: ${squadName}`, icon: 'star-half' as const, color: '#10B981' };
+    }
+    return TEAM_ROLES.find(r => r.value === 'soldier');
+  }, [inviteType, selectedTeamRole, selectedOrgRole, finalTeamRole, squadName]);
+
+  // Available team roles (filter commander if taken)
+  const availableTeamRoles = useMemo((): RoleConfig[] => {
+    if (!canAssignCommander) return TEAM_ROLES.filter(r => r.value !== 'commander');
+    return TEAM_ROLES;
+  }, [canAssignCommander]);
+
   // Handlers
   const handleNext = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -294,13 +333,7 @@ export default function InviteMembersSheet() {
       Alert.alert('Select Team', 'Please select a team to invite to.');
       return;
     }
-    if (step === 1 && inviteType === 'team' && (selectedTeamRole === 'soldier' || selectedTeamRole === 'squad_commander')) {
-      if (!squadName.trim()) {
-        Alert.alert('Squad Required', 'Please enter a squad name for this role.');
-        return;
-      }
-    }
-    if (step < (inviteType === 'team' ? 2 : 1)) setStep(step + 1);
+    if (step < totalSteps - 1) setStep(step + 1);
   };
 
   const handleBack = () => {
@@ -310,14 +343,32 @@ export default function InviteMembersSheet() {
 
   const handleCreateInvite = async () => {
     if (!activeWorkspaceId) return;
+    
+    // Validate squad name if assigning to squad
+    if (inviteType === 'team' && isMemberRole && assignToSquad && !squadName.trim()) {
+      Alert.alert('Squad Name Required', 'Please enter a squad name.');
+      return;
+    }
+    
     setIsCreating(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      const role = inviteType === 'team' ? 'member' : (selectedOrgRole as WorkspaceRole);
+      // Determine role based on invite type
+      let role: WorkspaceRole;
+      if (inviteType === 'attached') {
+        role = 'attached';
+      } else if (inviteType === 'team') {
+        role = 'member';
+      } else {
+        role = selectedOrgRole as WorkspaceRole;
+      }
+      
       const teamId = inviteType === 'team' ? selectedTeamId : null;
-      const teamRole = inviteType === 'team' ? (selectedTeamRole as TeamMemberShip) : null;
-      const metadata = inviteType === 'team' && squadName.trim() ? { squad_id: squadName.trim() } : undefined;
+      const teamRole = inviteType === 'team' ? finalTeamRole : null;
+      const metadata = inviteType === 'team' && assignToSquad && squadName.trim() 
+        ? { squad_id: squadName.trim() } 
+        : undefined;
 
       const invitation = await createInvitation(activeWorkspaceId, role, teamId, teamRole, metadata);
       await Clipboard.setStringAsync(invitation.invite_code);
@@ -362,14 +413,6 @@ export default function InviteMembersSheet() {
     ]);
   };
 
-  const selectedTeam = useMemo(() => availableTeams.find(t => t.id === selectedTeamId), [availableTeams, selectedTeamId]);
-  const selectedRoleConfig = useMemo(() => {
-    if (inviteType === 'team') return TEAM_ROLES.find(r => r.value === selectedTeamRole);
-    return ORG_ROLES.find(r => r.value === selectedOrgRole);
-  }, [inviteType, selectedTeamRole, selectedOrgRole]);
-  const totalSteps = inviteType === 'team' ? 3 : 2;
-  const needsSquad = inviteType === 'team' && (selectedTeamRole === 'soldier' || selectedTeamRole === 'squad_commander');
-
   return (
     <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
       <View style={styles.grabberSpacer} />
@@ -395,7 +438,7 @@ export default function InviteMembersSheet() {
       >
         <StepIndicator currentStep={step} totalSteps={totalSteps} colors={colors} />
 
-        {/* STEP 0: Choose Type */}
+        {/* STEP 0: Choose Type & Team */}
         {step === 0 && (
           <View style={styles.stepContent}>
             <Text style={[styles.stepTitle, { color: colors.text }]}>What type of invite?</Text>
@@ -433,6 +476,23 @@ export default function InviteMembersSheet() {
               </TouchableOpacity>
             )}
 
+            {canCreateOrgInvites && (
+              <TouchableOpacity
+                style={[styles.typeCard, { backgroundColor: inviteType === 'attached' ? colors.primary + '10' : colors.card, borderColor: inviteType === 'attached' ? colors.primary : colors.border }]}
+                onPress={() => setInviteType('attached')}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.typeIconBox, { backgroundColor: '#10B98120' }]}>
+                  <Ionicons name="link" size={24} color="#10B981" />
+                </View>
+                <View style={styles.typeInfo}>
+                  <Text style={[styles.typeLabel, { color: colors.text }]}>Attached Member</Text>
+                  <Text style={[styles.typeDesc, { color: colors.textMuted }]}>External user (e.g. range customer)</Text>
+                </View>
+                {inviteType === 'attached' && <Ionicons name="checkmark-circle" size={24} color={colors.primary} />}
+              </TouchableOpacity>
+            )}
+
             {inviteType === 'team' && availableTeams.length > 0 && (
               <View style={styles.teamSection}>
                 <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>SELECT TEAM</Text>
@@ -446,8 +506,8 @@ export default function InviteMembersSheet() {
           </View>
         )}
 
-        {/* STEP 1: Choose Role */}
-        {step === 1 && (
+        {/* STEP 1: Choose Role (not for attached - they skip to confirm) */}
+        {step === 1 && inviteType !== 'attached' && (
           <View style={styles.stepContent}>
             <Text style={[styles.stepTitle, { color: colors.text }]}>
               {inviteType === 'team' ? 'Select team role' : 'Select role'}
@@ -459,18 +519,106 @@ export default function InviteMembersSheet() {
                 <Text style={[styles.loadingRolesText, { color: colors.textMuted }]}>Checking availability...</Text>
               </View>
             ) : inviteType === 'team' ? (
-              <View style={styles.rolesGrid}>
-                {availableTeamRoles.map(role => {
-                  let takenBy: string | null = null;
-                  if (role.value === 'commander' && commanderStatus) {
-                    if (commanderStatus.has_commander) takenBy = commanderStatus.commander_name || 'Someone';
-                    else if (commanderStatus.has_pending_commander) takenBy = 'pending';
-                  }
-                  return (
-                    <RoleCard key={role.value} role={role} isSelected={selectedTeamRole === role.value} onSelect={() => setSelectedTeamRole(role.value)} colors={colors} takenBy={takenBy} />
-                  );
-                })}
-              </View>
+              <>
+                <View style={styles.rolesGrid}>
+                  {availableTeamRoles.map(role => {
+                    let takenBy: string | null = null;
+                    if (role.value === 'commander' && commanderStatus) {
+                      if (commanderStatus.has_commander) takenBy = commanderStatus.commander_name || 'Someone';
+                      else if (commanderStatus.has_pending_commander) takenBy = 'pending';
+                    }
+                    return (
+                      <RoleCard 
+                        key={role.value} 
+                        role={role} 
+                        isSelected={selectedTeamRole === role.value} 
+                        onSelect={() => setSelectedTeamRole(role.value)} 
+                        colors={colors} 
+                        takenBy={takenBy} 
+                      />
+                    );
+                  })}
+                </View>
+
+                {/* Squad Options for Members */}
+                {isMemberRole && (
+                  <View style={[styles.squadOptionsSection, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                    <View style={styles.squadOptionHeader}>
+                      <View style={styles.squadOptionInfo}>
+                        <Ionicons name="layers-outline" size={20} color={colors.primary} />
+                        <View>
+                          <Text style={[styles.squadOptionTitle, { color: colors.text }]}>Assign to Squad</Text>
+                          <Text style={[styles.squadOptionDesc, { color: colors.textMuted }]}>Optional: add to a specific squad</Text>
+                        </View>
+                      </View>
+                      <Switch
+                        value={assignToSquad}
+                        onValueChange={(val) => {
+                          setAssignToSquad(val);
+                          if (!val) {
+                            setMakeSquadCommander(false);
+                            setSquadName('');
+                          }
+                        }}
+                        trackColor={{ false: colors.border, true: colors.primary + '60' }}
+                        thumbColor={assignToSquad ? colors.primary : colors.card}
+                      />
+                    </View>
+
+                    {assignToSquad && (
+                      <View style={styles.squadOptionsContent}>
+                        {/* Squad Name Input */}
+                        <View style={styles.squadInputSection}>
+                          <Text style={[styles.squadInputLabel, { color: colors.textMuted }]}>Squad Name</Text>
+                          {commanderStatus?.squads && commanderStatus.squads.length > 0 && (
+                            <View style={styles.squadChips}>
+                              {commanderStatus.squads.map((squad: string) => (
+                                <TouchableOpacity
+                                  key={squad}
+                                  style={[styles.squadChip, { backgroundColor: squadName === squad ? colors.primary : colors.secondary, borderColor: squadName === squad ? colors.primary : colors.border }]}
+                                  onPress={() => setSquadName(squadName === squad ? '' : squad)}
+                                >
+                                  <Text style={[styles.squadChipText, { color: squadName === squad ? '#fff' : colors.text }]}>{squad}</Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          )}
+                          <View style={[styles.inputWrapper, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                            <TextInput
+                              style={[styles.input, { color: colors.text }]}
+                              placeholder="Enter squad name..."
+                              placeholderTextColor={colors.textMuted}
+                              value={squadName}
+                              onChangeText={setSquadName}
+                            />
+                          </View>
+                        </View>
+
+                        {/* Squad Commander Toggle */}
+                        {squadName.trim() && (
+                          <View style={[styles.squadCommanderOption, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                            <View style={styles.squadCommanderInfo}>
+                              <Ionicons name="star-half" size={18} color="#10B981" />
+                              <View>
+                                <Text style={[styles.squadCommanderTitle, { color: colors.text }]}>Make Squad Commander</Text>
+                                <Text style={[styles.squadCommanderDesc, { color: colors.textMuted }]}>
+                                  Lead squad "{squadName}"
+                                </Text>
+                              </View>
+                            </View>
+                            <Switch
+                              value={makeSquadCommander}
+                              onValueChange={setMakeSquadCommander}
+                              trackColor={{ false: colors.border, true: '#10B98160' }}
+                              thumbColor={makeSquadCommander ? '#10B981' : colors.card}
+                            />
+                          </View>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                )}
+              </>
             ) : (
               <View style={styles.rolesGrid}>
                 {ORG_ROLES.map(role => (
@@ -478,41 +626,11 @@ export default function InviteMembersSheet() {
                 ))}
               </View>
             )}
-
-            {needsSquad && (
-              <View style={styles.squadSection}>
-                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-                  {selectedTeamRole === 'squad_commander' ? 'SELECT SQUAD TO LEAD' : 'ASSIGN TO SQUAD'}
-                </Text>
-                {commanderStatus?.squads && commanderStatus.squads.length > 0 && (
-                  <View style={styles.squadChips}>
-                    {commanderStatus.squads.map((squad: string) => (
-                      <TouchableOpacity
-                        key={squad}
-                        style={[styles.squadChip, { backgroundColor: squadName === squad ? colors.primary : colors.card, borderColor: squadName === squad ? colors.primary : colors.border }]}
-                        onPress={() => setSquadName(squad)}
-                      >
-                        <Text style={[styles.squadChipText, { color: squadName === squad ? '#fff' : colors.text }]}>{squad}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-                <View style={[styles.inputWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <TextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="Enter squad name..."
-                    placeholderTextColor={colors.textMuted}
-                    value={squadName}
-                    onChangeText={setSquadName}
-                  />
-                </View>
-              </View>
-            )}
           </View>
         )}
 
-        {/* STEP 2: Confirm */}
-        {((inviteType === 'team' && step === 2) || (inviteType === 'org' && step === 1)) && (
+        {/* STEP: Confirm - shown at step 2 for team, step 1 for org/attached */}
+        {((inviteType === 'team' && step === 2) || (inviteType === 'org' && step === 1) || (inviteType === 'attached' && step === 1)) && (
           <View style={styles.stepContent}>
             <Text style={[styles.stepTitle, { color: colors.text }]}>Review & Create</Text>
 
@@ -530,13 +648,30 @@ export default function InviteMembersSheet() {
                   <Text style={[styles.summaryValueText, { color: colors.text }]}>{selectedTeam.name}</Text>
                 </View>
               )}
-              {needsSquad && squadName && (
+              {inviteType === 'team' && isMemberRole && (
                 <View style={styles.summaryRow}>
                   <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Squad</Text>
-                  <Text style={[styles.summaryValueText, { color: colors.text }]}>{squadName}</Text>
+                  <Text style={[styles.summaryValueText, { color: assignToSquad && squadName ? colors.text : colors.textMuted }]}>
+                    {assignToSquad && squadName ? squadName : 'No squad assigned'}
+                  </Text>
+                </View>
+              )}
+              {inviteType === 'attached' && (
+                <View style={styles.summaryRow}>
+                  <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Access</Text>
+                  <Text style={[styles.summaryValueText, { color: colors.textMuted }]}>Own sessions only</Text>
                 </View>
               )}
             </View>
+
+            {inviteType === 'attached' && (
+              <View style={[styles.infoBanner, { backgroundColor: '#10B98115', borderColor: '#10B98130' }]}>
+                <Ionicons name="information-circle-outline" size={18} color="#10B981" />
+                <Text style={[styles.infoBannerText, { color: '#10B981' }]}>
+                  Attached members can log their own sessions linked to your organization, but cannot see team data or other members.
+                </Text>
+              </View>
+            )}
 
             <View style={[styles.infoBanner, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
               <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
@@ -556,7 +691,7 @@ export default function InviteMembersSheet() {
             </TouchableOpacity>
           )}
 
-          {((inviteType === 'team' && step < 2) || (inviteType === 'org' && step < 1)) ? (
+          {((inviteType === 'team' && step < 2) || (inviteType === 'org' && step < 1) || (inviteType === 'attached' && step < 1)) ? (
             <TouchableOpacity style={[styles.nextButton, { backgroundColor: colors.primary }]} onPress={handleNext} activeOpacity={0.8}>
               <Text style={styles.nextButtonText}>Continue</Text>
               <Ionicons name="arrow-forward" size={18} color="#fff" />
@@ -669,12 +804,24 @@ const styles = StyleSheet.create({
   loadingRoles: { alignItems: 'center', paddingVertical: 24, gap: 8 },
   loadingRolesText: { fontSize: 13 },
 
-  squadSection: { marginTop: 24 },
-  squadChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-  squadChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
-  squadChipText: { fontSize: 13, fontWeight: '600' },
+  // Squad Options
+  squadOptionsSection: { marginTop: 20, borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
+  squadOptionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
+  squadOptionInfo: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  squadOptionTitle: { fontSize: 15, fontWeight: '600' },
+  squadOptionDesc: { fontSize: 12, marginTop: 1 },
+  squadOptionsContent: { paddingHorizontal: 14, paddingBottom: 14, gap: 12 },
+  squadInputSection: { gap: 8 },
+  squadInputLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase' },
+  squadChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  squadChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1 },
+  squadChipText: { fontSize: 12, fontWeight: '600' },
   inputWrapper: { borderRadius: 10, borderWidth: 1 },
   input: { height: 44, paddingHorizontal: 14, fontSize: 15 },
+  squadCommanderOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderRadius: 10, borderWidth: 1 },
+  squadCommanderInfo: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  squadCommanderTitle: { fontSize: 14, fontWeight: '600' },
+  squadCommanderDesc: { fontSize: 11, marginTop: 1 },
 
   summaryCard: { borderRadius: 14, borderWidth: 1, padding: 16, gap: 14 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -713,4 +860,3 @@ const styles = StyleSheet.create({
   emptyState: { padding: 20, borderRadius: 12, alignItems: 'center' },
   emptyStateText: { fontSize: 13 },
 });
-

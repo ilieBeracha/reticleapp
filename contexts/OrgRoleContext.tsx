@@ -27,11 +27,15 @@ interface TeamRoleInfo {
 
 interface OrgRoleContextValue {
   // Organization role
-  orgRole: 'owner' | 'admin' | 'instructor' | 'member';
+  orgRole: 'owner' | 'admin' | 'instructor' | 'member' | 'attached';
   isAdmin: boolean;
+  isAttached: boolean;
   canManageWorkspace: boolean;
   canManageTeams: boolean;
   canInviteMembers: boolean;
+  canViewTeams: boolean;
+  canViewMembers: boolean;
+  canViewOrgTrainings: boolean;
   
   // Team role (if member)
   hasTeam: boolean;
@@ -61,9 +65,13 @@ interface OrgRoleContextValue {
 const DEFAULT_ORG_ROLE_VALUE: OrgRoleContextValue = {
   orgRole: 'member',
   isAdmin: false,
+  isAttached: false,
   canManageWorkspace: false,
   canManageTeams: false,
   canInviteMembers: false,
+  canViewTeams: true,
+  canViewMembers: true,
+  canViewOrgTrainings: true,
   hasTeam: false,
   teamRole: null,
   teamInfo: null,
@@ -139,6 +147,7 @@ export function OrgRoleProvider({ children }: { children: React.ReactNode }) {
     const teamRole = teamInfo?.teamRole || null;
     
     const isAdmin = permissions.role === 'owner' || permissions.role === 'admin';
+    const isAttached = permissions.isAttached;
     const hasTeam = allTeams.length > 0;
     const isCommander = teamRole === 'commander';
     const isSquadCommander = teamRole === 'squad_commander';
@@ -148,9 +157,13 @@ export function OrgRoleProvider({ children }: { children: React.ReactNode }) {
       // Org role
       orgRole: permissions.role,
       isAdmin,
+      isAttached,
       canManageWorkspace: permissions.canManageWorkspace,
       canManageTeams: permissions.canManageTeams,
       canInviteMembers: permissions.canInviteMembers,
+      canViewTeams: permissions.canViewTeams,
+      canViewMembers: permissions.canViewMembers,
+      canViewOrgTrainings: permissions.canViewOrgTrainings,
       
       // Team role
       hasTeam,
@@ -174,9 +187,13 @@ export function OrgRoleProvider({ children }: { children: React.ReactNode }) {
     };
   }, [
     permissions.role,
+    permissions.isAttached,
     permissions.canManageWorkspace,
     permissions.canManageTeams,
     permissions.canInviteMembers,
+    permissions.canViewTeams,
+    permissions.canViewMembers,
+    permissions.canViewOrgTrainings,
     allTeams,
     currentUserId,
     loading,

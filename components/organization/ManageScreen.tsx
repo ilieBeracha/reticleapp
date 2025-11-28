@@ -24,7 +24,7 @@ import {
   View,
 } from 'react-native';
 
-type ManageTab = 'members' | 'teams' | 'invites';
+type ManageTab = 'members' | 'teams' | 'attached' | 'invites';
 
 // ============================================================================
 // ROLE BADGE COMPONENT
@@ -48,6 +48,8 @@ const RoleBadge = React.memo(function RoleBadge({
         return { label: 'Admin', color: '#8B5CF6', bg: '#8B5CF615', icon: 'shield-half' as const };
       case 'instructor':
         return { label: 'Instructor', color: '#EC4899', bg: '#EC489915', icon: 'school' as const };
+      case 'attached':
+        return { label: 'Attached', color: '#10B981', bg: '#10B98115', icon: 'link' as const };
       default:
         return { label: 'Member', color: colors.textMuted, bg: colors.secondary, icon: 'person' as const };
     }
@@ -484,6 +486,11 @@ const ManageScreen = React.memo(function ManageScreen() {
     router.push('/(protected)/inviteMembers' as any);
   }, []);
 
+  const handleInviteAttached = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push('/(protected)/inviteMembers?type=attached' as any);
+  }, []);
+
   const handleCreateTeam = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push('/(protected)/createTeam' as any);
@@ -508,6 +515,7 @@ const ManageScreen = React.memo(function ManageScreen() {
       admin: [],
       instructor: [],
       member: [],
+      attached: [],
     };
 
     workspaceMembers.forEach((m) => {
@@ -516,6 +524,9 @@ const ManageScreen = React.memo(function ManageScreen() {
 
     return groups;
   }, [workspaceMembers]);
+  
+  // Count of attached members (for tab badge)
+  const attachedCount = groupedMembers.attached.length;
 
   const isLoading = membersLoading || teamsLoading || roleLoading;
 
@@ -526,6 +537,9 @@ const ManageScreen = React.memo(function ManageScreen() {
     }
     if (activeTab === 'teams' && canCreateTeam) {
       return { icon: 'add' as const, onPress: handleCreateTeam };
+    }
+    if (activeTab === 'attached' && canInvite) {
+      return { icon: 'add' as const, onPress: handleInviteAttached };
     }
     if (activeTab === 'invites' && canInvite) {
       return { icon: 'add' as const, onPress: handleInvite };
@@ -601,6 +615,25 @@ const ManageScreen = React.memo(function ManageScreen() {
               </Text>
             </View>
           </TouchableOpacity>
+
+          {/* Attached Members Tab - visible to admins/owners */}
+          {(orgRole === 'owner' || orgRole === 'admin') && (
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'attached' && { backgroundColor: colors.card }]}
+              onPress={() => setActiveTab('attached')}
+            >
+              <Text style={[styles.tabText, { color: activeTab === 'attached' ? colors.text : colors.textMuted }]}>
+                Attached
+              </Text>
+              {attachedCount > 0 && (
+                <View style={[styles.tabBadge, { backgroundColor: activeTab === 'attached' ? '#10B981' : colors.border }]}>
+                  <Text style={[styles.tabBadgeText, { color: activeTab === 'attached' ? '#fff' : colors.textMuted }]}>
+                    {attachedCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
 
           {canSeeInvites && (
             <TouchableOpacity
@@ -736,6 +769,46 @@ const ManageScreen = React.memo(function ManageScreen() {
                     team={team}
                     colors={colors}
                     onPress={() => handleTeamPress(team)}
+                  />
+                ))}
+              </>
+            )}
+          </>
+        )}
+
+        {/* Attached Members Tab */}
+        {activeTab === 'attached' && (orgRole === 'owner' || orgRole === 'admin') && (
+          <>
+            {/* Info banner about attached members */}
+            <View style={[styles.permissionBanner, { backgroundColor: '#10B98110', borderColor: '#10B98130' }]}>
+              <Ionicons name="link" size={20} color="#10B981" />
+              <View style={styles.permissionText}>
+                <Text style={[styles.permissionTitle, { color: '#10B981' }]}>Attached Members</Text>
+                <Text style={[styles.permissionDesc, { color: colors.textMuted }]}>
+                  External users (like range customers) who log their own sessions linked to your organization
+                </Text>
+              </View>
+            </View>
+
+            {groupedMembers.attached.length === 0 ? (
+              <EmptyState
+                icon="link"
+                title="No attached members"
+                description="Invite external users who can log their own sessions without joining your team structure"
+                actionLabel={canInvite ? "Invite Attached Member" : undefined}
+                onAction={canInvite ? handleInviteAttached : undefined}
+                colors={colors}
+              />
+            ) : (
+              <>
+                <SectionHeader title="All Attached Members" count={groupedMembers.attached.length} colors={colors} />
+                {groupedMembers.attached.map((member) => (
+                  <MemberCard
+                    key={member.id}
+                    member={member}
+                    colors={colors}
+                    onPress={() => handleMemberPress(member)}
+                    isCurrentUser={member.member_id === currentUserId}
                   />
                 ))}
               </>

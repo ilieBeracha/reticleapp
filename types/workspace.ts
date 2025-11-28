@@ -3,7 +3,7 @@
 // Users must create or join organizations
 // =====================================================
 
-export type WorkspaceRole = 'owner' | 'admin' | 'instructor' | 'member';
+export type WorkspaceRole = 'owner' | 'admin' | 'instructor' | 'member' | 'attached';
 export type TeamMemberShip =
   | "commander"        // One per team - full control
   | "squad_commander"  // Manages a squad
