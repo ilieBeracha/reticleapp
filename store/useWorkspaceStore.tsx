@@ -10,11 +10,13 @@ interface WorkspaceStore {
   workspaces: Workspace[];
   activeWorkspaceId: string | null;  // Currently viewing workspace
   loading: boolean;
+  isSwitching: boolean;  // True when transitioning between workspaces
   error: string | null;
   workspaceMembers: WorkspaceMemberWithTeams[];
   loadWorkspaceMembers: () => Promise<void>;
   loadWorkspaces: () => Promise<void>;
   setActiveWorkspace: (workspaceId: string | null) => void;
+  setIsSwitching: (isSwitching: boolean) => void;
   reset: () => void;
 } 
 
@@ -35,6 +37,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   workspaces: [],
   activeWorkspaceId: null,  // ALWAYS start in personal mode
   loading: true,
+  isSwitching: false,
   error: null,
   workspaceMembers: [],
   
@@ -93,6 +96,13 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   setActiveWorkspace: (workspaceId: string | null) => {
     if (__DEV__) console.log('🔄 Setting active workspace:', workspaceId);
     set({ activeWorkspaceId: workspaceId });
+  },
+
+  /**
+   * Set switching state (shows loading screen during transitions)
+   */
+  setIsSwitching: (isSwitching: boolean) => {
+    set({ isSwitching });
   },
 
   /**

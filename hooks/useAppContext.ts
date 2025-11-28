@@ -33,9 +33,9 @@ export interface AppContext {
  * Use this hook in ALL components to get user and workspace context.
  * NEVER access user or workspace data directly from other sources.
  * 
- * NEW ROUTING MODEL:
+ * ROUTING MODEL:
  * - Personal mode: /(protected)/personal/*
- * - Org mode: /(protected)/org/[workspaceId]/*
+ * - Org mode: /(protected)/org/* (store has activeWorkspaceId)
  * 
  * switchWorkspace now navigates to the appropriate route!
  */
@@ -54,8 +54,8 @@ export function useAppContext(): AppContext {
    */
   const navigateToWorkspace = useCallback((workspaceId: string | null) => {
     if (workspaceId) {
-      // Navigate to org mode with workspace ID in URL
-      router.replace(`/(protected)/org/${workspaceId}` as any);
+      // Navigate to org mode (store has the active workspace ID)
+      router.replace('/(protected)/org' as any);
     } else {
       // Navigate to personal mode
       router.replace('/(protected)/personal' as any);

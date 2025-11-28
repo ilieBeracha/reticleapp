@@ -16,5 +16,5 @@ export default function Index() {
   }
 
   // User is authenticated - send to app (regardless of org status)
-  return <Redirect href="/(protected)/workspace" />;
+  return <Redirect href="/(protected)/personal" />;
 }

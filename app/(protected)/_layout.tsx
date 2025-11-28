@@ -1,4 +1,5 @@
 import { Header } from '@/components/Header';
+import { LoadingScreen } from '@/components/LoadingScreen';
 import { AcceptInviteSheet } from '@/components/modals/AcceptInviteSheet';
 import { ComingSoonSheet } from '@/components/modals/ComingSoonSheet';
 import { CreateSessionSheet } from '@/components/modals/CreateSessionSheet';
@@ -10,11 +11,11 @@ import { MemberPreviewSheet } from '@/components/modals/MemberPreviewSheet';
 import { TeamPreviewSheet } from '@/components/modals/TeamPreviewSheet';
 import { TrainingDetailSheet } from '@/components/modals/TrainingDetailSheet';
 import { UserMenuBottomSheet, UserMenuBottomSheetRef } from '@/components/modals/UserMenuBottomSheet';
-import { WorkspaceSwitcherBottomSheet } from '@/components/modals/WorkspaceSwitcherBottomSheet';
 import { useModals } from '@/contexts/ModalContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { useColors } from '@/hooks/ui/useColors';
-import { Stack } from 'expo-router';
+import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import { router, Stack } from 'expo-router';
 import { useRef } from 'react';
 
 /**
@@ -24,7 +25,7 @@ import { useRef } from 'react';
  * 
  * Route Structure:
  * - /(protected)/personal/* - Personal mode (no workspace)
- * - /(protected)/org/[workspaceId]/* - Organization mode (with workspace)
+ * - /(protected)/org/* - Organization mode (store has activeWorkspaceId)
  * 
  * NOTE: OrgRoleProvider is now in org/_layout.tsx, NOT here.
  * This prevents unnecessary org-related code running in personal mode.
@@ -33,7 +34,6 @@ export default function ProtectedLayout() {
   const userMenuSheetRef = useRef<UserMenuBottomSheetRef>(null);
   const { 
     // Sheet refs
-    workspaceSwitcherSheetRef, 
     createWorkspaceSheetRef, 
     acceptInviteSheetRef, 
     createTeamSheetRef, 
@@ -48,7 +48,6 @@ export default function ProtectedLayout() {
     selectedTeam, 
     selectedMember,
     // Callback getters
-    getOnWorkspaceSwitched, 
     getOnWorkspaceCreated, 
     getOnInviteAccepted, 
     getOnTeamCreated, 
@@ -58,6 +57,12 @@ export default function ProtectedLayout() {
     getOnTrainingUpdated,
   } = useModals();
   const colors = useColors();
+  const isSwitching = useWorkspaceStore(state => state.isSwitching);
+
+  // Show full-screen loader when switching workspaces
+  if (isSwitching) {
+    return <LoadingScreen />;
+  }
 
   return (
     <ThemeProvider>
@@ -69,25 +74,19 @@ export default function ProtectedLayout() {
           headerTitle: () => (
             <Header
               onNotificationPress={() => {}}
-              onUserPress={() => userMenuSheetRef.current?.open()}
-              onWorkspacePress={() => workspaceSwitcherSheetRef.current?.open()}
+              onUserPress={() => router.push('/(protected)/liquidGlassSheet')}
+              onWorkspacePress={() => router.push('/(protected)/workspaceSwitcher')}
             />
           ),
           headerTitleAlign: 'left',
           headerTintColor: colors.text,
         }}
       >
-        {/* Personal Mode Routes */}
-        <Stack.Screen name="personal" options={{ headerShown: true }} />
+        {/* Personal Mode Routes - Tabs handle their own display */}
+        <Stack.Screen name="personal" />
         
-        {/* Organization Mode Routes */}
-        <Stack.Screen name="org" options={{ headerShown: true }} />
-        
-        {/* Legacy workspace routes - redirect to new structure */}
-        <Stack.Screen 
-          name="workspace" 
-          options={{ headerShown: true }} 
-        />
+        {/* Organization Mode Routes - Tabs handle their own display */}
+        <Stack.Screen name="org" />
         
         {/* Liquid Glass Sheet - iOS 26+ native form sheet */}
         <Stack.Screen
@@ -103,6 +102,21 @@ export default function ProtectedLayout() {
             sheetLargestUndimmedDetentIndex: 0,
           }}
         />
+        
+        {/* Workspace Switcher - Native Form Sheet */}
+        <Stack.Screen
+          name="workspaceSwitcher"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.background + '44'},
+            sheetAllowedDetents: [0.5, 0.85,1],
+            sheetInitialDetentIndex: 1,
+            sheetLargestUndimmedDetentIndex: 0,
+          }}
+        />
       </Stack>
 
       {/* Global Sheets - Available in both modes */}
@@ -110,12 +124,6 @@ export default function ProtectedLayout() {
         ref={userMenuSheetRef}
         onSettingsPress={() => {}}
         onSwitchOrgPress={() => {}}
-      />
-      <WorkspaceSwitcherBottomSheet
-        ref={workspaceSwitcherSheetRef}
-        onSettingsPress={() => {
-          getOnWorkspaceSwitched()?.();
-        }}
       />
       <CreateWorkspaceSheet
         ref={createWorkspaceSheetRef}

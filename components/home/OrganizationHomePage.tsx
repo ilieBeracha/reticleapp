@@ -9,7 +9,7 @@ import { useAppContext } from '@/hooks/useAppContext';
 import { Feather } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-
+  
 /**
  * Organization mode home page - displays team training stats, session overview, and active sessions.
  * Extracted from workspace/index.tsx for better code organization.
@@ -152,7 +152,6 @@ export const OrganizationHomePage = React.memo(function OrganizationHomePage() {
             />
           ))}
         </ScrollView>
-
         {/* Productivity KPIs */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -236,6 +235,7 @@ const styles = StyleSheet.create({
   },
   section: {
     paddingHorizontal: 20,
+    display: 'flex',
     paddingTop: 24,
   },
   sectionHeader: {

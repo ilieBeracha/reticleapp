@@ -242,3 +242,32 @@ export async function getTeamMembers(teamId: string): Promise<(TeamMember & { pr
 
   return data || [];
 }
+
+/**
+ * Commander status for a team - shows availability of commander roles
+ */
+export interface TeamCommanderStatus {
+  has_commander: boolean;
+  has_pending_commander: boolean;
+  commander_name: string | null;
+  squads: string[];
+  squads_with_commanders: string[];
+  squads_available: string[];
+}
+
+/**
+ * Get commander status for a team
+ * Used to show which roles are available when creating invitations
+ */
+export async function getTeamCommanderStatus(teamId: string): Promise<TeamCommanderStatus> {
+  const { data, error } = await supabase.rpc('get_team_commander_status', {
+    p_team_id: teamId,
+  });
+
+  if (error) {
+    console.error('Failed to get team commander status:', error);
+    throw new Error(error.message || 'Failed to get team commander status');
+  }
+
+  return data as TeamCommanderStatus;
+}

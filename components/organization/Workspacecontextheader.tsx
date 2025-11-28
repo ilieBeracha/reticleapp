@@ -5,14 +5,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-    Dimensions,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Dimensions,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
 
 const { height } = Dimensions.get('window');
@@ -50,7 +50,7 @@ export default function WorkspaceContextHeader({
 
   const handleSeeAll = () => {
     setShowSwitcher(false);
-    router.push('/(protected)/workspace');
+    router.push('/(protected)/org');
   };
 
   const getWorkspaceIcon = (type?: string) => {
@@ -306,7 +306,7 @@ export default function WorkspaceContextHeader({
                 onPress={() => {
                   setShowSwitcher(false);
                   // Navigate to create workspace
-                  router.push('/(protected)/workspace');
+                  router.push('/(protected)/org');
                 }}
                 activeOpacity={0.7}
               >

@@ -3,7 +3,7 @@ import { OrganizationHomePage } from '@/components/home/OrganizationHomePage';
 /**
  * Organization Mode Home Screen
  * 
- * Route: /(protected)/org/[workspaceId]/
+ * Route: /(protected)/org/
  */
 export default function OrgHomeScreen() {
   return <OrganizationHomePage />;

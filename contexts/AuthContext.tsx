@@ -5,7 +5,7 @@ import { useWorkspaceStore } from '@/store/useWorkspaceStore'
 import { Session, User } from '@supabase/supabase-js'
 import { router } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react'
 
 WebBrowser.maybeCompleteAuthSession()
 
@@ -46,9 +46,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, 500)
   }
 
+  // Track if we've handled initial session to prevent re-triggers
+  const initialSessionHandledRef = useRef(false)
+
   /**
    * Handle initial session (app startup with existing session)
-   * ALWAYS starts in personal mode - navigates to /(protected)/personal
+   * Only runs ONCE on true app startup, not on re-triggers
    */
   const handleInitialSession = async (session: Session | null) => {
     if (!session?.user) {
@@ -57,27 +60,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
+    // Skip if already handled (prevents re-triggers from resetting state)
+    if (initialSessionHandledRef.current) {
+      if (__DEV__) console.log("📱 Auth: Initial session already handled, skipping")
+      setLoading(false)
+      return
+    }
+    initialSessionHandledRef.current = true
+
     setTransitioning(true)
     setLoading(false)
     
-    // Clear workspace ID to ensure personal mode
-    await supabase.auth.updateUser({
-      data: { active_workspace_id: null }
-    }).catch(err => console.error("Failed to clear workspace ID:", err))
-    
-    // Force personal mode in store
-    useWorkspaceStore.getState().setActiveWorkspace(null)
-    
-    // Load workspaces in background
+    // Load workspaces in background (don't reset activeWorkspace - let store preserve it)
     useWorkspaceStore.getState().loadWorkspaces().catch(err => 
       console.error("Background workspace load error:", err)
     )
     
-    // Navigate to personal mode
+    // Navigate to personal mode ONLY if no active workspace is set
+    const currentActiveWorkspace = useWorkspaceStore.getState().activeWorkspaceId
+    
     setTimeout(() => {
-      router.replace("/(protected)/personal" as any)
+      if (currentActiveWorkspace) {
+        // User was in an org, stay there
+        if (__DEV__) console.log("📱 Auth: Preserving active workspace:", currentActiveWorkspace)
+      } else {
+        // No active workspace, go to personal
+        router.replace("/(protected)/personal" as any)
+      }
       setTransitioning(false)
-    }, 800)
+    }, 100) // Reduced delay since we're not always navigating
   }
 
   /**
@@ -124,9 +135,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Navigate to appropriate route
       if (workspaceId) {
-        router.replace(`/(protected)/org/${workspaceId}` as any)
+        router.replace('/(protected)/org' as any)
       } else {
-        router.replace("/(protected)/personal" as any)
+        router.replace('/(protected)/personal' as any)
       }
     } catch (error) {
       console.error("Switch workspace error:", error)

@@ -2,7 +2,7 @@ import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BellIcon } from 'lucide-react-native';
-import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { BaseAvatar } from './BaseAvatar';
 import { Text } from './ui/text';
   
@@ -27,7 +27,7 @@ export function Header({ notificationCount = 0, onNotificationPress, onUserPress
       <View style={[styles.container]}>
         {/* Left Section */}
         <View style={styles.left}>
-          <Pressable onPress={onUserPress} style={({ pressed }) => [styles.avatar, { opacity: pressed ? 0.6 : 1 }]}>
+          <TouchableOpacity onPress={onUserPress} style={[styles.avatar, { opacity:1 }]}>
             <View style={[styles.avatarRing, { borderColor: colors.primary + '20' }]}>
               <BaseAvatar
                 source={avatarUrl ? { uri: avatarUrl } : undefined}
@@ -36,7 +36,7 @@ export function Header({ notificationCount = 0, onNotificationPress, onUserPress
                 borderWidth={0}
               />
             </View>
-          </Pressable>
+          </TouchableOpacity>
 
       <TouchableOpacity style={styles.workspaceContainer} onPress={onWorkspacePress}  > 
           <Text style={[styles.workspaceText, { color: colors.text}]}>
@@ -72,9 +72,6 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-
-
-
     display: 'flex',
     width: '100%',
   },
