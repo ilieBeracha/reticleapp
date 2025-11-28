@@ -11,6 +11,7 @@ import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import type { WorkspaceInvitationWithDetails, WorkspaceMemberWithTeams } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -383,11 +384,7 @@ const ManageScreen = React.memo(function ManageScreen() {
   const { orgRole, isCommander, teamInfo, currentUserId, loading: roleLoading } = useOrgRole();
 
   const {
-    inviteMembersSheetRef,
-    createTeamSheetRef,
-    teamPreviewSheetRef,
     setSelectedTeam,
-    memberPreviewSheetRef,
     setSelectedMember,
     setOnTeamCreated,
     setOnMemberInvited,
@@ -484,25 +481,25 @@ const ManageScreen = React.memo(function ManageScreen() {
 
   const handleInvite = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    inviteMembersSheetRef.current?.open();
-  }, [inviteMembersSheetRef]);
+    router.push('/(protected)/inviteMembers' as any);
+  }, []);
 
   const handleCreateTeam = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    createTeamSheetRef.current?.open();
-  }, [createTeamSheetRef]);
+    router.push('/(protected)/createTeam' as any);
+  }, []);
 
   const handleTeamPress = useCallback((team: any) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedTeam(team);
-    teamPreviewSheetRef.current?.open();
-  }, [setSelectedTeam, teamPreviewSheetRef]);
+    router.push('/(protected)/teamPreview' as any);
+  }, [setSelectedTeam]);
 
   const handleMemberPress = useCallback((member: WorkspaceMemberWithTeams) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedMember(member);
-    memberPreviewSheetRef.current?.open();
-  }, [setSelectedMember, memberPreviewSheetRef]);
+    router.push('/(protected)/memberPreview' as any);
+  }, [setSelectedMember]);
 
   // Group members by role
   const groupedMembers = useMemo(() => {

@@ -6,6 +6,7 @@ import { getOrgTrainings } from '@/services/trainingService';
 import type { TrainingStatus, TrainingWithDetails } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -138,8 +139,7 @@ const TrainingsPage = React.memo(function TrainingsPage() {
   const { activeWorkspaceId } = useAppContext();
   const { teamInfo, orgRole } = useOrgRole();
   const { 
-    createTrainingSheetRef, 
-    trainingDetailSheetRef,
+    setSelectedTraining,
     setOnTrainingCreated,
     setOnTrainingUpdated,
   } = useModals();
@@ -217,13 +217,14 @@ const TrainingsPage = React.memo(function TrainingsPage() {
 
   const handleTrainingPress = useCallback((training: TrainingWithDetails) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    trainingDetailSheetRef.current?.open(training.id);
-  }, [trainingDetailSheetRef]);
+    setSelectedTraining(training);
+    router.push('/(protected)/trainingDetail' as any);
+  }, [setSelectedTraining]);
 
   const handleCreateTraining = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    createTrainingSheetRef.current?.open();
-  }, [createTrainingSheetRef]);
+    router.push('/(protected)/createTraining' as any);
+  }, []);
 
   const handleRefresh = useCallback(() => {
     fetchTrainings(true);

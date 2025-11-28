@@ -1,16 +1,27 @@
-export { AcceptInviteSheet } from './AcceptInviteSheet';
+// Base components (may still be useful for any custom sheets)
 export { BaseBottomSheet } from './BaseBottomSheet';
 export type { BaseBottomSheetRef } from './BaseBottomSheet';
 export { BaseDetachedBottomSheet } from './BaseDetachedBottomSheet';
 export type { BaseDetachedBottomSheetRef } from './BaseDetachedBottomSheet';
+
+// Remaining sheets
 export { ComingSoonSheet } from './ComingSoonSheet';
-export { CreateSessionSheet } from './CreateSessionSheet';
-export { CreateTeamSheet } from './CreateTeamSheet';
-export { CreateTrainingSheet } from './CreateTrainingSheet';
-export { InviteMembersSheet } from './InviteMembersSheet';
-export { TrainingDetailSheet } from './TrainingDetailSheet';
-export type { TrainingDetailSheetRef } from './TrainingDetailSheet';
-export { UserMenuBottomSheet } from './UserMenuBottomSheet';
-export type { UserMenuBottomSheetRef } from './UserMenuBottomSheet';
 export { default as WorkspaceItem } from './WorkspaceItem';
-// WorkspaceSwitcherBottomSheet is now a route: app/(protected)/workspaceSwitcher.tsx
+
+/**
+ * All sheets have been migrated to native form sheet routes:
+ * 
+ * - AcceptInviteSheet → app/(protected)/acceptInvite.tsx
+ * - CreateSessionSheet → app/(protected)/createSession.tsx
+ * - CreateTeamSheet → app/(protected)/createTeam.tsx
+ * - CreateTrainingSheet → app/(protected)/createTraining.tsx
+ * - CreateWorkspaceSheet → app/(protected)/createWorkspace.tsx
+ * - InviteMembersSheet → app/(protected)/inviteMembers.tsx
+ * - MemberPreviewSheet → app/(protected)/memberPreview.tsx
+ * - TeamPreviewSheet → app/(protected)/teamPreview.tsx
+ * - TrainingDetailSheet → app/(protected)/trainingDetail.tsx
+ * - UserMenuBottomSheet → app/(protected)/userMenu.tsx
+ * - WorkspaceSwitcherSheet → app/(protected)/workspaceSwitcher.tsx
+ * 
+ * Open sheets with: router.push('/(protected)/sheetName')
+ */

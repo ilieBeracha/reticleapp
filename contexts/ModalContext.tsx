@@ -1,6 +1,9 @@
 /**
  * Modal Context
- * Provides refs to all bottom sheet modals for use across the app
+ * 
+ * Now simplified for native form sheet navigation pattern.
+ * Provides selected items and callbacks for data coordination.
+ * Sheet refs have been removed - use router.push() instead.
  * 
  * OPTIMIZED: 
  * - Callback refs prevent re-renders when updating callbacks
@@ -8,28 +11,13 @@
  * - Getter functions to access current callback values
  */
 
-import type { BaseBottomSheetRef } from '@/components/modals/BaseBottomSheet';
-import type { BaseDetachedBottomSheetRef } from '@/components/modals/BaseDetachedBottomSheet';
-import type { TrainingDetailSheetRef } from '@/components/modals/TrainingDetailSheet';
 import type { Team, TrainingWithDetails, WorkspaceMemberWithTeams } from '@/types/workspace';
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 
 type TeamWithMemberCount = Team & { member_count?: number };
 
 interface ModalContextType {
-  // Sheet refs
-  chartDetailsSheetRef: React.RefObject<BaseDetachedBottomSheetRef | null>;
-  createSessionSheetRef: React.RefObject<BaseBottomSheetRef | null>;
-  createTeamSheetRef: React.RefObject<BaseBottomSheetRef | null>;
-  inviteMembersSheetRef: React.RefObject<BaseBottomSheetRef | null>;
-  createWorkspaceSheetRef: React.RefObject<BaseBottomSheetRef | null>;
-  acceptInviteSheetRef: React.RefObject<BaseBottomSheetRef | null>;
-  teamPreviewSheetRef: React.RefObject<BaseDetachedBottomSheetRef | null>;
-  memberPreviewSheetRef: React.RefObject<BaseDetachedBottomSheetRef | null>;
-  createTrainingSheetRef: React.RefObject<BaseBottomSheetRef | null>;
-  trainingDetailSheetRef: React.RefObject<TrainingDetailSheetRef | null>;
-  
-  // Selected items
+  // Selected items for preview sheets
   selectedTeam: TeamWithMemberCount | null;
   setSelectedTeam: (team: TeamWithMemberCount | null) => void;
   selectedMember: WorkspaceMemberWithTeams | null;
@@ -68,18 +56,6 @@ interface ModalContextType {
 const ModalContext = createContext<ModalContextType | null>(null);
 
 export function ModalProvider({ children }: { children: ReactNode }) {
-  // Sheet refs - stable, never change
-  const chartDetailsSheetRef = useRef<BaseDetachedBottomSheetRef>(null);
-  const createSessionSheetRef = useRef<BaseBottomSheetRef>(null);
-  const createTeamSheetRef = useRef<BaseBottomSheetRef>(null);
-  const inviteMembersSheetRef = useRef<BaseBottomSheetRef>(null);
-  const createWorkspaceSheetRef = useRef<BaseBottomSheetRef>(null);
-  const acceptInviteSheetRef = useRef<BaseBottomSheetRef>(null);
-  const teamPreviewSheetRef = useRef<BaseDetachedBottomSheetRef>(null);
-  const memberPreviewSheetRef = useRef<BaseDetachedBottomSheetRef>(null);
-  const createTrainingSheetRef = useRef<BaseBottomSheetRef>(null);
-  const trainingDetailSheetRef = useRef<TrainingDetailSheetRef>(null);
-  
   // Selected items - need state since they affect UI
   const [selectedTeam, setSelectedTeam] = useState<TeamWithMemberCount | null>(null);
   const [selectedMember, setSelectedMember] = useState<WorkspaceMemberWithTeams | null>(null);
@@ -128,17 +104,6 @@ export function ModalProvider({ children }: { children: ReactNode }) {
 
   // Memoize the context value to prevent unnecessary re-renders
   const value = useMemo<ModalContextType>(() => ({
-    // Sheet refs
-    chartDetailsSheetRef,
-    createSessionSheetRef,
-    createTeamSheetRef,
-    inviteMembersSheetRef,
-    createWorkspaceSheetRef,
-    acceptInviteSheetRef,
-    teamPreviewSheetRef,
-    memberPreviewSheetRef,
-    createTrainingSheetRef,
-    trainingDetailSheetRef,
     // Selected items
     selectedTeam,
     setSelectedTeam,

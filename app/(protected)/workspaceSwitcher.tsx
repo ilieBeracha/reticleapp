@@ -71,7 +71,7 @@ export default function WorkspaceSwitcherSheet() {
   }, []);
 
   return (
-    <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card + '44' }]} edges={['bottom']}>
+    <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
       <View style={styles.grabberSpacer} />
       
       {/* Header */}

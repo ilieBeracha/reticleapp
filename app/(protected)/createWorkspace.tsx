@@ -5,19 +5,19 @@ import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -103,7 +103,7 @@ export default function CreateWorkspaceSheet() {
   // Success state
   if (step === 'success' && createdWorkspace) {
     return (
-      <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card + '44' }]} edges={['bottom']}>
+      <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
         <View style={styles.grabberSpacer} />
         
         <View style={styles.successContainer}>
@@ -146,7 +146,7 @@ export default function CreateWorkspaceSheet() {
   }
 
   return (
-    <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card + '44' }]} edges={['bottom']}>
+    <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
       <View style={styles.grabberSpacer} />
       
       <KeyboardAvoidingView 

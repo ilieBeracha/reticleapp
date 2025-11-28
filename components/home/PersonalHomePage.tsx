@@ -16,6 +16,7 @@ import { useTrainingStore } from '@/store/trainingStore';
 import type { TrainingWithDetails } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
 import { format, isToday, isTomorrow } from 'date-fns';
+import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -27,7 +28,7 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
   const colors = useColors();
   const { fullName } = useAppContext();
   const permissions = useWorkspacePermissions();
-  const { chartDetailsSheetRef, setOnSessionCreated, setOnTeamCreated, trainingDetailSheetRef } = useModals();
+  const { setSelectedTraining, setOnSessionCreated, setOnTeamCreated } = useModals();
   const { sessions, sessionsLoading, sessionsError, loadTeams, refreshSessions } = useWorkspaceData();
   const { loadSessions } = useSessionStore();
   // Training data
@@ -68,20 +69,21 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
   }, [onStartSession]);
 
   const handleViewProgress = useCallback(() => {
-    chartDetailsSheetRef.current?.open();
-  }, [chartDetailsSheetRef]);
+    // TODO: Navigate to analytics/progress screen when available
+  }, []);
 
   const handleCreateTeam = useCallback(() => {
     onCreateTeam();
   }, [onCreateTeam]);
 
   const handleChartDoubleTap = useCallback(() => {
-    chartDetailsSheetRef.current?.open();
-  }, [chartDetailsSheetRef]);
+    // TODO: Navigate to analytics/progress screen when available
+  }, []);
 
   const handleTrainingPress = useCallback((training: TrainingWithDetails) => {
-    trainingDetailSheetRef.current?.open(training.id);
-  }, [trainingDetailSheetRef]);
+    setSelectedTraining(training);
+    router.push('/(protected)/trainingDetail' as any);
+  }, [setSelectedTraining]);
 
   // REAL pie chart data based on session status
   const pieData = useMemo(() => {

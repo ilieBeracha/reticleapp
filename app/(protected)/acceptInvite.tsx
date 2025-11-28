@@ -5,7 +5,7 @@ import type { WorkspaceInvitationWithDetails } from "@/types/workspace";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from 'expo-haptics';
 import { router } from "expo-router";
-import React, { useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -101,7 +101,7 @@ export default function AcceptInviteSheet() {
             onPress: () => {
               // Set active workspace and navigate
               useWorkspaceStore.getState().setIsSwitching(true);
-              useWorkspaceStore.getState().setActiveWorkspace(validatedInvite.workspace_id);
+              useWorkspaceStore.getState().setActiveWorkspace(validatedInvite.org_workspace_id);
               setTimeout(() => {
                 router.replace('/(protected)/org' as any);
                 setTimeout(() => {
@@ -177,7 +177,7 @@ export default function AcceptInviteSheet() {
   };
 
   return (
-    <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card + '44' }]} edges={['bottom']}>
+    <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
       {/* Native grabber takes ~20pt, add spacing */}
       <View style={styles.grabberSpacer} />
       

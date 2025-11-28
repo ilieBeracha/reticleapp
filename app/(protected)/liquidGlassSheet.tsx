@@ -1,10 +1,10 @@
-import { useModals } from "@/contexts/ModalContext";
 import { useColors } from "@/hooks/ui/useColors";
 import { useAppContext } from "@/hooks/useAppContext";
 import { createOrgWorkspace } from "@/services/workspaceService";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import type { Workspace } from "@/types/workspace";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from 'expo-haptics';
 import { router } from "expo-router";
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
@@ -30,7 +30,6 @@ interface LiquidGlassSheetProps {
 export const LiquidGlassSheet = forwardRef<LiquidGlassSheetRef, LiquidGlassSheetProps>(
   (props, ref) => {
     const colors = useColors();
-    const { acceptInviteSheetRef, setOnInviteAccepted } = useModals();
     
     const { 
       userId, 
@@ -129,15 +128,9 @@ export const LiquidGlassSheet = forwardRef<LiquidGlassSheetRef, LiquidGlassSheet
     }, [workspaceName]);
 
     const handleJoinWorkspace = useCallback(() => {
-      
-      setOnInviteAccepted(() => async () => {
-        await useWorkspaceStore.getState().loadWorkspaces();
-      });
-      
-      setTimeout(() => {
-        acceptInviteSheetRef.current?.open();
-      }, 300);
-    }, [acceptInviteSheetRef, setOnInviteAccepted]);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      router.push('/(protected)/acceptInvite' as any);
+    }, []);
 
     return (
       <View style={{flex: 1, backgroundColor: colors.background }}>
