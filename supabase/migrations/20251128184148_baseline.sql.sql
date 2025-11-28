@@ -546,6 +546,7 @@ BEGIN
     END IF;
   END IF;
 
+  
   -- Insert team with squads
   INSERT INTO teams (
     workspace_type,
