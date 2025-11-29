@@ -8,7 +8,7 @@ import type { TeamMemberShip } from "@/types/workspace";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -125,13 +125,19 @@ export default function InviteTeamMemberSheet() {
   const { activeWorkspaceId, activeWorkspace } = useAppContext();
   const { teams } = useWorkspaceData();
   const permissions = useWorkspacePermissions();
+  
+  // Get pre-selected team from URL params (e.g., when commander invites to their team)
+  const { teamId: preselectedTeamId } = useLocalSearchParams<{ teamId?: string }>();
 
   const isAdminOrOwner = permissions.isOwner || permissions.isAdmin;
   const canAssignCommander = isAdminOrOwner;
+  
+  // If team is pre-selected, skip step 0
+  const hasPreselectedTeam = !!preselectedTeamId && teams.some(t => t.id === preselectedTeamId);
 
-  // State
-  const [step, setStep] = useState(0);
-  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  // State - start at step 1 if team is pre-selected
+  const [step, setStep] = useState(hasPreselectedTeam ? 1 : 0);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(preselectedTeamId || null);
   const [selectedTeamRole, setSelectedTeamRole] = useState<string>('soldier');
   
   // Squad options
@@ -140,17 +146,20 @@ export default function InviteTeamMemberSheet() {
   const [squadName, setSquadName] = useState('');
   
   const [isCreating, setIsCreating] = useState(false);
+  const [createdCode, setCreatedCode] = useState<string | null>(null);
   const [commanderStatus, setCommanderStatus] = useState<TeamCommanderStatus | null>(null);
   const [loadingCommanderStatus, setLoadingCommanderStatus] = useState(false);
 
-  const totalSteps = 3; // Team → Role → Confirm
+  const totalSteps = hasPreselectedTeam ? 2 : 3; // Skip team step if pre-selected
 
-  // Set default team
+  // Set team from URL params or default to first team
   useEffect(() => {
-    if (teams.length > 0 && !selectedTeamId) {
+    if (preselectedTeamId && teams.some(t => t.id === preselectedTeamId)) {
+      setSelectedTeamId(preselectedTeamId);
+    } else if (teams.length > 0 && !selectedTeamId) {
       setSelectedTeamId(teams[0].id);
     }
-  }, [teams, selectedTeamId]);
+  }, [teams, preselectedTeamId]);
 
   // Fetch commander status when team changes
   useEffect(() => {
@@ -219,8 +228,13 @@ export default function InviteTeamMemberSheet() {
 
   const handleBack = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (step > 0) setStep(step - 1);
-  }, [step]);
+    const minStep = hasPreselectedTeam ? 1 : 0;
+    if (step > minStep) {
+      setStep(step - 1);
+    } else {
+      router.back();
+    }
+  }, [step, hasPreselectedTeam]);
 
   const handleCreateInvite = async () => {
     if (!activeWorkspaceId || !selectedTeamId) return;
@@ -240,6 +254,8 @@ export default function InviteTeamMemberSheet() {
 
       const invitation = await createInvitation(activeWorkspaceId, 'member', selectedTeamId, finalTeamRole, metadata);
       await Clipboard.setStringAsync(invitation.invite_code);
+      setCreatedCode(invitation.invite_code);
+      setIsCreating(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
       Alert.alert(
@@ -250,7 +266,6 @@ export default function InviteTeamMemberSheet() {
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Error', error.message || 'Failed to create invitation');
-    } finally {
       setIsCreating(false);
     }
   };
@@ -279,6 +294,25 @@ export default function InviteTeamMemberSheet() {
           </TouchableOpacity>
         </View>
       </SafeAreaView>
+    );
+  }
+
+  // Success state
+  if (createdCode) {
+    return (
+      <View style={[styles.successContainer, { backgroundColor: colors.card }]}>
+        <View style={[styles.successIcon, { backgroundColor: selectedRoleConfig?.color + '20' }]}>
+          <Ionicons name="checkmark-circle" size={64} color={selectedRoleConfig?.color || colors.primary} />
+        </View>
+        <Text style={[styles.successTitle, { color: colors.text }]}>Invite Created!</Text>
+        <View style={[styles.codeBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <Text style={[styles.codeText, { color: colors.text }]}>{createdCode}</Text>
+        </View>
+        <Text style={[styles.successHint, { color: colors.textMuted }]}>Code copied to clipboard</Text>
+        <Text style={[styles.successTeam, { color: colors.textMuted }]}>
+          For {selectedTeam?.name}
+        </Text>
+      </View>
     );
   }
 
@@ -645,5 +679,14 @@ const styles = StyleSheet.create({
   emptyDesc: { fontSize: 14, textAlign: 'center', marginBottom: 24, lineHeight: 20 },
   emptyButton: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 24, borderRadius: 12, gap: 8 },
   emptyButtonText: { fontSize: 15, fontWeight: '600', color: '#fff' },
+
+  // Success state
+  successContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
+  successIcon: { width: 100, height: 100, borderRadius: 50, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
+  successTitle: { fontSize: 24, fontWeight: '700', marginBottom: 20 },
+  codeBox: { paddingHorizontal: 24, paddingVertical: 16, borderRadius: 12, borderWidth: 2, marginBottom: 12 },
+  codeText: { fontSize: 28, fontWeight: '700', letterSpacing: 4 },
+  successHint: { fontSize: 14 },
+  successTeam: { fontSize: 13, marginTop: 8 },
 });
 

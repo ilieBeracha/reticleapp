@@ -8,13 +8,13 @@ import * as Haptics from 'expo-haptics';
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -44,6 +44,7 @@ export default function InviteStaffSheet() {
 
   const [selectedRole, setSelectedRole] = useState<WorkspaceRole>('instructor');
   const [isCreating, setIsCreating] = useState(false);
+  const [createdCode, setCreatedCode] = useState<string | null>(null);
 
   const selectedRoleConfig = STAFF_ROLES.find(r => r.value === selectedRole);
 
@@ -56,6 +57,8 @@ export default function InviteStaffSheet() {
     try {
       const invitation = await createInvitation(activeWorkspaceId, selectedRole, null, null);
       await Clipboard.setStringAsync(invitation.invite_code);
+      setCreatedCode(invitation.invite_code);
+      setIsCreating(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
       Alert.alert(
@@ -66,10 +69,25 @@ export default function InviteStaffSheet() {
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Error', error.message || 'Failed to create invitation');
-    } finally {
       setIsCreating(false);
     }
   };
+
+  // Success state
+  if (createdCode) {
+    return (
+      <View style={[styles.successContainer, { backgroundColor: colors.card }]}>
+        <View style={[styles.successIcon, { backgroundColor: selectedRoleConfig?.color + '20' }]}>
+          <Ionicons name="checkmark-circle" size={64} color={selectedRoleConfig?.color || colors.primary} />
+        </View>
+        <Text style={[styles.successTitle, { color: colors.text }]}>Invite Created!</Text>
+        <View style={[styles.codeBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <Text style={[styles.codeText, { color: colors.text }]}>{createdCode}</Text>
+        </View>
+        <Text style={[styles.successHint, { color: colors.textMuted }]}>Code copied to clipboard</Text>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
@@ -269,5 +287,41 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   createButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+
+  // Success state
+  successContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+  },
+  successIcon: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  successTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 20,
+  },
+  codeBox: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    marginBottom: 12,
+  },
+  codeText: {
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: 4,
+  },
+  successHint: {
+    fontSize: 14,
+  },
 });
 

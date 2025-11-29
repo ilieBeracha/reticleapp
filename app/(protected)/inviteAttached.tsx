@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { router } from "expo-router";
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,17 +15,16 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 export default function InviteAttachedSheet() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
-  const { activeWorkspaceId, activeWorkspace } = useAppContext();
+  const { activeWorkspaceId } = useAppContext();
 
   const [isCreating, setIsCreating] = useState(false);
+  const [createdCode, setCreatedCode] = useState<string | null>(null);
 
   const handleCreateInvite = async () => {
     if (!activeWorkspaceId) return;
@@ -36,6 +35,8 @@ export default function InviteAttachedSheet() {
     try {
       const invitation = await createInvitation(activeWorkspaceId, 'attached', null, null);
       await Clipboard.setStringAsync(invitation.invite_code);
+      setCreatedCode(invitation.invite_code);
+      setIsCreating(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
       Alert.alert(
@@ -46,31 +47,30 @@ export default function InviteAttachedSheet() {
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Error', error.message || 'Failed to create invitation');
-    } finally {
       setIsCreating(false);
     }
   };
 
-  return (
-    <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
-      <View style={styles.grabberSpacer} />
-
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <View style={[styles.headerIcon, { backgroundColor: '#10B98115' }]}>
-          <Ionicons name="link" size={24} color="#10B981" />
+  // Success state - show code while Alert is visible
+  if (createdCode) {
+    return (
+      <View style={[styles.successContainer, { backgroundColor: colors.card }]}>
+        <View style={[styles.successIcon, { backgroundColor: '#10B98120' }]}>
+          <Ionicons name="checkmark-circle" size={64} color="#10B981" />
         </View>
-        <View style={styles.headerText}>
-          <Text style={[styles.title, { color: colors.text }]}>Invite Attached Member</Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            {activeWorkspace?.workspace_name}
-          </Text>
+        <Text style={[styles.successTitle, { color: colors.text }]}>Invite Created!</Text>
+        <View style={[styles.codeBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <Text style={[styles.codeText, { color: colors.text }]}>{createdCode}</Text>
         </View>
+        <Text style={[styles.successHint, { color: colors.textMuted }]}>Code copied to clipboard</Text>
       </View>
+    );
+  }
 
+  return (
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Main Illustration */}
@@ -146,12 +146,10 @@ export default function InviteAttachedSheet() {
             Range customers, external trainees, or anyone who needs to log sessions associated with your organization but doesn't need access to your internal team structure.
           </Text>
         </View>
-      </ScrollView>
 
-      {/* Action Button */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 16, borderTopColor: colors.border }]}>
+        {/* Invite Button inside scroll */}
         <TouchableOpacity
-          style={[styles.createButton, { backgroundColor: isCreating ? colors.muted : '#10B981' }]}
+          style={[styles.createButton, { backgroundColor: isCreating ? colors.muted : '#10B981', marginTop: 8, marginBottom: 40 }]}
           onPress={handleCreateInvite}
           disabled={isCreating}
           activeOpacity={0.8}
@@ -165,8 +163,8 @@ export default function InviteAttachedSheet() {
             </>
           )}
         </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+      </ScrollView>
+
   );
 }
 
@@ -174,29 +172,8 @@ export default function InviteAttachedSheet() {
 // STYLES
 // ============================================================================
 const styles = StyleSheet.create({
-  sheet: { flex: 1 },
-  grabberSpacer: { height: 12 },
   scrollView: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20 },
-
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 14,
-  },
-  headerIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerText: { flex: 1 },
-  title: { fontSize: 22, fontWeight: '700', letterSpacing: -0.3 },
-  subtitle: { fontSize: 14, marginTop: 2 },
+  scrollContent: { paddingHorizontal: 20},
 
   // Illustration
   illustrationSection: {
@@ -276,12 +253,6 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
 
-  // Footer
-  footer: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
   createButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -291,5 +262,41 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   createButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+
+  // Success state
+  successContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+  },
+  successIcon: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  successTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 20,
+  },
+  codeBox: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    marginBottom: 12,
+  },
+  codeText: {
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: 4,
+  },
+  successHint: {
+    fontSize: 14,
+  },
 });
 

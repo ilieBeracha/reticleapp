@@ -65,7 +65,7 @@ const SectionTabs = React.memo(function SectionTabs({
     return true;
   });
 
-  return (
+    return (
     <View style={[styles.sectionTabs, { backgroundColor: colors.secondary }]}>
       {tabs.map((tab) => {
         const isActive = activeSection === tab.key;
@@ -78,7 +78,7 @@ const SectionTabs = React.memo(function SectionTabs({
           >
             <View style={[styles.sectionTabIcon, { backgroundColor: isActive ? tab.color + '20' : 'transparent' }]}>
               <Ionicons name={tab.icon} size={16} color={isActive ? tab.color : colors.textMuted} />
-            </View>
+      </View>
             <Text style={[styles.sectionTabLabel, { color: isActive ? colors.text : colors.textMuted }]}>
               {tab.label}
             </Text>
@@ -176,8 +176,8 @@ const MemberCard = React.memo(function MemberCard({
           <Text style={[styles.memberTeam, { color: colors.textMuted }]} numberOfLines={1}>
             {member.teams[0].team_role} in {member.teams[0].team_name}
           </Text>
-        )}
-      </View>
+          )}
+        </View>
       <RoleBadge role={member.role} colors={colors} />
       <Ionicons name="chevron-forward" size={16} color={colors.textMuted} style={{ opacity: 0.4 }} />
     </TouchableOpacity>
@@ -251,16 +251,16 @@ const TeamCard = React.memo(function TeamCard({
 
   return (
     <View style={[styles.teamCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <TouchableOpacity
+    <TouchableOpacity
         style={styles.teamCardHeader}
-        activeOpacity={0.7}
+      activeOpacity={0.7}
         onPress={() => setExpanded(!expanded)}
-      >
+    >
         <View style={[styles.teamIcon, { backgroundColor: '#F59E0B15' }]}>
           <Ionicons name="people" size={20} color="#F59E0B" />
-        </View>
-        <View style={styles.teamInfo}>
-          <Text style={[styles.teamName, { color: colors.text }]}>{team.name}</Text>
+      </View>
+      <View style={styles.teamInfo}>
+        <Text style={[styles.teamName, { color: colors.text }]}>{team.name}</Text>
           <Text style={[styles.teamMeta, { color: colors.textMuted }]}>
             {memberCount} {memberCount === 1 ? 'member' : 'members'}
             {team.squads?.length > 0 && ` · ${team.squads.length} squads`}
@@ -290,19 +290,19 @@ const TeamCard = React.memo(function TeamCard({
                 <BaseAvatar fallbackText={member.profile_full_name || 'UN'} size="xs" role={member.role} />
                 <Text style={[styles.teamMemberName, { color: colors.text }]} numberOfLines={1}>
                   {member.profile_full_name || 'Unknown'}
-                </Text>
+              </Text>
                 {member.member_id === currentUserId && (
                   <View style={[styles.youBadgeSmall, { backgroundColor: colors.primary }]}>
                     <Text style={styles.youBadgeSmallText}>You</Text>
                   </View>
-                )}
+          )}
                 <RoleBadge role={teamMembership?.team_role || 'member'} colors={colors} size="small" />
               </TouchableOpacity>
             );
           })}
         </View>
       )}
-    </View>
+      </View>
   );
 });
 
@@ -322,7 +322,7 @@ const InviteCard = React.memo(function InviteCard({
     ? 'Attached Member'
     : invite.team_name
       ? `${invite.team_role} in ${invite.team_name}`
-      : invite.role;
+    : invite.role;
 
   return (
     <View style={[styles.inviteCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -342,11 +342,11 @@ const InviteCard = React.memo(function InviteCard({
         <Text style={[styles.inviteCode, { color: colors.text }]}>{invite.invite_code}</Text>
         <Text style={[styles.inviteRole, { color: colors.textMuted }]}>{roleLabel}</Text>
       </View>
-      {isExpired && (
-        <View style={[styles.expiredBadge, { backgroundColor: colors.red + '15' }]}>
-          <Text style={[styles.expiredBadgeText, { color: colors.red }]}>Expired</Text>
-        </View>
-      )}
+          {isExpired && (
+            <View style={[styles.expiredBadge, { backgroundColor: colors.red + '15' }]}>
+              <Text style={[styles.expiredBadgeText, { color: colors.red }]}>Expired</Text>
+            </View>
+          )}
     </View>
   );
 });
@@ -372,7 +372,7 @@ const SectionHeader = React.memo(function SectionHeader({
         {typeof count === 'number' && (
           <View style={[styles.sectionBadge, { backgroundColor: colors.secondary }]}>
             <Text style={[styles.sectionBadgeText, { color: colors.textMuted }]}>{count}</Text>
-          </View>
+      </View>
         )}
       </View>
       {action && (
@@ -444,25 +444,45 @@ const EmptyState = React.memo(function EmptyState({
 });
 
 // ============================================================================
-// TEAM MEMBER VIEW (for soldiers/commanders - their team is their home)
+// TEAM MEMBER VIEW (for soldiers/commanders - their team + org overview)
 // ============================================================================
 const TeamMemberView = React.memo(function TeamMemberView({
   colors,
   teamInfo,
   members,
+  teams,
   currentUserId,
+  isCommander,
   onMemberPress,
+  onTeamPress,
+  onInviteToTeam,
 }: {
   colors: typeof Colors.light;
   teamInfo: { teamId: string; teamName: string; teamRole: string } | null;
   members: WorkspaceMemberWithTeams[];
+  teams: any[];
   currentUserId?: string | null;
+  isCommander: boolean;
   onMemberPress: (member: WorkspaceMemberWithTeams) => void;
+  onTeamPress: (team: any) => void;
+  onInviteToTeam: () => void;
 }) {
   // Filter members for this team
   const teamMembers = useMemo(
     () => (teamInfo ? members.filter((m) => m.teams?.some((t) => t.team_id === teamInfo.teamId)) : []),
     [members, teamInfo]
+  );
+  
+  // Staff members (visible to all team members)
+  const staffMembers = useMemo(
+    () => members.filter(m => ['owner', 'admin', 'instructor'].includes(m.role)),
+    [members]
+  );
+  
+  // Other teams (not my team)
+  const otherTeams = useMemo(
+    () => (teamInfo ? teams.filter(t => t.id !== teamInfo.teamId) : teams),
+    [teams, teamInfo]
   );
 
   if (!teamInfo) {
@@ -476,7 +496,7 @@ const TeamMemberView = React.memo(function TeamMemberView({
 
   return (
     <>
-      {/* Team Header */}
+      {/* My Team Header */}
       <View style={[styles.teamHeader, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={[styles.teamHeaderIcon, { backgroundColor: '#F59E0B15' }]}>
           <Ionicons name="people" size={28} color="#F59E0B" />
@@ -487,9 +507,18 @@ const TeamMemberView = React.memo(function TeamMemberView({
             Your role: <Text style={{ color: '#F59E0B', fontWeight: '600' }}>{teamInfo.teamRole}</Text>
           </Text>
         </View>
-      </View>
+        {isCommander && (
+        <TouchableOpacity
+            style={[styles.teamInviteBtn, { backgroundColor: '#10B98115' }]}
+            onPress={onInviteToTeam}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="person-add" size={18} color="#10B981" />
+        </TouchableOpacity>
+      )}
+    </View>
 
-      {/* Team Members */}
+      {/* My Team Members */}
       <SectionHeader title="TEAM MEMBERS" count={teamMembers.length} colors={colors} />
       {teamMembers.map((member) => {
         const membership = member.teams?.find((t) => t.team_id === teamInfo.teamId);
@@ -517,6 +546,57 @@ const TeamMemberView = React.memo(function TeamMemberView({
           </TouchableOpacity>
         );
       })}
+      
+      {/* ═══ ORGANIZATION OVERVIEW ═══ */}
+      
+      {/* Organization Staff */}
+      {staffMembers.length > 0 && (
+        <>
+          <SectionHeader title="ORGANIZATION STAFF" count={staffMembers.length} colors={colors} />
+          {staffMembers.map((member) => (
+            <TouchableOpacity
+              key={member.id}
+              style={[styles.memberCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              activeOpacity={0.7}
+              onPress={() => onMemberPress(member)}
+            >
+              <BaseAvatar fallbackText={member.profile_full_name || 'UN'} size="sm" role={member.role} />
+              <View style={styles.memberInfo}>
+                <Text style={[styles.memberName, { color: colors.text }]} numberOfLines={1}>
+                  {member.profile_full_name || 'Unknown'}
+                </Text>
+              </View>
+              <RoleBadge role={member.role} colors={colors} />
+            </TouchableOpacity>
+          ))}
+        </>
+      )}
+      
+      {/* Other Teams */}
+      {otherTeams.length > 0 && (
+        <>
+          <SectionHeader title="OTHER TEAMS" count={otherTeams.length} colors={colors} />
+          {otherTeams.map((team) => (
+            <TouchableOpacity
+              key={team.id}
+              style={[styles.teamCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              activeOpacity={0.7}
+              onPress={() => onTeamPress(team)}
+            >
+              <View style={[styles.teamCardIcon, { backgroundColor: '#6366F115' }]}>
+                <Ionicons name="people" size={20} color="#6366F1" />
+              </View>
+              <View style={styles.teamCardInfo}>
+                <Text style={[styles.teamCardName, { color: colors.text }]}>{team.name}</Text>
+                <Text style={[styles.teamCardCount, { color: colors.textMuted }]}>
+                  {team.member_count || 0} members
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+          ))}
+        </>
+      )}
     </>
   );
 });
@@ -743,7 +823,7 @@ const ManageScreen = React.memo(function ManageScreen() {
   const [invites, setInvites] = useState<WorkspaceInvitationWithDetails[]>([]);
   const [teamsLoading, setTeamsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  
+
   // Get visibility settings from workspace (persisted in database)
   const showTeams = activeWorkspace?.show_teams_tab ?? true;
   const showAttached = activeWorkspace?.show_attached_tab ?? true;
@@ -870,8 +950,8 @@ const ManageScreen = React.memo(function ManageScreen() {
 
   const handleTeamPress = useCallback(
     (team: any) => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      setSelectedTeam(team);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedTeam(team);
       router.push('/(protected)/teamPreview' as any);
     },
     [setSelectedTeam]
@@ -879,8 +959,8 @@ const ManageScreen = React.memo(function ManageScreen() {
 
   const handleMemberPress = useCallback(
     (member: WorkspaceMemberWithTeams) => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      setSelectedMember(member);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedMember(member);
       router.push('/(protected)/memberPreview' as any);
     },
     [setSelectedMember]
@@ -929,11 +1009,11 @@ const ManageScreen = React.memo(function ManageScreen() {
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <View style={styles.headerLeft}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>{getHeaderTitle()}</Text>
-          <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
+            <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
             {activeWorkspace?.workspace_name ?? 'Workspace'}
-          </Text>
-        </View>
-        
+            </Text>
+          </View>
+
         {/* Visibility Options Dropdown - Only for admin/owner on iOS */}
         {canChangeSettings && Platform.OS === 'ios' && (
           <Host style={styles.dropdownHost}>
@@ -959,8 +1039,8 @@ const ManageScreen = React.memo(function ManageScreen() {
               </ContextMenu.Trigger>
             </ContextMenu>
           </Host>
-        )}
-      </View>
+          )}
+        </View>
 
       {/* Section Tabs (only for org staff) */}
       {isOrgStaff && (
@@ -975,8 +1055,8 @@ const ManageScreen = React.memo(function ManageScreen() {
             showTeams={showTeams}
             showAttached={showAttached}
           />
-        </View>
-      )}
+                </View>
+              )}
 
       {/* Content */}
       <ScrollView
@@ -985,21 +1065,25 @@ const ManageScreen = React.memo(function ManageScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />}
       >
-        {/* TEAM MEMBER VIEW - Their team is their home */}
+        {/* TEAM MEMBER VIEW - Their team + org overview */}
         {isTeamMember && (
           <TeamMemberView
             colors={colors}
             teamInfo={teamInfo}
-            members={teamMembers}
+            members={workspaceMembers}
+            teams={teams}
             currentUserId={currentUserId}
+            isCommander={isCommander}
             onMemberPress={handleMemberPress}
+            onTeamPress={handleTeamPress}
+            onInviteToTeam={handleInviteTeam}
           />
         )}
 
         {/* ADMIN VIEW - Full management (attached members never see this screen) */}
         {isOrgStaff && (
           <AdminView
-            colors={colors}
+                        colors={colors}
             activeSection={activeSection}
             staffMembers={staffMembers}
             teamMembers={teamMembers}
@@ -1032,127 +1116,134 @@ export default ManageScreen;
 const styles = StyleSheet.create({
   container: { flex: 1 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
-  loadingText: { fontSize: 14 },
+  loadingText: { fontSize: 13 },
 
   // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 16 : 20,
+    paddingTop: Platform.OS === 'ios' ? 8 : 16,
     paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerLeft: { flex: 1 },
-  headerTitle: { fontSize: 32, fontWeight: '700', letterSpacing: -0.5 },
-  headerSubtitle: { fontSize: 15, marginTop: 4 },
-  dropdownHost: { width: 80, height: 40, marginLeft: 12 },
+  headerTitle: { fontSize: 26, fontWeight: '700', letterSpacing: -0.5 },
+  headerSubtitle: { fontSize: 13, marginTop: 2, opacity: 0.6 },
+  dropdownHost: { width: 70, height: 36, marginLeft: 8 },
 
   // Tabs
-  tabsContainer: { paddingHorizontal: 16, paddingVertical: 12 },
-  sectionTabs: { flexDirection: 'row', borderRadius: 14, padding: 4, gap: 2 },
+  tabsContainer: { paddingHorizontal: 16, paddingVertical: 10 },
+  sectionTabs: { flexDirection: 'row', borderRadius: 12, padding: 3, gap: 2 },
   sectionTab: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderRadius: 9,
+    gap: 5,
   },
-  sectionTabIcon: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  sectionTabLabel: { fontSize: 13, fontWeight: '600' },
-  sectionTabBadge: { minWidth: 20, height: 18, paddingHorizontal: 6, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  sectionTabBadgeText: { fontSize: 11, fontWeight: '600' },
+  sectionTabIcon: { width: 24, height: 24, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  sectionTabLabel: { fontSize: 12, fontWeight: '600' },
+  sectionTabBadge: { minWidth: 18, height: 16, paddingHorizontal: 5, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  sectionTabBadgeText: { fontSize: 10, fontWeight: '600' },
 
   // Content
   content: { flex: 1 },
-  contentContainer: { padding: 16 },
+  contentContainer: { padding: 16, paddingTop: 8 },
 
   // Section Header
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 12 },
-  sectionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  sectionTitle: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5 },
-  sectionBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
-  sectionBadgeText: { fontSize: 11, fontWeight: '600' },
-  sectionAction: { fontSize: 13, fontWeight: '600' },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, marginBottom: 10 },
+  sectionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sectionTitle: { fontSize: 11, fontWeight: '600', letterSpacing: 0.6, textTransform: 'uppercase' },
+  sectionBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  sectionBadgeText: { fontSize: 10, fontWeight: '600' },
+  sectionAction: { fontSize: 12, fontWeight: '600' },
 
   // Info Banner
-  infoBanner: { flexDirection: 'row', alignItems: 'flex-start', padding: 14, borderRadius: 12, borderWidth: 1, gap: 12, marginBottom: 8 },
-  infoBannerText: { flex: 1, fontSize: 13, lineHeight: 18 },
+  infoBanner: { flexDirection: 'row', alignItems: 'flex-start', padding: 12, borderRadius: 10, borderWidth: 1, gap: 10, marginBottom: 6 },
+  infoBannerText: { flex: 1, fontSize: 12, lineHeight: 17, opacity: 0.8 },
 
   // Member Card
-  memberCard: { flexDirection: 'row', alignItems: 'center', padding: 12, marginBottom: 8, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, gap: 12 },
-  memberInfo: { flex: 1, gap: 2 },
-  memberNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  memberName: { fontSize: 15, fontWeight: '600' },
-  memberEmail: { fontSize: 12 },
-  memberTeam: { fontSize: 11, marginTop: 2 },
+  memberCard: { flexDirection: 'row', alignItems: 'center', padding: 10, marginBottom: 6, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, gap: 10 },
+  memberInfo: { flex: 1, gap: 1 },
+  memberNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  memberName: { fontSize: 14, fontWeight: '600' },
+  memberEmail: { fontSize: 11, opacity: 0.6 },
+  memberTeam: { fontSize: 10, marginTop: 1, opacity: 0.5 },
 
   // Attached Card
-  attachedCard: { flexDirection: 'row', alignItems: 'center', padding: 14, marginBottom: 10, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, gap: 14 },
-  attachedInfo: { flex: 1, gap: 2 },
-  attachedName: { fontSize: 16, fontWeight: '600' },
-  attachedEmail: { fontSize: 13 },
-  attachedMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  attachedMetaText: { fontSize: 11 },
+  attachedCard: { flexDirection: 'row', alignItems: 'center', padding: 12, marginBottom: 8, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, gap: 12 },
+  attachedInfo: { flex: 1, gap: 1 },
+  attachedName: { fontSize: 15, fontWeight: '600' },
+  attachedEmail: { fontSize: 12, opacity: 0.6 },
+  attachedMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  attachedMetaText: { fontSize: 10, opacity: 0.5 },
 
   // Team Card
-  teamCard: { marginBottom: 10, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  teamCardHeader: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  teamIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  teamInfo: { flex: 1, gap: 2 },
-  teamName: { fontSize: 16, fontWeight: '600' },
-  teamMeta: { fontSize: 13 },
-  teamViewBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  teamViewBtnText: { fontSize: 13, fontWeight: '600' },
-  teamMembersList: { borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 8, paddingHorizontal: 14 },
-  teamMemberRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 10 },
-  teamMemberName: { flex: 1, fontSize: 14 },
+  teamCard: { marginBottom: 8, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  teamCardHeader: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10 },
+  teamIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  teamInfo: { flex: 1, gap: 1 },
+  teamName: { fontSize: 15, fontWeight: '600' },
+  teamMeta: { fontSize: 12, opacity: 0.6 },
+  teamViewBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
+  teamViewBtnText: { fontSize: 12, fontWeight: '600' },
+  teamMembersList: { borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 6, paddingHorizontal: 12 },
+  teamMemberRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, gap: 8 },
+  teamMemberName: { flex: 1, fontSize: 13 },
 
   // Team Header (for team member view)
-  teamHeader: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, gap: 14, marginBottom: 8 },
-  teamHeaderIcon: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  teamHeaderInfo: { flex: 1, gap: 4 },
-  teamHeaderName: { fontSize: 20, fontWeight: '700' },
-  teamHeaderRole: { fontSize: 14 },
+  teamHeader: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, gap: 12, marginBottom: 6 },
+  teamHeaderIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  teamHeaderInfo: { flex: 1, gap: 2 },
+  teamHeaderName: { fontSize: 18, fontWeight: '700' },
+  teamHeaderRole: { fontSize: 13, opacity: 0.7 },
+  teamInviteBtn: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  
+  // Team Card (for org overview in team member view)
+  teamCardIcon: { width: 36, height: 36, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  teamCardInfo: { flex: 1, gap: 1 },
+  teamCardName: { fontSize: 14, fontWeight: '600' },
+  teamCardCount: { fontSize: 11, opacity: 0.6 },
 
   // Invite Button
-  inviteTeamBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, marginTop: 8, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', gap: 8 },
-  inviteTeamBtnText: { fontSize: 14, fontWeight: '600' },
+  inviteTeamBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, marginTop: 6, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', gap: 6 },
+  inviteTeamBtnText: { fontSize: 13, fontWeight: '600' },
 
   // Invite Card
-  inviteCard: { flexDirection: 'row', alignItems: 'center', padding: 12, marginBottom: 6, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, gap: 10 },
-  inviteIcon: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  inviteInfo: { flex: 1, gap: 1 },
-  inviteCode: { fontSize: 14, fontWeight: '600', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
-  inviteRole: { fontSize: 11 },
-  expiredBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  expiredBadgeText: { fontSize: 10, fontWeight: '600' },
+  inviteCard: { flexDirection: 'row', alignItems: 'center', padding: 10, marginBottom: 5, borderRadius: 8, borderWidth: StyleSheet.hairlineWidth, gap: 8 },
+  inviteIcon: { width: 28, height: 28, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
+  inviteInfo: { flex: 1, gap: 0 },
+  inviteCode: { fontSize: 13, fontWeight: '600', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  inviteRole: { fontSize: 10, opacity: 0.6 },
+  expiredBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
+  expiredBadgeText: { fontSize: 9, fontWeight: '600' },
 
   // Role Badge
-  roleBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, gap: 4 },
-  roleBadgeSmall: { paddingHorizontal: 6, paddingVertical: 3 },
-  roleBadgeText: { fontSize: 11, fontWeight: '600' },
-  roleBadgeTextSmall: { fontSize: 10 },
+  roleBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5, gap: 3 },
+  roleBadgeSmall: { paddingHorizontal: 5, paddingVertical: 2 },
+  roleBadgeText: { fontSize: 10, fontWeight: '600' },
+  roleBadgeTextSmall: { fontSize: 9 },
 
   // You Badge
-  youBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  youBadgeText: { fontSize: 9, fontWeight: '700', color: '#fff' },
-  youBadgeSmall: { paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
-  youBadgeSmallText: { fontSize: 8, fontWeight: '700', color: '#fff' },
+  youBadge: { paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
+  youBadgeText: { fontSize: 8, fontWeight: '700', color: '#fff' },
+  youBadgeSmall: { paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3 },
+  youBadgeSmallText: { fontSize: 7, fontWeight: '700', color: '#fff' },
 
   // No Team
-  noTeamContainer: { alignItems: 'center', paddingVertical: 60, gap: 12 },
-  noTeamText: { fontSize: 15 },
+  noTeamContainer: { alignItems: 'center', paddingVertical: 50, gap: 10 },
+  noTeamText: { fontSize: 14, opacity: 0.6 },
 
   // Empty State
-  emptyState: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 32 },
-  emptyIconBox: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  emptyTitle: { fontSize: 17, fontWeight: '600', marginBottom: 6, textAlign: 'center' },
-  emptyDesc: { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
-  emptyAction: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 18, borderRadius: 12, gap: 6 },
-  emptyActionText: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  emptyState: { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 28 },
+  emptyIconBox: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  emptyTitle: { fontSize: 15, fontWeight: '600', marginBottom: 4, textAlign: 'center' },
+  emptyDesc: { fontSize: 13, textAlign: 'center', lineHeight: 18, marginBottom: 16, opacity: 0.7 },
+  emptyAction: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10, gap: 5 },
+  emptyActionText: { fontSize: 13, fontWeight: '600', color: '#fff' },
 });

@@ -37,6 +37,7 @@ export default function AcceptInviteSheet() {
   const [validatedInvite, setValidatedInvite] = useState<WorkspaceInvitationWithDetails | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [isAccepting, setIsAccepting] = useState(false);
+  const [isAccepted, setIsAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleValidate = useCallback(async () => {
@@ -90,6 +91,9 @@ export default function AcceptInviteSheet() {
       // Reload workspaces to include the new one
       await useWorkspaceStore.getState().loadWorkspaces();
       
+      // Show success state immediately
+      setIsAccepted(true);
+      setIsAccepting(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       
       Alert.alert(
@@ -125,7 +129,6 @@ export default function AcceptInviteSheet() {
       console.error("Failed to accept invitation:", error);
       Alert.alert("Error", error.message || "Failed to join workspace");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    } finally {
       setIsAccepting(false);
     }
   }, [validatedInvite]);
@@ -175,6 +178,27 @@ export default function AcceptInviteSheet() {
     };
     return (icons[role as keyof typeof icons] || 'person') as keyof typeof Ionicons.glyphMap;
   };
+
+  // Success state - show while Alert is visible
+  if (isAccepted && validatedInvite) {
+    return (
+      <View style={[styles.successContainer, { backgroundColor: colors.card }]}>
+        <View style={[styles.successIcon, { backgroundColor: colors.primary + '20' }]}>
+          <Ionicons name="checkmark-circle" size={64} color={colors.primary} />
+        </View>
+        <Text style={[styles.successTitle, { color: colors.text }]}>Welcome!</Text>
+        <Text style={[styles.successWorkspace, { color: colors.text }]}>
+          {validatedInvite.workspace_name}
+        </Text>
+        <View style={[styles.successBadge, { backgroundColor: getRoleColor(validatedInvite.role) + '20' }]}>
+          <Ionicons name={getRoleIcon(validatedInvite.role)} size={16} color={getRoleColor(validatedInvite.role)} />
+          <Text style={[styles.successRole, { color: getRoleColor(validatedInvite.role) }]}>
+            Joined as {validatedInvite.role.charAt(0).toUpperCase() + validatedInvite.role.slice(1)}
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
@@ -586,6 +610,44 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     letterSpacing: -0.2,
+  },
+
+  // Success state
+  successContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+  },
+  successIcon: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  successTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  successWorkspace: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  successBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 8,
+  },
+  successRole: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

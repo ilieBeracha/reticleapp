@@ -237,14 +237,16 @@ export async function acceptInvitation(inviteCode: string): Promise<void> {
     p_user_id: user.id,
   });
 
-  if (error) {
-    console.error('RPC error accepting invite:', error);
-    throw new Error('Failed to accept invitation');
-  }
+  console.log('Accept invite response:', JSON.stringify(data));
+  console.log('Accept invite error:', JSON.stringify(error));
 
-  // Check response
+  // Check response - the RPC returns { success: boolean, error?: string }
+  console.log('Accept invite response:', JSON.stringify(data));
+  
   if (!data || !data.success) {
-    throw new Error(data?.error || 'Failed to accept invitation');
+    const errorMsg = data?.error || 'Failed to accept invitation';
+    console.error('Accept invite failed:', errorMsg);
+    throw new Error(errorMsg);
   }
 }
 
