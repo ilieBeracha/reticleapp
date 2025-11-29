@@ -34,7 +34,13 @@
       "package": "com.retic.app",
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
       ]
     },
     "web": {
@@ -67,7 +73,9 @@
           }
         }
       ],
-      ["react-native-bottom-tabs"],
+      [
+        "react-native-bottom-tabs"
+      ],
       [
         "expo-camera",
         {
@@ -97,6 +105,12 @@
       },
       "router": {}
     },
-    "owner": "ilieberacha"
+    "owner": "ilieberacha",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/a6389fa6-2be9-4cf2-803c-58ceab564997"
+    }
   }
 }
