@@ -168,7 +168,7 @@ export default function ProtectedLayout() {
         }}
       />
         
-        {/* Invite Members */}
+        {/* Invite Members (legacy - can be removed later) */}
         <Stack.Screen
           name="inviteMembers"
           options={{
@@ -182,6 +182,51 @@ export default function ProtectedLayout() {
             sheetLargestUndimmedDetentIndex: -1,
         }}
       />
+        
+        {/* Invite Staff - Org-level roles */}
+        <Stack.Screen
+          name="inviteStaff"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.7, 0.85],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+          }}
+        />
+        
+        {/* Invite Team Member - Team roles */}
+        <Stack.Screen
+          name="inviteTeamMember"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.85, 0.95],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+          }}
+        />
+        
+        {/* Invite Attached - External users */}
+        <Stack.Screen
+          name="inviteAttached"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.75, 0.9],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+          }}
+        />
         
         {/* Team Preview */}
         <Stack.Screen

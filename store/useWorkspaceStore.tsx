@@ -2,8 +2,9 @@
 import {
   getAccessibleWorkspaces,
   getWorkspaceMembers,
+  updateOrgWorkspaceSettings,
 } from "@/services/workspaceService";
-import { Workspace, WorkspaceMemberWithTeams } from "@/types/workspace";
+import { OrgWorkspaceSettings, Workspace, WorkspaceMemberWithTeams } from "@/types/workspace";
 import { create } from "zustand";
 
 interface WorkspaceStore {
@@ -17,6 +18,7 @@ interface WorkspaceStore {
   loadWorkspaces: () => Promise<void>;
   setActiveWorkspace: (workspaceId: string | null) => void;
   setIsSwitching: (isSwitching: boolean) => void;
+  updateWorkspaceSettings: (settings: OrgWorkspaceSettings) => Promise<void>;
   reset: () => void;
 } 
 
@@ -103,6 +105,37 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
    */
   setIsSwitching: (isSwitching: boolean) => {
     set({ isSwitching });
+  },
+
+  /**
+   * Update workspace settings (admin/owner only)
+   * Updates both local state and database
+   */
+  updateWorkspaceSettings: async (settings: OrgWorkspaceSettings) => {
+    const { activeWorkspaceId, workspaces } = get();
+    if (!activeWorkspaceId) return;
+
+    try {
+      // Update database
+      await updateOrgWorkspaceSettings(activeWorkspaceId, settings);
+
+      // Update local state
+      const updatedWorkspaces = workspaces.map(ws => {
+        if (ws.id === activeWorkspaceId) {
+          return {
+            ...ws,
+            ...(settings.show_teams_tab !== undefined && { show_teams_tab: settings.show_teams_tab }),
+            ...(settings.show_attached_tab !== undefined && { show_attached_tab: settings.show_attached_tab }),
+          };
+        }
+        return ws;
+      });
+
+      set({ workspaces: updatedWorkspaces });
+    } catch (error: any) {
+      console.error('Failed to update workspace settings:', error);
+      throw error;
+    }
   },
 
   /**

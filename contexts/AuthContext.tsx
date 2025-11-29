@@ -38,12 +38,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Handle user sign out - clear state and redirect to login
    */
   const handleSignOut = () => {
+    // Reset workspace state
     useWorkspaceStore.getState().reset()
+    // Reset initial session handler so next login works correctly
+    initialSessionHandledRef.current = false
+    // Transition to login
     setTransitioning(true)
     setTimeout(() => {
       router.replace("/auth/sign-in")
-      setTransitioning(false)
-    }, 500)
+      // Small delay before removing overlay to ensure navigation completes
+      setTimeout(() => setTransitioning(false), 200)
+    }, 100)
   }
 
   // Track if we've handled initial session to prevent re-triggers

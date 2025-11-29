@@ -41,11 +41,16 @@ function OrgTabs() {
   const { activeWorkspaceId } = useWorkspaceStore();
   const permissions = useWorkspacePermissions();
   
-  // Attached members see a simplified view - only their own sessions
-  // They still have access to all routes but only see the Home tab
+  // Role-based UI:
+  // - Attached: Only "My Sessions" tab (personal-like experience)
+  // - Team Member: "Home", "Trainings", "My Team" (team-focused, no management)
+  // - Org Staff: "Home", "Trainings", "Manage" (full admin capabilities)
+  
   const isAttached = permissions.isAttached;
+  const isOrgStaff = permissions.canManageWorkspace; // owner, admin, instructor
+  const isTeamMember = !isAttached && !isOrgStaff;
 
-  // For attached members, show simplified single-tab view
+  // ATTACHED MEMBERS: Minimal single-tab view
   if (isAttached) {
     return (
       <Tabs
@@ -63,27 +68,53 @@ function OrgTabs() {
             tabBarIcon: ({ focused }) => getTabIcon('house', focused ? 'home' : 'home-outline'),
           }}
         />
-        {/* These screens exist but are hidden from tab bar for attached members */}
+        <Tabs.Screen name="trainings" options={{ tabBarItemHidden: true }} />
+        <Tabs.Screen name="manage" options={{ tabBarItemHidden: true }} />
+      </Tabs>
+    );
+  }
+
+  // TEAM MEMBERS: Team-focused view (no admin features)
+  if (isTeamMember) {
+    return (
+      <Tabs
+        key={`org-${activeWorkspaceId}-team`}
+        rippleColor={colors.primary}
+        sidebarAdaptable
+        tabBarStyle={{ backgroundColor: colors.background }}
+        activeIndicatorColor={colors.primary + '20'}
+        tabBarActiveTintColor={colors.primary}
+        tabBarInactiveTintColor={colors.textMuted}
+      >
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: 'Home',
+            tabBarIcon: ({ focused }) => getTabIcon('house', focused ? 'home' : 'home-outline'),
+          }}
+        />
         <Tabs.Screen
           name="trainings"
           options={{
-            tabBarItemHidden: true,
+            title: 'Trainings',
+            tabBarIcon: ({ focused }) => getTabIcon('target', focused ? 'fitness' : 'fitness-outline'),
           }}
         />
         <Tabs.Screen
           name="manage"
           options={{
-            tabBarItemHidden: true,
+            title: 'My Team',
+            tabBarIcon: ({ focused }) => getTabIcon('person.2.fill', focused ? 'people' : 'people-outline'),
           }}
         />
       </Tabs>
     );
   }
 
-  // Full view for regular members
+  // ORG STAFF: Full admin view
   return (
     <Tabs
-      key={`org-${activeWorkspaceId}-full`}
+      key={`org-${activeWorkspaceId}-admin`}
       rippleColor={colors.primary}
       sidebarAdaptable
       tabBarStyle={{ backgroundColor: colors.background }}
@@ -98,7 +129,6 @@ function OrgTabs() {
           tabBarIcon: ({ focused }) => getTabIcon('house', focused ? 'home' : 'home-outline'),
         }}
       />
-
       <Tabs.Screen
         name="trainings"
         options={{
@@ -106,12 +136,11 @@ function OrgTabs() {
           tabBarIcon: ({ focused }) => getTabIcon('target', focused ? 'fitness' : 'fitness-outline'),
         }}
       />
-
       <Tabs.Screen
         name="manage"
         options={{
           title: 'Manage',
-          tabBarIcon: ({ focused }) => getTabIcon('person.2.fill', focused ? 'people' : 'people-outline'),
+          tabBarIcon: ({ focused }) => getTabIcon('gearshape.fill', focused ? 'settings' : 'settings-outline'),
         }}
       />
     </Tabs>

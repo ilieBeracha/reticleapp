@@ -9,6 +9,7 @@ import { getPendingInvitations } from '@/services/invitationService';
 import { getWorkspaceTeams } from '@/services/teamService';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import type { WorkspaceInvitationWithDetails, WorkspaceMemberWithTeams } from '@/types/workspace';
+import { Button, ContextMenu, Host } from '@expo/ui/swift-ui';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -24,69 +25,71 @@ import {
   View,
 } from 'react-native';
 
-type MainView = 'teams' | 'attached';
+// ============================================================================
+// TYPES
+// ============================================================================
+type ManageSection = 'staff' | 'attached' | 'teams';
 
 // ============================================================================
-// TOP-LEVEL VIEW TOGGLE
+// SECTION TAB BAR (for admins)
 // ============================================================================
-const ViewToggle = React.memo(function ViewToggle({
-  activeView,
-  onViewChange,
-  teamCount,
+const SectionTabs = React.memo(function SectionTabs({
+  activeSection,
+  onSectionChange,
+  staffCount,
   attachedCount,
+  teamCount,
   colors,
+  showTeams,
+  showAttached,
 }: {
-  activeView: MainView;
-  onViewChange: (view: MainView) => void;
-  teamCount: number;
+  activeSection: ManageSection;
+  onSectionChange: (section: ManageSection) => void;
+  staffCount: number;
   attachedCount: number;
+  teamCount: number;
   colors: typeof Colors.light;
+  showTeams: boolean;
+  showAttached: boolean;
 }) {
+  const allTabs: { key: ManageSection; label: string; icon: keyof typeof Ionicons.glyphMap; count: number; color: string }[] = [
+    { key: 'staff', label: 'Staff', icon: 'shield', count: staffCount, color: '#6366F1' },
+    { key: 'teams', label: 'Teams', icon: 'people', count: teamCount, color: '#F59E0B' },
+    { key: 'attached', label: 'Attached', icon: 'link', count: attachedCount, color: '#10B981' },
+  ];
+
+  // Filter tabs based on visibility settings
+  const tabs = allTabs.filter(tab => {
+    if (tab.key === 'teams' && !showTeams) return false;
+    if (tab.key === 'attached' && !showAttached) return false;
+    return true;
+  });
+
   return (
-    <View style={[styles.viewToggle, { backgroundColor: colors.secondary }]}>
-      <TouchableOpacity
-        style={[
-          styles.viewToggleItem,
-          activeView === 'teams' && { backgroundColor: colors.card },
-        ]}
-        onPress={() => onViewChange('teams')}
-        activeOpacity={0.7}
-      >
-        <View style={[styles.viewToggleIcon, { backgroundColor: activeView === 'teams' ? '#6366F120' : 'transparent' }]}>
-          <Ionicons name="people" size={18} color={activeView === 'teams' ? '#6366F1' : colors.textMuted} />
-        </View>
-        <View style={styles.viewToggleText}>
-          <Text style={[styles.viewToggleLabel, { color: activeView === 'teams' ? colors.text : colors.textMuted }]}>
-            Team Structure
-          </Text>
-          <Text style={[styles.viewToggleCount, { color: activeView === 'teams' ? '#6366F1' : colors.textMuted }]}>
-            {teamCount} teams
-          </Text>
-        </View>
-      </TouchableOpacity>
-
-      <View style={[styles.viewToggleDivider, { backgroundColor: colors.border }]} />
-
-      <TouchableOpacity
-        style={[
-          styles.viewToggleItem,
-          activeView === 'attached' && { backgroundColor: colors.card },
-        ]}
-        onPress={() => onViewChange('attached')}
-        activeOpacity={0.7}
-      >
-        <View style={[styles.viewToggleIcon, { backgroundColor: activeView === 'attached' ? '#10B98120' : 'transparent' }]}>
-          <Ionicons name="link" size={18} color={activeView === 'attached' ? '#10B981' : colors.textMuted} />
-        </View>
-        <View style={styles.viewToggleText}>
-          <Text style={[styles.viewToggleLabel, { color: activeView === 'attached' ? colors.text : colors.textMuted }]}>
-            Attached
-          </Text>
-          <Text style={[styles.viewToggleCount, { color: activeView === 'attached' ? '#10B981' : colors.textMuted }]}>
-            {attachedCount} members
-          </Text>
-        </View>
-      </TouchableOpacity>
+    <View style={[styles.sectionTabs, { backgroundColor: colors.secondary }]}>
+      {tabs.map((tab) => {
+        const isActive = activeSection === tab.key;
+        return (
+          <TouchableOpacity
+            key={tab.key}
+            style={[styles.sectionTab, isActive && { backgroundColor: colors.card }]}
+            onPress={() => onSectionChange(tab.key)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.sectionTabIcon, { backgroundColor: isActive ? tab.color + '20' : 'transparent' }]}>
+              <Ionicons name={tab.icon} size={16} color={isActive ? tab.color : colors.textMuted} />
+            </View>
+            <Text style={[styles.sectionTabLabel, { color: isActive ? colors.text : colors.textMuted }]}>
+              {tab.label}
+            </Text>
+            <View style={[styles.sectionTabBadge, { backgroundColor: isActive ? tab.color : colors.border }]}>
+              <Text style={[styles.sectionTabBadgeText, { color: isActive ? '#fff' : colors.textMuted }]}>
+                {tab.count}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 });
@@ -97,176 +100,67 @@ const ViewToggle = React.memo(function ViewToggle({
 const RoleBadge = React.memo(function RoleBadge({
   role,
   colors,
+  size = 'normal',
 }: {
   role: string;
   colors: typeof Colors.light;
+  size?: 'small' | 'normal';
 }) {
-  const getRoleConfig = () => {
+  const config = useMemo(() => {
     switch (role) {
-      case 'owner':
-        return { label: 'Owner', color: '#6366F1', bg: '#6366F115', icon: 'shield-checkmark' as const };
-      case 'admin':
-        return { label: 'Admin', color: '#8B5CF6', bg: '#8B5CF615', icon: 'shield-half' as const };
-      case 'instructor':
-        return { label: 'Instructor', color: '#EC4899', bg: '#EC489915', icon: 'school' as const };
-      case 'commander':
-        return { label: 'Commander', color: '#F59E0B', bg: '#F59E0B15', icon: 'star' as const };
-      case 'squad_commander':
-        return { label: 'Squad Cmdr', color: '#10B981', bg: '#10B98115', icon: 'star-half' as const };
-      case 'soldier':
-        return { label: 'Soldier', color: colors.textMuted, bg: colors.secondary, icon: 'person' as const };
-      default:
-        return { label: 'Member', color: colors.textMuted, bg: colors.secondary, icon: 'person' as const };
+      case 'owner': return { label: 'Owner', color: '#6366F1', icon: 'shield-checkmark' as const };
+      case 'admin': return { label: 'Admin', color: '#8B5CF6', icon: 'shield-half' as const };
+      case 'instructor': return { label: 'Instructor', color: '#EC4899', icon: 'school' as const };
+      case 'attached': return { label: 'Attached', color: '#10B981', icon: 'link' as const };
+      case 'commander': return { label: 'Commander', color: '#F59E0B', icon: 'star' as const };
+      case 'squad_commander': return { label: 'Squad Cmdr', color: '#10B981', icon: 'star-half' as const };
+      case 'soldier': return { label: 'Soldier', color: colors.textMuted, icon: 'person' as const };
+      default: return { label: 'Member', color: colors.textMuted, icon: 'person' as const };
     }
-  };
+  }, [role, colors.textMuted]);
 
-  const config = getRoleConfig();
+  const isSmall = size === 'small';
 
   return (
-    <View style={[styles.roleBadge, { backgroundColor: config.bg }]}>
-      <Ionicons name={config.icon} size={11} color={config.color} />
-      <Text style={[styles.roleBadgeText, { color: config.color }]}>{config.label}</Text>
+    <View style={[styles.roleBadge, { backgroundColor: config.color + '15' }, isSmall && styles.roleBadgeSmall]}>
+      <Ionicons name={config.icon} size={isSmall ? 10 : 11} color={config.color} />
+      <Text style={[styles.roleBadgeText, { color: config.color }, isSmall && styles.roleBadgeTextSmall]}>
+        {config.label}
+      </Text>
     </View>
   );
 });
 
 // ============================================================================
-// TEAM CARD (EXPANDABLE)
+// MEMBER CARD
 // ============================================================================
-const TeamCard = React.memo(function TeamCard({
-  team,
-  colors,
-  onPress,
-  members,
-  onMemberPress,
-  currentUserId,
-}: {
-  team: any;
-  colors: typeof Colors.light;
-  onPress: () => void;
-  members: WorkspaceMemberWithTeams[];
-  onMemberPress: (member: WorkspaceMemberWithTeams) => void;
-  currentUserId?: string | null;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const memberCount = team.member_count || members.length || 0;
-
-  // Filter members for this team
-  const teamMembers = useMemo(() => 
-    members.filter(m => m.teams?.some(t => t.team_id === team.id)),
-    [members, team.id]
-  );
-
-  return (
-    <View style={[styles.teamCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <TouchableOpacity
-        style={styles.teamCardHeader}
-        activeOpacity={0.7}
-        onPress={() => setExpanded(!expanded)}
-      >
-        <View style={[styles.teamIcon, { backgroundColor: '#6366F115' }]}>
-          <Ionicons name="people" size={20} color="#6366F1" />
-        </View>
-
-        <View style={styles.teamInfo}>
-          <Text style={[styles.teamName, { color: colors.text }]}>{team.name}</Text>
-          <View style={styles.teamMeta}>
-            <Text style={[styles.teamMetaText, { color: colors.textMuted }]}>
-              {memberCount} {memberCount === 1 ? 'member' : 'members'}
-            </Text>
-            {team.squads && team.squads.length > 0 && (
-              <>
-                <View style={[styles.teamMetaDot, { backgroundColor: colors.textMuted }]} />
-                <Text style={[styles.teamMetaText, { color: colors.textMuted }]}>
-                  {team.squads.length} squads
-                </Text>
-              </>
-            )}
-          </View>
-        </View>
-
-        <View style={styles.teamCardRight}>
-          <TouchableOpacity
-            style={[styles.teamViewBtn, { backgroundColor: colors.secondary }]}
-            onPress={onPress}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.teamViewBtnText, { color: colors.text }]}>View</Text>
-          </TouchableOpacity>
-          <Ionicons
-            name={expanded ? 'chevron-up' : 'chevron-down'}
-            size={18}
-            color={colors.textMuted}
-          />
-        </View>
-      </TouchableOpacity>
-
-      {expanded && teamMembers.length > 0 && (
-        <View style={[styles.teamMembersList, { borderTopColor: colors.border }]}>
-          {teamMembers.map((member) => {
-            const teamMembership = member.teams?.find(t => t.team_id === team.id);
-            return (
-              <TouchableOpacity
-                key={member.id}
-                style={styles.teamMemberRow}
-                onPress={() => onMemberPress(member)}
-                activeOpacity={0.7}
-              >
-                <BaseAvatar
-                  fallbackText={member.profile_full_name || 'UN'}
-                  size="xs"
-                  role={member.role}
-                />
-                <Text style={[styles.teamMemberName, { color: colors.text }]} numberOfLines={1}>
-                  {member.profile_full_name || 'Unknown'}
-                </Text>
-                {member.member_id === currentUserId && (
-                  <View style={[styles.youBadgeSmall, { backgroundColor: colors.primary }]}>
-                    <Text style={styles.youBadgeSmallText}>You</Text>
-                  </View>
-                )}
-                <RoleBadge role={teamMembership?.team_role || 'member'} colors={colors} />
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
-    </View>
-  );
-});
-
-// ============================================================================
-// STAFF MEMBER CARD (for org-level staff)
-// ============================================================================
-const StaffCard = React.memo(function StaffCard({
+const MemberCard = React.memo(function MemberCard({
   member,
   colors,
   onPress,
   isCurrentUser,
+  showTeamInfo,
 }: {
   member: WorkspaceMemberWithTeams;
   colors: typeof Colors.light;
   onPress: () => void;
   isCurrentUser?: boolean;
+  showTeamInfo?: boolean;
 }) {
   return (
     <TouchableOpacity
       style={[
-        styles.staffCard,
+        styles.memberCard,
         { backgroundColor: colors.card, borderColor: colors.border },
         isCurrentUser && { borderColor: colors.primary },
       ]}
       activeOpacity={0.7}
       onPress={onPress}
     >
-      <BaseAvatar
-        fallbackText={member.profile_full_name || 'UN'}
-        size="sm"
-        role={member.role}
-      />
-      <View style={styles.staffInfo}>
-        <View style={styles.staffNameRow}>
-          <Text style={[styles.staffName, { color: colors.text }]} numberOfLines={1}>
+      <BaseAvatar fallbackText={member.profile_full_name || 'UN'} size="sm" role={member.role} />
+      <View style={styles.memberInfo}>
+        <View style={styles.memberNameRow}>
+          <Text style={[styles.memberName, { color: colors.text }]} numberOfLines={1}>
             {member.profile_full_name || 'Unknown'}
           </Text>
           {isCurrentUser && (
@@ -275,9 +169,14 @@ const StaffCard = React.memo(function StaffCard({
             </View>
           )}
         </View>
-        <Text style={[styles.staffEmail, { color: colors.textMuted }]} numberOfLines={1}>
+        <Text style={[styles.memberEmail, { color: colors.textMuted }]} numberOfLines={1}>
           {member.profile_email}
         </Text>
+        {showTeamInfo && member.teams && member.teams.length > 0 && (
+          <Text style={[styles.memberTeam, { color: colors.textMuted }]} numberOfLines={1}>
+            {member.teams[0].team_role} in {member.teams[0].team_name}
+          </Text>
+        )}
       </View>
       <RoleBadge role={member.role} colors={colors} />
       <Ionicons name="chevron-forward" size={16} color={colors.textMuted} style={{ opacity: 0.4 }} />
@@ -303,11 +202,7 @@ const AttachedCard = React.memo(function AttachedCard({
       activeOpacity={0.7}
       onPress={onPress}
     >
-      <BaseAvatar
-        fallbackText={member.profile_full_name || 'UN'}
-        size="md"
-        role="attached"
-      />
+      <BaseAvatar fallbackText={member.profile_full_name || 'UN'} size="md" role="attached" />
       <View style={styles.attachedInfo}>
         <Text style={[styles.attachedName, { color: colors.text }]} numberOfLines={1}>
           {member.profile_full_name || 'Unknown'}
@@ -328,6 +223,90 @@ const AttachedCard = React.memo(function AttachedCard({
 });
 
 // ============================================================================
+// TEAM CARD (EXPANDABLE)
+// ============================================================================
+const TeamCard = React.memo(function TeamCard({
+  team,
+  colors,
+  onPress,
+  members,
+  onMemberPress,
+  currentUserId,
+}: {
+  team: any;
+  colors: typeof Colors.light;
+  onPress: () => void;
+  members: WorkspaceMemberWithTeams[];
+  onMemberPress: (member: WorkspaceMemberWithTeams) => void;
+  currentUserId?: string | null;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  const teamMembers = useMemo(
+    () => members.filter((m) => m.teams?.some((t) => t.team_id === team.id)),
+    [members, team.id]
+  );
+
+  const memberCount = team.member_count || teamMembers.length || 0;
+
+  return (
+    <View style={[styles.teamCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <TouchableOpacity
+        style={styles.teamCardHeader}
+        activeOpacity={0.7}
+        onPress={() => setExpanded(!expanded)}
+      >
+        <View style={[styles.teamIcon, { backgroundColor: '#F59E0B15' }]}>
+          <Ionicons name="people" size={20} color="#F59E0B" />
+        </View>
+        <View style={styles.teamInfo}>
+          <Text style={[styles.teamName, { color: colors.text }]}>{team.name}</Text>
+          <Text style={[styles.teamMeta, { color: colors.textMuted }]}>
+            {memberCount} {memberCount === 1 ? 'member' : 'members'}
+            {team.squads?.length > 0 && ` · ${team.squads.length} squads`}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={[styles.teamViewBtn, { backgroundColor: colors.secondary }]}
+          onPress={onPress}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.teamViewBtnText, { color: colors.text }]}>Manage</Text>
+        </TouchableOpacity>
+        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textMuted} />
+      </TouchableOpacity>
+
+      {expanded && teamMembers.length > 0 && (
+        <View style={[styles.teamMembersList, { borderTopColor: colors.border }]}>
+          {teamMembers.map((member) => {
+            const teamMembership = member.teams?.find((t) => t.team_id === team.id);
+            return (
+              <TouchableOpacity
+                key={member.id}
+                style={styles.teamMemberRow}
+                onPress={() => onMemberPress(member)}
+                activeOpacity={0.7}
+              >
+                <BaseAvatar fallbackText={member.profile_full_name || 'UN'} size="xs" role={member.role} />
+                <Text style={[styles.teamMemberName, { color: colors.text }]} numberOfLines={1}>
+                  {member.profile_full_name || 'Unknown'}
+                </Text>
+                {member.member_id === currentUserId && (
+                  <View style={[styles.youBadgeSmall, { backgroundColor: colors.primary }]}>
+                    <Text style={styles.youBadgeSmallText}>You</Text>
+                  </View>
+                )}
+                <RoleBadge role={teamMembership?.team_role || 'member'} colors={colors} size="small" />
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+});
+
+// ============================================================================
 // INVITE CARD
 // ============================================================================
 const InviteCard = React.memo(function InviteCard({
@@ -339,13 +318,20 @@ const InviteCard = React.memo(function InviteCard({
 }) {
   const isExpired = new Date(invite.expires_at) < new Date();
   const isAttached = invite.role === 'attached';
+  const roleLabel = isAttached
+    ? 'Attached Member'
+    : invite.team_name
+      ? `${invite.team_role} in ${invite.team_name}`
+      : invite.role;
 
   return (
     <View style={[styles.inviteCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={[
-        styles.inviteIcon,
-        { backgroundColor: isExpired ? colors.red + '15' : isAttached ? '#10B98115' : '#6366F115' }
-      ]}>
+      <View
+        style={[
+          styles.inviteIcon,
+          { backgroundColor: isExpired ? colors.red + '15' : isAttached ? '#10B98115' : '#6366F115' },
+        ]}
+      >
         <Ionicons
           name={isExpired ? 'time-outline' : isAttached ? 'link' : 'ticket-outline'}
           size={14}
@@ -354,9 +340,7 @@ const InviteCard = React.memo(function InviteCard({
       </View>
       <View style={styles.inviteInfo}>
         <Text style={[styles.inviteCode, { color: colors.text }]}>{invite.invite_code}</Text>
-        <Text style={[styles.inviteRole, { color: colors.textMuted }]}>
-          {isAttached ? 'Attached Member' : invite.team_name ? `${invite.team_role} in ${invite.team_name}` : invite.role}
-        </Text>
+        <Text style={[styles.inviteRole, { color: colors.textMuted }]}>{roleLabel}</Text>
       </View>
       {isExpired && (
         <View style={[styles.expiredBadge, { backgroundColor: colors.red + '15' }]}>
@@ -401,6 +385,28 @@ const SectionHeader = React.memo(function SectionHeader({
 });
 
 // ============================================================================
+// INFO BANNER
+// ============================================================================
+const InfoBanner = React.memo(function InfoBanner({
+  icon,
+  iconColor,
+  text,
+  colors,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  iconColor: string;
+  text: string;
+  colors: typeof Colors.light;
+}) {
+  return (
+    <View style={[styles.infoBanner, { backgroundColor: iconColor + '10', borderColor: iconColor + '30' }]}>
+      <Ionicons name={icon} size={18} color={iconColor} />
+      <Text style={[styles.infoBannerText, { color: colors.textMuted }]}>{text}</Text>
+    </View>
+  );
+});
+
+// ============================================================================
 // EMPTY STATE
 // ============================================================================
 const EmptyState = React.memo(function EmptyState({
@@ -423,21 +429,300 @@ const EmptyState = React.memo(function EmptyState({
   return (
     <View style={styles.emptyState}>
       <View style={[styles.emptyIconBox, { backgroundColor: iconColor + '15' }]}>
-        <Ionicons name={icon} size={36} color={iconColor} />
+        <Ionicons name={icon} size={32} color={iconColor} />
       </View>
       <Text style={[styles.emptyTitle, { color: colors.text }]}>{title}</Text>
       <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>{description}</Text>
       {actionLabel && onAction && (
-        <TouchableOpacity
-          style={[styles.emptyAction, { backgroundColor: iconColor }]}
-          onPress={onAction}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="add" size={18} color="#fff" />
+        <TouchableOpacity style={[styles.emptyAction, { backgroundColor: iconColor }]} onPress={onAction} activeOpacity={0.8}>
+          <Ionicons name="add" size={16} color="#fff" />
           <Text style={styles.emptyActionText}>{actionLabel}</Text>
         </TouchableOpacity>
       )}
     </View>
+  );
+});
+
+// ============================================================================
+// TEAM MEMBER VIEW (for soldiers/commanders - their team is their home)
+// ============================================================================
+const TeamMemberView = React.memo(function TeamMemberView({
+  colors,
+  teamInfo,
+  members,
+  currentUserId,
+  onMemberPress,
+}: {
+  colors: typeof Colors.light;
+  teamInfo: { teamId: string; teamName: string; teamRole: string } | null;
+  members: WorkspaceMemberWithTeams[];
+  currentUserId?: string | null;
+  onMemberPress: (member: WorkspaceMemberWithTeams) => void;
+}) {
+  // Filter members for this team
+  const teamMembers = useMemo(
+    () => (teamInfo ? members.filter((m) => m.teams?.some((t) => t.team_id === teamInfo.teamId)) : []),
+    [members, teamInfo]
+  );
+
+  if (!teamInfo) {
+    return (
+      <View style={styles.noTeamContainer}>
+        <Ionicons name="alert-circle-outline" size={48} color={colors.textMuted} />
+        <Text style={[styles.noTeamText, { color: colors.textMuted }]}>You're not assigned to a team yet</Text>
+      </View>
+    );
+  }
+
+  return (
+    <>
+      {/* Team Header */}
+      <View style={[styles.teamHeader, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.teamHeaderIcon, { backgroundColor: '#F59E0B15' }]}>
+          <Ionicons name="people" size={28} color="#F59E0B" />
+        </View>
+        <View style={styles.teamHeaderInfo}>
+          <Text style={[styles.teamHeaderName, { color: colors.text }]}>{teamInfo.teamName}</Text>
+          <Text style={[styles.teamHeaderRole, { color: colors.textMuted }]}>
+            Your role: <Text style={{ color: '#F59E0B', fontWeight: '600' }}>{teamInfo.teamRole}</Text>
+          </Text>
+        </View>
+      </View>
+
+      {/* Team Members */}
+      <SectionHeader title="TEAM MEMBERS" count={teamMembers.length} colors={colors} />
+      {teamMembers.map((member) => {
+        const membership = member.teams?.find((t) => t.team_id === teamInfo.teamId);
+        return (
+          <TouchableOpacity
+            key={member.id}
+            style={[styles.memberCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+            activeOpacity={0.7}
+            onPress={() => onMemberPress(member)}
+          >
+            <BaseAvatar fallbackText={member.profile_full_name || 'UN'} size="sm" role={member.role} />
+            <View style={styles.memberInfo}>
+              <View style={styles.memberNameRow}>
+                <Text style={[styles.memberName, { color: colors.text }]} numberOfLines={1}>
+                  {member.profile_full_name || 'Unknown'}
+                </Text>
+                {member.member_id === currentUserId && (
+                  <View style={[styles.youBadge, { backgroundColor: colors.primary }]}>
+                    <Text style={styles.youBadgeText}>You</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+            <RoleBadge role={membership?.team_role || 'member'} colors={colors} />
+          </TouchableOpacity>
+        );
+      })}
+    </>
+  );
+});
+
+
+// ============================================================================
+// ADMIN VIEW (full access - Staff, Teams, Attached)
+// ============================================================================
+const AdminView = React.memo(function AdminView({
+  colors,
+  activeSection,
+  staffMembers,
+  teamMembers,
+  attachedMembers,
+  teams,
+  invites,
+  currentUserId,
+  onMemberPress,
+  onTeamPress,
+  onInviteStaff,
+  onInviteTeam,
+  onInviteAttached,
+  onCreateTeam,
+  canInvite,
+  canCreateTeam,
+}: {
+  colors: typeof Colors.light;
+  activeSection: ManageSection;
+  staffMembers: WorkspaceMemberWithTeams[];
+  teamMembers: WorkspaceMemberWithTeams[];
+  attachedMembers: WorkspaceMemberWithTeams[];
+  teams: any[];
+  invites: WorkspaceInvitationWithDetails[];
+  currentUserId?: string | null;
+  onMemberPress: (member: WorkspaceMemberWithTeams) => void;
+  onTeamPress: (team: any) => void;
+  onInviteStaff: () => void;
+  onInviteTeam: () => void;
+  onInviteAttached: () => void;
+  onCreateTeam: () => void;
+  canInvite: boolean;
+  canCreateTeam: boolean;
+}) {
+  const staffInvites = invites.filter((i) => ['owner', 'admin', 'instructor'].includes(i.role));
+  const teamInvites = invites.filter((i) => i.team_id && i.role === 'member');
+  const attachedInvites = invites.filter((i) => i.role === 'attached');
+
+  return (
+    <>
+      {/* ========== STAFF SECTION ========== */}
+      {activeSection === 'staff' && (
+        <>
+          <InfoBanner
+            icon="shield"
+            iconColor="#6366F1"
+            text="Staff members have organization-wide access. They can see all teams and members."
+            colors={colors}
+          />
+
+          <SectionHeader
+            title="ORGANIZATION STAFF"
+            count={staffMembers.length}
+            colors={colors}
+            action={canInvite ? { label: '+ Invite Staff', onPress: onInviteStaff } : undefined}
+          />
+
+          {staffMembers.length === 0 ? (
+            <EmptyState
+              icon="shield"
+              iconColor="#6366F1"
+              title="No staff members"
+              description="Invite admins and instructors to help manage your organization"
+              actionLabel={canInvite ? 'Invite Staff' : undefined}
+              onAction={canInvite ? onInviteStaff : undefined}
+              colors={colors}
+            />
+          ) : (
+            staffMembers.map((member) => (
+              <MemberCard
+                key={member.id}
+                member={member}
+                colors={colors}
+                onPress={() => onMemberPress(member)}
+                isCurrentUser={member.member_id === currentUserId}
+              />
+            ))
+          )}
+
+          {staffInvites.length > 0 && (
+            <>
+              <SectionHeader title="PENDING STAFF INVITES" count={staffInvites.length} colors={colors} />
+              {staffInvites.map((invite) => (
+                <InviteCard key={invite.id} invite={invite} colors={colors} />
+              ))}
+            </>
+          )}
+        </>
+      )}
+
+      {/* ========== TEAMS SECTION ========== */}
+      {activeSection === 'teams' && (
+        <>
+          <InfoBanner
+            icon="people"
+            iconColor="#F59E0B"
+            text="Teams organize members into groups with commanders and soldiers. Team members only see their own team."
+            colors={colors}
+          />
+
+          <SectionHeader
+            title="TEAMS"
+            count={teams.length}
+            colors={colors}
+            action={canCreateTeam ? { label: '+ Create Team', onPress: onCreateTeam } : undefined}
+          />
+
+          {teams.length === 0 ? (
+            <EmptyState
+              icon="people"
+              iconColor="#F59E0B"
+              title="No teams yet"
+              description="Create teams to organize members with commanders and soldiers"
+              actionLabel={canCreateTeam ? 'Create Team' : undefined}
+              onAction={canCreateTeam ? onCreateTeam : undefined}
+              colors={colors}
+            />
+          ) : (
+            teams.map((team) => (
+              <TeamCard
+                key={team.id}
+                team={team}
+                colors={colors}
+                onPress={() => onTeamPress(team)}
+                members={teamMembers}
+                onMemberPress={onMemberPress}
+                currentUserId={currentUserId}
+              />
+            ))
+          )}
+
+          {canInvite && (
+            <TouchableOpacity
+              style={[styles.inviteTeamBtn, { borderColor: colors.border }]}
+              onPress={onInviteTeam}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="person-add-outline" size={18} color={colors.primary} />
+              <Text style={[styles.inviteTeamBtnText, { color: colors.primary }]}>Invite Team Member</Text>
+            </TouchableOpacity>
+          )}
+
+          {teamInvites.length > 0 && (
+            <>
+              <SectionHeader title="PENDING TEAM INVITES" count={teamInvites.length} colors={colors} />
+              {teamInvites.map((invite) => (
+                <InviteCard key={invite.id} invite={invite} colors={colors} />
+              ))}
+            </>
+          )}
+        </>
+      )}
+
+      {/* ========== ATTACHED SECTION ========== */}
+      {activeSection === 'attached' && (
+        <>
+          <InfoBanner
+            icon="link"
+            iconColor="#10B981"
+            text="Attached members are external users who log their own sessions. They can't see teams or other members."
+            colors={colors}
+          />
+
+          <SectionHeader
+            title="ATTACHED MEMBERS"
+            count={attachedMembers.length}
+            colors={colors}
+            action={canInvite ? { label: '+ Invite', onPress: onInviteAttached } : undefined}
+          />
+
+          {attachedMembers.length === 0 ? (
+            <EmptyState
+              icon="link"
+              iconColor="#10B981"
+              title="No attached members"
+              description="Invite external users (like range customers) to log sessions linked to your org"
+              actionLabel={canInvite ? 'Invite Attached Member' : undefined}
+              onAction={canInvite ? onInviteAttached : undefined}
+              colors={colors}
+            />
+          ) : (
+            attachedMembers.map((member) => (
+              <AttachedCard key={member.id} member={member} colors={colors} onPress={() => onMemberPress(member)} />
+            ))
+          )}
+
+          {attachedInvites.length > 0 && (
+            <>
+              <SectionHeader title="PENDING INVITES" count={attachedInvites.length} colors={colors} />
+              {attachedInvites.map((invite) => (
+                <InviteCard key={invite.id} invite={invite} colors={colors} />
+              ))}
+            </>
+          )}
+        </>
+      )}
+    </>
   );
 });
 
@@ -449,52 +734,87 @@ const ManageScreen = React.memo(function ManageScreen() {
   const colors = Colors[theme];
   const { activeWorkspace, activeWorkspaceId } = useAppContext();
   const { workspaceMembers, loadWorkspaceMembers, loading: membersLoading } = useWorkspaceStore();
-  const { orgRole, isCommander, currentUserId, loading: roleLoading } = useOrgRole();
+  const { orgRole, isCommander, teamInfo, currentUserId, loading: roleLoading } = useOrgRole();
 
-  const {
-    setSelectedTeam,
-    setSelectedMember,
-    setOnTeamCreated,
-    setOnMemberInvited,
-    setOnInviteAccepted,
-  } = useModals();
+  const { setSelectedTeam, setSelectedMember, setOnTeamCreated, setOnMemberInvited, setOnInviteAccepted } = useModals();
 
-  const [mainView, setMainView] = useState<MainView>('teams');
+  const [activeSection, setActiveSection] = useState<ManageSection>('staff');
   const [teams, setTeams] = useState<any[]>([]);
-  const [pendingInvites, setPendingInvites] = useState<WorkspaceInvitationWithDetails[]>([]);
+  const [invites, setInvites] = useState<WorkspaceInvitationWithDetails[]>([]);
   const [teamsLoading, setTeamsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Get visibility settings from workspace (persisted in database)
+  const showTeams = activeWorkspace?.show_teams_tab ?? true;
+  const showAttached = activeWorkspace?.show_attached_tab ?? true;
+  
+  // Get store action to update settings
+  const { updateWorkspaceSettings } = useWorkspaceStore();
+
+  // Determine user type (attached members never see this screen - they're redirected)
+  const isOrgStaff = ['owner', 'admin', 'instructor'].includes(orgRole);
+  const isTeamMember = !isOrgStaff; // Soldiers, commanders - they see "My Team" view
+  
+  // Check if user can change settings (admin/owner only)
+  const canChangeSettings = orgRole === 'owner' || orgRole === 'admin';
+  
+  // Reset active section if current section is hidden
+  useEffect(() => {
+    if (activeSection === 'teams' && !showTeams) {
+      setActiveSection('staff');
+    } else if (activeSection === 'attached' && !showAttached) {
+      setActiveSection('staff');
+    }
+  }, [showTeams, showAttached, activeSection]);
+  
+  // Handler to toggle settings (saves to database)
+  const handleToggleTeams = useCallback(async () => {
+    if (!canChangeSettings) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await updateWorkspaceSettings({ show_teams_tab: !showTeams });
+    } catch (error) {
+      console.error('Failed to update setting:', error);
+    }
+  }, [canChangeSettings, showTeams, updateWorkspaceSettings]);
+  
+  const handleToggleAttached = useCallback(async () => {
+    if (!canChangeSettings) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await updateWorkspaceSettings({ show_attached_tab: !showAttached });
+    } catch (error) {
+      console.error('Failed to update setting:', error);
+    }
+  }, [canChangeSettings, showAttached, updateWorkspaceSettings]);
 
   // Permissions
-  const isAdmin = orgRole === 'owner' || orgRole === 'admin';
-  const canInvite = isAdmin || isCommander;
-  const canCreateTeam = isAdmin;
-  const canSeeInvites = isAdmin || isCommander;
+  const canInvite = isOrgStaff || isCommander;
+  const canCreateTeam = ['owner', 'admin'].includes(orgRole);
+  const canSeeInvites = isOrgStaff || isCommander;
 
   // Load teams
   const loadTeams = useCallback(async () => {
     if (!activeWorkspaceId) return;
     setTeamsLoading(true);
     try {
-      const teamsData = await getWorkspaceTeams(activeWorkspaceId);
-      setTeams(teamsData || []);
-    } catch (error) {
-      console.error('Failed to load teams:', error);
-      setTeams([]);
+      const data = await getWorkspaceTeams(activeWorkspaceId);
+      setTeams(data || []);
+    } catch (e) {
+      console.error('Failed to load teams:', e);
     } finally {
       setTeamsLoading(false);
     }
   }, [activeWorkspaceId]);
 
   // Load invites
-  const loadPendingInvites = useCallback(async () => {
+  const loadInvites = useCallback(async () => {
     if (!activeWorkspaceId || !canSeeInvites) return;
     try {
-      const invites = await getPendingInvitations(activeWorkspaceId);
-      setPendingInvites(invites);
-    } catch (error) {
-      console.error('Failed to load invites:', error);
-      setPendingInvites([]);
+      const data = await getPendingInvitations(activeWorkspaceId);
+      setInvites(data);
+    } catch (e) {
+      console.error('Failed to load invites:', e);
     }
   }, [activeWorkspaceId, canSeeInvites]);
 
@@ -502,15 +822,15 @@ const ManageScreen = React.memo(function ManageScreen() {
     if (activeWorkspaceId) {
       loadWorkspaceMembers();
       loadTeams();
-      if (canSeeInvites) loadPendingInvites();
+      if (canSeeInvites) loadInvites();
     }
-  }, [activeWorkspaceId, loadWorkspaceMembers, loadTeams, loadPendingInvites, canSeeInvites]);
+  }, [activeWorkspaceId, loadWorkspaceMembers, loadTeams, loadInvites, canSeeInvites]);
 
   useEffect(() => {
     setOnTeamCreated(() => loadTeams);
     setOnMemberInvited(() => () => {
       loadWorkspaceMembers();
-      loadPendingInvites();
+      loadInvites();
     });
     setOnInviteAccepted(() => loadWorkspaceMembers);
     return () => {
@@ -518,28 +838,29 @@ const ManageScreen = React.memo(function ManageScreen() {
       setOnMemberInvited(null);
       setOnInviteAccepted(null);
     };
-  }, [loadTeams, loadWorkspaceMembers, loadPendingInvites, setOnTeamCreated, setOnMemberInvited, setOnInviteAccepted]);
+  }, [loadTeams, loadWorkspaceMembers, loadInvites, setOnTeamCreated, setOnMemberInvited, setOnInviteAccepted]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await Promise.all([
-      loadWorkspaceMembers(),
-      loadTeams(),
-      canSeeInvites ? loadPendingInvites() : Promise.resolve(),
-    ]);
+    await Promise.all([loadWorkspaceMembers(), loadTeams(), canSeeInvites ? loadInvites() : Promise.resolve()]);
     setRefreshing(false);
-  }, [loadWorkspaceMembers, loadTeams, loadPendingInvites, canSeeInvites]);
+  }, [loadWorkspaceMembers, loadTeams, loadInvites, canSeeInvites]);
 
-  // Actions
-  const handleInviteTeamMember = useCallback(() => {
+  // Actions - Separate invite sheets for each type
+  const handleInviteStaff = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push('/(protected)/inviteMembers' as any);
+    router.push('/(protected)/inviteStaff' as any);
+  }, []);
+
+  const handleInviteTeam = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push('/(protected)/inviteTeamMember' as any);
   }, []);
 
   const handleInviteAttached = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push('/(protected)/inviteMembers?type=attached' as any);
+    router.push('/(protected)/inviteAttached' as any);
   }, []);
 
   const handleCreateTeam = useCallback(() => {
@@ -547,17 +868,23 @@ const ManageScreen = React.memo(function ManageScreen() {
     router.push('/(protected)/createTeam' as any);
   }, []);
 
-  const handleTeamPress = useCallback((team: any) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSelectedTeam(team);
-    router.push('/(protected)/teamPreview' as any);
-  }, [setSelectedTeam]);
+  const handleTeamPress = useCallback(
+    (team: any) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setSelectedTeam(team);
+      router.push('/(protected)/teamPreview' as any);
+    },
+    [setSelectedTeam]
+  );
 
-  const handleMemberPress = useCallback((member: WorkspaceMemberWithTeams) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSelectedMember(member);
-    router.push('/(protected)/memberPreview' as any);
-  }, [setSelectedMember]);
+  const handleMemberPress = useCallback(
+    (member: WorkspaceMemberWithTeams) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setSelectedMember(member);
+      router.push('/(protected)/memberPreview' as any);
+    },
+    [setSelectedMember]
+  );
 
   // Categorize members
   const { staffMembers, teamMembers, attachedMembers } = useMemo(() => {
@@ -566,37 +893,17 @@ const ManageScreen = React.memo(function ManageScreen() {
     const attached: WorkspaceMemberWithTeams[] = [];
 
     workspaceMembers.forEach((m) => {
-      if (m.role === 'attached') {
-        attached.push(m);
-      } else if (['owner', 'admin', 'instructor'].includes(m.role)) {
-        staff.push(m);
-      } else {
-        team.push(m);
-      }
+      if (m.role === 'attached') attached.push(m);
+      else if (['owner', 'admin', 'instructor'].includes(m.role)) staff.push(m);
+      else team.push(m);
     });
 
     return { staffMembers: staff, teamMembers: team, attachedMembers: attached };
   }, [workspaceMembers]);
 
-  // Categorize invites
-  const { teamInvites, attachedInvites } = useMemo(() => {
-    const teamInv: WorkspaceInvitationWithDetails[] = [];
-    const attachedInv: WorkspaceInvitationWithDetails[] = [];
-
-    pendingInvites.forEach((inv) => {
-      if (inv.role === 'attached') {
-        attachedInv.push(inv);
-      } else {
-        teamInv.push(inv);
-      }
-    });
-
-    return { teamInvites: teamInv, attachedInvites: attachedInv };
-  }, [pendingInvites]);
-
   const isLoading = membersLoading || teamsLoading || roleLoading;
 
-  if (isLoading && !refreshing && workspaceMembers.length === 0 && teams.length === 0) {
+  if (isLoading && !refreshing && workspaceMembers.length === 0) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ThemedStatusBar />
@@ -608,27 +915,65 @@ const ManageScreen = React.memo(function ManageScreen() {
     );
   }
 
+  // Determine header title based on view
+  const getHeaderTitle = () => {
+    if (isTeamMember) return 'My Team';
+    return 'Manage';
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ThemedStatusBar />
 
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Manage</Text>
-        <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
-          {activeWorkspace?.workspace_name ?? 'Workspace'}
-        </Text>
+        <View style={styles.headerLeft}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{getHeaderTitle()}</Text>
+          <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
+            {activeWorkspace?.workspace_name ?? 'Workspace'}
+          </Text>
+        </View>
+        
+        {/* Visibility Options Dropdown - Only for admin/owner on iOS */}
+        {canChangeSettings && Platform.OS === 'ios' && (
+          <Host style={styles.dropdownHost}>
+            <ContextMenu>
+              <ContextMenu.Items>
+                <Button
+                  systemImage={showTeams ? 'checkmark.circle.fill' : 'circle'}
+                  onPress={handleToggleTeams}
+                >
+                  {showTeams ? 'Hide Teams' : 'Show Teams'}
+                </Button>
+                <Button
+                  systemImage={showAttached ? 'checkmark.circle.fill' : 'circle'}
+                  onPress={handleToggleAttached}
+                >
+                  {showAttached ? 'Hide Attached' : 'Show Attached'}
+                </Button>
+              </ContextMenu.Items>
+              <ContextMenu.Trigger>
+                <Button variant="borderless" systemImage="line.3.horizontal.decrease.circle">
+                  View
+                </Button>
+              </ContextMenu.Trigger>
+            </ContextMenu>
+          </Host>
+        )}
       </View>
 
-      {/* View Toggle */}
-      {isAdmin && (
-        <View style={styles.toggleContainer}>
-          <ViewToggle
-            activeView={mainView}
-            onViewChange={setMainView}
-            teamCount={teams.length}
+      {/* Section Tabs (only for org staff) */}
+      {isOrgStaff && (
+        <View style={styles.tabsContainer}>
+          <SectionTabs
+            activeSection={activeSection}
+            onSectionChange={setActiveSection}
+            staffCount={staffMembers.length}
             attachedCount={attachedMembers.length}
+            teamCount={teams.length}
             colors={colors}
+            showTeams={showTeams}
+            showAttached={showAttached}
           />
         </View>
       )}
@@ -638,132 +983,39 @@ const ManageScreen = React.memo(function ManageScreen() {
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />}
       >
-        {/* ============================================================ */}
-        {/* TEAMS VIEW */}
-        {/* ============================================================ */}
-        {(mainView === 'teams' || !isAdmin) && (
-          <>
-            {/* Staff Members Section */}
-            {staffMembers.length > 0 && (
-              <>
-                <SectionHeader
-                  title="ORGANIZATION STAFF"
-                  count={staffMembers.length}
-                  colors={colors}
-                  action={canInvite ? { label: '+ Invite', onPress: handleInviteTeamMember } : undefined}
-                />
-                {staffMembers.map((member) => (
-                  <StaffCard
-                    key={member.id}
-                    member={member}
-                    colors={colors}
-                    onPress={() => handleMemberPress(member)}
-                    isCurrentUser={member.member_id === currentUserId}
-                  />
-                ))}
-              </>
-            )}
-
-            {/* Teams Section */}
-            <SectionHeader
-              title="TEAMS"
-              count={teams.length}
-              colors={colors}
-              action={canCreateTeam ? { label: '+ Create', onPress: handleCreateTeam } : undefined}
-            />
-
-            {teams.length === 0 ? (
-              <EmptyState
-                icon="people"
-                iconColor="#6366F1"
-                title="No teams yet"
-                description="Create teams to organize your members into groups with commanders and soldiers"
-                actionLabel={canCreateTeam ? "Create First Team" : undefined}
-                onAction={canCreateTeam ? handleCreateTeam : undefined}
-                colors={colors}
-              />
-            ) : (
-              teams.map((team) => (
-                <TeamCard
-                  key={team.id}
-                  team={team}
-                  colors={colors}
-                  onPress={() => handleTeamPress(team)}
-                  members={teamMembers}
-                  onMemberPress={handleMemberPress}
-                  currentUserId={currentUserId}
-                />
-              ))
-            )}
-
-            {/* Team Invites */}
-            {canSeeInvites && teamInvites.length > 0 && (
-              <>
-                <SectionHeader title="PENDING TEAM INVITES" count={teamInvites.length} colors={colors} />
-                {teamInvites.map((invite) => (
-                  <InviteCard key={invite.id} invite={invite} colors={colors} />
-                ))}
-              </>
-            )}
-          </>
+        {/* TEAM MEMBER VIEW - Their team is their home */}
+        {isTeamMember && (
+          <TeamMemberView
+            colors={colors}
+            teamInfo={teamInfo}
+            members={teamMembers}
+            currentUserId={currentUserId}
+            onMemberPress={handleMemberPress}
+          />
         )}
 
-        {/* ============================================================ */}
-        {/* ATTACHED VIEW */}
-        {/* ============================================================ */}
-        {mainView === 'attached' && isAdmin && (
-          <>
-            {/* Info Banner */}
-            <View style={[styles.infoBanner, { backgroundColor: '#10B98110', borderColor: '#10B98130' }]}>
-              <Ionicons name="information-circle" size={20} color="#10B981" />
-              <Text style={[styles.infoBannerText, { color: colors.textMuted }]}>
-                Attached members are external users (like range customers) who can log their own personal sessions linked to your organization. They cannot see teams or other members.
-              </Text>
-            </View>
-
-            {/* Attached Members */}
-            <SectionHeader
-              title="ATTACHED MEMBERS"
-              count={attachedMembers.length}
-              colors={colors}
-              action={canInvite ? { label: '+ Invite', onPress: handleInviteAttached } : undefined}
-            />
-
-            {attachedMembers.length === 0 ? (
-              <EmptyState
-                icon="link"
-                iconColor="#10B981"
-                title="No attached members"
-                description="Invite external users who can log their own sessions without being part of your team structure"
-                actionLabel="Invite Attached Member"
-                onAction={handleInviteAttached}
-                colors={colors}
-              />
-            ) : (
-              attachedMembers.map((member) => (
-                <AttachedCard
-                  key={member.id}
-                  member={member}
-                  colors={colors}
-                  onPress={() => handleMemberPress(member)}
-                />
-              ))
-            )}
-
-            {/* Attached Invites */}
-            {attachedInvites.length > 0 && (
-              <>
-                <SectionHeader title="PENDING INVITES" count={attachedInvites.length} colors={colors} />
-                {attachedInvites.map((invite) => (
-                  <InviteCard key={invite.id} invite={invite} colors={colors} />
-                ))}
-              </>
-            )}
-          </>
+        {/* ADMIN VIEW - Full management (attached members never see this screen) */}
+        {isOrgStaff && (
+          <AdminView
+            colors={colors}
+            activeSection={activeSection}
+            staffMembers={staffMembers}
+            teamMembers={teamMembers}
+            attachedMembers={attachedMembers}
+            teams={teams}
+            invites={invites}
+            currentUserId={currentUserId}
+            onMemberPress={handleMemberPress}
+            onTeamPress={handleTeamPress}
+            onInviteStaff={handleInviteStaff}
+            onInviteTeam={handleInviteTeam}
+            onInviteAttached={handleInviteAttached}
+            onCreateTeam={handleCreateTeam}
+            canInvite={canInvite}
+            canCreateTeam={canCreateTeam}
+          />
         )}
 
         <View style={{ height: 120 }} />
@@ -778,377 +1030,129 @@ export default ManageScreen;
 // STYLES
 // ============================================================================
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 14,
-  },
+  container: { flex: 1 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
+  loadingText: { fontSize: 14 },
 
   // Header
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingTop: Platform.OS === 'ios' ? 16 : 20,
     paddingHorizontal: 20,
     paddingBottom: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
-  headerSubtitle: {
-    fontSize: 15,
-    marginTop: 4,
-  },
+  headerLeft: { flex: 1 },
+  headerTitle: { fontSize: 32, fontWeight: '700', letterSpacing: -0.5 },
+  headerSubtitle: { fontSize: 15, marginTop: 4 },
+  dropdownHost: { width: 80, height: 40, marginLeft: 12 },
 
-  // Toggle Container
-  toggleContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-
-  // View Toggle
-  viewToggle: {
-    flexDirection: 'row',
-    borderRadius: 16,
-    padding: 4,
-  },
-  viewToggleItem: {
+  // Tabs
+  tabsContainer: { paddingHorizontal: 16, paddingVertical: 12 },
+  sectionTabs: { flexDirection: 'row', borderRadius: 14, padding: 4, gap: 2 },
+  sectionTab: {
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    gap: 10,
-  },
-  viewToggleDivider: {
-    width: 1,
-    marginVertical: 8,
-  },
-  viewToggleIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    gap: 6,
   },
-  viewToggleText: {
-    flex: 1,
-  },
-  viewToggleLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  viewToggleCount: {
-    fontSize: 12,
-    marginTop: 1,
-  },
+  sectionTabIcon: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  sectionTabLabel: { fontSize: 13, fontWeight: '600' },
+  sectionTabBadge: { minWidth: 20, height: 18, paddingHorizontal: 6, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  sectionTabBadgeText: { fontSize: 11, fontWeight: '600' },
 
   // Content
-  content: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 16,
-  },
+  content: { flex: 1 },
+  contentContainer: { padding: 16 },
 
   // Section Header
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 12,
-  },
-  sectionHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  sectionBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  sectionBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  sectionAction: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 12 },
+  sectionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sectionTitle: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5 },
+  sectionBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
+  sectionBadgeText: { fontSize: 11, fontWeight: '600' },
+  sectionAction: { fontSize: 13, fontWeight: '600' },
 
   // Info Banner
-  infoBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 12,
-    marginBottom: 8,
-  },
-  infoBannerText: {
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 18,
-  },
+  infoBanner: { flexDirection: 'row', alignItems: 'flex-start', padding: 14, borderRadius: 12, borderWidth: 1, gap: 12, marginBottom: 8 },
+  infoBannerText: { flex: 1, fontSize: 13, lineHeight: 18 },
 
-  // Staff Card
-  staffCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    marginBottom: 8,
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    gap: 12,
-  },
-  staffInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  staffNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  staffName: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  staffEmail: {
-    fontSize: 12,
-  },
-
-  // Team Card
-  teamCard: {
-    marginBottom: 10,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
-  },
-  teamCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    gap: 12,
-  },
-  teamIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  teamInfo: {
-    flex: 1,
-    gap: 4,
-  },
-  teamName: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  teamMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  teamMetaText: {
-    fontSize: 13,
-  },
-  teamMetaDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-  },
-  teamCardRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  teamViewBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  teamViewBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  teamMembersList: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-  },
-  teamMemberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    gap: 10,
-  },
-  teamMemberName: {
-    flex: 1,
-    fontSize: 14,
-  },
+  // Member Card
+  memberCard: { flexDirection: 'row', alignItems: 'center', padding: 12, marginBottom: 8, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, gap: 12 },
+  memberInfo: { flex: 1, gap: 2 },
+  memberNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  memberName: { fontSize: 15, fontWeight: '600' },
+  memberEmail: { fontSize: 12 },
+  memberTeam: { fontSize: 11, marginTop: 2 },
 
   // Attached Card
-  attachedCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    marginBottom: 10,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    gap: 14,
-  },
-  attachedInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  attachedName: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  attachedEmail: {
-    fontSize: 13,
-  },
-  attachedMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
-  },
-  attachedMetaText: {
-    fontSize: 11,
-  },
+  attachedCard: { flexDirection: 'row', alignItems: 'center', padding: 14, marginBottom: 10, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, gap: 14 },
+  attachedInfo: { flex: 1, gap: 2 },
+  attachedName: { fontSize: 16, fontWeight: '600' },
+  attachedEmail: { fontSize: 13 },
+  attachedMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  attachedMetaText: { fontSize: 11 },
+
+  // Team Card
+  teamCard: { marginBottom: 10, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  teamCardHeader: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
+  teamIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  teamInfo: { flex: 1, gap: 2 },
+  teamName: { fontSize: 16, fontWeight: '600' },
+  teamMeta: { fontSize: 13 },
+  teamViewBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  teamViewBtnText: { fontSize: 13, fontWeight: '600' },
+  teamMembersList: { borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 8, paddingHorizontal: 14 },
+  teamMemberRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 10 },
+  teamMemberName: { flex: 1, fontSize: 14 },
+
+  // Team Header (for team member view)
+  teamHeader: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, gap: 14, marginBottom: 8 },
+  teamHeaderIcon: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  teamHeaderInfo: { flex: 1, gap: 4 },
+  teamHeaderName: { fontSize: 20, fontWeight: '700' },
+  teamHeaderRole: { fontSize: 14 },
+
+  // Invite Button
+  inviteTeamBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, marginTop: 8, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', gap: 8 },
+  inviteTeamBtnText: { fontSize: 14, fontWeight: '600' },
 
   // Invite Card
-  inviteCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    marginBottom: 6,
-    borderRadius: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-    gap: 10,
-  },
-  inviteIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  inviteInfo: {
-    flex: 1,
-    gap: 1,
-  },
-  inviteCode: {
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  },
-  inviteRole: {
-    fontSize: 11,
-  },
-  expiredBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  expiredBadgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
+  inviteCard: { flexDirection: 'row', alignItems: 'center', padding: 12, marginBottom: 6, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, gap: 10 },
+  inviteIcon: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  inviteInfo: { flex: 1, gap: 1 },
+  inviteCode: { fontSize: 14, fontWeight: '600', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  inviteRole: { fontSize: 11 },
+  expiredBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  expiredBadgeText: { fontSize: 10, fontWeight: '600' },
 
   // Role Badge
-  roleBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4,
-  },
-  roleBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
+  roleBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, gap: 4 },
+  roleBadgeSmall: { paddingHorizontal: 6, paddingVertical: 3 },
+  roleBadgeText: { fontSize: 11, fontWeight: '600' },
+  roleBadgeTextSmall: { fontSize: 10 },
 
   // You Badge
-  youBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  youBadgeText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  youBadgeSmall: {
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  youBadgeSmallText: {
-    fontSize: 8,
-    fontWeight: '700',
-    color: '#fff',
-  },
+  youBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  youBadgeText: { fontSize: 9, fontWeight: '700', color: '#fff' },
+  youBadgeSmall: { paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
+  youBadgeSmallText: { fontSize: 8, fontWeight: '700', color: '#fff' },
+
+  // No Team
+  noTeamContainer: { alignItems: 'center', paddingVertical: 60, gap: 12 },
+  noTeamText: { fontSize: 15 },
 
   // Empty State
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: 32,
-  },
-  emptyIconBox: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptyDesc: {
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 24,
-  },
-  emptyAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    gap: 6,
-  },
-  emptyActionText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#fff',
-  },
+  emptyState: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 32 },
+  emptyIconBox: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  emptyTitle: { fontSize: 17, fontWeight: '600', marginBottom: 6, textAlign: 'center' },
+  emptyDesc: { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
+  emptyAction: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 18, borderRadius: 12, gap: 6 },
+  emptyActionText: { fontSize: 14, fontWeight: '600', color: '#fff' },
 });

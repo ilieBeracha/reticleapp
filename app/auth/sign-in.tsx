@@ -5,7 +5,7 @@ import { View } from "react-native";
 export default function SignInPage() {
   const colors = useColors();
   return (
-    <View style={{backgroundColor: colors.background, flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+    <View style={{ backgroundColor: colors.background, flex: 1 }}>
       <SignIn />
     </View>
   );

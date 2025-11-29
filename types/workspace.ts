@@ -21,6 +21,10 @@ export interface Workspace {
   
   // Access info
   access_role: WorkspaceRole;
+  
+  // View settings (admin/owner controlled)
+  show_teams_tab: boolean;
+  show_attached_tab: boolean;
 }
 
 // Organization workspace (user-created)
@@ -32,6 +36,16 @@ export interface OrgWorkspace {
   created_by: string;
   created_at: string;
   updated_at: string;
+  
+  // View settings
+  show_teams_tab: boolean;
+  show_attached_tab: boolean;
+}
+
+// Settings update input
+export interface OrgWorkspaceSettings {
+  show_teams_tab?: boolean;
+  show_attached_tab?: boolean;
 }
 
 export interface WorkspaceAccess {

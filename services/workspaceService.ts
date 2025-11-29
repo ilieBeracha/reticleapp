@@ -5,6 +5,7 @@
 
 import { supabase } from "@/lib/supabase";
 import type {
+  OrgWorkspaceSettings,
   TeamMemberShip,
   TeamMembership,
   Workspace,
@@ -48,6 +49,9 @@ export async function getAccessibleWorkspaces(): Promise<Workspace[]> {
       created_at: access.org_workspace.created_at,
       updated_at: access.org_workspace.updated_at,
       access_role: access.role,
+      // View settings
+      show_teams_tab: access.org_workspace.show_teams_tab ?? true,
+      show_attached_tab: access.org_workspace.show_attached_tab ?? true,
     }));
 
   return workspaces;
@@ -79,7 +83,29 @@ export async function createOrgWorkspace(input: {
     created_at: orgWorkspace.created_at,
     updated_at: orgWorkspace.created_at,
     access_role: 'owner',
+    show_teams_tab: true,
+    show_attached_tab: true,
   };
+}
+
+/**
+ * Update organization workspace settings (admin/owner only)
+ * RLS policy ensures only admin/owner can update
+ */
+export async function updateOrgWorkspaceSettings(
+  orgWorkspaceId: string,
+  settings: OrgWorkspaceSettings
+): Promise<void> {
+  const { error } = await supabase
+    .from("org_workspaces")
+    .update({
+      ...(settings.show_teams_tab !== undefined && { show_teams_tab: settings.show_teams_tab }),
+      ...(settings.show_attached_tab !== undefined && { show_attached_tab: settings.show_attached_tab }),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", orgWorkspaceId);
+
+  if (error) throw error;
 }
 
 

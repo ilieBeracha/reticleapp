@@ -103,7 +103,7 @@ export default function AcceptInviteSheet() {
               useWorkspaceStore.getState().setIsSwitching(true);
               useWorkspaceStore.getState().setActiveWorkspace(validatedInvite.org_workspace_id);
               setTimeout(() => {
-                router.replace('/(protected)/org' as any);
+                router.replace('/(protected)/org');
                 setTimeout(() => {
                   useWorkspaceStore.getState().setIsSwitching(false);
                 }, 300);
