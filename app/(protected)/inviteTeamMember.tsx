@@ -21,7 +21,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 // ============================================================================
 // CONFIGURATIONS
@@ -121,7 +120,6 @@ const RoleCard = React.memo(function RoleCard({
 // ============================================================================
 export default function InviteTeamMemberSheet() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const { activeWorkspaceId, activeWorkspace } = useAppContext();
   const { teams } = useWorkspaceData();
   const permissions = useWorkspacePermissions();
@@ -272,28 +270,25 @@ export default function InviteTeamMemberSheet() {
 
   if (teams.length === 0) {
     return (
-      <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
-        <View style={styles.grabberSpacer} />
-        <View style={styles.emptyContainer}>
-          <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
-            <Ionicons name="people-outline" size={48} color={colors.textMuted} />
-          </View>
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>No Teams</Text>
-          <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
-            Create a team first before inviting team members.
-          </Text>
-          <TouchableOpacity
-            style={[styles.emptyButton, { backgroundColor: colors.primary }]}
-            onPress={() => {
-              router.back();
-              setTimeout(() => router.push('/(protected)/createTeam' as any), 100);
-            }}
-          >
-            <Ionicons name="add" size={20} color="#fff" />
-            <Text style={styles.emptyButtonText}>Create Team</Text>
-          </TouchableOpacity>
+      <View style={[styles.emptyContainer, { backgroundColor: colors.card }]}>
+        <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
+          <Ionicons name="people-outline" size={48} color={colors.textMuted} />
         </View>
-      </SafeAreaView>
+        <Text style={[styles.emptyTitle, { color: colors.text }]}>No Teams</Text>
+        <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
+          Create a team first before inviting team members.
+        </Text>
+        <TouchableOpacity
+          style={[styles.emptyButton, { backgroundColor: colors.primary }]}
+          onPress={() => {
+            router.back();
+            setTimeout(() => router.push('/(protected)/createTeam' as any), 100);
+          }}
+        >
+          <Ionicons name="add" size={20} color="#fff" />
+          <Text style={styles.emptyButtonText}>Create Team</Text>
+        </TouchableOpacity>
+      </View>
     );
   }
 
@@ -317,32 +312,24 @@ export default function InviteTeamMemberSheet() {
   }
 
   return (
-    <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
-      <View style={styles.grabberSpacer} />
-
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+      <View style={styles.headerSection}>
         <View style={[styles.headerIcon, { backgroundColor: '#F59E0B15' }]}>
-          <Ionicons name="people" size={24} color="#F59E0B" />
+          <Ionicons name="people" size={28} color="#F59E0B" />
         </View>
-        <View style={styles.headerText}>
-          <Text style={[styles.title, { color: colors.text }]}>Invite Team Member</Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            {activeWorkspace?.workspace_name}
-          </Text>
-        </View>
-        <View style={[styles.stepBadge, { backgroundColor: colors.secondary }]}>
-          <Text style={[styles.stepBadgeText, { color: colors.textMuted }]}>{step + 1}/{totalSteps}</Text>
-        </View>
+        <Text style={[styles.title, { color: colors.text }]}>Invite Team Member</Text>
+        <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+          {activeWorkspace?.workspace_name}
+        </Text>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <StepIndicator currentStep={step} totalSteps={totalSteps} colors={colors} />
+      <StepIndicator currentStep={step} totalSteps={totalSteps} colors={colors} />
 
         {/* STEP 0: Select Team */}
         {step === 0 && (
@@ -371,9 +358,11 @@ export default function InviteTeamMemberSheet() {
                   </View>
                   <View style={styles.teamInfo}>
                     <Text style={[styles.teamName, { color: colors.text }]}>{team.name}</Text>
-                    <Text style={[styles.teamMeta, { color: colors.textMuted }]}>
-                      {team.member_count || 0} members
-                    </Text>
+                    {team.description && (
+                      <Text style={[styles.teamMeta, { color: colors.textMuted }]} numberOfLines={1}>
+                        {team.description}
+                      </Text>
+                    )}
                   </View>
                   {selectedTeamId === team.id && (
                     <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
@@ -547,14 +536,13 @@ export default function InviteTeamMemberSheet() {
             </View>
           </View>
         )}
-      </ScrollView>
 
-      {/* Footer Buttons */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 16, borderTopColor: colors.border }]}>
-        <View style={styles.footerButtons}>
+        {/* Action Buttons */}
+        <View style={styles.actions}>
           {step > 0 && (
             <TouchableOpacity style={[styles.backButton, { backgroundColor: colors.secondary }]} onPress={handleBack} activeOpacity={0.8}>
               <Ionicons name="arrow-back" size={18} color={colors.text} />
+              <Text style={[styles.backButtonText, { color: colors.text }]}>Back</Text>
             </TouchableOpacity>
           )}
 
@@ -581,8 +569,7 @@ export default function InviteTeamMemberSheet() {
             </TouchableOpacity>
           )}
         </View>
-      </View>
-    </SafeAreaView>
+      </ScrollView>
   );
 }
 
@@ -590,27 +577,19 @@ export default function InviteTeamMemberSheet() {
 // STYLES
 // ============================================================================
 const styles = StyleSheet.create({
-  sheet: { flex: 1 },
-  grabberSpacer: { height: 12 },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 20 },
 
-  header: {
-    flexDirection: 'row',
+  headerSection: {
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 14,
+    paddingTop: 24,
+    paddingBottom: 20,
   },
-  headerIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  headerText: { flex: 1 },
-  title: { fontSize: 22, fontWeight: '700', letterSpacing: -0.3 },
-  subtitle: { fontSize: 14, marginTop: 2 },
-  stepBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-  stepBadgeText: { fontSize: 13, fontWeight: '600' },
+  headerIcon: { width: 64, height: 64, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  title: { fontSize: 22, fontWeight: '700', letterSpacing: -0.3, marginBottom: 6 },
+  subtitle: { fontSize: 14, textAlign: 'center' },
 
-  stepIndicator: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginVertical: 20 },
+  stepIndicator: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginBottom: 20 },
   stepDot: { height: 6, borderRadius: 3 },
 
   stepContent: { marginBottom: 16 },
@@ -663,13 +642,13 @@ const styles = StyleSheet.create({
   infoBanner: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 10, borderWidth: 1, marginTop: 16, gap: 10 },
   infoBannerText: { flex: 1, fontSize: 13, lineHeight: 18 },
 
-  // Footer
-  footer: { paddingHorizontal: 20, paddingTop: 16, borderTopWidth: StyleSheet.hairlineWidth },
-  footerButtons: { flexDirection: 'row', gap: 10 },
-  backButton: { width: 50, height: 54, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  nextButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 54, borderRadius: 14, gap: 8 },
+  // Actions
+  actions: { flexDirection: 'row', gap: 10, marginTop: 24 },
+  backButton: { flex: 1, flexDirection: 'row', height: 54, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 6 },
+  backButtonText: { fontSize: 15, fontWeight: '600' },
+  nextButton: { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 54, borderRadius: 14, gap: 8 },
   nextButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
-  createButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 54, borderRadius: 14, gap: 10 },
+  createButton: { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 54, borderRadius: 14, gap: 10 },
   createButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
 
   // Empty State

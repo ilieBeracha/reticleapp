@@ -5,7 +5,6 @@ import { useColors } from "@/hooks/ui/useColors";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from 'expo-haptics';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 /**
  * MEMBER PREVIEW - Native Form Sheet
@@ -18,12 +17,9 @@ export default function MemberPreviewSheet() {
 
   if (!member) {
     return (
-      <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
-        <View style={styles.grabberSpacer} />
-        <View style={styles.emptyContainer}>
-          <Text style={[styles.emptyText, { color: colors.textMuted }]}>No member selected</Text>
-        </View>
-      </SafeAreaView>
+      <View style={[styles.emptyContainer, { backgroundColor: colors.card }]}>
+        <Text style={[styles.emptyText, { color: colors.textMuted }]}>No member selected</Text>
+      </View>
     );
   }
 
@@ -52,14 +48,11 @@ export default function MemberPreviewSheet() {
   };
 
   return (
-    <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
-      <View style={styles.grabberSpacer} />
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
         {/* Header */}
         <View style={styles.header}>
           <BaseAvatar fallbackText={member.profile_full_name || 'UN'} size="lg" role={member.role} />
@@ -128,14 +121,11 @@ export default function MemberPreviewSheet() {
         {isOwner && (
           <Text style={[styles.ownerNote, { color: colors.textMuted }]}>Workspace owners cannot be edited or removed</Text>
         )}
-      </ScrollView>
-    </SafeAreaView>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  sheet: { flex: 1 },
-  grabberSpacer: { height: 12 },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 40, gap: 24 },
 

@@ -15,7 +15,6 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Squad templates
 const SQUAD_TEMPLATES = [
@@ -29,7 +28,6 @@ const SQUAD_TEMPLATES = [
  */
 export default function CreateTeamSheet() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const { activeWorkspaceId } = useAppContext();
   const { createTeam, loadTeams, loading } = useTeamStore();
 
@@ -64,18 +62,18 @@ export default function CreateTeamSheet() {
       });
 
       // Refresh teams list immediately
-      await loadTeams(activeWorkspaceId);
-
+      
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
+      
       Alert.alert("✓ Team Created", `"${teamName}" is ready to go!`, [
-        {
-          text: "OK",
-          onPress: () => {
-            if (router.canGoBack()) router.back();
-          },
-        },
-      ]);
+          {
+              text: "OK",
+              onPress: () => {
+                  if (router.canGoBack()) router.back();
+                },
+            },
+        ]);
+    await loadTeams(activeWorkspaceId);
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert("Error", error.message || "Failed to create team");
@@ -107,15 +105,12 @@ export default function CreateTeamSheet() {
   }, []);
 
   return (
-    <SafeAreaView style={[styles.sheet]} edges={['bottom']}>
-      <View style={styles.grabberSpacer} />
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
         {/* Header */}
         <View style={styles.header}>
           <View style={[styles.headerIcon, { backgroundColor: colors.primary + '15' }]}>
@@ -282,14 +277,11 @@ export default function CreateTeamSheet() {
             </>
           )}
         </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  sheet: { flex: 1 },
-  grabberSpacer: { height: 12 },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 20 },
 

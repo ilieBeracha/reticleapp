@@ -23,7 +23,7 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface DrillFormData extends CreateDrillInput {
   id: string;
@@ -299,45 +299,36 @@ export default function CreateTrainingSheet() {
   // ========== NOT IN ORG MODE ==========
   if (!isInOrgMode) {
     return (
-      <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
-        <View style={styles.grabberSpacer} />
-        <View style={styles.notAvailable}>
-          <View style={[styles.notAvailableIcon, { backgroundColor: colors.secondary }]}>
-            <Ionicons name="business-outline" size={32} color={colors.textMuted} />
-          </View>
-          <Text style={[styles.notAvailableTitle, { color: colors.text }]}>Organization Required</Text>
-          <Text style={[styles.notAvailableText, { color: colors.textMuted }]}>
-            Switch to an organization workspace to schedule trainings
-          </Text>
+      <View style={[styles.notAvailable, { backgroundColor: colors.card }]}>
+        <View style={[styles.notAvailableIcon, { backgroundColor: colors.secondary }]}>
+          <Ionicons name="business-outline" size={32} color={colors.textMuted} />
         </View>
-      </SafeAreaView>
+        <Text style={[styles.notAvailableTitle, { color: colors.text }]}>Organization Required</Text>
+        <Text style={[styles.notAvailableText, { color: colors.textMuted }]}>
+          Switch to an organization workspace to schedule trainings
+        </Text>
+      </View>
     );
   }
 
   // ========== RENDER ==========
   return (
-    <SafeAreaView style={[styles.sheet]}>
-      <View style={styles.grabberSpacer} />
-
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
       {/* Header */}
-      <View style={[styles.headerContainer, { borderBottomColor: colors.border }]}>
-        <View style={styles.headerContent}>
-          <Text style={[styles.title, { color: colors.text }]}>Schedule Training</Text>
-          <View style={[styles.stepBadge, { backgroundColor: colors.secondary }]}>
-            <Text style={[styles.stepBadgeText, { color: colors.textMuted }]}>{step + 1}/{totalSteps}</Text>
-          </View>
+      <View style={styles.headerSection}>
+        <View style={[styles.headerIcon, { backgroundColor: colors.primary + '15' }]}>
+          <Ionicons name="calendar" size={28} color={colors.primary} />
         </View>
+        <Text style={[styles.title, { color: colors.text }]}>Schedule Training</Text>
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>
           {step === 0 ? 'Set up your training session' : 'Add drills & review'}
         </Text>
       </View>
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
         {/* Step Indicator */}
         <StepIndicator currentStep={step} totalSteps={totalSteps} colors={colors} />
 
@@ -549,7 +540,6 @@ export default function CreateTrainingSheet() {
             </TouchableOpacity>
           )}
         </View>
-      </ScrollView>
 
       {/* Date/Time Picker Modal */}
       <Modal
@@ -616,7 +606,7 @@ export default function CreateTrainingSheet() {
           </Pressable>
         </Pressable>
       </Modal>
-    </SafeAreaView>
+    </ScrollView>
   );
 }
 
@@ -624,40 +614,32 @@ export default function CreateTrainingSheet() {
 // STYLES
 // ============================================================================
 const styles = StyleSheet.create({
-  sheet: { flex: 1 },
-  grabberSpacer: { height: 12 },
   scrollView: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 16 },
+  scrollContent: { paddingHorizontal: 20 },
 
-  // Header (like workspaceSwitcher)
-  headerContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  headerContent: {
-    flexDirection: 'row',
+  // Header
+  headerSection: {
     alignItems: 'center',
-    gap: 10,
+    paddingTop: 24,
+    paddingBottom: 20,
+  },
+  headerIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
   },
   title: {
     fontSize: 22,
     fontWeight: '700',
     letterSpacing: -0.3,
-  },
-  stepBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  stepBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
+    marginBottom: 6,
   },
   subtitle: {
     fontSize: 14,
-    marginTop: 6,
+    textAlign: 'center',
   },
 
   // Step Indicator

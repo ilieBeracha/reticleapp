@@ -10,8 +10,6 @@ import {
     ActivityIndicator,
     Alert,
     Keyboard,
-    KeyboardAvoidingView,
-    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -19,7 +17,6 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 /**
  * CREATE WORKSPACE - Native Form Sheet
@@ -33,7 +30,6 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
  */
 export default function CreateWorkspaceSheet() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ isFirst?: string }>();
   const { workspaces } = useAppContext();
   
@@ -103,62 +99,51 @@ export default function CreateWorkspaceSheet() {
   // Success state
   if (step === 'success' && createdWorkspace) {
     return (
-      <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
-        <View style={styles.grabberSpacer} />
-        
-        <View style={styles.successContainer}>
-          <View style={[styles.successIcon, { backgroundColor: colors.primary + '15' }]}>
-            <Ionicons name="checkmark-circle" size={48} color={colors.primary} />
-          </View>
-          
-          <Text style={[styles.successTitle, { color: colors.text }]}>
-            You're all set!
-          </Text>
-          
-          <Text style={[styles.successSubtitle, { color: colors.textMuted }]}>
-            <Text style={{ fontWeight: '600', color: colors.text }}>{createdWorkspace.name}</Text>
-            {' '}is ready. You can invite team members anytime.
-          </Text>
-          
-          <View style={styles.successActions}>
-            <TouchableOpacity
-              style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
-              onPress={handleOpenWorkspace}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="arrow-forward" size={20} color="#fff" />
-              <Text style={styles.primaryBtnText}>Open Workspace</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.secondaryBtn, { borderColor: colors.border }]}
-              onPress={handleStayHere}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.secondaryBtnText, { color: colors.textMuted }]}>
-                Stay in Personal Mode
-              </Text>
-            </TouchableOpacity>
-          </View>
+      <View style={[styles.successContainer, { backgroundColor: colors.card }]}>
+        <View style={[styles.successIcon, { backgroundColor: colors.primary + '15' }]}>
+          <Ionicons name="checkmark-circle" size={48} color={colors.primary} />
         </View>
-      </SafeAreaView>
+        
+        <Text style={[styles.successTitle, { color: colors.text }]}>
+          You're all set!
+        </Text>
+        
+        <Text style={[styles.successSubtitle, { color: colors.textMuted }]}>
+          <Text style={{ fontWeight: '600', color: colors.text }}>{createdWorkspace.name}</Text>
+          {' '}is ready. You can invite team members anytime.
+        </Text>
+        
+        <View style={styles.successActions}>
+          <TouchableOpacity
+            style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
+            onPress={handleOpenWorkspace}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="arrow-forward" size={20} color="#fff" />
+            <Text style={styles.primaryBtnText}>Open Workspace</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.secondaryBtn, { borderColor: colors.border }]}
+            onPress={handleStayHere}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.secondaryBtnText, { color: colors.textMuted }]}>
+              Stay in Personal Mode
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
-      <View style={styles.grabberSpacer} />
-      
-      <KeyboardAvoidingView 
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView 
-          style={styles.scrollView}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
+    <ScrollView 
+      style={styles.scrollView}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
           {/* Header */}
           <View style={styles.header}>
             <View style={[styles.headerIcon, { backgroundColor: colors.primary + '12' }]}>
@@ -259,29 +244,13 @@ export default function CreateWorkspaceSheet() {
           >
             <Text style={[styles.cancelBtnText, { color: colors.textMuted }]}>Cancel</Text>
           </TouchableOpacity>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  sheet: {
-    flex: 1,
-  },
-  flex: {
-    flex: 1,
-  },
-  grabberSpacer: {
-    height: 12,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-  },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingHorizontal: 24 },
 
   // Header
   header: {

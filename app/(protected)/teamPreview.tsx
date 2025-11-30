@@ -2,7 +2,6 @@ import { useModals } from "@/contexts/ModalContext";
 import { useColors } from "@/hooks/ui/useColors";
 import { Ionicons } from "@expo/vector-icons";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 /**
  * TEAM PREVIEW - Native Form Sheet
@@ -15,24 +14,18 @@ export default function TeamPreviewSheet() {
 
   if (!team) {
     return (
-      <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
-        <View style={styles.grabberSpacer} />
-        <View style={styles.emptyContainer}>
-          <Text style={[styles.emptyText, { color: colors.textMuted }]}>No team selected</Text>
-        </View>
-      </SafeAreaView>
+      <View style={[styles.emptyContainer, { backgroundColor: colors.card }]}>
+        <Text style={[styles.emptyText, { color: colors.textMuted }]}>No team selected</Text>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
-      <View style={styles.grabberSpacer} />
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
         {/* Header */}
         <View style={styles.header}>
           <View style={[styles.iconBox, { backgroundColor: colors.secondary }]}>
@@ -69,14 +62,11 @@ export default function TeamPreviewSheet() {
             <Text style={[styles.emptyText, { color: colors.textMuted }]}>No squads defined</Text>
           )}
         </View>
-      </ScrollView>
-    </SafeAreaView>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  sheet: { flex: 1 },
-  grabberSpacer: { height: 12 },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 40, gap: 24 },
 

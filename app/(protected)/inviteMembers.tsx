@@ -21,7 +21,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 // ============================================================================
 // CONFIGURATIONS
@@ -202,7 +201,6 @@ const PendingInviteRow = React.memo(function PendingInviteRow({
 // ============================================================================
 export default function InviteMembersSheet() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const { activeWorkspaceId, activeWorkspace } = useAppContext();
   const { teams } = useWorkspaceData();
   const permissions = useWorkspacePermissions();
@@ -414,11 +412,14 @@ export default function InviteMembersSheet() {
   };
 
   return (
-    <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
-      <View style={styles.grabberSpacer} />
-
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
       {/* Header */}
-      <View style={[styles.headerContainer, { borderBottomColor: colors.border }]}>
+      <View style={styles.headerSection}>
         <View style={styles.headerContent}>
           <Text style={[styles.title, { color: colors.text }]}>Invite Member</Text>
           <View style={[styles.stepBadge, { backgroundColor: colors.secondary }]}>
@@ -430,13 +431,7 @@ export default function InviteMembersSheet() {
         </Text>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <StepIndicator currentStep={step} totalSteps={totalSteps} colors={colors} />
+      <StepIndicator currentStep={step} totalSteps={totalSteps} colors={colors} />
 
         {/* STEP 0: Choose Type & Team */}
         {step === 0 && (
@@ -756,8 +751,7 @@ export default function InviteMembersSheet() {
             )}
           </View>
         )}
-      </ScrollView>
-    </SafeAreaView>
+    </ScrollView>
   );
 }
 
@@ -765,12 +759,10 @@ export default function InviteMembersSheet() {
 // STYLES
 // ============================================================================
 const styles = StyleSheet.create({
-  sheet: { flex: 1 },
-  grabberSpacer: { height: 12 },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 20 },
 
-  headerContainer: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  headerSection: { paddingTop: 16, paddingBottom: 12 },
   headerContent: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   title: { fontSize: 22, fontWeight: '700', letterSpacing: -0.3 },
   stepBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },

@@ -12,7 +12,6 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 /**
  * WORKSPACE SWITCHER - Native Form Sheet
@@ -23,7 +22,6 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
  */
 export default function WorkspaceSwitcherSheet() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const { userId, activeWorkspaceId, workspaces, loading } = useAppContext();
 
   const groupedWorkspaces = useMemo(() => {
@@ -71,42 +69,44 @@ export default function WorkspaceSwitcherSheet() {
   }, []);
 
   return (
-    <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
-      <View style={styles.grabberSpacer} />
-      
+    <ScrollView 
+      style={styles.scrollView}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
       {/* Header */}
-      <View style={[styles.headerContainer, { borderBottomColor: colors.border }]}>
-        <View style={styles.headerContent}>
-          <Text style={[styles.title, { color: colors.text }]}>Workspaces</Text>
-          <View style={[styles.countBadge, { backgroundColor: colors.secondary }]}>
-            <Text style={[styles.countText, { color: colors.text }]}>{workspaces.length}</Text>
+      <View style={styles.headerSection}>
+        <View style={styles.headerTop}>
+          <View style={[styles.headerIcon, { backgroundColor: colors.primary + '15' }]}>
+            <Ionicons name="business" size={24} color={colors.primary} />
+          </View>
+          <View style={styles.headerTitleRow}>
+            <Text style={[styles.title, { color: colors.text }]}>Workspaces</Text>
+            <View style={[styles.countBadge, { backgroundColor: colors.secondary }]}>
+              <Text style={[styles.countText, { color: colors.text }]}>{workspaces.length}</Text>
+            </View>
           </View>
         </View>
         
         <View style={styles.headerActions}>
           <TouchableOpacity
-            style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+            style={[styles.actionBtn, { backgroundColor: colors.secondary }]}
             onPress={handleJoinWorkspace}
             activeOpacity={0.7}
           >
             <Ionicons name="enter-outline" size={18} color={colors.primary} />
+            <Text style={[styles.actionBtnText, { color: colors.text }]}>Join</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.iconBtn, styles.primaryBtn, { backgroundColor: colors.primary }]}
+            style={[styles.actionBtn, { backgroundColor: colors.primary }]}
             onPress={handleCreateWorkspace}
             activeOpacity={0.7}
           >
-            <Ionicons name="add" size={20} color="#fff" />
+            <Ionicons name="add" size={18} color="#fff" />
+            <Text style={[styles.actionBtnText, { color: '#fff' }]}>Create</Text>
           </TouchableOpacity>
         </View>
       </View>
-
-      {/* Content */}
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
-        showsVerticalScrollIndicator={false}
-      >
         {/* Personal Mode */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>PERSONAL</Text>
@@ -169,8 +169,7 @@ export default function WorkspaceSwitcherSheet() {
             </Text>
           </View>
         )}
-      </ScrollView>
-    </SafeAreaView>
+    </ScrollView>
   );
 }
 
@@ -232,25 +231,34 @@ const WorkspaceRow = React.memo(function WorkspaceRow({
 });
 
 const styles = StyleSheet.create({
-  sheet: {
+  scrollView: {
     flex: 1,
   },
-  grabberSpacer: {
-    height: 12,
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerContent: {
+  headerSection: {
+    paddingTop: 24,
+    paddingBottom: 20,
+    gap: 16,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  headerIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    flex: 1,
   },
   title: {
     fontSize: 22,
@@ -268,25 +276,20 @@ const styles = StyleSheet.create({
   },
   headerActions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
   },
-  iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    height: 44,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    gap: 6,
   },
-  primaryBtn: {
-    borderWidth: 0,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
+  actionBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   section: {
     marginBottom: 24,

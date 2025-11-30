@@ -4,11 +4,11 @@ import { getTrainingSessions, SessionWithDetails } from "@/services/sessionServi
 import { cancelTraining, finishTraining, getTrainingById, startTraining } from "@/services/trainingService";
 import type { TrainingDrill, TrainingStatus, TrainingWithDetails } from "@/types/workspace";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import * as Haptics from 'expo-haptics';
 import { router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Status configs
 function getStatusConfig(status: TrainingStatus) {
@@ -86,7 +86,6 @@ const DrillCard = ({ drill, index, colors }: { drill: TrainingDrill; index: numb
  */
 export default function TrainingDetailSheet() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const { selectedTraining: initialTraining, getOnTrainingUpdated } = useModals();
 
   const [training, setTraining] = useState<TrainingWithDetails | null>(initialTraining);
@@ -123,11 +122,14 @@ export default function TrainingDetailSheet() {
     }
   }, []);
 
-  useEffect(() => {
-    if (initialTraining?.id) {
-      fetchTraining(initialTraining.id);
-    }
-  }, [initialTraining?.id, fetchTraining]);
+  // Reload data every time screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (initialTraining?.id) {
+        fetchTraining(initialTraining.id);
+      }
+    }, [initialTraining?.id, fetchTraining])
+  );
 
   const handleStartTraining = useCallback(async () => {
     if (!training) return;
@@ -204,12 +206,9 @@ export default function TrainingDetailSheet() {
 
   if (loading || !training) {
     return (
-      <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
-        <View style={styles.grabberSpacer} />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      </SafeAreaView>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.card }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
     );
   }
 
@@ -217,14 +216,11 @@ export default function TrainingDetailSheet() {
   const drills = training.drills || [];
 
   return (
-    <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
-      <View style={styles.grabberSpacer} />
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
-        showsVerticalScrollIndicator={false}
-      >
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
         {/* Header */}
         <View style={styles.header}>
           <View style={[styles.statusBadge, { backgroundColor: statusConfig.bg }]}>
@@ -346,17 +342,14 @@ export default function TrainingDetailSheet() {
             <Text style={[styles.creatorLabel, { color: colors.textMuted }]}>Created by {training.creator.full_name || 'Unknown'}</Text>
           </View>
         )}
-      </ScrollView>
-    </SafeAreaView>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  sheet: { flex: 1 },
-  grabberSpacer: { height: 12 },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 20 },
-  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
+  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   header: { paddingTop: 8, paddingBottom: 20, alignItems: 'center' },
   statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginBottom: 12 },

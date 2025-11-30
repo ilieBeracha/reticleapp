@@ -1,8 +1,10 @@
 import { useColors } from '@/hooks/ui/useColors';
 import { SessionWithDetails } from '@/services/sessionService';
 import { Ionicons } from '@expo/vector-icons';
-import { memo, useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
+import { memo, useCallback, useMemo } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 function formatDateTime(value?: string | null) {
   if (!value) return 'In progress';
@@ -46,8 +48,16 @@ const OrgSessionCard = memo(({ session, isFirst, isLast }: OrgSessionCardProps) 
     { backgroundColor: statusColor.bg }
   ], [statusColor.bg]);
 
+  const handlePress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push({
+      pathname: '/(protected)/sessionDetail',
+      params: { sessionId: session.id },
+    });
+  }, [session.id]);
+
   return (
-    <View style={cardStyle}>
+    <TouchableOpacity style={cardStyle} onPress={handlePress} activeOpacity={0.7}>
       <View style={styles.sessionHeader}>
         <View style={styles.sessionLeft}>
           <View style={[styles.sessionIcon, { backgroundColor: '#5B7A8C15' }]}>
@@ -85,7 +95,7 @@ const OrgSessionCard = memo(({ session, isFirst, isLast }: OrgSessionCardProps) 
           </View>
         )}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 });
 

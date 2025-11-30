@@ -17,7 +17,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 /**
  * ACCEPT INVITE SHEET - Native Form Sheet
@@ -31,7 +30,6 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
  */
 export default function AcceptInviteSheet() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   
   const [inviteCode, setInviteCode] = useState("");
   const [validatedInvite, setValidatedInvite] = useState<WorkspaceInvitationWithDetails | null>(null);
@@ -201,42 +199,33 @@ export default function AcceptInviteSheet() {
   }
 
   return (
-    <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
-      {/* Native grabber takes ~20pt, add spacing */}
-      <View style={styles.grabberSpacer} />
-      
-      {/* Fixed Header */}
-      <View style={[styles.headerContainer, { borderBottomColor: colors.border }]}>
-        <View style={styles.headerContent}>
-          <View style={[styles.headerIcon, { backgroundColor: colors.primary + '15' }]}>
-            <Ionicons name="enter" size={20} color={colors.primary} />
-          </View>
-          <View>
-            <Text style={[styles.title, { color: colors.text }]}>Join Workspace</Text>
-            <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-              {validatedInvite ? 'Review invitation' : 'Enter invite code'}
-            </Text>
-          </View>
+    <ScrollView 
+      style={styles.scrollView}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
+      {/* Header */}
+      <View style={styles.headerSection}>
+        <View style={[styles.headerIcon, { backgroundColor: colors.primary + '15' }]}>
+          <Ionicons name="enter" size={28} color={colors.primary} />
         </View>
+        <Text style={[styles.title, { color: colors.text }]}>Join Workspace</Text>
+        <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+          {validatedInvite ? 'Review invitation' : 'Enter invite code to get started'}
+        </Text>
         
         {validatedInvite && (
           <TouchableOpacity
-            style={[styles.resetBtn, { backgroundColor: colors.secondary }]}
+            style={[styles.resetBtn, { backgroundColor: colors.secondary, marginTop: 12 }]}
             onPress={handleReset}
             activeOpacity={0.7}
           >
             <Ionicons name="refresh" size={16} color={colors.text} />
+            <Text style={[styles.resetBtnText, { color: colors.text }]}>Enter Different Code</Text>
           </TouchableOpacity>
         )}
       </View>
-
-      {/* Scrollable Content */}
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
         {!validatedInvite ? (
           // Step 1: Enter and Validate Code
           <>
@@ -385,67 +374,55 @@ export default function AcceptInviteSheet() {
             </View>
           </>
         )}
-      </ScrollView>
-    </SafeAreaView>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  sheet: {
-    flex: 1,
-  },
-  
-  grabberSpacer: {
-    height: 12,
-  },
-
-  // Header
-  headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  headerIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
-  subtitle: {
-    fontSize: 13,
-    fontWeight: '400',
-    marginTop: 1,
-  },
-  resetBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
   // Scroll
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 20,
+  },
+
+  // Header
+  headerSection: {
+    alignItems: 'center',
+    paddingTop: 24,
+    paddingBottom: 20,
+  },
+  headerIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    marginBottom: 6,
+  },
+  subtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  resetBtn: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  resetBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 
   // Input Card

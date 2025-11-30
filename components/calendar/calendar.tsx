@@ -32,8 +32,9 @@ const CalendarScreen = React.memo(function CalendarScreen() {
 
   useEffect(() => {
     const mappedEvents: CalendarEvent[] = sessions.map((session: SessionWithDetails) => {
-      const title =
-        session.session_data?.name || (session.team_name ? `${session.team_name} Session` : 'Training Session');
+      // Build title from training or team name
+      const title = session.training_title 
+        || (session.team_name ? `${session.team_name} Session` : 'Training Session');
 
       return {
         id: session.id,

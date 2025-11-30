@@ -5,14 +5,15 @@ import { useOrgRole } from '@/contexts/OrgRoleContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAppContext } from '@/hooks/useAppContext';
 import { getWorkspaceSessions, type SessionWithDetails } from '@/services/sessionService';
-import { getWorkspaceTeams } from '@/services/teamService';
-import { getUpcomingTrainings } from '@/services/trainingService';
+import { useTeamStore } from '@/store/teamStore';
+import { useTrainingStore } from '@/store/trainingStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
-import type { Team, TrainingWithDetails, WorkspaceMemberWithTeams } from '@/types/workspace';
+import type { TrainingWithDetails, WorkspaceMemberWithTeams } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -215,9 +216,9 @@ export const OrganizationHomePage = React.memo(function OrganizationHomePage() {
   const { activeWorkspace, activeWorkspaceId } = useAppContext();
   const { orgRole, hasTeam, teamInfo, isCommander, currentUserId } = useOrgRole();
   const { workspaceMembers, loadWorkspaceMembers } = useWorkspaceStore();
+  const { orgTrainings: trainings, loadOrgTrainings, loadingOrgTrainings } = useTrainingStore();
+  const { teams, loadTeams } = useTeamStore();
 
-  const [teams, setTeams] = useState<(Team & { member_count?: number })[]>([]);
-  const [trainings, setTrainings] = useState<TrainingWithDetails[]>([]);
   const [sessions, setSessions] = useState<SessionWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -233,36 +234,39 @@ export const OrganizationHomePage = React.memo(function OrganizationHomePage() {
   const loadData = useCallback(async () => {
     if (!activeWorkspaceId) return;
     try {
-      const [teamsData, trainingsData, sessionsData] = await Promise.all([
-        !isAttached ? getWorkspaceTeams(activeWorkspaceId) : Promise.resolve([]),
-        getUpcomingTrainings(activeWorkspaceId, 5),
+      const [sessionsData] = await Promise.all([
         getWorkspaceSessions(activeWorkspaceId),
+        !isAttached ? loadTeams(activeWorkspaceId) : Promise.resolve(),
+        loadOrgTrainings(activeWorkspaceId), // Uses store
       ]);
-      setTeams(teamsData || []);
-      setTrainings(trainingsData || []);
       setSessions(sessionsData || []);
     } catch (error) {
       console.error('Failed to load org data:', error);
     } finally {
       setLoading(false);
     }
-  }, [activeWorkspaceId, isAttached]);
+  }, [activeWorkspaceId, isAttached, loadOrgTrainings, loadTeams]);
 
-  useEffect(() => {
-    if (activeWorkspaceId) {
-      loadData();
-      loadWorkspaceMembers();
-    }
-  }, [activeWorkspaceId, loadData, loadWorkspaceMembers]);
+  // Reload data every time screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (activeWorkspaceId) {
+        loadData();
+        loadOrgTrainings(activeWorkspaceId);
+        loadTeams(activeWorkspaceId);
+        loadWorkspaceMembers();
+      }
+    }, [activeWorkspaceId, loadData, loadWorkspaceMembers])
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await Promise.all([loadData(), loadWorkspaceMembers()]);
+     await Promise.all([loadData(), loadWorkspaceMembers(), activeWorkspaceId && loadOrgTrainings(activeWorkspaceId)]);
     setRefreshing(false);
-  }, [loadData, loadWorkspaceMembers]);
+  }, [loadData, loadWorkspaceMembers, loadOrgTrainings, activeWorkspaceId]);
 
-  // Computed data
+  // Computed dataxsS
   const recentSessions = useMemo(() => sessions.slice(0, 4), [sessions]);
   const completedCount = useMemo(() => sessions.filter(s => s.status === 'completed').length, [sessions]);
   
@@ -294,14 +298,17 @@ export const OrganizationHomePage = React.memo(function OrganizationHomePage() {
   // Navigation
   const nav = useMemo(() => ({
     createTraining: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/(protected)/createTraining' as any); },
-    createSession: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/(protected)/createSession' as any); },
+    createSession: () => { loadData(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/(protected)/createSession' as any); },
     viewTrainings: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(protected)/org/trainings' as any); },
     viewManage: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(protected)/org/manage' as any); },
     inviteToTeam: () => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       router.push(teamInfo?.teamId ? `/(protected)/inviteTeamMember?teamId=${teamInfo.teamId}` as any : '/(protected)/inviteTeamMember' as any);
     },
-    trainingDetail: (id: string) => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/(protected)/trainingDetail?id=${id}` as any); },
+    trainingLive: (id: string) => { 
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); 
+      router.push(`/(protected)/trainingLive?trainingId=${id}` as any); 
+    },
     memberPreview: (id: string) => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/(protected)/memberPreview?id=${id}` as any); },
   }), [teamInfo]);
 
@@ -390,7 +397,7 @@ export const OrganizationHomePage = React.memo(function OrganizationHomePage() {
             {trainings.slice(0, 3).map((t, i) => (
               <React.Fragment key={t.id}>
                 {i > 0 && <Divider colors={colors} />}
-                <TrainingItem training={t} colors={colors} onPress={() => nav.trainingDetail(t.id)} />
+                <TrainingItem training={t} colors={colors} onPress={() => nav.trainingLive(t.id)} />
               </React.Fragment>
             ))}
           </Section>

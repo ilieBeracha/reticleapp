@@ -13,7 +13,6 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 /**
  * USER MENU - Native Form Sheet
@@ -22,7 +21,6 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
  */
 export default function UserMenuSheet() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const { user, signOut } = useAuth();
 
   const avatarUri = user?.user_metadata?.avatar_url;
@@ -66,14 +64,11 @@ export default function UserMenuSheet() {
   }, []);
 
   return (
-    <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
-      <View style={styles.grabberSpacer} />
-      
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
-        showsVerticalScrollIndicator={false}
-      >
+    <ScrollView 
+      style={styles.scrollView}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
         {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.text }]}>Account</Text>
@@ -126,8 +121,7 @@ export default function UserMenuSheet() {
             destructive
           />
         </View>
-      </ScrollView>
-    </SafeAreaView>
+    </ScrollView>
   );
 }
 
@@ -167,12 +161,6 @@ function MenuItem({
 }
 
 const styles = StyleSheet.create({
-  sheet: {
-    flex: 1,
-  },
-  grabberSpacer: {
-    height: 12,
-  },
   scrollView: {
     flex: 1,
   },

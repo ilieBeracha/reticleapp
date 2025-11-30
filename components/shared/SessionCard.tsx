@@ -1,8 +1,10 @@
 import { useColors } from '@/hooks/ui/useColors';
 import { SessionWithDetails } from '@/services/sessionService';
 import { Ionicons } from '@expo/vector-icons';
-import { memo, useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
+import { memo, useCallback, useMemo } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 function formatDateTime(value?: string | null) {
   if (!value) {
@@ -63,11 +65,8 @@ interface SessionCardProps {
 
 const SessionCard = memo(({ session }: SessionCardProps) => {
   const colors = useColors();
-  
-  const sessionPayload = session.session_data as Record<string, any> | null;
-  const environment = sessionPayload?.environment ?? null;
 
-  // Get training info from actual fields (not session_data)
+  // Get training info from actual fields
   const hasTraining = !!session.training_id;
   const trainingTitle = session.training_title;
   const drillName = session.drill_name;
@@ -84,8 +83,20 @@ const SessionCard = memo(({ session }: SessionCardProps) => {
 
   const duration = formatDuration(session.started_at, session.ended_at);
 
+  const handlePress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push({
+      pathname: '/(protected)/sessionDetail',
+      params: { sessionId: session.id },
+    });
+  }, [session.id]);
+
   return (
-    <View style={[styles.sessionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <TouchableOpacity 
+      style={[styles.sessionCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+      onPress={handlePress}
+      activeOpacity={0.7}
+    >
       {/* Header Row */}
       <View style={styles.sessionHeader}>
         <View style={styles.headerLeft}>
@@ -152,36 +163,7 @@ const SessionCard = memo(({ session }: SessionCardProps) => {
         )}
       </View>
 
-      {/* Environment Info (collapsed by default) */}
-      {environment && Object.keys(environment).filter(k => k !== 'notes').length > 0 && (
-        <View style={[styles.environmentSection, { borderTopColor: colors.border }]}>
-          <View style={styles.environmentHeader}>
-            <Ionicons name="cloud-outline" size={14} color={colors.textMuted} />
-            <Text style={[styles.environmentLabel, { color: colors.textMuted }]}>
-              Environment
-            </Text>
-          </View>
-          <View style={styles.environmentTags}>
-            {Object.entries(environment)
-              .filter(([key]) => key !== 'notes')
-              .map(([key, value]) => (
-                <View key={key} style={[styles.envTag, { backgroundColor: colors.secondary }]}>
-                  <Text style={[styles.envTagText, { color: colors.text }]}>
-                    {String(value)}
-                  </Text>
-                </View>
-              ))}
-          </View>
-        </View>
-      )}
-
-      {/* Notes */}
-      {environment?.notes && (
-        <Text style={[styles.notes, { color: colors.textMuted }]} numberOfLines={2}>
-          {environment.notes}
-        </Text>
-      )}
-    </View>
+    </TouchableOpacity>
   );
 });
 
@@ -270,41 +252,6 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 13,
-  },
-  environmentSection: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  environmentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
-  },
-  environmentLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  environmentTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  envTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  envTagText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  notes: {
-    marginTop: 10,
-    fontSize: 13,
-    fontStyle: 'italic',
-    lineHeight: 18,
   },
 });
 

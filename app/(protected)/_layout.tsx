@@ -272,6 +272,58 @@ export default function ProtectedLayout() {
             sheetLargestUndimmedDetentIndex: -1,
         }}
       />
+        
+        {/* Active Session - Full screen */}
+        <Stack.Screen
+          name="activeSession"
+          options={{
+            headerShown: false,
+            presentation: "card",
+            gestureEnabled: false,
+            contentStyle: { backgroundColor: colors.background },
+          }}
+        />
+        
+        {/* Training Live Dashboard - Full screen */}
+        <Stack.Screen
+          name="trainingLive"
+          options={{
+            headerShown: false,
+            presentation: "card",
+            gestureEnabled: false,
+            contentStyle: { backgroundColor: "#0A0A0A" },
+          }}
+        />
+        
+        {/* Add Target - Sheet */}
+        <Stack.Screen
+          name="addTarget"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: false,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.85, 0.95],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+          }}
+        />
+
+        {/* Session Detail - Sheet */}
+        <Stack.Screen
+          name="sessionDetail"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: "#0a0a0a" },
+            sheetAllowedDetents: [0.9, 1],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+          }}
+        />
       </Stack>
     </ThemeProvider>
   );

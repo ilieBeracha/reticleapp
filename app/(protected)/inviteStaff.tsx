@@ -16,7 +16,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 // ============================================================================
 // STAFF ROLES
@@ -39,7 +38,6 @@ const STAFF_ROLES: RoleConfig[] = [
 // ============================================================================
 export default function InviteStaffSheet() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const { activeWorkspaceId, activeWorkspace } = useAppContext();
 
   const [selectedRole, setSelectedRole] = useState<WorkspaceRole>('instructor');
@@ -90,27 +88,21 @@ export default function InviteStaffSheet() {
   }
 
   return (
-    <SafeAreaView style={[styles.sheet, { backgroundColor: colors.card }]} edges={['bottom']}>
-      <View style={styles.grabberSpacer} />
-
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+      <View style={styles.headerSection}>
         <View style={[styles.headerIcon, { backgroundColor: '#6366F115' }]}>
-          <Ionicons name="shield" size={24} color="#6366F1" />
+          <Ionicons name="shield" size={28} color="#6366F1" />
         </View>
-        <View style={styles.headerText}>
-          <Text style={[styles.title, { color: colors.text }]}>Invite Staff</Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            {activeWorkspace?.workspace_name}
-          </Text>
-        </View>
+        <Text style={[styles.title, { color: colors.text }]}>Invite Staff</Text>
+        <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+          {activeWorkspace?.workspace_name}
+        </Text>
       </View>
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
-        showsVerticalScrollIndicator={false}
-      >
         {/* Info Banner */}
         <View style={[styles.infoBanner, { backgroundColor: '#6366F110', borderColor: '#6366F130' }]}>
           <Ionicons name="information-circle" size={18} color="#6366F1" />
@@ -159,32 +151,29 @@ export default function InviteStaffSheet() {
               </Text>
             </View>
           </View>
-          <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Expires</Text>
-            <Text style={[styles.summaryValue, { color: colors.text }]}>7 days</Text>
-          </View>
+        <View style={styles.summaryRow}>
+          <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Expires</Text>
+          <Text style={[styles.summaryValue, { color: colors.text }]}>7 days</Text>
         </View>
-      </ScrollView>
+      </View>
 
       {/* Action Button */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 16, borderTopColor: colors.border }]}>
-        <TouchableOpacity
-          style={[styles.createButton, { backgroundColor: isCreating ? colors.muted : '#6366F1' }]}
-          onPress={handleCreateInvite}
-          disabled={isCreating}
-          activeOpacity={0.8}
-        >
-          {isCreating ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <>
-              <Ionicons name="ticket" size={20} color="#fff" />
-              <Text style={styles.createButtonText}>Generate Invite Code</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+      <TouchableOpacity
+        style={[styles.createButton, { backgroundColor: isCreating ? colors.muted : '#6366F1', marginTop: 8 }]}
+        onPress={handleCreateInvite}
+        disabled={isCreating}
+        activeOpacity={0.8}
+      >
+        {isCreating ? (
+          <ActivityIndicator color="#fff" size="small" />
+        ) : (
+          <>
+            <Ionicons name="ticket" size={20} color="#fff" />
+            <Text style={styles.createButtonText}>Generate Invite Code</Text>
+          </>
+        )}
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
@@ -192,29 +181,24 @@ export default function InviteStaffSheet() {
 // STYLES
 // ============================================================================
 const styles = StyleSheet.create({
-  sheet: { flex: 1 },
-  grabberSpacer: { height: 12 },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 20 },
 
-  header: {
-    flexDirection: 'row',
+  headerSection: {
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 14,
+    paddingTop: 24,
+    paddingBottom: 20,
   },
   headerIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+    width: 64,
+    height: 64,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 16,
   },
-  headerText: { flex: 1 },
-  title: { fontSize: 22, fontWeight: '700', letterSpacing: -0.3 },
-  subtitle: { fontSize: 14, marginTop: 2 },
+  title: { fontSize: 22, fontWeight: '700', letterSpacing: -0.3, marginBottom: 6 },
+  subtitle: { fontSize: 14, textAlign: 'center' },
 
   infoBanner: {
     flexDirection: 'row',
@@ -273,11 +257,6 @@ const styles = StyleSheet.create({
   },
   summaryBadgeText: { fontSize: 13, fontWeight: '600' },
 
-  footer: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
   createButton: {
     flexDirection: 'row',
     alignItems: 'center',

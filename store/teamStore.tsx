@@ -19,7 +19,7 @@ import type { Team, TeamWithMembers } from '@/types/workspace';
 import { create } from 'zustand';
 
 interface TeamStore {
-  teams: Team[];
+  teams: (Team & { member_count?: number })[];
   selectedTeam: TeamWithMembers | null;
   loading: boolean;
   error: string | null;
@@ -63,13 +63,6 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
     try {
       set({ loading: true, error: null });
       const newTeam = await createTeamService(input);
-      
-      // Add the new team to the list
-      set((state) => ({
-        teams: [newTeam, ...state.teams],
-        loading: false,
-      }));
-
       return newTeam;
     } catch (error: any) {
       console.error('Failed to create team:', error);
