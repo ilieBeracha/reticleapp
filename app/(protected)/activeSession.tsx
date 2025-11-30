@@ -1,218 +1,45 @@
 import {
-    calculateSessionStats,
-    endSession,
-    getSessionById,
-    getSessionTargetsWithResults,
-    SessionStats,
-    SessionTargetWithResults,
-    SessionWithDetails,
+  calculateSessionStats,
+  endSession,
+  getSessionById,
+  getSessionTargetsWithResults,
+  SessionStats,
+  SessionTargetWithResults,
+  SessionWithDetails,
 } from "@/services/sessionService";
 import { useSessionStore } from "@/store/sessionStore";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    Dimensions,
-    Easing,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  Image,
+  Modal,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Circle, Defs, G, Line, RadialGradient, Stop } from "react-native-svg";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const VISUALIZATION_SIZE = SCREEN_WIDTH * 0.7;
-
-// ============================================================================
-// GLOWING TARGET VISUALIZATION
-// ============================================================================
-const TargetVisualization = React.memo(function TargetVisualization({
-  progress,
-  targetType,
-}: {
-  progress: number;
-  targetType: "paper" | "tactical";
-}) {
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-  const glowAnim = useRef(new Animated.Value(0.6)).current;
-
-  useEffect(() => {
-    // Pulse animation
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.05,
-          duration: 2000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 2000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-
-    // Slow rotation
-    Animated.loop(
-      Animated.timing(rotateAnim, {
-        toValue: 1,
-        duration: 60000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    ).start();
-
-    // Glow pulse
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim, {
-          toValue: 1,
-          duration: 1500,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(glowAnim, {
-          toValue: 0.6,
-          duration: 1500,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, []);
-
-  const spin = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
-  });
-
-  const rings = [0.9, 0.7, 0.5, 0.3, 0.15];
-  const activeRings = Math.ceil(progress * rings.length);
-
-  return (
-    <View style={styles.visualizationContainer}>
-      {/* Outer glow */}
-      <Animated.View
-        style={[
-          styles.outerGlow,
-          {
-            opacity: glowAnim,
-            transform: [{ scale: pulseAnim }],
-          },
-        ]}
-      />
-
-      {/* Main visualization */}
-      <Animated.View
-        style={[
-          styles.visualization,
-          { transform: [{ rotate: spin }, { scale: pulseAnim }] },
-        ]}
-      >
-        <Svg width={VISUALIZATION_SIZE} height={VISUALIZATION_SIZE} viewBox="0 0 200 200">
-          <Defs>
-            <RadialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
-              <Stop offset="0%" stopColor="#10B981" stopOpacity="0.8" />
-              <Stop offset="50%" stopColor="#10B981" stopOpacity="0.3" />
-              <Stop offset="100%" stopColor="#10B981" stopOpacity="0" />
-            </RadialGradient>
-            <RadialGradient id="coreGrad" cx="50%" cy="50%" r="50%">
-              <Stop offset="0%" stopColor="#6EE7B7" stopOpacity="1" />
-              <Stop offset="70%" stopColor="#10B981" stopOpacity="0.6" />
-              <Stop offset="100%" stopColor="#059669" stopOpacity="0" />
-            </RadialGradient>
-          </Defs>
-
-          {/* Background glow */}
-          <Circle cx="100" cy="100" r="95" fill="url(#glowGrad)" />
-
-          {/* Target rings */}
-          {rings.map((size, i) => (
-            <G key={i}>
-              <Circle
-                cx="100"
-                cy="100"
-                r={95 * size}
-                fill="none"
-                stroke={i < activeRings ? "#10B981" : "rgba(255,255,255,0.08)"}
-                strokeWidth={i < activeRings ? 2 : 1}
-                strokeDasharray={i === 0 ? "0" : "4 4"}
-                opacity={i < activeRings ? 0.8 - i * 0.15 : 0.3}
-              />
-            </G>
-          ))}
-
-          {/* Crosshair lines */}
-          <Line x1="100" y1="20" x2="100" y2="45" stroke="#10B981" strokeWidth="1.5" opacity="0.6" />
-          <Line x1="100" y1="155" x2="100" y2="180" stroke="#10B981" strokeWidth="1.5" opacity="0.6" />
-          <Line x1="20" y1="100" x2="45" y2="100" stroke="#10B981" strokeWidth="1.5" opacity="0.6" />
-          <Line x1="155" y1="100" x2="180" y2="100" stroke="#10B981" strokeWidth="1.5" opacity="0.6" />
-
-          {/* Core */}
-          <Circle cx="100" cy="100" r="8" fill="url(#coreGrad)" />
-          <Circle cx="100" cy="100" r="3" fill="#fff" opacity="0.9" />
-        </Svg>
-      </Animated.View>
-
-      {/* Particle effects - scattered dots */}
-      {Array.from({ length: 12 }).map((_, i) => {
-        const angle = (i / 12) * Math.PI * 2;
-        const radius = 90 + Math.random() * 30;
-        const x = Math.cos(angle) * radius;
-        const y = Math.sin(angle) * radius;
-        return (
-          <Animated.View
-            key={i}
-            style={[
-              styles.particle,
-              {
-                transform: [
-                  { translateX: x },
-                  { translateY: y },
-                  { scale: glowAnim },
-                ],
-                opacity: glowAnim.interpolate({
-                  inputRange: [0.6, 1],
-                  outputRange: [0.3, 0.7],
-                }),
-              },
-            ]}
-          />
-        );
-      })}
-    </View>
-  );
-});
 
 // ============================================================================
 // TIMER COMPONENT
 // ============================================================================
-const SessionTimer = React.memo(function SessionTimer({
-  startedAt,
-}: {
-  startedAt: string;
-}) {
+const SessionTimer = React.memo(function SessionTimer({ startedAt }: { startedAt: string }) {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
     const start = new Date(startedAt).getTime();
-    const updateTimer = () => {
-      setElapsed(Math.floor((Date.now() - start) / 1000));
-    };
+    const updateTimer = () => setElapsed(Math.floor((Date.now() - start) / 1000));
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
@@ -222,177 +49,340 @@ const SessionTimer = React.memo(function SessionTimer({
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
-    if (h > 0) {
-      return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-    }
+    if (h > 0) return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  return <Text style={styles.timerValue}>{formatTime(elapsed)}</Text>;
+  return (
+    <View style={styles.timerBox}>
+      <View style={styles.timerDot} />
+      <Text style={styles.timerText}>{formatTime(elapsed)}</Text>
+    </View>
+  );
 });
 
 // ============================================================================
-// PROGRESS METER (like Pace of Aging)
+// STAT CARD
 // ============================================================================
-const ProgressMeter = React.memo(function ProgressMeter({
-  current,
-  total,
+const StatCard = React.memo(function StatCard({
+  value,
   label,
+  accent,
 }: {
-  current: number;
-  total: number;
+  value: string | number;
   label: string;
+  accent?: boolean;
 }) {
-  const progress = total > 0 ? Math.min(current / total, 1) : 0;
-  const segments = 30;
-
   return (
-    <View style={styles.meterContainer}>
-      <View style={styles.meterHeader}>
-        <View style={styles.meterDot} />
-        <Text style={styles.meterLabel}>{label}</Text>
-      </View>
-
-      <View style={styles.meterValueRow}>
-        <Text style={styles.meterSideLabel}>0</Text>
-        <Text style={styles.meterValue}>{current}/{total}</Text>
-        <Text style={styles.meterSideLabel}>{total}</Text>
-      </View>
-
-      <View style={styles.meterTrack}>
-        {Array.from({ length: segments }).map((_, i) => {
-          const segmentProgress = (i + 1) / segments;
-          const isActive = segmentProgress <= progress;
-          const isEdge = Math.abs(segmentProgress - progress) < 0.05;
-          return (
-            <View
-              key={i}
-              style={[
-                styles.meterSegment,
-                isActive && styles.meterSegmentActive,
-                isEdge && styles.meterSegmentEdge,
-              ]}
-            />
-          );
-        })}
-        {/* Indicator */}
-        <View style={[styles.meterIndicator, { left: `${progress * 100}%` }]}>
-          <View style={styles.meterIndicatorDot} />
-        </View>
-      </View>
+    <View style={styles.statCard}>
+      <Text style={[styles.statValue, accent && styles.statValueAccent]}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
 });
 
 // ============================================================================
-// INSIGHT CARD
+// TARGET CARD
 // ============================================================================
-const InsightCard = React.memo(function InsightCard({
-  title,
-  description,
+const TargetCard = React.memo(function TargetCard({
+  target,
+  index,
+  onPress,
 }: {
-  title: string;
-  description: string;
+  target: SessionTargetWithResults;
+  index: number;
+  onPress: () => void;
 }) {
-  return (
-    <View style={styles.insightCard}>
-      <Text style={styles.insightTitle}>{title}</Text>
-      <Text style={styles.insightDescription}>{description}</Text>
-    </View>
-  );
-});
+  const isPaper = target.target_type === 'paper';
+  
+  let hits = 0;
+  let shots = 0;
+  let accuracy = 0;
+  const hasImage = isPaper && target.paper_result?.scanned_image_url;
+  
+  if (isPaper && target.paper_result) {
+    hits = target.paper_result.hits_total ?? 0;
+    shots = target.paper_result.bullets_fired;
+    accuracy = shots > 0 ? Math.round((hits / shots) * 100) : 0;
+  } else if (!isPaper && target.tactical_result) {
+    hits = target.tactical_result.hits;
+    shots = target.tactical_result.bullets_fired;
+    accuracy = shots > 0 ? Math.round((hits / shots) * 100) : 0;
+  }
 
-// ============================================================================
-// TARGET TIMELINE
-// ============================================================================
-const TargetTimeline = React.memo(function TargetTimeline({
-  targets,
-  maxItems = 5,
-}: {
-  targets: SessionTargetWithResults[];
-  maxItems?: number;
-}) {
-  if (targets.length === 0) return null;
-
-  // Show most recent targets first
-  const recentTargets = [...targets].reverse().slice(0, maxItems);
+  const hasResult = (isPaper && target.paper_result) || (!isPaper && target.tactical_result);
+  const accuracyColor = accuracy >= 70 ? '#10B981' : accuracy >= 50 ? '#F59E0B' : '#EF4444';
 
   return (
-    <View style={styles.timelineContainer}>
-      <View style={styles.timelineHeader}>
-        <Text style={styles.timelineTitle}>Recent Targets</Text>
-        <Text style={styles.timelineCount}>{targets.length} total</Text>
+    <TouchableOpacity style={styles.targetCard} onPress={onPress} activeOpacity={0.7}>
+      <View style={[styles.targetIcon, isPaper ? styles.targetIconPaper : styles.targetIconTactical]}>
+        <Ionicons 
+          name={isPaper ? 'disc-outline' : 'flash-outline'} 
+          size={22} 
+          color={isPaper ? '#3B82F6' : '#F59E0B'} 
+        />
+        {hasImage && (
+          <View style={styles.imageIndicator}>
+            <Ionicons name="image" size={10} color="#fff" />
+          </View>
+        )}
       </View>
       
-      {recentTargets.map((target, index) => {
-        const seqNum = targets.length - index;
-        const isPaper = target.target_type === 'paper';
-        
-        let hits = 0;
-        let shots = 0;
-        let accuracy = 0;
-        let extraInfo = '';
-        
-        if (isPaper && target.paper_result) {
-          hits = target.paper_result.hits_total ?? 0;
-          shots = target.paper_result.bullets_fired;
-          accuracy = shots > 0 ? Math.round((hits / shots) * 100) : 0;
-          if (target.paper_result.dispersion_cm) {
-            extraInfo = `${target.paper_result.dispersion_cm}cm`;
-          }
-        } else if (!isPaper && target.tactical_result) {
-          hits = target.tactical_result.hits;
-          shots = target.tactical_result.bullets_fired;
-          accuracy = shots > 0 ? Math.round((hits / shots) * 100) : 0;
-          if (target.tactical_result.is_stage_cleared) {
-            extraInfo = '✓ Cleared';
-          }
-          if (target.tactical_result.time_seconds) {
-            extraInfo = extraInfo 
-              ? `${extraInfo} • ${target.tactical_result.time_seconds}s`
-              : `${target.tactical_result.time_seconds}s`;
-          }
-        }
+      <View style={styles.targetInfo}>
+        <View style={styles.targetHeader}>
+          <Text style={styles.targetType}>{isPaper ? 'Paper Target' : 'Tactical Target'}</Text>
+          <Text style={styles.targetIndex}>#{index}</Text>
+        </View>
+        <View style={styles.targetMeta}>
+          <Ionicons name="resize-outline" size={14} color="rgba(255,255,255,0.4)" />
+          <Text style={styles.targetMetaText}>{target.distance_m}m</Text>
+          {hasResult && (
+            <>
+              <View style={styles.metaDot} />
+              <Text style={styles.targetMetaText}>{hits}/{shots} hits</Text>
+            </>
+          )}
+        </View>
+      </View>
 
-        const hasResult = (isPaper && target.paper_result) || (!isPaper && target.tactical_result);
-        
-        return (
-          <View key={target.id} style={styles.timelineItem}>
-            <View style={styles.timelineItemLeft}>
-              <View style={[
-                styles.timelineSeq,
-                { backgroundColor: isPaper ? '#3B82F620' : '#F59E0B20' }
-              ]}>
-                <Text style={[
-                  styles.timelineSeqText,
-                  { color: isPaper ? '#3B82F6' : '#F59E0B' }
-                ]}>
-                  {seqNum}
-                </Text>
+      {hasResult ? (
+        <View style={[styles.accuracyBadge, { backgroundColor: accuracyColor + '20' }]}>
+          <Text style={[styles.accuracyText, { color: accuracyColor }]}>{accuracy}%</Text>
+        </View>
+      ) : (
+        <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.3)" />
+      )}
+    </TouchableOpacity>
+  );
+});
+
+// ============================================================================
+// TARGET DETAIL MODAL
+// ============================================================================
+const TargetDetailModal = React.memo(function TargetDetailModal({
+  target,
+  index,
+  visible,
+  onClose,
+}: {
+  target: SessionTargetWithResults | null;
+  index: number;
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  
+  if (!target) return null;
+
+  const isPaper = target.target_type === 'paper';
+  const paperResult = target.paper_result;
+  const tacticalResult = target.tactical_result;
+  
+  let hits = 0;
+  let shots = 0;
+  let accuracy = 0;
+  
+  if (isPaper && paperResult) {
+    hits = paperResult.hits_total ?? 0;
+    shots = paperResult.bullets_fired;
+    accuracy = shots > 0 ? Math.round((hits / shots) * 100) : 0;
+  } else if (!isPaper && tacticalResult) {
+    hits = tacticalResult.hits;
+    shots = tacticalResult.bullets_fired;
+    accuracy = shots > 0 ? Math.round((hits / shots) * 100) : 0;
+  }
+
+  const accuracyColor = accuracy >= 70 ? '#10B981' : accuracy >= 50 ? '#F59E0B' : '#EF4444';
+  const hasImage = isPaper && paperResult?.scanned_image_url;
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <View style={[styles.modalContainer, { paddingTop: insets.top }]}>
+        {/* Header */}
+        <View style={styles.modalHeader}>
+          <View style={styles.modalGrabber} />
+          <View style={styles.modalHeaderRow}>
+            <View style={styles.modalTitleSection}>
+              <View style={[styles.modalIcon, isPaper ? styles.targetIconPaper : styles.targetIconTactical]}>
+                <Ionicons 
+                  name={isPaper ? 'disc-outline' : 'flash-outline'} 
+                  size={24} 
+                  color={isPaper ? '#3B82F6' : '#F59E0B'} 
+                />
               </View>
-              <View style={styles.timelineItemInfo}>
-                <Text style={styles.timelineItemType}>
-                  {isPaper ? 'Paper' : 'Tactical'} • {target.distance_m || '-'}m
-                </Text>
-                {hasResult && (
-                  <Text style={styles.timelineItemResult}>
-                    {hits}/{shots} hits ({accuracy}%)
-                    {extraInfo ? ` • ${extraInfo}` : ''}
-                  </Text>
+              <View>
+                <Text style={styles.modalTitle}>Target #{index}</Text>
+                <Text style={styles.modalSubtitle}>{isPaper ? 'Paper' : 'Tactical'} • {target.distance_m}m</Text>
+              </View>
+            </View>
+            <TouchableOpacity style={styles.modalCloseBtn} onPress={onClose}>
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <ScrollView 
+          style={styles.modalScroll}
+          contentContainerStyle={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Image Section */}
+          {hasImage && (
+            <View style={styles.imageSection}>
+              <Text style={styles.sectionLabel}>SCANNED TARGET</Text>
+              <View style={styles.imageContainer}>
+                <Image 
+                  source={{ uri: paperResult.scanned_image_url! }} 
+                  style={styles.targetImage}
+                  resizeMode="contain"
+                />
+              </View>
+            </View>
+          )}
+
+          {/* Stats Section */}
+          <View style={styles.detailSection}>
+            <Text style={styles.sectionLabel}>RESULTS</Text>
+            
+            <View style={styles.detailStatsRow}>
+              <View style={styles.detailStatCard}>
+                <Text style={styles.detailStatValue}>{shots}</Text>
+                <Text style={styles.detailStatLabel}>Shots Fired</Text>
+              </View>
+              <View style={styles.detailStatCard}>
+                <Text style={[styles.detailStatValue, { color: '#10B981' }]}>{hits}</Text>
+                <Text style={styles.detailStatLabel}>Hits</Text>
+              </View>
+              <View style={[styles.detailStatCard, { backgroundColor: accuracyColor + '15' }]}>
+                <Text style={[styles.detailStatValue, { color: accuracyColor }]}>{accuracy}%</Text>
+                <Text style={styles.detailStatLabel}>Accuracy</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Paper-specific details */}
+          {isPaper && paperResult && (
+            <View style={styles.detailSection}>
+              <Text style={styles.sectionLabel}>PAPER TARGET DATA</Text>
+              <View style={styles.detailGrid}>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Paper Type</Text>
+                  <Text style={styles.detailValue}>{paperResult.paper_type || 'Standard'}</Text>
+                </View>
+                {paperResult.hits_inside_scoring != null && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Hits Inside Scoring</Text>
+                    <Text style={styles.detailValue}>{paperResult.hits_inside_scoring}</Text>
+                  </View>
+                )}
+                {paperResult.dispersion_cm != null && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Dispersion</Text>
+                    <Text style={styles.detailValue}>{paperResult.dispersion_cm} cm</Text>
+                  </View>
+                )}
+                {paperResult.offset_right_cm != null && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Offset (Right)</Text>
+                    <Text style={styles.detailValue}>{paperResult.offset_right_cm} cm</Text>
+                  </View>
+                )}
+                {paperResult.offset_up_cm != null && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Offset (Up)</Text>
+                    <Text style={styles.detailValue}>{paperResult.offset_up_cm} cm</Text>
+                  </View>
                 )}
               </View>
             </View>
-            <View style={[
-              styles.timelineAccuracy,
-              accuracy >= 80 ? styles.accuracyHigh :
-              accuracy >= 50 ? styles.accuracyMed :
-              styles.accuracyLow
-            ]}>
-              <Text style={styles.timelineAccuracyText}>{accuracy}%</Text>
+          )}
+
+          {/* Tactical-specific details */}
+          {!isPaper && tacticalResult && (
+            <View style={styles.detailSection}>
+              <Text style={styles.sectionLabel}>TACTICAL DATA</Text>
+              <View style={styles.detailGrid}>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Stage Cleared</Text>
+                  <View style={[
+                    styles.statusBadge, 
+                    { backgroundColor: tacticalResult.is_stage_cleared ? '#10B98120' : '#EF444420' }
+                  ]}>
+                    <Ionicons 
+                      name={tacticalResult.is_stage_cleared ? 'checkmark-circle' : 'close-circle'} 
+                      size={16} 
+                      color={tacticalResult.is_stage_cleared ? '#10B981' : '#EF4444'} 
+                    />
+                    <Text style={[
+                      styles.statusText,
+                      { color: tacticalResult.is_stage_cleared ? '#10B981' : '#EF4444' }
+                    ]}>
+                      {tacticalResult.is_stage_cleared ? 'Yes' : 'No'}
+                    </Text>
+                  </View>
+                </View>
+                {tacticalResult.time_seconds != null && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Engagement Time</Text>
+                    <Text style={styles.detailValue}>{tacticalResult.time_seconds}s</Text>
+                  </View>
+                )}
+              </View>
             </View>
-          </View>
-        );
-      })}
+          )}
+
+          {/* Notes Section */}
+          {(target.notes || paperResult?.notes || tacticalResult?.notes) && (
+            <View style={styles.detailSection}>
+              <Text style={styles.sectionLabel}>NOTES</Text>
+              <View style={styles.notesBox}>
+                <Text style={styles.notesText}>
+                  {target.notes || paperResult?.notes || tacticalResult?.notes}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Target Data (if any custom data) - filter out internal objects */}
+          {target.target_data && Object.keys(target.target_data).filter(k => 
+            k !== 'detection_result' && typeof target.target_data![k] !== 'object'
+          ).length > 0 && (
+            <View style={styles.detailSection}>
+              <Text style={styles.sectionLabel}>ADDITIONAL DATA</Text>
+              <View style={styles.detailGrid}>
+                {Object.entries(target.target_data)
+                  .filter(([key, value]) => key !== 'detection_result' && typeof value !== 'object')
+                  .map(([key, value]) => (
+                    <View key={key} style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>{key.replace(/_/g, ' ')}</Text>
+                      <Text style={styles.detailValue}>{String(value)}</Text>
+                    </View>
+                  ))}
+              </View>
+            </View>
+          )}
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+});
+
+// ============================================================================
+// EMPTY STATE
+// ============================================================================
+const EmptyTargets = React.memo(function EmptyTargets() {
+  return (
+    <View style={styles.emptyState}>
+      <View style={styles.emptyIcon}>
+        <Ionicons name="disc-outline" size={48} color="rgba(255,255,255,0.2)" />
+      </View>
+      <Text style={styles.emptyTitle}>No targets logged</Text>
+      <Text style={styles.emptyText}>Start adding targets to track your session</Text>
     </View>
   );
 });
@@ -411,16 +401,50 @@ export default function ActiveSessionScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [ending, setEnding] = useState(false);
+  
+  // Target detail modal
+  const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
+
+  // Get selected target from current targets array (always synced)
+  const selectedTarget = useMemo(() => {
+    if (!selectedTargetId) return null;
+    return targets.find(t => t.id === selectedTargetId) || null;
+  }, [targets, selectedTargetId]);
 
   // Load session data
   const loadData = useCallback(async () => {
     if (!sessionId) return;
     try {
+      console.log('[Session] Loading data for session:', sessionId);
       const [sessionData, targetsData, statsData] = await Promise.all([
         getSessionById(sessionId),
         getSessionTargetsWithResults(sessionId),
         calculateSessionStats(sessionId),
       ]);
+      console.log('[Session] Loaded:', {
+        session: sessionData?.id,
+        targetsCount: targetsData.length,
+        stats: statsData,
+      });
+      
+      // Log individual target results for debugging
+      targetsData.forEach((t, i) => {
+        console.log(`[Session] Target ${i}:`, {
+          id: t.id,
+          type: t.target_type,
+          paper_result: t.paper_result ? {
+            bullets_fired: t.paper_result.bullets_fired,
+            hits_total: t.paper_result.hits_total,
+          } : 'null',
+          tactical_result: t.tactical_result ? {
+            bullets_fired: t.tactical_result.bullets_fired,
+            hits: t.tactical_result.hits,
+          } : 'null',
+        });
+      });
+      
       setSession(sessionData);
       setTargets(targetsData);
       setStats(statsData);
@@ -432,7 +456,6 @@ export default function ActiveSessionScreen() {
     }
   }, [sessionId]);
 
-  // Reload data every time screen comes into focus (e.g., after adding a target)
   useFocusEffect(
     useCallback(() => {
       loadData();
@@ -441,83 +464,49 @@ export default function ActiveSessionScreen() {
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     loadData();
   }, [loadData]);
 
-  // Session stats derived from targets
-  const sessionInfo = useMemo(() => {
-    if (targets.length === 0) {
-      return {
-        distance: 100, // default
-        plannedRounds: 10, // default
-        targetType: 'paper' as const,
-      };
-    }
-    // Get most common target type and average distance from targets
-    const paperCount = targets.filter(t => t.target_type === 'paper').length;
-    const tacticalCount = targets.filter(t => t.target_type === 'tactical').length;
-    const avgDistance = targets.reduce((sum, t) => sum + (t.distance_m || 100), 0) / targets.length;
-    
-    return {
-      distance: Math.round(avgDistance),
-      plannedRounds: targets.length + 5, // current + buffer
-      targetType: paperCount >= tacticalCount ? 'paper' as const : 'tactical' as const,
-    };
+  // Stats
+  const totalShots = stats?.totalShotsFired ?? 0;
+  const totalHits = stats?.totalHits ?? 0;
+  const accuracy = stats?.accuracyPct ?? 0;
+
+  const avgDistance = useMemo(() => {
+    if (targets.length === 0) return 0;
+    return Math.round(targets.reduce((sum, t) => sum + (t.distance_m || 0), 0) / targets.length);
   }, [targets]);
 
-  const totalShotsFired = stats?.totalShotsFired ?? 0;
-  const totalHits = stats?.totalHits ?? 0;
-  const accuracyPct = stats?.accuracyPct ?? 0;
-
-  const progress = useMemo(() => {
-    return sessionInfo.plannedRounds > 0
-      ? targets.length / sessionInfo.plannedRounds
-      : 0;
-  }, [targets.length, sessionInfo.plannedRounds]);
-
+  // Actions
   const handleAddTarget = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push({
       pathname: "/(protected)/addTarget",
       params: {
         sessionId,
-        defaultDistance: sessionInfo.distance.toString(),
+        defaultDistance: avgDistance > 0 ? avgDistance.toString() : '25',
       },
     });
-  }, [sessionId, sessionInfo]);
+  }, [sessionId, avgDistance]);
 
-  const handleViewTargets = useCallback(() => {
+  const handleTargetPress = useCallback((target: SessionTargetWithResults, index: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
-    const targetDetails = targets.map((t, i) => {
-      let resultInfo = '';
-      if (t.target_type === 'paper' && t.paper_result) {
-        const accuracy = t.paper_result.bullets_fired > 0 
-          ? Math.round((t.paper_result.hits_total ?? 0) / t.paper_result.bullets_fired * 100)
-          : 0;
-        resultInfo = `${t.paper_result.hits_total ?? 0}/${t.paper_result.bullets_fired} hits (${accuracy}%)`;
-      } else if (t.target_type === 'tactical' && t.tactical_result) {
-        const accuracy = t.tactical_result.bullets_fired > 0 
-          ? Math.round(t.tactical_result.hits / t.tactical_result.bullets_fired * 100)
-          : 0;
-        resultInfo = `${t.tactical_result.hits}/${t.tactical_result.bullets_fired} hits (${accuracy}%)${t.tactical_result.is_stage_cleared ? ' ✓' : ''}`;
-      } else {
-        resultInfo = 'No results';
-      }
-      return `#${i + 1}: ${t.target_type} at ${t.distance_m}m\n   ${resultInfo}`;
-    }).join("\n\n");
-    
-    Alert.alert(
-      `${targets.length} Target${targets.length !== 1 ? "s" : ""} Logged`,
-      targetDetails || "No targets yet"
-    );
-  }, [targets]);
+    setSelectedTargetId(target.id);
+    setSelectedIndex(index);
+    setDetailModalVisible(true);
+  }, []);
+
+  const handleCloseDetail = useCallback(() => {
+    setDetailModalVisible(false);
+    setSelectedTargetId(null);
+  }, []);
 
   const handleEndSession = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert(
       "End Session?",
-      `You've logged ${targets.length} target${targets.length !== 1 ? "s" : ""}. End this session now?`,
+      `${targets.length} target${targets.length !== 1 ? "s" : ""} logged`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -530,9 +519,7 @@ export default function ActiveSessionScreen() {
               await endSession(sessionId!);
               await loadSessions();
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              Alert.alert("Session Complete", "Your training session has been saved.", [
-                { text: "OK", onPress: () => router.replace("/(protected)/org") },
-              ]);
+              router.replace("/(protected)/org");
             } catch (error: any) {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
               Alert.alert("Error", error.message || "Failed to end session");
@@ -548,7 +535,7 @@ export default function ActiveSessionScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert(
       "Leave Session?",
-      "Your session will stay active. You can return to it later.",
+      "Your session stays active. You can return later.",
       [
         { text: "Stay", style: "cancel" },
         { text: "Leave", onPress: () => router.back() },
@@ -556,58 +543,34 @@ export default function ActiveSessionScreen() {
     );
   }, []);
 
-  // Generate insight
-  const insight = useMemo(() => {
-    if (targets.length === 0) {
-      return {
-        title: "Ready to Fire",
-        description: `Session started at ${sessionInfo.distance}m. Add your first target when ready.`,
-      };
-    }
-    if (totalShotsFired > 0 && accuracyPct > 0) {
-      if (accuracyPct >= 80) {
-        return {
-          title: "Excellent Accuracy",
-          description: `${accuracyPct}% hit rate with ${totalHits}/${totalShotsFired} rounds on target. Outstanding!`,
-        };
-      }
-      if (accuracyPct >= 60) {
-        return {
-          title: "Good Progress",
-          description: `${accuracyPct}% accuracy across ${targets.length} targets. Keep it up!`,
-        };
-      }
-      return {
-        title: "Keep Training",
-        description: `${accuracyPct}% hit rate. Focus on fundamentals to improve.`,
-      };
-    }
-    return {
-      title: "Session Active",
-      description: `${targets.length} target${targets.length !== 1 ? "s" : ""} logged. Continue training.`,
-    };
-  }, [targets.length, totalShotsFired, totalHits, accuracyPct, sessionInfo]);
+  // Render target
+  const renderTarget = useCallback(({ item, index }: { item: SessionTargetWithResults; index: number }) => (
+    <TargetCard 
+      target={item} 
+      index={targets.length - index}
+      onPress={() => handleTargetPress(item, targets.length - index)}
+    />
+  ), [targets.length, handleTargetPress]);
 
-  // Loading state
+  // Loading
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#10B981" />
-        <Text style={styles.loadingText}>Loading session...</Text>
       </View>
     );
   }
 
-  // Session not found
+  // Not found / completed
   if (!session || session.status !== "active") {
     return (
       <View style={styles.errorContainer}>
         <Ionicons
           name={session?.status === "completed" ? "checkmark-circle" : "alert-circle"}
-          size={48}
-          color="#10B981"
+          size={56}
+          color={session?.status === "completed" ? "#10B981" : "#EF4444"}
         />
-        <Text style={styles.errorText}>
+        <Text style={styles.errorTitle}>
           {session?.status === "completed" ? "Session Completed" : "Session not found"}
         </Text>
         <TouchableOpacity style={styles.errorButton} onPress={() => router.back()}>
@@ -621,119 +584,81 @@ export default function ActiveSessionScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity style={styles.headerButton} onPress={handleClose}>
-          <Ionicons name="chevron-down" size={28} color="#fff" />
+        <TouchableOpacity style={styles.headerBtn} onPress={handleClose}>
+          <Ionicons name="chevron-down" size={26} color="#fff" />
         </TouchableOpacity>
-
-        <Text style={styles.headerTitle}>Session</Text>
-
-        <TouchableOpacity style={styles.headerButton} onPress={handleViewTargets}>
-          <Text style={styles.infoIcon}>i</Text>
-        </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>Session</Text>
+          {session.training_title && (
+            <Text style={styles.headerSubtitle} numberOfLines={1}>{session.training_title}</Text>
+          )}
+        </View>
+        <SessionTimer startedAt={session.started_at} />
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#10B981" />
-        }
-      >
-        {/* Context Row */}
-        <View style={styles.contextRow}>
-          <View style={styles.contextItem}>
-            <Ionicons name="locate-outline" size={14} color="rgba(255,255,255,0.4)" />
-            <Text style={styles.contextText}>{sessionInfo.distance}m</Text>
-          </View>
-          <Text style={styles.contextHighlight}>{session.training_title || 'Training'}</Text>
-          <View style={styles.contextItem}>
-            <Text style={styles.contextText}>{targets.length} targets</Text>
-            <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.4)" />
-          </View>
+      {/* Stats Row */}
+      <View style={styles.statsRow}>
+        <StatCard value={targets.length} label="Targets" />
+        <StatCard value={totalShots} label="Shots" />
+        <StatCard value={totalHits} label="Hits" accent />
+        <StatCard value={`${accuracy}%`} label="Accuracy" />
+      </View>
+
+      {/* Targets List */}
+      <View style={styles.listContainer}>
+        <View style={styles.listHeader}>
+          <Text style={styles.listTitle}>TARGETS</Text>
+          <Text style={styles.listCount}>{targets.length}</Text>
         </View>
 
-        {/* Visualization */}
-        <TargetVisualization progress={progress} targetType={sessionInfo.targetType} />
-
-        {/* Central Stats */}
-        <View style={styles.centralStats}>
-          <Text style={styles.mainStat}>{accuracyPct > 0 ? `${accuracyPct}%` : targets.length}</Text>
-          <Text style={styles.mainStatLabel}>{accuracyPct > 0 ? 'Accuracy' : 'Targets Logged'}</Text>
-          <View style={styles.subStatRow}>
-            <SessionTimer startedAt={session.started_at} />
-            <Text style={styles.subStatDivider}>•</Text>
-            <Text style={styles.subStatText}>{totalHits}/{totalShotsFired} hits</Text>
-          </View>
-        </View>
-
-        {/* Quick Stats Row */}
-        {stats && totalShotsFired > 0 && (
-          <View style={styles.quickStatsRow}>
-            <View style={styles.quickStatItem}>
-              <Text style={styles.quickStatValue}>{targets.length}</Text>
-              <Text style={styles.quickStatLabel}>Targets</Text>
-            </View>
-            <View style={styles.quickStatItem}>
-              <Text style={styles.quickStatValue}>{totalShotsFired}</Text>
-              <Text style={styles.quickStatLabel}>Rounds</Text>
-            </View>
-            <View style={styles.quickStatItem}>
-              <Text style={[styles.quickStatValue, { color: '#10B981' }]}>{totalHits}</Text>
-              <Text style={styles.quickStatLabel}>Hits</Text>
-            </View>
-            {stats.stagesCleared > 0 && (
-              <View style={styles.quickStatItem}>
-                <Text style={[styles.quickStatValue, { color: '#F59E0B' }]}>{stats.stagesCleared}</Text>
-                <Text style={styles.quickStatLabel}>Cleared</Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* Progress Meter */}
-        <ProgressMeter
-          current={totalShotsFired}
-          total={Math.max(totalShotsFired, 10)}
-          label="Targets Progress"
+        <FlatList
+          data={targets}
+          renderItem={renderTarget}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: insets.bottom + 100 },
+          ]}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={EmptyTargets}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#10B981" />
+          }
         />
+      </View>
 
-        {/* Target Timeline */}
-        <TargetTimeline targets={targets} maxItems={5} />
-
-        {/* Insight Card */}
-        <InsightCard title={insight.title} description={insight.description} />
-
-        {/* Action Buttons */}
+      {/* Bottom Actions */}
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
         <TouchableOpacity
-          style={styles.primaryButton}
+          style={styles.addButton}
           onPress={handleAddTarget}
-          activeOpacity={0.9}
+          activeOpacity={0.85}
         >
-          <LinearGradient
-            colors={["#10B981", "#34D399", "#6EE7B7"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.primaryButtonGradient}
-          >
-            <Ionicons name="add-circle" size={22} color="#000" />
-            <Text style={styles.primaryButtonText}>Add Target</Text>
-          </LinearGradient>
+          <Ionicons name="add" size={26} color="#000" />
+          <Text style={styles.addButtonText}>Add Target</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.secondaryButton}
+          style={styles.endButton}
           onPress={handleEndSession}
           disabled={ending}
           activeOpacity={0.7}
         >
           {ending ? (
-            <ActivityIndicator color="#10B981" size="small" />
+            <ActivityIndicator color="#EF4444" size="small" />
           ) : (
-            <Text style={styles.secondaryButtonText}>End Session</Text>
+            <Ionicons name="stop-circle-outline" size={24} color="#EF4444" />
           )}
         </TouchableOpacity>
-      </ScrollView>
+      </View>
+
+      {/* Target Detail Modal */}
+      <TargetDetailModal
+        target={selectedTarget}
+        index={selectedIndex}
+        visible={detailModalVisible}
+        onClose={handleCloseDetail}
+      />
     </View>
   );
 }
@@ -744,53 +669,48 @@ export default function ActiveSessionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#0A0A0A",
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#0A0A0A",
     alignItems: "center",
     justifyContent: "center",
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.6)",
   },
   errorContainer: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#0A0A0A",
     alignItems: "center",
     justifyContent: "center",
-    gap: 12,
+    gap: 16,
     padding: 40,
   },
-  errorText: {
-    fontSize: 18,
+  errorTitle: {
+    fontSize: 20,
     fontWeight: "600",
     color: "#fff",
   },
   errorButton: {
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: 12,
     backgroundColor: "rgba(255,255,255,0.1)",
-    marginTop: 8,
   },
   errorButtonText: {
-    color: "#fff",
+    fontSize: 15,
     fontWeight: "600",
+    color: "#fff",
   },
 
   // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingBottom: 16,
+    gap: 12,
   },
-  headerButton: {
+  headerBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -798,351 +718,389 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "rgba(255,255,255,0.7)",
+  headerCenter: {
+    flex: 1,
   },
-  infoIcon: {
+  headerTitle: {
     fontSize: 18,
     fontWeight: "600",
     color: "#fff",
-    fontStyle: "italic",
   },
-
-  // Scroll
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 24,
-    alignItems: "center",
-  },
-
-  // Context Row
-  contextRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-    marginBottom: 20,
-    paddingHorizontal: 8,
-  },
-  contextItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  contextText: {
-    fontSize: 13,
-    color: "rgba(255,255,255,0.4)",
-    textTransform: "capitalize",
-  },
-  contextHighlight: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#fff",
-  },
-
-  // Visualization
-  visualizationContainer: {
-    width: VISUALIZATION_SIZE,
-    height: VISUALIZATION_SIZE,
-    alignItems: "center",
-    justifyContent: "center",
-    marginVertical: 10,
-  },
-  outerGlow: {
-    position: "absolute",
-    width: VISUALIZATION_SIZE * 1.3,
-    height: VISUALIZATION_SIZE * 1.3,
-    borderRadius: VISUALIZATION_SIZE * 0.65,
-    backgroundColor: "rgba(16, 185, 129, 0.08)",
-  },
-  visualization: {
-    width: VISUALIZATION_SIZE,
-    height: VISUALIZATION_SIZE,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  particle: {
-    position: "absolute",
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#10B981",
-  },
-
-  // Central Stats
-  centralStats: {
-    alignItems: "center",
-    marginTop: -20,
-    marginBottom: 30,
-  },
-  mainStat: {
-    fontSize: 72,
-    fontWeight: "200",
-    color: "#fff",
-    letterSpacing: -2,
-  },
-  mainStatLabel: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#fff",
-    marginTop: -8,
-  },
-  subStatRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 8,
-  },
-  timerValue: {
+  headerSubtitle: {
     fontSize: 14,
-    color: "rgba(255,255,255,0.5)",
-    fontVariant: ["tabular-nums"],
-  },
-  subStatDivider: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.3)",
-  },
-  subStatText: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.5)",
-    textTransform: "capitalize",
-  },
-
-  // Quick Stats Row
-  quickStatsRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    width: "100%",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderRadius: 16,
-    paddingVertical: 16,
-    marginBottom: 24,
-  },
-  quickStatItem: {
-    alignItems: "center",
-    paddingHorizontal: 12,
-  },
-  quickStatValue: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#fff",
-  },
-  quickStatLabel: {
-    fontSize: 11,
     color: "rgba(255,255,255,0.4)",
     marginTop: 2,
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
   },
-
-  // Progress Meter
-  meterContainer: {
-    width: "100%",
-    marginBottom: 24,
-  },
-  meterHeader: {
+  timerBox: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
   },
-  meterDot: {
+  timerDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#F59E0B",
-  },
-  meterLabel: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#fff",
-  },
-  meterValueRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  meterSideLabel: {
-    fontSize: 11,
-    color: "rgba(255,255,255,0.3)",
-  },
-  meterValue: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#fff",
-  },
-  meterTrack: {
-    flexDirection: "row",
-    alignItems: "center",
-    height: 24,
-    gap: 2,
-    position: "relative",
-  },
-  meterSegment: {
-    flex: 1,
-    height: 8,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderRadius: 1,
-  },
-  meterSegmentActive: {
     backgroundColor: "#10B981",
   },
-  meterSegmentEdge: {
-    backgroundColor: "#6EE7B7",
-  },
-  meterIndicator: {
-    position: "absolute",
-    top: 0,
-    marginLeft: -8,
-  },
-  meterIndicatorDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: "#F59E0B",
-    borderWidth: 3,
-    borderColor: "#000",
+  timerText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#10B981",
+    fontVariant: ["tabular-nums"],
   },
 
-  // Target Timeline
-  timelineContainer: {
-    width: "100%",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-  },
-  timelineHeader: {
+  // Stats
+  statsRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.06)",
+    paddingHorizontal: 16,
+    gap: 10,
+    marginBottom: 20,
   },
-  timelineTitle: {
-    fontSize: 14,
-    fontWeight: "600",
+  statCard: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 16,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: "700",
     color: "#fff",
   },
-  timelineCount: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.4)",
+  statValueAccent: {
+    color: "#10B981",
   },
-  timelineItem: {
+  statLabel: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.4)",
+    marginTop: 4,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
+  // List
+  listContainer: {
+    flex: 1,
+  },
+  listHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.04)",
+    paddingHorizontal: 20,
+    marginBottom: 12,
   },
-  timelineItemLeft: {
+  listTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.4)",
+    letterSpacing: 1,
+  },
+  listCount: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.3)",
+  },
+  listContent: {
+    paddingHorizontal: 16,
+  },
+
+  // Target Card
+  targetCard: {
     flexDirection: "row",
     alignItems: "center",
-    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    gap: 14,
   },
-  timelineSeq: {
-    width: 28,
-    height: 28,
+  targetIcon: {
+    width: 48,
+    height: 48,
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 12,
+    position: "relative",
   },
-  timelineSeqText: {
-    fontSize: 12,
-    fontWeight: "700",
+  targetIconPaper: {
+    backgroundColor: "rgba(59, 130, 246, 0.15)",
   },
-  timelineItemInfo: {
+  targetIconTactical: {
+    backgroundColor: "rgba(245, 158, 11, 0.15)",
+  },
+  imageIndicator: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#10B981",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  targetInfo: {
     flex: 1,
   },
-  timelineItemType: {
-    fontSize: 13,
+  targetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  targetType: {
+    fontSize: 16,
     fontWeight: "600",
     color: "#fff",
   },
-  timelineItemResult: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.5)",
-    marginTop: 2,
+  targetIndex: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.3)",
   },
-  timelineAccuracy: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+  targetMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 6,
+    gap: 6,
+  },
+  targetMetaText: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.4)",
+  },
+  metaDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  accuracyBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 10,
   },
-  timelineAccuracyText: {
-    fontSize: 12,
+  accuracyText: {
+    fontSize: 15,
     fontWeight: "700",
-    color: "#000",
-  },
-  accuracyHigh: {
-    backgroundColor: "#10B981",
-  },
-  accuracyMed: {
-    backgroundColor: "#F59E0B",
-  },
-  accuracyLow: {
-    backgroundColor: "#EF4444",
   },
 
-  // Insight Card
-  insightCard: {
-    width: "100%",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
+  // Empty State
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: 60,
   },
-  insightTitle: {
-    fontSize: 17,
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 18,
     fontWeight: "600",
     color: "#fff",
     marginBottom: 8,
   },
-  insightDescription: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.5)",
-    lineHeight: 20,
+  emptyText: {
+    fontSize: 15,
+    color: "rgba(255,255,255,0.4)",
   },
 
-  // Buttons
-  primaryButton: {
-    width: "100%",
-    borderRadius: 28,
-    overflow: "hidden",
-    marginBottom: 12,
+  // Bottom Bar
+  bottomBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    gap: 12,
+    backgroundColor: "#0A0A0A",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(255,255,255,0.1)",
   },
-  primaryButtonGradient: {
+  addButton: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     height: 56,
-    gap: 10,
+    borderRadius: 16,
+    backgroundColor: "#10B981",
+    gap: 8,
   },
-  primaryButtonText: {
+  addButtonText: {
     fontSize: 17,
-    fontWeight: "700",
+    fontWeight: "600",
     color: "#000",
   },
-  secondaryButton: {
+  endButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: "rgba(239, 68, 68, 0.15)",
     alignItems: "center",
-    paddingVertical: 14,
+    justifyContent: "center",
   },
-  secondaryButtonText: {
-    fontSize: 16,
+
+  // Modal
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "#0A0A0A",
+  },
+  modalHeader: {
+    paddingHorizontal: 20,
+    // paddingBottom: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    // borderBottomColor: "rgba(255,255,255,0.1)",
+  },
+  modalGrabber: {
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignSelf: "center",
+
+    marginBottom: 16,
+  },
+  modalHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  modalTitleSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  modalIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#fff",
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.5)",
+    marginTop: 2,
+  },
+  modalCloseBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalScroll: {
+    flex: 1,
+  },
+  modalContent: {
+    padding: 20,
+  },
+
+  // Image Section
+  imageSection: {
+    marginBottom: 24,
+  },
+  imageContainer: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 16,
+    overflow: "hidden",
+    aspectRatio: 1,
+  },
+  targetImage: {
+    width: "100%",
+    height: "100%",
+  },
+
+  // Detail Section
+  detailSection: {
+    marginBottom: 24,
+  },
+  sectionLabel: {
+    fontSize: 12,
     fontWeight: "600",
-    color: "#10B981",
+    color: "rgba(255,255,255,0.4)",
+    letterSpacing: 1,
+    marginBottom: 12,
+  },
+  detailStatsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  detailStatCard: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 18,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  detailStatValue: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#fff",
+  },
+  detailStatLabel: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.4)",
+    marginTop: 4,
+  },
+  detailGrid: {
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: 14,
+    overflow: "hidden",
+  },
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+  detailLabel: {
+    fontSize: 15,
+    color: "rgba(255,255,255,0.6)",
+  },
+  detailValue: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  notesBox: {
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: 14,
+    padding: 16,
+  },
+  notesText: {
+    fontSize: 15,
+    color: "rgba(255,255,255,0.7)",
+    lineHeight: 22,
   },
 });

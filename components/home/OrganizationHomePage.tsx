@@ -83,23 +83,40 @@ const TrainingItem = React.memo(function TrainingItem({
   onPress: () => void;
 }) {
   const scheduledDate = new Date(training.scheduled_at);
-  const isToday = scheduledDate.toDateString() === new Date().toDateString();
+  const now = new Date();
+  const isToday = scheduledDate.toDateString() === now.toDateString();
   const isTomorrow = scheduledDate.toDateString() === new Date(Date.now() + 86400000).toDateString();
+  const isOngoing = training.status === 'ongoing';
   
   const dateLabel = isToday ? 'Today' : isTomorrow ? 'Tomorrow' : scheduledDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   const timeLabel = scheduledDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
+  // Subtle status indicator
+  const showLive = isOngoing;
+  const showToday = isToday && !isOngoing;
+
   return (
-    <TouchableOpacity style={styles.trainingItem} activeOpacity={0.5} onPress={onPress}>
-      <View style={styles.trainingLeft}>
-        <Text style={[styles.trainingTitle, { color: colors.text }]} numberOfLines={1}>
-          {training.title}
-        </Text>
+    <TouchableOpacity style={styles.trainingItem} activeOpacity={0.6} onPress={onPress}>
+      <View style={styles.trainingContent}>
+        <View style={styles.trainingHeader}>
+          <Text style={[styles.trainingTitle, { color: colors.text }]} numberOfLines={1}>
+            {training.title}
+          </Text>
+          {showLive && (
+            <View style={styles.trainingLiveBadge}>
+              <View style={styles.trainingLiveDot} />
+              <Text style={styles.trainingLiveText}>LIVE</Text>
+            </View>
+          )}
+        </View>
+        
         <Text style={[styles.trainingMeta, { color: colors.textMuted }]}>
-          {dateLabel} at {timeLabel}
+          {showToday ? <Text style={{ color: '#FF9500', fontWeight: '500' }}>Today</Text> : dateLabel} at {timeLabel}
           {training.team && ` · ${training.team.name}`}
+          {(training.drill_count ?? 0) > 0 && ` · ${training.drill_count} drills`}
         </Text>
       </View>
+
       <Ionicons name="chevron-forward" size={16} color={colors.border} />
     </TouchableOpacity>
   );
@@ -523,7 +540,7 @@ const styles = StyleSheet.create({
   // Stats Bar
   statsBar: { flexDirection: 'row', borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, marginBottom: 20, overflow: 'hidden' },
   statBlock: { flex: 1, alignItems: 'center', paddingVertical: 16 },
-  statValue: { fontSize: 22, fontWeight: '700' },
+  statValue: { fontSize: 24, fontWeight: '700' },
   statLabel: { fontSize: 12, marginTop: 2 },
   statsDivider: { width: StyleSheet.hairlineWidth, marginVertical: 12 },
 
@@ -541,8 +558,12 @@ const styles = StyleSheet.create({
 
   // Training Item
   trainingItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16 },
-  trainingLeft: { flex: 1 },
-  trainingTitle: { fontSize: 16, fontWeight: '500', marginBottom: 2 },
+  trainingContent: { flex: 1 },
+  trainingHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 3 },
+  trainingTitle: { fontSize: 16, fontWeight: '500', flex: 1 },
+  trainingLiveBadge: { flexDirection: 'row', alignItems: 'center', marginLeft: 8 },
+  trainingLiveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#34C759', marginRight: 4 },
+  trainingLiveText: { fontSize: 11, fontWeight: '600', color: '#34C759', letterSpacing: 0.3 },
   trainingMeta: { fontSize: 13 },
 
   // Activity Item

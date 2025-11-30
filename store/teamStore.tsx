@@ -4,16 +4,16 @@
  */
 
 import {
-    addTeamMember as addTeamMemberService,
-    createTeam as createTeamService,
-    deleteTeam as deleteTeamService,
-    getTeamWithMembers,
-    getWorkspaceTeams,
-    OrgCreateTeamInput,
-    removeTeamMember as removeTeamMemberService,
-    updateTeam as updateTeamService,
-    type AddTeamMemberInput,
-    type UpdateTeamInput
+  addTeamMember as addTeamMemberService,
+  createTeam as createTeamService,
+  deleteTeam as deleteTeamService,
+  getTeamWithMembers,
+  getWorkspaceTeams,
+  OrgCreateTeamInput,
+  removeTeamMember as removeTeamMemberService,
+  updateTeam as updateTeamService,
+  type AddTeamMemberInput,
+  type UpdateTeamInput
 } from '@/services/teamService';
 import type { Team, TeamWithMembers } from '@/types/workspace';
 import { create } from 'zustand';

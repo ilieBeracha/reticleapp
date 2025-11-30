@@ -68,12 +68,23 @@ function mapSession(row: any): SessionWithDetails {
 /**
  * Create a new session - supports both personal and org sessions
  * Can be linked to a training and/or drill
+ * 
+ * IMPORTANT: If joining a training, checks for existing active session first
  */
 export async function createSession(params: CreateSessionParams): Promise<SessionWithDetails> {
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) {
     throw new Error('Not authenticated');
+  }
+
+  // If joining a training, check if user already has an active session for it
+  if (params.training_id) {
+    const existingSession = await getMyActiveSessionForTraining(params.training_id);
+    if (existingSession) {
+      // Return existing session instead of creating duplicate
+      return existingSession;
+    }
   }
 
   // Direct insert for all sessions (RLS handles permissions)
@@ -111,6 +122,92 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
     .single();
 
   if (error) throw error;
+  return mapSession(data);
+}
+
+/**
+ * Get user's active session for a specific training (if any)
+ */
+export async function getMyActiveSessionForTraining(trainingId: string): Promise<SessionWithDetails | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from('sessions')
+    .select(`
+      id,
+      org_workspace_id,
+      user_id,
+      team_id,
+      training_id,
+      drill_id,
+      session_mode,
+      status,
+      started_at,
+      ended_at,
+      created_at,
+      updated_at,
+      profiles:user_id(full_name),
+      teams:team_id(name),
+      org_workspaces:org_workspace_id(name),
+      trainings:training_id(title),
+      training_drills:drill_id(name)
+    `)
+    .eq('training_id', trainingId)
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+  
+  return mapSession(data);
+}
+
+/**
+ * Get user's active session (any)
+ */
+export async function getMyActiveSession(): Promise<SessionWithDetails | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from('sessions')
+    .select(`
+      id,
+      org_workspace_id,
+      user_id,
+      team_id,
+      training_id,
+      drill_id,
+      session_mode,
+      status,
+      started_at,
+      ended_at,
+      created_at,
+      updated_at,
+      profiles:user_id(full_name),
+      teams:team_id(name),
+      org_workspaces:org_workspace_id(name),
+      trainings:training_id(title),
+      training_drills:drill_id(name)
+    `)
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .order('started_at', { ascending: false })
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+  
   return mapSession(data);
 }
 
@@ -492,14 +589,26 @@ export async function getSessionSummary(sessionId: string): Promise<{
  * Save paper target results (upsert)
  */
 export async function savePaperTargetResult(params: CreatePaperResultParams): Promise<PaperTargetResult> {
+  console.log('[SessionService] savePaperTargetResult called with:', {
+    session_target_id: params.session_target_id,
+    paper_type: params.paper_type,
+    bullets_fired: params.bullets_fired,
+    hits_total: params.hits_total,
+  });
+  
   // Check if result already exists for this target
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from('paper_target_results')
     .select('id')
     .eq('session_target_id', params.session_target_id)
     .single();
 
+  if (existingError && existingError.code !== 'PGRST116') {
+    console.error('[SessionService] Error checking existing result:', existingError);
+  }
+
   if (existing) {
+    console.log('[SessionService] Updating existing paper result:', existing.id);
     // Update existing result
     const { data, error } = await supabase
       .from('paper_target_results')
@@ -518,10 +627,15 @@ export async function savePaperTargetResult(params: CreatePaperResultParams): Pr
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('[SessionService] Error updating paper result:', error);
+      throw error;
+    }
+    console.log('[SessionService] Paper result updated:', data.id);
     return data;
   }
 
+  console.log('[SessionService] Inserting new paper result');
   // Insert new result
   const { data, error } = await supabase
     .from('paper_target_results')
@@ -540,7 +654,11 @@ export async function savePaperTargetResult(params: CreatePaperResultParams): Pr
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('[SessionService] Error inserting paper result:', error);
+    throw error;
+  }
+  console.log('[SessionService] Paper result inserted:', data.id);
   return data;
 }
 
@@ -838,6 +956,8 @@ export async function addTargetWithPaperResult(params: {
   scanned_image_url?: string | null;
   result_notes?: string | null;
 }): Promise<SessionTargetWithResults> {
+  console.log('[SessionService] addTargetWithPaperResult called');
+  
   // First create the target
   const target = await addSessionTarget({
     session_id: params.session_id,
@@ -848,6 +968,7 @@ export async function addTargetWithPaperResult(params: {
     notes: params.notes,
     target_data: params.target_data,
   });
+  console.log('[SessionService] Target created:', target.id);
 
   // Then save the paper result
   const paperResult = await savePaperTargetResult({
@@ -862,6 +983,7 @@ export async function addTargetWithPaperResult(params: {
     scanned_image_url: params.scanned_image_url,
     notes: params.result_notes,
   });
+  console.log('[SessionService] Paper result created:', paperResult.id);
 
   return {
     ...target,

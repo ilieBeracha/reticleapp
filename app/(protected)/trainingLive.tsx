@@ -1,28 +1,27 @@
 import { BaseAvatar } from "@/components/BaseAvatar";
 import {
-  getSessionTargets,
+  calculateSessionStats,
+  createSession,
+  getMyActiveSessionForTraining,
+  getSessionTargetsWithResults,
   getTrainingSessions,
-  SessionTarget,
   SessionWithDetails,
 } from "@/services/sessionService";
+import { getTeamWithMembers } from "@/services/teamService";
 import {
   finishTraining,
   getTrainingById,
   startTraining,
 } from "@/services/trainingService";
-import type { TrainingWithDetails } from "@/types/workspace";
+import type { TeamWithMembers, TrainingDrill, TrainingWithDetails } from "@/types/workspace";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Animated,
   Dimensions,
-  Easing,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -30,227 +29,118 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Circle, Defs, G, Line, RadialGradient, Stop } from "react-native-svg";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const VISUALIZATION_SIZE = SCREEN_WIDTH * 0.55;
 
 // ============================================================================
 // TYPES
 // ============================================================================
-interface ParticipantData {
-  session: SessionWithDetails;
-  targets: SessionTarget[];
+interface SessionWithStats extends SessionWithDetails {
+  targetCount: number;
+  accuracy: number;
 }
 
 // ============================================================================
-// TRAINING VISUALIZATION (aggregate view)
+// INFO CARD
 // ============================================================================
-const TrainingVisualization = React.memo(function TrainingVisualization({
-  totalTargets,
-  activeParticipants,
-  status,
-}: {
-  totalTargets: number;
-  activeParticipants: number;
-  status: string;
-}) {
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-  const glowAnim = useRef(new Animated.Value(0.6)).current;
-  const isActive = status === 'ongoing';
-
-  useEffect(() => {
-    if (!isActive) return;
-    
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.03,
-          duration: 2500,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 2500,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-
-    Animated.loop(
-      Animated.timing(rotateAnim, {
-        toValue: 1,
-        duration: 80000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    ).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim, {
-          toValue: 1,
-          duration: 2000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(glowAnim, {
-          toValue: 0.6,
-          duration: 2000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, [isActive]);
-
-  const spin = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
-  });
-
-  const primaryColor = isActive ? "#10B981" : status === 'finished' ? "#6B7280" : "#3B82F6";
-  const rings = [0.85, 0.65, 0.45, 0.25];
-
-  return (
-    <View style={styles.visualizationContainer}>
-      <Animated.View
-        style={[
-          styles.outerGlow,
-          {
-            opacity: isActive ? glowAnim : 0.3,
-            backgroundColor: `${primaryColor}15`,
-          },
-        ]}
-      />
-
-      <Animated.View
-        style={[
-          styles.visualization,
-          { transform: [{ rotate: isActive ? spin : "0deg" }, { scale: isActive ? pulseAnim : 1 }] },
-        ]}
-      >
-        <Svg width={VISUALIZATION_SIZE} height={VISUALIZATION_SIZE} viewBox="0 0 200 200">
-          <Defs>
-            <RadialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
-              <Stop offset="0%" stopColor={primaryColor} stopOpacity="0.6" />
-              <Stop offset="60%" stopColor={primaryColor} stopOpacity="0.2" />
-              <Stop offset="100%" stopColor={primaryColor} stopOpacity="0" />
-            </RadialGradient>
-          </Defs>
-
-          <Circle cx="100" cy="100" r="95" fill="url(#glowGrad)" />
-
-          {rings.map((size, i) => (
-            <G key={i}>
-              <Circle
-                cx="100"
-                cy="100"
-                r={95 * size}
-                fill="none"
-                stroke={primaryColor}
-                strokeWidth={1.5}
-                strokeDasharray={i > 0 ? "4 6" : "0"}
-                opacity={0.4 - i * 0.08}
-              />
-            </G>
-          ))}
-
-          <Line x1="100" y1="15" x2="100" y2="40" stroke={primaryColor} strokeWidth="1.5" opacity="0.5" />
-          <Line x1="100" y1="160" x2="100" y2="185" stroke={primaryColor} strokeWidth="1.5" opacity="0.5" />
-          <Line x1="15" y1="100" x2="40" y2="100" stroke={primaryColor} strokeWidth="1.5" opacity="0.5" />
-          <Line x1="160" y1="100" x2="185" y2="100" stroke={primaryColor} strokeWidth="1.5" opacity="0.5" />
-
-          <Circle cx="100" cy="100" r="12" fill={primaryColor} opacity="0.3" />
-          <Circle cx="100" cy="100" r="6" fill={primaryColor} opacity="0.6" />
-          <Circle cx="100" cy="100" r="2" fill="#fff" opacity="0.8" />
-        </Svg>
-      </Animated.View>
-
-      {/* Central Stats Overlay */}
-      <View style={styles.vizOverlay}>
-        <Text style={[styles.vizMainNumber, { color: primaryColor }]}>{totalTargets}</Text>
-        <Text style={styles.vizLabel}>TARGETS</Text>
-      </View>
-    </View>
-  );
-});
-
-// ============================================================================
-// PARTICIPANT CARD
-// ============================================================================
-const ParticipantCard = React.memo(function ParticipantCard({
-  participant,
-  isCurrentUser,
-  onAddTarget,
-}: {
-  participant: ParticipantData;
-  isCurrentUser: boolean;
-  onAddTarget?: () => void;
-}) {
-  const { session, targets } = participant;
-  const isActive = session.status === 'active';
-  
-  return (
-    <View style={[styles.participantCard, isCurrentUser && styles.participantCardHighlight]}>
-      <View style={styles.participantHeader}>
-        <View style={styles.participantInfo}>
-          <BaseAvatar 
-            fallbackText={session.user_full_name || 'UN'} 
-            size="sm"
-          />
-          <View style={styles.participantName}>
-            <View style={styles.nameRow}>
-              <Text style={styles.participantNameText} numberOfLines={1}>
-                {session.user_full_name || 'Unknown'}
-              </Text>
-              {isCurrentUser && (
-                <View style={styles.youBadge}>
-                  <Text style={styles.youBadgeText}>YOU</Text>
-                </View>
-              )}
-            </View>
-            <Text style={styles.participantStatus}>
-              {isActive ? 'Active' : session.status}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.participantStats}>
-          <Text style={styles.participantTargetCount}>{targets.length}</Text>
-          <Text style={styles.participantTargetLabel}>targets</Text>
-        </View>
-      </View>
-      
-      {isCurrentUser && isActive && onAddTarget && (
-        <TouchableOpacity style={styles.addTargetMini} onPress={onAddTarget} activeOpacity={0.8}>
-          <Ionicons name="add" size={18} color="#000" />
-          <Text style={styles.addTargetMiniText}>Add Target</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-});
-
-// ============================================================================
-// STAT PILL
-// ============================================================================
-const StatPill = React.memo(function StatPill({
+const InfoCard = React.memo(function InfoCard({
   icon,
-  value,
   label,
+  value,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
-  value: string | number;
+  icon: string;
   label: string;
+  value: string;
 }) {
   return (
-    <View style={styles.statPill}>
-      <Ionicons name={icon} size={14} color="rgba(255,255,255,0.5)" />
-      <Text style={styles.statPillValue}>{value}</Text>
-      <Text style={styles.statPillLabel}>{label}</Text>
+    <View style={styles.infoCard}>
+      <View style={styles.infoCardIcon}>
+        <Ionicons name={icon as any} size={20} color="rgba(255,255,255,0.5)" />
+      </View>
+      <View style={styles.infoCardContent}>
+        <Text style={styles.infoCardLabel}>{label}</Text>
+        <Text style={styles.infoCardValue}>{value}</Text>
+      </View>
+    </View>
+  );
+});
+
+// ============================================================================
+// DRILL ITEM
+// ============================================================================
+const DrillItem = React.memo(function DrillItem({
+  drill,
+  index,
+}: {
+  drill: TrainingDrill;
+  index: number;
+}) {
+  return (
+    <View style={styles.drillItem}>
+      <View style={styles.drillNumber}>
+        <Text style={styles.drillNumberText}>{index + 1}</Text>
+      </View>
+      <View style={styles.drillInfo}>
+        <Text style={styles.drillName}>{drill.name}</Text>
+        <Text style={styles.drillMeta}>
+          {drill.distance_m}m • {drill.rounds_per_shooter} rounds • {drill.target_type}
+        </Text>
+      </View>
+    </View>
+  );
+});
+
+// ============================================================================
+// SESSION ITEM
+// ============================================================================
+const SessionItem = React.memo(function SessionItem({
+  session,
+  isMe,
+  onPress,
+}: {
+  session: SessionWithStats;
+  isMe: boolean;
+  onPress: () => void;
+}) {
+  const isActive = session.status === "active";
+  const name = session.user_full_name || "Unknown";
+  const initials = name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+
+  return (
+    <TouchableOpacity style={styles.sessionItem} onPress={onPress} activeOpacity={0.7}>
+      <View style={styles.sessionAvatar}>
+        <BaseAvatar fallbackText={initials} size="sm" />
+        {isActive && <View style={styles.sessionActiveDot} />}
+      </View>
+      <View style={styles.sessionInfo}>
+        <Text style={styles.sessionName}>{name}{isMe ? ' (You)' : ''}</Text>
+        <Text style={styles.sessionMeta}>
+          {session.targetCount} targets • {session.accuracy}% accuracy
+        </Text>
+      </View>
+      {session.status === 'active' && (
+        <View style={styles.activeTag}>
+          <Text style={styles.activeTagText}>Active</Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+});
+
+// ============================================================================
+// EMPTY STATE
+// ============================================================================
+const EmptyState = React.memo(function EmptyState({
+  icon,
+  text,
+}: {
+  icon: string;
+  text: string;
+}) {
+  return (
+    <View style={styles.emptyCard}>
+      <Ionicons name={icon as any} size={28} color="rgba(255,255,255,0.2)" />
+      <Text style={styles.emptyText}>{text}</Text>
     </View>
   );
 });
@@ -258,48 +148,68 @@ const StatPill = React.memo(function StatPill({
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
-export default function TrainingLiveScreen() {
+export default function TrainingScreen() {
   const insets = useSafeAreaInsets();
   const { trainingId } = useLocalSearchParams<{ trainingId: string }>();
 
   const [training, setTraining] = useState<TrainingWithDetails | null>(null);
-  const [participants, setParticipants] = useState<ParticipantData[]>([]);
+  const [team, setTeam] = useState<TeamWithMembers | null>(null);
+  const [sessions, setSessions] = useState<SessionWithStats[]>([]);
+  const [mySession, setMySession] = useState<SessionWithDetails | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [creatorName, setCreatorName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Load all data
+  // Load data
   const loadData = useCallback(async () => {
     if (!trainingId) return;
     try {
-      const [trainingData, sessions] = await Promise.all([
+      const { supabase } = await import("@/lib/supabase");
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUserId(user?.id || null);
+
+      const [trainingData, trainingSessions, activeSession] = await Promise.all([
         getTrainingById(trainingId),
         getTrainingSessions(trainingId),
+        getMyActiveSessionForTraining(trainingId),
       ]);
-      
+
       setTraining(trainingData);
-      
-      // Load targets for each session
-      const participantsWithTargets = await Promise.all(
-        sessions.map(async (session) => {
-          const targets = await getSessionTargets(session.id);
-          return { session, targets };
+      setMySession(activeSession);
+
+      // Get creator name
+      if (trainingData?.created_by) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', trainingData.created_by)
+          .single();
+        setCreatorName(profile?.full_name || null);
+      }
+
+      // Load stats for sessions
+      const sessionsWithStats: SessionWithStats[] = await Promise.all(
+        trainingSessions.map(async (s) => {
+          const [stats, targets] = await Promise.all([
+            calculateSessionStats(s.id),
+            getSessionTargetsWithResults(s.id),
+          ]);
+          return { ...s, targetCount: targets.length, accuracy: stats.accuracyPct };
         })
       );
-      
-      setParticipants(participantsWithTargets);
-      
-      // Get current user ID from first session or training
-      if (sessions.length > 0) {
-        // We'll mark current user based on training creator for now
-        // In real app, get from auth context
+
+      sessionsWithStats.sort((a, b) => b.accuracy - a.accuracy);
+      setSessions(sessionsWithStats);
+
+      if (trainingData?.team_id) {
+        const teamData = await getTeamWithMembers(trainingData.team_id);
+        setTeam(teamData);
       }
     } catch (error) {
-      console.error("Failed to load training:", error);
+      console.error("Failed to load:", error);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, [trainingId]);
 
@@ -307,45 +217,27 @@ export default function TrainingLiveScreen() {
     loadData();
   }, [loadData]);
 
-  const handleRefresh = useCallback(() => {
-    setRefreshing(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    loadData();
-  }, [loadData]);
-
-  // Computed values
-  const totalTargets = useMemo(() => 
-    participants.reduce((sum, p) => sum + p.targets.length, 0), 
-    [participants]
-  );
-  
-  const activeCount = useMemo(() => 
-    participants.filter(p => p.session.status === 'active').length, 
-    [participants]
-  );
-
-  // Training timer
-  const [elapsed, setElapsed] = useState(0);
-  useEffect(() => {
-    if (!training || training.status !== 'ongoing') return;
-    
-    const start = training.started_at 
-      ? new Date(training.started_at).getTime() 
-      : Date.now();
-    
-    const updateTimer = () => setElapsed(Math.floor((Date.now() - start) / 1000));
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
+  // Formatted values
+  const formattedDate = useMemo(() => {
+    if (!training?.scheduled_at) return "Not scheduled";
+    const date = new Date(training.scheduled_at);
+    return date.toLocaleDateString("en-US", { 
+      weekday: "long", 
+      month: "long", 
+      day: "numeric",
+      year: "numeric"
+    });
   }, [training]);
 
-  const formatTime = (seconds: number) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    if (h > 0) return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-    return `${m}:${s.toString().padStart(2, "0")}`;
-  };
+  const formattedTime = useMemo(() => {
+    if (!training?.scheduled_at) return "";
+    const date = new Date(training.scheduled_at);
+    return date.toLocaleTimeString("en-US", { 
+      hour: "numeric", 
+      minute: "2-digit",
+      hour12: true 
+    });
+  }, [training]);
 
   // Actions
   const handleStartTraining = useCallback(async () => {
@@ -354,56 +246,76 @@ export default function TrainingLiveScreen() {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       await startTraining(training.id);
-      setTraining(prev => prev ? { ...prev, status: 'ongoing', started_at: new Date().toISOString() } : null);
+      setTraining((prev) => (prev ? { ...prev, status: "ongoing" } : null));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to start training');
+      Alert.alert("Error", error.message);
     } finally {
       setActionLoading(false);
     }
   }, [training]);
 
-  const handleFinishTraining = useCallback(async () => {
+  const handleStartSession = useCallback(async () => {
     if (!training) return;
-    Alert.alert('Finish Training?', `End training with ${totalTargets} total targets logged?`, [
-      { text: 'Cancel', style: 'cancel' },
+    setActionLoading(true);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      const session = await createSession({
+        training_id: training.id,
+        team_id: training.team_id || undefined,
+        org_workspace_id: training.org_workspace_id || undefined,
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.push({
+        pathname: "/(protected)/activeSession",
+        params: { sessionId: session.id },
+      });
+    } catch (error: any) {
+      Alert.alert("Error", error.message);
+    } finally {
+      setActionLoading(false);
+    }
+  }, [training]);
+
+  const handleContinueSession = useCallback(() => {
+    if (!mySession) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push({
+      pathname: "/(protected)/activeSession",
+      params: { sessionId: mySession.id },
+    });
+  }, [mySession]);
+
+  const handleEndTraining = useCallback(async () => {
+    if (!training) return;
+    Alert.alert("Mark as Completed?", "This will end the training for all participants.", [
+      { text: "Cancel", style: "cancel" },
       {
-        text: 'Finish',
+        text: "Complete",
         onPress: async () => {
           setActionLoading(true);
           try {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             await finishTraining(training.id);
-            setTraining(prev => prev ? { ...prev, status: 'finished' } : null);
+            setTraining((prev) => (prev ? { ...prev, status: "finished" } : null));
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to finish training');
+            Alert.alert("Error", error.message);
           } finally {
             setActionLoading(false);
           }
         },
       },
     ]);
-  }, [training, totalTargets]);
-
-  const handleAddTarget = useCallback((sessionId: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push({
-      pathname: "/(protected)/addTarget",
-      params: { sessionId },
-    });
-  }, []);
-
-  const handleJoinTraining = useCallback(() => {
-    if (!training) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push({
-      pathname: "/(protected)/createSession",
-      params: { trainingId: training.id },
-    });
   }, [training]);
 
-  const handleClose = useCallback(() => {
+  const handleSessionPress = useCallback((session: SessionWithStats) => {
+    if (session.user_id === currentUserId && session.status === "active") {
+      handleContinueSession();
+    }
+  }, [currentUserId, handleContinueSession]);
+
+  const handleBack = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.back();
   }, []);
@@ -413,7 +325,6 @@ export default function TrainingLiveScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#10B981" />
-        <Text style={styles.loadingText}>Loading training...</Text>
       </View>
     );
   }
@@ -423,179 +334,155 @@ export default function TrainingLiveScreen() {
       <View style={styles.errorContainer}>
         <Ionicons name="alert-circle" size={48} color="#EF4444" />
         <Text style={styles.errorText}>Training not found</Text>
-        <TouchableOpacity style={styles.errorButton} onPress={handleClose}>
+        <TouchableOpacity style={styles.errorButton} onPress={handleBack}>
           <Text style={styles.errorButtonText}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  const isOngoing = training.status === 'ongoing';
-  const isPlanned = training.status === 'planned';
-  const isFinished = training.status === 'finished';
-  const statusColor = isOngoing ? '#10B981' : isFinished ? '#6B7280' : '#3B82F6';
+  const isLive = training.status === "ongoing";
+  const isPlanned = training.status === "planned";
+  const isFinished = training.status === "finished";
+
+  const statusLabel = isLive ? "In Progress" : isFinished ? "Completed" : "Scheduled";
+  const statusColor = isLive ? "#10B981" : isFinished ? "rgba(255,255,255,0.4)" : "#3B82F6";
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity style={styles.headerButton} onPress={handleClose}>
-          <Ionicons name="chevron-down" size={28} color="#fff" />
+        <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
+          <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
-
         <View style={styles.headerCenter}>
-          <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-          <Text style={styles.headerTitle}>
-            {isOngoing ? 'LIVE' : isFinished ? 'FINISHED' : 'PLANNED'}
-          </Text>
+          <View style={styles.grabber} />
         </View>
-
-        <TouchableOpacity style={styles.headerButton} onPress={handleRefresh}>
-          <Ionicons name="refresh-outline" size={22} color="#fff" />
-        </TouchableOpacity>
+        <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
+      <ScrollView 
+        style={styles.scroll} 
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#10B981" />
-        }
       >
-        {/* Training Title */}
-        <Text style={styles.trainingTitle}>{training.title}</Text>
-        {training.team && (
-          <Text style={styles.trainingTeam}>{training.team.name}</Text>
-        )}
-
-        {/* Timer (only when ongoing) */}
-        {isOngoing && (
-          <View style={styles.timerContainer}>
-            <Text style={styles.timerValue}>{formatTime(elapsed)}</Text>
-            <Text style={styles.timerLabel}>elapsed</Text>
+        {/* Status Badge */}
+        <View style={styles.statusSection}>
+          <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
+            {isLive && <View style={[styles.statusDot, { backgroundColor: statusColor }]} />}
+            <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
           </View>
-        )}
-
-        {/* Visualization */}
-        <TrainingVisualization 
-          totalTargets={totalTargets}
-          activeParticipants={activeCount}
-          status={training.status}
-        />
-
-        {/* Stats Row */}
-        <View style={styles.statsRow}>
-          <StatPill icon="people" value={participants.length} label="joined" />
-          <StatPill icon="pulse" value={activeCount} label="active" />
-          <StatPill icon="flag" value={training.drills?.length || 0} label="drills" />
         </View>
 
-        {/* Participants Section */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>PARTICIPANTS</Text>
-          <Text style={styles.sectionCount}>{participants.length}</Text>
+        {/* Title */}
+        <Text style={styles.title}>{training.title}</Text>
+
+        {/* Info Cards */}
+        <View style={styles.infoSection}>
+          <InfoCard icon="calendar-outline" label="Date" value={formattedDate} />
+          {formattedTime && (
+            <InfoCard icon="time-outline" label="Time" value={formattedTime} />
+          )}
+          {team && (
+            <InfoCard icon="people-outline" label="Team" value={team.name} />
+          )}
         </View>
 
-        {participants.length === 0 ? (
-          <View style={styles.emptyParticipants}>
-            <Ionicons name="people-outline" size={32} color="rgba(255,255,255,0.2)" />
-            <Text style={styles.emptyText}>No one has joined yet</Text>
-          </View>
-        ) : (
-          <View style={styles.participantsList}>
-            {participants.map((p) => (
-              <ParticipantCard
-                key={p.session.id}
-                participant={p}
-                isCurrentUser={p.session.user_id === currentUserId}
-                onAddTarget={p.session.status === 'active' ? () => handleAddTarget(p.session.id) : undefined}
+        {/* Drills Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Drills ({training.drills?.length || 0})</Text>
+          {training.drills && training.drills.length > 0 ? (
+            training.drills.map((drill, idx) => (
+              <DrillItem key={drill.id} drill={drill} index={idx} />
+            ))
+          ) : (
+            <EmptyState icon="list-outline" text="No drills scheduled" />
+          )}
+        </View>
+
+        {/* Sessions Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Sessions ({sessions.length})</Text>
+          {sessions.length > 0 ? (
+            sessions.map((session) => (
+              <SessionItem
+                key={session.id}
+                session={session}
+                isMe={session.user_id === currentUserId}
+                onPress={() => handleSessionPress(session)}
               />
-            ))}
-          </View>
-        )}
+            ))
+          ) : (
+            <EmptyState icon="pulse-outline" text="No sessions logged yet" />
+          )}
+        </View>
 
-        {/* Drills Preview */}
-        {training.drills && training.drills.length > 0 && (
-          <>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>DRILLS</Text>
-            </View>
-            <View style={styles.drillsList}>
-              {training.drills.map((drill, i) => (
-                <View key={drill.id} style={styles.drillPill}>
-                  <Text style={styles.drillIndex}>#{i + 1}</Text>
-                  <Text style={styles.drillName}>{drill.name}</Text>
-                  <Text style={styles.drillMeta}>{drill.distance_m}m · {drill.rounds_per_shooter}rds</Text>
-                </View>
-              ))}
-            </View>
-          </>
+        {/* Creator */}
+        {creatorName && (
+          <Text style={styles.creatorText}>Created by {creatorName}</Text>
         )}
       </ScrollView>
 
       {/* Bottom Actions */}
-      <View style={[styles.bottomActions, { paddingBottom: insets.bottom + 16 }]}>
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
+        {/* Planned: Show Start Training */}
         {isPlanned && (
           <TouchableOpacity
-            style={styles.primaryAction}
+            style={styles.primaryBtn}
             onPress={handleStartTraining}
             disabled={actionLoading}
-            activeOpacity={0.9}
+            activeOpacity={0.85}
           >
-            <LinearGradient
-              colors={["#3B82F6", "#60A5FA"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.primaryActionGradient}
-            >
-              {actionLoading ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <>
-                  <Ionicons name="play" size={20} color="#fff" />
-                  <Text style={styles.primaryActionText}>Start Training</Text>
-                </>
-              )}
-            </LinearGradient>
+            {actionLoading ? (
+              <ActivityIndicator color="#000" size="small" />
+            ) : (
+              <>
+                <Ionicons name="play-circle" size={22} color="#000" />
+                <Text style={styles.primaryBtnText}>Start Training</Text>
+              </>
+            )}
           </TouchableOpacity>
         )}
 
-        {isOngoing && (
-          <>
+        {/* Live: Show Enter/Continue Session + Mark Complete */}
+        {isLive && (
+          <View style={styles.liveActions}>
             <TouchableOpacity
-              style={styles.primaryAction}
-              onPress={handleJoinTraining}
-              activeOpacity={0.9}
-            >
-              <LinearGradient
-                colors={["#10B981", "#34D399"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.primaryActionGradient}
-              >
-                <Ionicons name="enter" size={20} color="#000" />
-                <Text style={[styles.primaryActionText, { color: "#000" }]}>Join Training</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.secondaryAction}
-              onPress={handleFinishTraining}
+              style={styles.primaryBtn}
+              onPress={mySession ? handleContinueSession : handleStartSession}
               disabled={actionLoading}
+              activeOpacity={0.85}
+            >
+              {actionLoading ? (
+                <ActivityIndicator color="#000" size="small" />
+              ) : (
+                <>
+                  <Ionicons 
+                    name={mySession ? "arrow-forward-circle" : "add-circle"} 
+                    size={22} 
+                    color="#000" 
+                  />
+                  <Text style={styles.primaryBtnText}>
+                    {mySession ? "Continue Session" : "Enter Session"}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.completeBtn} 
+              onPress={handleEndTraining}
               activeOpacity={0.7}
             >
-              <Text style={styles.secondaryActionText}>
-                {actionLoading ? 'Finishing...' : 'Finish Training'}
-              </Text>
+              <Ionicons name="checkmark" size={22} color="#10B981" />
             </TouchableOpacity>
-          </>
+          </View>
         )}
 
+        {/* Finished: Show completed state */}
         {isFinished && (
-          <View style={styles.finishedBanner}>
-            <Ionicons name="checkmark-circle" size={20} color="#6B7280" />
-            <Text style={styles.finishedText}>Training completed</Text>
+          <View style={styles.finishedBar}>
+            <Ionicons name="checkmark-circle" size={22} color="#10B981" />
+            <Text style={styles.finishedText}>Training Completed</Text>
           </View>
         )}
       </View>
@@ -611,16 +498,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#0A0A0A",
   },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+  },
   loadingContainer: {
     flex: 1,
     backgroundColor: "#0A0A0A",
     alignItems: "center",
     justifyContent: "center",
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.5)",
   },
   errorContainer: {
     flex: 1,
@@ -628,359 +516,288 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 12,
-    padding: 40,
   },
   errorText: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: 16,
     color: "#fff",
   },
   errorButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     backgroundColor: "rgba(255,255,255,0.1)",
-    marginTop: 8,
+    borderRadius: 8,
   },
   errorButtonText: {
     color: "#fff",
-    fontWeight: "600",
   },
 
   // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingBottom: 8,
   },
-  headerButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "rgba(255,255,255,0.08)",
     alignItems: "center",
     justifyContent: "center",
   },
   headerCenter: {
+    flex: 1,
+    alignItems: "center",
+  },
+  grabber: {
+    width: 36,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+
+  // Status
+  statusSection: {
+    alignItems: "center",
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  statusBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
   },
-  headerTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "rgba(255,255,255,0.8)",
-    letterSpacing: 1,
+  statusText: {
+    fontSize: 14,
+    fontWeight: "600",
   },
 
-  // Scroll
-  scrollView: {
+  // Title
+  title: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#fff",
+    textAlign: "center",
+    marginBottom: 24,
+  },
+
+  // Info Cards
+  infoSection: {
+    gap: 10,
+    marginBottom: 28,
+  },
+  infoCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 14,
+    padding: 16,
+    gap: 14,
+  },
+  infoCardIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  infoCardContent: {
     flex: 1,
   },
-  scrollContent: {
-    paddingHorizontal: 20,
-  },
-
-  // Training Info
-  trainingTitle: {
-    fontSize: 26,
-    fontWeight: "700",
-    color: "#fff",
-    textAlign: "center",
-    letterSpacing: -0.5,
-  },
-  trainingTeam: {
-    fontSize: 15,
-    color: "rgba(255,255,255,0.5)",
-    textAlign: "center",
-    marginTop: 4,
-  },
-
-  // Timer
-  timerContainer: {
-    alignItems: "center",
-    marginTop: 16,
-  },
-  timerValue: {
-    fontSize: 48,
-    fontWeight: "200",
-    color: "#10B981",
-    fontVariant: ["tabular-nums"],
-  },
-  timerLabel: {
+  infoCardLabel: {
     fontSize: 12,
     color: "rgba(255,255,255,0.4)",
-    textTransform: "uppercase",
-    letterSpacing: 2,
-    marginTop: -4,
+    marginBottom: 2,
   },
-
-  // Visualization
-  visualizationContainer: {
-    width: VISUALIZATION_SIZE,
-    height: VISUALIZATION_SIZE,
-    alignSelf: "center",
-    alignItems: "center",
-    justifyContent: "center",
-    marginVertical: 24,
-  },
-  outerGlow: {
-    position: "absolute",
-    width: VISUALIZATION_SIZE * 1.2,
-    height: VISUALIZATION_SIZE * 1.2,
-    borderRadius: VISUALIZATION_SIZE * 0.6,
-  },
-  visualization: {
-    width: VISUALIZATION_SIZE,
-    height: VISUALIZATION_SIZE,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  vizOverlay: {
-    position: "absolute",
-    alignItems: "center",
-  },
-  vizMainNumber: {
-    fontSize: 56,
-    fontWeight: "200",
-  },
-  vizLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "rgba(255,255,255,0.4)",
-    letterSpacing: 2,
-    marginTop: -4,
-  },
-
-  // Stats Row
-  statsRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 12,
-    marginBottom: 32,
-  },
-  statPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  statPillValue: {
-    fontSize: 15,
+  infoCardValue: {
+    fontSize: 16,
     fontWeight: "600",
     color: "#fff",
   },
-  statPillLabel: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.4)",
-  },
 
-  // Section
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 12,
+  // Sections
+  section: {
+    marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "rgba(255,255,255,0.4)",
-    letterSpacing: 1,
-  },
-  sectionCount: {
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: "600",
-    color: "rgba(255,255,255,0.3)",
+    color: "rgba(255,255,255,0.6)",
+    marginBottom: 12,
   },
 
-  // Participants
-  emptyParticipants: {
+  // Empty state
+  emptyCard: {
     alignItems: "center",
-    paddingVertical: 40,
-    gap: 8,
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: 14,
+    padding: 32,
+    gap: 10,
   },
   emptyText: {
     fontSize: 14,
     color: "rgba(255,255,255,0.3)",
   },
-  participantsList: {
-    gap: 8,
-    marginBottom: 24,
-  },
-  participantCard: {
+
+  // Drill Item
+  drillItem: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.04)",
-    borderRadius: 14,
+    borderRadius: 12,
     padding: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-  },
-  participantCardHighlight: {
-    borderColor: "rgba(16, 185, 129, 0.3)",
-    backgroundColor: "rgba(16, 185, 129, 0.08)",
-  },
-  participantHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  participantInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
+    marginBottom: 8,
     gap: 12,
   },
-  participantName: {
+  drillNumber: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  drillNumberText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#10B981",
+  },
+  drillInfo: {
     flex: 1,
   },
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  participantNameText: {
+  drillName: {
     fontSize: 15,
     fontWeight: "600",
     color: "#fff",
+    marginBottom: 2,
   },
-  youBadge: {
-    backgroundColor: "#10B981",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  youBadgeText: {
-    fontSize: 9,
-    fontWeight: "700",
-    color: "#000",
-    letterSpacing: 0.5,
-  },
-  participantStatus: {
-    fontSize: 12,
+  drillMeta: {
+    fontSize: 13,
     color: "rgba(255,255,255,0.4)",
-    marginTop: 2,
-    textTransform: "capitalize",
   },
-  participantStats: {
-    alignItems: "flex-end",
+
+  // Session Item
+  sessionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+    gap: 12,
   },
-  participantTargetCount: {
-    fontSize: 24,
+  sessionAvatar: {
+    position: "relative",
+  },
+  sessionActiveDot: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#10B981",
+    borderWidth: 2,
+    borderColor: "#0A0A0A",
+  },
+  sessionInfo: {
+    flex: 1,
+  },
+  sessionName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#fff",
+    marginBottom: 2,
+  },
+  sessionMeta: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.4)",
+  },
+  activeTag: {
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  activeTagText: {
+    fontSize: 12,
     fontWeight: "600",
     color: "#10B981",
   },
-  participantTargetLabel: {
-    fontSize: 10,
-    color: "rgba(255,255,255,0.4)",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginTop: -2,
-  },
-  addTargetMini: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    backgroundColor: "#10B981",
-    paddingVertical: 10,
-    borderRadius: 10,
-    marginTop: 12,
-  },
-  addTargetMiniText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#000",
-  },
 
-  // Drills
-  drillsList: {
-    gap: 8,
-    marginBottom: 24,
-  },
-  drillPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 10,
-  },
-  drillIndex: {
-    fontSize: 12,
-    fontWeight: "600",
+  // Creator
+  creatorText: {
+    fontSize: 13,
     color: "rgba(255,255,255,0.3)",
-    width: 24,
-  },
-  drillName: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#fff",
-  },
-  drillMeta: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.4)",
+    textAlign: "center",
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(255,255,255,0.1)",
   },
 
-  // Bottom Actions
-  bottomActions: {
+  // Bottom Bar
+  bottomBar: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
     paddingHorizontal: 20,
     paddingTop: 16,
-    backgroundColor: "rgba(10,10,10,0.95)",
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "#0A0A0A",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(255,255,255,0.1)",
   },
-  primaryAction: {
-    borderRadius: 28,
-    overflow: "hidden",
-  },
-  primaryActionGradient: {
+  primaryBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     height: 56,
+    borderRadius: 16,
+    backgroundColor: "#10B981",
     gap: 10,
+    flex: 1,
   },
-  primaryActionText: {
+  primaryBtnText: {
     fontSize: 17,
-    fontWeight: "700",
-    color: "#fff",
-  },
-  secondaryAction: {
-    alignItems: "center",
-    paddingVertical: 14,
-  },
-  secondaryActionText: {
-    fontSize: 15,
     fontWeight: "600",
-    color: "rgba(255,255,255,0.5)",
+    color: "#000",
   },
-  finishedBanner: {
+  liveActions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  completeBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  finishedBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    paddingVertical: 16,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    gap: 10,
   },
   finishedText: {
-    fontSize: 15,
-    color: "#6B7280",
+    fontSize: 16,
     fontWeight: "500",
+    color: "rgba(255,255,255,0.5)",
   },
 });
-

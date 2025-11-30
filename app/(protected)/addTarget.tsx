@@ -1,7 +1,7 @@
 import {
-    addTargetWithPaperResult,
-    addTargetWithTacticalResult,
-    PaperType
+  addTargetWithPaperResult,
+  addTargetWithTacticalResult,
+  PaperType
 } from "@/services/sessionService";
 import { useDetectionStore } from "@/store/detectionStore";
 import type { AnalyzeResponse, Detection } from "@/types/api";
@@ -13,18 +13,20 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Image,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import Svg, { Circle, G, Line } from "react-native-svg";
 
@@ -120,7 +122,7 @@ const DetectionEditor = React.memo(function DetectionEditor({
 
   // Calculate scale factor from original image to canvas
   const scale = useMemo(() => {
-    if (!result.metadata) return { x: 1, y: 1 };
+    if (!result.metadata) return { x: 1, y: 1, offsetX: 0, offsetY: 0, displayWidth: CANVAS_SIZE, displayHeight: CANVAS_SIZE };
     const imgAspect = result.metadata.width / result.metadata.height;
     const canvasAspect = CANVAS_SIZE / CANVAS_SIZE;
     
@@ -346,7 +348,72 @@ const ResultCard = React.memo(function ResultCard({
   editedDetections: EditableDetection[];
   onDetectionsChange: (detections: EditableDetection[]) => void;
 }) {
-  const [editMode, setEditMode] = useState<'add' | 'remove'>('remove');
+  const [editMode, setEditMode] = useState<'add' | 'remove'>('add'); // Default: ADD mode
+  const [editingEnabled, setEditingEnabled] = useState(false);
+  const [editorModalVisible, setEditorModalVisible] = useState(false);
+  
+  // Animation for modal
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  
+  // Handle editor toggle with animation
+  const handleToggleEditor = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (!editingEnabled) {
+      setEditingEnabled(true);
+      setEditorModalVisible(true);
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 8,
+          tension: 65,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 0,
+          friction: 8,
+          tension: 65,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setEditorModalVisible(false);
+        setEditingEnabled(false);
+      });
+    }
+  }, [editingEnabled, scaleAnim, opacityAnim]);
+
+  const handleCloseEditor = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: 0,
+        friction: 8,
+        tension: 65,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setEditorModalVisible(false);
+      setEditingEnabled(false);
+    });
+  }, [scaleAnim, opacityAnim]);
   
   // Calculate stats from edited detections
   const stats = useMemo(() => {
@@ -369,19 +436,125 @@ const ResultCard = React.memo(function ResultCard({
       {/* Header */}
       <View style={editorStyles.header}>
         <Text style={editorStyles.title}>Review Detections</Text>
-        <Text style={editorStyles.subtitle}>
-          Correct any errors in the AI detection
-        </Text>
+        <Text style={editorStyles.subtitle}>AI detected bullet holes</Text>
       </View>
 
-      {/* Detection Editor Canvas */}
-      <DetectionEditor
-        result={result}
-        detections={editedDetections}
-        onDetectionsChange={onDetectionsChange}
-        editMode={editMode}
-        onModeChange={setEditMode}
-      />
+      {/* View-Only Preview: Show image with markers */}
+      <View style={editorStyles.viewOnlyContainer}>
+        <Image
+          source={{ uri: `data:image/jpeg;base64,${result.original_image_base64}` }}
+          style={editorStyles.viewOnlyImage}
+          resizeMode="contain"
+        />
+        {/* Overlay markers on image */}
+        <View style={editorStyles.markersOverlay}>
+          <Svg width={CANVAS_SIZE} height={CANVAS_SIZE} viewBox={`0 0 ${CANVAS_SIZE} ${CANVAS_SIZE}`}>
+            {editedDetections.map((detection) => {
+              // Calculate scale for overlay
+              const imgAspect = result.metadata ? result.metadata.width / result.metadata.height : 1;
+              const canvasAspect = 1;
+              let scaleX = 1, scaleY = 1, offsetX = 0, offsetY = 0;
+              if (imgAspect > canvasAspect) {
+                const displayWidth = CANVAS_SIZE;
+                const displayHeight = CANVAS_SIZE / imgAspect;
+                scaleX = displayWidth / (result.metadata?.width || 1);
+                scaleY = displayHeight / (result.metadata?.height || 1);
+                offsetY = (CANVAS_SIZE - displayHeight) / 2;
+              } else {
+                const displayHeight = CANVAS_SIZE;
+                const displayWidth = CANVAS_SIZE * imgAspect;
+                scaleX = displayWidth / (result.metadata?.width || 1);
+                scaleY = displayHeight / (result.metadata?.height || 1);
+                offsetX = (CANVAS_SIZE - displayWidth) / 2;
+              }
+              const cx = detection.center[0] * scaleX + offsetX;
+              const cy = detection.center[1] * scaleY + offsetY;
+              
+              return (
+                <G key={detection.id}>
+                  <Circle cx={cx} cy={cy} r={MARKER_RADIUS + 4} fill="none" stroke="#10B981" strokeWidth={1} opacity={0.4} />
+                  <Circle cx={cx} cy={cy} r={MARKER_RADIUS} fill="none" stroke="#10B981" strokeWidth={2.5} />
+                </G>
+              );
+            })}
+          </Svg>
+        </View>
+      </View>
+
+      {/* Edit Toggle Button */}
+      <TouchableOpacity
+        style={editorStyles.editToggle}
+        onPress={handleToggleEditor}
+        activeOpacity={0.7}
+      >
+        <View style={[editorStyles.editToggleIcon, editingEnabled && editorStyles.editToggleIconActive]}>
+          <Ionicons name="pencil" size={16} color={editingEnabled ? '#000' : 'rgba(255,255,255,0.6)'} />
+        </View>
+        <Text style={editorStyles.editToggleText}>
+          {editingEnabled ? 'Editing...' : 'Edit Detections'}
+        </Text>
+        <Ionicons name="expand-outline" size={18} color="rgba(255,255,255,0.4)" />
+      </TouchableOpacity>
+
+      {/* Editor Modal (grows from center) */}
+      <Modal
+        visible={editorModalVisible}
+        transparent
+        animationType="none"
+        onRequestClose={handleCloseEditor}
+      >
+        <Animated.View 
+          style={[
+            editorStyles.editorModalOverlay,
+            { opacity: opacityAnim }
+          ]}
+        >
+          <Pressable style={editorStyles.editorModalBackdrop} onPress={handleCloseEditor} />
+          <Animated.View 
+            style={[
+              editorStyles.editorModalContent,
+              {
+                transform: [{ scale: scaleAnim }],
+                opacity: opacityAnim,
+              }
+            ]}
+          >
+            {/* Modal Header */}
+            <View style={editorStyles.editorModalHeader}>
+              <Text style={editorStyles.editorModalTitle}>Edit Detections</Text>
+              <TouchableOpacity onPress={handleCloseEditor} style={editorStyles.editorModalClose}>
+                <Ionicons name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            
+            {/* Detection Editor */}
+            <DetectionEditor
+              result={result}
+              detections={editedDetections}
+              onDetectionsChange={onDetectionsChange}
+              editMode={editMode}
+              onModeChange={setEditMode}
+            />
+            
+            {/* Stats in Modal */}
+            <View style={editorStyles.editorModalStats}>
+              <Text style={editorStyles.editorModalStatsText}>
+                {stats.total} hits • {stats.manual} added manually
+              </Text>
+            </View>
+            
+            {/* Done Button */}
+            <TouchableOpacity 
+              style={editorStyles.editorModalDone}
+              onPress={handleCloseEditor}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="checkmark-circle" size={20} color="#000" />
+              <Text style={editorStyles.editorModalDoneText}>Done Editing</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
 
       {/* Live Stats */}
       <View style={editorStyles.statsContainer}>
@@ -447,10 +620,10 @@ const ResultCard = React.memo(function ResultCard({
         style={styles.doneButton} 
         onPress={() => onDone(editedDetections)} 
         activeOpacity={0.9}
-        disabled={saving || stats.total === 0}
+        disabled={saving}
       >
         <LinearGradient
-          colors={saving || stats.total === 0 ? ["#6B7280", "#9CA3AF"] : ["#10B981", "#34D399"]}
+          colors={saving ? ["#6B7280", "#9CA3AF"] : ["#10B981", "#34D399"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.doneButtonGradient}
@@ -461,7 +634,7 @@ const ResultCard = React.memo(function ResultCard({
             <>
               <Ionicons name="checkmark-circle" size={22} color="#000" />
               <Text style={styles.doneButtonText}>
-                Save {stats.total} Hit{stats.total !== 1 ? 's' : ''}
+                {stats.total === 0 ? 'Save (No Hits)' : `Save ${stats.total} Hit${stats.total !== 1 ? 's' : ''}`}
               </Text>
             </>
           )}
@@ -621,6 +794,145 @@ const editorStyles = StyleSheet.create({
     fontSize: 13,
     color: '#3B82F6',
     fontWeight: '500',
+  },
+  // View-only mode styles
+  viewOnlyContainer: {
+    width: CANVAS_SIZE,
+    height: CANVAS_SIZE,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#1a1a1a',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  viewOnlyImage: {
+    width: CANVAS_SIZE,
+    height: CANVAS_SIZE,
+  },
+  markersOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: CANVAS_SIZE,
+    height: CANVAS_SIZE,
+  },
+  // Edit toggle styles
+  editToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    gap: 12,
+  },
+  editToggleIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editToggleIconActive: {
+    backgroundColor: '#10B981',
+  },
+  editToggleText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.8)',
+  },
+  editTogglePill: {
+    width: 44,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    padding: 2,
+    justifyContent: 'center',
+  },
+  editTogglePillActive: {
+    backgroundColor: '#10B981',
+  },
+  editToggleKnob: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#fff',
+  },
+  editToggleKnobActive: {
+    alignSelf: 'flex-end',
+  },
+  // Editor Modal styles
+  editorModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editorModalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  editorModalContent: {
+    width: SCREEN_WIDTH - 24,
+    maxHeight: '90%',
+    backgroundColor: '#1A1A1A',
+    borderRadius: 24,
+    padding: 20,
+    alignItems: 'center',
+  },
+  editorModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 16,
+  },
+  editorModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  editorModalClose: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editorModalStats: {
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 12,
+    width: '100%',
+    alignItems: 'center',
+  },
+  editorModalStatsText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  editorModalDone: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: 52,
+    backgroundColor: '#10B981',
+    borderRadius: 14,
+    marginTop: 16,
+    gap: 8,
+  },
+  editorModalDoneText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
   },
 });
 
@@ -1017,31 +1329,34 @@ export default function AddTargetSheet() {
         manual: manualCount,
       };
       
-      await addTargetWithPaperResult({
+      const saveParams = {
         session_id: sessionId,
         distance_m: effectiveDistance,
         planned_shots: effectiveBullets,
-        target_data: result ? {
-          detection_result: {
-            detections: finalDetections, // Use edited detections
-            stats: editedStats,
-            original_stats: result.stats, // Keep original for reference
-            annotated_image: result.annotated_image_base64,
-            original_image: result.original_image_base64,
-            was_edited: finalDetections.length !== result.detections.length || manualCount > 0,
-          }
-        } : null,
-        // Paper result params
+        target_data: null,
         paper_type: paperType,
         bullets_fired: effectiveBullets,
-        hits_total: detectionCount, // Use edited count
-        hits_inside_scoring: highConfHits, // High confidence + manual hits
-        dispersion_cm: null, // Could be calculated from detections
+        hits_total: detectionCount,
+        hits_inside_scoring: highConfHits,
+        dispersion_cm: null,
         scanned_image_url: result?.annotated_image_base64 
           ? `data:image/jpeg;base64,${result.annotated_image_base64}` 
           : null,
         result_notes: paperNotes || null,
+      };
+      
+      console.log('[AddTarget] Saving paper target with params:', {
+        session_id: saveParams.session_id,
+        distance_m: saveParams.distance_m,
+        bullets_fired: saveParams.bullets_fired,
+        hits_total: saveParams.hits_total,
+        hits_inside_scoring: saveParams.hits_inside_scoring,
+        paper_type: saveParams.paper_type,
+        has_image: !!saveParams.scanned_image_url,
       });
+      
+      const savedTarget = await addTargetWithPaperResult(saveParams);
+      console.log('[AddTarget] Target saved:', savedTarget.id, 'paper_result:', savedTarget.paper_result);
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       resetDetection();
@@ -1331,10 +1646,14 @@ export default function AddTargetSheet() {
                 </View>
 
                 <View style={styles.cameraGuide}>
-                  <View style={styles.guideCorner} />
-                  <View style={[styles.guideCorner, { right: 0, left: undefined }]} />
-                  <View style={[styles.guideCorner, { bottom: 0, top: undefined }]} />
-                  <View style={[styles.guideCorner, { bottom: 0, right: 0, top: undefined, left: undefined }]} />
+                  {/* Top Left */}
+                  <View style={[styles.guideCorner, styles.guideCornerTL]} />
+                  {/* Top Right */}
+                  <View style={[styles.guideCorner, styles.guideCornerTR]} />
+                  {/* Bottom Left */}
+                  <View style={[styles.guideCorner, styles.guideCornerBL]} />
+                  {/* Bottom Right */}
+                  <View style={[styles.guideCorner, styles.guideCornerBR]} />
                 </View>
 
                 <View style={styles.cameraInstructions}>
@@ -1439,7 +1758,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 28,
-    marginTop: 8,
+    marginTop: 20,
   },
   headerTitle: { fontSize: 24, fontWeight: "700", color: "#fff" },
   headerSubtitle: { fontSize: 14, color: "rgba(255,255,255,0.5)", marginTop: 2 },
@@ -1687,13 +2006,33 @@ const styles = StyleSheet.create({
   },
   guideCorner: {
     position: "absolute",
-    width: 40,
-    height: 40,
+    width: 50,
+    height: 50,
     borderColor: "#10B981",
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
+  },
+  guideCornerTL: {
     top: 0,
     left: 0,
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+  },
+  guideCornerTR: {
+    top: 0,
+    right: 0,
+    borderTopWidth: 3,
+    borderRightWidth: 3,
+  },
+  guideCornerBL: {
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: 3,
+    borderLeftWidth: 3,
+  },
+  guideCornerBR: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: 3,
+    borderRightWidth: 3,
   },
   cameraInstructions: { alignItems: "center", paddingHorizontal: 20 },
   instructionBadge: {

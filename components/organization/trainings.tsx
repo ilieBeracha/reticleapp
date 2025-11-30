@@ -359,7 +359,7 @@ const TrainingsPage = React.memo(function TrainingsPage() {
           }
         >
           {filteredTrainings.length === 0 ? (
-            <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
+            <View style={[styles.emptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Ionicons 
                 name={filter === 'upcoming' ? 'calendar-outline' : filter === 'ongoing' ? 'play-circle-outline' : 'checkmark-circle-outline'} 
                 size={48} 
@@ -410,16 +410,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerContainer: {
-    paddingTop: Platform.OS === 'ios' ? 16 : 20,
+    paddingTop: Platform.OS === 'ios' ? 8 : 16,
     paddingHorizontal: 16,
     paddingBottom: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerTop: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     marginBottom: 16,
+    paddingHorizontal: 4,
   },
   headerTitleContainer: {
     flex: 1,
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: 15,
     marginTop: 4,
   },
   createButton: {
@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: 8,
   },
   createButtonText: {
     fontSize: 14,
@@ -483,41 +483,31 @@ const styles = StyleSheet.create({
 
   // Training List
   trainingsList: {
-    gap: 12,
+    gap: 8,
   },
   trainingCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
     gap: 12,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
   },
   trainingIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   trainingInfo: {
     flex: 1,
-    gap: 4,
+    gap: 2,
   },
   trainingTitle: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '500',
   },
   trainingMeta: {
     flexDirection: 'row',
@@ -530,39 +520,40 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   trainingMetaText: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 13,
   },
   drillsInfo: {
     marginTop: 2,
   },
   drillsText: {
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 12,
   },
   statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
   statusText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '600',
     textTransform: 'capitalize',
   },
 
   // Empty State
   emptyState: {
     alignItems: 'center',
-    padding: 40,
-    borderRadius: 16,
-    gap: 12,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 8,
   },
   emptyIcon: {
     opacity: 0.4,
+    marginBottom: 4,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '600',
   },
   emptyText: {
@@ -575,7 +566,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: 8,
     marginTop: 8,
   },
   emptyButtonText: {

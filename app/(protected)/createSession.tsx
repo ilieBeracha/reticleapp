@@ -1,5 +1,6 @@
 import { useColors } from "@/hooks/ui/useColors";
 import { useAppContext } from "@/hooks/useAppContext";
+import { getMyActiveSession } from "@/services/sessionService";
 import { useSessionStore } from "@/store/sessionStore";
 import { useTrainingStore } from "@/store/trainingStore";
 import type { TrainingWithDetails } from "@/types/workspace";
@@ -80,8 +81,47 @@ export default function CreateSessionSheet() {
   const [isCreating, setIsCreating] = useState(false);
   const [selectedTraining, setSelectedTraining] = useState<TrainingWithDetails | null>(null);
   const [mode, setMode] = useState<'training' | 'solo' | null>(trainingId ? 'training' : null);
+  const [checkingActiveSession, setCheckingActiveSession] = useState(true);
 
   // ========== EFFECTS ==========
+  // Check for existing active session on mount
+  useEffect(() => {
+    const checkActiveSession = async () => {
+      try {
+        const activeSession = await getMyActiveSession();
+        if (activeSession) {
+          // User already has an active session - ask what to do
+          Alert.alert(
+            "Active Session Found",
+            `You already have an active ${activeSession.training_title ? `training session "${activeSession.training_title}"` : 'session'}. Would you like to continue it?`,
+            [
+              {
+                text: "Continue Session",
+                onPress: () => {
+                  router.replace({
+                    pathname: "/(protected)/activeSession",
+                    params: { sessionId: activeSession.id },
+                  });
+                },
+              },
+              {
+                text: "Start New",
+                style: "destructive",
+                onPress: () => setCheckingActiveSession(false),
+              },
+            ]
+          );
+        } else {
+          setCheckingActiveSession(false);
+        }
+      } catch (error) {
+        console.error("Failed to check active session:", error);
+        setCheckingActiveSession(false);
+      }
+    };
+    checkActiveSession();
+  }, []);
+
   useEffect(() => {
     loadMyUpcomingTrainings();
   }, []);
@@ -166,6 +206,17 @@ export default function CreateSessionSheet() {
   }, [userId, canStart, createSession, selectedTraining, activeWorkspaceId, loadSessions]);
 
   // ========== RENDER ==========
+  if (checkingActiveSession) {
+    return (
+      <View style={[styles.scrollView, styles.loadingContainer]}>
+        <ActivityIndicator color={colors.text} size="small" />
+        <Text style={[styles.loadingText, { color: colors.textMuted }]}>
+          Checking for active sessions...
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <ScrollView
       style={styles.scrollView}
@@ -336,6 +387,8 @@ export default function CreateSessionSheet() {
 const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 20 },
+  loadingContainer: { justifyContent: 'center', alignItems: 'center', gap: 12 },
+  loadingText: { fontSize: 14 },
 
   // Header
   header: {
