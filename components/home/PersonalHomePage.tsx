@@ -221,7 +221,9 @@ const ActivityRow = React.memo(function ActivityRow({
   onPress: () => void;
 }) {
   const isActive = session.status === 'active';
+  const isPersonal = !session.org_workspace_id;
   const statusColor = isActive ? colors.primary : session.status === 'completed' ? '#10B981' : colors.textMuted;
+  const contextColor = isPersonal ? '#8B5CF6' : '#3B82F6'; // Purple for personal, blue for org
   const duration = session.ended_at
     ? Math.round((new Date(session.ended_at).getTime() - new Date(session.started_at).getTime()) / 60000)
     : Math.round((Date.now() - new Date(session.started_at).getTime()) / 60000);
@@ -234,9 +236,21 @@ const ActivityRow = React.memo(function ActivityRow({
     >
       <View style={[styles.activityIndicator, { backgroundColor: statusColor }]} />
       <View style={styles.activityContent}>
-        <Text style={[styles.activityTitle, { color: colors.text }]} numberOfLines={1}>
-          {session.training_title || session.drill_name || 'Free Session'}
-        </Text>
+        <View style={styles.activityHeader}>
+          <Text style={[styles.activityTitle, { color: colors.text }]} numberOfLines={1}>
+            {session.training_title || session.drill_name || 'Free Session'}
+          </Text>
+          <View style={[styles.activityContextBadge, { backgroundColor: contextColor + '15' }]}>
+            <Ionicons 
+              name={isPersonal ? 'person' : 'business'} 
+              size={10} 
+              color={contextColor} 
+            />
+            <Text style={[styles.activityContextText, { color: contextColor }]}>
+              {isPersonal ? 'Personal' : (session.workspace_name || 'Org')}
+            </Text>
+          </View>
+        </View>
         <Text style={[styles.activityMeta, { color: colors.textMuted }]}>
           {isActive ? 'In progress' : `${duration}m`}
           {session.team_name && ` · ${session.team_name}`}
@@ -319,13 +333,17 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
     startSession: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onStartSession(); },
     createTeam: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onCreateTeam(); },
     viewProgress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); },
+    viewScans: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(protected)/scans' as any); },
     resumeSession: (id: string) => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push(`/(protected)/activeSession?sessionId=${id}` as any); },
     trainingLive: (id: string) => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push(`/(protected)/trainingLive?trainingId=${id}` as any); },
   }), [onStartSession, onCreateTeam]);
 
   // Featured content
   const featuredSession = activeSessions[0];
+  console.log(activeSessions)
+  console.log('featuredSession', featuredSession);
   const featuredTraining = ongoingTrainings[0] || plannedTrainings[0];
+  console.log('featuredTraining', featuredTraining);
 
   const isLoading = sessionsLoading || loadingMyTrainings;
 
@@ -395,18 +413,25 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
         {/* ═══ QUICK ACTIONS ═══ */}
         <View style={styles.section}>
           <SectionHeader title="Quick Actions" colors={colors} />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.quickActionsRow}
-          >
+          <View style={styles.quickActionsGrid}>
             <QuickActionButton icon="add-circle" label="Session" color="#6366F1" colors={colors} onPress={nav.startSession} />
             <QuickActionButton icon="stats-chart" label="Progress" color="#10B981" colors={colors} onPress={nav.viewProgress} />
-            {permissions.canManageTeams && (
-              <QuickActionButton icon="people" label="Create Team" color="#F59E0B" colors={colors} onPress={nav.createTeam} />
-            )}
             <QuickActionButton icon="settings-outline" label="Settings" color="#8B5CF6" colors={colors} onPress={() => {}} />
-          </ScrollView>
+          </View>
+          <TouchableOpacity
+            style={[styles.scansButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={nav.viewScans}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.scansButtonIcon, { backgroundColor: '#F59E0B15' }]}>
+              <Ionicons name="scan" size={22} color="#F59E0B" />
+            </View>
+            <View style={styles.scansButtonContent}>
+              <Text style={[styles.scansButtonTitle, { color: colors.text }]}>Recent Scans</Text>
+              <Text style={[styles.scansButtonSubtitle, { color: colors.textMuted }]}>View all your target scans</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.border} />
+          </TouchableOpacity>
         </View>
 
         {/* ═══ UPCOMING TRAININGS ═══ */}
@@ -522,10 +547,17 @@ const styles = StyleSheet.create({
   sectionAction: { fontSize: 14, fontWeight: '600' },
 
   // Quick Actions
-  quickActionsRow: { paddingHorizontal: 20, gap: 12 },
-  quickActionBtn: { alignItems: 'center', paddingVertical: 16, paddingHorizontal: 20, borderRadius: 16, borderWidth: 1, minWidth: 100 },
-  quickActionIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  quickActionLabel: { fontSize: 13, fontWeight: '600' },
+  quickActionsGrid: { flexDirection: 'row', paddingHorizontal: 20, gap: 10 },
+  quickActionBtn: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 14, borderWidth: 1 },
+  quickActionIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  quickActionLabel: { fontSize: 12, fontWeight: '600' },
+  
+  // Scans Button (full width)
+  scansButton: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginTop: 12, padding: 14, borderRadius: 14, borderWidth: 1 },
+  scansButtonIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  scansButtonContent: { flex: 1 },
+  scansButtonTitle: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
+  scansButtonSubtitle: { fontSize: 13 },
 
   // Training Scroll Cards
   trainingsRow: { paddingHorizontal: 20, gap: 12 },
@@ -541,7 +573,10 @@ const styles = StyleSheet.create({
   activityRow: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 14, borderWidth: 1 },
   activityIndicator: { width: 8, height: 8, borderRadius: 4, marginRight: 12 },
   activityContent: { flex: 1 },
-  activityTitle: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
+  activityHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
+  activityTitle: { fontSize: 15, fontWeight: '600', flexShrink: 1 },
+  activityContextBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  activityContextText: { fontSize: 10, fontWeight: '600' },
   activityMeta: { fontSize: 13 },
 
   // Empty State

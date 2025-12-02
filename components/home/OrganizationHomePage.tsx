@@ -99,9 +99,9 @@ const TrainingItem = React.memo(function TrainingItem({
     <TouchableOpacity style={styles.trainingItem} activeOpacity={0.6} onPress={onPress}>
       <View style={styles.trainingContent}>
         <View style={styles.trainingHeader}>
-          <Text style={[styles.trainingTitle, { color: colors.text }]} numberOfLines={1}>
-            {training.title}
-          </Text>
+        <Text style={[styles.trainingTitle, { color: colors.text }]} numberOfLines={1}>
+          {training.title}
+        </Text>
           {showLive && (
             <View style={styles.trainingLiveBadge}>
               <View style={styles.trainingLiveDot} />

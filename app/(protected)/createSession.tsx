@@ -1,6 +1,6 @@
 import { useColors } from "@/hooks/ui/useColors";
 import { useAppContext } from "@/hooks/useAppContext";
-import { getMyActiveSession } from "@/services/sessionService";
+import { getMyActivePersonalSession, getMyActiveSession } from "@/services/sessionService";
 import { useSessionStore } from "@/store/sessionStore";
 import { useTrainingStore } from "@/store/trainingStore";
 import type { TrainingWithDetails } from "@/types/workspace";
@@ -9,13 +9,13 @@ import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 // ============================================================================
@@ -83,34 +83,67 @@ export default function CreateSessionSheet() {
   const [mode, setMode] = useState<'training' | 'solo' | null>(trainingId ? 'training' : null);
   const [checkingActiveSession, setCheckingActiveSession] = useState(true);
 
+  // Check if in personal mode (no org workspace)
+  const isPersonalMode = !activeWorkspaceId;
+
   // ========== EFFECTS ==========
   // Check for existing active session on mount
   useEffect(() => {
     const checkActiveSession = async () => {
       try {
-        const activeSession = await getMyActiveSession();
+        // Personal mode: only check for personal sessions (no org)
+        // Org mode: check for any active session
+        const activeSession = isPersonalMode 
+          ? await getMyActivePersonalSession()
+          : await getMyActiveSession();
+          
         if (activeSession) {
-          // User already has an active session - ask what to do
-          Alert.alert(
-            "Active Session Found",
-            `You already have an active ${activeSession.training_title ? `training session "${activeSession.training_title}"` : 'session'}. Would you like to continue it?`,
-            [
-              {
-                text: "Continue Session",
-                onPress: () => {
-                  router.replace({
-                    pathname: "/(protected)/activeSession",
-                    params: { sessionId: activeSession.id },
-                  });
+          // User already has an active session
+          if (isPersonalMode) {
+            // PERSONAL MODE: Only allow one session at a time - no "Start New" option
+            Alert.alert(
+              "Active Session",
+              `You already have an active ${activeSession.training_title ? `training session "${activeSession.training_title}"` : 'session'}. In personal mode, you can only have one session at a time.`,
+              [
+                {
+                  text: "Continue Session",
+                  onPress: () => {
+                    router.replace({
+                      pathname: "/(protected)/activeSession",
+                      params: { sessionId: activeSession.id },
+                    });
+                  },
                 },
-              },
-              {
-                text: "Start New",
-                style: "destructive",
-                onPress: () => setCheckingActiveSession(false),
-              },
-            ]
-          );
+                {
+                  text: "Cancel",
+                  style: "cancel",
+                  onPress: () => router.back(),
+                },
+              ]
+            );
+          } else {
+            // ORG MODE: Allow multiple sessions (can join different trainings)
+            Alert.alert(
+              "Active Session Found",
+              `You already have an active ${activeSession.training_title ? `training session "${activeSession.training_title}"` : 'session'}. Would you like to continue it?`,
+              [
+                {
+                  text: "Continue Session",
+                  onPress: () => {
+                    router.replace({
+                      pathname: "/(protected)/activeSession",
+                      params: { sessionId: activeSession.id },
+                    });
+                  },
+                },
+                {
+                  text: "Start New",
+                  style: "destructive",
+                  onPress: () => setCheckingActiveSession(false),
+                },
+              ]
+            );
+          }
         } else {
           setCheckingActiveSession(false);
         }
@@ -120,7 +153,7 @@ export default function CreateSessionSheet() {
       }
     };
     checkActiveSession();
-  }, []);
+  }, [isPersonalMode]);
 
   useEffect(() => {
     loadMyUpcomingTrainings();

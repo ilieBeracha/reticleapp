@@ -324,6 +324,17 @@ export default function ProtectedLayout() {
             sheetLargestUndimmedDetentIndex: -1,
           }}
         />
+
+        {/* Scans Gallery - Full screen */}
+        <Stack.Screen
+          name="scans"
+          options={{
+            headerShown: false,
+            presentation: "card",
+            gestureEnabled: true,
+            contentStyle: { backgroundColor: colors.background },
+          }}
+        />
       </Stack>
     </ThemeProvider>
   );

@@ -1,4 +1,9 @@
 import {
+  shouldSubmitForTraining,
+  submitTrainingData,
+  TrainingDataPayload
+} from "@/services/detectionService";
+import {
   addTargetWithPaperResult,
   addTargetWithTacticalResult,
   PaperType
@@ -29,6 +34,7 @@ import {
   View,
 } from "react-native";
 import Svg, { Circle, G, Line } from "react-native-svg";
+import ViewShot from "react-native-view-shot";
 
 type TargetType = "paper" | "tactical";
 type Step = "form" | "camera" | "preview" | "analyzing" | "results" | "tactical_results";
@@ -110,12 +116,14 @@ const DetectionEditor = React.memo(function DetectionEditor({
   onDetectionsChange,
   editMode,
   onModeChange,
+  captureRef,
 }: {
   result: AnalyzeResponse;
   detections: EditableDetection[];
   onDetectionsChange: (detections: EditableDetection[]) => void;
   editMode: 'add' | 'remove';
   onModeChange: (mode: 'add' | 'remove') => void;
+  captureRef?: React.RefObject<ViewShot | null>;
 }) {
   const [imageLayout, setImageLayout] = useState({ width: 0, height: 0, x: 0, y: 0 });
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -154,11 +162,21 @@ const DetectionEditor = React.memo(function DetectionEditor({
   }, [result.metadata]);
 
   const handleCanvasTap = useCallback((evt: any) => {
-    const { locationX, locationY } = evt.nativeEvent;
+    // Handle both press events and touch events
+    const touch = evt.nativeEvent.changedTouches?.[0] || evt.nativeEvent;
+    const locationX = touch.locationX ?? touch.pageX;
+    const locationY = touch.locationY ?? touch.pageY;
+    
+    if (locationX === undefined || locationY === undefined) {
+      console.log('[Editor] No touch coordinates found');
+      return;
+    }
     
     // Convert tap coordinates to original image coordinates
     const imgX = (locationX - (scale.offsetX || 0)) / scale.x;
     const imgY = (locationY - (scale.offsetY || 0)) / scale.y;
+    
+    console.log('[Editor] Tap at canvas:', locationX, locationY, '-> image:', imgX, imgY, 'mode:', editMode);
     
     if (editMode === 'add') {
       // Add new detection at tap location
@@ -170,6 +188,7 @@ const DetectionEditor = React.memo(function DetectionEditor({
         confidence: 1.0, // Manual additions are 100% confidence
         isManual: true,
       };
+      console.log('[Editor] Adding detection:', newDetection.id);
       onDetectionsChange([...detections, newDetection]);
     } else {
       // Check if tap is near any detection to remove it
@@ -184,6 +203,7 @@ const DetectionEditor = React.memo(function DetectionEditor({
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         const newDetections = [...detections];
         newDetections.splice(tappedIndex, 1);
+        console.log('[Editor] Removed detection at index:', tappedIndex);
         onDetectionsChange(newDetections);
       }
     }
@@ -236,75 +256,85 @@ const DetectionEditor = React.memo(function DetectionEditor({
       </Text>
 
       {/* Interactive Canvas */}
-      <TouchableOpacity 
-        activeOpacity={1} 
-        onPress={handleCanvasTap}
-        style={editorStyles.canvasContainer}
-      >
-        {/* Base Image */}
-        <Image
-          source={{ uri: `data:image/jpeg;base64,${result.original_image_base64}` }}
-          style={editorStyles.canvasImage}
-          resizeMode="contain"
-          onLoad={() => setImageLoaded(true)}
+      <View style={editorStyles.canvasContainer}>
+        {/* ViewShot for capturing the edited image - NOT touchable */}
+        <ViewShot 
+          ref={captureRef} 
+          options={{ format: 'jpg', quality: 0.9, result: 'base64' }}
+          style={editorStyles.viewShotInner}
+        >
+          {/* Base Image */}
+          <Image
+            source={{ uri: `data:image/jpeg;base64,${result.original_image_base64}` }}
+            style={editorStyles.canvasImage}
+            resizeMode="contain"
+            onLoad={() => setImageLoaded(true)}
+          />
+          
+          {/* SVG Overlay for Detection Markers */}
+          {imageLoaded && (
+            <View style={editorStyles.svgOverlay}>
+              <Svg width={CANVAS_SIZE} height={CANVAS_SIZE} viewBox={`0 0 ${CANVAS_SIZE} ${CANVAS_SIZE}`}>
+                {detections.map((detection, index) => {
+                  // Convert detection center to canvas coordinates
+                  const cx = detection.center[0] * scale.x + (scale.offsetX || 0);
+                  const cy = detection.center[1] * scale.y + (scale.offsetY || 0);
+                  
+                  // Color based on confidence or manual
+                  let color = '#10B981'; // High confidence / manual
+                  if (!detection.isManual) {
+                    if (detection.confidence < 0.4) color = '#EF4444';
+                    else if (detection.confidence < 0.6) color = '#F59E0B';
+                  }
+                  
+                  return (
+                    <G key={detection.id}>
+                      {/* Outer glow ring */}
+                      <Circle
+                        cx={cx}
+                        cy={cy}
+                        r={MARKER_RADIUS + 6}
+                        fill="none"
+                        stroke={color}
+                        strokeWidth={1}
+                        opacity={0.3}
+                      />
+                      {/* Main ring - just outline, no fill */}
+                      <Circle
+                        cx={cx}
+                        cy={cy}
+                        r={MARKER_RADIUS}
+                        fill="none"
+                        stroke={color}
+                        strokeWidth={2.5}
+                        opacity={0.9}
+                      />
+                      {/* Corner brackets instead of full circle - more visibility */}
+                      <Line x1={cx - MARKER_RADIUS - 4} y1={cy - 2} x2={cx - MARKER_RADIUS - 4} y2={cy + 2} stroke={color} strokeWidth={2} opacity={0.8} />
+                      <Line x1={cx + MARKER_RADIUS + 4} y1={cy - 2} x2={cx + MARKER_RADIUS + 4} y2={cy + 2} stroke={color} strokeWidth={2} opacity={0.8} />
+                      <Line x1={cx - 2} y1={cy - MARKER_RADIUS - 4} x2={cx + 2} y2={cy - MARKER_RADIUS - 4} stroke={color} strokeWidth={2} opacity={0.8} />
+                      <Line x1={cx - 2} y1={cy + MARKER_RADIUS + 4} x2={cx + 2} y2={cy + MARKER_RADIUS + 4} stroke={color} strokeWidth={2} opacity={0.8} />
+                      {/* Manual additions: crosshair */}
+                      {detection.isManual && (
+                        <>
+                          <Line x1={cx - 6} y1={cy} x2={cx + 6} y2={cy} stroke="#fff" strokeWidth={1.5} opacity={0.8} />
+                          <Line x1={cx} y1={cy - 6} x2={cx} y2={cy + 6} stroke="#fff" strokeWidth={1.5} opacity={0.8} />
+                        </>
+                      )}
+                    </G>
+                  );
+                })}
+              </Svg>
+            </View>
+          )}
+        </ViewShot>
+
+        {/* Invisible touch layer on top - handles all taps */}
+        <View 
+          style={editorStyles.touchLayer}
+          onStartShouldSetResponder={() => true}
+          onResponderRelease={handleCanvasTap}
         />
-        
-        {/* SVG Overlay for Detection Markers */}
-        {imageLoaded && (
-          <View style={editorStyles.svgOverlay}>
-            <Svg width={CANVAS_SIZE} height={CANVAS_SIZE} viewBox={`0 0 ${CANVAS_SIZE} ${CANVAS_SIZE}`}>
-              {detections.map((detection, index) => {
-                // Convert detection center to canvas coordinates
-                const cx = detection.center[0] * scale.x + (scale.offsetX || 0);
-                const cy = detection.center[1] * scale.y + (scale.offsetY || 0);
-                
-                // Color based on confidence or manual
-                let color = '#10B981'; // High confidence / manual
-                if (!detection.isManual) {
-                  if (detection.confidence < 0.4) color = '#EF4444';
-                  else if (detection.confidence < 0.6) color = '#F59E0B';
-                }
-                
-                return (
-                  <G key={detection.id}>
-                    {/* Outer glow ring */}
-                    <Circle
-                      cx={cx}
-                      cy={cy}
-                      r={MARKER_RADIUS + 6}
-                      fill="none"
-                      stroke={color}
-                      strokeWidth={1}
-                      opacity={0.3}
-                    />
-                    {/* Main ring - just outline, no fill */}
-                    <Circle
-                      cx={cx}
-                      cy={cy}
-                      r={MARKER_RADIUS}
-                      fill="none"
-                      stroke={color}
-                      strokeWidth={2.5}
-                      opacity={0.9}
-                    />
-                    {/* Corner brackets instead of full circle - more visibility */}
-                    <Line x1={cx - MARKER_RADIUS - 4} y1={cy - 2} x2={cx - MARKER_RADIUS - 4} y2={cy + 2} stroke={color} strokeWidth={2} opacity={0.8} />
-                    <Line x1={cx + MARKER_RADIUS + 4} y1={cy - 2} x2={cx + MARKER_RADIUS + 4} y2={cy + 2} stroke={color} strokeWidth={2} opacity={0.8} />
-                    <Line x1={cx - 2} y1={cy - MARKER_RADIUS - 4} x2={cx + 2} y2={cy - MARKER_RADIUS - 4} stroke={color} strokeWidth={2} opacity={0.8} />
-                    <Line x1={cx - 2} y1={cy + MARKER_RADIUS + 4} x2={cx + 2} y2={cy + MARKER_RADIUS + 4} stroke={color} strokeWidth={2} opacity={0.8} />
-                    {/* Manual additions: crosshair */}
-                    {detection.isManual && (
-                      <>
-                        <Line x1={cx - 6} y1={cy} x2={cx + 6} y2={cy} stroke="#fff" strokeWidth={1.5} opacity={0.8} />
-                        <Line x1={cx} y1={cy - 6} x2={cx} y2={cy + 6} stroke="#fff" strokeWidth={1.5} opacity={0.8} />
-                      </>
-                    )}
-                  </G>
-                );
-              })}
-            </Svg>
-          </View>
-        )}
 
         {/* Tap targets for removal (larger touch area) */}
         {editMode === 'remove' && detections.map((detection, index) => {
@@ -325,7 +355,7 @@ const DetectionEditor = React.memo(function DetectionEditor({
             />
           );
         })}
-      </TouchableOpacity>
+      </View>
     </View>
   );
 });
@@ -342,7 +372,7 @@ const ResultCard = React.memo(function ResultCard({
   onDetectionsChange,
 }: {
   result: AnalyzeResponse;
-  onDone: (finalDetections: EditableDetection[]) => void;
+  onDone: (finalDetections: EditableDetection[], editedImageBase64?: string) => void;
   onRetake: () => void;
   saving: boolean;
   editedDetections: EditableDetection[];
@@ -351,6 +381,12 @@ const ResultCard = React.memo(function ResultCard({
   const [editMode, setEditMode] = useState<'add' | 'remove'>('add'); // Default: ADD mode
   const [editingEnabled, setEditingEnabled] = useState(false);
   const [editorModalVisible, setEditorModalVisible] = useState(false);
+  
+  // Ref for capturing the edited image
+  const editorCaptureRef = useRef<ViewShot>(null);
+  
+  // Store captured image when modal closes
+  const [capturedEditedImage, setCapturedEditedImage] = useState<string | null>(null);
   
   // Animation for modal
   const scaleAnim = useRef(new Animated.Value(0)).current;
@@ -395,8 +431,22 @@ const ResultCard = React.memo(function ResultCard({
     }
   }, [editingEnabled, scaleAnim, opacityAnim]);
 
-  const handleCloseEditor = useCallback(() => {
+  const handleCloseEditor = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    // Capture the edited image BEFORE closing the modal (while ViewShot is still mounted)
+    if (editorCaptureRef.current) {
+      try {
+        const capturedBase64 = await (editorCaptureRef.current as any).capture();
+        if (capturedBase64) {
+          setCapturedEditedImage(capturedBase64);
+          console.log('[AddTarget] Captured edited image on modal close, length:', capturedBase64.length);
+        }
+      } catch (err) {
+        console.log('[AddTarget] Could not capture edited image on close:', err);
+      }
+    }
+    
     Animated.parallel([
       Animated.spring(scaleAnim, {
         toValue: 0,
@@ -430,6 +480,20 @@ const ResultCard = React.memo(function ResultCard({
     return editedDetections.length !== result.detections.length ||
       editedDetections.some(d => d.isManual);
   }, [editedDetections, result.detections]);
+
+  // Handle save with the captured edited image
+  const handleSave = useCallback(async () => {
+    // Use the image captured when the user closed the editor modal
+    const editedImageBase64 = hasChanges ? capturedEditedImage || undefined : undefined;
+    
+    if (hasChanges && editedImageBase64) {
+      console.log('[AddTarget] Saving with edited image, length:', editedImageBase64.length);
+    } else if (hasChanges) {
+      console.log('[AddTarget] Saving with changes but no captured image');
+    }
+    
+    onDone(editedDetections, editedImageBase64);
+  }, [editedDetections, hasChanges, capturedEditedImage, onDone]);
 
   return (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.resultsContent}>
@@ -470,10 +534,24 @@ const ResultCard = React.memo(function ResultCard({
               const cx = detection.center[0] * scaleX + offsetX;
               const cy = detection.center[1] * scaleY + offsetY;
               
+              // Color by confidence/manual
+              let color = '#10B981';
+              if (!detection.isManual) {
+                if (detection.confidence < 0.4) color = '#EF4444';
+                else if (detection.confidence < 0.6) color = '#F59E0B';
+              }
+              
               return (
                 <G key={detection.id}>
-                  <Circle cx={cx} cy={cy} r={MARKER_RADIUS + 4} fill="none" stroke="#10B981" strokeWidth={1} opacity={0.4} />
-                  <Circle cx={cx} cy={cy} r={MARKER_RADIUS} fill="none" stroke="#10B981" strokeWidth={2.5} />
+                  <Circle cx={cx} cy={cy} r={MARKER_RADIUS + 4} fill="none" stroke={color} strokeWidth={1} opacity={0.4} />
+                  <Circle cx={cx} cy={cy} r={MARKER_RADIUS} fill="none" stroke={color} strokeWidth={2.5} />
+                  {/* Show crosshair for manual additions */}
+                  {detection.isManual && (
+                    <>
+                      <Line x1={cx - 5} y1={cy} x2={cx + 5} y2={cy} stroke="#fff" strokeWidth={1.5} />
+                      <Line x1={cx} y1={cy - 5} x2={cx} y2={cy + 5} stroke="#fff" strokeWidth={1.5} />
+                    </>
+                  )}
                 </G>
               );
             })}
@@ -534,6 +612,7 @@ const ResultCard = React.memo(function ResultCard({
               onDetectionsChange={onDetectionsChange}
               editMode={editMode}
               onModeChange={setEditMode}
+              captureRef={editorCaptureRef}
             />
             
             {/* Stats in Modal */}
@@ -618,7 +697,7 @@ const ResultCard = React.memo(function ResultCard({
       {/* Actions */}
       <TouchableOpacity 
         style={styles.doneButton} 
-        onPress={() => onDone(editedDetections)} 
+        onPress={handleSave} 
         activeOpacity={0.9}
         disabled={saving}
       >
@@ -714,6 +793,18 @@ const editorStyles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#1a1a1a',
     alignSelf: 'center',
+  },
+  viewShotInner: {
+    width: CANVAS_SIZE,
+    height: CANVAS_SIZE,
+  },
+  touchLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: CANVAS_SIZE,
+    height: CANVAS_SIZE,
+    backgroundColor: 'transparent',
   },
   canvasImage: {
     width: CANVAS_SIZE,
@@ -1307,7 +1398,7 @@ export default function AddTargetSheet() {
   }, [analyze, handleClose]);
 
   // Save paper target with edited detection results
-  const savePaperTarget = useCallback(async (finalDetections: EditableDetection[]) => {
+  const savePaperTarget = useCallback(async (finalDetections: EditableDetection[], editedImageBase64?: string) => {
     if (!sessionId) {
       Alert.alert("Error", "Session ID missing");
       return;
@@ -1318,7 +1409,9 @@ export default function AddTargetSheet() {
     try {
       // Calculate stats from edited detections
       const detectionCount = finalDetections.length;
-      const highConfHits = finalDetections.filter(d => d.isManual || d.confidence >= 0.6).length;
+      const rawHighConfHits = finalDetections.filter(d => d.isManual || d.confidence >= 0.6).length;
+      // Cap hits to not exceed bullets fired
+      const highConfHits = Math.min(rawHighConfHits, effectiveBullets);
       const manualCount = finalDetections.filter(d => d.isManual).length;
       
       // Build edited stats
@@ -1329,34 +1422,69 @@ export default function AddTargetSheet() {
         manual: manualCount,
       };
       
+      // If user edited the detections, store the user-corrected image for display/training
+      // Priority: editedImageBase64 (user-edited) > annotated_image_base64 (AI-generated)
+      const finalImageBase64 = editedImageBase64 || result?.annotated_image_base64;
+      
+      // Store training data if user made corrections (for model improvement)
+      const trainingData = manualCount > 0 || finalDetections.length !== (result?.detections?.length ?? 0) ? {
+        original_image_base64: result?.original_image_base64,
+        edited_image_base64: editedImageBase64,
+        original_detections: result?.detections,
+        final_detections: finalDetections.map(d => ({
+          center: d.center,
+          bbox: d.bbox,
+          confidence: d.confidence,
+          is_manual: d.isManual,
+        })),
+        edits: {
+          added: manualCount,
+          removed: (result?.detections?.length ?? 0) - finalDetections.length + manualCount,
+        },
+      } : null;
+      
       const saveParams = {
         session_id: sessionId,
         distance_m: effectiveDistance,
+        lane_number: laneNumber ? parseInt(laneNumber) : null,
         planned_shots: effectiveBullets,
-        target_data: null,
+        notes: paperNotes || null, // target-level notes
+        target_data: null, // Training data sent to Python backend instead (smaller DB)
         paper_type: paperType,
         bullets_fired: effectiveBullets,
-        hits_total: detectionCount,
+        hits_total: Math.min(detectionCount, effectiveBullets),
         hits_inside_scoring: highConfHits,
         dispersion_cm: null,
-        scanned_image_url: result?.annotated_image_base64 
-          ? `data:image/jpeg;base64,${result.annotated_image_base64}` 
+        // Use user-edited image if available, otherwise AI-annotated
+        scanned_image_url: finalImageBase64 
+          ? `data:image/jpeg;base64,${finalImageBase64}` 
           : null,
-        result_notes: paperNotes || null,
+        result_notes: paperNotes || null, // result-level notes (same)
       };
       
       console.log('[AddTarget] Saving paper target with params:', {
         session_id: saveParams.session_id,
         distance_m: saveParams.distance_m,
+        lane_number: saveParams.lane_number,
         bullets_fired: saveParams.bullets_fired,
         hits_total: saveParams.hits_total,
         hits_inside_scoring: saveParams.hits_inside_scoring,
         paper_type: saveParams.paper_type,
         has_image: !!saveParams.scanned_image_url,
+        has_notes: !!saveParams.notes,
+        has_training_data: !!trainingData,
+        user_made_edits: !!editedImageBase64,
       });
       
       const savedTarget = await addTargetWithPaperResult(saveParams);
       console.log('[AddTarget] Target saved:', savedTarget.id, 'paper_result:', savedTarget.paper_result);
+
+      // Best-effort: submit corrections to backend for model training
+      if (trainingData && shouldSubmitForTraining(trainingData as TrainingDataPayload)) {
+        submitTrainingData(trainingData as TrainingDataPayload)
+          .then(res => console.log('[Training] Submitted:', res.message))
+          .catch(err => console.log('[Training] Failed:', err));
+      }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       resetDetection();
@@ -1367,7 +1495,7 @@ export default function AddTargetSheet() {
       Alert.alert("Error", error.message || "Failed to add target");
       setSaving(false);
     }
-  }, [sessionId, effectiveDistance, effectiveBullets, result, paperType, paperNotes, resetDetection]);
+  }, [sessionId, effectiveDistance, effectiveBullets, laneNumber, result, paperType, paperNotes, resetDetection]);
 
   // Save tactical target with results
   const saveTacticalTarget = useCallback(async () => {

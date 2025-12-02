@@ -1,6 +1,5 @@
 import { BaseAvatar } from "@/components/BaseAvatar";
 import {
-  calculateSessionStats,
   createSession,
   getMyActiveSessionForTraining,
   getSessionTargetsWithResults,
@@ -37,7 +36,6 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 // ============================================================================
 interface SessionWithStats extends SessionWithDetails {
   targetCount: number;
-  accuracy: number;
 }
 
 // ============================================================================
@@ -91,38 +89,57 @@ const DrillItem = React.memo(function DrillItem({
 });
 
 // ============================================================================
-// SESSION ITEM
+// SESSION ITEM - More unique display with rank + start time
 // ============================================================================
 const SessionItem = React.memo(function SessionItem({
   session,
   isMe,
+  rank,
   onPress,
 }: {
   session: SessionWithStats;
   isMe: boolean;
+  rank: number;
   onPress: () => void;
 }) {
   const isActive = session.status === "active";
   const name = session.user_full_name || "Unknown";
   const initials = name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  
+  // Format start time
+  const startTime = new Date(session.started_at).toLocaleTimeString('en-US', { 
+    hour: 'numeric', 
+    minute: '2-digit',
+    hour12: true 
+  });
 
   return (
     <TouchableOpacity style={styles.sessionItem} onPress={onPress} activeOpacity={0.7}>
+      {/* Rank badge */}
+      <View style={[styles.rankBadge, rank === 1 && styles.rankBadgeFirst]}>
+        <Text style={[styles.rankText, rank === 1 && styles.rankTextFirst]}>#{rank}</Text>
+      </View>
+      
       <View style={styles.sessionAvatar}>
         <BaseAvatar fallbackText={initials} size="sm" />
         {isActive && <View style={styles.sessionActiveDot} />}
       </View>
+      
       <View style={styles.sessionInfo}>
-        <Text style={styles.sessionName}>{name}{isMe ? ' (You)' : ''}</Text>
+        <View style={styles.sessionNameRow}>
+          <Text style={styles.sessionName}>{name}</Text>
+          {isMe && <Text style={styles.sessionYouTag}>You</Text>}
+        </View>
         <Text style={styles.sessionMeta}>
-          {session.targetCount} targets • {session.accuracy}% accuracy
+          {session.targetCount} targets • {startTime}
         </Text>
       </View>
-      {session.status === 'active' && (
-        <View style={styles.activeTag}>
-          <Text style={styles.activeTagText}>Active</Text>
-        </View>
-      )}
+      
+      {/* Target count as primary metric */}
+      <View style={styles.targetCountBox}>
+        <Text style={styles.targetCountValue}>{session.targetCount}</Text>
+        <Text style={styles.targetCountLabel}>targets</Text>
+      </View>
     </TouchableOpacity>
   );
 });
@@ -188,18 +205,16 @@ export default function TrainingScreen() {
         setCreatorName(profile?.full_name || null);
       }
 
-      // Load stats for sessions
+      // Load target counts for sessions
       const sessionsWithStats: SessionWithStats[] = await Promise.all(
         trainingSessions.map(async (s) => {
-          const [stats, targets] = await Promise.all([
-            calculateSessionStats(s.id),
-            getSessionTargetsWithResults(s.id),
-          ]);
-          return { ...s, targetCount: targets.length, accuracy: stats.accuracyPct };
+          const targets = await getSessionTargetsWithResults(s.id);
+          return { ...s, targetCount: targets.length };
         })
       );
 
-      sessionsWithStats.sort((a, b) => b.accuracy - a.accuracy);
+      // Sort by target count (most targets first)
+      sessionsWithStats.sort((a, b) => b.targetCount - a.targetCount);
       setSessions(sessionsWithStats);
 
       if (trainingData?.team_id) {
@@ -402,13 +417,14 @@ export default function TrainingScreen() {
 
         {/* Sessions Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Sessions ({sessions.length})</Text>
+          <Text style={styles.sectionTitle}>Leaderboard ({sessions.length})</Text>
           {sessions.length > 0 ? (
-            sessions.map((session) => (
+            sessions.map((session, index) => (
               <SessionItem
                 key={session.id}
                 session={session}
                 isMe={session.user_id === currentUserId}
+                rank={index + 1}
                 onPress={() => handleSessionPress(session)}
               />
             ))
@@ -693,9 +709,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.04)",
     borderRadius: 12,
-    padding: 14,
+    padding: 12,
     marginBottom: 8,
-    gap: 12,
+    gap: 10,
+  },
+  rankBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rankBadgeFirst: {
+    backgroundColor: "rgba(245, 158, 11, 0.2)",
+  },
+  rankText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.5)",
+  },
+  rankTextFirst: {
+    color: "#F59E0B",
   },
   sessionAvatar: {
     position: "relative",
@@ -714,15 +749,47 @@ const styles = StyleSheet.create({
   sessionInfo: {
     flex: 1,
   },
+  sessionNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   sessionName: {
     fontSize: 15,
     fontWeight: "600",
     color: "#fff",
-    marginBottom: 2,
+  },
+  sessionYouTag: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#10B981",
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   sessionMeta: {
-    fontSize: 13,
+    fontSize: 12,
     color: "rgba(255,255,255,0.4)",
+    marginTop: 2,
+  },
+  targetCountBox: {
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+  },
+  targetCountValue: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: '#10B981',
+  },
+  targetCountLabel: {
+    fontSize: 9,
+    fontWeight: '500',
+    color: '#10B981',
+    marginTop: 1,
   },
   activeTag: {
     backgroundColor: "rgba(16, 185, 129, 0.15)",

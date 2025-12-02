@@ -169,7 +169,7 @@ export async function getMyActiveSessionForTraining(trainingId: string): Promise
 }
 
 /**
- * Get user's active session (any)
+ * Get user's active session - checks for ANY active session
  */
 export async function getMyActiveSession(): Promise<SessionWithDetails | null> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -202,13 +202,67 @@ export async function getMyActiveSession(): Promise<SessionWithDetails | null> {
     .eq('user_id', user.id)
     .eq('status', 'active')
     .order('started_at', { ascending: false })
-    .maybeSingle();
+    .limit(1);
 
-  if (error || !data) {
+  if (error || !data || data.length === 0) {
     return null;
   }
   
-  return mapSession(data);
+  return mapSession(data[0]);
+}
+
+/**
+ * Get user's active PERSONAL session (no org workspace)
+ * Used to enforce 1 session limit in personal mode
+ */
+export async function getMyActivePersonalSession(): Promise<SessionWithDetails | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    return null;
+  }
+
+  console.log('[getMyActivePersonalSession] Checking for user:', user.id);
+
+  const { data, error } = await supabase
+    .from('sessions')
+    .select(`
+      id,
+      org_workspace_id,
+      user_id,
+      team_id,
+      training_id,
+      drill_id,
+      session_mode,
+      status,
+      started_at,
+      ended_at,
+      created_at,
+      updated_at,
+      profiles:user_id(full_name),
+      teams:team_id(name),
+      org_workspaces:org_workspace_id(name),
+      trainings:training_id(title),
+      training_drills:drill_id(name)
+    `)
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .is('org_workspace_id', null)  // Personal sessions have no org
+    .order('started_at', { ascending: false })
+    .limit(1);
+
+  if (error) {
+    console.log('[getMyActivePersonalSession] Error:', error);
+    return null;
+  }
+  
+  if (!data || data.length === 0) {
+    console.log('[getMyActivePersonalSession] No active personal session found');
+    return null;
+  }
+  
+  console.log('[getMyActivePersonalSession] Found active personal session:', data[0].id);
+  return mapSession(data[0]);
 }
 
 /**
@@ -768,19 +822,30 @@ export async function getSessionTargetsWithResults(sessionId: string): Promise<S
 
   if (error) throw error;
 
-  return (targets ?? []).map((t: any) => ({
-    id: t.id,
-    session_id: t.session_id,
-    target_type: t.target_type,
-    sequence_in_session: t.sequence_in_session,
-    distance_m: t.distance_m,
-    lane_number: t.lane_number,
-    planned_shots: t.planned_shots,
-    notes: t.notes,
-    target_data: t.target_data,
-    paper_result: t.paper_target_results?.[0] ?? null,
-    tactical_result: t.tactical_target_results?.[0] ?? null,
-  }));
+  return (targets ?? []).map((t: any) => {
+    // Handle both array and object results (depends on Supabase relation type)
+    // One-to-one relations return object, one-to-many return array
+    const paperResult = Array.isArray(t.paper_target_results) 
+      ? t.paper_target_results[0] 
+      : t.paper_target_results;
+    const tacticalResult = Array.isArray(t.tactical_target_results) 
+      ? t.tactical_target_results[0] 
+      : t.tactical_target_results;
+    
+    return {
+      id: t.id,
+      session_id: t.session_id,
+      target_type: t.target_type,
+      sequence_in_session: t.sequence_in_session,
+      distance_m: t.distance_m,
+      lane_number: t.lane_number,
+      planned_shots: t.planned_shots,
+      notes: t.notes,
+      target_data: t.target_data,
+      paper_result: paperResult ?? null,
+      tactical_result: tacticalResult ?? null,
+    };
+  });
 }
 
 /**
@@ -802,6 +867,14 @@ export async function getTargetWithResults(targetId: string): Promise<SessionTar
     throw error;
   }
 
+  // Handle both array and object results
+  const paperResult = Array.isArray(target.paper_target_results) 
+    ? target.paper_target_results[0] 
+    : target.paper_target_results;
+  const tacticalResult = Array.isArray(target.tactical_target_results) 
+    ? target.tactical_target_results[0] 
+    : target.tactical_target_results;
+
   return {
     id: target.id,
     session_id: target.session_id,
@@ -812,8 +885,8 @@ export async function getTargetWithResults(targetId: string): Promise<SessionTar
     planned_shots: target.planned_shots,
     notes: target.notes,
     target_data: target.target_data,
-    paper_result: target.paper_target_results?.[0] ?? null,
-    tactical_result: target.tactical_target_results?.[0] ?? null,
+    paper_result: paperResult ?? null,
+    tactical_result: tacticalResult ?? null,
   };
 }
 

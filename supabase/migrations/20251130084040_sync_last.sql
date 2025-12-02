@@ -1,46 +1,18 @@
+-- Skip notifications table creation (already exists from 20251130070000_notifications_table.sql)
 
-alter table "public"."team_members" drop constraint "team_members_squad_requirement";
+alter table "public"."team_members" drop constraint if exists "team_members_squad_requirement";
 
 drop view if exists "public"."session_stats_sniper";
 
+alter table "public"."org_workspaces" add column if not exists "show_attached_tab" boolean not null default true;
 
-  create table "public"."notifications" (
-    "id" uuid not null default gen_random_uuid(),
-    "user_id" uuid not null,
-    "type" text not null,
-    "title" text not null,
-    "body" text,
-    "data" jsonb,
-    "read" boolean not null default false,
-    "created_at" timestamp with time zone not null default now()
-      );
+alter table "public"."org_workspaces" add column if not exists "show_teams_tab" boolean not null default true;
 
+alter table "public"."session_targets" add column if not exists "planned_shots" integer;
 
-alter table "public"."notifications" enable row level security;
+alter table "public"."session_targets" add column if not exists "target_data" jsonb;
 
-alter table "public"."org_workspaces" add column "show_attached_tab" boolean not null default true;
-
-alter table "public"."org_workspaces" add column "show_teams_tab" boolean not null default true;
-
-alter table "public"."session_targets" add column "planned_shots" integer;
-
-alter table "public"."session_targets" add column "target_data" jsonb;
-
-alter table "public"."sessions" drop column "session_data";
-
-CREATE INDEX notifications_created_at_idx ON public.notifications USING btree (created_at DESC);
-
-CREATE UNIQUE INDEX notifications_pkey ON public.notifications USING btree (id);
-
-CREATE INDEX notifications_user_id_idx ON public.notifications USING btree (user_id);
-
-CREATE INDEX notifications_user_unread_idx ON public.notifications USING btree (user_id, read) WHERE (read = false);
-
-alter table "public"."notifications" add constraint "notifications_pkey" PRIMARY KEY using index "notifications_pkey";
-
-alter table "public"."notifications" add constraint "notifications_user_id_fkey" FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE not valid;
-
-alter table "public"."notifications" validate constraint "notifications_user_id_fkey";
+alter table "public"."sessions" drop column if exists "session_data";
 
 alter table "public"."team_members" add constraint "team_members_squad_requirement" CHECK (((role = 'commander'::text) OR (role = 'soldier'::text) OR ((role = 'squad_commander'::text) AND (details ? 'squad_id'::text) AND ((details ->> 'squad_id'::text) IS NOT NULL) AND ((details ->> 'squad_id'::text) <> ''::text)))) not valid;
 
@@ -209,83 +181,7 @@ create or replace view "public"."session_stats_sniper" as  SELECT s.id AS sessio
   GROUP BY s.id, s.org_workspace_id, s.training_id, s.team_id, s.drill_id, s.session_mode, s.status, s.started_at, s.ended_at, sp.user_id, sp.role, sp.weapon_id, sp.sight_id, sp."position", sp.shots_fired, t.title, td.name, td.distance_m, td.weapon_category, p.full_name, p.email, ow.name, tm.name;
 
 
-grant delete on table "public"."notifications" to "anon";
-
-grant insert on table "public"."notifications" to "anon";
-
-grant references on table "public"."notifications" to "anon";
-
-grant select on table "public"."notifications" to "anon";
-
-grant trigger on table "public"."notifications" to "anon";
-
-grant truncate on table "public"."notifications" to "anon";
-
-grant update on table "public"."notifications" to "anon";
-
-grant delete on table "public"."notifications" to "authenticated";
-
-grant insert on table "public"."notifications" to "authenticated";
-
-grant references on table "public"."notifications" to "authenticated";
-
-grant select on table "public"."notifications" to "authenticated";
-
-grant trigger on table "public"."notifications" to "authenticated";
-
-grant truncate on table "public"."notifications" to "authenticated";
-
-grant update on table "public"."notifications" to "authenticated";
-
-grant delete on table "public"."notifications" to "service_role";
-
-grant insert on table "public"."notifications" to "service_role";
-
-grant references on table "public"."notifications" to "service_role";
-
-grant select on table "public"."notifications" to "service_role";
-
-grant trigger on table "public"."notifications" to "service_role";
-
-grant truncate on table "public"."notifications" to "service_role";
-
-grant update on table "public"."notifications" to "service_role";
-
-
-  create policy "System can insert notifications"
-  on "public"."notifications"
-  as permissive
-  for insert
-  to public
-with check (true);
-
-
-
-  create policy "Users can delete own notifications"
-  on "public"."notifications"
-  as permissive
-  for delete
-  to public
-using ((auth.uid() = user_id));
-
-
-
-  create policy "Users can update own notifications"
-  on "public"."notifications"
-  as permissive
-  for update
-  to public
-using ((auth.uid() = user_id))
-with check ((auth.uid() = user_id));
-
-
-
-  create policy "Users can view own notifications"
-  on "public"."notifications"
-  as permissive
-  for select
-  to public
-using ((auth.uid() = user_id));
+-- Skip notifications grants and policies (already exist from 20251130070000_notifications_table.sql)
 
 
 

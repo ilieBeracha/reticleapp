@@ -162,3 +162,4 @@ CREATE TRIGGER on_training_started
     EXECUTE FUNCTION public.notify_team_on_training_started();
 
 
+
