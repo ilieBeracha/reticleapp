@@ -77,7 +77,7 @@ const TRAINING_BUCKET = "training-corrections";
       }
   
       const result = await response.json();
-  
+      console.log("[DetectionService] Detection result:", result);
       if (!isAnalyzeResponse(result)) {
         throw new ValidationError(
           "Invalid response structure from detection API"

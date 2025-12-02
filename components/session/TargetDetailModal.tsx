@@ -159,6 +159,13 @@ export const TargetDetailModal = React.memo(function TargetDetailModal({
               {isPaper && paperResult?.hits_inside_scoring != null && (
                 <ResultRow label="Inside Scoring" value={paperResult.hits_inside_scoring} />
               )}
+              {isPaper && paperResult?.dispersion_cm != null && (
+                <ResultRow 
+                  label="Group Size" 
+                  value={`${paperResult.dispersion_cm.toFixed(1)} cm`} 
+                  valueColor="#EF4444"
+                />
+              )}
               {!isPaper && tacticalResult && (
                 <>
                   <ResultRow

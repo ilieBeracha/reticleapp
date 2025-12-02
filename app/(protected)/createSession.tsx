@@ -1,6 +1,6 @@
 import { useColors } from "@/hooks/ui/useColors";
 import { useAppContext } from "@/hooks/useAppContext";
-import { getMyActivePersonalSession, getMyActiveSession } from "@/services/sessionService";
+import { endSession, getMyActivePersonalSession, getMyActiveSession } from "@/services/sessionService";
 import { useSessionStore } from "@/store/sessionStore";
 import { useTrainingStore } from "@/store/trainingStore";
 import type { TrainingWithDetails } from "@/types/workspace";
@@ -98,12 +98,11 @@ export default function CreateSessionSheet() {
           : await getMyActiveSession();
           
         if (activeSession) {
-          // User already has an active session
           if (isPersonalMode) {
-            // PERSONAL MODE: Only allow one session at a time - no "Start New" option
+            // PERSONAL MODE: Ask to continue or close & start new
             Alert.alert(
               "Active Session",
-              `You already have an active ${activeSession.training_title ? `training session "${activeSession.training_title}"` : 'session'}. In personal mode, you can only have one session at a time.`,
+              "You have an active personal session. What would you like to do?",
               [
                 {
                   text: "Continue Session",
@@ -115,6 +114,20 @@ export default function CreateSessionSheet() {
                   },
                 },
                 {
+                  text: "Close & Start New",
+                  style: "destructive",
+                  onPress: async () => {
+                    try {
+                      await endSession(activeSession.id);
+                      setCheckingActiveSession(false);
+                    } catch (err) {
+                      console.error("Failed to close session:", err);
+                      Alert.alert("Error", "Failed to close active session");
+                      setCheckingActiveSession(false);
+                    }
+                  },
+                },
+                {
                   text: "Cancel",
                   style: "cancel",
                   onPress: () => router.back(),
@@ -122,7 +135,7 @@ export default function CreateSessionSheet() {
               ]
             );
           } else {
-            // ORG MODE: Allow multiple sessions (can join different trainings)
+            // ORG MODE: Allow multiple sessions - ask user
             Alert.alert(
               "Active Session Found",
               `You already have an active ${activeSession.training_title ? `training session "${activeSession.training_title}"` : 'session'}. Would you like to continue it?`,
@@ -238,17 +251,6 @@ export default function CreateSessionSheet() {
     }
   }, [userId, canStart, createSession, selectedTraining, activeWorkspaceId, loadSessions]);
 
-  // ========== RENDER ==========
-  if (checkingActiveSession) {
-    return (
-      <View style={[styles.scrollView, styles.loadingContainer]}>
-        <ActivityIndicator color={colors.text} size="small" />
-        <Text style={[styles.loadingText, { color: colors.textMuted }]}>
-          Checking for active sessions...
-        </Text>
-      </View>
-    );
-  }
 
   return (
     <ScrollView
@@ -270,10 +272,21 @@ export default function CreateSessionSheet() {
       {/* Mode Selection */}
       <View style={styles.modeSection}>
         <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>SESSION TYPE</Text>
-        <View style={styles.modeRow}>
+        
+        {/* Loading indicator while checking for active session */}
+        {checkingActiveSession && (
+          <View style={[styles.checkingBanner, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <ActivityIndicator color={colors.primary} size="small" />
+            <Text style={[styles.checkingText, { color: colors.textMuted }]}>
+              Checking for active sessions...
+            </Text>
+          </View>
+        )}
+        
+        <View style={[styles.modeRow, checkingActiveSession && { opacity: 0.5 }]}>
           {/* Solo Option */}
-              <TouchableOpacity
-                style={[
+          <TouchableOpacity
+            style={[
               styles.modeCard,
               {
                 backgroundColor: mode === 'solo' ? colors.orange + '15' : colors.card,
@@ -282,29 +295,30 @@ export default function CreateSessionSheet() {
               },
             ]}
             onPress={() => handleModeSelect('solo')}
-                activeOpacity={0.7}
-              >
-                  <Ionicons
+            activeOpacity={0.7}
+            disabled={checkingActiveSession}
+          >
+            <Ionicons
               name="person" 
               size={28} 
               color={mode === 'solo' ? colors.orange : colors.textMuted} 
             />
             <Text style={[styles.modeTitle, { color: mode === 'solo' ? colors.orange : colors.text }]}>
               Solo Practice
-                  </Text>
+            </Text>
             <Text style={[styles.modeDesc, { color: colors.textMuted }]}>
               Personal training
             </Text>
             {mode === 'solo' && (
               <View style={[styles.modeCheck, { backgroundColor: colors.orange }]}>
                 <Ionicons name="checkmark" size={14} color="#fff" />
-                </View>
+              </View>
             )}
-              </TouchableOpacity>
+          </TouchableOpacity>
 
           {/* Training Option */}
-                        <TouchableOpacity
-                          style={[
+          <TouchableOpacity
+            style={[
               styles.modeCard,
               {
                 backgroundColor: mode === 'training' ? '#10B98115' : colors.card,
@@ -314,8 +328,8 @@ export default function CreateSessionSheet() {
               },
             ]}
             onPress={() => availableTrainings.length > 0 && handleModeSelect('training')}
-                          activeOpacity={0.7}
-            disabled={availableTrainings.length === 0}
+            activeOpacity={0.7}
+            disabled={availableTrainings.length === 0 || checkingActiveSession}
           >
             <Ionicons 
               name="people" 
@@ -324,20 +338,20 @@ export default function CreateSessionSheet() {
             />
             <Text style={[styles.modeTitle, { color: mode === 'training' ? '#10B981' : colors.text }]}>
               Join Training
-                            </Text>
+            </Text>
             <Text style={[styles.modeDesc, { color: colors.textMuted }]}>
               {availableTrainings.length > 0 
                 ? `${availableTrainings.length} available` 
                 : 'None available'}
-                          </Text>
+            </Text>
             {mode === 'training' && (
               <View style={[styles.modeCheck, { backgroundColor: '#10B981' }]}>
                 <Ionicons name="checkmark" size={14} color="#fff" />
-                                </View>
-                                )}
-                              </TouchableOpacity>
-                        </View>
-                </View>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* Training Selection (if training mode) */}
       {mode === 'training' && (
@@ -381,28 +395,28 @@ export default function CreateSessionSheet() {
             )}
 
       {/* Start Button */}
-            <TouchableOpacity
-              style={[
+      <TouchableOpacity
+        style={[
           styles.startButton,
           { 
-            backgroundColor: !canStart || isCreating || loading ? colors.muted : '#10B981',
+            backgroundColor: !canStart || isCreating || loading || checkingActiveSession ? colors.muted : '#10B981',
           },
-              ]}
-              onPress={handleCreate}
-        disabled={!canStart || isCreating || loading}
-              activeOpacity={0.8}
-            >
-              {isCreating || loading ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <>
+        ]}
+        onPress={handleCreate}
+        disabled={!canStart || isCreating || loading || checkingActiveSession}
+        activeOpacity={0.8}
+      >
+        {isCreating || loading ? (
+          <ActivityIndicator color="#fff" size="small" />
+        ) : (
+          <>
             <Ionicons name="play" size={22} color="#fff" />
             <Text style={styles.startButtonText}>
               {mode === 'solo' ? 'Start Solo Session' : 'Join Training'}
             </Text>
-                </>
-              )}
-            </TouchableOpacity>
+          </>
+        )}
+      </TouchableOpacity>
 
       {/* Info */}
       <Text style={[styles.infoText, { color: colors.textMuted }]}>
@@ -490,6 +504,21 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  checkingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  checkingText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
 
   // Trainings

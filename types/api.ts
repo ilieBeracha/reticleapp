@@ -57,6 +57,52 @@ export interface QuadrantPair {
   distance_px: number;
   /** Distance in millimeters (if calibrated) */
   distance_mm: number | null;
+  /** Distance in centimeters (if calibrated) */
+  distance_cm?: number | null;
+}
+
+export interface ScaleInfo {
+  /** Pixels per centimeter */
+  pixels_per_cm: number;
+  /** Pixels per millimeter */
+  pixels_per_mm: number;
+  /** Centimeters per pixel */
+  cm_per_pixel: number;
+  /** Millimeters per pixel */
+  mm_per_pixel: number;
+  /** Image width in pixels */
+  image_width_px: number;
+  /** Image height in pixels */
+  image_height_px: number;
+  /** Detected page format (e.g., "A4") */
+  page_format?: string;
+  /** Page width in mm */
+  page_width_mm?: number;
+  /** Page height in mm */
+  page_height_mm?: number;
+  /** Calibration note */
+  calibration_note?: string;
+}
+
+export interface OverallStats {
+  /** All detection points */
+  points: QuadrantPoint[];
+  /** Total detection count */
+  count: number;
+  /** Farthest pair of points (largest group) */
+  max_pair: QuadrantPair;
+  /** Closest pair of points (tightest) */
+  min_pair: QuadrantPair;
+  /** Average distance between all pairs */
+  avg_distance: number;
+  /** Horizontal spread in pixels */
+  spread_x: number;
+  /** Vertical spread in pixels */
+  spread_y: number;
+  /** Center of mass [x, y] */
+  center_of_mass: [number, number];
+  /** Density (detections per area) */
+  density?: number;
 }
 
 export interface QuadrantResult {
@@ -108,6 +154,12 @@ export interface AnalyzeResponse {
   quadrant_stats: QuadrantStats;
   /** Quadrant analysis results (millimeters) */
   quadrant_stats_mm: QuadrantStats;
+  /** Overall stats for all detections (pixels) */
+  overall_stats?: OverallStats;
+  /** Overall stats with real-world measurements (mm/cm) */
+  overall_stats_mm?: OverallStats;
+  /** Scale/calibration information */
+  scale_info?: ScaleInfo;
 }
 
 export interface BatchFileResult {
