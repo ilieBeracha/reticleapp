@@ -1,16 +1,16 @@
+import type { AnalyzeResponse } from "@/types/api";
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import React, { useCallback, useMemo, useState } from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Svg, { Circle, G, Line } from "react-native-svg";
 import ViewShot from "react-native-view-shot";
-import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
-import type { AnalyzeResponse } from "@/types/api";
 import {
-  CANVAS_SIZE,
-  COLORS,
-  MARKER_RADIUS,
-  EditableDetection,
-  EditMode,
+    CANVAS_SIZE,
+    COLORS,
+    EditableDetection,
+    EditMode,
+    MARKER_RADIUS,
 } from "./types";
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -158,13 +158,13 @@ const StatPill = React.memo(function StatPill({
 const QuickActionButton = React.memo(function QuickActionButton({
   icon,
   label,
-  color,
+  color = '#ffffff',
   colors,
   onPress,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
-  color: string;
+  color?: string;
   colors: typeof Colors.light;
   onPress: () => void;
 }) {
@@ -209,7 +209,7 @@ const SectionHeader = React.memo(function SectionHeader({
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ACTIVITY ROW
+// ACTIVITY ROW (Subtle/Muted)
 // ═══════════════════════════════════════════════════════════════════════════
 const ActivityRow = React.memo(function ActivityRow({
   session,
@@ -222,42 +222,80 @@ const ActivityRow = React.memo(function ActivityRow({
 }) {
   const isActive = session.status === 'active';
   const isPersonal = !session.org_workspace_id;
-  const statusColor = isActive ? colors.primary : session.status === 'completed' ? '#10B981' : colors.textMuted;
-  const contextColor = isPersonal ? '#8B5CF6' : '#3B82F6'; // Purple for personal, blue for org
   const duration = session.ended_at
     ? Math.round((new Date(session.ended_at).getTime() - new Date(session.started_at).getTime()) / 60000)
     : Math.round((Date.now() - new Date(session.started_at).getTime()) / 60000);
+  const sessionDate = format(new Date(session.started_at), 'MMM d');
 
   return (
     <TouchableOpacity
-      style={[styles.activityRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+      style={styles.activityRowSubtle}
       onPress={onPress}
-      activeOpacity={0.7}
+      activeOpacity={0.6}
     >
-      <View style={[styles.activityIndicator, { backgroundColor: statusColor }]} />
-      <View style={styles.activityContent}>
-        <View style={styles.activityHeader}>
-          <Text style={[styles.activityTitle, { color: colors.text }]} numberOfLines={1}>
-            {session.training_title || session.drill_name || 'Free Session'}
-          </Text>
-          <View style={[styles.activityContextBadge, { backgroundColor: contextColor + '15' }]}>
-            <Ionicons 
-              name={isPersonal ? 'person' : 'business'} 
-              size={10} 
-              color={contextColor} 
-            />
-            <Text style={[styles.activityContextText, { color: contextColor }]}>
-              {isPersonal ? 'Personal' : (session.workspace_name || 'Org')}
-            </Text>
-          </View>
-        </View>
-        <Text style={[styles.activityMeta, { color: colors.textMuted }]}>
-          {isActive ? 'In progress' : `${duration}m`}
-          {session.team_name && ` · ${session.team_name}`}
+      <View style={styles.activityContentSubtle}>
+        <Text style={[styles.activityTitleSubtle, { color: colors.textMuted }]} numberOfLines={1}>
+          {session.training_title || session.drill_name || 'Free Session'}
+        </Text>
+        <Text style={[styles.activityMetaSubtle, { color: colors.border }]}>
+          {sessionDate} · {isActive ? 'Active' : `${duration}m`}
+          {isPersonal ? '' : ` · ${session.workspace_name || 'Org'}`}
         </Text>
       </View>
-      <Ionicons name="chevron-forward" size={18} color={colors.border} />
+      <Ionicons name="chevron-forward" size={16} color={colors.border} />
     </TouchableOpacity>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TIP CARD
+// ═══════════════════════════════════════════════════════════════════════════
+const TipCard = React.memo(function TipCard({
+  icon,
+  title,
+  description,
+  colors,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  description: string;
+  colors: typeof Colors.light;
+}) {
+  return (
+    <View style={[styles.tipCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={[styles.tipIconContainer, { backgroundColor: colors.primary + '10' }]}>
+        <Ionicons name={icon} size={20} color={colors.primary} />
+      </View>
+      <View style={styles.tipContent}>
+        <Text style={[styles.tipTitle, { color: colors.text }]}>{title}</Text>
+        <Text style={[styles.tipDesc, { color: colors.textMuted }]}>{description}</Text>
+      </View>
+    </View>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INSIGHT ROW
+// ═══════════════════════════════════════════════════════════════════════════
+const InsightRow = React.memo(function InsightRow({
+  label,
+  value,
+  icon,
+  colors,
+}: {
+  label: string;
+  value: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  colors: typeof Colors.light;
+}) {
+  return (
+    <View style={styles.insightRow}>
+      <View style={styles.insightLeft}>
+        <Ionicons name={icon} size={16} color={colors.textMuted} />
+        <Text style={[styles.insightLabel, { color: colors.textMuted }]}>{label}</Text>
+      </View>
+      <Text style={[styles.insightValue, { color: colors.text }]}>{value}</Text>
+    </View>
   );
 });
 
@@ -414,9 +452,9 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
         <View style={styles.section}>
           <SectionHeader title="Quick Actions" colors={colors} />
           <View style={styles.quickActionsGrid}>
-            <QuickActionButton icon="add-circle" label="Session" color="#6366F1" colors={colors} onPress={nav.startSession} />
-            <QuickActionButton icon="stats-chart" label="Progress" color="#10B981" colors={colors} onPress={nav.viewProgress} />
-            <QuickActionButton icon="settings-outline" label="Settings" color="#8B5CF6" colors={colors} onPress={() => {}} />
+            <QuickActionButton icon="add-circle" label="Session"  colors={colors} onPress={nav.startSession} />
+            <QuickActionButton icon="stats-chart" label="Progress" colors={colors} onPress={nav.viewProgress} />
+            <QuickActionButton icon="settings-outline" label="Settings" colors={colors} onPress={() => {}} />
           </View>
           <TouchableOpacity
             style={[styles.scansButton, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -457,18 +495,63 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
           </View>
         )}
 
-        {/* ═══ RECENT ACTIVITY ═══ */}
+        {/* ═══ TRAINING TIPS ═══ */}
+        <View style={styles.section}>
+          <SectionHeader title="Tips & Insights" colors={colors} />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tipsRow}
+          >
+            <TipCard
+              icon="bulb-outline"
+              title="Consistency wins"
+              description="Short daily sessions beat long occasional ones"
+              colors={colors}
+            />
+            <TipCard
+              icon="analytics-outline"
+              title="Track progress"
+              description="Review your scans to identify patterns"
+              colors={colors}
+            />
+            <TipCard
+              icon="people-outline"
+              title="Train together"
+              description="Join a team for accountability"
+              colors={colors}
+            />
+          </ScrollView>
+        </View>
+
+        {/* ═══ YOUR INSIGHTS ═══ */}
+        <View style={styles.section}>
+          <SectionHeader title="Your Stats" colors={colors} />
+          <View style={[styles.insightsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <InsightRow icon="flame-outline" label="Current streak" value={stats.totalSessions > 0 ? '3 days' : '—'} colors={colors} />
+            <View style={[styles.insightDivider, { backgroundColor: colors.border }]} />
+            <InsightRow icon="trending-up-outline" label="This week" value={`${Math.min(stats.totalSessions, 5)} sessions`} colors={colors} />
+            <View style={[styles.insightDivider, { backgroundColor: colors.border }]} />
+            <InsightRow icon="ribbon-outline" label="Best session" value={totalTime !== '0m' ? totalTime : '—'} colors={colors} />
+          </View>
+        </View>
+
+        {/* ═══ SESSION HISTORY (Subtle) ═══ */}
         {recentSessions.length > 0 && (
           <View style={styles.section}>
-            <SectionHeader title="Recent Activity" colors={colors} />
-            <View style={styles.activityList}>
-              {recentSessions.map(session => (
-                <ActivityRow
-                  key={session.id}
-                  session={session}
-                  colors={colors}
-                  onPress={() => session.status === 'active' ? nav.resumeSession(session.id) : {}}
-                />
+            <SectionHeader title="Session History" colors={colors} />
+            <View style={[styles.historyContainer, { borderColor: colors.border }]}>
+              {recentSessions.map((session, index) => (
+                <React.Fragment key={session.id}>
+                  <ActivityRow
+                    session={session}
+                    colors={colors}
+                    onPress={() => session.status === 'active' ? nav.resumeSession(session.id) : {}}
+                  />
+                  {index < recentSessions.length - 1 && (
+                    <View style={[styles.historyDivider, { backgroundColor: colors.border }]} />
+                  )}
+                </React.Fragment>
               ))}
             </View>
           </View>
@@ -568,16 +651,29 @@ const styles = StyleSheet.create({
   trainingScrollMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
   trainingScrollMetaText: { fontSize: 13 },
 
-  // Activity List
-  activityList: { paddingHorizontal: 20, gap: 10 },
-  activityRow: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 14, borderWidth: 1 },
-  activityIndicator: { width: 8, height: 8, borderRadius: 4, marginRight: 12 },
-  activityContent: { flex: 1 },
-  activityHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
-  activityTitle: { fontSize: 15, fontWeight: '600', flexShrink: 1 },
-  activityContextBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  activityContextText: { fontSize: 10, fontWeight: '600' },
-  activityMeta: { fontSize: 13 },
+  // Tips
+  tipsRow: { paddingHorizontal: 20, gap: 12 },
+  tipCard: { width: 200, padding: 16, borderRadius: 14, borderWidth: 1 },
+  tipIconContainer: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  tipContent: { flex: 1 },
+  tipTitle: { fontSize: 14, fontWeight: '600', marginBottom: 4 },
+  tipDesc: { fontSize: 12, lineHeight: 16 },
+
+  // Insights Card
+  insightsCard: { marginHorizontal: 20, borderRadius: 14, borderWidth: 1, padding: 4 },
+  insightRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 14 },
+  insightLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  insightLabel: { fontSize: 14 },
+  insightValue: { fontSize: 14, fontWeight: '600' },
+  insightDivider: { height: 1, marginHorizontal: 14 },
+
+  // Session History (Subtle)
+  historyContainer: { marginHorizontal: 20, borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
+  historyDivider: { height: 1, marginLeft: 16 },
+  activityRowSubtle: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16 },
+  activityContentSubtle: { flex: 1 },
+  activityTitleSubtle: { fontSize: 14, marginBottom: 2 },
+  activityMetaSubtle: { fontSize: 12 },
 
   // Empty State
   emptyState: { marginHorizontal: 20, alignItems: 'center', padding: 32, borderRadius: 20, borderWidth: 1 },
