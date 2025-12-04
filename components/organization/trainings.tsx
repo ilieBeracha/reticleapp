@@ -232,111 +232,61 @@ const TrainingsPage = React.memo(function TrainingsPage() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header & Tabs */}
-      <View style={[styles.headerContainer, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-        <View style={styles.headerTop}>
-          <View style={styles.headerTitleContainer}>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Trainings</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
-              {teamInfo?.teamName || 'Organization'}
-            </Text>
-          </View>
-          
-          {canCreateTraining && (
-            <TouchableOpacity
-              style={[styles.createButton, { backgroundColor: colors.primary }]}
-              onPress={handleCreateTraining}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="add" size={20} color="#fff" />
-              <Text style={styles.createButtonText}>New</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Filter Tabs */}
+      {/* Compact Filter Bar */}
+      <View style={[styles.filterBar, { backgroundColor: colors.background }]}>
         <View style={[styles.tabsContainer, { backgroundColor: colors.secondary }]}>
           <TouchableOpacity
-            style={[
-              styles.tab, 
-              filter === 'upcoming' && { 
-                backgroundColor: colors.card, 
-                shadowColor: '#000', 
-                shadowOpacity: 0.05, 
-                shadowRadius: 2, 
-                shadowOffset: { width: 0, height: 1 } 
-              }
-            ]}
+            style={[styles.tab, filter === 'upcoming' && { backgroundColor: colors.card }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               setFilter('upcoming');
             }}
-            activeOpacity={0.9}
+            activeOpacity={0.8}
           >
-            <Ionicons 
-              name="calendar" 
-              size={16} 
-              color={filter === 'upcoming' ? colors.text : colors.textMuted} 
-            />
             <Text style={[styles.tabText, { color: filter === 'upcoming' ? colors.text : colors.textMuted }]}>
               Upcoming
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[
-              styles.tab, 
-              filter === 'ongoing' && { 
-                backgroundColor: colors.card, 
-                shadowColor: '#000', 
-                shadowOpacity: 0.05, 
-                shadowRadius: 2, 
-                shadowOffset: { width: 0, height: 1 } 
-              }
-            ]}
+            style={[styles.tab, filter === 'ongoing' && { backgroundColor: colors.card }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               setFilter('ongoing');
             }}
-            activeOpacity={0.9}
+            activeOpacity={0.8}
           >
-            <Ionicons 
-              name="play-circle" 
-              size={16} 
-              color={filter === 'ongoing' ? colors.text : colors.textMuted} 
-            />
             <Text style={[styles.tabText, { color: filter === 'ongoing' ? colors.text : colors.textMuted }]}>
-              Ongoing
+              Live
             </Text>
+            {trainings.filter(t => t.status === 'ongoing').length > 0 && (
+              <View style={styles.liveDot} />
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[
-              styles.tab, 
-              filter === 'completed' && { 
-                backgroundColor: colors.card, 
-                shadowColor: '#000', 
-                shadowOpacity: 0.05, 
-                shadowRadius: 2, 
-                shadowOffset: { width: 0, height: 1 } 
-              }
-            ]}
+            style={[styles.tab, filter === 'completed' && { backgroundColor: colors.card }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               setFilter('completed');
             }}
-            activeOpacity={0.9}
+            activeOpacity={0.8}
           >
-            <Ionicons 
-              name="checkmark-circle" 
-              size={16} 
-              color={filter === 'completed' ? colors.text : colors.textMuted} 
-            />
             <Text style={[styles.tabText, { color: filter === 'completed' ? colors.text : colors.textMuted }]}>
-              Completed
+              Past
             </Text>
           </TouchableOpacity>
         </View>
+
+        {canCreateTraining && (
+          <TouchableOpacity
+            style={[styles.createButton, { backgroundColor: colors.primary }]}
+            onPress={handleCreateTraining}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="add" size={20} color="#fff" />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Content */}
@@ -409,44 +359,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  headerContainer: {
-    paddingTop: Platform.OS === 'ios' ? 8 : 16,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    paddingHorizontal: 4,
-  },
-  headerTitleContainer: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
-  headerSubtitle: {
-    fontSize: 15,
-    marginTop: 4,
-  },
-  createButton: {
+  filterBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  createButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#fff',
+    paddingTop: Platform.OS === 'ios' ? 8 : 12,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    gap: 10,
   },
   tabsContainer: {
+    flex: 1,
     flexDirection: 'row',
     padding: 3,
     borderRadius: 10,
@@ -457,12 +379,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 4,
     borderRadius: 8,
   },
   tabText: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#34C759',
+  },
+  createButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   
   // Loading

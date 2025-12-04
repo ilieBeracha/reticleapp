@@ -26,7 +26,37 @@ import {
 } from 'react-native';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ACTION ROW
+// QUICK ACTION BUTTON (Compact action button)
+// ═══════════════════════════════════════════════════════════════════════════
+const QuickAction = React.memo(function QuickAction({
+  icon,
+  label,
+  colors,
+  onPress,
+  accent,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  colors: typeof Colors.light;
+  onPress: () => void;
+  accent?: string;
+}) {
+  return (
+    <TouchableOpacity 
+      style={[styles.quickAction, { backgroundColor: colors.card, borderColor: colors.border }]} 
+      activeOpacity={0.6} 
+      onPress={onPress}
+    >
+      <View style={[styles.quickActionIcon, { backgroundColor: accent ? accent + '15' : colors.secondary }]}>
+        <Ionicons name={icon} size={20} color={accent || colors.text} />
+      </View>
+      <Text style={[styles.quickActionLabel, { color: colors.text }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ACTION ROW (for lists)
 // ═══════════════════════════════════════════════════════════════════════════
 const ActionRow = React.memo(function ActionRow({
   icon,
@@ -77,10 +107,12 @@ const TrainingItem = React.memo(function TrainingItem({
   training,
   colors,
   onPress,
+  compact,
 }: {
   training: TrainingWithDetails;
   colors: typeof Colors.light;
   onPress: () => void;
+  compact?: boolean;
 }) {
   const scheduledDate = new Date(training.scheduled_at);
   const now = new Date();
@@ -91,18 +123,14 @@ const TrainingItem = React.memo(function TrainingItem({
   const dateLabel = isToday ? 'Today' : isTomorrow ? 'Tomorrow' : scheduledDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   const timeLabel = scheduledDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
-  // Subtle status indicator
-  const showLive = isOngoing;
-  const showToday = isToday && !isOngoing;
-
   return (
     <TouchableOpacity style={styles.trainingItem} activeOpacity={0.6} onPress={onPress}>
       <View style={styles.trainingContent}>
         <View style={styles.trainingHeader}>
-        <Text style={[styles.trainingTitle, { color: colors.text }]} numberOfLines={1}>
-          {training.title}
-        </Text>
-          {showLive && (
+          <Text style={[styles.trainingTitle, { color: colors.text }]} numberOfLines={1}>
+            {training.title}
+          </Text>
+          {isOngoing && (
             <View style={styles.trainingLiveBadge}>
               <View style={styles.trainingLiveDot} />
               <Text style={styles.trainingLiveText}>LIVE</Text>
@@ -110,15 +138,106 @@ const TrainingItem = React.memo(function TrainingItem({
           )}
         </View>
         
-        <Text style={[styles.trainingMeta, { color: colors.textMuted }]}>
-          {showToday ? <Text style={{ color: '#FF9500', fontWeight: '500' }}>Today</Text> : dateLabel} at {timeLabel}
-          {training.team && ` · ${training.team.name}`}
-          {(training.drill_count ?? 0) > 0 && ` · ${training.drill_count} drills`}
-        </Text>
+        {!compact && (
+          <Text style={[styles.trainingMeta, { color: colors.textMuted }]}>
+            {isToday && !isOngoing ? (
+              <Text style={{ color: '#FF9500', fontWeight: '500' }}>Today</Text>
+            ) : (
+              dateLabel
+            )} at {timeLabel}
+            {training.team && ` · ${training.team.name}`}
+            {(training.drill_count ?? 0) > 0 && ` · ${training.drill_count} drills`}
+          </Text>
+        )}
+        {compact && (
+          <Text style={[styles.trainingMeta, { color: colors.textMuted }]}>
+            {timeLabel}{training.team && ` · ${training.team.name}`}
+          </Text>
+        )}
       </View>
 
       <Ionicons name="chevron-forward" size={16} color={colors.border} />
     </TouchableOpacity>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TODAY CARD (Prominent "now/today" display)
+// ═══════════════════════════════════════════════════════════════════════════
+const TodayCard = React.memo(function TodayCard({
+  trainings,
+  activeSessions,
+  colors,
+  onTrainingPress,
+}: {
+  trainings: TrainingWithDetails[];
+  activeSessions: number;
+  colors: typeof Colors.light;
+  onTrainingPress: (id: string) => void;
+}) {
+  const ongoingTrainings = trainings.filter(t => t.status === 'ongoing');
+  const todayTrainings = trainings.filter(t => {
+    const d = new Date(t.scheduled_at);
+    return d.toDateString() === new Date().toDateString() && t.status !== 'ongoing';
+  });
+  
+  const hasActivity = ongoingTrainings.length > 0 || todayTrainings.length > 0 || activeSessions > 0;
+  
+  if (!hasActivity) return null;
+
+  return (
+    <View style={[styles.todayCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={styles.todayHeader}>
+        <View style={[styles.todayDot, { backgroundColor: '#34C759' }]} />
+        <Text style={[styles.todayTitle, { color: colors.text }]}>Today</Text>
+        {activeSessions > 0 && (
+          <View style={[styles.todayBadge, { backgroundColor: colors.primary + '20' }]}>
+            <Text style={[styles.todayBadgeText, { color: colors.primary }]}>
+              {activeSessions} active
+            </Text>
+          </View>
+        )}
+      </View>
+      
+      {ongoingTrainings.map((t) => (
+        <TouchableOpacity 
+          key={t.id} 
+          style={styles.todayItem}
+          onPress={() => onTrainingPress(t.id)}
+          activeOpacity={0.6}
+        >
+          <View style={styles.todayItemContent}>
+            <View style={styles.trainingLiveBadge}>
+              <View style={styles.trainingLiveDot} />
+              <Text style={styles.trainingLiveText}>LIVE</Text>
+            </View>
+            <Text style={[styles.todayItemTitle, { color: colors.text }]} numberOfLines={1}>
+              {t.title}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.border} />
+        </TouchableOpacity>
+      ))}
+      
+      {todayTrainings.slice(0, 2).map((t) => (
+        <TouchableOpacity 
+          key={t.id} 
+          style={styles.todayItem}
+          onPress={() => onTrainingPress(t.id)}
+          activeOpacity={0.6}
+        >
+          <View style={styles.todayItemContent}>
+            <Text style={[styles.todayTime, { color: '#FF9500' }]}>
+              {new Date(t.scheduled_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+            </Text>
+            <Text style={[styles.todayItemTitle, { color: colors.text }]} numberOfLines={1}>
+              {t.title}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.border} />
+        </TouchableOpacity>
+      ))}
+    </View>
   );
 });
 
@@ -241,9 +360,7 @@ export const OrganizationHomePage = React.memo(function OrganizationHomePage() {
   const [refreshing, setRefreshing] = useState(false);
 
   // Role checks
-  const isAdmin = orgRole === 'owner' || orgRole === 'admin';
-  const isInstructor = orgRole === 'instructor';
-  const isStaff = isAdmin || isInstructor;
+  const isStaff = ['owner', 'admin', 'instructor'].includes(orgRole);
   const isAttached = orgRole === 'attached';
   const isTeamMember = !isStaff && !isAttached;
 
@@ -297,11 +414,6 @@ export const OrganizationHomePage = React.memo(function OrganizationHomePage() {
     return workspaceMembers.filter(m => m.teams?.some(t => t.team_id === teamInfo.teamId));
   }, [workspaceMembers, teamInfo]);
 
-  const staffMembers = useMemo(() =>
-    workspaceMembers.filter(m => ['owner', 'admin', 'instructor'].includes(m.role)),
-    [workspaceMembers]
-  );
-
   // Role subtitle
   const roleSubtitle = useMemo(() => {
     if (isStaff) return orgRole.charAt(0).toUpperCase() + orgRole.slice(1);
@@ -312,12 +424,22 @@ export const OrganizationHomePage = React.memo(function OrganizationHomePage() {
     return 'Member';
   }, [orgRole, isStaff, teamInfo]);
 
-  // Navigation
+  // Active sessions count
+  const activeSessions = useMemo(() => 
+    sessions.filter(s => s.status === 'active').length, 
+    [sessions]
+  );
+
+  // Navigation - only real actions, not tab navigation
   const nav = useMemo(() => ({
-    createTraining: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/(protected)/createTraining' as any); },
-    createSession: () => { loadData(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/(protected)/createSession' as any); },
-    viewTrainings: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(protected)/org/trainings' as any); },
-    viewManage: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(protected)/org/manage' as any); },
+    createTraining: () => { 
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); 
+      router.push('/(protected)/createTraining' as any); 
+    },
+    createSession: () => { 
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); 
+      router.push('/(protected)/createSession' as any); 
+    },
     inviteToTeam: () => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       router.push(teamInfo?.teamId ? `/(protected)/inviteTeamMember?teamId=${teamInfo.teamId}` as any : '/(protected)/inviteTeamMember' as any);
@@ -326,7 +448,10 @@ export const OrganizationHomePage = React.memo(function OrganizationHomePage() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); 
       router.push(`/(protected)/trainingLive?trainingId=${id}` as any); 
     },
-    memberPreview: (id: string) => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/(protected)/memberPreview?id=${id}` as any); },
+    memberPreview: (id: string) => { 
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); 
+      router.push(`/(protected)/memberPreview?id=${id}` as any); 
+    },
   }), [teamInfo]);
 
   if (loading) {
@@ -354,63 +479,73 @@ export const OrganizationHomePage = React.memo(function OrganizationHomePage() {
           <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>{roleSubtitle}</Text>
         </View>
 
-        {/* ═══ STATS BAR (Staff) ═══ */}
-        {isStaff && (
-          <View style={[styles.statsBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <StatBlock value={workspaceMembers.length} label="Members" colors={colors} />
-            <View style={[styles.statsDivider, { backgroundColor: colors.border }]} />
-            <StatBlock value={teams.length} label="Teams" colors={colors} />
-            <View style={[styles.statsDivider, { backgroundColor: colors.border }]} />
-            <StatBlock value={trainings.length} label="Upcoming" colors={colors} />
+        {/* ═══ TODAY CARD (Prominent "now" section) ═══ */}
+        {!isAttached && (
+          <TodayCard
+            trainings={trainings}
+            activeSessions={activeSessions}
+            colors={colors}
+            onTrainingPress={nav.trainingLive}
+          />
+        )}
+
+        {/* ═══ QUICK ACTIONS (Grid of real actions) ═══ */}
+        {!isAttached && (
+          <View style={styles.quickActionsGrid}>
+            <QuickAction
+              icon="fitness"
+              label="Start Session"
+              colors={colors}
+              onPress={nav.createSession}
+              accent="#34C759"
+            />
+            {(isStaff || isCommander) && (
+              <QuickAction
+                icon="calendar"
+                label="New Training"
+                colors={colors}
+                onPress={nav.createTraining}
+                accent="#007AFF"
+              />
+            )}
+            {isCommander && !isStaff && (
+              <QuickAction
+                icon="person-add"
+                label="Invite"
+                colors={colors}
+                onPress={nav.inviteToTeam}
+                accent="#FF9500"
+              />
+            )}
           </View>
         )}
 
-        {/* ═══ STATS BAR (Team Member) ═══ */}
-        {isTeamMember && (
+        {/* ═══ STATS BAR ═══ */}
+        {(isStaff || isTeamMember) && (
           <View style={[styles.statsBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <StatBlock value={myTeamMembers.length} label="Team" colors={colors} />
-            <View style={[styles.statsDivider, { backgroundColor: colors.border }]} />
-            <StatBlock value={trainings.length} label="Upcoming" colors={colors} />
-            <View style={[styles.statsDivider, { backgroundColor: colors.border }]} />
-            <StatBlock value={completedCount} label="Completed" colors={colors} />
+            {isStaff ? (
+              <>
+                <StatBlock value={workspaceMembers.length} label="Members" colors={colors} />
+                <View style={[styles.statsDivider, { backgroundColor: colors.border }]} />
+                <StatBlock value={teams.length} label="Teams" colors={colors} />
+                <View style={[styles.statsDivider, { backgroundColor: colors.border }]} />
+                <StatBlock value={trainings.length} label="Scheduled" colors={colors} />
+              </>
+            ) : (
+              <>
+                <StatBlock value={myTeamMembers.length} label="Team" colors={colors} />
+                <View style={[styles.statsDivider, { backgroundColor: colors.border }]} />
+                <StatBlock value={trainings.length} label="Scheduled" colors={colors} />
+                <View style={[styles.statsDivider, { backgroundColor: colors.border }]} />
+                <StatBlock value={completedCount} label="Completed" colors={colors} />
+              </>
+            )}
           </View>
         )}
 
-        {/* ═══ ACTIONS (Staff) ═══ */}
-        {isStaff && (
-          <Section title="Actions" colors={colors}>
-            <ActionRow icon="add-circle-outline" label="Create Training" colors={colors} onPress={nav.createTraining} />
-            <Divider colors={colors} />
-            <ActionRow icon="fitness-outline" label="Start Session" colors={colors} onPress={nav.createSession} />
-            <Divider colors={colors} />
-            <ActionRow icon="people-outline" label="Manage Organization" colors={colors} onPress={nav.viewManage} />
-          </Section>
-        )}
-
-        {/* ═══ ACTIONS (Team Member) ═══ */}
-        {isTeamMember && (
-          <Section title="Actions" colors={colors}>
-            {isCommander && (
-              <>
-                <ActionRow icon="add-circle-outline" label="Create Training" colors={colors} onPress={nav.createTraining} />
-                <Divider colors={colors} />
-              </>
-            )}
-            <ActionRow icon="fitness-outline" label="Start Session" colors={colors} onPress={nav.createSession} />
-            {isCommander && (
-              <>
-                <Divider colors={colors} />
-                <ActionRow icon="person-add-outline" label="Invite to Team" colors={colors} onPress={nav.inviteToTeam} />
-              </>
-            )}
-            <Divider colors={colors} />
-            <ActionRow icon="business-outline" label="View Organization" colors={colors} onPress={nav.viewManage} />
-          </Section>
-        )}
-
-        {/* ═══ UPCOMING TRAININGS ═══ */}
+        {/* ═══ UPCOMING TRAININGS (no "See all" - use Trainings tab) ═══ */}
         {!isAttached && trainings.length > 0 && (
-          <Section title="Upcoming Trainings" action="See all" onAction={nav.viewTrainings} colors={colors}>
+          <Section title="Upcoming" colors={colors}>
             {trainings.slice(0, 3).map((t, i) => (
               <React.Fragment key={t.id}>
                 {i > 0 && <Divider colors={colors} />}
@@ -432,10 +567,10 @@ export const OrganizationHomePage = React.memo(function OrganizationHomePage() {
           </Section>
         )}
 
-        {/* ═══ MY TEAM (Team Members) ═══ */}
+        {/* ═══ MY TEAM (Team Members - no "View all" - use My Team tab) ═══ */}
         {isTeamMember && myTeam && myTeamMembers.length > 0 && (
-          <Section title={myTeam.name} action="View all" onAction={nav.viewManage} colors={colors}>
-            {myTeamMembers.slice(0, 5).map((m, i) => {
+          <Section title={myTeam.name} colors={colors}>
+            {myTeamMembers.slice(0, 4).map((m, i) => {
               const membership = m.teams?.find(t => t.team_id === teamInfo?.teamId);
               return (
                 <React.Fragment key={m.id}>
@@ -453,45 +588,18 @@ export const OrganizationHomePage = React.memo(function OrganizationHomePage() {
           </Section>
         )}
 
-        {/* ═══ STAFF (Admin view) ═══ */}
-        {isAdmin && staffMembers.length > 0 && (
-          <Section title="Staff" action="Manage" onAction={nav.viewManage} colors={colors}>
-            {staffMembers.slice(0, 4).map((m, i) => (
-              <React.Fragment key={m.id}>
-                {i > 0 && <Divider colors={colors} />}
-                <MemberItem
-                  member={m}
-                  colors={colors}
-                  onPress={() => nav.memberPreview(m.member_id)}
-                  isYou={m.member_id === currentUserId}
-                />
-              </React.Fragment>
-            ))}
-          </Section>
-        )}
-
-        {/* ═══ TEAMS (Staff view) ═══ */}
-        {isStaff && teams.length > 0 && (
-          <Section title="Teams" action="Manage" onAction={nav.viewManage} colors={colors}>
-            {teams.slice(0, 4).map((team, i) => (
-              <React.Fragment key={team.id}>
-                {i > 0 && <Divider colors={colors} />}
-                <TouchableOpacity style={styles.teamItem} activeOpacity={0.5} onPress={nav.viewManage}>
-                  <Text style={[styles.teamName, { color: colors.text }]}>{team.name}</Text>
-                  <Text style={[styles.teamCount, { color: colors.textMuted }]}>{team.member_count || 0}</Text>
-                  <Ionicons name="chevron-forward" size={16} color={colors.border} />
-                </TouchableOpacity>
-              </React.Fragment>
-            ))}
-          </Section>
-        )}
-
         {/* ═══ ATTACHED VIEW ═══ */}
         {isAttached && (
           <>
-            <Section title="Actions" colors={colors}>
-              <ActionRow icon="fitness-outline" label="Start Session" colors={colors} onPress={nav.createSession} />
-            </Section>
+            <View style={styles.quickActionsGrid}>
+              <QuickAction
+                icon="fitness"
+                label="Start Session"
+                colors={colors}
+                onPress={nav.createSession}
+                accent="#34C759"
+              />
+            </View>
 
             {recentSessions.length > 0 && (
               <Section title="Your Sessions" colors={colors}>
@@ -533,16 +641,103 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 16 },
 
   // Header
-  header: { paddingTop: Platform.OS === 'ios' ? 8 : 16, paddingBottom: 16, paddingHorizontal: 4 },
+  header: { paddingTop: Platform.OS === 'ios' ? 8 : 16, paddingBottom: 12, paddingHorizontal: 4 },
   headerTitle: { fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
   headerSubtitle: { fontSize: 15, marginTop: 4 },
 
+  // Quick Actions Grid
+  quickActionsGrid: { 
+    flexDirection: 'row', 
+    gap: 10, 
+    marginBottom: 16,
+  },
+  quickAction: { 
+    flex: 1, 
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14, 
+    paddingHorizontal: 14, 
+    borderRadius: 12, 
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 10,
+  },
+  quickActionIcon: { 
+    width: 36, 
+    height: 36, 
+    borderRadius: 10, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+  },
+  quickActionLabel: { 
+    fontSize: 14, 
+    fontWeight: '600',
+    flex: 1,
+  },
+
+  // Today Card
+  todayCard: {
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 16,
+    overflow: 'hidden',
+  },
+  todayHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  todayDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  todayTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    flex: 1,
+  },
+  todayBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  todayBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  todayItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(128,128,128,0.1)',
+  },
+  todayItemContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  todayItemTitle: {
+    fontSize: 15,
+    fontWeight: '500',
+    flex: 1,
+  },
+  todayTime: {
+    fontSize: 13,
+    fontWeight: '600',
+    minWidth: 60,
+  },
+
   // Stats Bar
   statsBar: { flexDirection: 'row', borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, marginBottom: 20, overflow: 'hidden' },
-  statBlock: { flex: 1, alignItems: 'center', paddingVertical: 16 },
-  statValue: { fontSize: 24, fontWeight: '700' },
-  statLabel: { fontSize: 12, marginTop: 2 },
-  statsDivider: { width: StyleSheet.hairlineWidth, marginVertical: 12 },
+  statBlock: { flex: 1, alignItems: 'center', paddingVertical: 14 },
+  statValue: { fontSize: 22, fontWeight: '700' },
+  statLabel: { fontSize: 11, marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.3 },
+  statsDivider: { width: StyleSheet.hairlineWidth, marginVertical: 10 },
 
   // Section
   section: { marginBottom: 20 },
@@ -557,13 +752,13 @@ const styles = StyleSheet.create({
   actionLabel: { flex: 1, fontSize: 16, fontWeight: '500' },
 
   // Training Item
-  trainingItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16 },
+  trainingItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16 },
   trainingContent: { flex: 1 },
-  trainingHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 3 },
-  trainingTitle: { fontSize: 16, fontWeight: '500', flex: 1 },
+  trainingHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 2 },
+  trainingTitle: { fontSize: 15, fontWeight: '500', flex: 1 },
   trainingLiveBadge: { flexDirection: 'row', alignItems: 'center', marginLeft: 8 },
   trainingLiveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#34C759', marginRight: 4 },
-  trainingLiveText: { fontSize: 11, fontWeight: '600', color: '#34C759', letterSpacing: 0.3 },
+  trainingLiveText: { fontSize: 10, fontWeight: '700', color: '#34C759', letterSpacing: 0.5 },
   trainingMeta: { fontSize: 13 },
 
   // Activity Item
@@ -577,11 +772,6 @@ const styles = StyleSheet.create({
   memberInfo: { flex: 1, marginLeft: 12 },
   memberName: { fontSize: 15, fontWeight: '500' },
   memberRole: { fontSize: 13, marginTop: 1, textTransform: 'capitalize' },
-
-  // Team Item
-  teamItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16 },
-  teamName: { flex: 1, fontSize: 16, fontWeight: '500' },
-  teamCount: { fontSize: 14, marginRight: 8 },
 
   // Divider
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 16 },

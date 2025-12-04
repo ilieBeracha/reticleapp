@@ -13,6 +13,7 @@ import type { TrainingWithDetails } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { format, isToday, isTomorrow } from 'date-fns';
+import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -452,24 +453,10 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
         <View style={styles.section}>
           <SectionHeader title="Quick Actions" colors={colors} />
           <View style={styles.quickActionsGrid}>
-            <QuickActionButton icon="add-circle" label="Session"  colors={colors} onPress={nav.startSession} />
+            <QuickActionButton icon="add-circle" label="Session" colors={colors} onPress={nav.startSession} />
             <QuickActionButton icon="stats-chart" label="Progress" colors={colors} onPress={nav.viewProgress} />
             <QuickActionButton icon="settings-outline" label="Settings" colors={colors} onPress={() => {}} />
           </View>
-          <TouchableOpacity
-            style={[styles.scansButton, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={nav.viewScans}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.scansButtonIcon, { backgroundColor: '#F59E0B15' }]}>
-              <Ionicons name="scan" size={22} color="#F59E0B" />
-            </View>
-            <View style={styles.scansButtonContent}>
-              <Text style={[styles.scansButtonTitle, { color: colors.text }]}>Recent Scans</Text>
-              <Text style={[styles.scansButtonSubtitle, { color: colors.textMuted }]}>View all your target scans</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.border} />
-          </TouchableOpacity>
         </View>
 
         {/* ═══ UPCOMING TRAININGS ═══ */}
@@ -582,6 +569,40 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
 
         <View style={{ height: 120 }} />
       </ScrollView>
+
+      {/* ═══ FLOATING SCANS NOTIFICATION - GLASSY ═══ */}
+      <TouchableOpacity
+        style={styles.floatingNotification}
+        onPress={nav.viewScans}
+        activeOpacity={0.9}
+      >
+        <BlurView
+          intensity={100}
+          tint={theme === 'dark' ? 'dark' : 'light'}
+          style={styles.floatingNotificationBlur}
+        >
+          <View style={[
+            styles.floatingNotificationInner, 
+            { 
+              borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+              backgroundColor: theme === 'dark' ? 'rgba(30,30,35,0.85)' : 'rgba(255,255,255,0.8)',
+            }
+          ]}>
+            <View style={[styles.floatingNotificationIcon, { backgroundColor: colors.primary + '25' }]}>
+              <Ionicons name="scan" size={20} color={colors.primary} />
+            </View>
+            <View style={styles.floatingNotificationContent}>
+              <Text style={[styles.floatingNotificationTitle, { color: colors.text }]}>
+                Recent Scans
+              </Text>
+              <Text style={[styles.floatingNotificationSubtitle, { color: colors.textMuted }]}>
+                View your targets →
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          </View>
+        </BlurView>
+      </TouchableOpacity>
     </View>
   );
 });
@@ -635,12 +656,43 @@ const styles = StyleSheet.create({
   quickActionIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
   quickActionLabel: { fontSize: 12, fontWeight: '600' },
   
-  // Scans Button (full width)
-  scansButton: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginTop: 12, padding: 14, borderRadius: 14, borderWidth: 1 },
-  scansButtonIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  scansButtonContent: { flex: 1 },
-  scansButtonTitle: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
-  scansButtonSubtitle: { fontSize: 13 },
+  // Floating Notification - Glassy
+  floatingNotification: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 100 : 90,
+    left: 20,
+    right: 20,
+    borderRadius: 18,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  floatingNotificationBlur: {
+    overflow: 'hidden',
+    borderRadius: 18,
+  },
+  floatingNotificationInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    paddingHorizontal: 18,
+    borderWidth: 1,
+    borderRadius: 18,
+  },
+  floatingNotificationIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  floatingNotificationContent: { flex: 1 },
+  floatingNotificationTitle: { fontSize: 16, fontWeight: '600' },
+  floatingNotificationSubtitle: { fontSize: 13, marginTop: 2 },
 
   // Training Scroll Cards
   trainingsRow: { paddingHorizontal: 20, gap: 12 },

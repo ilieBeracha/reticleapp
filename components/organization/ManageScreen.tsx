@@ -9,7 +9,6 @@ import { getPendingInvitations } from '@/services/invitationService';
 import { getWorkspaceTeams } from '@/services/teamService';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import type { WorkspaceInvitationWithDetails, WorkspaceMemberWithTeams } from '@/types/workspace';
-import { Button, ContextMenu, Host } from '@expo/ui/swift-ui';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -25,74 +24,6 @@ import {
   View,
 } from 'react-native';
 
-// ============================================================================
-// TYPES
-// ============================================================================
-type ManageSection = 'staff' | 'attached' | 'teams';
-
-// ============================================================================
-// SECTION TAB BAR (for admins)
-// ============================================================================
-const SectionTabs = React.memo(function SectionTabs({
-  activeSection,
-  onSectionChange,
-  staffCount,
-  attachedCount,
-  teamCount,
-  colors,
-  showTeams,
-  showAttached,
-}: {
-  activeSection: ManageSection;
-  onSectionChange: (section: ManageSection) => void;
-  staffCount: number;
-  attachedCount: number;
-  teamCount: number;
-  colors: typeof Colors.light;
-  showTeams: boolean;
-  showAttached: boolean;
-}) {
-  const allTabs: { key: ManageSection; label: string; icon: keyof typeof Ionicons.glyphMap; count: number; color: string }[] = [
-    { key: 'staff', label: 'Staff', icon: 'shield', count: staffCount, color: '#6366F1' },
-    { key: 'teams', label: 'Teams', icon: 'people', count: teamCount, color: '#F59E0B' },
-    { key: 'attached', label: 'Attached', icon: 'link', count: attachedCount, color: '#10B981' },
-  ];
-
-  // Filter tabs based on visibility settings
-  const tabs = allTabs.filter(tab => {
-    if (tab.key === 'teams' && !showTeams) return false;
-    if (tab.key === 'attached' && !showAttached) return false;
-    return true;
-  });
-
-    return (
-    <View style={[styles.sectionTabs, { backgroundColor: colors.secondary }]}>
-      {tabs.map((tab) => {
-        const isActive = activeSection === tab.key;
-        return (
-          <TouchableOpacity
-            key={tab.key}
-            style={[styles.sectionTab, isActive && { backgroundColor: colors.card }]}
-            onPress={() => onSectionChange(tab.key)}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.sectionTabIcon, { backgroundColor: isActive ? tab.color + '20' : 'transparent' }]}>
-              <Ionicons name={tab.icon} size={16} color={isActive ? tab.color : colors.textMuted} />
-      </View>
-            <Text style={[styles.sectionTabLabel, { color: isActive ? colors.text : colors.textMuted }]}>
-              {tab.label}
-            </Text>
-            <View style={[styles.sectionTabBadge, { backgroundColor: isActive ? tab.color : colors.border }]}>
-              <Text style={[styles.sectionTabBadgeText, { color: isActive ? '#fff' : colors.textMuted }]}>
-                {tab.count}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-});
 
 // ============================================================================
 // ROLE BADGE
@@ -384,27 +315,6 @@ const SectionHeader = React.memo(function SectionHeader({
   );
 });
 
-// ============================================================================
-// INFO BANNER
-// ============================================================================
-const InfoBanner = React.memo(function InfoBanner({
-  icon,
-  iconColor,
-  text,
-  colors,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  iconColor: string;
-  text: string;
-  colors: typeof Colors.light;
-}) {
-  return (
-    <View style={[styles.infoBanner, { backgroundColor: iconColor + '10', borderColor: iconColor + '30' }]}>
-      <Ionicons name={icon} size={18} color={iconColor} />
-      <Text style={[styles.infoBannerText, { color: colors.textMuted }]}>{text}</Text>
-    </View>
-  );
-});
 
 // ============================================================================
 // EMPTY STATE
@@ -603,11 +513,10 @@ const TeamMemberView = React.memo(function TeamMemberView({
 
 
 // ============================================================================
-// ADMIN VIEW (full access - Staff, Teams, Attached)
+// STAFF VIEW (Single scroll - Staff → Teams → Attached hierarchy)
 // ============================================================================
-const AdminView = React.memo(function AdminView({
+const StaffView = React.memo(function StaffView({
   colors,
-  activeSection,
   staffMembers,
   teamMembers,
   attachedMembers,
@@ -622,9 +531,10 @@ const AdminView = React.memo(function AdminView({
   onCreateTeam,
   canInvite,
   canCreateTeam,
+  showTeams,
+  showAttached,
 }: {
   colors: typeof Colors.light;
-  activeSection: ManageSection;
   staffMembers: WorkspaceMemberWithTeams[];
   teamMembers: WorkspaceMemberWithTeams[];
   attachedMembers: WorkspaceMemberWithTeams[];
@@ -639,6 +549,8 @@ const AdminView = React.memo(function AdminView({
   onCreateTeam: () => void;
   canInvite: boolean;
   canCreateTeam: boolean;
+  showTeams: boolean;
+  showAttached: boolean;
 }) {
   const staffInvites = invites.filter((i) => ['owner', 'admin', 'instructor'].includes(i.role));
   const teamInvites = invites.filter((i) => i.team_id && i.role === 'member');
@@ -646,83 +558,52 @@ const AdminView = React.memo(function AdminView({
 
   return (
     <>
-      {/* ========== STAFF SECTION ========== */}
-      {activeSection === 'staff' && (
-        <>
-          <InfoBanner
-            icon="shield"
-            iconColor="#6366F1"
-            text="Staff members have organization-wide access. They can see all teams and members."
+      {/* ========== 1. STAFF SECTION (Your level) ========== */}
+      <SectionHeader
+        title="STAFF"
+        count={staffMembers.length}
+        colors={colors}
+        action={canInvite ? { label: '+ Invite', onPress: onInviteStaff } : undefined}
+      />
+
+      {staffMembers.length === 0 ? (
+        <View style={[styles.emptySmall, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.emptySmallText, { color: colors.textMuted }]}>No staff members yet</Text>
+        </View>
+      ) : (
+        staffMembers.map((member) => (
+          <MemberCard
+            key={member.id}
+            member={member}
             colors={colors}
+            onPress={() => onMemberPress(member)}
+            isCurrentUser={member.member_id === currentUserId}
           />
-
-          <SectionHeader
-            title="ORGANIZATION STAFF"
-            count={staffMembers.length}
-            colors={colors}
-            action={canInvite ? { label: '+ Invite Staff', onPress: onInviteStaff } : undefined}
-          />
-
-          {staffMembers.length === 0 ? (
-            <EmptyState
-              icon="shield"
-              iconColor="#6366F1"
-              title="No staff members"
-              description="Invite admins and instructors to help manage your organization"
-              actionLabel={canInvite ? 'Invite Staff' : undefined}
-              onAction={canInvite ? onInviteStaff : undefined}
-              colors={colors}
-            />
-          ) : (
-            staffMembers.map((member) => (
-              <MemberCard
-                key={member.id}
-                member={member}
-                colors={colors}
-                onPress={() => onMemberPress(member)}
-                isCurrentUser={member.member_id === currentUserId}
-              />
-            ))
-          )}
-
-          {staffInvites.length > 0 && (
-            <>
-              <SectionHeader title="PENDING STAFF INVITES" count={staffInvites.length} colors={colors} />
-              {staffInvites.map((invite) => (
-                <InviteCard key={invite.id} invite={invite} colors={colors} />
-              ))}
-            </>
-          )}
-        </>
+        ))
       )}
 
-      {/* ========== TEAMS SECTION ========== */}
-      {activeSection === 'teams' && (
-        <>
-          <InfoBanner
-            icon="people"
-            iconColor="#F59E0B"
-            text="Teams organize members into groups with commanders and soldiers. Team members only see their own team."
-            colors={colors}
-          />
+      {staffInvites.length > 0 && (
+        <View style={styles.pendingSection}>
+          {staffInvites.map((invite) => (
+            <InviteCard key={invite.id} invite={invite} colors={colors} />
+          ))}
+        </View>
+      )}
 
+      {/* ========== 2. TEAMS SECTION ========== */}
+      {showTeams && (
+        <>
           <SectionHeader
             title="TEAMS"
             count={teams.length}
             colors={colors}
-            action={canCreateTeam ? { label: '+ Create Team', onPress: onCreateTeam } : undefined}
+            action={canCreateTeam ? { label: '+ Create', onPress: onCreateTeam } : undefined}
           />
 
           {teams.length === 0 ? (
-            <EmptyState
-              icon="people"
-              iconColor="#F59E0B"
-              title="No teams yet"
-              description="Create teams to organize members with commanders and soldiers"
-              actionLabel={canCreateTeam ? 'Create Team' : undefined}
-              onAction={canCreateTeam ? onCreateTeam : undefined}
-              colors={colors}
-            />
+            <View style={[styles.emptySmall, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.emptySmallText, { color: colors.textMuted }]}>No teams yet</Text>
+            </View>
           ) : (
             teams.map((team) => (
               <TeamCard
@@ -737,55 +618,30 @@ const AdminView = React.memo(function AdminView({
             ))
           )}
 
-          {canInvite && (
-            <TouchableOpacity
-              style={[styles.inviteTeamBtn, { borderColor: colors.border }]}
-              onPress={onInviteTeam}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="person-add-outline" size={18} color={colors.primary} />
-              <Text style={[styles.inviteTeamBtnText, { color: colors.primary }]}>Invite Team Member</Text>
-            </TouchableOpacity>
-          )}
-
           {teamInvites.length > 0 && (
-            <>
-              <SectionHeader title="PENDING TEAM INVITES" count={teamInvites.length} colors={colors} />
+            <View style={styles.pendingSection}>
               {teamInvites.map((invite) => (
                 <InviteCard key={invite.id} invite={invite} colors={colors} />
               ))}
-            </>
+            </View>
           )}
         </>
       )}
 
-      {/* ========== ATTACHED SECTION ========== */}
-      {activeSection === 'attached' && (
+      {/* ========== 3. ATTACHED SECTION ========== */}
+      {showAttached && (
         <>
-          <InfoBanner
-            icon="link"
-            iconColor="#10B981"
-            text="Attached members are external users who log their own sessions. They can't see teams or other members."
-            colors={colors}
-          />
-
           <SectionHeader
-            title="ATTACHED MEMBERS"
+            title="ATTACHED"
             count={attachedMembers.length}
             colors={colors}
             action={canInvite ? { label: '+ Invite', onPress: onInviteAttached } : undefined}
           />
 
           {attachedMembers.length === 0 ? (
-            <EmptyState
-              icon="link"
-              iconColor="#10B981"
-              title="No attached members"
-              description="Invite external users (like range customers) to log sessions linked to your org"
-              actionLabel={canInvite ? 'Invite Attached Member' : undefined}
-              onAction={canInvite ? onInviteAttached : undefined}
-              colors={colors}
-            />
+            <View style={[styles.emptySmall, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.emptySmallText, { color: colors.textMuted }]}>No attached members</Text>
+            </View>
           ) : (
             attachedMembers.map((member) => (
               <AttachedCard key={member.id} member={member} colors={colors} onPress={() => onMemberPress(member)} />
@@ -793,12 +649,11 @@ const AdminView = React.memo(function AdminView({
           )}
 
           {attachedInvites.length > 0 && (
-            <>
-              <SectionHeader title="PENDING INVITES" count={attachedInvites.length} colors={colors} />
+            <View style={styles.pendingSection}>
               {attachedInvites.map((invite) => (
                 <InviteCard key={invite.id} invite={invite} colors={colors} />
               ))}
-            </>
+            </View>
           )}
         </>
       )}
@@ -818,7 +673,6 @@ const ManageScreen = React.memo(function ManageScreen() {
 
   const { setSelectedTeam, setSelectedMember, setOnTeamCreated, setOnMemberInvited, setOnInviteAccepted } = useModals();
 
-  const [activeSection, setActiveSection] = useState<ManageSection>('staff');
   const [teams, setTeams] = useState<any[]>([]);
   const [invites, setInvites] = useState<WorkspaceInvitationWithDetails[]>([]);
   const [teamsLoading, setTeamsLoading] = useState(false);
@@ -827,46 +681,10 @@ const ManageScreen = React.memo(function ManageScreen() {
   // Get visibility settings from workspace (persisted in database)
   const showTeams = activeWorkspace?.show_teams_tab ?? true;
   const showAttached = activeWorkspace?.show_attached_tab ?? true;
-  
-  // Get store action to update settings
-  const { updateWorkspaceSettings } = useWorkspaceStore();
 
   // Determine user type (attached members never see this screen - they're redirected)
   const isOrgStaff = ['owner', 'admin', 'instructor'].includes(orgRole);
   const isTeamMember = !isOrgStaff; // Soldiers, commanders - they see "My Team" view
-  
-  // Check if user can change settings (admin/owner only)
-  const canChangeSettings = orgRole === 'owner' || orgRole === 'admin';
-  
-  // Reset active section if current section is hidden
-  useEffect(() => {
-    if (activeSection === 'teams' && !showTeams) {
-      setActiveSection('staff');
-    } else if (activeSection === 'attached' && !showAttached) {
-      setActiveSection('staff');
-    }
-  }, [showTeams, showAttached, activeSection]);
-  
-  // Handler to toggle settings (saves to database)
-  const handleToggleTeams = useCallback(async () => {
-    if (!canChangeSettings) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    try {
-      await updateWorkspaceSettings({ show_teams_tab: !showTeams });
-    } catch (error) {
-      console.error('Failed to update setting:', error);
-    }
-  }, [canChangeSettings, showTeams, updateWorkspaceSettings]);
-  
-  const handleToggleAttached = useCallback(async () => {
-    if (!canChangeSettings) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    try {
-      await updateWorkspaceSettings({ show_attached_tab: !showAttached });
-    } catch (error) {
-      console.error('Failed to update setting:', error);
-    }
-  }, [canChangeSettings, showAttached, updateWorkspaceSettings]);
 
   // Permissions
   const canInvite = isOrgStaff || isCommander;
@@ -995,68 +813,9 @@ const ManageScreen = React.memo(function ManageScreen() {
     );
   }
 
-  // Determine header title based on view
-  const getHeaderTitle = () => {
-    if (isTeamMember) return 'My Team';
-    return 'Manage';
-  };
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ThemedStatusBar />
-
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <View style={styles.headerLeft}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>{getHeaderTitle()}</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
-            {activeWorkspace?.workspace_name ?? 'Workspace'}
-            </Text>
-          </View>
-
-        {/* Visibility Options Dropdown - Only for admin/owner on iOS */}
-        {canChangeSettings && Platform.OS === 'ios' && (
-          <Host style={styles.dropdownHost}>
-            <ContextMenu>
-              <ContextMenu.Items>
-                <Button
-                  systemImage={showTeams ? 'checkmark.circle.fill' : 'circle'}
-                  onPress={handleToggleTeams}
-                >
-                  {showTeams ? 'Hide Teams' : 'Show Teams'}
-                </Button>
-                <Button
-                  systemImage={showAttached ? 'checkmark.circle.fill' : 'circle'}
-                  onPress={handleToggleAttached}
-                >
-                  {showAttached ? 'Hide Attached' : 'Show Attached'}
-                </Button>
-              </ContextMenu.Items>
-              <ContextMenu.Trigger>
-                <Button variant="borderless" systemImage="line.3.horizontal.decrease.circle">
-                  View
-                </Button>
-              </ContextMenu.Trigger>
-            </ContextMenu>
-          </Host>
-          )}
-        </View>
-
-      {/* Section Tabs (only for org staff) */}
-      {isOrgStaff && (
-        <View style={styles.tabsContainer}>
-          <SectionTabs
-            activeSection={activeSection}
-            onSectionChange={setActiveSection}
-            staffCount={staffMembers.length}
-            attachedCount={attachedMembers.length}
-            teamCount={teams.length}
-            colors={colors}
-            showTeams={showTeams}
-            showAttached={showAttached}
-          />
-                </View>
-              )}
 
       {/* Content */}
       <ScrollView
@@ -1080,11 +839,10 @@ const ManageScreen = React.memo(function ManageScreen() {
           />
         )}
 
-        {/* ADMIN VIEW - Full management (attached members never see this screen) */}
+        {/* STAFF VIEW - Single scroll: Staff → Teams → Attached */}
         {isOrgStaff && (
-          <AdminView
-                        colors={colors}
-            activeSection={activeSection}
+          <StaffView
+            colors={colors}
             staffMembers={staffMembers}
             teamMembers={teamMembers}
             attachedMembers={attachedMembers}
@@ -1099,6 +857,8 @@ const ManageScreen = React.memo(function ManageScreen() {
             onCreateTeam={handleCreateTeam}
             canInvite={canInvite}
             canCreateTeam={canCreateTeam}
+            showTeams={showTeams}
+            showAttached={showAttached}
           />
         )}
 
@@ -1118,53 +878,30 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   loadingText: { fontSize: 14 },
 
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 8 : 16,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-  },
-  headerLeft: { flex: 1 },
-  headerTitle: { fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
-  headerSubtitle: { fontSize: 15, marginTop: 4 },
-  dropdownHost: { width: 70, height: 36, marginLeft: 8 },
-
-  // Tabs
-  tabsContainer: { paddingHorizontal: 16, paddingBottom: 8 },
-  sectionTabs: { flexDirection: 'row', borderRadius: 10, padding: 3, gap: 2 },
-  sectionTab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    borderRadius: 8,
-    gap: 5,
-  },
-  sectionTabIcon: { width: 24, height: 24, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-  sectionTabLabel: { fontSize: 13, fontWeight: '600' },
-  sectionTabBadge: { minWidth: 18, height: 16, paddingHorizontal: 5, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  sectionTabBadgeText: { fontSize: 10, fontWeight: '600' },
-
   // Content
   content: { flex: 1 },
-  contentContainer: { paddingHorizontal: 16, paddingTop: 8 },
+  contentContainer: { paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 8 : 16 },
+
+  // Empty Small (compact empty state)
+  emptySmall: { 
+    paddingVertical: 16, 
+    paddingHorizontal: 16, 
+    borderRadius: 12, 
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 8,
+  },
+  emptySmallText: { fontSize: 14, textAlign: 'center' },
+  
+  // Pending Section
+  pendingSection: { marginTop: 4, marginBottom: 8 },
 
   // Section Header
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 8, paddingHorizontal: 4 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, marginBottom: 8, paddingHorizontal: 4 },
   sectionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  sectionTitle: { fontSize: 13, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase' },
+  sectionTitle: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase' },
   sectionBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   sectionBadgeText: { fontSize: 11, fontWeight: '600' },
-  sectionAction: { fontSize: 14, fontWeight: '500' },
-
-  // Info Banner
-  infoBanner: { flexDirection: 'row', alignItems: 'flex-start', padding: 14, borderRadius: 12, borderWidth: 1, gap: 10, marginBottom: 8 },
-  infoBannerText: { flex: 1, fontSize: 13, lineHeight: 18 },
+  sectionAction: { fontSize: 13, fontWeight: '500' },
 
   // Member Card
   memberCard: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, marginBottom: 8, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, gap: 12 },

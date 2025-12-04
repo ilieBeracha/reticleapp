@@ -129,9 +129,9 @@ export const config = {
     "--color-outline-950": "26 23 23",
 
     /* Background */
-    "--color-background-0": "255 255 255",
-    "--color-background-50": "244 243 243",
-    "--color-background-100": "242 241 241",
+    "--color-background-0": "245 245 247",
+    "--color-background-50": "238 238 240",
+    "--color-background-100": "230 230 232",
     "--color-background-200": "220 219 219",
     "--color-background-300": "213 212 212",
     "--color-background-400": "162 163 163",
@@ -281,9 +281,9 @@ export const config = {
     "--color-outline-950": "253 254 254",
 
     /* Background */
-    "--color-background-0": "0 0 0",
-    "--color-background-50": "19 21 25",
-    "--color-background-100": "50 54 62",
+    "--color-background-0": "28 28 30",
+    "--color-background-50": "38 38 42",
+    "--color-background-100": "50 50 56",
     "--color-background-200": "83 82 82",
     "--color-background-300": "116 116 116",
     "--color-background-400": "142 142 142",
