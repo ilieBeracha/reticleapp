@@ -1,12 +1,12 @@
-import { createSession, CreateSessionParams, getSessions, getWorkspaceSessions, SessionWithDetails } from "@/services/sessionService";
+import { createSession, CreateSessionParams, getSessions, getTeamSessions, SessionWithDetails } from "@/services/sessionService";
 import { create } from "zustand";
-import { useWorkspaceStore } from "./useWorkspaceStore";
+import { useTeamStore } from "./teamStore";
 
 interface SessionStore {
   sessions: SessionWithDetails[];
   loading: boolean;
   error: string | null;
-  loadWorkspaceSessions: () => Promise<void>;
+  loadTeamSessions: () => Promise<void>;
   loadSessions: () => Promise<void>;
   createSession: (session: CreateSessionParams) => Promise<SessionWithDetails>;
   reset: () => void;
@@ -53,20 +53,20 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }
   },
   
-  loadWorkspaceSessions: async () => {
+  loadTeamSessions: async () => {
     // Prevent duplicate loading
     if (get().loading) return;
     
-    const workspaceId = useWorkspaceStore.getState().activeWorkspaceId;
+    const teamId = useTeamStore.getState().activeTeamId;
 
-    if (!workspaceId) {
+    if (!teamId) {
       set({ sessions: [], loading: false });
       return;
     }
 
     set({ loading: true, error: null });
     try {
-      const sessions = await getWorkspaceSessions(workspaceId);
+      const sessions = await getTeamSessions(teamId);
       set({ sessions, loading: false });
     } catch (error: any) {
       set({ error: error.message, loading: false });

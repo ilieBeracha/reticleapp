@@ -1,4 +1,4 @@
-import type { TeamMemberShip, WorkspaceInvitation, WorkspaceInvitationWithDetails, WorkspaceRole } from '@/types/workspace';
+import type { TeamMemberShip, TeamInvitation, TeamInvitationWithDetails, TeamRole } from '@/types/workspace';
 import { AuthenticatedClient } from './authenticatedClient';
 
 /**
@@ -14,16 +14,20 @@ function generateInviteCode(): string {
 }
 
 /**
- * Create a new workspace invitation
+ * Create a new team invitation (team-first architecture)
  */
 export async function createInvitation(
-    orgWorkspaceId: string,
-    role: WorkspaceRole = 'member',
-    teamId?: string | null,
+    _orgWorkspaceId: string | null, // Legacy param, ignored in team-first
+    _role: string = 'member', // Legacy param, ignored in team-first
+    teamId: string | null,
     teamRole?: TeamMemberShip | null,
     teamDetails?: Record<string, any>
-  ): Promise<WorkspaceInvitation> {
+  ): Promise<TeamInvitation> {
   const supabase = await AuthenticatedClient.getClient();
+
+  if (!teamId) {
+    throw new Error('Team ID is required to create an invitation');
+  }
 
   // Generate unique invite code
   let inviteCode = generateInviteCode();
@@ -33,7 +37,7 @@ export async function createInvitation(
   // Ensure code is unique (max 5 attempts)
   while (!isUnique && attempts < 5) {
     const { data: existing } = await supabase
-      .from('workspace_invitations')
+      .from('team_invitations')
       .select('id')
       .eq('invite_code', inviteCode)
       .single();
@@ -62,21 +66,14 @@ export async function createInvitation(
     throw new Error('You must be logged in to create an invitation');
   }
 
-  // Enforce rule: Only members can be assigned to teams via invite
-  const finalTeamId = role === 'member' ? teamId : null;
-  const finalTeamRole = role === 'member' ? teamRole : null;
-  const finalTeamDetails = role === 'member' && teamDetails ? teamDetails : {};
-
-  // Create invitation with squad details
+  // Create team invitation
   const { data, error } = await supabase
-    .from('workspace_invitations')
+    .from('team_invitations')
     .insert({
-      org_workspace_id: orgWorkspaceId,
+      team_id: teamId,
       invite_code: inviteCode,
-      role,
-      team_id: finalTeamId,
-      team_role: finalTeamRole,
-      details: finalTeamDetails,
+      team_role: teamRole || 'soldier',
+      details: teamDetails || {},
       status: 'pending',
       invited_by: user.id,
       expires_at: expiresAt.toISOString(),
@@ -85,7 +82,7 @@ export async function createInvitation(
     .single();
 
   if (error) {
-    console.error('Error creating invitation:', error);
+    console.error('Error creating team invitation:', error);
     throw new Error(error.message || 'Failed to create invitation');
   }
 
@@ -93,36 +90,33 @@ export async function createInvitation(
 }
 
 /**
- * Get all invitations for a workspace
+ * Get all invitations for a team (team-first architecture)
  */
-export async function getWorkspaceInvitations(orgWorkspaceId: string): Promise<WorkspaceInvitationWithDetails[]> {
+export async function getTeamInvitations(teamId: string): Promise<TeamInvitationWithDetails[]> {
   const supabase = await AuthenticatedClient.getClient();
 
   const { data, error } = await supabase
-  .from('workspace_invitations')
-  .select(
-    `
-    *,
-    invited_by_profile:profiles!workspace_invitations_invited_by_fkey(full_name, email),
-    accepted_by_profile:profiles!workspace_invitations_accepted_by_fkey(full_name, email),
-    workspace:org_workspaces!workspace_invitations_org_workspace_fkey(name),
-    team:teams!workspace_invitations_team_id_fkey(name)
-  `
-  )
-    .eq('org_workspace_id', orgWorkspaceId)
+    .from('team_invitations')
+    .select(`
+      *,
+      invited_by_profile:profiles!team_invitations_invited_by_fkey(full_name, email),
+      accepted_by_profile:profiles!team_invitations_accepted_by_fkey(full_name, email),
+      team:teams!team_invitations_team_id_fkey(name)
+    `)
+    .eq('team_id', teamId)
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Error fetching invitations:', error);
+    console.error('Error fetching team invitations:', error);
     throw new Error(error.message || 'Failed to fetch invitations');
   }
 
-  // Transform data to include friendly names
+  // Transform data to include friendly names (map team_role to role for type consistency)
   return data.map((inv: any) => ({
     id: inv.id,
-    org_workspace_id: inv.org_workspace_id,
+    team_id: inv.team_id,
     invite_code: inv.invite_code,
-    role: inv.role,
+    role: inv.team_role || 'soldier', // DB uses team_role, type uses role
     status: inv.status,
     invited_by: inv.invited_by,
     accepted_by: inv.accepted_by,
@@ -130,21 +124,27 @@ export async function getWorkspaceInvitations(orgWorkspaceId: string): Promise<W
     expires_at: inv.expires_at,
     created_at: inv.created_at,
     updated_at: inv.updated_at,
-    workspace_name: inv.workspace?.name,
+    team_name: inv.team?.name,
     invited_by_name: inv.invited_by_profile?.full_name || inv.invited_by_profile?.email,
     accepted_by_name: inv.accepted_by_profile?.full_name || inv.accepted_by_profile?.email,
-    team_id: inv.team_id,
-    team_role: inv.team_role,
-    team_name: inv.team?.name, // NEW
   }));
 }
 
 /**
- * Get pending invitations for a workspace (not expired, not accepted, not cancelled)
+ * @deprecated Use getTeamInvitations instead
  */
-export async function getPendingInvitations(orgWorkspaceId: string): Promise<WorkspaceInvitationWithDetails[]> {
-  const invitations = await getWorkspaceInvitations(orgWorkspaceId);
-  if (__DEV__) console.log('invitations', invitations);
+export async function getWorkspaceInvitations(orgWorkspaceId: string): Promise<TeamInvitationWithDetails[]> {
+  // Legacy function - return empty array since workspace_invitations table no longer exists
+  console.warn('getWorkspaceInvitations is deprecated, use getTeamInvitations instead');
+  return [];
+}
+
+/**
+ * Get pending invitations for a team (not expired, not accepted, not cancelled)
+ */
+export async function getPendingInvitations(teamId: string): Promise<TeamInvitationWithDetails[]> {
+  const invitations = await getTeamInvitations(teamId);
+  if (__DEV__) console.log('team invitations', invitations);
   const now = new Date();
 
   return invitations.filter((inv) => inv.status === 'pending' && new Date(inv.expires_at) > now);
@@ -157,7 +157,7 @@ export async function cancelInvitation(invitationId: string): Promise<void> {
   const supabase = await AuthenticatedClient.getClient();
 
   const { error } = await supabase
-    .from('workspace_invitations')
+    .from('team_invitations')
     .update({
       status: 'cancelled',
       updated_at: new Date().toISOString(),
@@ -172,9 +172,9 @@ export async function cancelInvitation(invitationId: string): Promise<void> {
 }
 
 /**
- * Validate an invite code using RPC (bypasses RLS)
+ * Validate an invite code - direct query approach
  */
-export async function validateInviteCode(inviteCode: string): Promise<WorkspaceInvitationWithDetails | null> {
+export async function validateInviteCode(inviteCode: string): Promise<TeamInvitationWithDetails | null> {
   const supabase = await AuthenticatedClient.getClient();
 
   // Get current user
@@ -185,40 +185,53 @@ export async function validateInviteCode(inviteCode: string): Promise<WorkspaceI
     throw new Error('You must be logged in to validate an invitation');
   }
 
-  // Call RPC function
-  const { data, error } = await supabase.rpc('validate_invite_code', {
-    p_invite_code: inviteCode.toUpperCase().trim(),
-    p_user_id: user.id,
-  });
+  // Direct query for the invitation (RLS allows viewing pending invitations)
+  const { data: invitation, error } = await supabase
+    .from('team_invitations')
+    .select(`
+      *,
+      invited_by_profile:profiles!team_invitations_invited_by_fkey(full_name, email),
+      team:teams!team_invitations_team_id_fkey(name)
+    `)
+    .eq('invite_code', inviteCode.toUpperCase().trim())
+    .eq('status', 'pending')
+    .gt('expires_at', new Date().toISOString())
+    .single();
 
-  if (error) {
-    console.error('RPC error validating invite:', error);
-    throw new Error('Failed to validate invitation code');
+  if (error || !invitation) {
+    throw new Error('Invalid or expired invitation code');
   }
 
-  // Check response
-  if (!data || !data.valid) {
-    throw new Error(data?.error || 'Invalid invitation code');
+  // Check if user is already a member
+  const { data: existingMember } = await supabase
+    .from('team_members')
+    .select('id')
+    .eq('team_id', invitation.team_id)
+    .eq('user_id', user.id)
+    .single();
+
+  if (existingMember) {
+    throw new Error('You are already a member of this team');
   }
 
   // Return transformed invitation data
   return {
-    id: data.invitation.id,
-    org_workspace_id: data.invitation.org_workspace_id,
-    invite_code: data.invitation.invite_code,
-    role: data.invitation.role,
+    id: invitation.id,
+    team_id: invitation.team_id,
+    invite_code: invitation.invite_code,
+    role: invitation.team_role || 'soldier',
     status: 'pending',
-    invited_by: data.invitation.invited_by,
-    invited_by_name: data.invitation.invited_by_name,
-    expires_at: data.invitation.expires_at,
-    created_at: data.invitation.created_at,
-    updated_at: data.invitation.created_at,
-    workspace_name: data.invitation.workspace_name,
+    invited_by: invitation.invited_by,
+    invited_by_name: invitation.invited_by_profile?.full_name || invitation.invited_by_profile?.email,
+    expires_at: invitation.expires_at,
+    created_at: invitation.created_at,
+    updated_at: invitation.updated_at,
+    team_name: invitation.team?.name,
   };
 }
 
 /**
- * Accept an invitation and add user to workspace using RPC (atomic operation)
+ * Accept an invitation and add user to team using RPC (atomic operation)
  */
 export async function acceptInvitation(inviteCode: string): Promise<void> {
   const supabase = await AuthenticatedClient.getClient();
@@ -231,21 +244,22 @@ export async function acceptInvitation(inviteCode: string): Promise<void> {
     throw new Error('You must be logged in to accept an invitation');
   }
 
-  // Call RPC function to accept invitation (includes validation)
-  const { data, error } = await supabase.rpc('accept_invite_code', {
+  // Call RPC function to accept team invitation (includes validation)
+  const { data, error } = await supabase.rpc('accept_team_invitation', {
     p_invite_code: inviteCode.toUpperCase().trim(),
-    p_user_id: user.id,
   });
 
-  console.log('Accept invite response:', JSON.stringify(data));
-  console.log('Accept invite error:', JSON.stringify(error));
+  console.log('Accept team invite response:', JSON.stringify(data));
 
-  // Check response - the RPC returns { success: boolean, error?: string }
-  console.log('Accept invite response:', JSON.stringify(data));
-  
+  if (error) {
+    console.error('Accept team invite error:', error);
+    throw new Error(error.message || 'Failed to accept invitation');
+  }
+
+  // Check response - the RPC returns { success: boolean, ... }
   if (!data || !data.success) {
-    const errorMsg = data?.error || 'Failed to accept invitation';
-    console.error('Accept invite failed:', errorMsg);
+    const errorMsg = 'Failed to accept invitation';
+    console.error('Accept team invite failed:', errorMsg);
     throw new Error(errorMsg);
   }
 }
@@ -256,7 +270,7 @@ export async function acceptInvitation(inviteCode: string): Promise<void> {
 export async function deleteInvitation(invitationId: string): Promise<void> {
   const supabase = await AuthenticatedClient.getClient();
 
-  const { error } = await supabase.from('workspace_invitations').delete().eq('id', invitationId);
+  const { error } = await supabase.from('team_invitations').delete().eq('id', invitationId);
 
   if (error) {
     console.error('Error deleting invitation:', error);
@@ -271,7 +285,7 @@ export async function expireOldInvitations(): Promise<number> {
   const supabase = await AuthenticatedClient.getClient();
 
   const { data, error } = await supabase
-    .from('workspace_invitations')
+    .from('team_invitations')
     .update({
       status: 'expired',
       updated_at: new Date().toISOString(),
@@ -281,7 +295,7 @@ export async function expireOldInvitations(): Promise<number> {
     .select();
 
   if (error) {
-    console.error('Error expiring invitations:', error);
+    console.error('Error expiring team invitations:', error);
     return 0;
   }
 

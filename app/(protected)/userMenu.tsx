@@ -6,12 +6,12 @@ import * as Haptics from 'expo-haptics';
 import { router } from "expo-router";
 import { useCallback } from "react";
 import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
 
 /**
@@ -58,9 +58,9 @@ export default function UserMenuSheet() {
     Alert.alert("Coming Soon", "Settings will be available soon!");
   }, []);
 
-  const handleSwitchWorkspace = useCallback(() => {
+  const handleSwitchTeam = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/(protected)/workspaceSwitcher' as any);
+    router.push('/(protected)/teamSwitcher' as any);
   }, []);
 
   return (
@@ -104,8 +104,8 @@ export default function UserMenuSheet() {
           <View style={[styles.separator, { backgroundColor: colors.border }]} />
           <MenuItem
             icon="business-outline"
-            label="Switch Workspace"
-            onPress={handleSwitchWorkspace}
+            label="Switch Team"
+            onPress={handleSwitchTeam}
             colors={colors}
             showChevron
           />

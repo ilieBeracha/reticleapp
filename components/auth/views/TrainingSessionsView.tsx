@@ -1,4 +1,4 @@
-import { useOrgRole } from '@/contexts/OrgRoleContext';
+import { useTeamRole } from '@/contexts/TeamRoleContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -31,7 +31,7 @@ interface TrainingSession {
  */
 export default function TrainingSessionsView() {
   const colors = useColors();
-  const { teamInfo, teamRole } = useOrgRole();
+  const { teamName, myRole } = useTeamRole();
   const [filter, setFilter] = useState<SessionType>('upcoming');
 
   // TODO: Fetch real training sessions
@@ -63,6 +63,8 @@ export default function TrainingSessionsView() {
     Alert.alert(session.title, `${session.date} at ${session.time}\n${session.location || ''}`);
   };
 
+  const roleLabel = myRole === 'squad_commander' ? 'Squad Commander' : 'Soldier';
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -73,7 +75,7 @@ export default function TrainingSessionsView() {
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>Training Sessions</Text>
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          {teamInfo?.teamName || 'Your Team'} • {teamRole === 'squad_commander' ? 'Squad Commander' : 'Soldier'}
+          {teamName || 'Your Team'} • {roleLabel}
         </Text>
       </View>
 
@@ -165,7 +167,7 @@ export default function TrainingSessionsView() {
         </View>
       ) : (
         <View style={styles.sessionsList}>
-          {filteredSessions.map((session, index) => (
+          {filteredSessions.map((session) => (
             <TouchableOpacity
               key={session.id}
               style={[styles.sessionCard, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -355,4 +357,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-

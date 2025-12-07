@@ -1,19 +1,19 @@
 /**
  * TRAINING SERVICE
- * Handles all training-related operations for organizations
+ * Handles all training-related operations for teams
  * 
- * Trainings are org-only and must include at least one team
+ * Team-first architecture: Trainings belong to teams directly
  */
 
 import { supabase } from '@/lib/supabase';
 import type {
-    CreateDrillInput,
-    CreateTrainingInput,
-    Training,
-    TrainingDrill,
-    TrainingStatus,
-    TrainingWithDetails,
-    UpdateTrainingInput,
+  CreateDrillInput,
+  CreateTrainingInput,
+  Training,
+  TrainingDrill,
+  TrainingStatus,
+  TrainingWithDetails,
+  UpdateTrainingInput,
 } from '@/types/workspace';
 
 // =====================================================
@@ -38,7 +38,6 @@ export async function createTraining(input: CreateTrainingInput): Promise<Traini
   const { data: training, error: trainingError } = await supabase
     .from('trainings')
     .insert({
-      org_workspace_id: input.org_workspace_id,
       team_id: input.team_id,
       title: input.title,
       description: input.description || null,
@@ -98,7 +97,51 @@ export async function createTraining(input: CreateTrainingInput): Promise<Traini
 }
 
 /**
- * Get trainings for an organization
+ * Get trainings for a team (team-first architecture)
+ */
+export async function getTeamTrainings(
+  teamId: string,
+  options?: {
+    status?: TrainingStatus;
+    limit?: number;
+  }
+): Promise<TrainingWithDetails[]> {
+  let query = supabase
+    .from('trainings')
+    .select(`
+      *,
+      team:teams(id, name, team_type),
+      creator:profiles!trainings_created_by_fkey(id, full_name, avatar_url),
+      training_drills(id)
+    `)
+    .eq('team_id', teamId)
+    .order('scheduled_at', { ascending: true });
+
+  if (options?.status) {
+    query = query.eq('status', options.status);
+  }
+
+  if (options?.limit) {
+    query = query.limit(options.limit);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Failed to fetch team trainings:', error);
+    throw new Error(error.message || 'Failed to fetch team trainings');
+  }
+
+  return (data || []).map((t: any) => ({
+    ...t,
+    drill_count: t.training_drills?.length || 0,
+    drills: undefined,
+    training_drills: undefined,
+  })) as TrainingWithDetails[];
+}
+
+/**
+ * @deprecated Use getTeamTrainings instead - legacy org-based function
  */
 export async function getOrgTrainings(
   orgWorkspaceId: string,
@@ -228,7 +271,6 @@ export async function updateTraining(
   if (updates.description !== undefined) updatePayload.description = updates.description;
   if (updates.scheduled_at !== undefined) updatePayload.scheduled_at = updates.scheduled_at;
   if (updates.status !== undefined) updatePayload.status = updates.status;
-  if (updates.team_id !== undefined) updatePayload.team_id = updates.team_id;
 
   const { data, error } = await supabase
     .from('trainings')
@@ -325,8 +367,7 @@ export async function getMyTrainings(
       *,
       team:teams(id, name, team_type),
       creator:profiles!trainings_created_by_fkey(id, full_name, avatar_url),
-      training_drills(id),
-      org:org_workspaces(id, name)
+      training_drills(id)
     `)
     .in('team_id', teamIds)
     .order('scheduled_at', { ascending: true });
@@ -349,10 +390,8 @@ export async function getMyTrainings(
   return (data || []).map((t: any) => ({
     ...t,
     drill_count: t.training_drills?.length || 0,
-    org_name: t.org?.name,
     drills: undefined,
     training_drills: undefined,
-    org: undefined,
   })) as TrainingWithDetails[];
 }
 

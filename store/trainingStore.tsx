@@ -2,11 +2,11 @@ import {
   getMyTrainings,
   getMyTrainingStats,
   getMyUpcomingTrainings,
-  getOrgTrainings,
+  getTeamTrainings,
 } from "@/services/trainingService";
 import type { TrainingWithDetails } from "@/types/workspace";
 import { create } from "zustand";
-import { useWorkspaceStore } from "./useWorkspaceStore";
+import { useTeamStore } from "./teamStore";
 
 interface TrainingStats {
   upcoming: number;
@@ -20,12 +20,12 @@ interface TrainingStore {
   myUpcomingTrainings: TrainingWithDetails[];
   myStats: TrainingStats;
   
-  // Org trainings (when in org mode)
-  orgTrainings: TrainingWithDetails[];
+  // Team trainings (when in team mode)
+  teamTrainings: TrainingWithDetails[];
   
   // Loading states
   loadingMyTrainings: boolean;
-  loadingOrgTrainings: boolean;
+  loadingTeamTrainings: boolean;
   
   // Error states
   error: string | null;
@@ -34,7 +34,7 @@ interface TrainingStore {
   loadMyTrainings: () => Promise<void>;
   loadMyUpcomingTrainings: () => Promise<void>;
   loadMyStats: () => Promise<void>;
-  loadOrgTrainings: (orgId?: string) => Promise<void>;
+  loadTeamTrainings: (teamId?: string) => Promise<void>;
   refreshAll: () => Promise<void>;
   reset: () => void;
 }
@@ -43,9 +43,9 @@ export const useTrainingStore = create<TrainingStore>((set, get) => ({
   myTrainings: [],
   myUpcomingTrainings: [],
   myStats: { upcoming: 0, completed: 0, total: 0 },
-  orgTrainings: [],
+  teamTrainings: [],
   loadingMyTrainings: false,
-  loadingOrgTrainings: false,
+  loadingTeamTrainings: false,
   error: null,
 
   loadMyTrainings: async () => {
@@ -79,21 +79,21 @@ export const useTrainingStore = create<TrainingStore>((set, get) => ({
     }
   },
 
-  loadOrgTrainings: async (orgId?: string) => {
-    const workspaceId = orgId || useWorkspaceStore.getState().activeWorkspaceId;
+  loadTeamTrainings: async (teamId?: string) => {
+    const activeTeamId = teamId || useTeamStore.getState().activeTeamId;
     
-    if (!workspaceId) {
-      set({ orgTrainings: [], loadingOrgTrainings: false });
+    if (!activeTeamId) {
+      set({ teamTrainings: [], loadingTeamTrainings: false });
       return;
     }
 
-    set({ loadingOrgTrainings: true, error: null });
+    set({ loadingTeamTrainings: true, error: null });
     try {
-      const trainings = await getOrgTrainings(workspaceId);
-      set({ orgTrainings: trainings, loadingOrgTrainings: false });
+      const trainings = await getTeamTrainings(activeTeamId);
+      set({ teamTrainings: trainings, loadingTeamTrainings: false });
     } catch (error: any) {
-      console.error('Failed to load org trainings:', error);
-      set({ error: error.message, loadingOrgTrainings: false });
+      console.error('Failed to load team trainings:', error);
+      set({ error: error.message, loadingTeamTrainings: false });
     }
   },
 
@@ -110,9 +110,9 @@ export const useTrainingStore = create<TrainingStore>((set, get) => ({
     myTrainings: [],
     myUpcomingTrainings: [],
     myStats: { upcoming: 0, completed: 0, total: 0 },
-    orgTrainings: [],
+    teamTrainings: [],
     loadingMyTrainings: false,
-    loadingOrgTrainings: false,
+    loadingTeamTrainings: false,
     error: null,
   }),
 }));

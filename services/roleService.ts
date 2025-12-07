@@ -22,9 +22,9 @@ export type OrgRole = 'owner' | 'admin' | 'instructor' | 'member';
 /**
  * Team-level roles
  * Stored in: team_members.role
- * Scope: Specific team within organization
+ * Scope: Specific team (standalone, no organization)
  */
-export type TeamRole = 'commander' | 'squad_commander' | 'soldier';
+export type TeamRole = 'owner' | 'commander' | 'squad_commander' | 'soldier';
 
 // =====================================================
 // ROLE HIERARCHY & PERMISSIONS
@@ -46,6 +46,7 @@ export const ORG_ROLE_HIERARCHY: Record<OrgRole, number> = {
  * Within a specific team
  */
 export const TEAM_ROLE_HIERARCHY: Record<TeamRole, number> = {
+  owner: 4,           // Team owner - full control
   commander: 3,       // Leads entire team
   squad_commander: 2, // Leads a specific squad
   soldier: 1,         // Regular team member
@@ -154,7 +155,7 @@ export function getTeamPermissions(role: TeamRole): TeamPermissions {
   
   return {
     // Team Management
-    canManageTeam: level >= TEAM_ROLE_HIERARCHY.commander,
+    canManageTeam: level >= TEAM_ROLE_HIERARCHY.owner,
     canViewTeamDetails: true, // All team members can view
     
     // Member Management
@@ -222,8 +223,11 @@ export function canModifyTeamRole(actorRole: TeamRole, targetRole: TeamRole): bo
   const actorLevel = TEAM_ROLE_HIERARCHY[actorRole];
   const targetLevel = TEAM_ROLE_HIERARCHY[targetRole];
   
-  // Commanders can modify anyone in their team
-  if (actorRole === 'commander') return true;
+  // Owners can modify anyone in their team
+  if (actorRole === 'owner') return true;
+  
+  // Commanders can modify anyone except owner
+  if (actorRole === 'commander' && targetRole !== 'owner') return true;
   
   // Squad commanders can modify soldiers in their squad (handled elsewhere)
   if (actorRole === 'squad_commander') {
@@ -297,6 +301,8 @@ export function getOrgRoleColor(role: OrgRole): string {
  */
 export function getTeamRoleColor(role: TeamRole): string {
   switch (role) {
+    case 'owner':
+      return '#9F7AEA'; // Purple (team owner)
     case 'commander':
       return '#FFD700'; // Gold
     case 'squad_commander':
@@ -327,6 +333,8 @@ export function getOrgRoleIcon(role: OrgRole): string {
  */
 export function getTeamRoleIcon(role: TeamRole): string {
   switch (role) {
+    case 'owner':
+      return 'shield-checkmark';
     case 'commander':
       return 'star';
     case 'squad_commander':

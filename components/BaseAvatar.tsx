@@ -2,7 +2,7 @@ import { useColors } from '@/hooks/ui/useColors';
 import { Image, ImageStyle, StyleSheet, Text, TextStyle, View, ViewStyle } from 'react-native';
 
 export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-export type UserRole = 'owner' | 'admin' | 'instructor' | 'member' | 'attached';
+export type UserRole = 'owner' | 'admin' | 'instructor' | 'member' | 'attached' | 'commander' | 'squad_commander' | 'soldier';
 
 interface BaseAvatarProps {
   /** Image source URI or require() */
@@ -11,8 +11,8 @@ interface BaseAvatarProps {
   fallbackText?: string;
   /** Size variant */
   size?: AvatarSize;
-  /** User role for color coding */
-  role?: UserRole;
+  /** User role for color coding - accepts string or object */
+  role?: UserRole | { role: UserRole; squad_id?: string };
   /** Custom container style */
   style?: ViewStyle;
   /** Custom image style */
@@ -31,11 +31,16 @@ interface BaseAvatarProps {
 
 // Role-based color mapping
 const ROLE_COLORS: Record<UserRole, { bg: string; text: string }> = {
+  // Organization roles
   owner: { bg: '#FF6B35', text: '#FFFFFF' },      // Orange
   admin: { bg: '#5B7A8C', text: '#FFFFFF' },      // Blue-gray
   instructor: { bg: '#34C759', text: '#FFFFFF' }, // Green
   member: { bg: '#8E8E93', text: '#FFFFFF' },     // Gray
   attached: { bg: '#10B981', text: '#FFFFFF' },   // Emerald/Green (for external users)
+  // Team roles
+  commander: { bg: '#FFD700', text: '#1A1A1A' },  // Gold
+  squad_commander: { bg: '#FF8A5C', text: '#FFFFFF' }, // Orange
+  soldier: { bg: '#4CAF50', text: '#FFFFFF' },   // Green
 };
 
 const SIZE_MAP: Record<AvatarSize, number> = {
@@ -72,8 +77,13 @@ export function BaseAvatar({
   const sizeValue = SIZE_MAP[size];
   const textSize = TEXT_SIZE_MAP[size];
   
+  // Extract role string from prop (handles both string and object formats)
+  const roleString = role 
+    ? (typeof role === 'string' ? role : role.role) 
+    : null;
+  
   // Use role-based colors if role is provided, otherwise fall back to custom or primary
-  const roleColors = role ? ROLE_COLORS[role] : null;
+  const roleColors = roleString ? ROLE_COLORS[roleString] : null;
   const bgColor = backgroundColor || roleColors?.bg || colors.primary;
   const txtColor = textColor || roleColors?.text || colors.primaryForeground;
 

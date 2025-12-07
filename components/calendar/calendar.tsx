@@ -17,7 +17,7 @@ type CalendarViewMode = 'week' | 'month';
 
 const CalendarScreen = React.memo(function CalendarScreen() {
   const colors = useColors();
-  const { activeWorkspace } = useAppContext();
+  const { activeTeamId } = useAppContext();
   const [filter, setFilter] = useState<EventFilter>('all');
   const [viewMode, setViewMode] = useState<CalendarViewMode>('week');
   const [selectedWeekDate] = useState<string>('');
@@ -28,7 +28,7 @@ const CalendarScreen = React.memo(function CalendarScreen() {
 
   useEffect(() => {
     loadSessions();
-  }, [loadSessions, activeWorkspace?.id]);
+  }, [loadSessions, activeTeamId]);
 
   useEffect(() => {
     const mappedEvents: CalendarEvent[] = sessions.map((session: SessionWithDetails) => {

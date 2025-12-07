@@ -1,9 +1,8 @@
 import { useColors } from "@/hooks/ui/useColors";
-import { useAppContext } from "@/hooks/useAppContext";
 import { useWorkspacePermissions } from "@/hooks/usePermissions";
-import { useWorkspaceData } from "@/hooks/useWorkspaceData";
 import { createInvitation } from "@/services/invitationService";
 import { getTeamCommanderStatus, type TeamCommanderStatus } from "@/services/teamService";
+import { useTeamStore } from "@/store/teamStore";
 import type { TeamMemberShip } from "@/types/workspace";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from 'expo-clipboard';
@@ -120,8 +119,7 @@ const RoleCard = React.memo(function RoleCard({
 // ============================================================================
 export default function InviteTeamMemberSheet() {
   const colors = useColors();
-  const { activeWorkspaceId, activeWorkspace } = useAppContext();
-  const { teams } = useWorkspaceData();
+  const { activeTeamId, teams, activeTeam } = useTeamStore();
   const permissions = useWorkspacePermissions();
   
   // Get pre-selected team from URL params (e.g., when commander invites to their team)
@@ -235,7 +233,7 @@ export default function InviteTeamMemberSheet() {
   }, [step, hasPreselectedTeam]);
 
   const handleCreateInvite = async () => {
-    if (!activeWorkspaceId || !selectedTeamId) return;
+    if (!selectedTeamId) return;
     
     if (isMemberRole && assignToSquad && !squadName.trim()) {
       Alert.alert('Squad Name Required', 'Please enter a squad name.');
@@ -250,7 +248,8 @@ export default function InviteTeamMemberSheet() {
         ? { squad_id: squadName.trim() } 
         : undefined;
 
-      const invitation = await createInvitation(activeWorkspaceId, 'member', selectedTeamId, finalTeamRole, metadata);
+      // Team-first: pass null for org workspace, team is the primary entity
+      const invitation = await createInvitation(null as any, 'member', selectedTeamId, finalTeamRole, metadata);
       await Clipboard.setStringAsync(invitation.invite_code);
       setCreatedCode(invitation.invite_code);
       setIsCreating(false);
@@ -325,7 +324,7 @@ export default function InviteTeamMemberSheet() {
         </View>
         <Text style={[styles.title, { color: colors.text }]}>Invite Team Member</Text>
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          {activeWorkspace?.workspace_name}
+          {activeTeam?.name || 'Select a team'}
         </Text>
       </View>
 

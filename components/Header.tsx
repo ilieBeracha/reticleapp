@@ -10,16 +10,15 @@ interface HeaderProps {
   notificationCount?: number;
   onNotificationPress?: () => void;
   onUserPress?: () => void;
-  onWorkspacePress?: () => void;
+  onTeamPress?: () => void;
 }
 
-export function Header({ notificationCount = 0, onNotificationPress, onUserPress, onWorkspacePress }: HeaderProps) {
-  const { email, avatarUrl, activeWorkspace } = useAppContext();
+export function Header({ notificationCount = 0, onNotificationPress, onUserPress, onTeamPress }: HeaderProps) {
+  const { email, avatarUrl, activeTeam } = useAppContext();
   const colors = useColors();
 
   const fallbackInitial = email?.charAt(0)?.toUpperCase() ?? '?';
-  const workspaceName =
-    activeWorkspace?.workspace_name || 'Workspace';
+  const teamName = activeTeam?.name || 'Personal';
 
 
   return (
@@ -38,9 +37,9 @@ export function Header({ notificationCount = 0, onNotificationPress, onUserPress
             </View>
           </TouchableOpacity>
 
-      <TouchableOpacity style={styles.workspaceContainer} onPress={onWorkspacePress}  > 
+      <TouchableOpacity style={styles.workspaceContainer} onPress={onTeamPress}  > 
           <Text style={[styles.workspaceText, { color: colors.text}]}>
-            {activeWorkspace?.id ? workspaceName : 'Profile'}
+            {teamName}
           </Text> 
           <MaterialCommunityIcons name="chevron-right" size={20} color={colors.text} />
         </TouchableOpacity> 

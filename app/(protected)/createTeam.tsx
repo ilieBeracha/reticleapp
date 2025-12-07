@@ -1,19 +1,19 @@
 import { useColors } from "@/hooks/ui/useColors";
-import { useAppContext } from "@/hooks/useAppContext";
 import { useTeamStore } from "@/store/teamStore";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from 'expo-haptics';
 import { router } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-    Alert,
-    Keyboard,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Keyboard,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 // Squad templates
@@ -25,17 +25,19 @@ const SQUAD_TEMPLATES = [
 
 /**
  * CREATE TEAM - Native Form Sheet
+ * Team-First Architecture: Teams are the primary entity
  */
 export default function CreateTeamSheet() {
   const colors = useColors();
-  const { activeWorkspaceId } = useAppContext();
-  const { createTeam, loadTeams, loading } = useTeamStore();
+  const { createTeam, setActiveTeam, loading } = useTeamStore();
 
   const [teamName, setTeamName] = useState("");
   const [teamDescription, setTeamDescription] = useState("");
   const [squads, setSquads] = useState<string[]>([]);
   const [newSquadName, setNewSquadName] = useState("");
   const [showSquadSection, setShowSquadSection] = useState(false);
+  const [step, setStep] = useState<'form' | 'success'>('form');
+  const [createdTeam, setCreatedTeam] = useState<{ id: string; name: string } | null>(null);
 
   const handleCreate = useCallback(async () => {
     if (!teamName.trim()) {
@@ -44,41 +46,36 @@ export default function CreateTeamSheet() {
       return;
     }
 
-    if (!activeWorkspaceId) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Error", "No active workspace");
-      return;
-    }
-
     Keyboard.dismiss();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      await createTeam({
-        org_workspace_id: activeWorkspaceId,
+      const team = await createTeam({
         name: teamName.trim(),
         description: teamDescription.trim() || undefined,
         squads: squads.length > 0 ? squads : undefined,
       });
 
-      // Refresh teams list immediately
-      
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
-      Alert.alert("✓ Team Created", `"${teamName}" is ready to go!`, [
-          {
-              text: "OK",
-              onPress: () => {
-                  if (router.canGoBack()) router.back();
-                },
-            },
-        ]);
-    await loadTeams(activeWorkspaceId);
+      setCreatedTeam({ id: team.id, name: team.name });
+      setStep('success');
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert("Error", error.message || "Failed to create team");
     }
-  }, [teamName, teamDescription, squads, activeWorkspaceId, createTeam, loadTeams]);
+  }, [teamName, teamDescription, squads, createTeam]);
+
+  const handleOpenTeam = useCallback(() => {
+    if (!createdTeam) return;
+    
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setActiveTeam(createdTeam.id);
+    
+    // Navigate to home (dismiss the sheet)
+    if (router.canDismiss()) {
+      router.dismiss();
+    }
+  }, [createdTeam, setActiveTeam]);
 
   const handleAddSquad = useCallback(() => {
     const trimmedName = newSquadName.trim();
@@ -104,6 +101,37 @@ export default function CreateTeamSheet() {
     setSquads(template);
   }, []);
 
+  // Success state
+  if (step === 'success' && createdTeam) {
+    return (
+      <View style={[styles.successContainer, { backgroundColor: colors.card }]}>
+        <View style={[styles.successIcon, { backgroundColor: colors.primary + '15' }]}>
+          <Ionicons name="checkmark-circle" size={48} color={colors.primary} />
+        </View>
+        
+        <Text style={[styles.successTitle, { color: colors.text }]}>
+          Team Created!
+        </Text>
+        
+        <Text style={[styles.successSubtitle, { color: colors.textMuted }]}>
+          <Text style={{ fontWeight: '600', color: colors.text }}>{createdTeam.name}</Text>
+          {' '}is ready. You can invite team members anytime.
+        </Text>
+        
+        <View style={styles.successActions}>
+          <TouchableOpacity
+            style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
+            onPress={handleOpenTeam}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="arrow-forward" size={20} color="#fff" />
+            <Text style={styles.primaryBtnText}>Open Team</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <ScrollView
       style={styles.scrollView}
@@ -118,7 +146,7 @@ export default function CreateTeamSheet() {
           </View>
           <Text style={[styles.title, { color: colors.text }]}>Create Team</Text>
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            Organize your members into groups
+            Start training together with your team
           </Text>
         </View>
 
@@ -257,7 +285,7 @@ export default function CreateTeamSheet() {
         <View style={[styles.infoCard, { backgroundColor: colors.secondary }]}>
           <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
           <Text style={[styles.infoText, { color: colors.textMuted }]}>
-            You can invite members and assign them to squads after creating the team.
+            You'll be the team owner. Invite members and assign roles after creating.
           </Text>
         </View>
 
@@ -269,7 +297,7 @@ export default function CreateTeamSheet() {
           activeOpacity={0.8}
         >
           {loading ? (
-            <Text style={styles.createButtonText}>Creating...</Text>
+            <ActivityIndicator color="#fff" size="small" />
           ) : (
             <>
               <Ionicons name="add-circle" size={20} color="#fff" />
@@ -327,5 +355,13 @@ const styles = StyleSheet.create({
 
   createButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 52, borderRadius: 14, gap: 8 },
   createButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
-});
 
+  // Success state
+  successContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingBottom: 60 },
+  successIcon: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
+  successTitle: { fontSize: 26, fontWeight: '700', letterSpacing: -0.4, marginBottom: 10 },
+  successSubtitle: { fontSize: 15, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
+  successActions: { width: '100%', gap: 12 },
+  primaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 52, borderRadius: 12, gap: 8 },
+  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+});

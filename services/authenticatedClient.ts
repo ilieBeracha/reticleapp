@@ -9,12 +9,17 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 /**
- * Workspace context for automatic scoping
+ * Team context for automatic scoping
  */
-export interface WorkspaceContext {
+export interface TeamContext {
   userId: string;
-  workspaceId: string | null;
+  teamId: string | null;
 }
+
+/**
+ * @deprecated Use TeamContext instead
+ */
+export type WorkspaceContext = TeamContext;
 
 /**
  * Singleton AuthenticatedClient class that automatically handles:
@@ -26,7 +31,7 @@ export interface WorkspaceContext {
 export class AuthenticatedClient {
   private static instance: SupabaseClient | null = null;
   private static tokenProvider: (() => Promise<string>) | null = null;
-  private static contextProvider: (() => WorkspaceContext | null) | null = null;
+  private static contextProvider: (() => TeamContext | null) | null = null;
 
   /**
    * Initialize the client with token and context providers
@@ -34,7 +39,7 @@ export class AuthenticatedClient {
    */
   static initialize(
     tokenProvider: () => Promise<string>,
-    contextProvider: () => WorkspaceContext | null
+    contextProvider: () => TeamContext | null
   ) {
     this.tokenProvider = tokenProvider;
     this.contextProvider = contextProvider;
@@ -95,10 +100,10 @@ export class AuthenticatedClient {
   }
 
   /**
-   * Get the current workspace context
-   * Returns { userId, workspaceId } automatically
+   * Get the current team context
+   * Returns { userId, teamId } automatically
    */
-  static getContext(): WorkspaceContext {
+  static getContext(): TeamContext {
     if (!this.contextProvider) {
       throw new AuthenticationError(
         "AuthenticatedClient not initialized. Call initialize() first."
@@ -124,9 +129,9 @@ export class AuthenticatedClient {
 
 /**
  * Helper to get context in service functions
- * Usage: const { userId, workspaceId } = getContext()
+ * Usage: const { userId, teamId } = getContext()
  */
-export function getContext(): WorkspaceContext {
+export function getContext(): TeamContext {
   return AuthenticatedClient.getContext();
 }
 

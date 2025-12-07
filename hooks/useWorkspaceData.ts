@@ -1,11 +1,11 @@
 import { useAppContext } from '@/hooks/useAppContext';
 import { useSessionStore } from '@/store/sessionStore';
 import { useTeamStore } from '@/store/teamStore';
-import type { Team } from '@/types/workspace';
+import type { TeamWithRole } from '@/types/workspace';
 import { useCallback, useEffect, useRef } from 'react';
 
 interface UseWorkspaceDataReturn {
-  teams: Team[];
+  teams: TeamWithRole[];
   loadingTeams: boolean;
   sessions: any[];
   sessionsLoading: boolean;
@@ -17,53 +17,51 @@ interface UseWorkspaceDataReturn {
 /**
  * Hook to load and manage workspace data (teams and sessions)
  * 
- * OPTIMIZED:
- * - Uses refs to track previous workspace ID and prevent double loading
- * - Stable callback functions that don't change identity
- * - Single load on workspace change, not multiple
+ * TEAM-FIRST ARCHITECTURE:
+ * - Uses activeTeamId from team store
+ * - Loads team sessions, not workspace sessions
  */
 export function useWorkspaceData(): UseWorkspaceDataReturn {
-  const { activeWorkspaceId } = useAppContext();
-  const { sessions, loading: sessionsLoading, error: sessionsError, loadWorkspaceSessions } = useSessionStore();
+  const { activeTeamId } = useAppContext();
+  const { sessions, loading: sessionsLoading, error: sessionsError, loadTeamSessions } = useSessionStore();
   const { teams, loading: loadingTeams, loadTeams: loadTeamsStore } = useTeamStore();
 
-  // Track previous workspace to prevent duplicate loads
-  const prevWorkspaceIdRef = useRef<string | null | undefined>(undefined);
+  // Track previous team to prevent duplicate loads
+  const prevTeamIdRef = useRef<string | null | undefined>(undefined);
   const isLoadingRef = useRef(false);
 
   // Stable load teams function
   const loadTeams = useCallback(async () => {
-    if (!activeWorkspaceId || isLoadingRef.current) return;
+    if (isLoadingRef.current) return;
     isLoadingRef.current = true;
     try {
-      await loadTeamsStore(activeWorkspaceId);
+      await loadTeamsStore();
     } finally {
       isLoadingRef.current = false;
     }
-  }, [activeWorkspaceId, loadTeamsStore]);
+  }, [loadTeamsStore]);
 
   // Stable refresh sessions function
   const refreshSessions = useCallback(() => {
-    if (activeWorkspaceId) {
-      loadWorkspaceSessions();
+    if (activeTeamId) {
+      loadTeamSessions();
     }
-  }, [activeWorkspaceId, loadWorkspaceSessions]);
+  }, [activeTeamId, loadTeamSessions]);
 
-  // Single effect to load data when workspace changes
+  // Single effect to load data when team changes
   useEffect(() => {
-    // Skip if workspace hasn't changed (prevents double loading)
-    if (prevWorkspaceIdRef.current === activeWorkspaceId) {
+    // Skip if team hasn't changed (prevents double loading)
+    if (prevTeamIdRef.current === activeTeamId) {
       return;
     }
     
-    prevWorkspaceIdRef.current = activeWorkspaceId;
+    prevTeamIdRef.current = activeTeamId;
 
-    if (activeWorkspaceId) {
-      // Load both teams and sessions for org workspace
-      loadTeamsStore(activeWorkspaceId);
-      loadWorkspaceSessions();
+    if (activeTeamId) {
+      // Load sessions for the active team
+      loadTeamSessions();
     }
-  }, [activeWorkspaceId, loadTeamsStore, loadWorkspaceSessions]);
+  }, [activeTeamId, loadTeamSessions]);
 
   return {
     teams,

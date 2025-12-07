@@ -1,6 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { useWorkspaceStore } from "@/store/useWorkspaceStore";
-import type { Workspace } from "@/types/workspace";
+import { useTeamStore } from "@/store/teamStore";
+import type { TeamWithRole, TeamRole } from "@/types/workspace";
 import { router } from "expo-router";
 import { useCallback, useMemo } from "react";
 
@@ -11,68 +11,61 @@ export interface AppContext {
   fullName: string | null;
   avatarUrl: string | null;
   
-  // Workspace (org-only)
-  activeWorkspaceId: string | null;  // Currently viewing organization
-  activeWorkspace: Workspace | null;
+  // Team (primary entity)
+  activeTeamId: string | null;
+  activeTeam: TeamWithRole | null;
+  myRole: TeamRole | null;
   
-  // All accessible organizations
-  workspaces: Workspace[];
+  // All my teams
+  teams: TeamWithRole[];
+  hasTeams: boolean;
   
   // Actions
-  switchWorkspace: (workspaceId: string | null) => Promise<void>;
-  navigateToWorkspace: (workspaceId: string | null) => void;
+  switchTeam: (teamId: string | null) => Promise<void>;
   
   // Loading states
   loading: boolean;
   isAuthenticated: boolean;
+  
+  // Permissions helpers
+  canManageTeam: boolean;  // owner or commander
+  isOwner: boolean;
+  isCommander: boolean;
 }
 
 /**
  * ✨ THE SINGLE SOURCE OF TRUTH ✨
  * 
- * Use this hook in ALL components to get user and workspace context.
- * NEVER access user or workspace data directly from other sources.
+ * Use this hook in ALL components to get user and team context.
+ * NEVER access user or team data directly from other sources.
  * 
- * ROUTING MODEL:
- * - Personal mode: /(protected)/personal/*
- * - Org mode: /(protected)/org/* (store has activeWorkspaceId)
- * 
- * switchWorkspace now navigates to the appropriate route!
+ * TEAM-FIRST ARCHITECTURE:
+ * - Teams are the primary entity
+ * - Users create and manage teams directly
+ * - No organization layer
  */
 export function useAppContext(): AppContext {
   const { user, loading: authLoading } = useAuth();
   const { 
-    workspaces, 
-    activeWorkspaceId,    
-    loading: workspacesLoading,
-    setActiveWorkspace
-  } = useWorkspaceStore();
+    teams, 
+    activeTeamId,    
+    loading: teamsLoading,
+    setActiveTeam,
+    setIsSwitching,
+  } = useTeamStore();
 
   /**
-   * Navigate to a workspace or personal mode
-   * This just does navigation, no state changes
+   * Switch team - Updates state
    */
-  const navigateToWorkspace = useCallback((workspaceId: string | null) => {
-    if (workspaceId) {
-      // Navigate to org mode (store has the active workspace ID)
-      router.replace('/(protected)/org' as any);
-    } else {
-      // Navigate to personal mode
-      router.replace('/(protected)/personal' as any);
-    }
-  }, []);
-
-  /**
-   * Switch workspace - Updates state AND navigates
-   * Use this from UI actions (like workspace switcher)
-   */
-  const handleSwitchWorkspace = useCallback(async (workspaceId: string | null) => {
-    // Update state
-    setActiveWorkspace(workspaceId);
+  const handleSwitchTeam = useCallback(async (teamId: string | null) => {
+    setIsSwitching(true);
+    setActiveTeam(teamId);
     
-    // Navigate to the appropriate route
-    navigateToWorkspace(workspaceId);
-  }, [setActiveWorkspace, navigateToWorkspace]);
+    // Small delay for smooth transition
+    setTimeout(() => {
+      setIsSwitching(false);
+    }, 300);
+  }, [setActiveTeam, setIsSwitching]);
 
   // Calculate derived values with memoization
   const context = useMemo<AppContext>(() => {
@@ -84,27 +77,38 @@ export function useAppContext(): AppContext {
         fullName: null,
         avatarUrl: null,
         
-        // Workspace
-        activeWorkspaceId: null,
-        activeWorkspace: null,
+        // Team
+        activeTeamId: null,
+        activeTeam: null,
+        myRole: null,
         
-        // All workspaces
-        workspaces: [],
+        // All teams
+        teams: [],
+        hasTeams: false,
         
         // Actions
-        switchWorkspace: handleSwitchWorkspace,
-        navigateToWorkspace,
+        switchTeam: handleSwitchTeam,
         
         // Loading
         loading: authLoading,
         isAuthenticated: false,
+        
+        // Permissions
+        canManageTeam: false,
+        isOwner: false,
+        isCommander: false,
       };
     }
 
-    // Active workspace (only if activeWorkspaceId is not null)
-    const activeWorkspace = activeWorkspaceId 
-      ? workspaces.find(w => w.id === activeWorkspaceId) || null
+    // Active team
+    const activeTeam = activeTeamId 
+      ? teams.find(t => t.id === activeTeamId) || null
       : null;
+    
+    const myRole = activeTeam?.my_role || null;
+    const isOwner = myRole === 'owner';
+    const isCommander = myRole === 'commander';
+    const canManageTeam = isOwner || isCommander;
 
     return {
       // User
@@ -113,30 +117,48 @@ export function useAppContext(): AppContext {
       fullName: user.user_metadata?.full_name ?? null,
       avatarUrl: user.user_metadata?.avatar_url ?? null,
       
-      // Workspace
-      activeWorkspaceId: activeWorkspaceId,
-      activeWorkspace,
+      // Team
+      activeTeamId,
+      activeTeam,
+      myRole,
       
-      // All workspaces
-      workspaces,
+      // All teams
+      teams,
+      hasTeams: teams.length > 0,
       
       // Actions
-      switchWorkspace: handleSwitchWorkspace,
-      navigateToWorkspace,
+      switchTeam: handleSwitchTeam,
       
       // Loading
-      loading: authLoading || workspacesLoading,
+      loading: authLoading || teamsLoading,
       isAuthenticated: true,
+      
+      // Permissions
+      canManageTeam,
+      isOwner,
+      isCommander,
     };
   }, [
     user,
-    workspaces,
-    activeWorkspaceId,
+    teams,
+    activeTeamId,
     authLoading,
-    workspacesLoading,
-    handleSwitchWorkspace,
-    navigateToWorkspace
+    teamsLoading,
+    handleSwitchTeam,
   ]);
 
   return context;
 }
+
+// =====================================================
+// LEGACY EXPORTS - For backwards compatibility
+// =====================================================
+
+/** @deprecated Use activeTeamId instead */
+export const useActiveWorkspaceId = () => useAppContext().activeTeamId;
+
+/** @deprecated Use activeTeam instead */
+export const useActiveWorkspace = () => useAppContext().activeTeam;
+
+/** @deprecated Use teams instead */
+export const useWorkspaces = () => useAppContext().teams;
