@@ -1,70 +1,62 @@
 import { useColors } from "@/hooks/ui/useColors";
-import { useAppContext } from "@/hooks/useAppContext";
-import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import { useTeamStore } from "@/store/teamStore";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from 'expo-haptics';
 import { router } from "expo-router";
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback } from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 /**
- * WORKSPACE SWITCHER - Native Form Sheet
+ * TEAM SWITCHER - Native Form Sheet
  * 
- * Lists workspaces and allows switching.
- * + button → separate createWorkspace sheet
- * Enter button → separate acceptInvite sheet
+ * Lists teams and allows switching between them.
+ * Also provides options to create or join teams.
  */
-export default function WorkspaceSwitcherSheet() {
+export default function TeamSwitcherSheet() {
   const colors = useColors();
-  const { userId, activeWorkspaceId, workspaces, loading } = useAppContext();
+  const { teams, activeTeamId, setActiveTeam, setIsSwitching } = useTeamStore();
 
-  const groupedWorkspaces = useMemo(() => {
-    const myWorkspaces = workspaces.filter(w => w.created_by === userId);
-    const otherWorkspaces = workspaces.filter(w => w.created_by !== userId);
-    return { myWorkspaces, otherWorkspaces };
-  }, [workspaces, userId]);
-
-  const handleSelectWorkspace = useCallback((workspaceId: string) => {
+  const handleSelectTeam = useCallback((teamId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    useWorkspaceStore.getState().setIsSwitching(true);
+    setIsSwitching(true);
     
+    // Match main branch pattern: setTimeout to allow state update before navigation
     setTimeout(() => {
-      useWorkspaceStore.getState().setActiveWorkspace(workspaceId);
-      router.replace('/(protected)/org' as any);
+      setActiveTeam(teamId);
+      router.replace('/(protected)/team' as any);
       setTimeout(() => {
-        useWorkspaceStore.getState().setIsSwitching(false);
+        setIsSwitching(false);
       }, 300);
     }, 200);
-  }, []);
+  }, [setActiveTeam, setIsSwitching]);
 
   const handleSwitchToPersonal = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    useWorkspaceStore.getState().setIsSwitching(true);
+    setIsSwitching(true);
     
+    // Match main branch pattern: setTimeout to allow state update before navigation
     setTimeout(() => {
-      useWorkspaceStore.getState().setActiveWorkspace(null);
+      setActiveTeam(null);
       router.replace('/(protected)/personal' as any);
       setTimeout(() => {
-        useWorkspaceStore.getState().setIsSwitching(false);
+        setIsSwitching(false);
       }, 300);
     }, 200);
+  }, [setActiveTeam, setIsSwitching]);
+
+  const handleCreateTeam = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/(protected)/createTeam' as any);
   }, []);
 
-  const handleCreateWorkspace = useCallback(() => {
+  const handleJoinTeam = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Opens separate sheet
-    router.push('/(protected)/createWorkspace' as any);
-  }, []);
-
-  const handleJoinWorkspace = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Opens separate sheet
     router.push('/(protected)/acceptInvite' as any);
   }, []);
 
@@ -78,12 +70,12 @@ export default function WorkspaceSwitcherSheet() {
       <View style={styles.headerSection}>
         <View style={styles.headerTop}>
           <View style={[styles.headerIcon, { backgroundColor: colors.primary + '15' }]}>
-            <Ionicons name="business" size={24} color={colors.primary} />
+            <Ionicons name="people" size={24} color={colors.primary} />
           </View>
           <View style={styles.headerTitleRow}>
-            <Text style={[styles.title, { color: colors.text }]}>Workspaces</Text>
+            <Text style={[styles.title, { color: colors.text }]}>Your Teams</Text>
             <View style={[styles.countBadge, { backgroundColor: colors.secondary }]}>
-              <Text style={[styles.countText, { color: colors.text }]}>{workspaces.length}</Text>
+              <Text style={[styles.countText, { color: colors.text }]}>{teams.length}</Text>
             </View>
           </View>
         </View>
@@ -91,7 +83,7 @@ export default function WorkspaceSwitcherSheet() {
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={[styles.actionBtn, { backgroundColor: colors.secondary }]}
-            onPress={handleJoinWorkspace}
+            onPress={handleJoinTeam}
             activeOpacity={0.7}
           >
             <Ionicons name="enter-outline" size={18} color={colors.primary} />
@@ -99,7 +91,7 @@ export default function WorkspaceSwitcherSheet() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionBtn, { backgroundColor: colors.primary }]}
-            onPress={handleCreateWorkspace}
+            onPress={handleCreateTeam}
             activeOpacity={0.7}
           >
             <Ionicons name="add" size={18} color="#fff" />
@@ -107,104 +99,93 @@ export default function WorkspaceSwitcherSheet() {
           </TouchableOpacity>
         </View>
       </View>
-        {/* Personal Mode */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>PERSONAL</Text>
-          <WorkspaceRow
-            name="Personal Mode"
-            subtitle="Independent training"
-            icon="person"
-            isActive={!activeWorkspaceId}
-            onPress={handleSwitchToPersonal}
+
+      {/* Personal Mode */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>PERSONAL</Text>
+        <TouchableOpacity
+          style={[styles.row, !activeTeamId && { backgroundColor: colors.primary + '10' }]}
+          onPress={handleSwitchToPersonal}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.rowAvatar, { backgroundColor: colors.secondary }]}>
+            <Ionicons name="person" size={18} color={colors.text} />
+          </View>
+          <View style={styles.rowContent}>
+            <Text style={[styles.rowName, { color: colors.text }]}>Personal Mode</Text>
+            <Text style={[styles.rowRole, { color: colors.textMuted }]}>Train independently</Text>
+          </View>
+          {!activeTeamId && (
+            <View style={[styles.checkIcon, { backgroundColor: colors.primary }]}>
+              <Ionicons name="checkmark" size={12} color="#fff" />
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Teams List */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>MY TEAMS</Text>
+        {teams.map(team => (
+          <TeamRow
+            key={team.id}
+            name={team.name}
+            role={team.my_role}
+            memberCount={team.member_count || 0}
+            isActive={team.id === activeTeamId}
+            isOwner={team.my_role === 'owner'}
+            onPress={() => handleSelectTeam(team.id)}
             colors={colors}
           />
+        ))}
+      </View>
+
+      {/* Empty State */}
+      {teams.length === 0 && (
+        <View style={styles.emptyState}>
+          <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
+            <Ionicons name="people-outline" size={36} color={colors.textMuted} />
+          </View>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>No teams yet</Text>
+          <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
+            Create a team or join one with an invite code
+          </Text>
         </View>
-
-        {/* My Organizations */}
-        {groupedWorkspaces.myWorkspaces.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>MY ORGANIZATIONS</Text>
-            {groupedWorkspaces.myWorkspaces.map(w => (
-              <WorkspaceRow
-                key={w.id}
-                name={w.workspace_name}
-                subtitle={w.access_role}
-                initial={w.workspace_name?.charAt(0).toUpperCase() || 'W'}
-                isActive={w.id === activeWorkspaceId}
-                isOwner={w.created_by === userId}
-                onPress={() => handleSelectWorkspace(w.id)}
-                colors={colors}
-              />
-            ))}
-          </View>
-        )}
-
-        {/* Member Of */}
-        {groupedWorkspaces.otherWorkspaces.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>MEMBER OF</Text>
-            {groupedWorkspaces.otherWorkspaces.map(w => (
-              <WorkspaceRow
-                key={w.id}
-                name={w.workspace_name}
-                subtitle={w.access_role}
-                initial={w.workspace_name?.charAt(0).toUpperCase() || 'W'}
-                isActive={w.id === activeWorkspaceId}
-                onPress={() => handleSelectWorkspace(w.id)}
-                colors={colors}
-              />
-            ))}
-          </View>
-        )}
-
-        {/* Empty State */}
-        {workspaces.length === 0 && !loading && (
-          <View style={styles.emptyState}>
-            <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
-              <Ionicons name="business-outline" size={36} color={colors.textMuted} />
-            </View>
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>No organizations yet</Text>
-            <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-              Create an organization or join with an invite code
-            </Text>
-          </View>
-        )}
+      )}
     </ScrollView>
   );
 }
 
-// Workspace Row Component
-const WorkspaceRow = React.memo(function WorkspaceRow({
+// Team Row Component
+const TeamRow = React.memo(function TeamRow({
   name,
-  subtitle,
-  icon,
-  initial,
+  role,
+  memberCount,
   isActive,
   isOwner,
   onPress,
   colors,
 }: {
   name: string;
-  subtitle: string;
-  icon?: keyof typeof Ionicons.glyphMap;
-  initial?: string;
+  role: string;
+  memberCount: number;
   isActive: boolean;
   isOwner?: boolean;
   onPress: () => void;
   colors: ReturnType<typeof useColors>;
 }) {
+  const roleLabel = role.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  
   return (
     <TouchableOpacity
       style={[styles.row, isActive && { backgroundColor: colors.primary + '10' }]}
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <View style={[styles.rowAvatar, { backgroundColor: icon ? colors.secondary : colors.primary + '15' }]}>
-        {icon ? (
-          <Ionicons name={icon} size={18} color={colors.text} />
-        ) : (
-          <Text style={[styles.rowInitial, { color: colors.primary }]}>{initial}</Text>
-        )}
+      <View style={[styles.rowAvatar, { backgroundColor: colors.primary + '15' }]}>
+        <Text style={[styles.rowInitial, { color: colors.primary }]}>
+          {name?.charAt(0).toUpperCase() || 'T'}
+        </Text>
       </View>
       
       <View style={styles.rowContent}>
@@ -212,7 +193,9 @@ const WorkspaceRow = React.memo(function WorkspaceRow({
           {name}
         </Text>
         <View style={styles.rowMeta}>
-          <Text style={[styles.rowRole, { color: colors.textMuted }]}>{subtitle}</Text>
+          <Text style={[styles.rowRole, { color: colors.textMuted }]}>{roleLabel}</Text>
+          <Text style={[styles.rowDot, { color: colors.textMuted }]}>•</Text>
+          <Text style={[styles.rowRole, { color: colors.textMuted }]}>{memberCount} members</Text>
           {isOwner && (
             <View style={[styles.ownerTag, { backgroundColor: colors.primary + '20' }]}>
               <Text style={[styles.ownerTagText, { color: colors.primary }]}>Owner</Text>
@@ -338,10 +321,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textTransform: 'capitalize',
   },
+  rowDot: {
+    fontSize: 10,
+  },
   ownerTag: {
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 4,
+    marginLeft: 4,
   },
   ownerTagText: {
     fontSize: 9,

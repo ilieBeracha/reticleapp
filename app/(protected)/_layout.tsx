@@ -2,24 +2,24 @@ import { Header } from '@/components/Header';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { useColors } from '@/hooks/ui/useColors';
-import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import { useTeamStore } from '@/store/teamStore';
 import { router, Stack } from 'expo-router';
 
 /**
- * Protected Layout
+ * Protected Layout - Team-First Architecture
  * 
  * This layout wraps all authenticated routes.
  * All sheets are now native form sheets via Stack.Screen.
  * 
  * Route Structure:
- * - /(protected)/personal/* - Personal mode (no workspace)
- * - /(protected)/org/* - Organization mode (store has activeWorkspaceId)
+ * - /(protected)/personal/* - Personal mode (training alone)
+ * - /(protected)/team/* - Team mode (active team context)
  */
 export default function ProtectedLayout() {
   const colors = useColors();
-  const isSwitching = useWorkspaceStore(state => state.isSwitching);
+  const isSwitching = useTeamStore(state => state.isSwitching);
 
-  // Show full-screen loader when switching workspaces
+  // Show full-screen loader when switching teams
   if (isSwitching) {
     return <LoadingScreen />;
   }
@@ -35,37 +35,28 @@ export default function ProtectedLayout() {
             <Header
               onNotificationPress={() => {}}
               onUserPress={() => router.push('/(protected)/userMenu')}
-              onWorkspacePress={() => router.push('/(protected)/workspaceSwitcher')}
+              onTeamPress={() => router.push('/(protected)/teamSwitcher')}
             />
           ),
           headerTitleAlign: 'left',
           headerTintColor: colors.text,
         }}
       >
-        {/* Personal Mode Routes */}
-        <Stack.Screen name="personal" />
-        
-        {/* Organization Mode Routes */}
-        <Stack.Screen name="org" />
-        
-        {/* Liquid Glass Sheet - iOS 26+ */}
-        <Stack.Screen
-          name="liquidGlassSheet"
-          options={{
-            headerShown: false,
-            presentation: "formSheet",
-            gestureEnabled: true,
-            sheetGrabberVisible: true,
-            contentStyle: { backgroundColor: "transparent" },
-            sheetAllowedDetents: [0.25, 0.5, 1],
-            sheetInitialDetentIndex: 0,
-            sheetLargestUndimmedDetentIndex: 0,
-          }}
+        {/* Personal Mode Tabs */}
+        <Stack.Screen 
+          name="personal" 
+          options={{ headerShown: true }}
         />
         
-        {/* Workspace Switcher */}
+        {/* Team Mode Tabs */}
         <Stack.Screen
-          name="workspaceSwitcher"
+          name="team" 
+          options={{ headerShown: true }}
+        />
+        
+        {/* Team Switcher */}
+        <Stack.Screen
+          name="teamSwitcher"
           options={{
             headerShown: false,
             presentation: "formSheet",
@@ -91,21 +82,6 @@ export default function ProtectedLayout() {
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
           }}
-      />
-        
-        {/* Create Workspace */}
-        <Stack.Screen
-          name="createWorkspace"
-          options={{
-            headerShown: false,
-            presentation: "formSheet",
-            gestureEnabled: true,
-            sheetGrabberVisible: true,
-            contentStyle: { backgroundColor: colors.card },
-            sheetAllowedDetents: [0.7, 0.9],
-            sheetInitialDetentIndex: 0,
-            sheetLargestUndimmedDetentIndex: -1,
-        }}
       />
         
         {/* User Menu */}
@@ -168,37 +144,7 @@ export default function ProtectedLayout() {
         }}
       />
         
-        {/* Invite Members (legacy - can be removed later) */}
-        <Stack.Screen
-          name="inviteMembers"
-          options={{
-            headerShown: false,
-            presentation: "formSheet",
-            gestureEnabled: true,
-            sheetGrabberVisible: true,
-            contentStyle: { backgroundColor: colors.card },
-            sheetAllowedDetents: [0.85, 0.95],
-            sheetInitialDetentIndex: 0,
-            sheetLargestUndimmedDetentIndex: -1,
-        }}
-      />
-        
-        {/* Invite Staff - Org-level roles */}
-        <Stack.Screen
-          name="inviteStaff"
-          options={{
-            headerShown: false,
-            presentation: "formSheet",
-            gestureEnabled: true,
-            sheetGrabberVisible: true,
-            contentStyle: { backgroundColor: colors.card },
-            sheetAllowedDetents: [0.7, 0.85],
-            sheetInitialDetentIndex: 0,
-            sheetLargestUndimmedDetentIndex: -1,
-          }}
-        />
-        
-        {/* Invite Team Member - Team roles */}
+        {/* Invite Team Member */}
         <Stack.Screen
           name="inviteTeamMember"
           options={{
@@ -208,21 +154,6 @@ export default function ProtectedLayout() {
             sheetGrabberVisible: true,
             contentStyle: { backgroundColor: colors.card },
             sheetAllowedDetents: [0.85, 0.95],
-            sheetInitialDetentIndex: 0,
-            sheetLargestUndimmedDetentIndex: -1,
-          }}
-        />
-        
-        {/* Invite Attached - External users */}
-        <Stack.Screen
-          name="inviteAttached"
-          options={{
-            headerShown: false,
-            presentation: "formSheet",
-            gestureEnabled: true,
-            sheetGrabberVisible: true,
-            contentStyle: { backgroundColor: colors.card },
-            sheetAllowedDetents: [0.75, 0.9],
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
           }}
@@ -257,6 +188,17 @@ export default function ProtectedLayout() {
             sheetLargestUndimmedDetentIndex: -1,
         }}
       />
+        
+        {/* Member Activity */}
+        <Stack.Screen
+          name="memberActivity"
+          options={{
+            headerShown: false,
+            presentation: "card",
+            gestureEnabled: true,
+            contentStyle: { backgroundColor: colors.background },
+          }}
+        />
         
         {/* Training Detail */}
         <Stack.Screen
@@ -310,8 +252,8 @@ export default function ProtectedLayout() {
           }}
         />
 
-        {/* Session Detail - Sheet */}
-        <Stack.Screen
+        {/* Session Detail - Sheet (TODO: create sessionDetail.tsx) */}
+        {/* <Stack.Screen
           name="sessionDetail"
           options={{
             headerShown: false,
@@ -323,7 +265,7 @@ export default function ProtectedLayout() {
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
           }}
-        />
+        /> */}
 
         {/* Scans Gallery - Full screen */}
         <Stack.Screen

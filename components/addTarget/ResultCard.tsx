@@ -1,3 +1,7 @@
+import type { AnalyzeDocumentResponse, AnalyzeResponse } from "@/types/api";
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -10,23 +14,22 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-import * as Haptics from "expo-haptics";
 import ViewShot from "react-native-view-shot";
-import type { AnalyzeResponse } from "@/types/api";
-import { COLORS, EditableDetection, EditMode } from "./types";
-import { DetectionPreview } from "./DetectionPreview";
 import { DetectionEditor } from "./DetectionEditor";
+import { DetectionPreview } from "./DetectionPreview";
 import { DistanceInput } from "./DistanceInput";
+import { COLORS, EditableDetection, EditMode } from "./types";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // RESULT CARD
 // Displays AI detection results with editing capabilities
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** Union type for detection results - supports both legacy and document analysis */
+type DetectionResult = AnalyzeResponse | AnalyzeDocumentResponse;
+
 interface ResultCardProps {
-  result: AnalyzeResponse;
+  result: DetectionResult;
   onDone: (finalDetections: EditableDetection[], editedImageBase64?: string) => void;
   onRetake: () => void;
   saving: boolean;

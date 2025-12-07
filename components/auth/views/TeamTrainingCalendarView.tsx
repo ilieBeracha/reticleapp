@@ -1,10 +1,10 @@
-import { useOrgRole } from '@/contexts/OrgRoleContext';
 import { TrainingCalendar } from '@/components/ui/TrainingCalendar';
+import { useTeamRole } from '@/contexts/TeamRoleContext';
 import { CalendarEvent } from '@/hooks/ui/useCalendar';
 import { useColors } from '@/hooks/ui/useColors';
-import { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, View, Alert } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { useMemo } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 /**
  * TEAM TRAINING CALENDAR VIEW
@@ -12,7 +12,7 @@ import * as Haptics from 'expo-haptics';
  */
 export default function TeamTrainingCalendarView() {
   const colors = useColors();
-  const { teamInfo } = useOrgRole();
+  const { teamName } = useTeamRole();
 
   // TODO: Fetch real team training data
   const teamEvents: CalendarEvent[] = useMemo(() => [], []);
@@ -37,7 +37,7 @@ export default function TeamTrainingCalendarView() {
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>Team Training</Text>
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          {teamInfo?.teamName || 'Your Team'} • Commander View
+          {teamName || 'Your Team'} • Commander View
         </Text>
       </View>
 
@@ -74,4 +74,3 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 });
-

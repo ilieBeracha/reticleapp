@@ -1,4 +1,4 @@
-import type { AnalyzeResponse } from "@/types/api";
+import type { AnalyzeDocumentResponse, AnalyzeResponse } from "@/types/api";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import React, { useCallback, useMemo, useState } from "react";
@@ -6,11 +6,11 @@ import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Svg, { Circle, G, Line } from "react-native-svg";
 import ViewShot from "react-native-view-shot";
 import {
-    CANVAS_SIZE,
-    COLORS,
-    EditableDetection,
-    EditMode,
-    MARKER_RADIUS,
+  CANVAS_SIZE,
+  COLORS,
+  EditableDetection,
+  EditMode,
+  MARKER_RADIUS,
 } from "./types";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -18,8 +18,11 @@ import {
 // Interactive canvas for adding/removing bullet hole detections
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** Union type for detection results - supports both legacy and document analysis */
+type DetectionResult = AnalyzeResponse | AnalyzeDocumentResponse;
+
 interface DetectionEditorProps {
-  result: AnalyzeResponse;
+  result: DetectionResult;
   detections: EditableDetection[];
   onDetectionsChange: (detections: EditableDetection[]) => void;
   editMode: EditMode;
@@ -38,10 +41,19 @@ export const DetectionEditor = React.memo(function DetectionEditor({
   const [imageLoaded, setImageLoaded] = useState(false);
 
   // Calculate scale factors for coordinate mapping
+  // Handles both AnalyzeResponse (uses width/height) and AnalyzeDocumentResponse (uses processed_width/height)
   const scale = useMemo(() => {
     if (!result.metadata) return { x: 1, y: 1, offsetX: 0, offsetY: 0 };
     
-    const imgAspect = result.metadata.width / result.metadata.height;
+    // Get image dimensions - document analysis uses processed dimensions, legacy uses width/height
+    const imgWidth = 'processed_width' in result.metadata 
+      ? result.metadata.processed_width 
+      : result.metadata.width;
+    const imgHeight = 'processed_height' in result.metadata 
+      ? result.metadata.processed_height 
+      : result.metadata.height;
+    
+    const imgAspect = imgWidth / imgHeight;
     const canvasAspect = 1; // Square canvas
     
     if (imgAspect > canvasAspect) {
@@ -49,8 +61,8 @@ export const DetectionEditor = React.memo(function DetectionEditor({
       const displayWidth = CANVAS_SIZE;
       const displayHeight = CANVAS_SIZE / imgAspect;
       return {
-        x: displayWidth / result.metadata.width,
-        y: displayHeight / result.metadata.height,
+        x: displayWidth / imgWidth,
+        y: displayHeight / imgHeight,
         offsetX: 0,
         offsetY: (CANVAS_SIZE - displayHeight) / 2,
       };
@@ -59,8 +71,8 @@ export const DetectionEditor = React.memo(function DetectionEditor({
       const displayHeight = CANVAS_SIZE;
       const displayWidth = CANVAS_SIZE * imgAspect;
       return {
-        x: displayWidth / result.metadata.width,
-        y: displayHeight / result.metadata.height,
+        x: displayWidth / imgWidth,
+        y: displayHeight / imgHeight,
         offsetX: (CANVAS_SIZE - displayWidth) / 2,
         offsetY: 0,
       };
@@ -128,6 +140,12 @@ export const DetectionEditor = React.memo(function DetectionEditor({
     return COLORS.primary;
   }, []);
 
+  // For document analysis, use rectified image (detections are in rectified coordinates)
+  // For legacy analysis, use original image
+  const displayImageBase64 = 'rectified_image_base64' in result 
+    ? result.rectified_image_base64 
+    : result.original_image_base64;
+
   return (
     <View style={styles.container}>
       {/* Mode Toggle */}
@@ -177,7 +195,7 @@ export const DetectionEditor = React.memo(function DetectionEditor({
         >
           {/* Base Image */}
           <Image
-            source={{ uri: `data:image/jpeg;base64,${result.original_image_base64}` }}
+            source={{ uri: `data:image/jpeg;base64,${displayImageBase64}` }}
             style={styles.canvasImage}
             resizeMode="contain"
             onLoad={() => setImageLoaded(true)}

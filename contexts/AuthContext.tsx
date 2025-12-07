@@ -1,7 +1,7 @@
 // contexts/AuthContext.tsx
 import { supabase } from '@/lib/supabase'
 import { AuthenticatedClient } from '@/services/authenticatedClient'
-import { useWorkspaceStore } from '@/store/useWorkspaceStore'
+import { useTeamStore } from '@/store/teamStore'
 import { Session, User } from '@supabase/supabase-js'
 import { router } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
@@ -18,7 +18,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signInWithOAuth: (provider: 'google' | 'apple') => Promise<void>;
   signOut: () => Promise<void>;
-  switchWorkspace: (workspaceId: string | null) => Promise<void>;
+  switchTeam: (teamId: string | null) => Promise<void>;
   switchToPersonal: () => Promise<void>;
 }
 
@@ -38,8 +38,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Handle user sign out - clear state and redirect to login
    */
   const handleSignOut = () => {
-    // Reset workspace state
-    useWorkspaceStore.getState().reset()
+    // Reset team state
+    useTeamStore.getState().reset()
     // Reset initial session handler so next login works correctly
     initialSessionHandledRef.current = false
     // Transition to login
@@ -76,28 +76,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setTransitioning(true)
     setLoading(false)
     
-    // Load workspaces in background (don't reset activeWorkspace - let store preserve it)
-    useWorkspaceStore.getState().loadWorkspaces().catch(err => 
-      console.error("Background workspace load error:", err)
+    // Load teams in background
+    useTeamStore.getState().loadTeams().catch(err => 
+      console.error("Background team load error:", err)
     )
     
-    // Navigate to personal mode ONLY if no active workspace is set
-    const currentActiveWorkspace = useWorkspaceStore.getState().activeWorkspaceId
-    
+    // Navigate to home (always start in personal mode)
     setTimeout(() => {
-      if (currentActiveWorkspace) {
-        // User was in an org, stay there
-        if (__DEV__) console.log("📱 Auth: Preserving active workspace:", currentActiveWorkspace)
-      } else {
-        // No active workspace, go to personal
-        router.replace("/(protected)/personal" as any)
-      }
+      router.replace("/(protected)/personal")
       setTransitioning(false)
-    }, 100) // Reduced delay since we're not always navigating
+    }, 100)
   }
 
   /**
-   * Handle new sign in - redirect to personal mode
+   * Handle new sign in - redirect to home
    */
   const handleSignIn = async (session: Session | null) => {
     if (!session?.user) return
@@ -105,28 +97,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setTransitioning(true)
     setLoading(false)
     
-    // Load workspaces in background
-    useWorkspaceStore.getState().loadWorkspaces().catch(err => 
-      console.error("Background workspace load error:", err)
+    // Load teams in background
+    useTeamStore.getState().loadTeams().catch(err => 
+      console.error("Background team load error:", err)
     )
     
-    // Navigate to personal mode
+    // Navigate to home (always start in personal mode)
     setTimeout(() => {
-      router.replace("/(protected)/personal" as any)
+      router.replace("/(protected)/personal")
       setTransitioning(false)
     }, 800)
   }
 
   /**
-   * Switch active workspace - updates user metadata and navigates
+   * Switch active team - updates store (no navigation needed, UI will update)
    */
-  const switchWorkspace = async (workspaceId: string | null) => {
-    if (__DEV__) console.log("switchWorkspace", workspaceId)
+  const switchTeam = async (teamId: string | null) => {
+    if (__DEV__) console.log("switchTeam", teamId)
     
     try {
       // Update user metadata
       await supabase.auth.updateUser({
-        data: { active_workspace_id: workspaceId }
+        data: { active_team_id: teamId }
       })
 
       // Refresh user to get updated metadata
@@ -136,26 +128,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Update workspace store
-      useWorkspaceStore.getState().setActiveWorkspace(workspaceId)
+      useTeamStore.getState().setActiveTeam(teamId)
       
-      // Navigate to appropriate route
-      if (workspaceId) {
-        router.replace('/(protected)/org' as any)
-      } else {
-        router.replace('/(protected)/personal' as any)
-      }
+      // No navigation needed - UI updates reactively based on activeTeamId
     } catch (error) {
-      console.error("Switch workspace error:", error)
+      console.error("Switch team error:", error)
       throw error
     }
   }
 
   /**
-   * Switch to personal mode
+   * Switch to personal mode (no team context)
    */
   const switchToPersonal = async () => {
     if (__DEV__) console.log("switchToPersonal")
-    await switchWorkspace(null)
+    await switchTeam(null)
     if (__DEV__) console.log("switchToPersonal done")
   }
 
@@ -202,8 +189,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false)
       
       if (session?.user) {
-        useWorkspaceStore.getState().loadWorkspaces().catch((err: Error) => 
-          console.error("Background workspace load error:", err)
+        useTeamStore.getState().loadTeams().catch((err: Error) => 
+          console.error("Background team load error:", err)
         )
       }
     })
@@ -226,12 +213,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const currentUser = user
         if (!currentUser) return null
         
-        const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
-        const isMyWorkspace = activeWorkspaceId === currentUser.id || !activeWorkspaceId
+        const activeTeamId = useTeamStore.getState().activeTeamId
         
         return {
           userId: currentUser.id,
-          workspaceId: isMyWorkspace ? null : activeWorkspaceId
+          teamId: activeTeamId
         }
       }
     )
@@ -271,7 +257,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
-    useWorkspaceStore.getState().reset()
+    useTeamStore.getState().reset()
     await supabase.auth.signOut()
     setUser(null)
     setSession(null)
@@ -287,7 +273,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signIn,
       signInWithOAuth,
       signOut,
-      switchWorkspace,
+      switchTeam,
       switchToPersonal
     }}>
       {children}

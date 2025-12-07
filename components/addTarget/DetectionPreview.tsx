@@ -1,16 +1,19 @@
+import type { AnalyzeDocumentResponse, AnalyzeResponse } from "@/types/api";
 import React, { useMemo } from "react";
 import { Image, StyleSheet, View } from "react-native";
 import Svg, { Circle, G, Line } from "react-native-svg";
-import type { AnalyzeResponse } from "@/types/api";
-import { CANVAS_SIZE, COLORS, MARKER_RADIUS, EditableDetection } from "./types";
+import { CANVAS_SIZE, COLORS, EditableDetection, MARKER_RADIUS } from "./types";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DETECTION PREVIEW
 // View-only display of detected bullet holes on the target image
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** Union type for detection results - supports both legacy and document analysis */
+type DetectionResult = AnalyzeResponse | AnalyzeDocumentResponse;
+
 interface DetectionPreviewProps {
-  result: AnalyzeResponse;
+  result: DetectionResult;
   detections: EditableDetection[];
 }
 
@@ -19,18 +22,27 @@ export const DetectionPreview = React.memo(function DetectionPreview({
   detections,
 }: DetectionPreviewProps) {
   // Calculate scale factors for coordinate mapping
+  // Handles both AnalyzeResponse (uses width/height) and AnalyzeDocumentResponse (uses processed_width/height)
   const scale = useMemo(() => {
     if (!result.metadata) return { x: 1, y: 1, offsetX: 0, offsetY: 0 };
     
-    const imgAspect = result.metadata.width / result.metadata.height;
+    // Get image dimensions - document analysis uses processed dimensions, legacy uses width/height
+    const imgWidth = 'processed_width' in result.metadata 
+      ? result.metadata.processed_width 
+      : result.metadata.width;
+    const imgHeight = 'processed_height' in result.metadata 
+      ? result.metadata.processed_height 
+      : result.metadata.height;
+    
+    const imgAspect = imgWidth / imgHeight;
     const canvasAspect = 1;
     
     if (imgAspect > canvasAspect) {
       const displayWidth = CANVAS_SIZE;
       const displayHeight = CANVAS_SIZE / imgAspect;
       return {
-        x: displayWidth / result.metadata.width,
-        y: displayHeight / result.metadata.height,
+        x: displayWidth / imgWidth,
+        y: displayHeight / imgHeight,
         offsetX: 0,
         offsetY: (CANVAS_SIZE - displayHeight) / 2,
       };
@@ -38,8 +50,8 @@ export const DetectionPreview = React.memo(function DetectionPreview({
       const displayHeight = CANVAS_SIZE;
       const displayWidth = CANVAS_SIZE * imgAspect;
       return {
-        x: displayWidth / result.metadata.width,
-        y: displayHeight / result.metadata.height,
+        x: displayWidth / imgWidth,
+        y: displayHeight / imgHeight,
         offsetX: (CANVAS_SIZE - displayWidth) / 2,
         offsetY: 0,
       };
@@ -112,10 +124,16 @@ export const DetectionPreview = React.memo(function DetectionPreview({
     };
   }, [maxPairData, detections, scale]);
 
+  // For document analysis, use rectified image (detections are in rectified coordinates)
+  // For legacy analysis, use original image
+  const displayImageBase64 = 'rectified_image_base64' in result 
+    ? result.rectified_image_base64 
+    : result.original_image_base64;
+
   return (
     <View style={styles.container}>
       <Image
-        source={{ uri: `data:image/jpeg;base64,${result.original_image_base64}` }}
+        source={{ uri: `data:image/jpeg;base64,${displayImageBase64}` }}
         style={styles.image}
         resizeMode="contain"
       />

@@ -40,14 +40,13 @@ function mapSession(row: any): SessionWithDetails {
 
   const profiles = row.profiles ?? {};
   const teams = row.teams ?? {};
-  const orgs = row.org_workspaces ?? {};
   const trainings = row.trainings ?? {};
   const drills = row.training_drills ?? {};
 
   return {
     id: row.id,
     org_workspace_id: row.org_workspace_id,
-    workspace_name: row.workspace_name ?? orgs.name ?? 'Personal',
+    workspace_name: row.workspace_name ?? teams.name ?? 'Personal',
     user_id: row.user_id,
     user_full_name: row.user_full_name ?? profiles.full_name ?? null,
     team_id: row.team_id ?? null,
@@ -115,7 +114,6 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
       updated_at,
       profiles:user_id(full_name),
       teams:team_id(name),
-      org_workspaces:org_workspace_id(name),
       trainings:training_id(title),
       training_drills:drill_id(name)
     `)
@@ -152,7 +150,6 @@ export async function getMyActiveSessionForTraining(trainingId: string): Promise
       updated_at,
       profiles:user_id(full_name),
       teams:team_id(name),
-      org_workspaces:org_workspace_id(name),
       trainings:training_id(title),
       training_drills:drill_id(name)
     `)
@@ -195,7 +192,6 @@ export async function getMyActiveSession(): Promise<SessionWithDetails | null> {
       updated_at,
       profiles:user_id(full_name),
       teams:team_id(name),
-      org_workspaces:org_workspace_id(name),
       trainings:training_id(title),
       training_drills:drill_id(name)
     `)
@@ -241,7 +237,6 @@ export async function getMyActivePersonalSession(): Promise<SessionWithDetails |
       updated_at,
       profiles:user_id(full_name),
       teams:team_id(name),
-      org_workspaces:org_workspace_id(name),
       trainings:training_id(title),
       training_drills:drill_id(name)
     `)
@@ -274,10 +269,10 @@ export async function createTrainingSession(params: {
   drill_id?: string | null;
   session_mode?: 'solo' | 'group';
 }): Promise<SessionWithDetails> {
-  // First, get the training to know the org_workspace_id and team_id
+  // First, get the training to know the team_id
   const { data: training, error: trainingError } = await supabase
     .from('trainings')
-    .select('org_workspace_id, team_id')
+    .select('team_id')
     .eq('id', params.training_id)
     .single();
 
@@ -286,7 +281,6 @@ export async function createTrainingSession(params: {
   }
 
   return createSession({
-    org_workspace_id: training.org_workspace_id,
     team_id: training.team_id,
     training_id: params.training_id,
     drill_id: params.drill_id ?? null,
@@ -316,7 +310,6 @@ export async function getSessions(workspaceId?: string | null): Promise<SessionW
       updated_at,
       profiles:user_id(full_name),
       teams:team_id(name),
-      org_workspaces:org_workspace_id(name),
       trainings:training_id(title),
       training_drills:drill_id(name)
     `)
@@ -361,7 +354,6 @@ export async function getTrainingSessions(trainingId: string): Promise<SessionWi
       updated_at,
       profiles:user_id(full_name),
       teams:team_id(name),
-      org_workspaces:org_workspace_id(name),
       trainings:training_id(title),
       training_drills:drill_id(name)
     `)
@@ -377,6 +369,37 @@ export async function getTrainingSessions(trainingId: string): Promise<SessionWi
  */
 export async function getWorkspaceSessions(orgWorkspaceId: string | null): Promise<SessionWithDetails[]> {
   return getSessions(orgWorkspaceId);
+}
+
+/**
+ * Get sessions for a specific team
+ */
+export async function getTeamSessions(teamId: string): Promise<SessionWithDetails[]> {
+  const { data, error } = await supabase
+    .from('sessions')
+    .select(`
+      id,
+      org_workspace_id,
+      user_id,
+      team_id,
+      training_id,
+      drill_id,
+      session_mode,
+      status,
+      started_at,
+      ended_at,
+      created_at,
+      updated_at,
+      profiles:user_id(full_name),
+      teams:team_id(name),
+      trainings:training_id(title),
+      training_drills:drill_id(name)
+    `)
+    .eq('team_id', teamId)
+    .order('started_at', { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []).map(mapSession);
 }
 
 /**
@@ -541,7 +564,6 @@ export async function getSessionById(sessionId: string): Promise<SessionWithDeta
       updated_at,
       profiles:user_id(full_name),
       teams:team_id(name),
-      org_workspaces:org_workspace_id(name),
       trainings:training_id(title),
       training_drills:drill_id(name)
     `)

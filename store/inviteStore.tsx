@@ -1,17 +1,19 @@
 import { acceptInvitation, cancelInvitation, validateInviteCode as validateInviteCodeService } from "@/services/invitationService";
-import type { WorkspaceInvitationWithDetails } from "@/types/workspace";
+import type { TeamInvitationWithDetails } from "@/types/workspace";
 import { create } from "zustand";
-import { useWorkspaceStore } from "./useWorkspaceStore";
+import { useTeamStore } from "./teamStore";
 
 interface InviteStore {
-    invites: WorkspaceInvitationWithDetails[];
-    setInvites: (invites: WorkspaceInvitationWithDetails[]) => void;
-    validateInviteCode: (inviteCode: string) => Promise<WorkspaceInvitationWithDetails | null>;
+    invites: TeamInvitationWithDetails[];
+    setInvites: (invites: TeamInvitationWithDetails[]) => void;
+    validateInviteCode: (inviteCode: string) => Promise<TeamInvitationWithDetails | null>;
+    acceptInviteCode: (inviteCode: string) => Promise<void>;
+    cancelInviteCode: (inviteCode: string) => Promise<void>;
 }
 
 export const inviteStore = create<InviteStore>((set) => ({
-    invites: [] as WorkspaceInvitationWithDetails[],
-    setInvites: (invites: WorkspaceInvitationWithDetails[]) => set({ invites }),
+    invites: [] as TeamInvitationWithDetails[],
+    setInvites: (invites: TeamInvitationWithDetails[]) => set({ invites }),
 
     validateInviteCode: async (inviteCode: string) => {
         const invite = await validateInviteCodeService(inviteCode);
@@ -24,11 +26,13 @@ export const inviteStore = create<InviteStore>((set) => ({
     acceptInviteCode: async (inviteCode: string) => {
         await acceptInvitation(inviteCode);
         set((state) => ({ invites: state.invites.filter((invite) => invite.id !== inviteCode) }));
-        useWorkspaceStore.getState().loadWorkspaces();
+        // Reload teams after accepting an invite
+        useTeamStore.getState().loadTeams();
     },
     cancelInviteCode: async (inviteCode: string) => {
         await cancelInvitation(inviteCode);
         set((state) => ({ invites: state.invites.filter((invite) => invite.invite_code !== inviteCode) }));
-        useWorkspaceStore.getState().loadWorkspaces();
+        // Reload teams after cancelling
+        useTeamStore.getState().loadTeams();
     }
 }));

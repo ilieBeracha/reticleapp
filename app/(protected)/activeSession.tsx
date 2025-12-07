@@ -162,7 +162,7 @@ export default function ActiveSessionScreen() {
               await endSession(sessionId!);
               await loadSessions();
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              router.replace('/(protected)/org');
+              router.replace('/(protected)/team');
             } catch (error: any) {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
               Alert.alert('Error', error.message || 'Failed to end session');

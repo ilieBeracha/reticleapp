@@ -4,7 +4,16 @@ import {
   handleServiceError,
 } from "@/lib/errors";
 import { supabase } from "@/lib/supabase";
-import { AnalyzeResponse, isAnalyzeResponse } from "@/types/api";
+import {
+  AnalyzeDocumentResponse,
+  AnalyzeResponse,
+  DetectDocumentResponse,
+  RectifyOnlyResponse,
+  isAnalyzeDocumentResponse,
+  isAnalyzeResponse,
+  isDetectDocumentResponse,
+  isRectifyOnlyResponse,
+} from "@/types/api";
 import { decode } from "base64-arraybuffer";
 
 // Type for training/correction data
@@ -89,14 +98,276 @@ const TRAINING_BUCKET = "training-corrections";
       if (err.name === "ValidationError" || err.name === "NetworkError") {
         throw err;
       }
-  
+
       if (err.name === "TypeError" && err.message?.includes("fetch")) {
         throw new NetworkError("Failed to connect to detection service");
       }
-  
+
       handleServiceError(err, "Failed to upload image for detection");
     }
   }
+
+/** Options for document analysis */
+export interface AnalyzeDocumentOptions {
+  /** Pre-detected corner coordinates [[x,y], ...] in order: TL, TR, BR, BL */
+  corners?: [number, number][];
+  /** Minimum confidence threshold (default: 0.2 - same as legacy) */
+  minConfidence?: number;
+  /** Use multi-scale detection for close-ups (default: true) */
+  enhanceCloseup?: boolean;
+  /** Skip rectification and process as-is (default: false) */
+  skipRectification?: boolean;
+}
+
+/**
+ * Analyze A4 document with automatic perspective correction and bullet detection.
+ *
+ * This is the RECOMMENDED function for mobile scanning workflows.
+ * It handles document detection, perspective warp, and bullet detection in one call.
+ *
+ * @param imageUri - URI to the image file
+ * @param options - Optional configuration for analysis
+ * @returns Document analysis response with world coordinates (mm)
+ *
+ * @example
+ * ```ts
+ * // Basic usage
+ * const result = await analyzeDocument(imageUri);
+ *
+ * // With pre-detected corners from device
+ * const result = await analyzeDocument(imageUri, {
+ *   corners: [[100, 100], [900, 100], [900, 1200], [100, 1200]]
+ * });
+ *
+ * // Skip rectification (fallback mode)
+ * const result = await analyzeDocument(imageUri, { skipRectification: true });
+ * ```
+ */
+export async function analyzeDocument(
+  imageUri: string,
+  options: AnalyzeDocumentOptions = {}
+): Promise<AnalyzeDocumentResponse> {
+  if (!imageUri) {
+    throw new ValidationError("Image URI is required");
+  }
+
+  const {
+    corners,
+    minConfidence = 0.2, // Match legacy threshold for better detection
+    enhanceCloseup = true,
+    skipRectification = false,
+  } = options;
+
+  const formData = new FormData();
+  formData.append("file", {
+    uri: imageUri,
+    name: "document.jpg",
+    type: "image/jpeg",
+  } as any);
+
+  formData.append("min_confidence", minConfidence.toString());
+  formData.append("enhance_closeup", enhanceCloseup.toString());
+  formData.append("skip_rectification", skipRectification.toString());
+
+  // Add corners if provided
+  if (corners && corners.length === 4) {
+    formData.append("corners", JSON.stringify(corners));
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/analyze_document`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      if (response.status >= 400 && response.status < 500) {
+        throw new ValidationError(
+          `Client error: ${response.status} - ${errorText}`
+        );
+      } else if (response.status >= 500) {
+        throw new NetworkError(
+          `Server error: ${response.status} - ${errorText}`
+        );
+      } else {
+        throw new NetworkError(`HTTP error: ${response.status} - ${errorText}`);
+      }
+    }
+
+    const result = await response.json();
+    console.log("[DetectionService] Document analysis result:", result);
+
+    if (!isAnalyzeDocumentResponse(result)) {
+      throw new ValidationError(
+        "Invalid response structure from document analysis API"
+      );
+    }
+
+    return result;
+  } catch (err: any) {
+    if (err.name === "ValidationError" || err.name === "NetworkError") {
+      throw err;
+    }
+
+    if (err.name === "TypeError" && err.message?.includes("fetch")) {
+      throw new NetworkError("Failed to connect to detection service");
+    }
+
+    handleServiceError(err, "Failed to analyze document");
+  }
+
+}
+
+/**
+ * Detect document corners only (no bullet detection).
+ *
+ * Use this to:
+ * - Check if document is detected before full analysis
+ * - Get corner coordinates for preview/UI feedback
+ * - Validate document alignment quality
+ *
+ * @param imageUri - URI to the image file
+ * @param debug - If true, return debug visualization image
+ * @returns Document detection result with corners if found
+ */
+export async function detectDocument(
+  imageUri: string,
+  debug: boolean = false
+): Promise<DetectDocumentResponse> {
+  if (!imageUri) {
+    throw new ValidationError("Image URI is required");
+  }
+
+  const formData = new FormData();
+  formData.append("file", {
+    uri: imageUri,
+    name: "document.jpg",
+    type: "image/jpeg",
+  } as any);
+
+  formData.append("debug", debug.toString());
+
+  try {
+    const response = await fetch(`${API_URL}/detect_document`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      if (response.status >= 400 && response.status < 500) {
+        throw new ValidationError(
+          `Client error: ${response.status} - ${errorText}`
+        );
+      } else if (response.status >= 500) {
+        throw new NetworkError(
+          `Server error: ${response.status} - ${errorText}`
+        );
+      } else {
+        throw new NetworkError(`HTTP error: ${response.status} - ${errorText}`);
+      }
+    }
+
+    const result = await response.json();
+    console.log("[DetectionService] Document detection result:", result);
+
+    if (!isDetectDocumentResponse(result)) {
+      throw new ValidationError(
+        "Invalid response structure from document detection API"
+      );
+    }
+
+    return result;
+  } catch (err: any) {
+    if (err.name === "ValidationError" || err.name === "NetworkError") {
+      throw err;
+    }
+
+    if (err.name === "TypeError" && err.message?.includes("fetch")) {
+      throw new NetworkError("Failed to connect to detection service");
+    }
+
+    handleServiceError(err, "Failed to detect document");
+  }
+
+}
+
+/**
+ * Rectify document without running bullet detection.
+ *
+ * Use this for:
+ * - Getting a clean top-down document image
+ * - Manual inspection before analysis
+ * - Debugging rectification issues
+ *
+ * @param imageUri - URI to the image file
+ * @param corners - Optional pre-detected corners
+ * @returns Rectified image and scale info
+ */
+export async function rectifyOnly(
+  imageUri: string,
+  corners?: [number, number][]
+): Promise<RectifyOnlyResponse> {
+  if (!imageUri) {
+    throw new ValidationError("Image URI is required");
+  }
+
+  const formData = new FormData();
+  formData.append("file", {
+    uri: imageUri,
+    name: "document.jpg",
+    type: "image/jpeg",
+  } as any);
+
+  if (corners && corners.length === 4) {
+    formData.append("corners", JSON.stringify(corners));
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/rectify_only`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      if (response.status >= 400 && response.status < 500) {
+        throw new ValidationError(
+          `Client error: ${response.status} - ${errorText}`
+        );
+      } else if (response.status >= 500) {
+        throw new NetworkError(
+          `Server error: ${response.status} - ${errorText}`
+        );
+      } else {
+        throw new NetworkError(`HTTP error: ${response.status} - ${errorText}`);
+      }
+    }
+
+    const result = await response.json();
+    console.log("[DetectionService] Rectification result:", result);
+
+    if (!isRectifyOnlyResponse(result)) {
+      throw new ValidationError(
+        "Invalid response structure from rectify API"
+      );
+    }
+
+    return result;
+  } catch (err: any) {
+    if (err.name === "ValidationError" || err.name === "NetworkError") {
+      throw err;
+    }
+
+    if (err.name === "TypeError" && err.message?.includes("fetch")) {
+      throw new NetworkError("Failed to connect to detection service");
+    }
+
+    handleServiceError(err, "Failed to rectify document");
+  }
+
+}
 
 /**
  * Upload an image to Supabase Storage for training

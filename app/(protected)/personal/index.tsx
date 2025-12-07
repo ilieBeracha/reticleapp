@@ -1,7 +1,7 @@
 import { PersonalHomePage } from '@/components/home/PersonalHomePage';
 
 /**
- * Personal Mode Home Screen
+ * Personal Home Screen
  * 
  * Route: /(protected)/personal/
  */

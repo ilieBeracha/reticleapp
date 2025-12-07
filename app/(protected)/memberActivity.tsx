@@ -31,7 +31,7 @@ interface MemberStats {
  */
 export default function MemberActivityScreen() {
   const colors = useColors();
-  const { activeWorkspace } = useAppContext();
+  const { activeTeamId } = useAppContext();
   const { memberId, memberName } = useLocalSearchParams<{ memberId: string; memberName: string }>();
   
   const [sessions, setSessions] = useState<MemberSession[]>([]);
@@ -40,10 +40,11 @@ export default function MemberActivityScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const loadActivity = useCallback(async () => {
-    if (!memberId || !activeWorkspace?.id) return;
+    if (!memberId || !activeTeamId) return;
 
     try {
       // Fetch member's sessions in this org
+      // Query sessions for this member in the active team
       const { data: sessionData, error: sessionError } = await supabase
         .from('sessions')
         .select(`
@@ -57,7 +58,7 @@ export default function MemberActivityScreen() {
           training_drills:drill_id(name)
         `)
         .eq('user_id', memberId)
-        .eq('org_workspace_id', activeWorkspace.id)
+        .eq('team_id', activeTeamId)
         .order('started_at', { ascending: false })
         .limit(50);
 
@@ -102,7 +103,7 @@ export default function MemberActivityScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [memberId, activeWorkspace?.id]);
+  }, [memberId, activeTeamId]);
 
   useEffect(() => {
     loadActivity();

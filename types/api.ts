@@ -82,6 +82,128 @@ export interface ScaleInfo {
   page_height_mm?: number;
   /** Calibration note */
   calibration_note?: string;
+  /** Detection confidence (for document rectification) */
+  detection_confidence?: number;
+  /** Document area ratio */
+  document_area_ratio?: number;
+  /** Fallback reason if rectification failed */
+  fallback_reason?: string;
+}
+
+/** Extended detection with world coordinates (mm) */
+export interface DocumentDetection extends Detection {
+  /** Center coordinates in millimeters [cx_mm, cy_mm] */
+  center_mm: [number, number];
+  /** Bounding box in millimeters [x1_mm, y1_mm, x2_mm, y2_mm] */
+  bbox_mm: [number, number, number, number];
+}
+
+/** Document rectification information */
+export interface RectificationInfo {
+  /** Whether rectification was attempted */
+  performed: boolean;
+  /** Whether rectification succeeded */
+  success: boolean;
+  /** Method used: "perspective_transform", "fallback_resize", "skipped", "none" */
+  method: "perspective_transform" | "fallback_resize" | "skipped" | "none";
+  /** Human-readable message about rectification status */
+  message: string;
+  /** Detection confidence (0-1) if document was detected */
+  detection_confidence?: number;
+  /** Ratio of document area to image area */
+  document_area_ratio?: number;
+}
+
+/** Document analysis model info */
+export interface DocumentModelInfo extends ModelInfo {
+  /** Number of detections returned */
+  returned_detections: number;
+  /** Whether close-up enhancement was used */
+  enhance_closeup: boolean;
+}
+
+/** Document analysis metadata - different structure from legacy Metadata */
+export interface DocumentMetadata {
+  /** Original image width (before rectification) */
+  original_width: number;
+  /** Original image height (before rectification) */
+  original_height: number;
+  /** Processed/rectified image width */
+  processed_width: number;
+  /** Processed/rectified image height */
+  processed_height: number;
+  /** Original file size in bytes */
+  file_size_bytes: number;
+  /** Path to processed image file */
+  image_path: string;
+}
+
+/** Response from /analyze_document endpoint */
+export interface AnalyzeDocumentResponse {
+  /** Whether the analysis was successful */
+  success: boolean;
+  /** Unique session identifier */
+  session_id: string;
+  /** Short session identifier */
+  session_short: string;
+  /** Original filename */
+  filename: string;
+  /** List of detected bullet holes with world coordinates */
+  detections: DocumentDetection[];
+  /** Detection confidence statistics */
+  stats: DetectionStats;
+  /** Document rectification details */
+  rectification_info: RectificationInfo;
+  /** Scale/calibration information (critical for measurements) */
+  scale_info: ScaleInfo;
+  /** Processing time in seconds */
+  processing_time_s: number;
+  /** Information about the detection model */
+  model_info: DocumentModelInfo;
+  /** Image and processing metadata */
+  metadata: DocumentMetadata;
+  /** Overall stats for all detections (pixels) */
+  overall_stats: OverallStats;
+  /** Overall stats with real-world measurements (mm/cm) */
+  overall_stats_mm: OverallStats;
+  /** Base64-encoded original image (JPEG) */
+  original_image_base64: string;
+  /** Base64-encoded rectified document image (JPEG) */
+  rectified_image_base64: string;
+  /** Base64-encoded annotated image with detections (JPEG) */
+  annotated_image_base64: string;
+  /** ISO timestamp of analysis */
+  timestamp: string;
+}
+
+/** Response from /detect_document endpoint */
+export interface DetectDocumentResponse {
+  /** Whether document was successfully detected */
+  success: boolean;
+  /** Human-readable message */
+  message: string;
+  /** Detection confidence (0-1) */
+  confidence: number;
+  /** Ratio of document area to image area */
+  document_area_ratio: number;
+  /** Corner coordinates [[x,y], ...] in order: TL, TR, BR, BL */
+  corners?: [number, number][];
+  /** Debug visualization image (if requested) */
+  debug_image_base64?: string;
+}
+
+/** Response from /rectify_only endpoint */
+export interface RectifyOnlyResponse {
+  /** Whether operation was successful */
+  success: boolean;
+  /** Whether document was successfully rectified */
+  was_rectified: boolean;
+  /** Scale/calibration information */
+  scale_info: ScaleInfo;
+  /** Base64-encoded rectified image */
+  rectified_image_base64: string;
+  /** Base64-encoded original image */
+  original_image_base64: string;
 }
 
 export interface OverallStats {
@@ -238,6 +360,9 @@ export interface ModelInfoResponse {
 // Union type for all possible API responses
 export type ApiResponse =
   | AnalyzeResponse
+  | AnalyzeDocumentResponse
+  | DetectDocumentResponse
+  | RectifyOnlyResponse
   | BatchAnalyzeResponse
   | HealthResponse
   | ModelInfoResponse
@@ -251,6 +376,41 @@ export function isAnalyzeResponse(response: any): response is AnalyzeResponse {
     Array.isArray(response.detections) &&
     typeof response.original_image_base64 === "string" &&
     typeof response.annotated_image_base64 === "string"
+  );
+}
+
+export function isAnalyzeDocumentResponse(
+  response: any
+): response is AnalyzeDocumentResponse {
+  return (
+    response &&
+    typeof response.success === "boolean" &&
+    Array.isArray(response.detections) &&
+    typeof response.rectified_image_base64 === "string" &&
+    typeof response.rectification_info === "object" &&
+    typeof response.scale_info === "object"
+  );
+}
+
+export function isDetectDocumentResponse(
+  response: any
+): response is DetectDocumentResponse {
+  return (
+    response &&
+    typeof response.success === "boolean" &&
+    typeof response.message === "string" &&
+    typeof response.confidence === "number"
+  );
+}
+
+export function isRectifyOnlyResponse(
+  response: any
+): response is RectifyOnlyResponse {
+  return (
+    response &&
+    typeof response.success === "boolean" &&
+    typeof response.was_rectified === "boolean" &&
+    typeof response.rectified_image_base64 === "string"
   );
 }
 

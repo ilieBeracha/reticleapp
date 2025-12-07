@@ -1,3 +1,6 @@
+import { Ionicons } from "@expo/vector-icons";
+import { CameraView } from "expo-camera";
+import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
 import {
   ActivityIndicator,
@@ -9,9 +12,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { CameraView } from "expo-camera";
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { COLORS, Step } from "./types";
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -15,6 +15,6 @@ export default function Index() {
     return <Redirect href="/auth/sign-in" />;
   }
 
-  // User is authenticated - send to app (regardless of org status)
+  // User is authenticated - send to home (always personal mode first)
   return <Redirect href="/(protected)/personal" />;
 }

@@ -1,8 +1,6 @@
 import { useColors } from "@/hooks/ui/useColors";
-import { useAppContext } from "@/hooks/useAppContext";
-import { useWorkspacePermissions } from "@/hooks/usePermissions";
-import { getWorkspaceTeams } from "@/services/teamService";
 import { createTraining } from "@/services/trainingService";
+import { useTeamStore } from "@/store/teamStore";
 import { useTrainingStore } from "@/store/trainingStore";
 import type { CreateDrillInput, TargetType, Team } from "@/types/workspace";
 import { Ionicons } from "@expo/vector-icons";
@@ -11,17 +9,17 @@ import * as Haptics from 'expo-haptics';
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Keyboard,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Keyboard,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -118,12 +116,12 @@ const TeamChip = React.memo(function TeamChip({
 export default function CreateTrainingSheet() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { activeWorkspaceId } = useAppContext();
-  const permissions = useWorkspacePermissions();
-  const { loadOrgTrainings, loadMyUpcomingTrainings } = useTrainingStore();
+  const { activeTeamId, teams: myTeams, activeTeam } = useTeamStore();
+  const { loadTeamTrainings, loadMyUpcomingTrainings } = useTrainingStore();
 
-  const isInOrgMode = !!activeWorkspaceId;
-  const canCreateTraining = permissions.canCreateTraining;
+  const isInTeamMode = !!activeTeamId;
+  // In team-first, if you're in a team, you can create trainings for it
+  const canCreateTraining = isInTeamMode;
 
   // ========== STEP STATE ==========
   const [step, setStep] = useState(0);
@@ -152,11 +150,18 @@ export default function CreateTrainingSheet() {
   const selectedTeam = useMemo(() => teams.find(t => t.id === selectedTeamId), [teams, selectedTeamId]);
 
   // ========== EFFECTS ==========
+  // In team-first, use the active team directly
   useEffect(() => {
-    if (activeWorkspaceId && isInOrgMode) {
-      fetchTeams();
+    if (activeTeamId && activeTeam) {
+      // Set the active team as the only option
+      setTeams([activeTeam as any]);
+      setSelectedTeamId(activeTeamId);
+      setLoadingTeams(false);
+    } else {
+      setTeams([]);
+      setLoadingTeams(false);
     }
-  }, [activeWorkspaceId, isInOrgMode]);
+  }, [activeTeamId, activeTeam]);
 
   useEffect(() => {
     if (availableTeams.length === 1 && !selectedTeamId) {
@@ -164,17 +169,9 @@ export default function CreateTrainingSheet() {
     }
   }, [availableTeams, selectedTeamId]);
 
+  // Legacy function - not used in team-first (teams come from useTeamStore)
   const fetchTeams = async () => {
-    if (!activeWorkspaceId) return;
-    setLoadingTeams(true);
-    try {
-      const data = await getWorkspaceTeams(activeWorkspaceId);
-      setTeams(data);
-    } catch (error) {
-      console.error('Failed to fetch teams:', error);
-    } finally {
-      setLoadingTeams(false);
-    }
+    // No-op in team-first - teams are managed by teamStore
   };
 
   // ========== HANDLERS ==========
@@ -245,7 +242,7 @@ export default function CreateTrainingSheet() {
   }, []);
 
   const handleCreate = useCallback(async () => {
-    if (!activeWorkspaceId || !selectedTeamId) return;
+    if (!selectedTeamId) return;
 
     Keyboard.dismiss();
     setSubmitting(true);
@@ -253,7 +250,6 @@ export default function CreateTrainingSheet() {
 
     try {
       await createTraining({
-        org_workspace_id: activeWorkspaceId,
         team_id: selectedTeamId,
         title: title.trim(),
         description: description.trim() || undefined,
@@ -263,7 +259,7 @@ export default function CreateTrainingSheet() {
 
       // Refresh trainings lists
       await Promise.all([
-        loadOrgTrainings(activeWorkspaceId),
+        loadTeamTrainings(selectedTeamId),
         loadMyUpcomingTrainings(),
       ]);
 
@@ -278,7 +274,7 @@ export default function CreateTrainingSheet() {
     } finally {
       setSubmitting(false);
     }
-  }, [title, description, selectedTeamId, scheduledDate, drills, activeWorkspaceId, loadOrgTrainings, loadMyUpcomingTrainings]);
+  }, [title, description, selectedTeamId, scheduledDate, drills, loadTeamTrainings, loadMyUpcomingTrainings]);
 
   // ========== FORMATTERS ==========
   const formatDateDisplay = (date: Date) => {
@@ -297,7 +293,7 @@ export default function CreateTrainingSheet() {
   };
 
   // ========== NOT IN ORG MODE ==========
-  if (!isInOrgMode) {
+  if (!isInTeamMode) {
     return (
       <View style={[styles.notAvailable, { backgroundColor: colors.card }]}>
         <View style={[styles.notAvailableIcon, { backgroundColor: colors.secondary }]}>

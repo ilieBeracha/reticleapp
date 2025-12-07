@@ -1,41 +1,40 @@
 import { BaseAvatar } from "@/components/BaseAvatar";
 import { RoleBadge } from "@/components/shared/RoleBadge";
 import { useModals } from "@/contexts/ModalContext";
-import { useOrgRole } from "@/contexts/OrgRoleContext";
 import { useColors } from "@/hooks/ui/useColors";
-import { removeWorkspaceMember, updateWorkspaceMemberRole } from "@/services/workspaceService";
 import { removeTeamMember, updateTeamMemberRole } from "@/services/teamService";
-import { useWorkspaceStore } from "@/store/useWorkspaceStore";
-import type { WorkspaceRole, TeamMemberShip } from "@/types/workspace";
+import { useTeamStore, useMyTeamRole, useCanManageTeam } from "@/store/teamStore";
+import type { TeamRole } from "@/types/workspace";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Haptics from 'expo-haptics';
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ActionSheetIOS, ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 /**
- * MEMBER PREVIEW - Native Form Sheet
+ * MEMBER PREVIEW - Native Form Sheet (Team-First)
  * 
  * Permission Matrix:
- * - Org Staff (owner/admin/instructor): Can view activity, change org role, remove from org
- * - Team Commander: Can view activity, change team role (for their team), remove from team
- * - Squad Commander: Can view activity for squad members
+ * - Team Owner/Commander: Can change team role, remove from team
  * - Everyone: Can view basic info
  */
 export default function MemberPreviewSheet() {
   const colors = useColors();
   const { selectedMember: member, setSelectedMember } = useModals();
-  const { 
-    orgRole, 
-    isAdmin, 
-    isCommander, 
-    isSquadCommander,
-    teamInfo,
-    allTeams,
-    currentUserId 
-  } = useOrgRole();
-  const { loadWorkspaceMembers } = useWorkspaceStore();
+  const { activeTeamId, loadMembers } = useTeamStore();
+  const myRole = useMyTeamRole();
+  const canManage = useCanManageTeam();
   const [loading, setLoading] = useState(false);
+
+  // Get current user ID
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  useMemo(() => {
+    import('@/lib/supabase').then(({ supabase }) => {
+      supabase.auth.getUser().then(({ data }) => {
+        if (data.user) setCurrentUserId(data.user.id);
+      });
+    });
+  }, []);
 
   if (!member) {
     return (
@@ -45,29 +44,17 @@ export default function MemberPreviewSheet() {
     );
   }
 
-  // Permission checks
+  // Permission checks (team-first)
   const isTargetOwner = member.role === 'owner';
   const isTargetSelf = member.member_id === currentUserId;
-  const isOrgStaff = orgRole === 'owner' || orgRole === 'admin' || orgRole === 'instructor';
-  
-  // Check if current user is commander of any of target's teams
-  const commandedTeams = member.teams.filter(memberTeam => 
-    allTeams.some(myTeam => 
-      myTeam.teamId === memberTeam.team_id && 
-      (myTeam.teamRole === 'commander' || myTeam.teamRole === 'squad_commander')
-    )
-  );
-  const isCommanderOfMember = commandedTeams.length > 0;
   
   // Determine what actions are available
   const canViewActivity = true; // Everyone can view
-  const canChangeOrgRole = isOrgStaff && !isTargetOwner && !isTargetSelf;
-  const canRemoveFromOrg = isOrgStaff && !isTargetOwner && !isTargetSelf;
-  const canManageTeamRole = (isCommander || isSquadCommander) && isCommanderOfMember && !isTargetSelf;
+  const canManageTeamRole = canManage && !isTargetOwner && !isTargetSelf;
+  const canRemoveFromTeam = canManage && !isTargetOwner && !isTargetSelf;
 
-  // Role options based on org permissions
-  const orgRoleOptions: WorkspaceRole[] = ['admin', 'instructor', 'member', 'attached'];
-  const teamRoleOptions: TeamMemberShip[] = ['commander', 'squad_commander', 'soldier'];
+  // Team role options
+  const teamRoleOptions: TeamRole[] = ['commander', 'squad_commander', 'soldier'];
 
   const handleViewActivity = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -77,68 +64,12 @@ export default function MemberPreviewSheet() {
     });
   };
 
-  const handleChangeOrgRole = () => {
+  const handleChangeTeamRole = () => {
+    if (!activeTeamId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
-    const options = [...orgRoleOptions.filter(r => r !== member.role), 'Cancel'];
-    const cancelButtonIndex = options.length - 1;
-    
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options,
-          cancelButtonIndex,
-          title: 'Change Organization Role',
-          message: `Current role: ${member.role}`,
-        },
-        async (buttonIndex) => {
-          if (buttonIndex !== cancelButtonIndex) {
-            const newRole = options[buttonIndex] as WorkspaceRole;
-            await updateOrgRole(newRole);
-          }
-        }
-      );
-    } else {
-      // Android fallback
-      Alert.alert(
-        'Change Organization Role',
-        `Current role: ${member.role}\n\nSelect new role:`,
-        [
-          ...orgRoleOptions
-            .filter(r => r !== member.role)
-            .map(role => ({
-              text: role.charAt(0).toUpperCase() + role.slice(1),
-              onPress: () => updateOrgRole(role),
-            })),
-          { text: 'Cancel', style: 'cancel' as const },
-        ]
-      );
-    }
-  };
-
-  const updateOrgRole = async (newRole: WorkspaceRole) => {
-    try {
-      setLoading(true);
-      await updateWorkspaceMemberRole(member.id, newRole);
-      await loadWorkspaceMembers();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Success', `Role changed to ${newRole}`);
-      router.back();
-    } catch (error: any) {
-      console.error('Failed to update role:', error);
-      Alert.alert('Error', error.message || 'Failed to update role');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleChangeTeamRole = (teamId: string, teamName: string, currentRole: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
-    // Squad commanders can only demote to soldier or promote soldier to squad_commander
-    const availableRoles = isCommander 
-      ? teamRoleOptions.filter(r => r !== currentRole)
-      : teamRoleOptions.filter(r => r !== currentRole && r !== 'commander');
+    const currentRole = member.role;
+    const availableRoles = teamRoleOptions.filter(r => r !== currentRole);
     
     const options = [...availableRoles, 'Cancel'];
     const cancelButtonIndex = options.length - 1;
@@ -148,24 +79,24 @@ export default function MemberPreviewSheet() {
         {
           options: options.map(o => o === 'Cancel' ? o : o.replace('_', ' ')),
           cancelButtonIndex,
-          title: `Change Role in ${teamName}`,
+          title: 'Change Team Role',
           message: `Current role: ${currentRole.replace('_', ' ')}`,
         },
         async (buttonIndex) => {
           if (buttonIndex !== cancelButtonIndex) {
             const newRole = availableRoles[buttonIndex];
-            await updateTeamRole(teamId, newRole);
+            await updateTeamRole(newRole);
           }
         }
       );
     } else {
       Alert.alert(
-        `Change Role in ${teamName}`,
+        'Change Team Role',
         `Current role: ${currentRole.replace('_', ' ')}\n\nSelect new role:`,
         [
           ...availableRoles.map(role => ({
             text: role.replace('_', ' '),
-            onPress: () => updateTeamRole(teamId, role),
+            onPress: () => updateTeamRole(role),
           })),
           { text: 'Cancel', style: 'cancel' as const },
         ]
@@ -173,13 +104,14 @@ export default function MemberPreviewSheet() {
     }
   };
 
-  const updateTeamRole = async (teamId: string, newRole: TeamMemberShip) => {
+  const updateTeamRole = async (newRole: TeamRole) => {
+    if (!activeTeamId) return;
     try {
       setLoading(true);
-      await updateTeamMemberRole(teamId, member.member_id, newRole);
-      await loadWorkspaceMembers();
+      await updateTeamMemberRole(activeTeamId, member.member_id, newRole);
+      await loadMembers();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Success', `Team role changed to ${newRole.replace('_', ' ')}`);
+      Alert.alert('Success', `Role changed to ${newRole.replace('_', ' ')}`);
       router.back();
     } catch (error: any) {
       console.error('Failed to update team role:', error);
@@ -189,40 +121,12 @@ export default function MemberPreviewSheet() {
     }
   };
 
-  const handleRemoveFromOrg = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(
-      'Remove from Organization',
-      `Are you sure you want to remove ${member.profile_full_name || 'this member'} from the organization?\n\nThis will also remove them from all teams.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Remove', 
-          style: 'destructive', 
-          onPress: async () => {
-            try {
-              setLoading(true);
-              await removeWorkspaceMember(member.id);
-              await loadWorkspaceMembers();
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              setSelectedMember(null);
-              router.back();
-            } catch (error: any) {
-              console.error('Failed to remove member:', error);
-              Alert.alert('Error', error.message || 'Failed to remove member');
-              setLoading(false);
-            }
-          }
-        },
-      ]
-    );
-  };
-
-  const handleRemoveFromTeam = (teamId: string, teamName: string) => {
+  const handleRemoveFromTeam = () => {
+    if (!activeTeamId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert(
       'Remove from Team',
-      `Remove ${member.profile_full_name || 'this member'} from ${teamName}?`,
+      `Remove ${member.profile_full_name || 'this member'} from this team?`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -231,16 +135,11 @@ export default function MemberPreviewSheet() {
           onPress: async () => {
             try {
               setLoading(true);
-              await removeTeamMember(teamId, member.member_id);
-              await loadWorkspaceMembers();
+              await removeTeamMember(activeTeamId, member.member_id);
+              await loadMembers();
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              // If they were only in this team, go back
-              if (member.teams.length === 1) {
-                setSelectedMember(null);
-                router.back();
-              } else {
-                setLoading(false);
-              }
+              setSelectedMember(null);
+              router.back();
             } catch (error: any) {
               console.error('Failed to remove from team:', error);
               Alert.alert('Error', error.message || 'Failed to remove from team');
@@ -351,31 +250,31 @@ export default function MemberPreviewSheet() {
               <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </TouchableOpacity>
 
-            {/* Change Org Role - Only for org staff */}
-            {canChangeOrgRole && (
+            {/* Change Team Role - Only for managers */}
+            {canManageTeamRole && (
               <TouchableOpacity
                 style={[styles.actionButton, { borderBottomColor: colors.border }]}
-                onPress={handleChangeOrgRole}
+                onPress={handleChangeTeamRole}
                 activeOpacity={0.7}
               >
                 <View style={styles.actionContent}>
                   <Ionicons name="shield-checkmark" size={20} color={colors.text} />
-                  <Text style={[styles.actionText, { color: colors.text }]}>Change Organization Role</Text>
+                  <Text style={[styles.actionText, { color: colors.text }]}>Change Team Role</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </TouchableOpacity>
             )}
 
-            {/* Remove from Org - Only for org staff */}
-            {canRemoveFromOrg && (
+            {/* Remove from Team - Only for managers */}
+            {canRemoveFromTeam && (
               <TouchableOpacity 
                 style={styles.actionButton} 
-                onPress={handleRemoveFromOrg} 
+                onPress={handleRemoveFromTeam} 
                 activeOpacity={0.7}
               >
                 <View style={styles.actionContent}>
                   <Ionicons name="person-remove" size={20} color="#ef4444" />
-                  <Text style={[styles.actionText, { color: '#ef4444' }]}>Remove from Organization</Text>
+                  <Text style={[styles.actionText, { color: '#ef4444' }]}>Remove from Team</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </TouchableOpacity>
@@ -386,17 +285,12 @@ export default function MemberPreviewSheet() {
         {/* Info notes */}
         {isTargetOwner && (
           <Text style={[styles.noteText, { color: colors.textMuted }]}>
-            Workspace owners cannot be edited or removed
+            Team owners cannot be edited or removed
           </Text>
         )}
         {isTargetSelf && !isTargetOwner && (
           <Text style={[styles.noteText, { color: colors.textMuted }]}>
             You cannot modify your own role or remove yourself
-          </Text>
-        )}
-        {!isOrgStaff && isCommanderOfMember && (
-          <Text style={[styles.noteText, { color: colors.textMuted }]}>
-            As team commander, tap on a team badge to manage team role
           </Text>
         )}
     </ScrollView>

@@ -278,7 +278,6 @@ export default function TrainingScreen() {
       const session = await createSession({
         training_id: training.id,
         team_id: training.team_id || undefined,
-        org_workspace_id: training.org_workspace_id || undefined,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.push({
