@@ -13,7 +13,6 @@ import type { TrainingWithDetails } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { format, isToday, isTomorrow } from 'date-fns';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -222,7 +221,7 @@ const ActivityRow = React.memo(function ActivityRow({
   onPress: () => void;
 }) {
   const isActive = session.status === 'active';
-  const isPersonal = !session.org_workspace_id;
+  const isPersonal = !session.team_id;
   const duration = session.ended_at
     ? Math.round((new Date(session.ended_at).getTime() - new Date(session.started_at).getTime()) / 60000)
     : Math.round((Date.now() - new Date(session.started_at).getTime()) / 60000);
@@ -240,7 +239,7 @@ const ActivityRow = React.memo(function ActivityRow({
         </Text>
         <Text style={[styles.activityMetaSubtle, { color: colors.border }]}>
           {sessionDate} · {isActive ? 'Active' : `${duration}m`}
-          {isPersonal ? '' : ` · ${session.workspace_name || 'Org'}`}
+          {isPersonal ? '' : ` · ${session.team_name || 'Team'}`}
         </Text>
       </View>
       <Ionicons name="chevron-forward" size={16} color={colors.border} />
@@ -454,8 +453,8 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
           <SectionHeader title="Quick Actions" colors={colors} />
           <View style={styles.quickActionsGrid}>
             <QuickActionButton icon="add-circle" label="Session" colors={colors} onPress={nav.startSession} />
+            <QuickActionButton icon="scan" label="Scans" colors={colors} onPress={nav.viewScans} />
             <QuickActionButton icon="stats-chart" label="Progress" colors={colors} onPress={nav.viewProgress} />
-            <QuickActionButton icon="settings-outline" label="Settings" colors={colors} onPress={() => {}} />
           </View>
         </View>
 
@@ -570,39 +569,6 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      {/* ═══ FLOATING SCANS NOTIFICATION - GLASSY ═══ */}
-      <TouchableOpacity
-        style={styles.floatingNotification}
-        onPress={nav.viewScans}
-        activeOpacity={0.9}
-      >
-        <BlurView
-          intensity={100}
-          tint={theme === 'dark' ? 'dark' : 'light'}
-          style={styles.floatingNotificationBlur}
-        >
-          <View style={[
-            styles.floatingNotificationInner, 
-            { 
-              borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
-              backgroundColor: theme === 'dark' ? 'rgba(30,30,35,0.85)' : 'rgba(255,255,255,0.8)',
-            }
-          ]}>
-            <View style={[styles.floatingNotificationIcon, { backgroundColor: colors.primary + '25' }]}>
-              <Ionicons name="scan" size={20} color={colors.primary} />
-            </View>
-            <View style={styles.floatingNotificationContent}>
-              <Text style={[styles.floatingNotificationTitle, { color: colors.text }]}>
-                Recent Scans
-              </Text>
-              <Text style={[styles.floatingNotificationSubtitle, { color: colors.textMuted }]}>
-                View your targets →
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-          </View>
-        </BlurView>
-      </TouchableOpacity>
     </View>
   );
 });
@@ -655,44 +621,6 @@ const styles = StyleSheet.create({
   quickActionBtn: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 14, borderWidth: 1 },
   quickActionIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
   quickActionLabel: { fontSize: 12, fontWeight: '600' },
-  
-  // Floating Notification - Glassy
-  floatingNotification: {
-    position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 100 : 90,
-    left: 20,
-    right: 20,
-    borderRadius: 18,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 12,
-  },
-  floatingNotificationBlur: {
-    overflow: 'hidden',
-    borderRadius: 18,
-  },
-  floatingNotificationInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    paddingHorizontal: 18,
-    borderWidth: 1,
-    borderRadius: 18,
-  },
-  floatingNotificationIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  floatingNotificationContent: { flex: 1 },
-  floatingNotificationTitle: { fontSize: 16, fontWeight: '600' },
-  floatingNotificationSubtitle: { fontSize: 13, marginTop: 2 },
 
   // Training Scroll Cards
   trainingsRow: { paddingHorizontal: 20, gap: 12 },

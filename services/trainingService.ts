@@ -141,59 +141,23 @@ export async function getTeamTrainings(
 }
 
 /**
- * @deprecated Use getTeamTrainings instead - legacy org-based function
+ * @deprecated Use getTeamTrainings instead
  */
 export async function getOrgTrainings(
-  orgWorkspaceId: string,
+  teamId: string,
   options?: {
     status?: TrainingStatus;
-    teamId?: string;
     limit?: number;
   }
 ): Promise<TrainingWithDetails[]> {
-  let query = supabase
-    .from('trainings')
-    .select(`
-      *,
-      team:teams(id, name, team_type),
-      creator:profiles!trainings_created_by_fkey(id, full_name, avatar_url),
-      training_drills(id)
-    `)
-    .eq('org_workspace_id', orgWorkspaceId)
-    .order('scheduled_at', { ascending: true });
-
-  if (options?.status) {
-    query = query.eq('status', options.status);
-  }
-
-  if (options?.teamId) {
-    query = query.eq('team_id', options.teamId);
-  }
-
-  if (options?.limit) {
-    query = query.limit(options.limit);
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error('Failed to fetch trainings:', error);
-    throw new Error(error.message || 'Failed to fetch trainings');
-  }
-
-  return (data || []).map((t: any) => ({
-    ...t,
-    drill_count: t.training_drills?.length || 0,
-    drills: undefined,
-    training_drills: undefined,
-  })) as TrainingWithDetails[];
+  return getTeamTrainings(teamId, options);
 }
 
 /**
- * Get upcoming trainings for an organization
+ * Get upcoming trainings for a team
  */
 export async function getUpcomingTrainings(
-  orgWorkspaceId: string,
+  teamId: string,
   limit: number = 10
 ): Promise<TrainingWithDetails[]> {
   const now = new Date().toISOString();
@@ -206,7 +170,7 @@ export async function getUpcomingTrainings(
       creator:profiles!trainings_created_by_fkey(id, full_name, avatar_url),
       training_drills(id)
     `)
-    .eq('org_workspace_id', orgWorkspaceId)
+    .eq('team_id', teamId)
     .in('status', ['planned', 'ongoing'])
     .gte('scheduled_at', now)
     .order('scheduled_at', { ascending: true })

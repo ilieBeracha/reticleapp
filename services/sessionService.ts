@@ -1,22 +1,19 @@
 /**
  * SESSION SERVICE
- * Supports both personal and organization sessions
+ * Team-first architecture: Supports personal and team sessions
  */
 
 import { supabase } from '@/lib/supabase';
 
 export interface CreateSessionParams {
-  org_workspace_id?: string | null;  // NULL for personal, UUID for org
-  team_id?: string | null;
-  training_id?: string | null;  // Link session to a training
-  drill_id?: string | null;     // Link session to a specific drill
+  team_id?: string | null;        // NULL for personal, UUID for team
+  training_id?: string | null;    // Link session to a training
+  drill_id?: string | null;       // Link session to a specific drill
   session_mode?: 'solo' | 'group';
 }
 
 export interface SessionWithDetails {
   id: string;
-  org_workspace_id: string | null;
-  workspace_name?: string | null;
   user_id: string;
   user_full_name?: string | null;
   team_id: string | null;
@@ -45,8 +42,6 @@ function mapSession(row: any): SessionWithDetails {
 
   return {
     id: row.id,
-    org_workspace_id: row.org_workspace_id,
-    workspace_name: row.workspace_name ?? teams.name ?? 'Personal',
     user_id: row.user_id,
     user_full_name: row.user_full_name ?? profiles.full_name ?? null,
     team_id: row.team_id ?? null,
@@ -91,7 +86,6 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
     .from('sessions')
     .insert({
       user_id: user.id,
-      org_workspace_id: params.org_workspace_id ?? null,
       team_id: params.team_id ?? null,
       training_id: params.training_id ?? null,
       drill_id: params.drill_id ?? null,
@@ -101,7 +95,6 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
     })
     .select(`
       id,
-      org_workspace_id,
       user_id,
       team_id,
       training_id,
@@ -137,7 +130,6 @@ export async function getMyActiveSessionForTraining(trainingId: string): Promise
     .from('sessions')
     .select(`
       id,
-      org_workspace_id,
       user_id,
       team_id,
       training_id,
@@ -179,7 +171,6 @@ export async function getMyActiveSession(): Promise<SessionWithDetails | null> {
     .from('sessions')
     .select(`
       id,
-      org_workspace_id,
       user_id,
       team_id,
       training_id,
@@ -208,7 +199,7 @@ export async function getMyActiveSession(): Promise<SessionWithDetails | null> {
 }
 
 /**
- * Get user's active PERSONAL session (no org workspace)
+ * Get user's active PERSONAL session (no team)
  * Used to enforce 1 session limit in personal mode
  */
 export async function getMyActivePersonalSession(): Promise<SessionWithDetails | null> {
@@ -224,7 +215,6 @@ export async function getMyActivePersonalSession(): Promise<SessionWithDetails |
     .from('sessions')
     .select(`
       id,
-      org_workspace_id,
       user_id,
       team_id,
       training_id,
@@ -242,7 +232,7 @@ export async function getMyActivePersonalSession(): Promise<SessionWithDetails |
     `)
     .eq('user_id', user.id)
     .eq('status', 'active')
-    .is('org_workspace_id', null)  // Personal sessions have no org
+    .is('team_id', null)  // Personal sessions have no team
     .order('started_at', { ascending: false })
     .limit(1);
 
@@ -290,14 +280,13 @@ export async function createTrainingSession(params: {
 
 /**
  * Get sessions - fetches all sessions accessible to the user
- * Includes both personal sessions and org sessions
+ * Includes both personal sessions and team sessions
  */
-export async function getSessions(workspaceId?: string | null): Promise<SessionWithDetails[]> {
+export async function getSessions(teamId?: string | null): Promise<SessionWithDetails[]> {
   let query = supabase
     .from('sessions')
     .select(`
       id,
-      org_workspace_id,
       user_id,
       team_id,
       training_id,
@@ -315,17 +304,17 @@ export async function getSessions(workspaceId?: string | null): Promise<SessionW
     `)
     .order('started_at', { ascending: false });
 
-  // Filter by workspace if provided
-  if (workspaceId !== undefined) {
-    if (workspaceId === null) {
+  // Filter by team if provided
+  if (teamId !== undefined) {
+    if (teamId === null) {
       // Get personal sessions only
-      query = query.is('org_workspace_id', null);
+      query = query.is('team_id', null);
     } else {
-      // Get org sessions only
-      query = query.eq('org_workspace_id', workspaceId);
+      // Get team sessions only
+      query = query.eq('team_id', teamId);
     }
   }
-  // Otherwise, get ALL sessions (personal + org)
+  // Otherwise, get ALL sessions (personal + team)
 
   const { data, error } = await query;
 
@@ -341,7 +330,6 @@ export async function getTrainingSessions(trainingId: string): Promise<SessionWi
     .from('sessions')
     .select(`
       id,
-      org_workspace_id,
       user_id,
       team_id,
       training_id,
@@ -365,10 +353,10 @@ export async function getTrainingSessions(trainingId: string): Promise<SessionWi
 }
 
 /**
- * Get sessions for a specific workspace
+ * @deprecated Use getTeamSessions instead
  */
-export async function getWorkspaceSessions(orgWorkspaceId: string | null): Promise<SessionWithDetails[]> {
-  return getSessions(orgWorkspaceId);
+export async function getWorkspaceSessions(teamId: string | null): Promise<SessionWithDetails[]> {
+  return getSessions(teamId);
 }
 
 /**
@@ -379,7 +367,6 @@ export async function getTeamSessions(teamId: string): Promise<SessionWithDetail
     .from('sessions')
     .select(`
       id,
-      org_workspace_id,
       user_id,
       team_id,
       training_id,
@@ -551,7 +538,6 @@ export async function getSessionById(sessionId: string): Promise<SessionWithDeta
     .from('sessions')
     .select(`
       id,
-      org_workspace_id,
       user_id,
       team_id,
       training_id,
