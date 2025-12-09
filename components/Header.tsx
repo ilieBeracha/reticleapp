@@ -1,5 +1,6 @@
+import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
-import { useAppContext } from '@/hooks/useAppContext';
+import { useTeamStore } from '@/store/teamStore';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BellIcon } from 'lucide-react-native';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
@@ -14,11 +15,19 @@ interface HeaderProps {
 }
 
 export function Header({ notificationCount = 0, onNotificationPress, onUserPress, onTeamPress }: HeaderProps) {
-  const { email, avatarUrl, activeTeam } = useAppContext();
+  const { user } = useAuth();
   const colors = useColors();
+  
+  // Use a single atomic selector that returns a primitive (string) to prevent infinite re-renders
+  const displayName = useTeamStore(state => {
+    if (!state.activeTeamId) return 'Personal';
+    const team = state.teams.find(t => t.id === state.activeTeamId);
+    return team?.name || 'Personal';
+  });
 
+  const email = user?.email;
+  const avatarUrl = user?.user_metadata?.avatar_url;
   const fallbackInitial = email?.charAt(0)?.toUpperCase() ?? '?';
-  const teamName = activeTeam?.name || 'Personal';
 
 
   return (
@@ -39,7 +48,7 @@ export function Header({ notificationCount = 0, onNotificationPress, onUserPress
 
       <TouchableOpacity style={styles.workspaceContainer} onPress={onTeamPress}  > 
           <Text style={[styles.workspaceText, { color: colors.text}]}>
-            {teamName}
+            {displayName}
           </Text> 
           <MaterialCommunityIcons name="chevron-right" size={20} color={colors.text} />
         </TouchableOpacity> 

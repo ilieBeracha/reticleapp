@@ -1,8 +1,8 @@
 import {
-  getMyTrainings,
-  getMyTrainingStats,
-  getMyUpcomingTrainings,
-  getTeamTrainings,
+    getMyTrainings,
+    getMyTrainingStats,
+    getMyUpcomingTrainings,
+    getTeamTrainings,
 } from "@/services/trainingService";
 import type { TrainingWithDetails } from "@/types/workspace";
 import { create } from "zustand";
@@ -49,7 +49,12 @@ export const useTrainingStore = create<TrainingStore>((set, get) => ({
   error: null,
 
   loadMyTrainings: async () => {
-    set({ loadingMyTrainings: true, error: null });
+    // Only show loading spinner on initial load, not refresh
+    const isInitialLoad = get().myTrainings.length === 0;
+    if (isInitialLoad) {
+      set({ loadingMyTrainings: true, error: null });
+    }
+    
     try {
       const trainings = await getMyTrainings();
       set({ myTrainings: trainings, loadingMyTrainings: false });
@@ -60,7 +65,12 @@ export const useTrainingStore = create<TrainingStore>((set, get) => ({
   },
 
   loadMyUpcomingTrainings: async () => {
-    set({ loadingMyTrainings: true, error: null });
+    // Only show loading spinner on initial load, not refresh
+    const isInitialLoad = get().myUpcomingTrainings.length === 0;
+    if (isInitialLoad) {
+      set({ loadingMyTrainings: true, error: null });
+    }
+    
     try {
       const trainings = await getMyUpcomingTrainings(5);
       set({ myUpcomingTrainings: trainings, loadingMyTrainings: false });
@@ -87,7 +97,12 @@ export const useTrainingStore = create<TrainingStore>((set, get) => ({
       return;
     }
 
-    set({ loadingTeamTrainings: true, error: null });
+    // Only show loading spinner on initial load, not refresh
+    const isInitialLoad = get().teamTrainings.length === 0;
+    if (isInitialLoad) {
+      set({ loadingTeamTrainings: true, error: null });
+    }
+    
     try {
       const trainings = await getTeamTrainings(activeTeamId);
       set({ teamTrainings: trainings, loadingTeamTrainings: false });

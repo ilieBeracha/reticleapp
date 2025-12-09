@@ -13,7 +13,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 
 // Import modular components
@@ -57,8 +57,10 @@ export default function AddTargetSheet() {
     setError,
   } = useDetectionStore();
 
-  // Navigation state
-  const [step, setStep] = useState<Step>("form");
+  // Navigation state - skip form for paper targets, go directly to camera
+  const [step, setStep] = useState<Step>(
+    (defaultTargetType as TargetType) === "paper" ? "camera" : "form"
+  );
   const [saving, setSaving] = useState(false);
   const [capturedUri, setCapturedUri] = useState<string | null>(null);
 
@@ -86,6 +88,25 @@ export default function AddTargetSheet() {
 
   // Editable detections state
   const [editedDetections, setEditedDetections] = useState<EditableDetection[]>([]);
+
+  // Auto-start camera capture when landing on camera step directly
+  useEffect(() => {
+    if (step === "camera" && targetType === "paper") {
+      // Request camera permission if needed
+      const initCamera = async () => {
+        if (!permission?.granted) {
+          const { granted } = await requestPermission();
+          if (!granted) {
+            Alert.alert("Camera Permission", "Camera access is required to scan paper targets.");
+            router.back();
+            return;
+          }
+        }
+        startCapture();
+      };
+      initCamera();
+    }
+  }, []);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // COMPUTED VALUES

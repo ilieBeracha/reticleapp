@@ -1,16 +1,16 @@
-import { useTeamRole } from '@/contexts/TeamRoleContext';
 import { useColors } from '@/hooks/ui/useColors';
+import { useActiveTeam, useMyTeamRole } from '@/store/teamStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useMemo, useState } from 'react';
 import {
-  Alert,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    Alert,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 type SessionType = 'upcoming' | 'completed' | 'missed';
@@ -31,7 +31,8 @@ interface TrainingSession {
  */
 export default function TrainingSessionsView() {
   const colors = useColors();
-  const { teamName, myRole } = useTeamRole();
+  const { teamName } = useActiveTeam();
+  const myRole = useMyTeamRole();
   const [filter, setFilter] = useState<SessionType>('upcoming');
 
   // TODO: Fetch real training sessions

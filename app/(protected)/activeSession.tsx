@@ -119,12 +119,27 @@ export default function ActiveSessionScreen() {
   // ============================================================================
   // ACTIONS
   // ============================================================================
-  const handleAddTarget = useCallback(() => {
+  // Quick Scan - goes directly to camera with paper defaults
+  const handleScanTarget = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push({
       pathname: '/(protected)/addTarget',
       params: {
         sessionId,
+        defaultTargetType: 'paper',
+        defaultDistance: avgDistance > 0 ? avgDistance.toString() : '100',
+      },
+    });
+  }, [sessionId, avgDistance]);
+
+  // Manual entry for tactical targets
+  const handleLogTarget = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push({
+      pathname: '/(protected)/addTarget',
+      params: {
+        sessionId,
+        defaultTargetType: 'tactical',
         defaultDistance: avgDistance > 0 ? avgDistance.toString() : '25',
       },
     });
@@ -292,27 +307,34 @@ export default function ActiveSessionScreen() {
           {ending ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <>
-              <Ionicons name="stop-circle-outline" size={20} color="#fff" />
-              <Text style={styles.endButtonText}>End</Text>
-            </>
+            <Ionicons name="stop" size={18} color="#EF4444" />
           )}
         </TouchableOpacity>
 
-        {/* Add Target Button */}
+        {/* Log Target Button (Tactical - manual entry) */}
         <TouchableOpacity
-          style={styles.addButton}
-          onPress={handleAddTarget}
+          style={styles.logButton}
+          onPress={handleLogTarget}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="create-outline" size={20} color="#fff" />
+          <Text style={styles.logButtonText}>Log</Text>
+        </TouchableOpacity>
+
+        {/* Scan Target Button (Paper - camera) */}
+        <TouchableOpacity
+          style={styles.scanButton}
+          onPress={handleScanTarget}
           activeOpacity={0.8}
         >
           <LinearGradient
             colors={['#10B981', '#059669']}
-            style={styles.addButtonGradient}
+            style={styles.scanButtonGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            <Ionicons name="add" size={24} color="#fff" />
-            <Text style={styles.addButtonText}>Add Target</Text>
+            <Ionicons name="scan" size={22} color="#fff" />
+            <Text style={styles.scanButtonText}>Scan</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -389,33 +411,41 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   endButton: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+  },
+  logButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     paddingVertical: 14,
     paddingHorizontal: 20,
     borderRadius: 12,
     gap: 6,
   },
-  endButtonText: {
-    color: '#EF4444',
+  logButtonText: {
+    color: '#fff',
     fontSize: 15,
     fontWeight: '600',
   },
-  addButton: {
+  scanButton: {
     flex: 1,
     borderRadius: 12,
     overflow: 'hidden',
   },
-  addButtonGradient: {
+  scanButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
     gap: 8,
   },
-  addButtonText: {
+  scanButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',

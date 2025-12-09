@@ -1,62 +1,104 @@
-import type { TeamRole } from "@/types/workspace";
-import { useAppContext } from "./useAppContext";
+/**
+ * UNIFIED PERMISSIONS HOOK
+ * 
+ * Single source for all permission checks.
+ * Replaces: useWorkspacePermissions, useTeamPermissions, useRolePermissions
+ */
+
+import { useTeamRoleFlags } from '@/store/teamStore';
+
+export interface Permissions {
+  // Role
+  role: string | null;
+  isOwner: boolean;
+  isCommander: boolean;
+  isSquadCommander: boolean;
+  isSoldier: boolean;
+  
+  // Team management
+  canManageTeam: boolean;
+  canInviteMembers: boolean;
+  canRemoveMembers: boolean;
+  canDeleteTeam: boolean;
+  
+  // Training
+  canCreateTraining: boolean;
+  canManageTraining: boolean;
+  canViewAllProgress: boolean;
+  
+  // Sessions
+  canCreateSession: boolean;
+  canViewAllSessions: boolean;
+}
 
 /**
- * Team-first permissions hook
- * Returns permissions based on the user's role in the active team
+ * Get all permissions for the current user in the active team
  */
-export function useWorkspacePermissions() {
-  const { activeTeam, myRole, canManageTeam, isOwner, isCommander } = useAppContext();
-  const role = myRole || 'soldier';
-
-  // Role checks
-  const isSquadCommander = role === 'squad_commander';
-  const isSoldier = role === 'soldier';
-
+export function usePermissions(): Permissions {
+  const { role, isOwner, isCommander, isSquadCommander, isSoldier, canManage } = useTeamRoleFlags();
+  
   return {
-    // Team-level permissions
-    canManageWorkspace: canManageTeam,
-    canDeleteWorkspace: isOwner,
-    canInviteMembers: canManageTeam,
-    canManageTeams: canManageTeam,
-    
-    // View permissions
-    canViewTeams: true,
-    canViewMembers: true,
-    canViewOrgTrainings: true,
-    
-    // Training permissions
-    canCreateTraining: canManageTeam,
-    canManageTraining: canManageTeam,
-    canViewAllProgress: canManageTeam,
-    
-    // Session permissions
-    canCreateSession: true, // All team members can create sessions
-    canViewAllSessions: canManageTeam,
-    
-    // Role checks
-    isOwner,
-    isAdmin: isOwner, // For backwards compatibility
-    isInstructor: isCommander, // Commander acts as instructor
-    isMember: isSoldier || isSquadCommander,
-    isAttached: false, // No attached concept in team-first
+    // Role info
     role,
+    isOwner,
+    isCommander,
+    isSquadCommander,
+    isSoldier,
+    
+    // Team management - owner and commander
+    canManageTeam: canManage,
+    canInviteMembers: canManage,
+    canRemoveMembers: canManage,
+    canDeleteTeam: isOwner,
+    
+    // Training - owner and commander
+    canCreateTraining: canManage,
+    canManageTraining: canManage,
+    canViewAllProgress: canManage,
+    
+    // Sessions - everyone can create, only leads can view all
+    canCreateSession: true,
+    canViewAllSessions: canManage,
   };
 }
 
-export function useTeamPermissions(teamRole?: TeamRole) {
-  const workspacePerms = useWorkspacePermissions();
+// =====================================================
+// LEGACY EXPORTS - For backwards compatibility
+// =====================================================
 
-  const isTeamLead = teamRole === 'owner' || teamRole === 'commander';
-
+/** @deprecated Use usePermissions() instead */
+export function useWorkspacePermissions() {
+  const perms = usePermissions();
   return {
-    // Team-level permissions
-    canManageTeam: workspacePerms.canManageWorkspace || isTeamLead,
-    canAddMembers: workspacePerms.canManageWorkspace || isTeamLead,
-    canRemoveMembers: workspacePerms.canManageWorkspace || isTeamLead,
-    canCreateTeamSession: true, // All team members can create sessions
-    
-    // Role check
-    isTeamLead,
+    canManageWorkspace: perms.canManageTeam,
+    canDeleteWorkspace: perms.canDeleteTeam,
+    canInviteMembers: perms.canInviteMembers,
+    canManageTeams: perms.canManageTeam,
+    canViewTeams: true,
+    canViewMembers: true,
+    canViewOrgTrainings: true,
+    canCreateTraining: perms.canCreateTraining,
+    canManageTraining: perms.canManageTraining,
+    canViewAllProgress: perms.canViewAllProgress,
+    canCreateSession: perms.canCreateSession,
+    canViewAllSessions: perms.canViewAllSessions,
+    isOwner: perms.isOwner,
+    isAdmin: perms.isOwner,
+    isInstructor: perms.isCommander,
+    isMember: perms.isSoldier || perms.isSquadCommander,
+    isAttached: false,
+    role: perms.role || 'soldier',
+  };
+}
+
+/** @deprecated Use usePermissions() instead */
+export function useTeamPermissions() {
+  const perms = usePermissions();
+  return {
+    canManageTeam: perms.canManageTeam,
+    canAddMembers: perms.canInviteMembers,
+    canRemoveMembers: perms.canRemoveMembers,
+    canCreateTeamSession: perms.canCreateSession,
+    isTeamLead: perms.isOwner || perms.isCommander,
   };
 }

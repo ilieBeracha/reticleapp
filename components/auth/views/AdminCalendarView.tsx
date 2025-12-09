@@ -1,7 +1,7 @@
 import { TrainingCalendar } from '@/components/ui/TrainingCalendar';
-import { useTeamRole } from '@/contexts/TeamRoleContext';
 import { CalendarEvent } from '@/hooks/ui/useCalendar';
 import { useColors } from '@/hooks/ui/useColors';
+import { useActiveTeam, useMyTeamRole } from '@/store/teamStore';
 import * as Haptics from 'expo-haptics';
 import { useMemo } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -12,7 +12,8 @@ import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
  */
 export default function AdminCalendarView() {
   const colors = useColors();
-  const { teamName, myRole } = useTeamRole();
+  const { teamName } = useActiveTeam();
+  const myRole = useMyTeamRole();
 
   // TODO: Fetch real team training data
   const events: CalendarEvent[] = useMemo(() => [], []);

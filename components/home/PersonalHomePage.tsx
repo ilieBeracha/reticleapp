@@ -6,7 +6,7 @@ import { useWorkspacePermissions } from '@/hooks/usePermissions';
 import { useSessionStats } from '@/hooks/useSessionStats';
 import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/hooks/useWorkspaceData';
-import type { SessionWithDetails } from '@/services/sessionService';
+import { getMyActivePersonalSession, type SessionWithDetails } from '@/services/sessionService';
 import { useSessionStore } from '@/store/sessionStore';
 import { useTrainingStore } from '@/store/trainingStore';
 import type { TrainingWithDetails } from '@/types/workspace';
@@ -339,6 +339,8 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
   }, [loadSessions, loadTeams, setOnSessionCreated, setOnTeamCreated]);
 
   const { onStartSession, onCreateTeam } = useWorkspaceActions();
+  const { createSession } = useSessionStore();
+  const [quickStarting, setQuickStarting] = useState(false);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -366,6 +368,36 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
     return hours > 0 ? `${hours}h` : `${mins}m`;
   }, [sessions]);
 
+  // ═══ QUICK START - One tap to begin training ═══
+  const handleQuickStart = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setQuickStarting(true);
+    
+    try {
+      // Check for existing active session first
+      const activeSession = await getMyActivePersonalSession();
+      
+      if (activeSession) {
+        // Resume existing session
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        router.push(`/(protected)/activeSession?sessionId=${activeSession.id}` as any);
+      } else {
+        // Create new solo session instantly
+        const newSession = await createSession({
+          session_mode: 'solo',
+        });
+        
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        router.push(`/(protected)/activeSession?sessionId=${newSession.id}` as any);
+      }
+    } catch (error: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      console.error('Quick start failed:', error);
+    } finally {
+      setQuickStarting(false);
+    }
+  }, [createSession]);
+
   // Navigation
   const nav = useMemo(() => ({
     startSession: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onStartSession(); },
@@ -378,10 +410,7 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
 
   // Featured content
   const featuredSession = activeSessions[0];
-  console.log(activeSessions)
-  console.log('featuredSession', featuredSession);
   const featuredTraining = ongoingTrainings[0] || plannedTrainings[0];
-  console.log('featuredTraining', featuredTraining);
 
   const isLoading = sessionsLoading || loadingMyTrainings;
 
@@ -406,8 +435,8 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
           <Text style={[styles.headerName, { color: colors.text }]}>{fullName || 'User'}</Text>
         </View>
 
-        {/* ═══ HERO SECTION ═══ */}
-        {featuredSession && (
+        {/* ═══ HERO SECTION - Start Button or Active Session ═══ */}
+        {featuredSession ? (
           <View style={styles.heroSection}>
             <HeroCard
               title={featuredSession.training_title || featuredSession.drill_name || 'Active Session'}
@@ -419,20 +448,54 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
               icon="fitness"
             />
           </View>
+        ) : (
+          <View style={styles.startSection}>
+            {/* Circular Start Button - subtle, blends with background */}
+            <TouchableOpacity
+              style={[styles.startButton, { borderColor: colors.border }]}
+              onPress={handleQuickStart}
+              disabled={quickStarting}
+              activeOpacity={0.85}
+            >
+              <View style={[styles.startButtonBg, { backgroundColor: colors.card }]}>
+                {/* Outer ring */}
+                <View style={[styles.startButtonOuter, { borderColor: colors.primary + '30' }]}>
+                  {/* Inner circle with subtle accent */}
+                  <View style={[styles.startButtonInner, { backgroundColor: colors.primary + '15' }]}>
+                    {quickStarting ? (
+                      <ActivityIndicator size="large" color={colors.primary} />
+                    ) : (
+                      <Text style={[styles.startButtonText, { color: colors.primary }]}>Start</Text>
+                    )}
+                  </View>
+                </View>
+              </View>
+            </TouchableOpacity>
+            
+            <Text style={[styles.startHint, { color: colors.textMuted }]}>
+              Tap to begin training
+            </Text>
+          </View>
         )}
 
+        {/* ═══ UPCOMING TRAINING (if no active session) ═══ */}
         {!featuredSession && featuredTraining && (
-          <View style={styles.heroSection}>
-            <HeroCard
-              title={featuredTraining.title}
-              subtitle={featuredTraining.status === 'ongoing' ? 'LIVE NOW' : 'UP NEXT'}
-              meta={featuredTraining.team?.name}
-              actionLabel={featuredTraining.status === 'ongoing' ? 'Join Now' : 'View Details'}
-              onPress={() => nav.trainingLive(featuredTraining.id)}
-              gradientColors={featuredTraining.status === 'ongoing' ? ['#10B981', '#059669'] : ['#3B82F6', '#2563EB']}
-              icon="calendar"
-            />
-          </View>
+          <TouchableOpacity 
+            style={[styles.upcomingBanner, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => nav.trainingLive(featuredTraining.id)}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.upcomingDot, { backgroundColor: featuredTraining.status === 'ongoing' ? '#10B981' : '#3B82F6' }]} />
+            <View style={styles.upcomingContent}>
+              <Text style={[styles.upcomingLabel, { color: colors.textMuted }]}>
+                {featuredTraining.status === 'ongoing' ? 'LIVE NOW' : 'UP NEXT'}
+              </Text>
+              <Text style={[styles.upcomingTitle, { color: colors.text }]} numberOfLines={1}>
+                {featuredTraining.title}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          </TouchableOpacity>
         )}
 
         {/* ═══ STATS ROW ═══ */}
@@ -452,7 +515,7 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
         <View style={styles.section}>
           <SectionHeader title="Quick Actions" colors={colors} />
           <View style={styles.quickActionsGrid}>
-            <QuickActionButton icon="add-circle" label="Session" colors={colors} onPress={nav.startSession} />
+            <QuickActionButton icon="play-circle" label="Train" colors={colors} onPress={handleQuickStart} />
             <QuickActionButton icon="scan" label="Scans" colors={colors} onPress={nav.viewScans} />
             <QuickActionButton icon="stats-chart" label="Progress" colors={colors} onPress={nav.viewProgress} />
           </View>
@@ -547,21 +610,13 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
         {plannedTrainings.length === 0 && recentSessions.length === 0 && !featuredSession && (
           <View style={styles.section}>
             <View style={[styles.emptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={[styles.emptyIconContainer, { backgroundColor: colors.primary + '15' }]}>
-                <Ionicons name="rocket-outline" size={40} color={colors.primary} />
+              <View style={[styles.emptyIconContainer, { backgroundColor: '#10B98115' }]}>
+                <Ionicons name="fitness-outline" size={40} color="#10B981" />
               </View>
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>Ready to train?</Text>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>No sessions yet</Text>
               <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
-                Start your first session or join a team to get going
+                Use the Start button above to begin your first training session
               </Text>
-              <TouchableOpacity
-                style={[styles.emptyButton, { backgroundColor: colors.primary }]}
-                onPress={nav.startSession}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="add" size={20} color="#fff" />
-                <Text style={styles.emptyButtonText}>Start Session</Text>
-              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -601,6 +656,62 @@ const styles = StyleSheet.create({
   heroAction: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 16 },
   heroActionText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   heroIconContainer: { position: 'absolute', right: -10, bottom: -10, opacity: 0.5 },
+
+  // Start Button Section - Subtle, blends with background
+  startSection: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 20 },
+  startButton: { 
+    width: 160, 
+    height: 160, 
+    borderRadius: 80, 
+    borderWidth: 1,
+  },
+  startButtonBg: { 
+    width: '100%', 
+    height: '100%', 
+    borderRadius: 80, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+  },
+  startButtonOuter: { 
+    width: 140, 
+    height: 140, 
+    borderRadius: 70, 
+    borderWidth: 2, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+  },
+  startButtonInner: { 
+    width: 100, 
+    height: 100, 
+    borderRadius: 50, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+  },
+  startButtonText: { 
+    fontSize: 20, 
+    fontWeight: '600', 
+    letterSpacing: 0.3,
+  },
+  startHint: { 
+    marginTop: 16, 
+    fontSize: 14,
+  },
+  
+  // Upcoming Training Banner
+  upcomingBanner: { 
+    marginHorizontal: 20, 
+    marginTop: 16, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    padding: 14, 
+    borderRadius: 12, 
+    borderWidth: 1,
+    gap: 12,
+  },
+  upcomingDot: { width: 8, height: 8, borderRadius: 4 },
+  upcomingContent: { flex: 1 },
+  upcomingLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, marginBottom: 2 },
+  upcomingTitle: { fontSize: 15, fontWeight: '600' },
 
   // Stats
   statsScrollView: { marginTop: 20 },
