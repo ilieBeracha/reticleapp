@@ -2,7 +2,7 @@ import { useColors } from "@/hooks/ui/useColors";
 import { useTeamStore } from "@/store/teamStore";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from 'expo-haptics';
-import { router } from "expo-router";
+import { router, useSegments } from "expo-router";
 import React, { useCallback } from "react";
 import {
   ScrollView,
@@ -16,39 +16,47 @@ import {
  * TEAM SWITCHER - Native Form Sheet
  * 
  * Lists teams and allows switching between them.
- * Also provides options to create or join teams.
+ * Dismisses sheet first, then navigates to prevent white screen issues.
  */
 export default function TeamSwitcherSheet() {
   const colors = useColors();
-  const { teams, activeTeamId, setActiveTeam, setIsSwitching } = useTeamStore();
+  const { teams, activeTeamId, setActiveTeam } = useTeamStore();
+  const segments = useSegments();
+  
+  // Determine if we're currently in team or personal mode
+  const isCurrentlyInTeamMode = segments.includes('team');
 
   const handleSelectTeam = useCallback((teamId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setIsSwitching(true);
+    setActiveTeam(teamId);
     
-    // Match main branch pattern: setTimeout to allow state update before navigation
-    setTimeout(() => {
-      setActiveTeam(teamId);
-      router.replace('/(protected)/team' as any);
+    // Dismiss sheet first, then navigate if needed
+    router.back();
+    
+    // Only navigate if we're not already in team mode
+    if (!isCurrentlyInTeamMode) {
+      // Small delay to allow sheet dismissal animation
       setTimeout(() => {
-        setIsSwitching(false);
-      }, 300);
-    }, 200);
-  }, [setActiveTeam, setIsSwitching]);
+        router.replace('/(protected)/team');
+      }, 50);
+    }
+  }, [setActiveTeam, isCurrentlyInTeamMode]);
 
   const handleSwitchToPersonal = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setIsSwitching(true);
+    setActiveTeam(null);
     
-    // Match main branch pattern: setTimeout to allow state update before navigation
-    setTimeout(() => {
-      setActiveTeam(null);
-      router.replace('/(protected)/personal' as any);
+    // Dismiss sheet first, then navigate if needed
+    router.back();
+    
+    // Only navigate if we're not already in personal mode
+    if (isCurrentlyInTeamMode) {
+      // Small delay to allow sheet dismissal animation
       setTimeout(() => {
-        setIsSwitching(false);
-      }, 300);
-    }, 200);
-  }, [setActiveTeam, setIsSwitching]);
+        router.replace('/(protected)/personal');
+      }, 50);
+    }
+  }, [setActiveTeam, isCurrentlyInTeamMode]);
 
   const handleCreateTeam = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

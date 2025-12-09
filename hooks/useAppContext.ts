@@ -1,164 +1,76 @@
+/**
+ * APP CONTEXT HOOK
+ * 
+ * Simple hook combining auth user + team store basics.
+ * For detailed team/permissions, use the store selectors directly.
+ */
+
 import { useAuth } from "@/contexts/AuthContext";
 import { useTeamStore } from "@/store/teamStore";
-import type { TeamWithRole, TeamRole } from "@/types/workspace";
-import { router } from "expo-router";
-import { useCallback, useMemo } from "react";
 
 export interface AppContext {
-  // User
+  // User info
   userId: string | null;
   email: string | null;
   fullName: string | null;
   avatarUrl: string | null;
-  
-  // Team (primary entity)
-  activeTeamId: string | null;
-  activeTeam: TeamWithRole | null;
-  myRole: TeamRole | null;
-  
-  // All my teams
-  teams: TeamWithRole[];
-  hasTeams: boolean;
-  
-  // Actions
-  switchTeam: (teamId: string | null) => Promise<void>;
-  
-  // Loading states
-  loading: boolean;
   isAuthenticated: boolean;
   
-  // Permissions helpers
-  canManageTeam: boolean;  // owner or commander
-  isOwner: boolean;
-  isCommander: boolean;
+  // Basic team info (use store selectors for more)
+  activeTeamId: string | null;
+  hasTeams: boolean;
+  
+  // Loading
+  loading: boolean;
 }
 
 /**
- * ✨ THE SINGLE SOURCE OF TRUTH ✨
+ * Get basic app context (user + team mode)
  * 
- * Use this hook in ALL components to get user and team context.
- * NEVER access user or team data directly from other sources.
- * 
- * TEAM-FIRST ARCHITECTURE:
- * - Teams are the primary entity
- * - Users create and manage teams directly
- * - No organization layer
+ * For team details: use useActiveTeam(), useMyTeamRole(), etc. from store
+ * For permissions: use usePermissions()
  */
 export function useAppContext(): AppContext {
   const { user, loading: authLoading } = useAuth();
-  const { 
-    teams, 
-    activeTeamId,    
-    loading: teamsLoading,
-    setActiveTeam,
-    setIsSwitching,
-  } = useTeamStore();
+  const { teams, activeTeamId, loading: teamsLoading } = useTeamStore();
 
-  /**
-   * Switch team - Updates state
-   */
-  const handleSwitchTeam = useCallback(async (teamId: string | null) => {
-    setIsSwitching(true);
-    setActiveTeam(teamId);
-    
-    // Small delay for smooth transition
-    setTimeout(() => {
-      setIsSwitching(false);
-    }, 300);
-  }, [setActiveTeam, setIsSwitching]);
-
-  // Calculate derived values with memoization
-  const context = useMemo<AppContext>(() => {
-    if (!user) {
-      return {
-        // User
-        userId: null,
-        email: null,
-        fullName: null,
-        avatarUrl: null,
-        
-        // Team
-        activeTeamId: null,
-        activeTeam: null,
-        myRole: null,
-        
-        // All teams
-        teams: [],
-        hasTeams: false,
-        
-        // Actions
-        switchTeam: handleSwitchTeam,
-        
-        // Loading
-        loading: authLoading,
-        isAuthenticated: false,
-        
-        // Permissions
-        canManageTeam: false,
-        isOwner: false,
-        isCommander: false,
-      };
-    }
-
-    // Active team
-    const activeTeam = activeTeamId 
-      ? teams.find(t => t.id === activeTeamId) || null
-      : null;
-    
-    const myRole = activeTeam?.my_role || null;
-    const isOwner = myRole === 'owner';
-    const isCommander = myRole === 'commander';
-    const canManageTeam = isOwner || isCommander;
-
+  if (!user) {
     return {
-      // User
-      userId: user.id,
-      email: user.email ?? null,
-      fullName: user.user_metadata?.full_name ?? null,
-      avatarUrl: user.user_metadata?.avatar_url ?? null,
-      
-      // Team
-      activeTeamId,
-      activeTeam,
-      myRole,
-      
-      // All teams
-      teams,
-      hasTeams: teams.length > 0,
-      
-      // Actions
-      switchTeam: handleSwitchTeam,
-      
-      // Loading
-      loading: authLoading || teamsLoading,
-      isAuthenticated: true,
-      
-      // Permissions
-      canManageTeam,
-      isOwner,
-      isCommander,
+      userId: null,
+      email: null,
+      fullName: null,
+      avatarUrl: null,
+      isAuthenticated: false,
+      activeTeamId: null,
+      hasTeams: false,
+      loading: authLoading,
     };
-  }, [
-    user,
-    teams,
-    activeTeamId,
-    authLoading,
-    teamsLoading,
-    handleSwitchTeam,
-  ]);
+  }
 
-  return context;
+  return {
+    userId: user.id,
+    email: user.email ?? null,
+    fullName: user.user_metadata?.full_name ?? null,
+    avatarUrl: user.user_metadata?.avatar_url ?? null,
+    isAuthenticated: true,
+    activeTeamId,
+    hasTeams: teams.length > 0,
+    loading: authLoading || teamsLoading,
+  };
 }
 
 // =====================================================
 // LEGACY EXPORTS - For backwards compatibility
 // =====================================================
 
-/** @deprecated Use activeTeamId instead */
-export const useActiveWorkspaceId = () => useAppContext().activeTeamId;
+/** @deprecated Use activeTeamId from useAppContext() or useTeamStore */
+export const useActiveWorkspaceId = () => useTeamStore(s => s.activeTeamId);
 
-/** @deprecated Use activeTeam instead */
-export const useActiveWorkspace = () => useAppContext().activeTeam;
+/** @deprecated Use useActiveTeam() from store */
+export const useActiveWorkspace = () => {
+  const { teams, activeTeamId } = useTeamStore();
+  return teams.find(t => t.id === activeTeamId) || null;
+};
 
-/** @deprecated Use teams instead */
-export const useWorkspaces = () => useAppContext().teams;
+/** @deprecated Use useTeamStore().teams */
+export const useWorkspaces = () => useTeamStore(s => s.teams);

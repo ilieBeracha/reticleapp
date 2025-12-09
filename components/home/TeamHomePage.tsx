@@ -10,14 +10,14 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -84,7 +84,6 @@ const MemberItem = React.memo(function MemberItem({
   onPress: () => void;
   isYou?: boolean;
 }) {
-  const roleLabel = member.role.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
   
   return (
     <TouchableOpacity style={styles.memberItem} activeOpacity={0.5} onPress={onPress}>
@@ -94,9 +93,9 @@ const MemberItem = React.memo(function MemberItem({
           {member.profile?.full_name || 'Unknown'}
           {isYou && <Text style={{ color: colors.textMuted }}> (you)</Text>}
         </Text>
-        <Text style={[styles.memberRole, { color: colors.textMuted }]}>
+        {/* <Text style={[styles.memberRole, { color: colors.textMuted }]}>
           {roleLabel}
-        </Text>
+        </Text> */}
       </View>
       <Ionicons name="chevron-forward" size={16} color={colors.border} />
     </TouchableOpacity>
@@ -262,10 +261,6 @@ export const TeamHomePage = React.memo(function TeamHomePage() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       router.push(`/(protected)/memberPreview?id=${id}` as any);
     },
-    switchTeam: () => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      router.push('/(protected)/teamSwitcher' as any);
-    },
   }), [activeTeamId]);
 
   // Role label
@@ -274,7 +269,8 @@ export const TeamHomePage = React.memo(function TeamHomePage() {
     return myRole.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
   }, [myRole]);
 
-  if (loading) {
+  // Only show full-page loader on initial load, not refresh
+  if (loading && teams.length === 0) {
     return (
       <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="small" color={colors.text} />
@@ -308,21 +304,9 @@ export const TeamHomePage = React.memo(function TeamHomePage() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />}
       >
         {/* ═══ HEADER ═══ */}
-        <TouchableOpacity 
-          style={styles.header} 
-          onPress={teams.length > 1 ? nav.switchTeam : undefined}
-          activeOpacity={teams.length > 1 ? 0.7 : 1}
-        >
-          <View style={styles.headerTop}>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>
-              {currentTeam?.name || 'Team'}
-            </Text>
-            {teams.length > 1 && (
-              <Ionicons name="chevron-down" size={20} color={colors.textMuted} />
-            )}
-          </View>
+        <View style={styles.header}>
           <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>{roleLabel}</Text>
-        </TouchableOpacity>
+        </View>
 
         {/* ═══ QUICK ACTIONS ═══ */}
         <View style={styles.quickActionsGrid}>
@@ -403,9 +387,7 @@ const styles = StyleSheet.create({
 
   // Header
   header: { paddingTop: Platform.OS === 'ios' ? 8 : 16, paddingBottom: 12, paddingHorizontal: 4 },
-  headerTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  headerTitle: { fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
-  headerSubtitle: { fontSize: 15, marginTop: 4 },
+  headerSubtitle: { fontSize: 15 },
 
   // Quick Actions Grid
   quickActionsGrid: { 

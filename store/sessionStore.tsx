@@ -44,7 +44,12 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     // Prevent duplicate loading
     if (get().loading) return;
     
-    set({ loading: true, error: null });
+    // Only show loading spinner on initial load, not refresh
+    const isInitialLoad = get().sessions.length === 0;
+    if (isInitialLoad) {
+      set({ loading: true, error: null });
+    }
+    
     try {
       const sessions = await getSessions();
       set({ sessions, loading: false });
@@ -64,7 +69,12 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       return;
     }
 
-    set({ loading: true, error: null });
+    // Only show loading spinner on initial load, not refresh
+    const isInitialLoad = get().sessions.length === 0;
+    if (isInitialLoad) {
+      set({ loading: true, error: null });
+    }
+    
     try {
       const sessions = await getTeamSessions(teamId);
       set({ sessions, loading: false });

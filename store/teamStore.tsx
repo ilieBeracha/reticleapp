@@ -1,10 +1,3 @@
-/**
- * Team Store - Team-First Architecture
- * 
- * This is the PRIMARY store for the app.
- * Users manage teams directly, no organization layer.
- */
-
 import {
   addTeamMember as addTeamMemberService,
   createTeam as createTeamService,
@@ -20,11 +13,10 @@ import {
   type UpdateTeamInput,
 } from '@/services/teamService';
 import type {
-  TeamMember,
   TeamMemberWithProfile,
   TeamRole,
   TeamWithMembers,
-  TeamWithRole,
+  TeamWithRole
 } from '@/types/workspace';
 import { create } from 'zustand';
 
@@ -33,9 +25,8 @@ interface TeamStore {
   teams: TeamWithRole[];
   activeTeamId: string | null;
   activeTeam: TeamWithMembers | null;
-  members: TeamMember[];
+  members: TeamMemberWithProfile[];
   loading: boolean;
-  isSwitching: boolean;
   error: string | null;
 
   // Team actions
@@ -47,7 +38,6 @@ interface TeamStore {
   // Active team
   setActiveTeam: (teamId: string | null) => void;
   loadActiveTeam: () => Promise<void>;
-  setIsSwitching: (isSwitching: boolean) => void;
 
   // Members
   loadMembers: () => Promise<void>;
@@ -66,7 +56,6 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
   activeTeam: null,
   members: [],
   loading: true,
-  isSwitching: false,
   error: null,
 
   // =====================================================
@@ -74,24 +63,22 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
   // =====================================================
   loadTeams: async () => {
     try {
-      set({ loading: true, error: null });
+      // Only show loading spinner on initial load, not refresh
+      const isInitialLoad = get().teams.length === 0;
+      if (isInitialLoad) {
+        set({ loading: true, error: null });
+      }
 
       const { supabase } = await import('@/lib/supabase');
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session?.user) {
-        if (__DEV__) console.log('📦 Team Store: User not authenticated');
         set({ loading: false, teams: [], activeTeamId: null });
         return;
       }
 
       const teams = await getMyTeams();
       const { activeTeamId: currentActiveTeamId } = get();
-
-      if (__DEV__) {
-        console.log('📦 loadTeams: currentActiveTeamId =', currentActiveTeamId);
-        console.log('📦 loadTeams: teams loaded =', teams.length);
-      }
 
       // Respect personal mode - never auto-select teams
       let newActiveTeamId: string | null = null;
@@ -100,16 +87,8 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
         // User had a team selected - verify it still exists
         const teamStillExists = teams.some(t => t.id === currentActiveTeamId);
         newActiveTeamId = teamStillExists ? currentActiveTeamId : null;
-        
-        if (__DEV__ && !teamStillExists) {
-          console.log('📦 loadTeams: Previous team gone, back to personal');
-        }
       }
       // If currentActiveTeamId is null, stay in personal mode
-
-      if (__DEV__) {
-        console.log('📦 loadTeams: newActiveTeamId =', newActiveTeamId);
-      }
 
       set({
         teams,
@@ -217,7 +196,6 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
   // ACTIVE TEAM
   // =====================================================
   setActiveTeam: (teamId) => {
-    if (__DEV__) console.log('🔄 Setting active team:', teamId);
     set({ activeTeamId: teamId, activeTeam: null, members: [] });
     if (teamId) {
       get().loadActiveTeam();
@@ -239,10 +217,6 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
     } catch (error: any) {
       console.error('Failed to load active team:', error);
     }
-  },
-
-  setIsSwitching: (isSwitching) => {
-    set({ isSwitching });
   },
 
   // =====================================================
@@ -322,14 +296,13 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
       activeTeam: null,
       members: [],
       loading: false,
-      isSwitching: false,
       error: null,
     });
   },
 }));
 
 // =====================================================
-// SELECTORS
+// SELECTORS - Use these instead of contexts!
 // =====================================================
 
 /**
@@ -343,7 +316,7 @@ export function useMyTeamRole(): TeamRole | null {
 }
 
 /**
- * Check if current user can manage the active team
+ * Check if current user can manage the active team (owner or commander)
  */
 export function useCanManageTeam(): boolean {
   return useTeamStore(state => {
@@ -357,4 +330,47 @@ export function useCanManageTeam(): boolean {
  */
 export function useHasTeams(): boolean {
   return useTeamStore(state => state.teams.length > 0);
+}
+
+/**
+ * Get active team info
+ */
+export function useActiveTeam() {
+  return useTeamStore(state => {
+    const team = state.teams.find(t => t.id === state.activeTeamId);
+    return {
+      teamId: state.activeTeamId,
+      team: team || null,
+      teamName: team?.name || null,
+      members: state.members,
+      memberCount: state.members.length || team?.member_count || 0,
+    };
+  });
+}
+
+/**
+ * Check if in team mode (has active team selected)
+ */
+export function useIsTeamMode(): boolean {
+  return useTeamStore(state => state.activeTeamId !== null);
+}
+
+/**
+ * Get role flags for active team
+ * Uses shallow comparison to prevent infinite re-renders
+ */
+export function useTeamRoleFlags() {
+  const role = useTeamStore(state => {
+    const team = state.teams.find(t => t.id === state.activeTeamId);
+    return team?.my_role || null;
+  });
+  
+  return {
+    role,
+    isOwner: role === 'owner',
+    isCommander: role === 'commander',
+    isSquadCommander: role === 'squad_commander',
+    isSoldier: role === 'soldier',
+    canManage: role === 'owner' || role === 'commander',
+  };
 }

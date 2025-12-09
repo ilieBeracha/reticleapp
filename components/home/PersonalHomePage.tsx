@@ -378,10 +378,7 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
 
   // Featured content
   const featuredSession = activeSessions[0];
-  console.log(activeSessions)
-  console.log('featuredSession', featuredSession);
   const featuredTraining = ongoingTrainings[0] || plannedTrainings[0];
-  console.log('featuredTraining', featuredTraining);
 
   const isLoading = sessionsLoading || loadingMyTrainings;
 

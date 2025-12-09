@@ -1,8 +1,6 @@
 import { Header } from '@/components/Header';
-import { LoadingScreen } from '@/components/LoadingScreen';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { useColors } from '@/hooks/ui/useColors';
-import { useTeamStore } from '@/store/teamStore';
 import { router, Stack } from 'expo-router';
 
 /**
@@ -17,12 +15,6 @@ import { router, Stack } from 'expo-router';
  */
 export default function ProtectedLayout() {
   const colors = useColors();
-  const isSwitching = useTeamStore(state => state.isSwitching);
-
-  // Show full-screen loader when switching teams
-  if (isSwitching) {
-    return <LoadingScreen />;
-  }
 
   return (
     <ThemeProvider>

@@ -1,4 +1,10 @@
-import { useAppContext } from '@/hooks/useAppContext';
+/**
+ * DATA LOADING HOOK
+ * 
+ * Loads sessions based on active team context.
+ * Named "workspaceData" for legacy compatibility, but really just team sessions.
+ */
+
 import { useSessionStore } from '@/store/sessionStore';
 import { useTeamStore } from '@/store/teamStore';
 import type { TeamWithRole } from '@/types/workspace';
@@ -15,14 +21,12 @@ interface UseWorkspaceDataReturn {
 }
 
 /**
- * Hook to load and manage workspace data (teams and sessions)
+ * Hook to load teams and sessions
  * 
- * TEAM-FIRST ARCHITECTURE:
- * - Uses activeTeamId from team store
- * - Loads team sessions, not workspace sessions
+ * Note: "workspace" naming is legacy - this is team-first architecture
  */
 export function useWorkspaceData(): UseWorkspaceDataReturn {
-  const { activeTeamId } = useAppContext();
+  const { activeTeamId } = useTeamStore();
   const { sessions, loading: sessionsLoading, error: sessionsError, loadTeamSessions } = useSessionStore();
   const { teams, loading: loadingTeams, loadTeams: loadTeamsStore } = useTeamStore();
 
@@ -48,9 +52,8 @@ export function useWorkspaceData(): UseWorkspaceDataReturn {
     }
   }, [activeTeamId, loadTeamSessions]);
 
-  // Single effect to load data when team changes
+  // Load sessions when team changes
   useEffect(() => {
-    // Skip if team hasn't changed (prevents double loading)
     if (prevTeamIdRef.current === activeTeamId) {
       return;
     }
@@ -58,7 +61,6 @@ export function useWorkspaceData(): UseWorkspaceDataReturn {
     prevTeamIdRef.current = activeTeamId;
 
     if (activeTeamId) {
-      // Load sessions for the active team
       loadTeamSessions();
     }
   }, [activeTeamId, loadTeamSessions]);

@@ -98,17 +98,8 @@ export default function AcceptInviteSheet() {
           {
             text: "Open Team",
             onPress: () => {
-              useTeamStore.getState().setIsSwitching(true);
               useTeamStore.getState().setActiveTeam(result.team_id);
-              setTimeout(() => {
-                // Dismiss the sheet to go back to home
-                if (router.canDismiss()) {
-                  router.dismiss();
-                }
-                setTimeout(() => {
-                  useTeamStore.getState().setIsSwitching(false);
-                }, 300);
-              }, 200);
+              router.replace('/(protected)/team');
             },
           },
           {
@@ -318,14 +309,14 @@ export default function AcceptInviteSheet() {
               {validatedInvite.team_name || 'Team'}
             </Text>
             
-            <View style={[styles.roleIndicator, { backgroundColor: getRoleColor(validatedInvite.team_role) + '20' }]}>
+            <View style={[styles.roleIndicator, { backgroundColor: getRoleColor(validatedInvite.role) + '20' }]}>
               <Ionicons 
-                name={getRoleIcon(validatedInvite.team_role)} 
+                name={getRoleIcon(validatedInvite.role)} 
                 size={18} 
-                color={getRoleColor(validatedInvite.team_role)} 
+                color={getRoleColor(validatedInvite.role)} 
               />
-              <Text style={[styles.roleText, { color: getRoleColor(validatedInvite.team_role) }]}>
-                You'll join as {getRoleLabel(validatedInvite.team_role)}
+              <Text style={[styles.roleText, { color: getRoleColor(validatedInvite.role) }]}>
+                You'll join as {getRoleLabel(validatedInvite.role)}
               </Text>
             </View>
 
