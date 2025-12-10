@@ -2,10 +2,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
 import { useNotifications } from '@/hooks/useNotifications';
-import {
-  scheduleNotificationAfterSeconds,
-  sendImmediateNotification,
-} from '@/services/notificationService';
+import { sendTestNotification } from '@/services/notifications';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Bell, BellRing } from 'lucide-react-native';
@@ -47,30 +44,8 @@ export default function PersonalSettingsScreen() {
       }
     }
 
-    // Send a test notification in 3 seconds
-    await scheduleNotificationAfterSeconds(
-      '🎯 Test Notification',
-      'This is a test notification from Reticle!',
-      3,
-      { type: 'reminder', screen: 'personal' }
-    );
-
+    await sendTestNotification();
     Alert.alert('Notification Scheduled', 'You will receive a test notification in 3 seconds.');
-  }, [notificationsEnabled, requestPermission]);
-
-  const handleImmediateNotification = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
-    if (!notificationsEnabled) {
-      const granted = await requestPermission();
-      if (!granted) return;
-    }
-
-    await sendImmediateNotification(
-      '👋 Hello!',
-      'This notification was sent immediately.',
-      { type: 'reminder' }
-    );
   }, [notificationsEnabled, requestPermission]);
 
   const handleSignOut = useCallback(() => {

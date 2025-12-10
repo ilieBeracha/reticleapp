@@ -1,34 +1,53 @@
 import { BaseAvatar } from "@/components/BaseAvatar";
-import { RoleBadge } from "@/components/shared/RoleBadge";
-import { useModals } from "@/contexts/ModalContext";
 import { useColors } from "@/hooks/ui/useColors";
 import { removeTeamMember, updateTeamMemberRole } from "@/services/teamService";
-import { useTeamStore, useMyTeamRole, useCanManageTeam } from "@/store/teamStore";
+import { useCanManageTeam, useMyTeamRole, useTeamStore } from "@/store/teamStore";
 import type { TeamRole } from "@/types/workspace";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { formatDistanceToNow } from "date-fns";
 import * as Haptics from 'expo-haptics';
-import { useState, useMemo } from "react";
-import { ActionSheetIOS, ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ActionSheetIOS,
+  ActivityIndicator,
+  Alert,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ROLE CONFIG
+// ═══════════════════════════════════════════════════════════════════════════
+const ROLE_CONFIG: Record<string, { color: string; bg: string; label: string; icon: string }> = {
+  owner: { color: '#8B5CF6', bg: '#8B5CF620', label: 'Owner', icon: 'crown' },
+  commander: { color: '#EF4444', bg: '#EF444420', label: 'Commander', icon: 'shield-checkmark' },
+  squad_commander: { color: '#F59E0B', bg: '#F59E0B20', label: 'Squad Commander', icon: 'shield' },
+  soldier: { color: '#22C55E', bg: '#22C55E20', label: 'Soldier', icon: 'person' },
+};
 
 /**
  * MEMBER PREVIEW - Native Form Sheet (Team-First)
  * 
  * Permission Matrix:
  * - Team Owner/Commander: Can change team role, remove from team
- * - Everyone: Can view basic info
+ * - Everyone: Can view basic info and activity
  */
 export default function MemberPreviewSheet() {
   const colors = useColors();
-  const { selectedMember: member, setSelectedMember } = useModals();
-  const { activeTeamId, loadMembers } = useTeamStore();
+  const params = useLocalSearchParams<{ id?: string }>();
+  const { activeTeamId, activeTeam, members, loadMembers } = useTeamStore();
   const myRole = useMyTeamRole();
   const canManage = useCanManageTeam();
   const [loading, setLoading] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Get current user ID
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  useMemo(() => {
+  useEffect(() => {
     import('@/lib/supabase').then(({ supabase }) => {
       supabase.auth.getUser().then(({ data }) => {
         if (data.user) setCurrentUserId(data.user.id);
@@ -36,51 +55,51 @@ export default function MemberPreviewSheet() {
     });
   }, []);
 
-  if (!member) {
-    return (
-      <View style={[styles.emptyContainer, { backgroundColor: colors.card }]}>
-        <Text style={[styles.emptyText, { color: colors.textMuted }]}>No member selected</Text>
-      </View>
-    );
-  }
+  // Find member from store
+  const member = useMemo(() => {
+    if (!params.id) return null;
+    return members.find(m => m.user_id === params.id);
+  }, [params.id, members]);
 
-  // Permission checks (team-first)
-  const isTargetOwner = member.role === 'owner';
-  const isTargetSelf = member.member_id === currentUserId;
-  
-  // Determine what actions are available
-  const canViewActivity = true; // Everyone can view
+  // Get role config
+  const memberRole = member?.role?.role || 'soldier';
+  const roleConfig = ROLE_CONFIG[memberRole] || ROLE_CONFIG.soldier;
+
+  // Permission checks
+  const isTargetOwner = memberRole === 'owner';
+  const isTargetSelf = member?.user_id === currentUserId;
   const canManageTeamRole = canManage && !isTargetOwner && !isTargetSelf;
   const canRemoveFromTeam = canManage && !isTargetOwner && !isTargetSelf;
 
-  // Team role options
+  // Team role options (excluding owner)
   const teamRoleOptions: TeamRole[] = ['commander', 'squad_commander', 'soldier'];
 
-  const handleViewActivity = () => {
+  const handleViewActivity = useCallback(() => {
+    if (!member) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push({
       pathname: '/(protected)/memberActivity',
-      params: { memberId: member.member_id, memberName: member.profile_full_name || 'Member' }
+      params: { memberId: member.user_id, memberName: member.profile?.full_name || 'Member' }
     });
-  };
+  }, [member]);
 
-  const handleChangeTeamRole = () => {
-    if (!activeTeamId) return;
+  const handleChangeTeamRole = useCallback(() => {
+    if (!activeTeamId || !member) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
-    const currentRole = member.role;
+    const currentRole = memberRole;
     const availableRoles = teamRoleOptions.filter(r => r !== currentRole);
     
-    const options = [...availableRoles, 'Cancel'];
+    const options = [...availableRoles.map(r => r.replace(/_/g, ' ')), 'Cancel'];
     const cancelButtonIndex = options.length - 1;
     
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          options: options.map(o => o === 'Cancel' ? o : o.replace('_', ' ')),
+          options,
           cancelButtonIndex,
           title: 'Change Team Role',
-          message: `Current role: ${currentRole.replace('_', ' ')}`,
+          message: `Current role: ${currentRole.replace(/_/g, ' ')}`,
         },
         async (buttonIndex) => {
           if (buttonIndex !== cancelButtonIndex) {
@@ -92,26 +111,26 @@ export default function MemberPreviewSheet() {
     } else {
       Alert.alert(
         'Change Team Role',
-        `Current role: ${currentRole.replace('_', ' ')}\n\nSelect new role:`,
+        `Current role: ${currentRole.replace(/_/g, ' ')}\n\nSelect new role:`,
         [
           ...availableRoles.map(role => ({
-            text: role.replace('_', ' '),
+            text: role.replace(/_/g, ' '),
             onPress: () => updateTeamRole(role),
           })),
           { text: 'Cancel', style: 'cancel' as const },
         ]
       );
     }
-  };
+  }, [activeTeamId, member, memberRole]);
 
   const updateTeamRole = async (newRole: TeamRole) => {
-    if (!activeTeamId) return;
+    if (!activeTeamId || !member) return;
     try {
       setLoading(true);
-      await updateTeamMemberRole(activeTeamId, member.member_id, newRole);
+      await updateTeamMemberRole(activeTeamId, member.user_id, newRole);
       await loadMembers();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Success', `Role changed to ${newRole.replace('_', ' ')}`);
+      Alert.alert('Success', `Role changed to ${newRole.replace(/_/g, ' ')}`);
       router.back();
     } catch (error: any) {
       console.error('Failed to update team role:', error);
@@ -121,12 +140,12 @@ export default function MemberPreviewSheet() {
     }
   };
 
-  const handleRemoveFromTeam = () => {
-    if (!activeTeamId) return;
+  const handleRemoveFromTeam = useCallback(() => {
+    if (!activeTeamId || !member) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert(
       'Remove from Team',
-      `Remove ${member.profile_full_name || 'this member'} from this team?`,
+      `Remove ${member.profile?.full_name || 'this member'} from ${activeTeam?.name || 'this team'}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -135,10 +154,9 @@ export default function MemberPreviewSheet() {
           onPress: async () => {
             try {
               setLoading(true);
-              await removeTeamMember(activeTeamId, member.member_id);
+              await removeTeamMember(activeTeamId, member.user_id);
               await loadMembers();
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              setSelectedMember(null);
               router.back();
             } catch (error: any) {
               console.error('Failed to remove from team:', error);
@@ -149,180 +167,305 @@ export default function MemberPreviewSheet() {
         },
       ]
     );
-  };
+  }, [activeTeamId, activeTeam, member, loadMembers]);
 
+  // Loading state
   if (loading) {
     return (
-      <View style={[styles.emptyContainer, { backgroundColor: colors.card }]}>
+      <View style={[styles.centerContainer, { backgroundColor: colors.card }]}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.emptyText, { color: colors.textMuted, marginTop: 12 }]}>Processing...</Text>
+        <Text style={[styles.loadingText, { color: colors.textMuted }]}>Processing...</Text>
       </View>
     );
   }
 
+  // No member state
+  if (!member) {
+    return (
+      <View style={[styles.centerContainer, { backgroundColor: colors.card }]}>
+        <Ionicons name="person-outline" size={48} color={colors.textMuted} />
+        <Text style={[styles.emptyText, { color: colors.textMuted }]}>Member not found</Text>
+      </View>
+    );
+  }
+
+  const joinedAt = member.joined_at
+    ? formatDistanceToNow(new Date(member.joined_at), { addSuffix: true })
+    : null;
+
   return (
     <ScrollView
-      style={styles.scrollView}
+      style={[styles.scrollView, { backgroundColor: colors.card }]}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
     >
-        {/* Header */}
-        <View style={styles.header}>
-          <BaseAvatar fallbackText={member.profile_full_name || 'UN'} size="lg" role={member.role} />
-          <View style={styles.headerText}>
-            <Text style={[styles.title, { color: colors.text }]}>{member.profile_full_name || 'Unknown'}</Text>
-            <Text style={[styles.subtitle, { color: colors.textMuted }]}>{member.profile_email}</Text>
-            <View style={styles.roleBadgeContainer}>
-              <RoleBadge role={member.role} />
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.avatarContainer}>
+          <BaseAvatar
+            source={member.profile?.avatar_url ? { uri: member.profile.avatar_url } : undefined}
+            fallbackText={member.profile?.full_name || 'UN'}
+            size="xl"
+            role={memberRole}
+          />
+          {isTargetSelf && (
+            <View style={[styles.selfBadge, { backgroundColor: colors.primary }]}>
+              <Text style={styles.selfBadgeText}>You</Text>
             </View>
-          </View>
+          )}
         </View>
 
-        {/* Teams Section */}
-        {member.teams && member.teams.length > 0 && (
-          <View style={[styles.section, { backgroundColor: colors.background, borderColor: colors.border }]}>
-            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Teams</Text>
-            <View style={styles.teamsList}>
-              {member.teams.map((team: any, index: number) => {
-                // Check if current user can manage this team
-                const canManageThisTeam = allTeams.some(
-                  myTeam => myTeam.teamId === team.team_id && 
-                  (myTeam.teamRole === 'commander' || myTeam.teamRole === 'squad_commander')
-                ) || isOrgStaff;
-                
-                return (
-                  <TouchableOpacity 
-                    key={team.team_id || index} 
-                    style={[styles.teamBadge, { backgroundColor: colors.secondary }]}
-                    onPress={() => {
-                      if (canManageThisTeam && !isTargetSelf) {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        const options = ['Change Role', 'Remove from Team', 'Cancel'];
-                        if (Platform.OS === 'ios') {
-                          ActionSheetIOS.showActionSheetWithOptions(
-                            { options, cancelButtonIndex: 2, destructiveButtonIndex: 1, title: team.team_name },
-                            (idx) => {
-                              if (idx === 0) handleChangeTeamRole(team.team_id, team.team_name, team.team_role);
-                              if (idx === 1) handleRemoveFromTeam(team.team_id, team.team_name);
-                            }
-                          );
-                        } else {
-                          Alert.alert(team.team_name, 'Select action:', [
-                            { text: 'Change Role', onPress: () => handleChangeTeamRole(team.team_id, team.team_name, team.team_role) },
-                            { text: 'Remove from Team', style: 'destructive', onPress: () => handleRemoveFromTeam(team.team_id, team.team_name) },
-                            { text: 'Cancel', style: 'cancel' },
-                          ]);
-                        }
-                      }
-                    }}
-                    activeOpacity={canManageThisTeam && !isTargetSelf ? 0.7 : 1}
-                    disabled={!canManageThisTeam || isTargetSelf}
-                  >
-                    <Ionicons name="people" size={14} color={colors.text} style={{ marginRight: 4 }} />
-                    <Text style={[styles.teamText, { color: colors.text }]}>{team.team_name || 'Unknown Team'}</Text>
-                    {team.team_role && (
-                      <Text style={[styles.teamRoleText, { color: colors.textMuted }]}> • {team.team_role.replace('_', ' ')}</Text>
-                    )}
-                    {canManageThisTeam && !isTargetSelf && (
-                      <Ionicons name="chevron-forward" size={12} color={colors.textMuted} style={{ marginLeft: 4 }} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
+        <Text style={[styles.memberName, { color: colors.text }]}>
+          {member.profile?.full_name || 'Unknown'}
+        </Text>
+
+        {member.profile?.email && (
+          <Text style={[styles.memberEmail, { color: colors.textMuted }]}>
+            {member.profile.email}
+          </Text>
         )}
 
-        {/* Actions Section */}
-        <View style={[styles.section, { backgroundColor: colors.background, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Actions</Text>
-          <View style={styles.actionsList}>
-            {/* View Activity - Available to everyone */}
-            <TouchableOpacity 
-              style={[styles.actionButton, { borderBottomColor: colors.border }]} 
-              onPress={handleViewActivity} 
-              activeOpacity={0.7}
-            >
-              <View style={styles.actionContent}>
-                <Ionicons name="stats-chart" size={20} color={colors.text} />
-                <Text style={[styles.actionText, { color: colors.text }]}>View Activity</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-            </TouchableOpacity>
-
-            {/* Change Team Role - Only for managers */}
-            {canManageTeamRole && (
-              <TouchableOpacity
-                style={[styles.actionButton, { borderBottomColor: colors.border }]}
-                onPress={handleChangeTeamRole}
-                activeOpacity={0.7}
-              >
-                <View style={styles.actionContent}>
-                  <Ionicons name="shield-checkmark" size={20} color={colors.text} />
-                  <Text style={[styles.actionText, { color: colors.text }]}>Change Team Role</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-              </TouchableOpacity>
-            )}
-
-            {/* Remove from Team - Only for managers */}
-            {canRemoveFromTeam && (
-              <TouchableOpacity 
-                style={styles.actionButton} 
-                onPress={handleRemoveFromTeam} 
-                activeOpacity={0.7}
-              >
-                <View style={styles.actionContent}>
-                  <Ionicons name="person-remove" size={20} color="#ef4444" />
-                  <Text style={[styles.actionText, { color: '#ef4444' }]}>Remove from Team</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-              </TouchableOpacity>
-            )}
-          </View>
+        {/* Role Badge */}
+        <View style={[styles.roleBadge, { backgroundColor: roleConfig.bg }]}>
+          <Ionicons name={roleConfig.icon as any} size={14} color={roleConfig.color} />
+          <Text style={[styles.roleText, { color: roleConfig.color }]}>{roleConfig.label}</Text>
         </View>
 
-        {/* Info notes */}
-        {isTargetOwner && (
+        {joinedAt && (
+          <Text style={[styles.joinedText, { color: colors.textMuted }]}>
+            Joined {joinedAt}
+          </Text>
+        )}
+      </View>
+
+      {/* Team Info */}
+      {activeTeam && (
+        <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <View style={styles.cardHeader}>
+            <View style={[styles.cardIcon, { backgroundColor: colors.secondary }]}>
+              <Ionicons name="people" size={18} color={colors.text} />
+            </View>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Team</Text>
+          </View>
+          <Text style={[styles.teamName, { color: colors.text }]}>{activeTeam.name}</Text>
+        </View>
+      )}
+
+      {/* Actions */}
+      <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.border }]}>
+        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>ACTIONS</Text>
+
+        {/* View Activity */}
+        <TouchableOpacity
+          style={[styles.actionRow, { borderBottomColor: colors.border }]}
+          onPress={handleViewActivity}
+          activeOpacity={0.7}
+        >
+          <View style={styles.actionLeft}>
+            <View style={[styles.actionIcon, { backgroundColor: colors.primary + '20' }]}>
+              <Ionicons name="stats-chart" size={18} color={colors.primary} />
+            </View>
+            <Text style={[styles.actionText, { color: colors.text }]}>View Activity</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+
+        {/* Change Role - Managers only */}
+        {canManageTeamRole && (
+          <TouchableOpacity
+            style={[styles.actionRow, { borderBottomColor: colors.border }]}
+            onPress={handleChangeTeamRole}
+            activeOpacity={0.7}
+          >
+            <View style={styles.actionLeft}>
+              <View style={[styles.actionIcon, { backgroundColor: '#F59E0B20' }]}>
+                <Ionicons name="shield-checkmark" size={18} color="#F59E0B" />
+              </View>
+              <Text style={[styles.actionText, { color: colors.text }]}>Change Role</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
+
+        {/* Remove from Team - Managers only */}
+        {canRemoveFromTeam && (
+          <TouchableOpacity
+            style={styles.actionRow}
+            onPress={handleRemoveFromTeam}
+            activeOpacity={0.7}
+          >
+            <View style={styles.actionLeft}>
+              <View style={[styles.actionIcon, { backgroundColor: '#EF444420' }]}>
+                <Ionicons name="person-remove" size={18} color="#EF4444" />
+              </View>
+              <Text style={[styles.actionText, { color: '#EF4444' }]}>Remove from Team</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Info notes */}
+      {isTargetOwner && (
+        <View style={[styles.noteCard, { backgroundColor: colors.secondary }]}>
+          <Ionicons name="information-circle" size={16} color={colors.textMuted} />
           <Text style={[styles.noteText, { color: colors.textMuted }]}>
             Team owners cannot be edited or removed
           </Text>
-        )}
-        {isTargetSelf && !isTargetOwner && (
+        </View>
+      )}
+      {isTargetSelf && !isTargetOwner && (
+        <View style={[styles.noteCard, { backgroundColor: colors.secondary }]}>
+          <Ionicons name="information-circle" size={16} color={colors.textMuted} />
           <Text style={[styles.noteText, { color: colors.textMuted }]}>
-            You cannot modify your own role or remove yourself
+            You cannot modify your own role
           </Text>
-        )}
+        </View>
+      )}
+
+      <View style={{ height: 40 }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   scrollView: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 40, gap: 24 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 16 },
 
-  emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 40 },
-  emptyText: { fontSize: 15, fontStyle: 'italic' },
+  centerContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  loadingText: { fontSize: 14 },
+  emptyText: { fontSize: 15, marginTop: 8 },
 
-  header: { flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
-  headerText: { flex: 1, gap: 4 },
-  title: { fontSize: 24, fontWeight: '700', letterSpacing: -0.5 },
-  subtitle: { fontSize: 14, fontWeight: '500' },
-  roleBadgeContainer: { marginTop: 8, alignSelf: 'flex-start' },
+  // Header
+  header: {
+    alignItems: 'center',
+    paddingBottom: 24,
+    marginBottom: 8,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  selfBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: -4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  selfBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  memberName: {
+    fontSize: 24,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  memberEmail: {
+    fontSize: 14,
+    marginBottom: 12,
+  },
+  roleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  roleText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  joinedText: {
+    fontSize: 12,
+    marginTop: 4,
+  },
 
-  section: { padding: 16, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, gap: 8 },
-  sectionTitle: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  // Cards
+  card: {
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  cardIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  teamName: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
 
-  teamsList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  teamBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  teamText: { fontSize: 14, fontWeight: '500' },
-  teamRoleText: { fontSize: 12, fontWeight: '400' },
+  // Actions
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 12,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  actionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  actionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
 
-  actionsList: { gap: 0 },
-  actionButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  actionContent: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  actionText: { fontSize: 15, fontWeight: '500' },
-
-  noteText: { fontSize: 13, fontStyle: 'italic', textAlign: 'center', paddingHorizontal: 16 },
+  // Note
+  noteCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  noteText: {
+    flex: 1,
+    fontSize: 13,
+  },
 });
-

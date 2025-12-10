@@ -1,8 +1,8 @@
 import {
-    areNotificationsEnabled,
-    NotificationData,
-    registerForPushNotificationsAsync,
-} from '@/services/notificationService';
+  areNotificationsEnabled,
+  type NotificationData,
+  registerForPushNotificationsAsync,
+} from '@/services/notifications';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -24,8 +24,8 @@ export function useNotifications(): UseNotificationsResult {
   const [notification, setNotification] = useState<Notifications.Notification | null>(null);
   const [isEnabled, setIsEnabled] = useState(false);
 
-  const notificationListener = useRef<Notifications.Subscription>();
-  const responseListener = useRef<Notifications.Subscription>();
+  const notificationListener = useRef<ReturnType<typeof Notifications.addNotificationReceivedListener> | null>(null);
+  const responseListener = useRef<ReturnType<typeof Notifications.addNotificationResponseReceivedListener> | null>(null);
 
   // Check initial permission status
   useEffect(() => {
@@ -35,9 +35,10 @@ export function useNotifications(): UseNotificationsResult {
   // Set up notification listeners
   useEffect(() => {
     // Register for push notifications
-    registerForPushNotificationsAsync().then((token) => {
-      if (token) {
-        setExpoPushToken(token);
+    registerForPushNotificationsAsync().then((token: string | null) => {
+      // token is null if permission denied, empty string on simulator, or actual token on device
+      if (token !== null) {
+        setExpoPushToken(token || null);
         setIsEnabled(true);
       }
     });
@@ -59,10 +60,10 @@ export function useNotifications(): UseNotificationsResult {
 
     return () => {
       if (notificationListener.current) {
-        Notifications.removeNotificationSubscription(notificationListener.current);
+        notificationListener.current.remove();
       }
       if (responseListener.current) {
-        Notifications.removeNotificationSubscription(responseListener.current);
+        responseListener.current.remove();
       }
     };
   }, []);
@@ -70,8 +71,9 @@ export function useNotifications(): UseNotificationsResult {
   // Request permission manually
   const requestPermission = async (): Promise<boolean> => {
     const token = await registerForPushNotificationsAsync();
-    if (token) {
-      setExpoPushToken(token);
+    // token is null if denied, empty string on simulator (still works for local), or actual token
+    if (token !== null) {
+      setExpoPushToken(token || null);
       setIsEnabled(true);
       return true;
     }
