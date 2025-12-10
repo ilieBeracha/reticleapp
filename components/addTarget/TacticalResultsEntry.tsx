@@ -1,21 +1,244 @@
-import React from "react";
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
+import { ArrowLeft, Check, Crosshair, Minus, Plus, Target, Timer } from "lucide-react-native";
+import React, { useCallback } from "react";
+import {
+    ActivityIndicator,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from "react-native";
 import { COLORS } from "./types";
 
 // ═══════════════════════════════════════════════════════════════════════════
+// CIRCULAR STEPPER COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════
+interface CircularStepperProps {
+  value: number;
+  max: number;
+  onChange: (value: number) => void;
+  label: string;
+  sublabel?: string;
+}
+
+const CircularStepper = React.memo(function CircularStepper({
+  value,
+  max,
+  onChange,
+  label,
+  sublabel,
+}: CircularStepperProps) {
+  const handleDecrement = useCallback(() => {
+    if (value > 0) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      onChange(value - 1);
+    }
+  }, [value, onChange]);
+
+  const handleIncrement = useCallback(() => {
+    if (value < max) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      onChange(value + 1);
+    }
+  }, [value, max, onChange]);
+
+  const percentage = max > 0 ? Math.round((value / max) * 100) : 0;
+  const isGood = percentage >= 80;
+  const isOkay = percentage >= 50 && percentage < 80;
+
+  return (
+    <View style={stepperStyles.container}>
+      <Text style={stepperStyles.label}>{label}</Text>
+      {sublabel && <Text style={stepperStyles.sublabel}>{sublabel}</Text>}
+      
+      <View style={stepperStyles.row}>
+        <TouchableOpacity
+          style={[stepperStyles.btn, value <= 0 && stepperStyles.btnDisabled]}
+          onPress={handleDecrement}
+          disabled={value <= 0}
+          activeOpacity={0.7}
+        >
+          <Minus size={28} color={value <= 0 ? COLORS.textDim : COLORS.white} strokeWidth={2.5} />
+        </TouchableOpacity>
+
+        <View style={stepperStyles.valueContainer}>
+          <View style={[
+            stepperStyles.valueRing,
+            isGood && stepperStyles.valueRingGood,
+            isOkay && stepperStyles.valueRingOkay,
+            !isGood && !isOkay && value > 0 && stepperStyles.valueRingBad,
+          ]}>
+            <Text style={stepperStyles.value}>{value}</Text>
+            <Text style={stepperStyles.maxLabel}>/ {max}</Text>
+          </View>
+          <Text style={[
+            stepperStyles.percentage,
+            isGood && { color: COLORS.primary },
+            isOkay && { color: COLORS.warning },
+            !isGood && !isOkay && value > 0 && { color: COLORS.danger },
+          ]}>
+            {percentage}% accuracy
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={[stepperStyles.btn, value >= max && stepperStyles.btnDisabled]}
+          onPress={handleIncrement}
+          disabled={value >= max}
+          activeOpacity={0.7}
+        >
+          <Plus size={28} color={value >= max ? COLORS.textDim : COLORS.white} strokeWidth={2.5} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Quick select all/none */}
+      <View style={stepperStyles.quickRow}>
+        <TouchableOpacity
+          style={[stepperStyles.quickBtn, value === 0 && stepperStyles.quickBtnActive]}
+          onPress={() => {
+            Haptics.selectionAsync();
+            onChange(0);
+          }}
+        >
+          <Text style={[stepperStyles.quickText, value === 0 && stepperStyles.quickTextActive]}>
+            None
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[stepperStyles.quickBtn, value === Math.floor(max / 2) && stepperStyles.quickBtnActive]}
+          onPress={() => {
+            Haptics.selectionAsync();
+            onChange(Math.floor(max / 2));
+          }}
+        >
+          <Text style={[stepperStyles.quickText, value === Math.floor(max / 2) && stepperStyles.quickTextActive]}>
+            Half
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[stepperStyles.quickBtn, value === max && stepperStyles.quickBtnActive]}
+          onPress={() => {
+            Haptics.selectionAsync();
+            onChange(max);
+          }}
+        >
+          <Text style={[stepperStyles.quickText, value === max && stepperStyles.quickTextActive]}>
+            All
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+});
+
+const stepperStyles = StyleSheet.create({
+  container: {
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  sublabel: {
+    fontSize: 13,
+    color: COLORS.textDim,
+    marginBottom: 16,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 24,
+  },
+  btn: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: COLORS.card,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+  },
+  btnDisabled: {
+    opacity: 0.4,
+  },
+  valueContainer: {
+    alignItems: "center",
+  },
+  valueRing: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: COLORS.card,
+    borderWidth: 3,
+    borderColor: COLORS.borderLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  valueRingGood: {
+    borderColor: COLORS.primary,
+    backgroundColor: `${COLORS.primary}15`,
+  },
+  valueRingOkay: {
+    borderColor: COLORS.warning,
+    backgroundColor: `${COLORS.warning}15`,
+  },
+  valueRingBad: {
+    borderColor: COLORS.danger,
+    backgroundColor: `${COLORS.danger}15`,
+  },
+  value: {
+    fontSize: 36,
+    fontWeight: "700",
+    color: COLORS.white,
+    fontVariant: ["tabular-nums"],
+  },
+  maxLabel: {
+    fontSize: 13,
+    color: COLORS.textDim,
+    marginTop: -2,
+  },
+  percentage: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    marginTop: 10,
+    fontWeight: "500",
+  },
+  quickRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 20,
+  },
+  quickBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: COLORS.card,
+  },
+  quickBtnActive: {
+    backgroundColor: `${COLORS.primary}25`,
+  },
+  quickText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.textMuted,
+  },
+  quickTextActive: {
+    color: COLORS.primary,
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // TACTICAL RESULTS ENTRY
-// Form for logging tactical target results (hits, time, etc.)
 // ═══════════════════════════════════════════════════════════════════════════
 
 interface TacticalResultsEntryProps {
@@ -50,128 +273,104 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
   saving,
 }: TacticalResultsEntryProps) {
   const hitsNum = parseInt(hits) || 0;
-  const accuracyPct = plannedRounds > 0 ? Math.round((hitsNum / plannedRounds) * 100) : 0;
+
+  const handleHitsChange = useCallback((value: number) => {
+    setHits(value.toString());
+  }, [setHits]);
 
   return (
     <ScrollView
       style={styles.scrollView}
       contentContainerStyle={styles.scrollContent}
       keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
     >
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
+          <ArrowLeft size={20} color={COLORS.white} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Log Results</Text>
-          <Text style={styles.headerSubtitle}>Tactical target at {distance}m</Text>
+          <View style={styles.headerMeta}>
+            <Crosshair size={14} color={COLORS.primary} />
+            <Text style={styles.headerSubtitle}>
+              Tactical • {distance}m • {plannedRounds} rounds
+            </Text>
+          </View>
         </View>
         <View style={{ width: 36 }} />
       </View>
 
-      {/* Summary Card */}
-      <View style={styles.summaryCard}>
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{plannedRounds}</Text>
-          <Text style={styles.summaryLabel}>Rounds</Text>
-        </View>
-        <View style={styles.summaryDivider} />
-        <View style={styles.summaryItem}>
-          <Text style={[styles.summaryValue, { color: COLORS.primary }]}>{hitsNum}</Text>
-          <Text style={styles.summaryLabel}>Hits</Text>
-        </View>
-        <View style={styles.summaryDivider} />
-        <View style={styles.summaryItem}>
-          <Text
-            style={[
-              styles.summaryValue,
-              accuracyPct >= 80
-                ? { color: COLORS.primary }
-                : accuracyPct >= 50
-                  ? { color: COLORS.warning }
-                  : { color: COLORS.danger },
-            ]}
-          >
-            {accuracyPct}%
-          </Text>
-          <Text style={styles.summaryLabel}>Accuracy</Text>
-        </View>
+      {/* Main Hits Stepper */}
+      <View style={styles.hitsSection}>
+        <CircularStepper
+          value={hitsNum}
+          max={plannedRounds}
+          onChange={handleHitsChange}
+          label="Hits on Target"
+          sublabel={`Out of ${plannedRounds} rounds fired`}
+        />
       </View>
 
-      {/* Hits Input */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Hits on Target</Text>
-        <View style={styles.hitsRow}>
-          {[0, 1, 2, 3, 4, 5].map((num) => (
-            <TouchableOpacity
-              key={num}
-              style={[styles.hitChip, hits === num.toString() && styles.hitChipSelected]}
-              onPress={() => setHits(num.toString())}
-            >
-              <Text style={[styles.hitChipText, hits === num.toString() && styles.hitChipTextSelected]}>
-                {num}
-              </Text>
-            </TouchableOpacity>
-          ))}
+      {/* Time Input - Modern card style */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardIconBox}>
+            <Timer size={18} color={COLORS.primary} />
+          </View>
+          <View style={styles.cardHeaderText}>
+            <Text style={styles.cardTitle}>Engagement Time</Text>
+            <Text style={styles.cardHint}>Optional - how fast?</Text>
+          </View>
         </View>
-        <View style={styles.inputContainer}>
+        <View style={styles.timeInputContainer}>
           <TextInput
-            style={styles.input}
-            value={hits}
-            onChangeText={setHits}
-            placeholder={`Custom (max ${plannedRounds})`}
-            placeholderTextColor={COLORS.textDimmer}
-            keyboardType="number-pad"
-            returnKeyType="done"
-          />
-        </View>
-      </View>
-
-      {/* Time Input */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          Engagement Time <Text style={styles.optionalLabel}>(optional)</Text>
-        </Text>
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
+            style={styles.timeInput}
             value={time}
             onChangeText={setTime}
-            placeholder="e.g. 4.5"
-            placeholderTextColor={COLORS.textDimmer}
+            placeholder="0.0"
+            placeholderTextColor={COLORS.textDim}
             keyboardType="decimal-pad"
             returnKeyType="done"
           />
-          <Text style={styles.inputUnit}>sec</Text>
+          <Text style={styles.timeUnit}>seconds</Text>
         </View>
       </View>
 
       {/* Stage Cleared Toggle */}
-      <View style={styles.toggleSection}>
-        <View style={styles.toggleInfo}>
-          <Text style={styles.toggleTitle}>Stage Cleared</Text>
-          <Text style={styles.toggleHint}>Did you complete the tactical stage?</Text>
+      <View style={styles.toggleCard}>
+        <View style={styles.toggleLeft}>
+          <View style={[styles.cardIconBox, stageCleared && styles.cardIconBoxActive]}>
+            <Check size={18} color={stageCleared ? "#000" : COLORS.textMuted} />
+          </View>
+          <View>
+            <Text style={styles.toggleTitle}>Stage Cleared</Text>
+            <Text style={styles.toggleHint}>Completed tactical objective?</Text>
+          </View>
         </View>
         <Switch
           value={stageCleared}
-          onValueChange={setStageCleared}
-          trackColor={{ false: COLORS.borderLight, true: "rgba(16, 185, 129, 0.4)" }}
+          onValueChange={(val) => {
+            Haptics.selectionAsync();
+            setStageCleared(val);
+          }}
+          trackColor={{ false: COLORS.borderLight, true: `${COLORS.primary}50` }}
           thumbColor={stageCleared ? COLORS.primary : "#6B7280"}
         />
       </View>
 
       {/* Notes */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
+      <View style={styles.notesSection}>
+        <Text style={styles.notesLabel}>
           Notes <Text style={styles.optionalLabel}>(optional)</Text>
         </Text>
         <TextInput
           style={styles.notesInput}
           value={notes}
           onChangeText={setNotes}
-          placeholder="Add any notes about this target..."
-          placeholderTextColor={COLORS.textDimmer}
+          placeholder="Any notes about this engagement..."
+          placeholderTextColor={COLORS.textDim}
           multiline
           numberOfLines={3}
         />
@@ -182,10 +381,10 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
         style={styles.saveButton}
         onPress={onSave}
         activeOpacity={0.9}
-        disabled={saving || !hits}
+        disabled={saving}
       >
         <LinearGradient
-          colors={saving || !hits ? ["#6B7280", "#9CA3AF"] : [COLORS.primary, COLORS.primaryLight, COLORS.primaryLighter]}
+          colors={saving ? ["#6B7280", "#9CA3AF"] : [COLORS.primary, COLORS.primaryLight, COLORS.primaryLighter]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.saveButtonGradient}
@@ -194,7 +393,7 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
             <ActivityIndicator color="#000" size="small" />
           ) : (
             <>
-              <Ionicons name="checkmark-circle" size={22} color="#000" />
+              <Target size={20} color="#000" />
               <Text style={styles.saveButtonText}>Save Target</Text>
             </>
           )}
@@ -205,7 +404,7 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
         <Text style={styles.cancelButtonText}>Back to Setup</Text>
       </TouchableOpacity>
 
-      <View style={{ height: 40 }} />
+      <View style={{ height: 30 }} />
     </ScrollView>
   );
 });
@@ -217,78 +416,154 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
   },
-  
+
   // Header
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 28,
-    marginTop: 20,
+    marginBottom: 24,
+    marginTop: 16,
   },
   headerCenter: {
     flex: 1,
     alignItems: "center",
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "700",
     color: COLORS.white,
   },
+  headerMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 4,
+  },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: COLORS.textMuted,
-    marginTop: 2,
   },
   backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.cardHover,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.card,
     alignItems: "center",
     justifyContent: "center",
   },
-  
-  // Summary
-  summaryCard: {
-    flexDirection: "row",
+
+  // Hits Section
+  hitsSection: {
+    backgroundColor: COLORS.card,
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  // Card
+  card: {
     backgroundColor: COLORS.card,
     borderRadius: 16,
-    padding: 20,
-    marginBottom: 28,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
-  summaryItem: {
-    flex: 1,
+  cardHeader: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: 12,
+    marginBottom: 14,
   },
-  summaryValue: {
-    fontSize: 32,
-    fontWeight: "700",
+  cardIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: `${COLORS.primary}20`,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardIconBoxActive: {
+    backgroundColor: COLORS.primary,
+  },
+  cardHeaderText: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: "600",
     color: COLORS.white,
   },
-  summaryLabel: {
+  cardHint: {
     fontSize: 12,
-    color: COLORS.textMuted,
-    marginTop: 4,
-    textTransform: "uppercase",
+    color: COLORS.textDim,
+    marginTop: 1,
   },
-  summaryDivider: {
-    width: 1,
-    backgroundColor: COLORS.borderLight,
-    marginHorizontal: 12,
+
+  // Time Input
+  timeInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.cardHover,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 52,
   },
-  
-  // Section
-  section: {
-    marginBottom: 28,
-  },
-  sectionTitle: {
-    fontSize: 14,
+  timeInput: {
+    flex: 1,
+    fontSize: 24,
     fontWeight: "600",
-    color: COLORS.text,
-    marginBottom: 12,
+    color: COLORS.white,
+    fontVariant: ["tabular-nums"],
+  },
+  timeUnit: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+    marginLeft: 8,
+  },
+
+  // Toggle
+  toggleCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  toggleLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  toggleTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: COLORS.white,
+  },
+  toggleHint: {
+    fontSize: 12,
+    color: COLORS.textDim,
+    marginTop: 1,
+  },
+
+  // Notes
+  notesSection: {
+    marginBottom: 24,
+  },
+  notesLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.textMuted,
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
+    marginBottom: 10,
   },
   optionalLabel: {
     fontWeight: "400",
@@ -296,97 +571,21 @@ const styles = StyleSheet.create({
     textTransform: "none",
     letterSpacing: 0,
   },
-  
-  // Hits
-  hitsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 12,
-  },
-  hitChip: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: COLORS.cardHover,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  hitChipSelected: {
-    backgroundColor: COLORS.primary,
-  },
-  hitChipText: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: COLORS.textMuted,
-  },
-  hitChipTextSelected: {
-    color: "#000",
-  },
-  
-  // Input
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    height: 48,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: COLORS.white,
-  },
-  inputUnit: {
-    fontSize: 14,
-    color: COLORS.textDim,
-    marginLeft: 8,
-  },
-  
-  // Toggle
-  toggleSection: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  notesInput: {
     backgroundColor: COLORS.card,
     borderRadius: 14,
     padding: 16,
-    marginBottom: 28,
-  },
-  toggleInfo: {
-    flex: 1,
-    marginRight: 16,
-  },
-  toggleTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: COLORS.white,
-  },
-  toggleHint: {
-    fontSize: 13,
-    color: COLORS.textDim,
-    marginTop: 2,
-  },
-  
-  // Notes
-  notesInput: {
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
+    fontSize: 15,
     color: COLORS.white,
     minHeight: 80,
     textAlignVertical: "top",
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  
+
   // Buttons
   saveButton: {
-    borderRadius: 28,
+    borderRadius: 14,
     overflow: "hidden",
     marginBottom: 12,
   },
@@ -394,22 +593,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    height: 56,
+    height: 54,
     gap: 10,
   },
   saveButtonText: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: "700",
     color: "#000",
   },
   cancelButton: {
     alignItems: "center",
-    paddingBottom: 20,
+    paddingVertical: 12,
   },
   cancelButtonText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "600",
     color: COLORS.textMuted,
   },
 });
-

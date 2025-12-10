@@ -5,6 +5,7 @@ import { useTeamStore } from "./teamStore";
 interface SessionStore {
   sessions: SessionWithDetails[];
   loading: boolean;
+  initialized: boolean;
   error: string | null;
   loadTeamSessions: () => Promise<void>;
   loadSessions: () => Promise<void>;
@@ -23,6 +24,7 @@ interface SessionStore {
 export const useSessionStore = create<SessionStore>((set, get) => ({
   sessions: [],
   loading: false,
+  initialized: false,
   error: null,
   
   createSession: async (params: CreateSessionParams) => {
@@ -44,17 +46,18 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     // Prevent duplicate loading
     if (get().loading) return;
     
-    // Only show loading spinner on initial load, not refresh
-    const isInitialLoad = get().sessions.length === 0;
-    if (isInitialLoad) {
+    // Always show loading on first load
+    const { initialized } = get();
+    if (!initialized) {
       set({ loading: true, error: null });
     }
     
     try {
       const sessions = await getSessions();
-      set({ sessions, loading: false });
+      set({ sessions, loading: false, initialized: true, error: null });
     } catch (error: any) {
-      set({ error: error.message, loading: false });
+      set({ error: error.message, loading: false, initialized: true });
+      // DON'T clear sessions on error - keep stale data
     }
   },
   
@@ -65,23 +68,24 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const teamId = useTeamStore.getState().activeTeamId;
 
     if (!teamId) {
-      set({ sessions: [], loading: false });
+      set({ sessions: [], loading: false, initialized: true });
       return;
     }
 
-    // Only show loading spinner on initial load, not refresh
-    const isInitialLoad = get().sessions.length === 0;
-    if (isInitialLoad) {
+    // Always show loading on first load
+    const { initialized } = get();
+    if (!initialized) {
       set({ loading: true, error: null });
     }
     
     try {
       const sessions = await getTeamSessions(teamId);
-      set({ sessions, loading: false });
+      set({ sessions, loading: false, initialized: true, error: null });
     } catch (error: any) {
-      set({ error: error.message, loading: false });
+      set({ error: error.message, loading: false, initialized: true });
+      // DON'T clear sessions on error
     }
   },
   
-  reset: () => set({ sessions: [], loading: false, error: null }),
+  reset: () => set({ sessions: [], loading: false, initialized: false, error: null }),
 }));

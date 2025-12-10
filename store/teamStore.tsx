@@ -1,22 +1,22 @@
 import {
-  addTeamMember as addTeamMemberService,
-  createTeam as createTeamService,
-  deleteTeam as deleteTeamService,
-  getMyTeams,
-  getTeamMembers,
-  getTeamWithMembers,
-  removeTeamMember as removeTeamMemberService,
-  updateTeamMemberRole as updateMemberRoleService,
-  updateTeam as updateTeamService,
-  type AddTeamMemberInput,
-  type CreateTeamInput,
-  type UpdateTeamInput,
+    addTeamMember as addTeamMemberService,
+    createTeam as createTeamService,
+    deleteTeam as deleteTeamService,
+    getMyTeams,
+    getTeamMembers,
+    getTeamWithMembers,
+    removeTeamMember as removeTeamMemberService,
+    updateTeamMemberRole as updateMemberRoleService,
+    updateTeam as updateTeamService,
+    type AddTeamMemberInput,
+    type CreateTeamInput,
+    type UpdateTeamInput,
 } from '@/services/teamService';
 import type {
-  TeamMemberWithProfile,
-  TeamRole,
-  TeamWithMembers,
-  TeamWithRole
+    TeamMemberWithProfile,
+    TeamRole,
+    TeamWithMembers,
+    TeamWithRole
 } from '@/types/workspace';
 import { create } from 'zustand';
 
@@ -27,6 +27,8 @@ interface TeamStore {
   activeTeam: TeamWithMembers | null;
   members: TeamMemberWithProfile[];
   loading: boolean;
+  membersLoading: boolean;  // Separate loading state for members
+  initialized: boolean;     // Track if initial load happened
   error: string | null;
 
   // Team actions
@@ -56,6 +58,8 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
   activeTeam: null,
   members: [],
   loading: true,
+  membersLoading: false,
+  initialized: false,
   error: null,
 
   // =====================================================
@@ -63,9 +67,9 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
   // =====================================================
   loadTeams: async () => {
     try {
-      // Only show loading spinner on initial load, not refresh
-      const isInitialLoad = get().teams.length === 0;
-      if (isInitialLoad) {
+      // Always show loading on first load, or if no teams yet
+      const { initialized } = get();
+      if (!initialized) {
         set({ loading: true, error: null });
       }
 
@@ -73,7 +77,7 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session?.user) {
-        set({ loading: false, teams: [], activeTeamId: null });
+        set({ loading: false, initialized: true, teams: [], activeTeamId: null });
         return;
       }
 
@@ -94,6 +98,8 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
         teams,
         activeTeamId: newActiveTeamId,
         loading: false,
+        initialized: true,
+        error: null,
       });
 
       // Load active team details if one is selected
@@ -102,7 +108,8 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
       }
     } catch (error: any) {
       console.error('Failed to load teams:', error);
-      set({ error: error.message, loading: false, teams: [] });
+      set({ error: error.message, loading: false, initialized: true });
+      // DON'T clear teams on error - keep stale data
     }
   },
 
@@ -196,8 +203,15 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
   // ACTIVE TEAM
   // =====================================================
   setActiveTeam: (teamId) => {
-    set({ activeTeamId: teamId, activeTeam: null, members: [] });
-    if (teamId) {
+    const prevTeamId = get().activeTeamId;
+    
+    // Don't clear data immediately - let new data replace it
+    // Only clear if switching to null (personal mode)
+    if (teamId === null) {
+      set({ activeTeamId: null, activeTeam: null, members: [], membersLoading: false });
+    } else {
+      // Set loading state but keep old data visible until new data arrives
+      set({ activeTeamId: teamId, membersLoading: true });
       get().loadActiveTeam();
     }
   },
@@ -206,16 +220,25 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
     const { activeTeamId } = get();
     if (!activeTeamId) return;
 
+    set({ membersLoading: true });
+    
     try {
       const team = await getTeamWithMembers(activeTeamId);
+      
+      // Verify we're still loading for the same team (prevent race condition)
+      if (get().activeTeamId !== activeTeamId) return;
+      
       if (team) {
         set({ 
           activeTeam: team, 
-          members: team.members || [] 
+          members: team.members || [],
+          membersLoading: false,
         });
       }
     } catch (error: any) {
       console.error('Failed to load active team:', error);
+      set({ membersLoading: false });
+      // DON'T clear data on error
     }
   },
 
@@ -226,11 +249,19 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
     const { activeTeamId } = get();
     if (!activeTeamId) return;
 
+    set({ membersLoading: true });
+    
     try {
       const members = await getTeamMembers(activeTeamId);
-      set({ members });
+      
+      // Verify we're still loading for the same team
+      if (get().activeTeamId !== activeTeamId) return;
+      
+      set({ members, membersLoading: false });
     } catch (error: any) {
       console.error('Failed to load members:', error);
+      set({ membersLoading: false });
+      // DON'T clear members on error
     }
   },
 
@@ -296,6 +327,8 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
       activeTeam: null,
       members: [],
       loading: false,
+      membersLoading: false,
+      initialized: false,
       error: null,
     });
   },

@@ -2,16 +2,10 @@
  * Active Session Screen
  * 
  * Shows the current active shooting session with targets, stats, and actions.
- * Users can add targets, view details, and end the session.
+ * Clear separation between Paper (scan) and Tactical (manual) target flows.
  */
 
-import {
-  EmptyTargets,
-  SessionHeader,
-  StatCard,
-  TargetCard,
-  TargetDetailModal,
-} from '@/components/session';
+import { useColors } from '@/hooks/ui/useColors';
 import {
   calculateSessionStats,
   endSession,
@@ -25,9 +19,9 @@ import { useSessionStore } from '@/store/sessionStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { Camera, Crosshair, Target, X, Zap } from 'lucide-react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -38,6 +32,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ============================================================================
@@ -45,6 +40,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // ============================================================================
 export default function ActiveSessionScreen() {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
   const { loadSessions } = useSessionStore();
 
@@ -56,16 +52,9 @@ export default function ActiveSessionScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [ending, setEnding] = useState(false);
 
-  // Target detail modal
-  const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [detailModalVisible, setDetailModalVisible] = useState(false);
-
-  // Get selected target from current targets array (always synced)
-  const selectedTarget = useMemo(() => {
-    if (!selectedTargetId) return null;
-    return targets.find((t) => t.id === selectedTargetId) || null;
-  }, [targets, selectedTargetId]);
+  // Live timer
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ============================================================================
   // DATA LOADING
@@ -97,6 +86,21 @@ export default function ActiveSessionScreen() {
     }, [loadData])
   );
 
+  // Live timer
+  useEffect(() => {
+    if (session?.started_at) {
+      const startTime = new Date(session.started_at).getTime();
+      const updateElapsed = () => {
+        setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+      };
+      updateElapsed();
+      timerRef.current = setInterval(updateElapsed, 1000);
+      return () => {
+        if (timerRef.current) clearInterval(timerRef.current);
+      };
+    }
+  }, [session?.started_at]);
+
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -108,6 +112,7 @@ export default function ActiveSessionScreen() {
   // ============================================================================
   const totalShots = stats?.totalShotsFired ?? 0;
   const totalHits = stats?.totalHits ?? 0;
+  const accuracy = totalShots > 0 ? Math.round((totalHits / totalShots) * 100) : 0;
 
   const avgDistance = useMemo(() => {
     if (targets.length === 0) return 0;
@@ -116,55 +121,50 @@ export default function ActiveSessionScreen() {
     );
   }, [targets]);
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   // ============================================================================
   // ACTIONS
   // ============================================================================
-  // Quick Scan - goes directly to camera with paper defaults
-  const handleScanTarget = useCallback(() => {
+  
+  // Paper scan - goes directly to camera
+  const handleScanPaper = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push({
-      pathname: '/(protected)/addTarget',
+      pathname: '/(protected)/scanTarget',
       params: {
         sessionId,
-        defaultTargetType: 'paper',
-        defaultDistance: avgDistance > 0 ? avgDistance.toString() : '100',
+        distance: avgDistance > 0 ? avgDistance.toString() : '100',
       },
     });
   }, [sessionId, avgDistance]);
 
-  // Manual entry for tactical targets
-  const handleLogTarget = useCallback(() => {
+  // Tactical entry - goes to form
+  const handleLogTactical = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push({
-      pathname: '/(protected)/addTarget',
+      pathname: '/(protected)/tacticalTarget',
       params: {
         sessionId,
-        defaultTargetType: 'tactical',
-        defaultDistance: avgDistance > 0 ? avgDistance.toString() : '25',
+        distance: avgDistance > 0 ? avgDistance.toString() : '25',
       },
     });
   }, [sessionId, avgDistance]);
 
-  const handleTargetPress = useCallback(
-    (target: SessionTargetWithResults, index: number) => {
+  const handleTargetPress = useCallback((target: SessionTargetWithResults) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      setSelectedTargetId(target.id);
-      setSelectedIndex(index);
-      setDetailModalVisible(true);
-    },
-    []
-  );
-
-  const handleCloseDetail = useCallback(() => {
-    setDetailModalVisible(false);
-    setSelectedTargetId(null);
+    // TODO: Open target detail modal
   }, []);
 
   const handleEndSession = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert(
       'End Session?',
-      `${targets.length} target${targets.length !== 1 ? 's' : ''} logged`,
+      `${targets.length} target${targets.length !== 1 ? 's' : ''} logged • ${formatTime(elapsedTime)} elapsed`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -177,7 +177,7 @@ export default function ActiveSessionScreen() {
               await endSession(sessionId!);
               await loadSessions();
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              router.replace('/(protected)/team');
+              router.replace('/(protected)/personal');
             } catch (error: any) {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
               Alert.alert('Error', error.message || 'Failed to end session');
@@ -187,7 +187,7 @@ export default function ActiveSessionScreen() {
         },
       ]
     );
-  }, [sessionId, targets.length, loadSessions]);
+  }, [sessionId, targets.length, elapsedTime, loadSessions]);
 
   const handleClose = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -205,23 +205,84 @@ export default function ActiveSessionScreen() {
   // RENDER HELPERS
   // ============================================================================
   const renderTarget = useCallback(
-    ({ item, index }: { item: SessionTargetWithResults; index: number }) => (
-      <TargetCard
-        target={item}
-        index={targets.length - index}
-        onPress={() => handleTargetPress(item, targets.length - index)}
-      />
-    ),
-    [targets.length, handleTargetPress]
+    ({ item, index }: { item: SessionTargetWithResults; index: number }) => {
+      const isPaper = item.target_type === 'paper';
+      const hits = isPaper 
+        ? item.paper_result?.hits_total 
+        : item.tactical_result?.hits;
+      const shots = isPaper 
+        ? item.paper_result?.bullets_fired 
+        : item.tactical_result?.bullets_fired;
+      
+      return (
+        <Animated.View entering={FadeInDown.delay(index * 50).duration(300)}>
+          <TouchableOpacity
+            style={[styles.targetCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => handleTargetPress(item)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.targetIcon, { backgroundColor: isPaper ? '#6366F120' : '#F59E0B20' }]}>
+              {isPaper ? (
+                <Target size={20} color="#6366F1" />
+              ) : (
+                <Crosshair size={20} color="#F59E0B" />
+              )}
+            </View>
+            
+            <View style={styles.targetInfo}>
+              <View style={styles.targetHeader}>
+                <Text style={[styles.targetTitle, { color: colors.text }]}>
+                  {isPaper ? 'Paper Target' : 'Tactical Target'}
+                </Text>
+                <Text style={[styles.targetIndex, { color: colors.textMuted }]}>
+                  #{targets.length - index}
+                </Text>
+              </View>
+              
+              <View style={styles.targetMeta}>
+                {item.distance_m && (
+                  <Text style={[styles.targetMetaText, { color: colors.textMuted }]}>
+                    {item.distance_m}m
+                  </Text>
+                )}
+                {shots && (
+                  <>
+                    <Text style={[styles.targetMetaDot, { color: colors.border }]}>•</Text>
+                    <Text style={[styles.targetMetaText, { color: colors.textMuted }]}>
+                      {hits ?? 0}/{shots} hits
+                    </Text>
+                  </>
+                )}
+              </View>
+            </View>
+            
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        </Animated.View>
+      );
+    },
+    [colors, targets.length, handleTargetPress]
   );
+
+  const renderEmpty = useCallback(() => (
+    <View style={styles.emptyContainer}>
+      <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
+        <Target size={40} color={colors.textMuted} />
+      </View>
+      <Text style={[styles.emptyTitle, { color: colors.text }]}>No targets yet</Text>
+      <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
+        Scan a paper target or log a tactical target
+      </Text>
+    </View>
+  ), [colors]);
 
   // ============================================================================
   // LOADING STATE
   // ============================================================================
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#10B981" />
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -232,17 +293,22 @@ export default function ActiveSessionScreen() {
   if (!session || session.status !== 'active') {
     const isCompleted = session?.status === 'completed';
     return (
-      <View style={styles.centerContainer}>
-        <Ionicons
-          name={isCompleted ? 'checkmark-circle' : 'alert-circle'}
-          size={56}
-          color={isCompleted ? '#10B981' : '#EF4444'}
-        />
-        <Text style={styles.errorTitle}>
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+        <View style={[styles.statusIcon, { backgroundColor: isCompleted ? '#10B98120' : '#EF444420' }]}>
+          <Ionicons
+            name={isCompleted ? 'checkmark-circle' : 'alert-circle'}
+            size={48}
+            color={isCompleted ? '#10B981' : '#EF4444'}
+          />
+        </View>
+        <Text style={[styles.statusTitle, { color: colors.text }]}>
           {isCompleted ? 'Session Completed' : 'Session not found'}
         </Text>
-        <TouchableOpacity style={styles.errorButton} onPress={() => router.back()}>
-          <Text style={styles.errorButtonText}>Go Back</Text>
+        <TouchableOpacity 
+          style={[styles.statusButton, { backgroundColor: colors.secondary }]} 
+          onPress={() => router.back()}
+        >
+          <Text style={[styles.statusButtonText, { color: colors.text }]}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -252,43 +318,109 @@ export default function ActiveSessionScreen() {
   // MAIN RENDER
   // ============================================================================
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <SessionHeader
-        title={session.training_title || undefined}
-        startedAt={session.started_at}
-        onClose={handleClose}
-        paddingTop={insets.top}
-      />
+      <Animated.View 
+        entering={FadeIn.duration(300)}
+        style={[styles.header, { paddingTop: insets.top + 8 }]}
+      >
+        <TouchableOpacity
+          style={[styles.closeButton, { backgroundColor: colors.secondary }]}
+          onPress={handleClose}
+        >
+          <X size={20} color={colors.text} />
+        </TouchableOpacity>
+        
+        <View style={styles.headerCenter}>
+          <View style={styles.liveIndicator}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveText}>LIVE</Text>
+          </View>
+          <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+            {session.training_title || session.drill_name || 'Training Session'}
+          </Text>
+        </View>
+        
+        <View style={[styles.timerBadge, { backgroundColor: colors.secondary }]}>
+          <Text style={[styles.timerText, { color: colors.text }]}>{formatTime(elapsedTime)}</Text>
+        </View>
+      </Animated.View>
 
-      {/* Stats Bar */}
-      <View style={styles.statsBar}>
-        <StatCard value={targets.length} label="targets" />
-        <View style={styles.statDivider} />
-        <StatCard value={totalShots} label="shots" />
-        <View style={styles.statDivider} />
-        <StatCard value={totalHits} label="hits" accent />
-        <View style={styles.statDivider} />
-        <StatCard value={avgDistance || '—'} label="avg m" />
-      </View>
+      {/* Stats Cards */}
+      <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.statsSection}>
+        <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: colors.text }]}>{targets.length}</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Targets</Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: colors.text }]}>{totalShots}</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Shots</Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: '#10B981' }]}>{totalHits}</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Hits</Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: accuracy >= 70 ? '#10B981' : accuracy >= 50 ? '#F59E0B' : colors.text }]}>
+                {accuracy}%
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Accuracy</Text>
+            </View>
+          </View>
+        </View>
+      </Animated.View>
+
+      {/* Target Type Breakdown (if targets exist) */}
+      {targets.length > 0 && (
+        <View style={styles.breakdownSection}>
+          <View style={styles.breakdownRow}>
+            <View style={[styles.breakdownItem, { backgroundColor: '#6366F115' }]}>
+              <Target size={14} color="#6366F1" />
+              <Text style={[styles.breakdownText, { color: colors.text }]}>
+                {stats?.paperTargets ?? 0} Paper
+              </Text>
+            </View>
+            <View style={[styles.breakdownItem, { backgroundColor: '#F59E0B15' }]}>
+              <Crosshair size={14} color="#F59E0B" />
+              <Text style={[styles.breakdownText, { color: colors.text }]}>
+                {stats?.tacticalTargets ?? 0} Tactical
+              </Text>
+            </View>
+            {avgDistance > 0 && (
+              <View style={[styles.breakdownItem, { backgroundColor: colors.secondary }]}>
+                <Zap size={14} color={colors.textMuted} />
+                <Text style={[styles.breakdownText, { color: colors.text }]}>
+                  ~{avgDistance}m avg
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      )}
 
       {/* Targets List */}
       <View style={styles.listContainer}>
+        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>TARGETS</Text>
         <FlatList
           data={targets}
           renderItem={renderTarget}
           keyExtractor={(item) => item.id}
           contentContainerStyle={[
             styles.listContent,
-            { paddingBottom: insets.bottom + 100 },
+            { paddingBottom: insets.bottom + 180 },
             targets.length === 0 && styles.listContentEmpty,
           ]}
-          ListEmptyComponent={EmptyTargets}
-        refreshControl={
+          ListEmptyComponent={renderEmpty}
+          refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              tintColor="#10B981"
+              tintColor={colors.primary}
             />
           }
           showsVerticalScrollIndicator={false}
@@ -296,56 +428,45 @@ export default function ActiveSessionScreen() {
       </View>
 
       {/* Bottom Actions */}
-      <View style={[styles.bottomActions, { paddingBottom: insets.bottom + 16 }]}>
+      <View style={[styles.bottomActions, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background, borderTopColor: colors.border }]}>
         {/* End Session Button */}
         <TouchableOpacity
-          style={styles.endButton}
+          style={[styles.endButton, { backgroundColor: '#EF444420' }]}
           onPress={handleEndSession}
           disabled={ending}
           activeOpacity={0.7}
         >
           {ending ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color="#EF4444" />
           ) : (
-            <Ionicons name="stop" size={18} color="#EF4444" />
+            <Ionicons name="stop" size={20} color="#EF4444" />
           )}
         </TouchableOpacity>
 
-        {/* Log Target Button (Tactical - manual entry) */}
+        {/* Tactical Target Button */}
         <TouchableOpacity
-          style={styles.logButton}
-          onPress={handleLogTarget}
+          style={[styles.tacticalButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={handleLogTactical}
           activeOpacity={0.8}
         >
-          <Ionicons name="create-outline" size={20} color="#fff" />
-          <Text style={styles.logButtonText}>Log</Text>
+          <View style={[styles.actionIconSmall, { backgroundColor: '#F59E0B20' }]}>
+            <Crosshair size={18} color="#F59E0B" />
+          </View>
+          <Text style={[styles.tacticalButtonText, { color: colors.text }]}>Tactical</Text>
         </TouchableOpacity>
 
-        {/* Scan Target Button (Paper - camera) */}
+        {/* Scan Paper Button (Primary) */}
         <TouchableOpacity
           style={styles.scanButton}
-          onPress={handleScanTarget}
+          onPress={handleScanPaper}
           activeOpacity={0.8}
         >
-          <LinearGradient
-            colors={['#10B981', '#059669']}
-            style={styles.scanButtonGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <Ionicons name="scan" size={22} color="#fff" />
-            <Text style={styles.scanButtonText}>Scan</Text>
-          </LinearGradient>
+          <View style={styles.scanButtonInner}>
+            <Camera size={20} color="#fff" />
+            <Text style={styles.scanButtonText}>Scan Paper</Text>
+          </View>
         </TouchableOpacity>
       </View>
-
-      {/* Target Detail Modal */}
-      <TargetDetailModal
-        target={selectedTarget}
-        index={selectedIndex}
-        visible={detailModalVisible}
-        onClose={handleCloseDetail}
-      />
     </View>
   );
 }
@@ -354,45 +475,234 @@ export default function ActiveSessionScreen() {
 // STYLES
 // ============================================================================
 const styles = StyleSheet.create({
-  // Layout
   container: {
     flex: 1,
-    backgroundColor: '#0A0A0A',
   },
   centerContainer: {
     flex: 1,
-    backgroundColor: '#0A0A0A',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
   },
 
-  // Stats Bar
-  statsBar: {
+  // Header
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    gap: 12,
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  liveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+  },
+  liveText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#10B981',
+    letterSpacing: 1,
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  timerBadge: {
     paddingHorizontal: 12,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  timerText: {
+    fontSize: 15,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+
+  // Stats
+  statsSection: {
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  statsCard: {
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+  },
+  statLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   statDivider: {
     width: 1,
-    height: 32,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    height: 28,
+  },
+
+  // Breakdown
+  breakdownSection: {
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  breakdownRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  breakdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  breakdownText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 
   // List
   listContainer: {
     flex: 1,
+    paddingHorizontal: 16,
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    marginBottom: 12,
   },
   listContent: {
-    padding: 16,
+    gap: 10,
   },
   listContentEmpty: {
     flex: 1,
+    justifyContent: 'center',
+  },
+
+  // Target Card
+  targetCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 12,
+  },
+  targetIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  targetInfo: {
+    flex: 1,
+  },
+  targetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  targetTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  targetIndex: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  targetMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 6,
+  },
+  targetMetaText: {
+    fontSize: 13,
+  },
+  targetMetaDot: {
+    fontSize: 8,
+  },
+
+  // Empty State
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  emptyDesc: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+
+  // Status States
+  statusIcon: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  statusTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 24,
+  },
+  statusButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+  },
+  statusButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
 
   // Bottom Actions
@@ -405,40 +715,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingTop: 16,
-    backgroundColor: '#0A0A0A',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
-    gap: 12,
+    gap: 10,
   },
   endButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    width: 48,
-    height: 48,
-    borderRadius: 12,
   },
-  logButton: {
+  tacticalButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 8,
   },
-  logButtonText: {
-    color: '#fff',
+  actionIconSmall: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tacticalButtonText: {
     fontSize: 15,
     fontWeight: '600',
   },
   scanButton: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: 14,
     overflow: 'hidden',
+    backgroundColor: '#10B981',
   },
-  scanButtonGradient: {
+  scanButtonInner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -449,25 +763,5 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
-  },
-
-  // Error State
-  errorTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#fff',
-    marginTop: 16,
-    marginBottom: 24,
-  },
-  errorButton: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 10,
-  },
-  errorButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
   },
 });

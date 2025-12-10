@@ -6,13 +6,13 @@
 
 import { supabase } from '@/lib/supabase';
 import type {
-  Team,
-  TeamInvitation,
-  TeamMember,
-  TeamMemberWithProfile,
-  TeamRole,
-  TeamWithMembers,
-  TeamWithRole,
+    Team,
+    TeamInvitation,
+    TeamMember,
+    TeamMemberWithProfile,
+    TeamRole,
+    TeamWithMembers,
+    TeamWithRole,
 } from '@/types/workspace';
 
 // =====================================================
@@ -229,8 +229,12 @@ export async function getTeamMembers(teamId: string): Promise<TeamMemberWithProf
   const { data, error } = await supabase
     .from('team_members')
     .select(`
-      *,
-      profile:profiles!team_members_user_fkey(id, email, full_name, avatar_url)
+      team_id,
+      user_id,
+      role,
+      joined_at,
+      details,
+      profile:profiles!user_id(id, email, full_name, avatar_url)
     `)
     .eq('team_id', teamId)
     .order('joined_at', { ascending: false });
@@ -240,8 +244,16 @@ export async function getTeamMembers(teamId: string): Promise<TeamMemberWithProf
     throw new Error(error.message || 'Failed to fetch team members');
   }
 
+  // Transform flat role string to expected nested object format
   return (data || []).map((m: any) => ({
-    ...m,
+    team_id: m.team_id,
+    user_id: m.user_id,
+    joined_at: m.joined_at,
+    details: m.details,
+    role: {
+      role: m.role, // DB stores as text, type expects { role: TeamRole }
+      squad_id: m.details?.squad_id,
+    },
     profile: m.profile || {},
   }));
 }
@@ -321,7 +333,7 @@ export async function getInvitationByCode(inviteCode: string): Promise<TeamInvit
     .from('team_invitations')
     .select(`
       *,
-      team:teams!team_invitations_team_id_fkey(name)
+      team:teams(name)
     `)
     .eq('invite_code', inviteCode)
     .eq('status', 'pending')
@@ -329,6 +341,7 @@ export async function getInvitationByCode(inviteCode: string): Promise<TeamInvit
     .single();
 
   if (error || !data) {
+    console.log('Invitation lookup error:', error?.message);
     return null;
   }
 
@@ -401,7 +414,7 @@ export async function getTeamCommanderStatus(teamId: string): Promise<TeamComman
     .from('team_members')
     .select(`
       role,
-      profile:profiles!team_members_user_fkey(full_name)
+      profile:profiles!user_id(full_name)
     `)
     .eq('team_id', teamId)
     .eq('role', 'commander')

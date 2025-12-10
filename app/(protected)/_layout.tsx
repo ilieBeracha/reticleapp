@@ -34,16 +34,28 @@ export default function ProtectedLayout() {
           headerTintColor: colors.text,
         }}
       >
+        {/* Index redirect - hide from stack */}
+        <Stack.Screen
+          name="index"
+          options={{ headerShown: false }}
+        />
+        
         {/* Personal Mode Tabs */}
         <Stack.Screen 
           name="personal" 
-          options={{ headerShown: true }}
+          options={{ 
+            headerShown: true,
+            headerBackVisible: false,  // Never show back button on root tabs
+          }}
         />
         
         {/* Team Mode Tabs */}
         <Stack.Screen
           name="team" 
-          options={{ headerShown: true }}
+          options={{ 
+            headerShown: true,
+            headerBackVisible: false,  // Never show back button on root tabs
+          }}
         />
         
         {/* Team Switcher */}
@@ -237,6 +249,36 @@ export default function ProtectedLayout() {
             presentation: "formSheet",
             gestureEnabled: true,
             sheetGrabberVisible: false,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.85, 0.95],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+          }}
+        />
+
+        {/* Scan Target - Paper only, opens camera directly */}
+        <Stack.Screen
+          name="scanTarget"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: false,
+            contentStyle: { backgroundColor: "#0A0A0A" },
+            sheetAllowedDetents: [1],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+          }}
+        />
+
+        {/* Tactical Target - Manual entry only */}
+        <Stack.Screen
+          name="tacticalTarget"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
             contentStyle: { backgroundColor: colors.card },
             sheetAllowedDetents: [0.85, 0.95],
             sheetInitialDetentIndex: 0,

@@ -1,4 +1,4 @@
-import type { TeamMemberShip, TeamInvitation, TeamInvitationWithDetails, TeamRole } from '@/types/workspace';
+import type { TeamInvitation, TeamInvitationWithDetails, TeamMemberShip } from '@/types/workspace';
 import { AuthenticatedClient } from './authenticatedClient';
 
 /**
@@ -99,9 +99,9 @@ export async function getTeamInvitations(teamId: string): Promise<TeamInvitation
     .from('team_invitations')
     .select(`
       *,
-      invited_by_profile:profiles!team_invitations_invited_by_fkey(full_name, email),
-      accepted_by_profile:profiles!team_invitations_accepted_by_fkey(full_name, email),
-      team:teams!team_invitations_team_id_fkey(name)
+      invited_by_profile:profiles!invited_by(full_name, email),
+      accepted_by_profile:profiles!accepted_by(full_name, email),
+      team:teams(name)
     `)
     .eq('team_id', teamId)
     .order('created_at', { ascending: false });
@@ -190,8 +190,8 @@ export async function validateInviteCode(inviteCode: string): Promise<TeamInvita
     .from('team_invitations')
     .select(`
       *,
-      invited_by_profile:profiles!team_invitations_invited_by_fkey(full_name, email),
-      team:teams!team_invitations_team_id_fkey(name)
+      invited_by_profile:profiles!invited_by(full_name, email),
+      team:teams(name)
     `)
     .eq('invite_code', inviteCode.toUpperCase().trim())
     .eq('status', 'pending')

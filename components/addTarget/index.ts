@@ -6,17 +6,21 @@
 export * from "./types";
 
 // UI Components
-export { OptionChip } from "./OptionChip";
 export { CustomInput } from "./CustomInput";
 export { DistanceInput } from "./DistanceInput";
+export { OptionChip } from "./OptionChip";
 
 // Detection Components
 export { DetectionEditor } from "./DetectionEditor";
 export { DetectionPreview } from "./DetectionPreview";
 
 // Page Components
+export { CameraFlow } from "./CameraFlow";
 export { ResultCard } from "./ResultCard";
 export { TacticalResultsEntry } from "./TacticalResultsEntry";
-export { CameraFlow } from "./CameraFlow";
 export { TargetForm } from "./TargetForm";
+
+// Standalone Flows (can be called independently)
+export { PaperTargetFlow } from "./PaperTargetFlow";
+export { TacticalTargetFlow } from "./TacticalTargetFlow";
 
