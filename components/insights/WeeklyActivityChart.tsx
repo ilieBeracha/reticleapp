@@ -52,7 +52,7 @@ export function WeeklyActivityChart({ sessions, colors }: WeeklyActivityChartPro
 
         <View style={styles.bars}>
           {dailyCounts.map((item, index) => {
-            const height = maxCount > 0 ? (item.count / maxCount) * 40 : 4;
+            const height = maxCount > 0 ? (item.count / maxCount) * 70 : 4;
             const barHeight = Math.max(height, 4);
             const today = isToday(item.day);
 
@@ -64,7 +64,7 @@ export function WeeklyActivityChart({ sessions, colors }: WeeklyActivityChartPro
               >
                 <View style={styles.barWrapper}>
                   {today && item.count > 0 ? (
-                    <Svg height={barHeight} width={12}>
+                    <Svg height={barHeight} width={16}>
                       <Defs>
                         <LinearGradient id={`barGrad${index}`} x1="0%" y1="0%" x2="0%" y2="100%">
                           <Stop offset="0%" stopColor="rgba(255,255,255,0.95)" />
@@ -75,7 +75,7 @@ export function WeeklyActivityChart({ sessions, colors }: WeeklyActivityChartPro
                       <Rect 
                         x="0" 
                         y="0" 
-                        width="12" 
+                        width="16" 
                         height={barHeight} 
                         rx="3" 
                         fill={`url(#barGrad${index})`} 
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    height: 50,
+    height: 80,
   },
   barColumn: {
     flex: 1,

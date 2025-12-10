@@ -26,7 +26,6 @@ import {
   SecondaryActionsRow,
   StatusDial,
   UpcomingTrainingsSection,
-  useDialState,
   useSessionStats,
   useWeeklyStats,
 } from './personal-home';
@@ -78,42 +77,24 @@ export function PersonalHomePage() {
     () => sessions.filter((s) => s.status === 'completed').slice(0, 4),
     [sessions]
   );
+  const lastSession = recentSessions[0];
   const nextTraining = useMemo(() => {
     // Get first live or upcoming training
     return myUpcomingTrainings.find((t) => t.status === 'ongoing') || myUpcomingTrainings[0];
   }, [myUpcomingTrainings]);
-  const lastSession = recentSessions[0];
-  const displaySession = activeSession || lastSession;
-  const sessionTitle = displaySession
-    ? displaySession.training_title || displaySession.drill_name || 'Freestyle Session'
-    : 'No sessions yet';
+  const sessionTitle = activeSession
+    ? activeSession.training_title || activeSession.drill_name || 'Freestyle'
+    : '';
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CUSTOM HOOKS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // Session stats (targets, shots, accuracy)
-  const { sessionStats, currentAccuracy } = useSessionStats(activeSession);
+  // Session stats (targets, shots, hits)
+  const { sessionStats } = useSessionStats(activeSession);
 
   // Weekly aggregated stats
   const weeklyStats = useWeeklyStats(sessions, activeSession);
-
-  // Dial mode state and navigation
-  const {
-    activeDialMode,
-    currentModeConfig,
-    dialValue,
-    dialProgress,
-    modeCount,
-    currentModeIndex,
-    handlePrevMode,
-    handleNextMode,
-  } = useDialState({
-    activeSession,
-    sessionStats,
-    currentAccuracy,
-    weeklyStats,
-  });
 
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLERS
@@ -126,26 +107,24 @@ export function PersonalHomePage() {
     setRefreshing(false);
   }, [loadSessions, loadMyUpcomingTrainings, loadMyStats]);
 
-  const handleStart = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+  const handleStartSession = useCallback(async () => {
+    if (starting) return;
     setStarting(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const existing = await getMyActivePersonalSession();
-      const sessionId = existing?.id || (await createSession({ session_mode: 'solo' })).id;
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.push(`/(protected)/activeSession?sessionId=${sessionId}` as any);
-    } catch {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      if (existing) {
+        router.push(`/(protected)/activeSession?sessionId=${existing.id}` as any);
+      } else {
+        const newSession = await createSession({ session_mode: 'solo' });
+        router.push(`/(protected)/activeSession?sessionId=${newSession.id}` as any);
+      }
+    } catch (error) {
+      console.error('Failed to start session:', error);
     } finally {
       setStarting(false);
     }
-  }, [createSession]);
-
-  const handleResume = useCallback(() => {
-    if (!activeSession) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push(`/(protected)/activeSession?sessionId=${activeSession.id}` as any);
-  }, [activeSession]);
+  }, [starting, createSession]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // LOADING STATE
@@ -178,25 +157,16 @@ export function PersonalHomePage() {
         }
       >
         <GreetingHeader firstName={firstName} colors={colors} />
-        {/* Status Dial */}
+        {/* Action Cards */}
         <StatusDial
           colors={colors}
           activeSession={activeSession}
-          displaySession={displaySession}
           sessionTitle={sessionTitle}
           sessionStats={sessionStats}
           weeklyStats={weeklyStats}
-          currentModeConfig={currentModeConfig}
-          dialValue={dialValue}
-          dialProgress={dialProgress}
-          modeCount={modeCount}
-          currentModeIndex={currentModeIndex}
-          activeDialMode={activeDialMode}
-          onPrevMode={handlePrevMode}
-          onNextMode={handleNextMode}
+          lastSession={lastSession}
           starting={starting}
-          onStart={handleStart}
-          onResume={handleResume}
+          onStart={handleStartSession}
           nextTraining={nextTraining}
         />
 

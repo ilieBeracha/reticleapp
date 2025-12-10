@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Camera, Crosshair, Target, X, Zap } from 'lucide-react-native';
+import { Camera, Crosshair, Target, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -266,12 +266,12 @@ export default function ActiveSessionScreen() {
 
   const renderEmpty = useCallback(() => (
     <View style={styles.emptyContainer}>
-      <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
-        <Target size={40} color={colors.textMuted} />
+      <View style={[styles.emptyIcon, { backgroundColor: '#10B98115' }]}>
+        <Target size={32} color="#10B981" />
       </View>
-      <Text style={[styles.emptyTitle, { color: colors.text }]}>No targets yet</Text>
+      <Text style={[styles.emptyTitle, { color: colors.text }]}>Ready to shoot</Text>
       <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
-        Scan a paper target or log a tactical target
+        Use the buttons below to scan a{'\n'}paper target or log results manually
       </Text>
     </View>
   ), [colors]);
@@ -322,97 +322,79 @@ export default function ActiveSessionScreen() {
       {/* Header */}
       <Animated.View 
         entering={FadeIn.duration(300)}
-        style={[styles.header, { paddingTop: insets.top + 8 }]}
+        style={[styles.header, { paddingTop: insets.top + 12 }]}
       >
         <TouchableOpacity
           style={[styles.closeButton, { backgroundColor: colors.secondary }]}
           onPress={handleClose}
         >
-          <X size={20} color={colors.text} />
+          <X size={18} color={colors.textMuted} />
         </TouchableOpacity>
         
         <View style={styles.headerCenter}>
-          <View style={styles.liveIndicator}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveText}>LIVE</Text>
-          </View>
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-            {session.training_title || session.drill_name || 'Training Session'}
+            {session.training_title || session.drill_name || 'Practice Session'}
           </Text>
         </View>
         
-        <View style={[styles.timerBadge, { backgroundColor: colors.secondary }]}>
+        <View style={styles.timerContainer}>
+          <View style={styles.liveDot} />
           <Text style={[styles.timerText, { color: colors.text }]}>{formatTime(elapsedTime)}</Text>
         </View>
       </Animated.View>
 
-      {/* Stats Cards */}
+      {/* Stats Ring */}
       <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.statsSection}>
         <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          {/* Main Accuracy Display */}
+          <View style={styles.accuracyCenter}>
+            <Text style={[styles.accuracyValue, { color: accuracy >= 70 ? '#10B981' : accuracy >= 50 ? '#F59E0B' : colors.text }]}>
+              {accuracy}%
+            </Text>
+            <Text style={[styles.accuracyLabel, { color: colors.textMuted }]}>accuracy</Text>
+          </View>
+          
+          {/* Stats Row */}
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
+              <View style={[styles.statIconBg, { backgroundColor: '#6366F110' }]}>
+                <Target size={16} color="#6366F1" />
+              </View>
               <Text style={[styles.statValue, { color: colors.text }]}>{targets.length}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Targets</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>targets</Text>
             </View>
-            <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
             <View style={styles.statItem}>
+              <View style={[styles.statIconBg, { backgroundColor: colors.secondary }]}>
+                <Crosshair size={16} color={colors.textMuted} />
+              </View>
               <Text style={[styles.statValue, { color: colors.text }]}>{totalShots}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Shots</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>shots</Text>
             </View>
-            <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
             <View style={styles.statItem}>
+              <View style={[styles.statIconBg, { backgroundColor: '#10B98115' }]}>
+                <Ionicons name="checkmark" size={16} color="#10B981" />
+              </View>
               <Text style={[styles.statValue, { color: '#10B981' }]}>{totalHits}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Hits</Text>
-            </View>
-            <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: accuracy >= 70 ? '#10B981' : accuracy >= 50 ? '#F59E0B' : colors.text }]}>
-                {accuracy}%
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Accuracy</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>hits</Text>
             </View>
           </View>
         </View>
       </Animated.View>
 
-      {/* Target Type Breakdown (if targets exist) */}
-      {targets.length > 0 && (
-        <View style={styles.breakdownSection}>
-          <View style={styles.breakdownRow}>
-            <View style={[styles.breakdownItem, { backgroundColor: '#6366F115' }]}>
-              <Target size={14} color="#6366F1" />
-              <Text style={[styles.breakdownText, { color: colors.text }]}>
-                {stats?.paperTargets ?? 0} Paper
-              </Text>
-            </View>
-            <View style={[styles.breakdownItem, { backgroundColor: '#F59E0B15' }]}>
-              <Crosshair size={14} color="#F59E0B" />
-              <Text style={[styles.breakdownText, { color: colors.text }]}>
-                {stats?.tacticalTargets ?? 0} Tactical
-              </Text>
-            </View>
-            {avgDistance > 0 && (
-              <View style={[styles.breakdownItem, { backgroundColor: colors.secondary }]}>
-                <Zap size={14} color={colors.textMuted} />
-                <Text style={[styles.breakdownText, { color: colors.text }]}>
-                  ~{avgDistance}m avg
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-      )}
-
       {/* Targets List */}
       <View style={styles.listContainer}>
-        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>TARGETS</Text>
+        {targets.length > 0 && (
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+            TARGETS ({targets.length})
+          </Text>
+        )}
         <FlatList
           data={targets}
           renderItem={renderTarget}
           keyExtractor={(item) => item.id}
           contentContainerStyle={[
             styles.listContent,
-            { paddingBottom: insets.bottom + 180 },
+            { paddingBottom: insets.bottom + 160 },
             targets.length === 0 && styles.listContentEmpty,
           ]}
           ListEmptyComponent={renderEmpty}
@@ -427,45 +409,46 @@ export default function ActiveSessionScreen() {
         />
       </View>
 
-      {/* Bottom Actions */}
-      <View style={[styles.bottomActions, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background, borderTopColor: colors.border }]}>
-        {/* End Session Button */}
-        <TouchableOpacity
-          style={[styles.endButton, { backgroundColor: '#EF444420' }]}
-          onPress={handleEndSession}
-          disabled={ending}
-          activeOpacity={0.7}
-        >
-          {ending ? (
-            <ActivityIndicator size="small" color="#EF4444" />
-          ) : (
-            <Ionicons name="stop" size={20} color="#EF4444" />
-          )}
-        </TouchableOpacity>
+      {/* Bottom Actions - Floating */}
+      <View style={[styles.bottomActions, { paddingBottom: insets.bottom + 12 }]}>
+        <View style={[styles.bottomActionsInner, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          {/* End Session */}
+          <TouchableOpacity
+            style={styles.endButton}
+            onPress={handleEndSession}
+            disabled={ending}
+            activeOpacity={0.7}
+          >
+            {ending ? (
+              <ActivityIndicator size="small" color="#EF4444" />
+            ) : (
+              <Ionicons name="stop-circle" size={24} color="#EF4444" />
+            )}
+          </TouchableOpacity>
 
-        {/* Tactical Target Button */}
-        <TouchableOpacity
-          style={[styles.tacticalButton, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={handleLogTactical}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.actionIconSmall, { backgroundColor: '#F59E0B20' }]}>
-            <Crosshair size={18} color="#F59E0B" />
-          </View>
-          <Text style={[styles.tacticalButtonText, { color: colors.text }]}>Tactical</Text>
-        </TouchableOpacity>
+          {/* Divider */}
+          <View style={[styles.actionDivider, { backgroundColor: colors.border }]} />
 
-        {/* Scan Paper Button (Primary) */}
-        <TouchableOpacity
-          style={styles.scanButton}
-          onPress={handleScanPaper}
-          activeOpacity={0.8}
-        >
-          <View style={styles.scanButtonInner}>
+          {/* Tactical */}
+          <TouchableOpacity
+            style={styles.tacticalButton}
+            onPress={handleLogTactical}
+            activeOpacity={0.8}
+          >
+            <Crosshair size={20} color="#F59E0B" />
+            <Text style={[styles.tacticalButtonText, { color: colors.text }]}>Manual</Text>
+          </TouchableOpacity>
+
+          {/* Scan Paper (Primary) */}
+          <TouchableOpacity
+            style={styles.scanButton}
+            onPress={handleScanPaper}
+            activeOpacity={0.8}
+          >
             <Camera size={20} color="#fff" />
-            <Text style={styles.scanButtonText}>Scan Paper</Text>
-          </View>
-        </TouchableOpacity>
+            <Text style={styles.scanButtonText}>Scan</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -490,25 +473,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingBottom: 16,
     gap: 12,
   },
   closeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerCenter: {
     flex: 1,
-    alignItems: 'center',
   },
-  liveIndicator: {
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  timerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 4,
   },
   liveDot: {
     width: 8,
@@ -516,23 +502,8 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#10B981',
   },
-  liveText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#10B981',
-    letterSpacing: 1,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  timerBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
   timerText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
   },
@@ -540,58 +511,54 @@ const styles = StyleSheet.create({
   // Stats
   statsSection: {
     paddingHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 20,
   },
   statsCard: {
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 20,
+    padding: 20,
     borderWidth: 1,
+  },
+  accuracyCenter: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  accuracyValue: {
+    fontSize: 48,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+    letterSpacing: -2,
+  },
+  accuracyLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: -4,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-around',
   },
   statItem: {
-    flex: 1,
     alignItems: 'center',
+    gap: 6,
+  },
+  statIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   statValue: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
     letterSpacing: -0.5,
   },
   statLabel: {
     fontSize: 11,
-    fontWeight: '600',
-    marginTop: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  statDivider: {
-    width: 1,
-    height: 28,
-  },
-
-  // Breakdown
-  breakdownSection: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  breakdownRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  breakdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  breakdownText: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
   },
 
   // List
@@ -617,15 +584,15 @@ const styles = StyleSheet.create({
   targetCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
+    padding: 12,
     borderRadius: 14,
     borderWidth: 1,
-    gap: 12,
+    gap: 10,
   },
   targetIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -638,47 +605,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   targetTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
   },
   targetIndex: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
   },
   targetMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 2,
     gap: 6,
   },
   targetMetaText: {
-    fontSize: 13,
+    fontSize: 12,
   },
   targetMetaDot: {
-    fontSize: 8,
+    fontSize: 6,
   },
 
   // Empty State
   emptyContainer: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 60,
   },
   emptyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   emptyDesc: {
-    fontSize: 14,
+    fontSize: 13,
     textAlign: 'center',
+    lineHeight: 18,
   },
 
   // Status States
@@ -711,57 +679,56 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
+    paddingHorizontal: 16,
+  },
+  bottomActionsInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    gap: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 8,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 8,
   },
   endButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 14,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  actionDivider: {
+    width: 1,
+    height: 24,
+  },
   tacticalButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 8,
-  },
-  actionIconSmall: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingVertical: 10,
+    gap: 6,
   },
   tacticalButtonText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
   },
   scanButton: {
     flex: 1,
-    borderRadius: 14,
-    overflow: 'hidden',
-    backgroundColor: '#10B981',
-  },
-  scanButtonInner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    gap: 8,
+    borderRadius: 14,
+    backgroundColor: '#10B981',
+    paddingVertical: 12,
+    gap: 6,
   },
   scanButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
   },
 });

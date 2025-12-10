@@ -1,12 +1,10 @@
+import { format } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { ArrowRight, Calendar, ChevronLeft, ChevronRight, Play, Target, Zap } from 'lucide-react-native';
+import { ArrowRight, Calendar, Crosshair, Play, Target } from 'lucide-react-native';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
-import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import type {
-  DialModeConfig,
-  DialValue,
   SessionStats,
   SessionWithDetails,
   ThemeColors,
@@ -19,25 +17,16 @@ interface UpcomingTraining {
   status: string;
 }
 
-interface StatusDialProps {
+interface StatsCardProps {
   colors: ThemeColors;
   activeSession: SessionWithDetails | undefined;
-  displaySession: SessionWithDetails | undefined;
   sessionTitle: string;
   sessionStats: SessionStats | null;
   weeklyStats: WeeklyStats;
-  currentModeConfig: DialModeConfig;
-  dialValue: DialValue;
-  dialProgress: number;
-  modeCount: number;
-  currentModeIndex: number;
-  activeDialMode: string;
-  onPrevMode: () => void;
-  onNextMode: () => void;
+  lastSession: SessionWithDetails | undefined;
   // Session actions
   starting: boolean;
   onStart: () => void;
-  onResume: () => void;
   // Training
   nextTraining?: UpcomingTraining;
 }
@@ -45,285 +34,175 @@ interface StatusDialProps {
 export function StatusDial({
   colors,
   activeSession,
-  displaySession,
   sessionTitle,
   sessionStats,
   weeklyStats,
-  currentModeConfig,
-  dialValue,
-  dialProgress,
-  modeCount,
-  currentModeIndex,
-  activeDialMode,
-  onPrevMode,
-  onNextMode,
+  lastSession,
   starting,
   onStart,
-  onResume,
   nextTraining,
-}: StatusDialProps) {
-  const strokeDashoffset = 165 * (1 - dialProgress);
+}: StatsCardProps) {
+  // Calculate last session insight
+  const lastSessionInsight = lastSession ? {
+    date: format(new Date(lastSession.created_at), 'MMM d'),
+    type: lastSession.training_title || lastSession.drill_name || 'Freestyle',
+  } : null;
 
   return (
     <Animated.View entering={FadeInUp.delay(100).duration(400)} style={styles.section}>
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {/* Header with session title */}
-        <View style={styles.header}>
-          {activeSession ? (
-            <>
-              <View style={styles.liveIndicator}>
-                <View style={styles.liveDot} />
-                <Text style={styles.liveLabel}>LIVE SESSION</Text>
-              </View>
-              <Text style={[styles.sessionTitle, { color: colors.text }]} numberOfLines={1}>
-                {sessionTitle}
+      {/* Active Session Card */}
+      {activeSession ? (
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={[styles.activeCard, { borderColor: '#10B981' }]}
+          onPress={onStart}
+        >
+          <View style={styles.activeHeader}>
+            <View style={styles.liveIndicator}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>LIVE SESSION</Text>
+            </View>
+            <Text style={[styles.activeTitle, { color: colors.text }]}>{sessionTitle}</Text>
+          </View>
+          
+          <View style={styles.activeStats}>
+            <View style={styles.activeStat}>
+              <Text style={[styles.activeStatValue, { color: colors.text }]}>
+                {sessionStats?.targetCount ?? 0}
               </Text>
-            </>
-          ) : (
-            <Text style={[styles.headerLabel, { color: colors.textMuted }]}>THIS WEEK</Text>
-          )}
-        </View>
-
-        {/* Dial Row */}
-        <View style={styles.dialRow}>
-          <TouchableOpacity
-            onPress={onPrevMode}
-            activeOpacity={0.7}
-            style={[styles.navButton, { backgroundColor: colors.secondary }]}
-          >
-            <ChevronLeft size={20} color={colors.text} strokeWidth={2} />
-          </TouchableOpacity>
-
-          <View style={styles.dialContainer}>
-            <Svg height={160} width={160} viewBox="0 0 100 100">
-              <Defs>
-                {/* Gentle gradient: white → soft blue → gray */}
-                <LinearGradient id="dialGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <Stop offset="0%" stopColor="rgba(255,255,255,0.95)" />
-                  <Stop offset="45%" stopColor="rgba(147,197,253,0.7)" />
-                  <Stop offset="100%" stopColor="rgba(156,163,175,0.85)" />
-                </LinearGradient>
-              </Defs>
-              
-              {/* Background */}
-              <Circle
-                cx="50"
-                cy="50"
-                r="44"
-                stroke={colors.border}
-                strokeWidth="5"
-                fill="transparent"
-                strokeDasharray="165 276"
-                strokeLinecap="round"
-                rotation="135"
-                origin="50, 50"
-              />
-              {/* Progress with gradient */}
-              <Circle
-                cx="50"
-                cy="50"
-                r="44"
-                stroke="url(#dialGradient)"
-                strokeWidth="5"
-                fill="transparent"
-                strokeDasharray={`${165 - strokeDashoffset} 276`}
-                strokeLinecap="round"
-                rotation="135"
-                origin="50, 50"
-              />
-            </Svg>
-
-            <View style={styles.dialCenter}>
-              <Text style={[styles.dialLabel, { color: colors.textMuted }]}>
-                {currentModeConfig.label}
+              <Text style={[styles.activeStatLabel, { color: colors.textMuted }]}>targets</Text>
+            </View>
+            <View style={styles.activeStat}>
+              <Text style={[styles.activeStatValue, { color: colors.text }]}>
+                {sessionStats?.totalShotsFired ?? 0}
               </Text>
-
-              <Text style={[styles.dialValue, { color: colors.text }]}>
-                {dialValue.value}
-                {activeSession && activeDialMode === 'accuracy' && (
-                  <Text style={[styles.dialPercent, { color: colors.textMuted }]}>%</Text>
-                )}
+              <Text style={[styles.activeStatLabel, { color: colors.textMuted }]}>shots</Text>
+            </View>
+            <View style={styles.activeStat}>
+              <Text style={[styles.activeStatValue, { color: colors.text }]}>
+                {sessionStats?.totalHits ?? 0}
               </Text>
-
-              <Text style={[styles.dialUnit, { color: colors.textMuted }]}>
-                {currentModeConfig.unit}
-              </Text>
+              <Text style={[styles.activeStatLabel, { color: colors.textMuted }]}>hits</Text>
             </View>
           </View>
 
-          <TouchableOpacity
-            onPress={onNextMode}
-            activeOpacity={0.7}
-            style={[styles.navButton, { backgroundColor: colors.secondary }]}
-          >
-            <ChevronRight size={20} color={colors.text} strokeWidth={2} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Dots */}
-        <View style={styles.dots}>
-          {Array.from({ length: modeCount }).map((_, i) => (
-            <View
-              key={i}
-              style={[
-                styles.dot,
-                {
-                  backgroundColor: i === currentModeIndex ? colors.text : colors.border,
-                  width: i === currentModeIndex ? 12 : 4,
-                },
-              ]}
-            />
-          ))}
-        </View>
-
-        {/* Stats Row */}
-        <View style={styles.statsRow}>
-          {activeSession ? (
-            <>
-              <StatItemWithIcon
-                icon={<Zap size={16} color={colors.text} />}
-                value="Solo"
-                label="MODE"
-                colors={colors}
-              />
-              <StatItemWithIcon
-                icon={<Target size={16} color={colors.text} />}
-                value={sessionStats?.targetCount ?? 0}
-                label="TARGETS"
-                colors={colors}
-              />
-              <StatItemWithIcon
-                icon={<Target size={16} color={colors.text} />}
-                value={sessionStats?.totalShotsFired ?? 0}
-                label="SHOTS"
-                colors={colors}
-              />
-            </>
-          ) : (
-            <>
-              <StatItem label="Sessions" value={weeklyStats.sessions} colors={colors} />
-              <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
-              <StatItem label="Targets" value={weeklyStats.paperTargets + weeklyStats.tacticalTargets} colors={colors} />
-              <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
-              <StatItem label="Shots" value={weeklyStats.totalShots} colors={colors} />
-            </>
-          )}
-        </View>
-      </View>
-
-      {/* Action Row - Start Session + Training */}
-      <View style={styles.actionRow}>
-        {/* Start/Resume Session - 2/3 width (or full if no training) */}
+          <View style={styles.resumeRow}>
+            <Text style={styles.resumeText}>Continue Session</Text>
+            <ArrowRight size={18} color="#10B981" />
+          </View>
+        </TouchableOpacity>
+      ) : (
+        /* Start Session Button */
         <TouchableOpacity
-          activeOpacity={0.7}
+          activeOpacity={0.8}
           disabled={starting}
+          style={[styles.startButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={onStart}
+        >
+          <View style={styles.startButtonIcon}>
+            {starting ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Play size={24} color="#fff" fill="#fff" />
+            )}
+          </View>
+          <View style={styles.startButtonText}>
+            <Text style={[styles.startTitle, { color: colors.text }]}>
+              {starting ? 'Starting...' : 'Start Session'}
+            </Text>
+            <Text style={[styles.startDesc, { color: colors.textMuted }]}>
+              Scan targets or log results
+            </Text>
+          </View>
+          <ArrowRight size={20} color={colors.textMuted} />
+        </TouchableOpacity>
+      )}
+
+      {/* Training Card - if available */}
+      {nextTraining && !activeSession && (
+        <TouchableOpacity
+          activeOpacity={0.8}
           style={[
-            styles.actionButton,
+            styles.trainingCard,
             { 
-              backgroundColor: activeSession ? '#10B981' : colors.card,
-              borderColor: activeSession ? '#10B981' : colors.border,
-              flex: nextTraining ? 2 : 1,
+              backgroundColor: colors.card,
+              borderColor: nextTraining.status === 'ongoing' ? '#EF4444' : colors.border,
             }
           ]}
-          onPress={activeSession ? onResume : onStart}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push(`/(protected)/trainingDetail?id=${nextTraining.id}` as any);
+          }}
         >
-          {starting ? (
-            <ActivityIndicator size="small" color={colors.text} />
-          ) : activeSession ? (
-            <>
-              <View style={styles.actionDot} />
-              <Text style={styles.actionResumeText}>Resume</Text>
-              <ArrowRight size={16} color="#000" />
-            </>
-          ) : (
-            <>
-              <Play size={16} color={colors.text} fill={colors.text} />
-              <Text style={[styles.actionLabel, { color: colors.text }]}>Start</Text>
-            </>
-          )}
-        </TouchableOpacity>
-
-        {/* Next Training - 1/3 width */}
-        {nextTraining && (
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={[
-              styles.trainingButton,
-              { 
-                backgroundColor: colors.card,
-                borderColor: nextTraining.status === 'ongoing' ? '#EF4444' : colors.border,
-              }
-            ]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push(`/(protected)/trainingDetail?id=${nextTraining.id}` as any);
-            }}
-          >
+          <View style={styles.trainingLeft}>
             {nextTraining.status === 'ongoing' ? (
-              <View style={styles.liveDotSmall} />
+              <View style={styles.trainingLive}>
+                <View style={styles.liveDotRed} />
+                <Text style={styles.liveTextRed}>LIVE</Text>
+              </View>
             ) : (
-              <Calendar size={14} color={colors.textMuted} />
+              <View style={styles.trainingScheduled}>
+                <Calendar size={14} color={colors.textMuted} />
+                <Text style={[styles.scheduledText, { color: colors.textMuted }]}>TRAINING</Text>
+              </View>
             )}
-            <Text 
-              style={[styles.trainingLabel, { color: colors.text }]} 
-              numberOfLines={1}
-            >
+            <Text style={[styles.trainingTitle, { color: colors.text }]} numberOfLines={1}>
               {nextTraining.title}
             </Text>
-          </TouchableOpacity>
-        )}
-      </View>
+          </View>
+          <View style={[styles.joinButton, { backgroundColor: colors.secondary }]}>
+            <Text style={[styles.joinText, { color: colors.text }]}>Join</Text>
+          </View>
+        </TouchableOpacity>
+      )}
+
+      {/* Weekly Stats - Small summary */}
+      {!activeSession && (
+        <View style={[styles.statsBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.statItem}>
+            <Target size={14} color={colors.textMuted} />
+            <Text style={[styles.statValue, { color: colors.text }]}>
+              {weeklyStats.paperTargets + weeklyStats.tacticalTargets}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>targets</Text>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.statItem}>
+            <Crosshair size={14} color={colors.textMuted} />
+            <Text style={[styles.statValue, { color: colors.text }]}>
+              {weeklyStats.totalShots}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>shots</Text>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: colors.text }]}>
+              {weeklyStats.sessions}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>sessions</Text>
+          </View>
+        </View>
+      )}
     </Animated.View>
-  );
-}
-
-function StatItem({ label, value, colors }: { label: string; value: string | number; colors: ThemeColors }) {
-  return (
-    <View style={styles.statItem}>
-      <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
-      <Text style={[styles.statLabel, { color: colors.textMuted }]}>{label}</Text>
-    </View>
-  );
-}
-
-function StatItemWithIcon({
-  icon,
-  value,
-  label,
-  colors,
-}: {
-  icon: React.ReactNode;
-  value: string | number;
-  label: string;
-  colors: ThemeColors;
-}) {
-  return (
-    <View style={styles.statItemWithIcon}>
-      <View style={[styles.statIcon, { backgroundColor: colors.secondary }]}>{icon}</View>
-      <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
-      <Text style={[styles.statLabel, { color: colors.textMuted }]}>{label}</Text>
-    </View>
   );
 }
 
 const styles = StyleSheet.create({
   section: {
     paddingHorizontal: 20,
+    marginBottom: 20,
+    gap: 12,
+  },
+  
+  // Active Session
+  activeCard: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderRadius: 16,
+    borderWidth: 2,
+    padding: 16,
+  },
+  activeHeader: {
     marginBottom: 16,
-  },
-  card: {
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  headerLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 1,
   },
   liveIndicator: {
     flexDirection: 'row',
@@ -337,160 +216,157 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#10B981',
   },
-  liveLabel: {
-    fontSize: 12,
+  liveText: {
+    fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
     color: '#10B981',
   },
-  sessionTitle: {
+  activeTitle: {
     fontSize: 18,
     fontWeight: '600',
-    letterSpacing: -0.3,
   },
-  dialRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 8,
-  },
-  navButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dialContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dialCenter: {
-    position: 'absolute',
-    alignItems: 'center',
-  },
-  dialLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 1,
-    marginBottom: 2,
-  },
-  dialValue: {
-    fontSize: 42,
-    fontWeight: '300',
-    letterSpacing: -2,
-    fontVariant: ['tabular-nums'],
-  },
-  dialPercent: {
-    fontSize: 24,
-    fontWeight: '400',
-  },
-  dialUnit: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 1,
-    marginTop: 4,
-  },
-  dots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 12,
-  },
-  dot: {
-    height: 4,
-    borderRadius: 2,
-  },
-  statsRow: {
+  activeStats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    alignItems: 'center',
-    marginTop: 20,
+    marginBottom: 16,
   },
-  statItem: {
+  activeStat: {
     alignItems: 'center',
-    flex: 1,
   },
-  statItemWithIcon: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  statValue: {
-    fontSize: 18,
+  activeStatValue: {
+    fontSize: 28,
     fontWeight: '600',
     fontVariant: ['tabular-nums'],
   },
-  statLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 0.5,
+  activeStatLabel: {
+    fontSize: 12,
     marginTop: 2,
   },
-  statDivider: {
-    width: 1,
-    height: 28,
-  },
-  // Action row
-  actionRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 12,
-  },
-  actionButton: {
+  resumeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(16, 185, 129, 0.3)',
   },
-  actionLabel: {
-    fontSize: 14,
+  resumeText: {
+    fontSize: 15,
     fontWeight: '600',
+    color: '#10B981',
   },
-  actionDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#000',
-    opacity: 0.6,
-  },
-  actionResumeText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#000',
-  },
-  // Training button
-  trainingButton: {
-    flex: 1,
+
+  // Start Session Button
+  startButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 14,
-    paddingHorizontal: 10,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
+    padding: 16,
+    gap: 14,
   },
-  trainingLabel: {
-    fontSize: 12,
-    fontWeight: '600',
+  startButtonIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#10B981',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  startButtonText: {
     flex: 1,
   },
-  liveDotSmall: {
+  startTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  startDesc: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+
+  // Training Card
+  trainingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+  },
+  trainingLeft: {
+    flex: 1,
+    gap: 4,
+  },
+  trainingLive: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  liveDotRed: {
     width: 6,
     height: 6,
     borderRadius: 3,
     backgroundColor: '#EF4444',
+  },
+  liveTextRed: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+    color: '#EF4444',
+  },
+  trainingScheduled: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  scheduledText: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  trainingTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  joinButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  joinText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  // Stats Bar
+  statsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  statValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  statLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  statDivider: {
+    width: 1,
+    height: 20,
   },
 });
