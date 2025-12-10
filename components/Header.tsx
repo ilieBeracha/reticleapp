@@ -2,6 +2,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { useTeamStore } from '@/store/teamStore';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { usePathname } from 'expo-router';
 import { BellIcon } from 'lucide-react-native';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { BaseAvatar } from './BaseAvatar';
@@ -17,13 +18,20 @@ interface HeaderProps {
 export function Header({ notificationCount = 0, onNotificationPress, onUserPress, onTeamPress }: HeaderProps) {
   const { user } = useAuth();
   const colors = useColors();
+  const pathname = usePathname();
   
-  // Use a single atomic selector that returns a primitive (string) to prevent infinite re-renders
-  const displayName = useTeamStore(state => {
-    if (!state.activeTeamId) return 'Personal';
+  // Check if we're on the personal tab - show "Personal" regardless of activeTeamId
+  const isPersonalRoute = pathname?.startsWith('/personal');
+  
+  // Get team name from store
+  const teamName = useTeamStore(state => {
+    if (!state.activeTeamId) return null;
     const team = state.teams.find(t => t.id === state.activeTeamId);
-    return team?.name || 'Personal';
+    return team?.name || null;
   });
+  
+  // Show "Personal" on personal routes, or when no team is active
+  const displayName = isPersonalRoute ? 'Personal' : (teamName || 'Personal');
 
   const email = user?.email;
   const avatarUrl = user?.user_metadata?.avatar_url;

@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 20 },
 
-  header: { alignItems: 'center', paddingTop: 4, paddingBottom: 24 },
+  header: { alignItems: 'center', paddingVertical: 24 },
   headerIcon: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   title: { fontSize: 22, fontWeight: '700', letterSpacing: -0.5 },
   subtitle: { fontSize: 14, marginTop: 4 },
@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
   createButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
 
   // Success state
-  successContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingBottom: 60 },
+  successContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingVertical: 60 },
   successIcon: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
   successTitle: { fontSize: 26, fontWeight: '700', letterSpacing: -0.4, marginBottom: 10 },
   successSubtitle: { fontSize: 15, textAlign: 'center', lineHeight: 22, marginBottom: 32 },

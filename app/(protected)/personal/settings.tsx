@@ -1,14 +1,18 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
+import { useNotifications } from '@/hooks/useNotifications';
+import { sendTestNotification } from '@/services/notifications';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { Bell, BellRing } from 'lucide-react-native';
 import { useCallback } from 'react';
 import {
   Alert,
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -23,6 +27,26 @@ export default function PersonalSettingsScreen() {
   const colors = useColors();
   const { fullName, email } = useAppContext();
   const { signOut } = useAuth();
+  const { isEnabled: notificationsEnabled, requestPermission } = useNotifications();
+
+  const handleTestNotification = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    if (!notificationsEnabled) {
+      const granted = await requestPermission();
+      if (!granted) {
+        Alert.alert(
+          'Notifications Disabled',
+          'Please enable notifications in your device settings to receive alerts.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+    }
+
+    await sendTestNotification();
+    Alert.alert('Notification Scheduled', 'You will receive a test notification in 3 seconds.');
+  }, [notificationsEnabled, requestPermission]);
 
   const handleSignOut = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -79,20 +103,59 @@ export default function PersonalSettingsScreen() {
           </View>
         </View>
 
+        {/* Notifications Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>NOTIFICATIONS</Text>
+          
+          <View style={[styles.settingItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.settingIcon, { backgroundColor: notificationsEnabled ? colors.primary + '20' : colors.secondary }]}>
+              <Bell size={20} color={notificationsEnabled ? colors.primary : colors.textMuted} />
+            </View>
+            <View style={styles.settingContent}>
+              <Text style={[styles.settingLabel, { color: colors.text }]}>Push Notifications</Text>
+              <Text style={[styles.settingHint, { color: colors.textMuted }]}>
+                {notificationsEnabled ? 'Enabled' : 'Disabled'}
+              </Text>
+            </View>
+            <Switch
+              value={notificationsEnabled}
+              onValueChange={async (value) => {
+                if (value) {
+                  await requestPermission();
+                } else {
+                  Alert.alert(
+                    'Disable Notifications',
+                    'To disable notifications, go to your device Settings > Reticle > Notifications.',
+                    [{ text: 'OK' }]
+                  );
+                }
+              }}
+              trackColor={{ false: colors.border, true: colors.primary + '50' }}
+              thumbColor={notificationsEnabled ? colors.primary : colors.textMuted}
+            />
+          </View>
+
+          <TouchableOpacity
+            style={[styles.settingItem, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={handleTestNotification}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.settingIcon, { backgroundColor: colors.primary + '20' }]}>
+              <BellRing size={20} color={colors.primary} />
+            </View>
+            <View style={styles.settingContent}>
+              <Text style={[styles.settingLabel, { color: colors.text }]}>Test Notification</Text>
+              <Text style={[styles.settingHint, { color: colors.textMuted }]}>
+                Send a test in 3 seconds
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+
         {/* App Settings Section */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>APP</Text>
-          
-          <TouchableOpacity
-            style={[styles.settingItem, { backgroundColor: colors.card, borderColor: colors.border }]}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.settingIcon, { backgroundColor: colors.secondary }]}>
-              <Ionicons name="notifications-outline" size={20} color={colors.text} />
-            </View>
-            <Text style={[styles.settingLabel, { color: colors.text }]}>Notifications</Text>
-            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-          </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.settingItem, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -238,10 +301,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  settingLabel: {
+  settingContent: {
     flex: 1,
+    gap: 2,
+  },
+  settingLabel: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  settingHint: {
+    fontSize: 13,
   },
   signOutButton: {
     flexDirection: 'row',

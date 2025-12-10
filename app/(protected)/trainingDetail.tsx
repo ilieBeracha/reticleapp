@@ -6,8 +6,8 @@ import type { TrainingDrill, TrainingStatus, TrainingWithDetails } from "@/types
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import * as Haptics from 'expo-haptics';
-import { router } from "expo-router";
-import { useCallback, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 // Status configs
@@ -82,24 +82,29 @@ const DrillCard = ({ drill, index, colors }: { drill: TrainingDrill; index: numb
 /**
  * TRAINING DETAIL - Native Form Sheet
  * 
- * Uses selectedTraining from ModalContext to fetch and display training details
+ * Supports both:
+ * 1. selectedTraining from ModalContext (legacy)
+ * 2. id param from URL (preferred)
  */
 export default function TrainingDetailSheet() {
   const colors = useColors();
-  const { selectedTraining: initialTraining, getOnTrainingUpdated } = useModals();
+  const { id: trainingIdParam } = useLocalSearchParams<{ id?: string }>();
+  const { selectedTraining: contextTraining, getOnTrainingUpdated } = useModals();
 
-  const [training, setTraining] = useState<TrainingWithDetails | null>(initialTraining);
+  // Use URL param first, fall back to context
+  const trainingId = trainingIdParam || contextTraining?.id;
+
+  const [training, setTraining] = useState<TrainingWithDetails | null>(contextTraining);
   const [sessions, setSessions] = useState<SessionWithDetails[]>([]);
-  const [loading, setLoading] = useState(!initialTraining);
+  const [loading, setLoading] = useState(true);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const fetchTraining = useCallback(async (trainingId: string) => {
+  const fetchTraining = useCallback(async (id: string) => {
     setLoading(true);
     try {
-      const data = await getTrainingById(trainingId);
+      const data = await getTrainingById(id);
       setTraining(data);
-      fetchSessions(trainingId);
     } catch (error) {
       console.error('Failed to fetch training:', error);
       Alert.alert('Error', 'Failed to load training details');
@@ -109,10 +114,10 @@ export default function TrainingDetailSheet() {
     }
   }, []);
 
-  const fetchSessions = useCallback(async (trainingId: string) => {
+  const fetchSessions = useCallback(async (id: string) => {
     setLoadingSessions(true);
     try {
-      const data = await getTrainingSessions(trainingId);
+      const data = await getTrainingSessions(id);
       setSessions(data);
     } catch (error) {
       console.error('Failed to fetch training sessions:', error);
@@ -122,13 +127,26 @@ export default function TrainingDetailSheet() {
     }
   }, []);
 
+  // Load training on mount or when ID changes
+  useEffect(() => {
+    if (trainingId) {
+      fetchTraining(trainingId);
+      fetchSessions(trainingId);
+    } else {
+      // No training ID available - go back
+      Alert.alert('Error', 'No training selected');
+      router.back();
+    }
+  }, [trainingId, fetchTraining, fetchSessions]);
+
   // Reload data every time screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      if (initialTraining?.id) {
-        fetchTraining(initialTraining.id);
+      if (trainingId) {
+        fetchTraining(trainingId);
+        fetchSessions(trainingId);
       }
-    }, [initialTraining?.id, fetchTraining])
+    }, [trainingId, fetchTraining, fetchSessions])
   );
 
   const handleStartTraining = useCallback(async () => {
@@ -206,9 +224,11 @@ export default function TrainingDetailSheet() {
 
   if (loading || !training) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.card }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      <View style={{paddingTop: 200}}>
+          <View style={[styles.loadingContainer, { backgroundColor: colors.card }]}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        </View>
     );
   }
 
@@ -349,9 +369,10 @@ export default function TrainingDetailSheet() {
 const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 20 },
-  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: "#0A0A0A" },
 
-  header: { paddingTop: 8, paddingBottom: 20, alignItems: 'center' },
+  header: { paddingVertical: 20, alignItems: 'center' },
   statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginBottom: 12 },
   statusText: { fontSize: 13, fontWeight: '600' },
   title: { fontSize: 22, fontWeight: '700', textAlign: 'center', letterSpacing: -0.4, marginBottom: 6 },

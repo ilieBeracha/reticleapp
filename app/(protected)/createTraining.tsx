@@ -9,17 +9,17 @@ import * as Haptics from 'expo-haptics';
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Keyboard,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Keyboard,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -257,22 +257,22 @@ export default function CreateTrainingSheet() {
         drills: drills.length > 0 ? drills.map(({ id, ...drill }) => drill) : undefined,
       });
 
-      // Refresh trainings lists
-      await Promise.all([
-        loadTeamTrainings(selectedTeamId),
-        loadMyUpcomingTrainings(),
-      ]);
-
+      // Stop loader immediately after successful creation
+      setSubmitting(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-      Alert.alert('✓ Training Scheduled', `"${title}" has been added to the calendar`, [
-        { text: 'OK', onPress: () => router.canGoBack() && router.back() },
-      ]);
+      // Refresh trainings lists in background (don't block)
+      loadTeamTrainings(selectedTeamId).catch(() => {});
+      loadMyUpcomingTrainings().catch(() => {});
+
+      // Navigate back immediately
+      if (router.canGoBack()) {
+        router.back();
+      }
     } catch (error: any) {
+      setSubmitting(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Error', error.message || 'Failed to create training');
-    } finally {
-      setSubmitting(false);
     }
   }, [title, description, selectedTeamId, scheduledDate, drills, loadTeamTrainings, loadMyUpcomingTrainings]);
 

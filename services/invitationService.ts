@@ -1,5 +1,6 @@
-import type { TeamMemberShip, TeamInvitation, TeamInvitationWithDetails, TeamRole } from '@/types/workspace';
+import type { TeamInvitation, TeamInvitationWithDetails, TeamMemberShip } from '@/types/workspace';
 import { AuthenticatedClient } from './authenticatedClient';
+import { notifyInviteAccepted } from './notifications';
 
 /**
  * Generate a unique 8-character invite code
@@ -99,9 +100,9 @@ export async function getTeamInvitations(teamId: string): Promise<TeamInvitation
     .from('team_invitations')
     .select(`
       *,
-      invited_by_profile:profiles!team_invitations_invited_by_fkey(full_name, email),
-      accepted_by_profile:profiles!team_invitations_accepted_by_fkey(full_name, email),
-      team:teams!team_invitations_team_id_fkey(name)
+      invited_by_profile:profiles!invited_by(full_name, email),
+      accepted_by_profile:profiles!accepted_by(full_name, email),
+      team:teams(name)
     `)
     .eq('team_id', teamId)
     .order('created_at', { ascending: false });
@@ -190,8 +191,8 @@ export async function validateInviteCode(inviteCode: string): Promise<TeamInvita
     .from('team_invitations')
     .select(`
       *,
-      invited_by_profile:profiles!team_invitations_invited_by_fkey(full_name, email),
-      team:teams!team_invitations_team_id_fkey(name)
+      invited_by_profile:profiles!invited_by(full_name, email),
+      team:teams(name)
     `)
     .eq('invite_code', inviteCode.toUpperCase().trim())
     .eq('status', 'pending')
@@ -261,6 +262,28 @@ export async function acceptInvitation(inviteCode: string): Promise<void> {
     const errorMsg = 'Failed to accept invitation';
     console.error('Accept team invite failed:', errorMsg);
     throw new Error(errorMsg);
+  }
+
+  // Get user profile for notification
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('id', user.id)
+    .single();
+
+  const memberName = profile?.full_name || 'A new member';
+
+  // Send local notification confirmation (for the user who accepted)
+  // The actual notification to commanders/owners needs server-side push
+  // TODO: Create Supabase Edge Function to notify team owners/commanders
+  
+  // For now, we can at least log it - the user who accepted sees a success UI
+  console.log(`[Notification] ${memberName} accepted invite to team`);
+  
+  // If the RPC returns team info, we could send local notification
+  if (data.team_id && data.team_name) {
+    // This notifies the current user (who accepted) - confirmation
+    notifyInviteAccepted(data.team_id, data.team_name, memberName).catch(console.error);
   }
 }
 

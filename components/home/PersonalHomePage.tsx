@@ -1,26 +1,18 @@
-import { Colors } from '@/constants/Colors';
 import { useModals } from '@/contexts/ModalContext';
-import { useTheme } from '@/contexts/ThemeContext';
+import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
-import { useWorkspacePermissions } from '@/hooks/usePermissions';
-import { useSessionStats } from '@/hooks/useSessionStats';
-import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/hooks/useWorkspaceData';
-import { getMyActivePersonalSession, type SessionWithDetails } from '@/services/sessionService';
+import { calculateSessionStats, getMyActivePersonalSession, type SessionWithDetails } from '@/services/sessionService';
 import { useSessionStore } from '@/store/sessionStore';
 import { useTrainingStore } from '@/store/trainingStore';
-import type { TrainingWithDetails } from '@/types/workspace';
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { format, isToday, isTomorrow } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Calendar, ChevronRight, Play, ScanLine, Target, Zap } from 'lucide-react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
-  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -28,296 +20,35 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = SCREEN_WIDTH * 0.75;
-
-// ═══════════════════════════════════════════════════════════════════════════
-// HERO CARD (Featured Training / Session)
-// ═══════════════════════════════════════════════════════════════════════════
-const HeroCard = React.memo(function HeroCard({
-  title,
-  subtitle,
-  meta,
-  actionLabel,
-  onPress,
-  gradientColors,
-  icon,
-}: {
-  title: string;
-  subtitle: string;
-  meta?: string;
-  actionLabel: string;
-  onPress: () => void;
-  gradientColors: [string, string];
-  icon: keyof typeof Ionicons.glyphMap;
-}) {
-  return (
-    <TouchableOpacity style={styles.heroCard} onPress={onPress} activeOpacity={0.9}>
-      <LinearGradient colors={gradientColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroGradient}>
-        <View style={styles.heroContent}>
-          <View style={styles.heroBadge}>
-            <View style={styles.heroBadgeDot} />
-            <Text style={styles.heroBadgeText}>{subtitle}</Text>
-          </View>
-          <Text style={styles.heroTitle} numberOfLines={2}>{title}</Text>
-          {meta && <Text style={styles.heroMeta}>{meta}</Text>}
-          <View style={styles.heroAction}>
-            <Text style={styles.heroActionText}>{actionLabel}</Text>
-            <Ionicons name="arrow-forward" size={16} color="#fff" />
-          </View>
-        </View>
-        <View style={styles.heroIconContainer}>
-          <Ionicons name={icon} size={80} color="rgba(255,255,255,0.15)" />
-        </View>
-      </LinearGradient>
-    </TouchableOpacity>
-  );
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// HORIZONTAL SCROLL TRAINING CARD
-// ═══════════════════════════════════════════════════════════════════════════
-const TrainingScrollCard = React.memo(function TrainingScrollCard({
-  training,
-  colors,
-  onPress,
-}: {
-  training: TrainingWithDetails;
-  colors: typeof Colors.light;
-  onPress: () => void;
-}) {
-  const scheduledDate = new Date(training.scheduled_at);
-  const today = isToday(scheduledDate);
-  const tomorrow = isTomorrow(scheduledDate);
-  const dateLabel = today ? 'Today' : tomorrow ? 'Tomorrow' : format(scheduledDate, 'EEE, MMM d');
-  const timeLabel = format(scheduledDate, 'HH:mm');
-
-  return (
-    <TouchableOpacity
-      style={[styles.trainingScrollCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
-      <View style={[styles.trainingScrollAccent, { backgroundColor: '#3B82F6' }]} />
-      <View style={styles.trainingScrollContent}>
-        <Text style={[styles.trainingScrollTitle, { color: colors.text }]} numberOfLines={2}>
-          {training.title}
-        </Text>
-        <View style={styles.trainingScrollMeta}>
-          <Ionicons name="calendar-outline" size={12} color={colors.textMuted} />
-          <Text style={[styles.trainingScrollMetaText, { color: colors.textMuted }]}>
-            {dateLabel}, {timeLabel}
-          </Text>
-        </View>
-        {training.team && (
-          <View style={styles.trainingScrollMeta}>
-            <Ionicons name="people-outline" size={12} color={colors.textMuted} />
-            <Text style={[styles.trainingScrollMetaText, { color: colors.textMuted }]}>
-              {training.team.name}
-            </Text>
-          </View>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// STAT PILL
-// ═══════════════════════════════════════════════════════════════════════════
-const StatPill = React.memo(function StatPill({
-  icon,
-  value,
-  label,
-  color,
-  colors,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  value: string | number;
-  label: string;
-  color: string;
-  colors: typeof Colors.light;
-}) {
-  return (
-    <View style={[styles.statPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={[styles.statPillIcon, { backgroundColor: color + '20' }]}>
-        <Ionicons name={icon} size={18} color={color} />
-      </View>
-      <View>
-        <Text style={[styles.statPillValue, { color: colors.text }]}>{value}</Text>
-        <Text style={[styles.statPillLabel, { color: colors.textMuted }]}>{label}</Text>
-      </View>
-    </View>
-  );
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// QUICK ACTION BUTTON
-// ═══════════════════════════════════════════════════════════════════════════
-const QuickActionButton = React.memo(function QuickActionButton({
-  icon,
-  label,
-  color = '#ffffff',
-  colors,
-  onPress,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  color?: string;
-  colors: typeof Colors.light;
-  onPress: () => void;
-}) {
-  return (
-    <TouchableOpacity
-      style={[styles.quickActionBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.quickActionIcon, { backgroundColor: color + '15' }]}>
-        <Ionicons name={icon} size={22} color={color} />
-      </View>
-      <Text style={[styles.quickActionLabel, { color: colors.text }]}>{label}</Text>
-    </TouchableOpacity>
-  );
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// SECTION HEADER
-// ═══════════════════════════════════════════════════════════════════════════
-const SectionHeader = React.memo(function SectionHeader({
-  title,
-  action,
-  onAction,
-  colors,
-}: {
-  title: string;
-  action?: string;
-  onAction?: () => void;
-  colors: typeof Colors.light;
-}) {
-  return (
-    <View style={styles.sectionHeader}>
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
-      {action && onAction && (
-        <TouchableOpacity onPress={onAction} activeOpacity={0.6}>
-          <Text style={[styles.sectionAction, { color: colors.primary }]}>{action}</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// ACTIVITY ROW (Subtle/Muted)
-// ═══════════════════════════════════════════════════════════════════════════
-const ActivityRow = React.memo(function ActivityRow({
-  session,
-  colors,
-  onPress,
-}: {
-  session: SessionWithDetails;
-  colors: typeof Colors.light;
-  onPress: () => void;
-}) {
-  const isActive = session.status === 'active';
-  const isPersonal = !session.team_id;
-  const duration = session.ended_at
-    ? Math.round((new Date(session.ended_at).getTime() - new Date(session.started_at).getTime()) / 60000)
-    : Math.round((Date.now() - new Date(session.started_at).getTime()) / 60000);
-  const sessionDate = format(new Date(session.started_at), 'MMM d');
-
-  return (
-    <TouchableOpacity
-      style={styles.activityRowSubtle}
-      onPress={onPress}
-      activeOpacity={0.6}
-    >
-      <View style={styles.activityContentSubtle}>
-        <Text style={[styles.activityTitleSubtle, { color: colors.textMuted }]} numberOfLines={1}>
-          {session.training_title || session.drill_name || 'Free Session'}
-        </Text>
-        <Text style={[styles.activityMetaSubtle, { color: colors.border }]}>
-          {sessionDate} · {isActive ? 'Active' : `${duration}m`}
-          {isPersonal ? '' : ` · ${session.team_name || 'Team'}`}
-        </Text>
-      </View>
-      <Ionicons name="chevron-forward" size={16} color={colors.border} />
-    </TouchableOpacity>
-  );
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// TIP CARD
-// ═══════════════════════════════════════════════════════════════════════════
-const TipCard = React.memo(function TipCard({
-  icon,
-  title,
-  description,
-  colors,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  description: string;
-  colors: typeof Colors.light;
-}) {
-  return (
-    <View style={[styles.tipCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={[styles.tipIconContainer, { backgroundColor: colors.primary + '10' }]}>
-        <Ionicons name={icon} size={20} color={colors.primary} />
-      </View>
-      <View style={styles.tipContent}>
-        <Text style={[styles.tipTitle, { color: colors.text }]}>{title}</Text>
-        <Text style={[styles.tipDesc, { color: colors.textMuted }]}>{description}</Text>
-      </View>
-    </View>
-  );
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// INSIGHT ROW
-// ═══════════════════════════════════════════════════════════════════════════
-const InsightRow = React.memo(function InsightRow({
-  label,
-  value,
-  icon,
-  colors,
-}: {
-  label: string;
-  value: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  colors: typeof Colors.light;
-}) {
-  return (
-    <View style={styles.insightRow}>
-      <View style={styles.insightLeft}>
-        <Ionicons name={icon} size={16} color={colors.textMuted} />
-        <Text style={[styles.insightLabel, { color: colors.textMuted }]}>{label}</Text>
-      </View>
-      <Text style={[styles.insightValue, { color: colors.text }]}>{value}</Text>
-    </View>
-  );
-});
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Svg, { Circle, Defs, Stop, LinearGradient as SvgLinearGradient } from 'react-native-svg';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
-export const PersonalHomePage = React.memo(function PersonalHomePage() {
-  const { theme } = useTheme();
-  const colors = Colors[theme];
+export function PersonalHomePage() {
+  const colors = useColors();
   const { fullName } = useAppContext();
-  const permissions = useWorkspacePermissions();
   const { setOnSessionCreated, setOnTeamCreated } = useModals();
   const { sessions, sessionsLoading, loadTeams } = useWorkspaceData();
-  const { loadSessions } = useSessionStore();
+  const { loadSessions, createSession } = useSessionStore();
   const [refreshing, setRefreshing] = useState(false);
+  const [starting, setStarting] = useState(false);
+  
+  // Live timer state for active session
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  
+  // Session stats (targets, shots, etc.)
+  const [sessionStats, setSessionStats] = useState<{
+    targetCount: number;
+    totalShotsFired: number;
+    totalHits: number;
+    paperTargets: number;
+    tacticalTargets: number;
+  } | null>(null);
 
-  const {
-    myUpcomingTrainings,
-    loadingMyTrainings,
-    loadMyUpcomingTrainings,
-    loadMyStats,
-  } = useTrainingStore();
+  const { myUpcomingTrainings, myStats, loadingMyTrainings, loadMyUpcomingTrainings, loadMyStats } = useTrainingStore();
 
   useFocusEffect(
     useCallback(() => {
@@ -326,8 +57,6 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
       loadMyStats();
     }, [loadSessions, loadMyUpcomingTrainings, loadMyStats])
   );
-
-  const stats = useSessionStats(sessions);
 
   useEffect(() => {
     setOnSessionCreated(() => loadSessions);
@@ -338,9 +67,89 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
     };
   }, [loadSessions, loadTeams, setOnSessionCreated, setOnTeamCreated]);
 
-  const { onStartSession, onCreateTeam } = useWorkspaceActions();
-  const { createSession } = useSessionStore();
-  const [quickStarting, setQuickStarting] = useState(false);
+  // Data
+  const activeSession = useMemo(() => sessions.find(s => s.status === 'active'), [sessions]);
+  const recentSessions = useMemo(() => sessions.filter(s => s.status === 'completed').slice(0, 4), [sessions]);
+  const lastSession = recentSessions[0];
+  
+  // Live timer for active session
+  useEffect(() => {
+    if (activeSession) {
+      // Calculate initial elapsed time
+      const startTime = new Date(activeSession.started_at).getTime();
+      const updateElapsed = () => {
+        const now = Date.now();
+        setElapsedTime(Math.floor((now - startTime) / 1000));
+      };
+      
+      updateElapsed();
+      timerRef.current = setInterval(updateElapsed, 1000);
+      
+      return () => {
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+      };
+    } else {
+      setElapsedTime(0);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+  }, [activeSession]);
+  
+  // Load session stats (targets) for active session
+  useEffect(() => {
+    if (activeSession) {
+      calculateSessionStats(activeSession.id)
+        .then(stats => setSessionStats(stats))
+        .catch(() => setSessionStats(null));
+    } else {
+      setSessionStats(null);
+    }
+  }, [activeSession]);
+  
+  // Format elapsed time
+  const formatElapsedTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return { minutes: mins, seconds: secs };
+  };
+  
+  const elapsed = formatElapsedTime(elapsedTime);
+  
+  // Calculate total training time this week
+  const weeklyStats = useMemo(() => {
+    const now = new Date();
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - 7);
+    
+    const weekSessions = sessions.filter(s => 
+      s.status === 'completed' && 
+      new Date(s.created_at) >= weekStart
+    );
+    
+    const totalMinutes = weekSessions.reduce((acc, s) => acc + getDuration(s), 0);
+    return { sessions: weekSessions.length, minutes: totalMinutes };
+  }, [sessions]);
+  
+  // Calculate dial progress (0-1) based on session duration
+  // Max duration for full dial = 60 minutes
+  const dialProgress = useMemo(() => {
+    if (activeSession) {
+      return Math.min(elapsed.minutes / 60, 1);
+    }
+    if (lastSession) {
+      return Math.min(getDuration(lastSession) / 60, 1);
+    }
+    return 0;
+  }, [activeSession, elapsed.minutes, lastSession]);
+  
+  // Calculate strokeDashoffset for progress
+  // Full arc is 198, so offset = 198 * (1 - progress)
+  const strokeDashoffset = 198 * (1 - dialProgress);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -349,428 +158,671 @@ export const PersonalHomePage = React.memo(function PersonalHomePage() {
     setRefreshing(false);
   }, [loadSessions, loadMyUpcomingTrainings, loadMyStats]);
 
-  // Data Filtering
-  const activeSessions = useMemo(() => sessions.filter(s => s.status === 'active'), [sessions]);
-  const ongoingTrainings = useMemo(() => myUpcomingTrainings.filter(t => t.status === 'ongoing'), [myUpcomingTrainings]);
-  const plannedTrainings = useMemo(() => myUpcomingTrainings.filter(t => t.status === 'planned'), [myUpcomingTrainings]);
-  const recentSessions = useMemo(() => sessions.slice(0, 5), [sessions]);
-
-  // Calculate time
-  const totalTime = useMemo(() => {
-    const totalMinutes = sessions.reduce((acc, session) => {
-      if (session.started_at && session.ended_at) {
-        return acc + (new Date(session.ended_at).getTime() - new Date(session.started_at).getTime()) / (1000 * 60);
-      }
-      return acc;
-    }, 0);
-    const hours = Math.floor(totalMinutes / 60);
-    const mins = Math.round(totalMinutes % 60);
-    return hours > 0 ? `${hours}h` : `${mins}m`;
-  }, [sessions]);
-
-  // ═══ QUICK START - One tap to begin training ═══
-  const handleQuickStart = useCallback(async () => {
+  // Handlers
+  const handleStart = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    setQuickStarting(true);
-    
+    setStarting(true);
     try {
-      // Check for existing active session first
-      const activeSession = await getMyActivePersonalSession();
-      
-      if (activeSession) {
-        // Resume existing session
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.push(`/(protected)/activeSession?sessionId=${activeSession.id}` as any);
-      } else {
-        // Create new solo session instantly
-        const newSession = await createSession({
-          session_mode: 'solo',
-        });
-        
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.push(`/(protected)/activeSession?sessionId=${newSession.id}` as any);
-      }
-    } catch (error: any) {
+      const existing = await getMyActivePersonalSession();
+      const sessionId = existing?.id || (await createSession({ session_mode: 'solo' })).id;
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.push(`/(protected)/activeSession?sessionId=${sessionId}` as any);
+    } catch {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      console.error('Quick start failed:', error);
     } finally {
-      setQuickStarting(false);
+      setStarting(false);
     }
   }, [createSession]);
 
-  // Navigation
-  const nav = useMemo(() => ({
-    startSession: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onStartSession(); },
-    createTeam: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onCreateTeam(); },
-    viewProgress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); },
-    viewScans: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(protected)/scans' as any); },
-    resumeSession: (id: string) => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push(`/(protected)/activeSession?sessionId=${id}` as any); },
-    trainingLive: (id: string) => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push(`/(protected)/trainingLive?trainingId=${id}` as any); },
-  }), [onStartSession, onCreateTeam]);
-
-  // Featured content
-  const featuredSession = activeSessions[0];
-  const featuredTraining = ongoingTrainings[0] || plannedTrainings[0];
+  const handleResume = useCallback(() => {
+    if (!activeSession) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push(`/(protected)/activeSession?sessionId=${activeSession.id}` as any);
+  }, [activeSession]);
 
   const isLoading = sessionsLoading || loadingMyTrainings;
 
   if (isLoading && sessions.length === 0) {
     return (
-      <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
+  const firstName = fullName?.split(' ')[0] || 'User';
+  
+  // Current display session (active or last)
+  const displaySession = activeSession || lastSession;
+  const sessionTitle = displaySession 
+    ? (displaySession.training_title || displaySession.drill_name || 'Freestyle Session')
+    : 'No sessions yet';
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            tintColor={colors.text} 
+          />
+        }
       >
-        {/* ═══ HEADER ═══ */}
-        <View style={styles.header}>
-          <Text style={[styles.headerGreeting, { color: colors.textMuted }]}>Welcome back,</Text>
-          <Text style={[styles.headerName, { color: colors.text }]}>{fullName || 'User'}</Text>
-        </View>
-
-        {/* ═══ HERO SECTION - Start Button or Active Session ═══ */}
-        {featuredSession ? (
-          <View style={styles.heroSection}>
-            <HeroCard
-              title={featuredSession.training_title || featuredSession.drill_name || 'Active Session'}
-              subtitle="IN PROGRESS"
-              meta={featuredSession.team_name || undefined}
-              actionLabel="Resume Session"
-              onPress={() => nav.resumeSession(featuredSession.id)}
-              gradientColors={['#6366F1', '#8B5CF6']}
-              icon="fitness"
-            />
-          </View>
-        ) : (
-          <View style={styles.startSection}>
-            {/* Circular Start Button - subtle, blends with background */}
-            <TouchableOpacity
-              style={[styles.startButton, { borderColor: colors.border }]}
-              onPress={handleQuickStart}
-              disabled={quickStarting}
-              activeOpacity={0.85}
-            >
-              <View style={[styles.startButtonBg, { backgroundColor: colors.card }]}>
-                {/* Outer ring */}
-                <View style={[styles.startButtonOuter, { borderColor: colors.primary + '30' }]}>
-                  {/* Inner circle with subtle accent */}
-                  <View style={[styles.startButtonInner, { backgroundColor: colors.primary + '15' }]}>
-                    {quickStarting ? (
-                      <ActivityIndicator size="large" color={colors.primary} />
-                    ) : (
-                      <Text style={[styles.startButtonText, { color: colors.primary }]}>Start</Text>
-                    )}
-                  </View>
-                </View>
-              </View>
-            </TouchableOpacity>
-            
-            <Text style={[styles.startHint, { color: colors.textMuted }]}>
-              Tap to begin training
+        {/* ══════════════════════════════════════════════════════════════════════
+            HEADER
+        ══════════════════════════════════════════════════════════════════════ */}
+        <Animated.View
+          entering={FadeInDown.duration(500).springify()}
+          style={styles.header}
+        >
+          <View>
+            <Text style={[styles.greeting, { color: colors.text }]}>
+              Hello, {firstName}
+            </Text>
+            <Text style={[styles.subGreeting, { color: colors.textMuted }]}>
+              Ready to train?
             </Text>
           </View>
-        )}
+        </Animated.View>
 
-        {/* ═══ UPCOMING TRAINING (if no active session) ═══ */}
-        {!featuredSession && featuredTraining && (
-          <TouchableOpacity 
-            style={[styles.upcomingBanner, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => nav.trainingLive(featuredTraining.id)}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.upcomingDot, { backgroundColor: featuredTraining.status === 'ongoing' ? '#10B981' : '#3B82F6' }]} />
-            <View style={styles.upcomingContent}>
-              <Text style={[styles.upcomingLabel, { color: colors.textMuted }]}>
-                {featuredTraining.status === 'ongoing' ? 'LIVE NOW' : 'UP NEXT'}
-              </Text>
-              <Text style={[styles.upcomingTitle, { color: colors.text }]} numberOfLines={1}>
-                {featuredTraining.title}
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-          </TouchableOpacity>
-        )}
-
-        {/* ═══ STATS ROW ═══ */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.statsRow}
-          style={styles.statsScrollView}
-        >
-          <StatPill icon="layers-outline" value={stats.totalSessions} label="Sessions" color="#6366F1" colors={colors} />
-          <StatPill icon="checkmark-circle-outline" value={stats.completedSessions} label="Completed" color="#10B981" colors={colors} />
-          <StatPill icon="time-outline" value={totalTime} label="Total Time" color="#F59E0B" colors={colors} />
-          <StatPill icon="calendar-outline" value={plannedTrainings.length} label="Upcoming" color="#3B82F6" colors={colors} />
-        </ScrollView>
-
-        {/* ═══ QUICK ACTIONS ═══ */}
-        <View style={styles.section}>
-          <SectionHeader title="Quick Actions" colors={colors} />
-          <View style={styles.quickActionsGrid}>
-            <QuickActionButton icon="play-circle" label="Train" colors={colors} onPress={handleQuickStart} />
-            <QuickActionButton icon="scan" label="Scans" colors={colors} onPress={nav.viewScans} />
-            <QuickActionButton icon="stats-chart" label="Progress" colors={colors} onPress={nav.viewProgress} />
-          </View>
-        </View>
-
-        {/* ═══ UPCOMING TRAININGS ═══ */}
-        {plannedTrainings.length > 0 && (
-          <View style={styles.section}>
-            <SectionHeader title="Upcoming Trainings" action="See all" onAction={() => {}} colors={colors} />
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.trainingsRow}
-              decelerationRate="fast"
-              snapToInterval={CARD_WIDTH + 12}
-            >
-              {plannedTrainings.slice(0, 5).map(training => (
-                <TrainingScrollCard
-                  key={training.id}
-                  training={training}
-                  colors={colors}
-                  onPress={() => nav.trainingLive(training.id)}
-                />
-              ))}
-            </ScrollView>
-          </View>
-        )}
-
-        {/* ═══ TRAINING TIPS ═══ */}
-        <View style={styles.section}>
-          <SectionHeader title="Tips & Insights" colors={colors} />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.tipsRow}
-          >
-            <TipCard
-              icon="bulb-outline"
-              title="Consistency wins"
-              description="Short daily sessions beat long occasional ones"
-              colors={colors}
-            />
-            <TipCard
-              icon="analytics-outline"
-              title="Track progress"
-              description="Review your scans to identify patterns"
-              colors={colors}
-            />
-            <TipCard
-              icon="people-outline"
-              title="Train together"
-              description="Join a team for accountability"
-              colors={colors}
-            />
-          </ScrollView>
-        </View>
-
-        {/* ═══ YOUR INSIGHTS ═══ */}
-        <View style={styles.section}>
-          <SectionHeader title="Your Stats" colors={colors} />
-          <View style={[styles.insightsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <InsightRow icon="flame-outline" label="Current streak" value={stats.totalSessions > 0 ? '3 days' : '—'} colors={colors} />
-            <View style={[styles.insightDivider, { backgroundColor: colors.border }]} />
-            <InsightRow icon="trending-up-outline" label="This week" value={`${Math.min(stats.totalSessions, 5)} sessions`} colors={colors} />
-            <View style={[styles.insightDivider, { backgroundColor: colors.border }]} />
-            <InsightRow icon="ribbon-outline" label="Best session" value={totalTime !== '0m' ? totalTime : '—'} colors={colors} />
-          </View>
-        </View>
-
-        {/* ═══ SESSION HISTORY (Subtle) ═══ */}
-        {recentSessions.length > 0 && (
-          <View style={styles.section}>
-            <SectionHeader title="Session History" colors={colors} />
-            <View style={[styles.historyContainer, { borderColor: colors.border }]}>
-              {recentSessions.map((session, index) => (
-                <React.Fragment key={session.id}>
-                  <ActivityRow
-                    session={session}
-                    colors={colors}
-                    onPress={() => session.status === 'active' ? nav.resumeSession(session.id) : {}}
-                  />
-                  {index < recentSessions.length - 1 && (
-                    <View style={[styles.historyDivider, { backgroundColor: colors.border }]} />
-                  )}
-                </React.Fragment>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* ═══ EMPTY STATE ═══ */}
-        {plannedTrainings.length === 0 && recentSessions.length === 0 && !featuredSession && (
-          <View style={styles.section}>
-            <View style={[styles.emptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={[styles.emptyIconContainer, { backgroundColor: '#10B98115' }]}>
-                <Ionicons name="fitness-outline" size={40} color="#10B981" />
+        {/* ══════════════════════════════════════════════════════════════════════
+            STATUS DIAL
+        ══════════════════════════════════════════════════════════════════════ */}
+        <Animated.View entering={FadeInUp.delay(100).duration(500)} style={styles.dialSection}>
+          <View style={[styles.dialCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {/* Top Row - Session Title */}
+            <View style={styles.dialHeader}>
+              <TouchableOpacity 
+                style={[styles.dialNavButton, { backgroundColor: colors.secondary }]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }}
+              >
+                <ChevronRight size={16} color={colors.textMuted} style={{ transform: [{ rotate: '180deg' }] }} />
+              </TouchableOpacity>
+              
+              <View style={styles.dialHeaderCenter}>
+                <Text style={[styles.dialLabel, { color: activeSession ? '#10B981' : colors.textMuted }]}>
+                  {activeSession ? '● LIVE SESSION' : 'LAST SESSION'}
+                </Text>
+                <Text style={[styles.dialTitle, { color: colors.text }]} numberOfLines={1}>
+                  {sessionTitle}
+                </Text>
               </View>
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>No sessions yet</Text>
-              <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
-                Use the Start button above to begin your first training session
-              </Text>
+              
+              <TouchableOpacity 
+                style={[styles.dialNavButton, { backgroundColor: colors.secondary }]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }}
+              >
+                <ChevronRight size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Dial */}
+            <View style={styles.dialContainer}>
+              <Svg height={200} width={200} viewBox="0 0 100 100">
+                <Defs>
+                  {/* Colorful gradient: Blue → Teal → Amber */}
+                  <SvgLinearGradient id="dialGrad" x1="0" y1="0" x2="1" y2="0">
+                    <Stop offset="0" stopColor={activeSession ? '#3B82F6' : '#6366F1'} />
+                    <Stop offset="0.5" stopColor={activeSession ? '#10B981' : '#8B5CF6'} />
+                    <Stop offset="1" stopColor={activeSession ? '#F59E0B' : '#EC4899'} />
+                  </SvgLinearGradient>
+                </Defs>
+                
+                {/* Background Track */}
+                <Circle
+                  cx="50"
+                  cy="50"
+                  r="42"
+                  stroke={colors.border}
+                  strokeWidth="6"
+                  fill="transparent"
+                  strokeDasharray="198 264"
+                  strokeLinecap="round"
+                  rotation="135"
+                  origin="50, 50"
+                />
+                
+                {/* Progress Track */}
+                <Circle
+                  cx="50"
+                  cy="50"
+                  r="42"
+                  stroke="url(#dialGrad)"
+                  strokeWidth="6"
+                  fill="transparent"
+                  strokeDasharray={`${198 - strokeDashoffset} 264`}
+                  strokeLinecap="round"
+                  rotation="135"
+                  origin="50, 50"
+                />
+              </Svg>
+
+              {/* Center Content */}
+              <View style={styles.dialCenter}>
+                <Text style={[styles.dialCenterLabel, { color: colors.textMuted }]}>
+                  {activeSession ? 'ELAPSED' : 'DURATION'}
+                </Text>
+                
+                {activeSession ? (
+                  // Live timer display
+                  <View style={styles.timerContainer}>
+                    <Text style={[styles.dialValue, { color: colors.text }]}>
+                      {elapsed.minutes}
+                    </Text>
+                    <Text style={[styles.dialValueSeparator, { color: colors.textMuted }]}>:</Text>
+                    <Text style={[styles.dialValueSeconds, { color: colors.textMuted }]}>
+                      {elapsed.seconds.toString().padStart(2, '0')}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={[styles.dialValue, { color: colors.text }]}>
+                    {lastSession ? getDuration(lastSession) : '0'}
+                  </Text>
+                )}
+                
+                <Text style={[styles.dialUnit, { color: '#F59E0B' }]}>
+                  {activeSession ? 'MIN:SEC' : 'MIN'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Bottom Stats */}
+            <View style={styles.dialStats}>
+              <View style={styles.dialStat}>
+                <View style={[styles.dialStatIcon, { backgroundColor: activeSession ? '#F59E0B20' : colors.secondary }]}>
+                  <Zap size={16} color={activeSession ? '#F59E0B' : colors.textMuted} />
+                </View>
+                <Text style={[styles.dialStatValue, { color: colors.text }]}>
+                  {displaySession?.session_mode === 'group' ? 'Group' : 'Solo'}
+                </Text>
+                <Text style={[styles.dialStatLabel, { color: colors.textMuted }]}>MODE</Text>
+              </View>
+
+              <View style={styles.dialStatCenter}>
+                <Text style={[styles.dialStatValueLarge, { color: colors.text }]}>
+                  {activeSession 
+                    ? (sessionStats?.targetCount ?? 0)
+                    : lastSession 
+                      ? format(new Date(lastSession.created_at), 'dd MMM') 
+                      : '--'}
+                </Text>
+                <Text style={[styles.dialStatLabel, { color: colors.textMuted }]}>
+                  {activeSession ? 'TARGETS' : 'DATE'}
+                </Text>
+              </View>
+
+              <View style={styles.dialStat}>
+                <View style={[styles.dialStatIcon, { backgroundColor: activeSession ? '#3B82F620' : colors.secondary }]}>
+                  <Target size={16} color={activeSession ? '#3B82F6' : colors.textMuted} />
+                </View>
+                <Text style={[styles.dialStatValue, { color: colors.text }]}>
+                  {activeSession 
+                    ? (sessionStats?.totalShotsFired ?? 0)
+                    : sessions.filter(s => s.status === 'completed').length}
+                </Text>
+                <Text style={[styles.dialStatLabel, { color: colors.textMuted }]}>
+                  {activeSession ? 'SHOTS' : 'TOTAL'}
+                </Text>
+              </View>
+            </View>
+            
+            {/* Active Session Target Details */}
+            {activeSession && sessionStats && sessionStats.targetCount > 0 && (
+              <View style={[styles.targetStats, { backgroundColor: colors.secondary }]}>
+                <View style={styles.targetStatItem}>
+                  <View style={[styles.targetStatDot, { backgroundColor: '#10B981' }]} />
+                  <Text style={[styles.targetStatText, { color: colors.text }]}>
+                    {sessionStats.totalHits} hits
+                  </Text>
+                </View>
+                <View style={[styles.targetStatDivider, { backgroundColor: colors.border }]} />
+                <View style={styles.targetStatItem}>
+                  <View style={[styles.targetStatDot, { backgroundColor: '#6366F1' }]} />
+                  <Text style={[styles.targetStatText, { color: colors.text }]}>
+                    {sessionStats.paperTargets} paper
+                  </Text>
+                </View>
+                <View style={[styles.targetStatDivider, { backgroundColor: colors.border }]} />
+                <View style={styles.targetStatItem}>
+                  <View style={[styles.targetStatDot, { backgroundColor: '#F59E0B' }]} />
+                  <Text style={[styles.targetStatText, { color: colors.text }]}>
+                    {sessionStats.tacticalTargets} tactical
+                  </Text>
+                </View>
+              </View>
+            )}
+            
+            {/* Team/Training Info (if applicable) */}
+            {displaySession && (displaySession.team_name || displaySession.training_title) && (
+              <View style={[styles.sessionMeta, { backgroundColor: colors.secondary }]}>
+                {displaySession.team_name && (
+                  <View style={styles.sessionMetaItem}>
+                    <Target size={12} color={colors.textMuted} />
+                    <Text style={[styles.sessionMetaText, { color: colors.textMuted }]}>
+                      {displaySession.team_name}
+                    </Text>
+                  </View>
+                )}
+                {displaySession.training_title && (
+                  <View style={styles.sessionMetaItem}>
+                    <Calendar size={12} color={colors.textMuted} />
+                    <Text style={[styles.sessionMetaText, { color: colors.textMuted }]}>
+                      {displaySession.training_title}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+        </Animated.View>
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            WEEKLY STATS
+        ══════════════════════════════════════════════════════════════════════ */}
+        <Animated.View entering={FadeInUp.delay(150).duration(500)} style={styles.section}>
+          <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.statsHeader}>
+              <Text style={[styles.statsTitle, { color: colors.text }]}>This Week</Text>
+              <Text style={[styles.statsSubtitle, { color: colors.textMuted }]}>Last 7 days</Text>
+            </View>
+            
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: colors.text }]}>{weeklyStats.sessions}</Text>
+                <Text style={[styles.statLabel, { color: colors.textMuted }]}>Sessions</Text>
+              </View>
+              <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: colors.text }]}>{weeklyStats.minutes}</Text>
+                <Text style={[styles.statLabel, { color: colors.textMuted }]}>Minutes</Text>
+              </View>
+              <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: colors.text }]}>{myStats.upcoming}</Text>
+                <Text style={[styles.statLabel, { color: colors.textMuted }]}>Upcoming</Text>
+              </View>
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            QUICK ACTIONS
+        ══════════════════════════════════════════════════════════════════════ */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>QUICK ACTIONS</Text>
+          <View style={styles.actionsRow}>
+            {/* Start/Resume */}
+            <TouchableOpacity
+              onPress={activeSession ? handleResume : handleStart}
+              activeOpacity={0.9}
+              disabled={starting}
+              style={[styles.actionCard, { backgroundColor: colors.card, borderColor: activeSession ? '#10B981' : colors.border }]}
+            >
+              <View style={[styles.actionIcon, { backgroundColor: activeSession ? '#10B98120' : colors.secondary }]}>
+                {starting ? (
+                  <ActivityIndicator size="small" color="#10B981" />
+                ) : activeSession ? (
+                  <Play size={20} color="#10B981" fill="#10B981" style={{ marginLeft: 2 }} />
+                ) : (
+                  <Play size={20} color={colors.text} fill={colors.text} style={{ marginLeft: 2 }} />
+                )}
+              </View>
+              <View style={styles.actionContent}>
+                <Text style={[styles.actionTitle, { color: colors.text }]}>
+                  {activeSession ? 'Resume Session' : 'Start Session'}
+                </Text>
+                <Text style={[styles.actionDesc, { color: colors.textMuted }]}>
+                  {activeSession 
+                    ? `${elapsed.minutes}:${elapsed.seconds.toString().padStart(2, '0')} elapsed`
+                    : 'Drill / Freestyle'}
+                </Text>
+              </View>
+              <View style={styles.actionIndicator}>
+                <View style={[styles.actionBar, { backgroundColor: activeSession ? '#10B981' : colors.border }]} />
+              </View>
+            </TouchableOpacity>
+
+            {/* Scans */}
+            <TouchableOpacity
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push('/(protected)/scans' as any);
+              }}
+              activeOpacity={0.9}
+              style={[styles.actionCard, styles.actionCardSecondary, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+            >
+              <View style={[styles.actionIcon, { backgroundColor: colors.card }]}>
+                <ScanLine size={20} color={colors.textMuted} />
+              </View>
+              <View style={styles.actionContent}>
+                <Text style={[styles.actionTitle, { color: colors.text }]}>Target Scans</Text>
+                <Text style={[styles.actionDesc, { color: colors.textMuted }]}>Gallery & Analyze</Text>
+              </View>
+              <View style={styles.actionIndicator}>
+                <View style={[styles.actionBar, { backgroundColor: colors.border }]} />
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            UPCOMING TRAININGS
+        ══════════════════════════════════════════════════════════════════════ */}
+        {myUpcomingTrainings.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>UPCOMING TRAININGS</Text>
+              <TouchableOpacity onPress={() => router.push('/(protected)/personal/trainings' as any)}>
+                <Text style={[styles.sectionLink, { color: colors.primary }]}>View All</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.listContainer}>
+              {myUpcomingTrainings.slice(0, 3).map((training) => (
+                <TouchableOpacity
+                  key={training.id}
+                  activeOpacity={0.7}
+                  style={[styles.listItem, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    router.push(`/(protected)/trainingDetail?id=${training.id}` as any);
+                  }}
+                >
+                  <View style={[styles.listItemIcon, { backgroundColor: '#3B82F620' }]}>
+                    <Calendar size={18} color="#3B82F6" />
+                  </View>
+                  <View style={styles.listItemContent}>
+                    <Text style={[styles.listItemTitle, { color: colors.text }]} numberOfLines={1}>
+                      {training.title}
+                    </Text>
+                    <Text style={[styles.listItemMeta, { color: colors.textMuted }]}>
+                      {training.scheduled_at 
+                        ? formatDistanceToNow(new Date(training.scheduled_at), { addSuffix: true })
+                        : 'Not scheduled'}
+                    </Text>
+                  </View>
+                  <ChevronRight size={18} color={colors.textMuted} />
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
         )}
 
-        <View style={{ height: 120 }} />
-      </ScrollView>
+        {/* ══════════════════════════════════════════════════════════════════════
+            RECENT SESSIONS
+        ══════════════════════════════════════════════════════════════════════ */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>RECENT SESSIONS</Text>
+            <TouchableOpacity onPress={() => router.push('/(protected)/personal/history' as any)}>
+              <Text style={[styles.sectionLink, { color: colors.primary }]}>View All</Text>
+            </TouchableOpacity>
+          </View>
 
+          <View style={styles.listContainer}>
+            {recentSessions.map((s) => (
+              <TouchableOpacity
+                key={s.id}
+                activeOpacity={0.7}
+                style={[styles.listItem, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }}
+              >
+                <View style={[styles.listItemIcon, { backgroundColor: colors.secondary }]}>
+                  <Target size={18} color={colors.textMuted} />
+                </View>
+                <View style={styles.listItemContent}>
+                  <Text style={[styles.listItemTitle, { color: colors.text }]} numberOfLines={1}>
+                    {s.training_title || s.drill_name || 'Freestyle Session'}
+                  </Text>
+                  <Text style={[styles.listItemMeta, { color: colors.textMuted }]}>
+                    {format(new Date(s.created_at), 'MMM d, yyyy • HH:mm')}
+                  </Text>
+                </View>
+                <View style={styles.listItemRight}>
+                  <Text style={[styles.listItemValue, { color: colors.text }]}>
+                    {getDuration(s)}
+                    <Text style={[styles.listItemUnit, { color: colors.textMuted }]}>m</Text>
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+            
+            {recentSessions.length === 0 && (
+              <View style={[styles.emptyState, { borderColor: colors.border }]}>
+                <Target size={32} color={colors.textMuted} />
+                <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+                  No sessions yet. Start training!
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </ScrollView>
     </View>
   );
-});
+}
 
-export default PersonalHomePage;
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+function getDuration(s: SessionWithDetails): number {
+  if (!s.ended_at) return 0;
+  return Math.round((new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 60000);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // STYLES
 // ═══════════════════════════════════════════════════════════════════════════
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  loadingContainer: { justifyContent: 'center', alignItems: 'center' },
   scrollView: { flex: 1 },
+  scrollContent: { paddingBottom: 100 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   // Header
-  header: { paddingTop: Platform.OS === 'ios' ? 8 : 16, paddingBottom: 8, paddingHorizontal: 20 },
-  headerGreeting: { fontSize: 15, marginBottom: 4 },
-  headerName: { fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 20,
+  },
+  greeting: { fontSize: 28, fontWeight: '600', letterSpacing: -0.5 },
+  subGreeting: { fontSize: 14, fontWeight: '500', marginTop: 4 },
 
-  // Hero
-  heroSection: { paddingHorizontal: 20, marginTop: 8 },
-  heroCard: { borderRadius: 20, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 5 },
-  heroGradient: { padding: 20, minHeight: 160, justifyContent: 'space-between' },
-  heroContent: { flex: 1, zIndex: 1 },
-  heroBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 100 },
-  heroBadgeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
-  heroBadgeText: { color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  heroTitle: { fontSize: 24, fontWeight: '700', color: '#fff', marginTop: 12, letterSpacing: -0.3 },
-  heroMeta: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
-  heroAction: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 16 },
-  heroActionText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  heroIconContainer: { position: 'absolute', right: -10, bottom: -10, opacity: 0.5 },
-
-  // Start Button Section - Subtle, blends with background
-  startSection: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 20 },
-  startButton: { 
-    width: 160, 
-    height: 160, 
-    borderRadius: 80, 
+  // Dial Section
+  dialSection: { paddingHorizontal: 20, marginBottom: 16 },
+  dialCard: {
+    borderRadius: 24,
+    padding: 20,
     borderWidth: 1,
   },
-  startButtonBg: { 
-    width: '100%', 
-    height: '100%', 
-    borderRadius: 80, 
-    alignItems: 'center', 
+  dialHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  dialHeaderCenter: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  dialNavButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  startButtonOuter: { 
-    width: 140, 
-    height: 140, 
-    borderRadius: 70, 
-    borderWidth: 2, 
-    alignItems: 'center', 
+  dialLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
+  dialTitle: { fontSize: 14, fontWeight: '600', marginTop: 4 },
+  dialContainer: {
+    alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 8,
   },
-  startButtonInner: { 
-    width: 100, 
-    height: 100, 
-    borderRadius: 50, 
-    alignItems: 'center', 
+  dialCenter: {
+    position: 'absolute',
+    alignItems: 'center',
+  },
+  dialCenterLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1, marginBottom: 4 },
+  timerContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  dialValue: { fontSize: 48, fontWeight: '300', letterSpacing: -2 },
+  dialValueSeparator: { fontSize: 36, fontWeight: '300', marginHorizontal: 2 },
+  dialValueSeconds: { fontSize: 28, fontWeight: '300' },
+  dialUnit: { fontSize: 10, fontWeight: '700', letterSpacing: 1, marginTop: 2 },
+  dialStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: 8,
+    paddingTop: 12,
+  },
+  dialStat: { alignItems: 'center', gap: 4 },
+  dialStatIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 4,
   },
-  startButtonText: { 
-    fontSize: 20, 
-    fontWeight: '600', 
-    letterSpacing: 0.3,
-  },
-  startHint: { 
-    marginTop: 16, 
-    fontSize: 14,
-  },
+  dialStatCenter: { alignItems: 'center' },
+  dialStatValue: { fontSize: 13, fontWeight: '600' },
+  dialStatValueLarge: { fontSize: 18, fontWeight: '500', letterSpacing: -0.5 },
+  dialStatLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
   
-  // Upcoming Training Banner
-  upcomingBanner: { 
-    marginHorizontal: 20, 
-    marginTop: 16, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    padding: 14, 
-    borderRadius: 12, 
+  // Session Meta
+  sessionMeta: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    marginTop: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+  },
+  sessionMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  sessionMetaText: { fontSize: 12, fontWeight: '500' },
+  
+  // Target Stats (active session)
+  targetStats: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    gap: 12,
+  },
+  targetStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  targetStatDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  targetStatText: { fontSize: 13, fontWeight: '600' },
+  targetStatDivider: { width: 1, height: 16 },
+
+  // Stats Card
+  section: { paddingHorizontal: 20, marginBottom: 20 },
+  statsCard: { borderRadius: 16, padding: 16, borderWidth: 1 },
+  statsHeader: { marginBottom: 16 },
+  statsTitle: { fontSize: 16, fontWeight: '600' },
+  statsSubtitle: { fontSize: 12, marginTop: 2 },
+  statsRow: { flexDirection: 'row', alignItems: 'center' },
+  statItem: { flex: 1, alignItems: 'center' },
+  statValue: { fontSize: 24, fontWeight: '600', letterSpacing: -0.5 },
+  statLabel: { fontSize: 12, marginTop: 4 },
+  statDivider: { width: 1, height: 32 },
+
+  // Section Header
+  sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 1.5, marginBottom: 12, marginLeft: 4 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sectionLink: { fontSize: 12, fontWeight: '600' },
+
+  // Actions
+  actionsRow: { flexDirection: 'row', gap: 12 },
+  actionCard: {
+    flex: 1,
+    aspectRatio: 1,
+    borderRadius: 20,
+    padding: 16,
+    justifyContent: 'space-between',
+    borderWidth: 1,
+  },
+  actionCardSecondary: { opacity: 0.8 },
+  actionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionContent: {},
+  actionTitle: { fontSize: 15, fontWeight: '600' },
+  actionDesc: { fontSize: 11, marginTop: 2 },
+  actionIndicator: { alignSelf: 'flex-end' },
+  actionBar: { width: 32, height: 4, borderRadius: 2 },
+
+  // Lists
+  listContainer: { gap: 10 },
+  listItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 14,
     borderWidth: 1,
     gap: 12,
   },
-  upcomingDot: { width: 8, height: 8, borderRadius: 4 },
-  upcomingContent: { flex: 1 },
-  upcomingLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, marginBottom: 2 },
-  upcomingTitle: { fontSize: 15, fontWeight: '600' },
-
-  // Stats
-  statsScrollView: { marginTop: 20 },
-  statsRow: { paddingHorizontal: 20, gap: 12 },
-  statPill: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, gap: 12 },
-  statPillIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  statPillValue: { fontSize: 18, fontWeight: '700' },
-  statPillLabel: { fontSize: 12, marginTop: 1 },
-
-  // Section
-  section: { marginTop: 28 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 14 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', letterSpacing: -0.3 },
-  sectionAction: { fontSize: 14, fontWeight: '600' },
-
-  // Quick Actions
-  quickActionsGrid: { flexDirection: 'row', paddingHorizontal: 20, gap: 10 },
-  quickActionBtn: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 14, borderWidth: 1 },
-  quickActionIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
-  quickActionLabel: { fontSize: 12, fontWeight: '600' },
-
-  // Training Scroll Cards
-  trainingsRow: { paddingHorizontal: 20, gap: 12 },
-  trainingScrollCard: { width: CARD_WIDTH, borderRadius: 16, borderWidth: 1, overflow: 'hidden', flexDirection: 'row' },
-  trainingScrollAccent: { width: 4 },
-  trainingScrollContent: { flex: 1, padding: 16 },
-  trainingScrollTitle: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
-  trainingScrollMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  trainingScrollMetaText: { fontSize: 13 },
-
-  // Tips
-  tipsRow: { paddingHorizontal: 20, gap: 12 },
-  tipCard: { width: 200, padding: 16, borderRadius: 14, borderWidth: 1 },
-  tipIconContainer: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  tipContent: { flex: 1 },
-  tipTitle: { fontSize: 14, fontWeight: '600', marginBottom: 4 },
-  tipDesc: { fontSize: 12, lineHeight: 16 },
-
-  // Insights Card
-  insightsCard: { marginHorizontal: 20, borderRadius: 14, borderWidth: 1, padding: 4 },
-  insightRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 14 },
-  insightLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  insightLabel: { fontSize: 14 },
-  insightValue: { fontSize: 14, fontWeight: '600' },
-  insightDivider: { height: 1, marginHorizontal: 14 },
-
-  // Session History (Subtle)
-  historyContainer: { marginHorizontal: 20, borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
-  historyDivider: { height: 1, marginLeft: 16 },
-  activityRowSubtle: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16 },
-  activityContentSubtle: { flex: 1 },
-  activityTitleSubtle: { fontSize: 14, marginBottom: 2 },
-  activityMetaSubtle: { fontSize: 12 },
+  listItemIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  listItemContent: { flex: 1 },
+  listItemTitle: { fontSize: 15, fontWeight: '600' },
+  listItemMeta: { fontSize: 12, marginTop: 2 },
+  listItemRight: { alignItems: 'flex-end' },
+  listItemValue: { fontSize: 15, fontWeight: '500' },
+  listItemUnit: { fontSize: 11 },
 
   // Empty State
-  emptyState: { marginHorizontal: 20, alignItems: 'center', padding: 32, borderRadius: 20, borderWidth: 1 },
-  emptyIconContainer: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  emptyTitle: { fontSize: 20, fontWeight: '700', marginBottom: 8 },
-  emptyDesc: { fontSize: 14, textAlign: 'center', marginBottom: 20, lineHeight: 20 },
-  emptyButton: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14, paddingHorizontal: 24, borderRadius: 14 },
-  emptyButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  emptyState: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: 16,
+    gap: 12,
+  },
+  emptyText: { fontSize: 14 },
 });
+
+export default PersonalHomePage;

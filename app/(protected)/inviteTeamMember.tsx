@@ -7,10 +7,12 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -18,48 +20,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
-// ============================================================================
-// CONFIGURATIONS
-// ============================================================================
-interface RoleConfig {
-  value: string;
-  label: string;
-  description: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  color: string;
-}
-
-// ============================================================================
-// COMPONENTS
-// ============================================================================
-const StepIndicator = React.memo(function StepIndicator({
-  currentStep,
-  totalSteps,
-  colors,
-}: {
-  currentStep: number;
-  totalSteps: number;
-  colors: ReturnType<typeof useColors>;
-}) {
-  return (
-    <View style={styles.stepIndicator}>
-      {Array.from({ length: totalSteps }).map((_, index) => (
-        <View
-          key={index}
-          style={[
-            styles.stepDot,
-            {
-              backgroundColor: index <= currentStep ? colors.primary : colors.border,
-              width: index === currentStep ? 24 : 8,
-            },
-          ]}
-        />
-      ))}
-    </View>
-  );
-});
-
 
 // ============================================================================
 // MAIN COMPONENT
@@ -92,7 +52,7 @@ export default function InviteTeamMemberSheet() {
   const [createdCode, setCreatedCode] = useState<string | null>(null);
   const [squadsList, setSquadsList] = useState<string[]>([]);
 
-  const totalSteps = hasPreselectedTeam ? 1 : 2; // Team selection + Confirm
+  const totalSteps = hasPreselectedTeam ? 1 : 2;
 
   // Set team from active team or URL params
   useEffect(() => {
@@ -121,12 +81,12 @@ export default function InviteTeamMemberSheet() {
     return 'soldier';
   }, [assignToSquad, makeSquadCommander]);
 
-  const selectedRoleConfig: RoleConfig = useMemo(() => {
+  const roleDisplay = useMemo(() => {
     if (finalTeamRole === 'squad_commander') {
-      return { value: 'squad_commander', label: 'Squad Commander', description: `Leads squad: ${squadName}`, icon: 'star-half', color: '#10B981' };
+      return { label: 'Squad Commander', description: `Will lead squad: ${squadName}`, icon: 'star-half' as const, color: '#10B981' };
     }
-    return { value: 'soldier', label: 'Team Member', description: 'Regular team member', icon: 'person', color: '#6B7280' };
-  }, [finalTeamRole, squadName]);
+    return { label: 'Team Member', description: 'Regular team member', icon: 'person' as const, color: colors.primary };
+  }, [finalTeamRole, squadName, colors.primary]);
 
   // Handlers
   const handleNext = useCallback(() => {
@@ -140,7 +100,6 @@ export default function InviteTeamMemberSheet() {
 
   const handleBack = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // When in team mode, minimum step is 1 (skip team selection)
     const minStep = hasPreselectedTeam ? 1 : 0;
     if (step > minStep) {
       setStep(step - 1);
@@ -153,6 +112,7 @@ export default function InviteTeamMemberSheet() {
     if (!selectedTeamId) return;
     
     if (assignToSquad && !squadName.trim()) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       Alert.alert('Squad Name Required', 'Please enter a squad name.');
       return;
     }
@@ -165,25 +125,28 @@ export default function InviteTeamMemberSheet() {
         ? { squad_id: squadName.trim() } 
         : undefined;
 
-      // Team-first: pass null for org workspace, team is the primary entity
       const invitation = await createInvitation(null as any, 'member', selectedTeamId, finalTeamRole, metadata);
       await Clipboard.setStringAsync(invitation.invite_code);
       setCreatedCode(invitation.invite_code);
-      setIsCreating(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-      Alert.alert(
-        '✓ Invite Created',
-        `Code ${invitation.invite_code} copied to clipboard!\n\nShare this code to invite a ${selectedRoleConfig.label} to ${selectedTeam?.name}.`,
-        [{ text: 'Done', onPress: () => router.back() }]
-      );
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Error', error.message || 'Failed to create invitation');
+    } finally {
       setIsCreating(false);
     }
   };
 
+  const handleCopyCode = async () => {
+    if (!createdCode) return;
+    await Clipboard.setStringAsync(createdCode);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert('Copied!', 'Invite code copied to clipboard.');
+  };
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // EMPTY STATE - No teams
+  // ══════════════════════════════════════════════════════════════════════════
   if (teams.length === 0) {
     return (
       <View style={[styles.emptyContainer, { backgroundColor: colors.card }]}>
@@ -192,7 +155,7 @@ export default function InviteTeamMemberSheet() {
         </View>
         <Text style={[styles.emptyTitle, { color: colors.text }]}>No Teams</Text>
         <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
-          Create a team first before inviting team members.
+          Create a team first before inviting members.
         </Text>
         <TouchableOpacity
           style={[styles.emptyButton, { backgroundColor: colors.primary }]}
@@ -200,6 +163,7 @@ export default function InviteTeamMemberSheet() {
             router.back();
             setTimeout(() => router.push('/(protected)/createTeam' as any), 100);
           }}
+          activeOpacity={0.8}
         >
           <Ionicons name="add" size={20} color="#fff" />
           <Text style={styles.emptyButtonText}>Create Team</Text>
@@ -208,50 +172,120 @@ export default function InviteTeamMemberSheet() {
     );
   }
 
-  // Success state
+  // ══════════════════════════════════════════════════════════════════════════
+  // SUCCESS STATE - Invite created
+  // ══════════════════════════════════════════════════════════════════════════
   if (createdCode) {
     return (
       <View style={[styles.successContainer, { backgroundColor: colors.card }]}>
-        <View style={[styles.successIcon, { backgroundColor: selectedRoleConfig?.color + '20' }]}>
-          <Ionicons name="checkmark-circle" size={64} color={selectedRoleConfig?.color || colors.primary} />
+        <View style={[styles.successIcon, { backgroundColor: colors.primary + '15' }]}>
+          <Ionicons name="checkmark-circle" size={56} color={colors.primary} />
         </View>
+        
         <Text style={[styles.successTitle, { color: colors.text }]}>Invite Created!</Text>
-        <View style={[styles.codeBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+        
+        <TouchableOpacity 
+          style={[styles.codeBox, { backgroundColor: colors.background, borderColor: colors.border }]}
+          onPress={handleCopyCode}
+          activeOpacity={0.7}
+        >
           <Text style={[styles.codeText, { color: colors.text }]}>{createdCode}</Text>
-        </View>
-        <Text style={[styles.successHint, { color: colors.textMuted }]}>Code copied to clipboard</Text>
-        <Text style={[styles.successTeam, { color: colors.textMuted }]}>
-          For {selectedTeam?.name}
+          <Ionicons name="copy-outline" size={20} color={colors.textMuted} />
+        </TouchableOpacity>
+        
+        <Text style={[styles.successHint, { color: colors.textMuted }]}>
+          Tap to copy • Code expires in 7 days
         </Text>
+        
+        <View style={[styles.successTeamCard, { backgroundColor: colors.secondary }]}>
+          <Ionicons name="people" size={18} color={colors.text} />
+          <Text style={[styles.successTeamName, { color: colors.text }]}>{selectedTeam?.name}</Text>
+          <View style={[styles.roleBadge, { backgroundColor: roleDisplay.color + '20' }]}>
+            <Text style={[styles.roleBadgeText, { color: roleDisplay.color }]}>{roleDisplay.label}</Text>
+          </View>
+        </View>
+
+        <View style={styles.successActions}>
+          <TouchableOpacity
+            style={[styles.secondaryBtn, { backgroundColor: colors.secondary }]}
+            onPress={() => {
+              setCreatedCode(null);
+              setAssignToSquad(false);
+              setMakeSquadCommander(false);
+              setSquadName('');
+            }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="add" size={18} color={colors.text} />
+            <Text style={[styles.secondaryBtnText, { color: colors.text }]}>Create Another</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
+            onPress={() => router.back()}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="checkmark" size={18} color="#fff" />
+            <Text style={styles.primaryBtnText}>Done</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // MAIN FORM
+  // ══════════════════════════════════════════════════════════════════════════
   return (
-    <ScrollView
-      style={styles.scrollView}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {/* Header */}
-      <View style={styles.headerSection}>
-        <View style={[styles.headerIcon, { backgroundColor: '#F59E0B15' }]}>
-          <Ionicons name="people" size={28} color="#F59E0B" />
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={[styles.headerIcon, { backgroundColor: colors.primary + '15' }]}>
+            <Ionicons name="person-add" size={28} color={colors.primary} />
+          </View>
+          <Text style={[styles.title, { color: colors.text }]}>Invite Team Member</Text>
+          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+            {selectedTeam?.name ? `To ${selectedTeam.name}` : 'Generate an invite code'}
+          </Text>
         </View>
-        <Text style={[styles.title, { color: colors.text }]}>Invite Team Member</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          {selectedTeam?.name || 'Select a team'}
-        </Text>
-      </View>
 
-      <StepIndicator currentStep={step} totalSteps={totalSteps} colors={colors} />
+        {/* Step Indicator */}
+        {totalSteps > 1 && (
+          <View style={styles.stepIndicator}>
+            {Array.from({ length: totalSteps }).map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.stepDot,
+                  {
+                    backgroundColor: index <= step ? colors.primary : colors.border,
+                    width: index === step ? 24 : 8,
+                  },
+                ]}
+              />
+            ))}
+          </View>
+        )}
 
-        {/* STEP 0: Select Team */}
+        {/* ════════════════════════════════════════════════════════════════════
+            STEP 0: Select Team
+        ════════════════════════════════════════════════════════════════════ */}
         {step === 0 && (
           <View style={styles.stepContent}>
-            <Text style={[styles.stepTitle, { color: colors.text }]}>Select Team</Text>
-            <Text style={[styles.stepDesc, { color: colors.textMuted }]}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="people" size={16} color={colors.primary} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Select Team</Text>
+            </View>
+            <Text style={[styles.sectionDesc, { color: colors.textMuted }]}>
               Which team should this member join?
             </Text>
 
@@ -269,8 +303,8 @@ export default function InviteTeamMemberSheet() {
                   onPress={() => setSelectedTeamId(team.id)}
                   activeOpacity={0.7}
                 >
-                  <View style={[styles.teamIcon, { backgroundColor: '#F59E0B15' }]}>
-                    <Ionicons name="people" size={22} color="#F59E0B" />
+                  <View style={[styles.teamIcon, { backgroundColor: colors.secondary }]}>
+                    <Ionicons name="people" size={20} color={colors.text} />
                   </View>
                   <View style={styles.teamInfo}>
                     <Text style={[styles.teamName, { color: colors.text }]}>{team.name}</Text>
@@ -281,7 +315,7 @@ export default function InviteTeamMemberSheet() {
                     )}
                   </View>
                   {selectedTeamId === team.id && (
-                    <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                    <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
                   )}
                 </TouchableOpacity>
               ))}
@@ -289,170 +323,251 @@ export default function InviteTeamMemberSheet() {
           </View>
         )}
 
-        {/* STEP 1: Invite Details + Create */}
+        {/* ════════════════════════════════════════════════════════════════════
+            STEP 1: Invite Details + Create
+        ════════════════════════════════════════════════════════════════════ */}
         {step === 1 && (
           <View style={styles.stepContent}>
-            <Text style={[styles.stepTitle, { color: colors.text }]}>Invite Details</Text>
-            <Text style={[styles.stepDesc, { color: colors.textMuted }]}>
-              Invite a new member to {selectedTeam?.name}
-            </Text>
-
             {/* Default Role Info */}
-            <View style={[styles.roleInfoBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-              <View style={[styles.roleIconBox, { backgroundColor: '#6B728020' }]}>
-                <Ionicons name="person" size={20} color="#6B7280" />
+            <View style={[styles.roleInfoBox, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+              <View style={[styles.roleIconBox, { backgroundColor: colors.background }]}>
+                <Ionicons name={roleDisplay.icon} size={20} color={roleDisplay.color} />
               </View>
-              <View style={styles.roleInfo}>
-                <Text style={[styles.roleLabel, { color: colors.text }]}>Team Member</Text>
-                <Text style={[styles.roleDesc, { color: colors.textMuted }]}>Will join as a regular team member</Text>
+              <View style={styles.roleInfoText}>
+                <Text style={[styles.roleLabel, { color: colors.text }]}>{roleDisplay.label}</Text>
+                <Text style={[styles.roleDesc, { color: colors.textMuted }]}>{roleDisplay.description}</Text>
               </View>
             </View>
 
-            {/* Squad Options */}
-            <View style={[styles.squadSection, { backgroundColor: colors.background, borderColor: colors.border }]}>
-              <View style={styles.squadHeader}>
-                <View style={styles.squadHeaderInfo}>
-                  <Ionicons name="layers-outline" size={20} color={colors.primary} />
-                  <View>
-                    <Text style={[styles.squadTitle, { color: colors.text }]}>Assign to Squad</Text>
-                    <Text style={[styles.squadSubtitle, { color: colors.textMuted }]}>Optional: add to a specific squad</Text>
-                  </View>
+            {/* Squad Assignment Toggle */}
+            <TouchableOpacity
+              style={[styles.squadToggle, { backgroundColor: colors.card, borderColor: assignToSquad ? colors.primary : colors.border }]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                if (assignToSquad) {
+                  setAssignToSquad(false);
+                  setMakeSquadCommander(false);
+                  setSquadName('');
+                } else {
+                  setAssignToSquad(true);
+                }
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.squadToggleLeft}>
+                <View style={[styles.squadToggleIcon, { backgroundColor: assignToSquad ? colors.primary + '15' : colors.secondary }]}>
+                  <Ionicons name="layers-outline" size={18} color={assignToSquad ? colors.primary : colors.text} />
                 </View>
-                <Switch
-                  value={assignToSquad}
-                  onValueChange={(val) => {
-                    setAssignToSquad(val);
-                    if (!val) {
-                      setMakeSquadCommander(false);
-                      setSquadName('');
-                    }
-                  }}
-                  trackColor={{ false: colors.border, true: colors.primary + '60' }}
-                  thumbColor={assignToSquad ? colors.primary : colors.card}
-                />
+                <View>
+                  <Text style={[styles.squadToggleTitle, { color: colors.text }]}>Assign to Squad</Text>
+                  <Text style={[styles.squadToggleDesc, { color: colors.textMuted }]}>
+                    Optional: add to a specific squad
+                  </Text>
+                </View>
               </View>
+              <Switch
+                value={assignToSquad}
+                onValueChange={(val) => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setAssignToSquad(val);
+                  if (!val) {
+                    setMakeSquadCommander(false);
+                    setSquadName('');
+                  }
+                }}
+                trackColor={{ false: colors.border, true: colors.primary + '60' }}
+                thumbColor={assignToSquad ? colors.primary : colors.card}
+              />
+            </TouchableOpacity>
 
-              {assignToSquad && (
-                <View style={styles.squadContent}>
-                  <View style={styles.squadInputSection}>
-                    <Text style={[styles.squadInputLabel, { color: colors.textMuted }]}>SQUAD NAME</Text>
-                    {squadsList?.length > 0 && (
-                      <View style={styles.squadChips}>
-                        {squadsList.map((squad: string) => (
-                          <TouchableOpacity
-                            key={squad}
-                            style={[
-                              styles.squadChip, 
-                              { 
-                                backgroundColor: squadName === squad ? colors.primary : colors.secondary, 
-                                borderColor: squadName === squad ? colors.primary : colors.border 
-                              }
-                            ]}
-                            onPress={() => setSquadName(squadName === squad ? '' : squad)}
-                          >
-                            <Text style={[styles.squadChipText, { color: squadName === squad ? '#fff' : colors.text }]}>{squad}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    )}
-                    <View style={[styles.inputWrapper, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                      <TextInput
-                        style={[styles.input, { color: colors.text }]}
-                        placeholder="Enter squad name..."
-                        placeholderTextColor={colors.textMuted}
-                        value={squadName}
-                        onChangeText={setSquadName}
-                      />
-                    </View>
-                  </View>
-
-                  {squadName.trim() && (
-                    <View style={[styles.squadCommanderOption, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                      <View style={styles.squadCommanderInfo}>
-                        <Ionicons name="star-half" size={18} color="#10B981" />
-                        <View>
-                          <Text style={[styles.squadCommanderTitle, { color: colors.text }]}>Make Squad Commander</Text>
-                          <Text style={[styles.squadCommanderDesc, { color: colors.textMuted }]}>
-                            Lead squad "{squadName}"
+            {/* Squad Details (when enabled) */}
+            {assignToSquad && (
+              <View style={[styles.squadSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                {/* Existing Squads */}
+                {squadsList.length > 0 && (
+                  <View style={styles.squadChipsSection}>
+                    <Text style={[styles.squadInputLabel, { color: colors.textMuted }]}>EXISTING SQUADS</Text>
+                    <View style={styles.squadChips}>
+                      {squadsList.map((squad: string) => (
+                        <TouchableOpacity
+                          key={squad}
+                          style={[
+                            styles.squadChip, 
+                            { 
+                              backgroundColor: squadName === squad ? colors.primary : colors.secondary, 
+                              borderColor: squadName === squad ? colors.primary : colors.border,
+                            }
+                          ]}
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            setSquadName(squadName === squad ? '' : squad);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons 
+                            name="shield" 
+                            size={12} 
+                            color={squadName === squad ? '#fff' : colors.text} 
+                          />
+                          <Text style={[styles.squadChipText, { color: squadName === squad ? '#fff' : colors.text }]}>
+                            {squad}
                           </Text>
-                        </View>
-                      </View>
-                      <Switch
-                        value={makeSquadCommander}
-                        onValueChange={setMakeSquadCommander}
-                        trackColor={{ false: colors.border, true: '#10B98160' }}
-                        thumbColor={makeSquadCommander ? '#10B981' : colors.card}
-                      />
+                        </TouchableOpacity>
+                      ))}
                     </View>
-                  )}
-                </View>
-              )}
-            </View>
+                  </View>
+                )}
 
-            {/* Summary */}
-            <View style={[styles.summaryCard, { backgroundColor: colors.background, borderColor: colors.border, marginTop: 20 }]}>
+                {/* Custom Squad Input */}
+                <View style={styles.squadInputSection}>
+                  <Text style={[styles.squadInputLabel, { color: colors.textMuted }]}>
+                    {squadsList.length > 0 ? 'OR ENTER NEW SQUAD' : 'SQUAD NAME'}
+                  </Text>
+                  <View style={[styles.inputWrapper, { backgroundColor: colors.background, borderColor: squadName ? colors.primary : colors.border }]}>
+                    <TextInput
+                      style={[styles.input, { color: colors.text }]}
+                      placeholder="Enter squad name..."
+                      placeholderTextColor={colors.textMuted}
+                      value={squadName}
+                      onChangeText={setSquadName}
+                      autoCapitalize="words"
+                    />
+                    {squadName.trim() && (
+                      <TouchableOpacity 
+                        style={styles.clearInputBtn}
+                        onPress={() => setSquadName('')}
+                      >
+                        <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+
+                {/* Squad Commander Option */}
+                {squadName.trim() && (
+                  <TouchableOpacity
+                    style={[styles.commanderOption, { backgroundColor: colors.background, borderColor: makeSquadCommander ? '#10B981' : colors.border }]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setMakeSquadCommander(!makeSquadCommander);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.commanderLeft}>
+                      <View style={[styles.commanderIcon, { backgroundColor: makeSquadCommander ? '#10B98115' : colors.secondary }]}>
+                        <Ionicons name="star-half" size={16} color={makeSquadCommander ? '#10B981' : colors.textMuted} />
+                      </View>
+                      <View>
+                        <Text style={[styles.commanderTitle, { color: colors.text }]}>Make Squad Commander</Text>
+                        <Text style={[styles.commanderDesc, { color: colors.textMuted }]}>
+                          Will lead "{squadName}"
+                        </Text>
+                      </View>
+                    </View>
+                    <Switch
+                      value={makeSquadCommander}
+                      onValueChange={(val) => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setMakeSquadCommander(val);
+                      }}
+                      trackColor={{ false: colors.border, true: '#10B98160' }}
+                      thumbColor={makeSquadCommander ? '#10B981' : colors.card}
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {/* Summary Card */}
+            <View style={[styles.summaryCard, { backgroundColor: colors.secondary }]}>
+              <View style={styles.summaryRow}>
+                <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Team</Text>
+                <Text style={[styles.summaryValue, { color: colors.text }]}>{selectedTeam?.name}</Text>
+              </View>
+              <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
               <View style={styles.summaryRow}>
                 <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Role</Text>
-                <View style={[styles.summaryBadge, { backgroundColor: selectedRoleConfig.color + '20' }]}>
-                  <Ionicons name={selectedRoleConfig.icon} size={14} color={selectedRoleConfig.color} />
-                  <Text style={[styles.summaryBadgeText, { color: selectedRoleConfig.color }]}>
-                    {selectedRoleConfig.label}
+                <View style={[styles.summaryBadge, { backgroundColor: roleDisplay.color + '20' }]}>
+                  <Ionicons name={roleDisplay.icon} size={12} color={roleDisplay.color} />
+                  <Text style={[styles.summaryBadgeText, { color: roleDisplay.color }]}>
+                    {roleDisplay.label}
                   </Text>
                 </View>
               </View>
               {assignToSquad && squadName && (
-                <View style={styles.summaryRow}>
-                  <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Squad</Text>
-                  <Text style={[styles.summaryValue, { color: colors.text }]}>{squadName}</Text>
-                </View>
+                <>
+                  <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
+                  <View style={styles.summaryRow}>
+                    <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Squad</Text>
+                    <Text style={[styles.summaryValue, { color: colors.text }]}>{squadName}</Text>
+                  </View>
+                </>
               )}
+              <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
               <View style={styles.summaryRow}>
                 <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Expires</Text>
                 <Text style={[styles.summaryValue, { color: colors.text }]}>7 days</Text>
               </View>
             </View>
 
-            <View style={[styles.infoBanner, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+            {/* Info Banner */}
+            <View style={[styles.infoCard, { backgroundColor: colors.secondary }]}>
               <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
-              <Text style={[styles.infoBannerText, { color: colors.textMuted }]}>
-                The invite code will be valid for 7 days and can only be used once.
+              <Text style={[styles.infoText, { color: colors.textMuted }]}>
+                The invite code can only be used once and will expire after 7 days.
               </Text>
             </View>
           </View>
         )}
-
-        {/* Action Buttons */}
-        <View style={styles.actions}>
-          {/* Back button - show on step 0 to close sheet, or step 1 if there was team selection */}
-          <TouchableOpacity style={[styles.backButton, { backgroundColor: colors.secondary }]} onPress={handleBack} activeOpacity={0.8}>
-            <Ionicons name="arrow-back" size={18} color={colors.text} />
-            <Text style={[styles.backButtonText, { color: colors.text }]}>{step === 0 ? 'Cancel' : 'Back'}</Text>
-          </TouchableOpacity>
-
-          {step === 0 ? (
-            <TouchableOpacity style={[styles.nextButton, { backgroundColor: colors.primary }]} onPress={handleNext} activeOpacity={0.8}>
-              <Text style={styles.nextButtonText}>Continue</Text>
-              <Ionicons name="arrow-forward" size={18} color="#fff" />
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[styles.createButton, { backgroundColor: isCreating ? colors.muted : '#F59E0B' }]}
-              onPress={handleCreateInvite}
-              disabled={isCreating}
-              activeOpacity={0.8}
-            >
-              {isCreating ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <>
-                  <Ionicons name="ticket" size={20} color="#fff" />
-                  <Text style={styles.createButtonText}>Generate Invite Code</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          )}
-        </View>
       </ScrollView>
+
+      {/* ═════════════════════════════════════════════════════════════════════
+          ACTION BUTTONS (Sticky Bottom)
+      ═════════════════════════════════════════════════════════════════════ */}
+      <View style={[styles.actionsContainer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+        <TouchableOpacity 
+          style={[styles.backButton, { backgroundColor: colors.secondary }]} 
+          onPress={handleBack} 
+          activeOpacity={0.8}
+        >
+          <Ionicons name="arrow-back" size={18} color={colors.text} />
+          <Text style={[styles.backButtonText, { color: colors.text }]}>
+            {step === 0 ? 'Cancel' : 'Back'}
+          </Text>
+        </TouchableOpacity>
+
+        {step === 0 ? (
+          <TouchableOpacity 
+            style={[styles.nextButton, { backgroundColor: selectedTeamId ? colors.primary : colors.muted }]} 
+            onPress={handleNext} 
+            activeOpacity={0.8}
+            disabled={!selectedTeamId}
+          >
+            <Text style={styles.nextButtonText}>Continue</Text>
+            <Ionicons name="arrow-forward" size={18} color="#fff" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[
+              styles.createButton, 
+              { backgroundColor: isCreating ? colors.muted : colors.primary }
+            ]}
+            onPress={handleCreateInvite}
+            disabled={isCreating || (assignToSquad && !squadName.trim())}
+            activeOpacity={0.8}
+          >
+            {isCreating ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <Ionicons name="ticket" size={18} color="#fff" />
+                <Text style={styles.createButtonText}>Generate Code</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -460,75 +575,94 @@ export default function InviteTeamMemberSheet() {
 // STYLES
 // ============================================================================
 const styles = StyleSheet.create({
+  container: { flex: 1 },
   scrollView: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20 },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 100 },
 
-  headerSection: {
-    alignItems: 'center',
-    paddingTop: 24,
-    paddingBottom: 20,
-  },
-  headerIcon: { width: 64, height: 64, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  title: { fontSize: 22, fontWeight: '700', letterSpacing: -0.3, marginBottom: 6 },
-  subtitle: { fontSize: 14, textAlign: 'center' },
+  // Header
+  header: { alignItems: 'center', paddingTop: 4, paddingBottom: 20 },
+  headerIcon: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  title: { fontSize: 22, fontWeight: '700', letterSpacing: -0.5 },
+  subtitle: { fontSize: 14, marginTop: 4 },
 
+  // Step Indicator
   stepIndicator: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginBottom: 20 },
   stepDot: { height: 6, borderRadius: 3 },
 
-  stepContent: { marginBottom: 16 },
-  stepTitle: { fontSize: 20, fontWeight: '600', marginBottom: 6, letterSpacing: -0.3 },
-  stepDesc: { fontSize: 14, marginBottom: 20 },
+  // Step Content
+  stepContent: { gap: 16 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sectionTitle: { fontSize: 16, fontWeight: '600' },
+  sectionDesc: { fontSize: 14, marginTop: -8, marginBottom: 4 },
 
+  // Team Selection
   teamsList: { gap: 10 },
-  teamCard: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 14, borderWidth: 1.5, gap: 14 },
-  teamIcon: { width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  teamCard: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 12, borderWidth: 1.5, gap: 12 },
+  teamIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   teamInfo: { flex: 1 },
-  teamName: { fontSize: 16, fontWeight: '600', marginBottom: 2 },
+  teamName: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
   teamMeta: { fontSize: 13 },
 
-  roleInfoBox: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 12, borderWidth: 1, gap: 12, marginBottom: 12 },
+  // Role Info Box
+  roleInfoBox: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 12, borderWidth: 1, gap: 12 },
   roleIconBox: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  roleInfo: { flex: 1 },
+  roleInfoText: { flex: 1 },
   roleLabel: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
   roleDesc: { fontSize: 12 },
 
+  // Squad Toggle
+  squadToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 12, borderWidth: 1.5 },
+  squadToggleLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  squadToggleIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  squadToggleTitle: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
+  squadToggleDesc: { fontSize: 12 },
+
   // Squad Section
-  squadSection: { marginTop: 20, borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
-  squadHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
-  squadHeaderInfo: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  squadTitle: { fontSize: 15, fontWeight: '600' },
-  squadSubtitle: { fontSize: 12, marginTop: 1 },
-  squadContent: { paddingHorizontal: 14, paddingBottom: 14, gap: 12 },
+  squadSection: { padding: 14, borderRadius: 12, borderWidth: 1, gap: 14 },
+  squadChipsSection: { gap: 8 },
   squadInputSection: { gap: 8 },
   squadInputLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5 },
-  squadChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  squadChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1 },
-  squadChipText: { fontSize: 12, fontWeight: '600' },
-  inputWrapper: { borderRadius: 10, borderWidth: 1 },
-  input: { height: 44, paddingHorizontal: 14, fontSize: 15 },
-  squadCommanderOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderRadius: 10, borderWidth: 1 },
-  squadCommanderInfo: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  squadCommanderTitle: { fontSize: 14, fontWeight: '600' },
-  squadCommanderDesc: { fontSize: 11, marginTop: 1 },
+  squadChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  squadChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
+  squadChipText: { fontSize: 13, fontWeight: '600' },
+  inputWrapper: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1.5, paddingRight: 8 },
+  input: { flex: 1, height: 44, paddingHorizontal: 14, fontSize: 15 },
+  clearInputBtn: { padding: 4 },
 
-  // Summary
-  summaryCard: { borderRadius: 14, borderWidth: 1, padding: 16, gap: 14 },
+  // Commander Option
+  commanderOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderRadius: 10, borderWidth: 1.5 },
+  commanderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  commanderIcon: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  commanderTitle: { fontSize: 14, fontWeight: '600' },
+  commanderDesc: { fontSize: 11, marginTop: 1 },
+
+  // Summary Card
+  summaryCard: { borderRadius: 12, padding: 16, gap: 12 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   summaryLabel: { fontSize: 14 },
   summaryValue: { fontSize: 14, fontWeight: '600' },
-  summaryBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, gap: 6 },
-  summaryBadgeText: { fontSize: 13, fontWeight: '600' },
+  summaryDivider: { height: 1 },
+  summaryBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, gap: 5 },
+  summaryBadgeText: { fontSize: 12, fontWeight: '600' },
 
-  infoBanner: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 10, borderWidth: 1, marginTop: 16, gap: 10 },
-  infoBannerText: { flex: 1, fontSize: 13, lineHeight: 18 },
+  // Info Card
+  infoCard: { flexDirection: 'row', alignItems: 'flex-start', padding: 14, borderRadius: 12, gap: 10 },
+  infoText: { flex: 1, fontSize: 13, lineHeight: 18 },
 
-  // Actions
-  actions: { flexDirection: 'row', gap: 10, marginTop: 24 },
-  backButton: { flex: 1, flexDirection: 'row', height: 54, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 6 },
+  // Actions (Sticky Bottom)
+  actionsContainer: { 
+    flexDirection: 'row', 
+    gap: 12, 
+    paddingHorizontal: 20, 
+    paddingVertical: 16,
+    paddingBottom: 32,
+    borderTopWidth: 1,
+  },
+  backButton: { flex: 1, flexDirection: 'row', height: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center', gap: 6 },
   backButtonText: { fontSize: 15, fontWeight: '600' },
-  nextButton: { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 54, borderRadius: 14, gap: 8 },
+  nextButton: { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 52, borderRadius: 12, gap: 8 },
   nextButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
-  createButton: { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 54, borderRadius: 14, gap: 10 },
+  createButton: { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 52, borderRadius: 12, gap: 8 },
   createButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
 
   // Empty State
@@ -539,13 +673,20 @@ const styles = StyleSheet.create({
   emptyButton: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 24, borderRadius: 12, gap: 8 },
   emptyButtonText: { fontSize: 15, fontWeight: '600', color: '#fff' },
 
-  // Success state
-  successContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  successIcon: { width: 100, height: 100, borderRadius: 50, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
-  successTitle: { fontSize: 24, fontWeight: '700', marginBottom: 20 },
-  codeBox: { paddingHorizontal: 24, paddingVertical: 16, borderRadius: 12, borderWidth: 2, marginBottom: 12 },
-  codeText: { fontSize: 28, fontWeight: '700', letterSpacing: 4 },
-  successHint: { fontSize: 14 },
-  successTeam: { fontSize: 13, marginTop: 8 },
+  // Success State
+  successContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingBottom: 60 },
+  successIcon: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+  successTitle: { fontSize: 26, fontWeight: '700', letterSpacing: -0.4, marginBottom: 16 },
+  codeBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 24, paddingVertical: 16, borderRadius: 12, borderWidth: 2, marginBottom: 8 },
+  codeText: { fontSize: 24, fontWeight: '700', letterSpacing: 3 },
+  successHint: { fontSize: 13, marginBottom: 20 },
+  successTeamCard: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 10, marginBottom: 32 },
+  successTeamName: { fontSize: 14, fontWeight: '600', flex: 1 },
+  roleBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  roleBadgeText: { fontSize: 12, fontWeight: '600' },
+  successActions: { flexDirection: 'row', gap: 12, width: '100%' },
+  secondaryBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 48, borderRadius: 10, gap: 6 },
+  secondaryBtnText: { fontSize: 14, fontWeight: '600' },
+  primaryBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 48, borderRadius: 10, gap: 6 },
+  primaryBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
 });
-

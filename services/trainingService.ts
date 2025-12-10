@@ -15,6 +15,7 @@ import type {
   TrainingWithDetails,
   UpdateTrainingInput,
 } from '@/types/workspace';
+import { notifyNewTrainingCreated, scheduleTrainingReminder } from './notifications';
 
 // =====================================================
 // TRAINING CRUD
@@ -82,18 +83,61 @@ export async function createTraining(input: CreateTrainingInput): Promise<Traini
       // Don't throw - training was created, just log the error
     }
 
-    return {
+    const result = {
       ...training,
       drills: drills || [],
       drill_count: drills?.length || 0,
     } as TrainingWithDetails;
+
+    // Send notifications (non-blocking)
+    sendTrainingCreatedNotifications(result).catch(console.error);
+
+    return result;
   }
 
-  return {
+  const result = {
     ...training,
     drills: [],
     drill_count: 0,
   } as TrainingWithDetails;
+
+  // Send notifications (non-blocking)
+  sendTrainingCreatedNotifications(result).catch(console.error);
+
+  return result;
+}
+
+/**
+ * Send notifications when training is created
+ * - Local notification for the creator (reminder 30 min before)
+ * - TODO: Push notifications to all team members via server
+ */
+async function sendTrainingCreatedNotifications(training: TrainingWithDetails) {
+  const teamName = training.team?.name || 'Team';
+  const creatorName = training.creator?.full_name || 'Someone';
+  const scheduledAt = new Date(training.scheduled_at);
+
+  // Schedule reminder for the creator (30 min before)
+  await scheduleTrainingReminder(
+    training.id,
+    training.title,
+    teamName,
+    scheduledAt
+  );
+
+  // Local notification for confirmation
+  await notifyNewTrainingCreated(
+    training.id,
+    training.title,
+    teamName,
+    scheduledAt,
+    creatorName
+  );
+
+  // TODO: To notify ALL team members, create a Supabase Edge Function that:
+  // 1. Gets all team member push tokens
+  // 2. Sends push notifications to each via Expo Push API
+  // Example: await supabase.functions.invoke('notify-team', { body: { ... } })
 }
 
 /**

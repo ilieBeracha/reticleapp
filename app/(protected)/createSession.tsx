@@ -5,23 +5,25 @@ import { useSessionStore } from "@/store/sessionStore";
 import { useTrainingStore } from "@/store/trainingStore";
 import type { TrainingWithDetails } from "@/types/workspace";
 import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from 'expo-haptics';
+import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronRight, Target, User, Users } from "lucide-react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
+import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 
 // ============================================================================
-// TRAINING CARD (for linking to a training)
+// TRAINING CARD
 // ============================================================================
-const TrainingCard = React.memo(function TrainingCard({
+function TrainingCard({
   training,
   isSelected,
   onSelect,
@@ -32,14 +34,14 @@ const TrainingCard = React.memo(function TrainingCard({
   onSelect: () => void;
   colors: ReturnType<typeof useColors>;
 }) {
-  const statusColor = training.status === 'ongoing' ? '#10B981' : colors.blue;
-  
+  const statusColor = training.status === "ongoing" ? "#10B981" : "#3B82F6";
+
   return (
     <TouchableOpacity
       style={[
         styles.trainingCard,
         {
-          backgroundColor: isSelected ? statusColor + '15' : colors.card,
+          backgroundColor: isSelected ? statusColor + "15" : colors.card,
           borderColor: isSelected ? statusColor : colors.border,
           borderWidth: isSelected ? 2 : 1,
         },
@@ -47,25 +49,93 @@ const TrainingCard = React.memo(function TrainingCard({
       onPress={onSelect}
       activeOpacity={0.7}
     >
-      <View style={styles.trainingCardHeader}>
-        <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+      <View style={styles.trainingCardRow}>
+        <View
+          style={[
+            styles.trainingIcon,
+            { backgroundColor: statusColor + "20" },
+          ]}
+        >
+          <Target size={18} color={statusColor} />
+        </View>
         <View style={styles.trainingCardContent}>
-          <Text style={[styles.trainingTitle, { color: colors.text }]} numberOfLines={1}>
+          <Text
+            style={[styles.trainingTitle, { color: colors.text }]}
+            numberOfLines={1}
+          >
             {training.title}
-      </Text>
-          <Text style={[styles.trainingMeta, { color: colors.textMuted }]}>
-            {training.team?.name || 'No team'} • {training.drill_count || 0} drills
-      </Text>
+          </Text>
+          <View style={styles.trainingMetaRow}>
+            <View
+              style={[
+                styles.statusBadge,
+                { backgroundColor: statusColor + "20" },
+              ]}
+            >
+              <View
+                style={[styles.statusDot, { backgroundColor: statusColor }]}
+              />
+              <Text style={[styles.statusText, { color: statusColor }]}>
+                {training.status === "ongoing" ? "Live" : "Scheduled"}
+              </Text>
+            </View>
+            {training.drill_count > 0 && (
+              <Text style={[styles.trainingMeta, { color: colors.textMuted }]}>
+                • {training.drill_count} drills
+              </Text>
+            )}
+          </View>
         </View>
-      {isSelected && (
+        {isSelected ? (
           <View style={[styles.checkIcon, { backgroundColor: statusColor }]}>
-          <Ionicons name="checkmark" size={14} color="#fff" />
-        </View>
-      )}
+            <Ionicons name="checkmark" size={14} color="#fff" />
+          </View>
+        ) : (
+          <ChevronRight size={18} color={colors.textMuted} />
+        )}
       </View>
     </TouchableOpacity>
   );
-});
+}
+
+// ============================================================================
+// TEAM GROUP
+// ============================================================================
+function TeamGroup({
+  teamName,
+  trainings,
+  selectedTrainingId,
+  onSelectTraining,
+  colors,
+}: {
+  teamName: string;
+  trainings: TrainingWithDetails[];
+  selectedTrainingId: string | null;
+  onSelectTraining: (training: TrainingWithDetails) => void;
+  colors: ReturnType<typeof useColors>;
+}) {
+  return (
+    <View style={styles.teamGroup}>
+      <View style={styles.teamHeader}>
+        <Users size={14} color={colors.textMuted} />
+        <Text style={[styles.teamName, { color: colors.textMuted }]}>
+          {teamName}
+        </Text>
+      </View>
+      <View style={styles.trainingsList}>
+        {trainings.map((training) => (
+          <TrainingCard
+            key={training.id}
+            training={training}
+            isSelected={selectedTrainingId === training.id}
+            onSelect={() => onSelectTraining(training)}
+            colors={colors}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
 
 // ============================================================================
 // MAIN COMPONENT
@@ -75,12 +145,19 @@ export default function CreateSessionSheet() {
   const { trainingId } = useLocalSearchParams<{ trainingId?: string }>();
   const { createSession, loadSessions, loading } = useSessionStore();
   const { activeTeamId, userId } = useAppContext();
-  const { myUpcomingTrainings, loadMyUpcomingTrainings, loadingMyTrainings } = useTrainingStore();
+  const {
+    myUpcomingTrainings,
+    loadMyUpcomingTrainings,
+    loadingMyTrainings,
+  } = useTrainingStore();
 
   // ========== STATE ==========
   const [isCreating, setIsCreating] = useState(false);
-  const [selectedTraining, setSelectedTraining] = useState<TrainingWithDetails | null>(null);
-  const [mode, setMode] = useState<'training' | 'solo' | null>(trainingId ? 'training' : null);
+  const [selectedTraining, setSelectedTraining] =
+    useState<TrainingWithDetails | null>(null);
+  const [mode, setMode] = useState<"training" | "solo" | null>(
+    trainingId ? "training" : null
+  );
   const [checkingActiveSession, setCheckingActiveSession] = useState(true);
 
   // Check if in personal mode (no team selected)
@@ -91,19 +168,19 @@ export default function CreateSessionSheet() {
   useEffect(() => {
     const checkActiveSession = async () => {
       try {
-        // Personal mode: only check for personal sessions (no org)
-        // Org mode: check for any active session
-        const activeSession = isPersonalMode 
+        const activeSession = isPersonalMode
           ? await getMyActivePersonalSession()
           : await getMyActiveSession();
-          
+
         if (activeSession) {
-          // User already has an active session
           if (isPersonalMode) {
-            // PERSONAL MODE: Only allow one session at a time - no "Start New" option
             Alert.alert(
               "Active Session",
-              `You already have an active ${activeSession.training_title ? `training session "${activeSession.training_title}"` : 'session'}. In personal mode, you can only have one session at a time.`,
+              `You already have an active ${
+                activeSession.training_title
+                  ? `training session "${activeSession.training_title}"`
+                  : "session"
+              }. In personal mode, you can only have one session at a time.`,
               [
                 {
                   text: "Continue Session",
@@ -122,10 +199,13 @@ export default function CreateSessionSheet() {
               ]
             );
           } else {
-            // ORG MODE: Allow multiple sessions (can join different trainings)
             Alert.alert(
               "Active Session Found",
-              `You already have an active ${activeSession.training_title ? `training session "${activeSession.training_title}"` : 'session'}. Would you like to continue it?`,
+              `You already have an active ${
+                activeSession.training_title
+                  ? `training session "${activeSession.training_title}"`
+                  : "session"
+              }. Would you like to continue it?`,
               [
                 {
                   text: "Continue Session",
@@ -157,49 +237,86 @@ export default function CreateSessionSheet() {
 
   useEffect(() => {
     loadMyUpcomingTrainings();
-  }, []);
+  }, [loadMyUpcomingTrainings]);
 
-  // Auto-select training if trainingId is provided in URL
+  // Auto-select training if trainingId is provided in URL (deep link)
   useEffect(() => {
     if (trainingId && myUpcomingTrainings.length > 0) {
-      const training = myUpcomingTrainings.find(t => t.id === trainingId);
+      const training = myUpcomingTrainings.find((t) => t.id === trainingId);
       if (training) {
         setSelectedTraining(training);
-        setMode('training');
+        setMode("training");
       }
     }
   }, [trainingId, myUpcomingTrainings]);
 
   // ========== COMPUTED ==========
   const availableTrainings = useMemo(
-    () => myUpcomingTrainings.filter(t => t.status === 'ongoing' || t.status === 'planned'),
+    () =>
+      myUpcomingTrainings.filter(
+        (t) => t.status === "ongoing" || t.status === "planned"
+      ),
     [myUpcomingTrainings]
   );
 
-  const canStart = mode === 'solo' || (mode === 'training' && selectedTraining);
+  // Group trainings by team
+  const trainingsByTeam = useMemo(() => {
+    const grouped: { [teamId: string]: { name: string; trainings: TrainingWithDetails[] } } = {};
+
+    for (const training of availableTrainings) {
+      const teamId = training.team_id;
+      const teamName = training.team?.name || "Unknown Team";
+
+      if (!grouped[teamId]) {
+        grouped[teamId] = { name: teamName, trainings: [] };
+      }
+      grouped[teamId].trainings.push(training);
+    }
+
+    // Sort: ongoing trainings first within each team
+    for (const teamId of Object.keys(grouped)) {
+      grouped[teamId].trainings.sort((a, b) => {
+        if (a.status === "ongoing" && b.status !== "ongoing") return -1;
+        if (b.status === "ongoing" && a.status !== "ongoing") return 1;
+        return 0;
+      });
+    }
+
+    return grouped;
+  }, [availableTrainings]);
+
+  const teamCount = Object.keys(trainingsByTeam).length;
+  const hasTrainings = availableTrainings.length > 0;
+  const canStart = mode === "solo" || (mode === "training" && selectedTraining);
 
   // ========== HANDLERS ==========
-  const handleTrainingSelect = useCallback((training: TrainingWithDetails) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (selectedTraining?.id === training.id) {
-      setSelectedTraining(null);
-    } else {
-      setSelectedTraining(training);
-      setMode('training');
-    }
-  }, [selectedTraining]);
+  const handleTrainingSelect = useCallback(
+    (training: TrainingWithDetails) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (selectedTraining?.id === training.id) {
+        setSelectedTraining(null);
+      } else {
+        setSelectedTraining(training);
+        setMode("training");
+      }
+    },
+    [selectedTraining]
+  );
 
-  const handleModeSelect = useCallback((newMode: 'training' | 'solo') => {
+  const handleModeSelect = useCallback((newMode: "training" | "solo") => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setMode(newMode);
-    if (newMode === 'solo') {
+    if (newMode === "solo") {
       setSelectedTraining(null);
     }
   }, []);
 
   const handleCreate = useCallback(async () => {
     if (!userId) {
-      Alert.alert("Error", "User information is still loading. Please try again.");
+      Alert.alert(
+        "Error",
+        "User information is still loading. Please try again."
+      );
       return;
     }
 
@@ -224,7 +341,6 @@ export default function CreateSessionSheet() {
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-      // Navigate to active session screen
       router.replace({
         pathname: "/(protected)/activeSession",
         params: { sessionId: newSession.id },
@@ -235,12 +351,19 @@ export default function CreateSessionSheet() {
     } finally {
       setIsCreating(false);
     }
-  }, [userId, canStart, createSession, selectedTraining, activeTeamId, loadSessions]);
+  }, [
+    userId,
+    canStart,
+    createSession,
+    selectedTraining,
+    activeTeamId,
+    loadSessions,
+  ]);
 
   // ========== RENDER ==========
   if (checkingActiveSession) {
     return (
-      <View style={[styles.scrollView, styles.loadingContainer]}>
+      <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator color={colors.text} size="small" />
         <Text style={[styles.loadingText, { color: colors.textMuted }]}>
           Checking for active sessions...
@@ -250,166 +373,157 @@ export default function CreateSessionSheet() {
   }
 
   return (
-    <ScrollView
-      style={styles.scrollView}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={[styles.headerIcon, { backgroundColor: '#10B98115' }]}>
-          <Ionicons name="play-circle" size={48} color="#10B981" />
-        </View>
-        <Text style={[styles.title, { color: colors.text }]}>Start Session</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          Join a training or start a solo practice session
-        </Text>
-      </View>
-
-      {/* Mode Selection */}
-      <View style={styles.modeSection}>
-        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>SESSION TYPE</Text>
-        <View style={styles.modeRow}>
-          {/* Solo Option */}
-              <TouchableOpacity
-                style={[
-              styles.modeCard,
-              {
-                backgroundColor: mode === 'solo' ? colors.orange + '15' : colors.card,
-                borderColor: mode === 'solo' ? colors.orange : colors.border,
-                borderWidth: mode === 'solo' ? 2 : 1,
-              },
-            ]}
-            onPress={() => handleModeSelect('solo')}
-                activeOpacity={0.7}
-              >
-                  <Ionicons
-              name="person" 
-              size={28} 
-              color={mode === 'solo' ? colors.orange : colors.textMuted} 
-            />
-            <Text style={[styles.modeTitle, { color: mode === 'solo' ? colors.orange : colors.text }]}>
-              Solo Practice
-                  </Text>
-            <Text style={[styles.modeDesc, { color: colors.textMuted }]}>
-              Personal training
-            </Text>
-            {mode === 'solo' && (
-              <View style={[styles.modeCheck, { backgroundColor: colors.orange }]}>
-                <Ionicons name="checkmark" size={14} color="#fff" />
-                </View>
-            )}
-              </TouchableOpacity>
-
-          {/* Training Option */}
-                        <TouchableOpacity
-                          style={[
-              styles.modeCard,
-              {
-                backgroundColor: mode === 'training' ? '#10B98115' : colors.card,
-                borderColor: mode === 'training' ? '#10B981' : colors.border,
-                borderWidth: mode === 'training' ? 2 : 1,
-                opacity: availableTrainings.length === 0 ? 0.5 : 1,
-              },
-            ]}
-            onPress={() => availableTrainings.length > 0 && handleModeSelect('training')}
-                          activeOpacity={0.7}
-            disabled={availableTrainings.length === 0}
-          >
-            <Ionicons 
-              name="people" 
-              size={28} 
-              color={mode === 'training' ? '#10B981' : colors.textMuted} 
-            />
-            <Text style={[styles.modeTitle, { color: mode === 'training' ? '#10B981' : colors.text }]}>
-              Join Training
-                            </Text>
-            <Text style={[styles.modeDesc, { color: colors.textMuted }]}>
-              {availableTrainings.length > 0 
-                ? `${availableTrainings.length} available` 
-                : 'None available'}
-                          </Text>
-            {mode === 'training' && (
-              <View style={[styles.modeCheck, { backgroundColor: '#10B981' }]}>
-                <Ionicons name="checkmark" size={14} color="#fff" />
-                                </View>
-                                )}
-                              </TouchableOpacity>
-                        </View>
-                </View>
-
-      {/* Training Selection (if training mode) */}
-      {mode === 'training' && (
-        <View style={styles.trainingsSection}>
-          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>SELECT TRAINING</Text>
-          {loadingMyTrainings ? (
-            <ActivityIndicator color="#10B981" style={{ padding: 20 }} />
-          ) : (
-            <View style={styles.trainingsList}>
-              {availableTrainings.map((training) => (
-                <TrainingCard
-                  key={training.id}
-                  training={training}
-                  isSelected={selectedTraining?.id === training.id}
-                  onSelect={() => handleTrainingSelect(training)}
-                  colors={colors}
-                />
-              ))}
-            </View>
-          )}
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
+          <View style={[styles.headerIcon, { backgroundColor: "#10B98115" }]}>
+            <Target size={36} color="#10B981" />
           </View>
-      )}
+          <Text style={[styles.title, { color: colors.text }]}>
+            Start Session
+          </Text>
+          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+            {hasTrainings
+              ? `Select a training or practice solo`
+              : "Start a solo practice session"}
+          </Text>
+        </Animated.View>
 
-      {/* Summary (if selection made) */}
-      {canStart && (
-        <View style={[styles.summaryCard, { backgroundColor: '#10B98108', borderColor: '#10B98120' }]}>
-          <View style={styles.summaryRow}>
-            <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-            <View style={styles.summaryContent}>
-              <Text style={[styles.summaryTitle, { color: '#10B981' }]}>
-                {mode === 'solo' ? 'Solo Session' : selectedTraining?.title}
-                </Text>
-              <Text style={[styles.summaryDesc, { color: colors.textMuted }]}>
-                {mode === 'solo' 
-                  ? 'Personal practice session'
-                  : `${selectedTraining?.team?.name} • ${selectedTraining?.drill_count || 0} drills`}
-                      </Text>
-                  </View>
-                </View>
+        {/* ══════════════════════════════════════════════════════════════════════
+            TEAM TRAININGS (MAIN OPTION)
+        ══════════════════════════════════════════════════════════════════════ */}
+        {hasTrainings && (
+          <Animated.View entering={FadeIn.delay(100)} style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+                TEAM TRAININGS
+              </Text>
+              <Text style={[styles.sectionNote, { color: colors.textMuted }]}>
+                {availableTrainings.length} available
+              </Text>
+            </View>
+
+            {loadingMyTrainings ? (
+              <View style={styles.loadingList}>
+                <ActivityIndicator color="#10B981" />
+              </View>
+            ) : (
+              <View style={styles.teamsList}>
+                {Object.entries(trainingsByTeam).map(([teamId, group]) => (
+                  <TeamGroup
+                    key={teamId}
+                    teamName={group.name}
+                    trainings={group.trainings}
+                    selectedTrainingId={selectedTraining?.id || null}
+                    onSelectTraining={handleTrainingSelect}
+                    colors={colors}
+                  />
+                ))}
               </View>
             )}
+          </Animated.View>
+        )}
 
-      {/* Start Button */}
-            <TouchableOpacity
+        {/* ══════════════════════════════════════════════════════════════════════
+            SOLO OPTION (SECONDARY)
+        ══════════════════════════════════════════════════════════════════════ */}
+        <Animated.View entering={FadeIn.delay(hasTrainings ? 200 : 100)} style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: colors.textMuted, marginBottom: 12, marginLeft: 4 }]}>
+            {hasTrainings ? "OR PRACTICE SOLO" : "PERSONAL SESSION"}
+          </Text>
+          <TouchableOpacity
+            style={[
+              styles.soloCard,
+              {
+                backgroundColor: mode === "solo" ? "#F59E0B15" : colors.card,
+                borderColor: mode === "solo" ? "#F59E0B" : colors.border,
+                borderWidth: mode === "solo" ? 2 : 1,
+              },
+            ]}
+            onPress={() => handleModeSelect("solo")}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.soloIcon, { backgroundColor: mode === "solo" ? "#F59E0B20" : colors.secondary }]}>
+              <User size={22} color={mode === "solo" ? "#F59E0B" : colors.textMuted} />
+            </View>
+            <View style={styles.soloContent}>
+              <Text style={[styles.soloTitle, { color: mode === "solo" ? "#F59E0B" : colors.text }]}>
+                Solo Practice
+              </Text>
+              <Text style={[styles.soloDesc, { color: colors.textMuted }]}>
+                Personal session without a team
+              </Text>
+            </View>
+            {mode === "solo" && (
+              <View style={[styles.checkBadge, { backgroundColor: "#F59E0B" }]}>
+                <Ionicons name="checkmark" size={16} color="#fff" />
+              </View>
+            )}
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            SUMMARY
+        ══════════════════════════════════════════════════════════════════════ */}
+        {canStart && (
+          <Animated.View entering={FadeIn} style={styles.summarySection}>
+            <View
               style={[
-          styles.startButton,
-          { 
-            backgroundColor: !canStart || isCreating || loading ? colors.muted : '#10B981',
-          },
+                styles.summaryCard,
+                { backgroundColor: "#10B98108", borderColor: "#10B98120" },
               ]}
-              onPress={handleCreate}
-        disabled={!canStart || isCreating || loading}
-              activeOpacity={0.8}
             >
-              {isCreating || loading ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <>
-            <Ionicons name="play" size={22} color="#fff" />
-            <Text style={styles.startButtonText}>
-              {mode === 'solo' ? 'Start Solo Session' : 'Join Training'}
-            </Text>
-                </>
-              )}
-            </TouchableOpacity>
+              <Ionicons name="checkmark-circle" size={22} color="#10B981" />
+              <View style={styles.summaryContent}>
+                <Text style={[styles.summaryTitle, { color: "#10B981" }]}>
+                  {mode === "solo" ? "Solo Session" : selectedTraining?.title}
+                </Text>
+                <Text style={[styles.summaryDesc, { color: colors.textMuted }]}>
+                  {mode === "solo"
+                    ? "Personal practice session"
+                    : `${selectedTraining?.team?.name} • ${selectedTraining?.drill_count || 0} drills`}
+                </Text>
+              </View>
+            </View>
+          </Animated.View>
+        )}
 
-      {/* Info */}
-      <Text style={[styles.infoText, { color: colors.textMuted }]}>
-        Add targets during your session to track your performance
-      </Text>
+        <View style={{ height: 120 }} />
+      </ScrollView>
 
-          <View style={{ height: 40 }} />
-    </ScrollView>
+      {/* ══════════════════════════════════════════════════════════════════════
+          BOTTOM BUTTON
+      ══════════════════════════════════════════════════════════════════════ */}
+      <View style={[styles.bottomContainer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
+        <TouchableOpacity
+          style={[
+            styles.startButton,
+            {
+              backgroundColor: !canStart || isCreating || loading ? colors.muted : "#10B981",
+            },
+          ]}
+          onPress={handleCreate}
+          disabled={!canStart || isCreating || loading}
+          activeOpacity={0.8}
+        >
+          {isCreating || loading ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <>
+              <Ionicons name="play" size={22} color="#fff" />
+              <Text style={styles.startButtonText}>
+                {mode === "solo" ? "Start Solo Session" : "Join Training"}
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
@@ -417,164 +531,197 @@ export default function CreateSessionSheet() {
 // STYLES
 // ============================================================================
 const styles = StyleSheet.create({
+  container: { flex: 1 },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 20 },
-  loadingContainer: { justifyContent: 'center', alignItems: 'center', gap: 12 },
+  loadingContainer: { justifyContent: "center", alignItems: "center", gap: 12 },
   loadingText: { fontSize: 14 },
+  loadingList: { padding: 24, alignItems: "center" },
 
   // Header
   header: {
-    alignItems: 'center',
-    paddingVertical: 32,
+    alignItems: "center",
+    paddingTop: 24,
+    paddingBottom: 28,
   },
   headerIcon: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
   },
   title: {
     fontSize: 24,
-    fontWeight: '700',
+    fontWeight: "700",
     letterSpacing: -0.4,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   subtitle: {
-    fontSize: 15,
-    textAlign: 'center',
-    lineHeight: 22,
+    fontSize: 14,
+    textAlign: "center",
   },
 
   // Section
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
+  section: { marginBottom: 24 },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 12,
   },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  sectionNote: { fontSize: 11 },
 
-  // Mode Selection
-  modeSection: {
-    marginBottom: 24,
-  },
-  modeRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  modeCard: {
-    flex: 1,
-    alignItems: 'center',
-    padding: 20,
+  // Solo Card
+  soloCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
     borderRadius: 16,
-    position: 'relative',
+    gap: 14,
   },
-  modeTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginTop: 12,
-    marginBottom: 4,
+  soloIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  modeDesc: {
-    fontSize: 12,
-  },
-  modeCheck: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
+  soloContent: { flex: 1 },
+  soloTitle: { fontSize: 16, fontWeight: "600" },
+  soloDesc: { fontSize: 13, marginTop: 2 },
+  checkBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
-  // Trainings
-  trainingsSection: {
-    marginBottom: 24,
+  // Team Group
+  teamsList: { gap: 20 },
+  teamGroup: {},
+  teamHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 10,
+    paddingLeft: 4,
   },
-  trainingsList: {
-    gap: 10,
-  },
+  teamName: { fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
+  trainingsList: { gap: 10 },
+
+  // Training Card
   trainingCard: {
     borderRadius: 14,
-    padding: 16,
+    padding: 14,
   },
-  trainingCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  trainingCardRow: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
-  statusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+  trainingIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  trainingCardContent: {
-    flex: 1,
-  },
+  trainingCardContent: { flex: 1 },
   trainingTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  trainingMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    gap: 6,
+  },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    gap: 5,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: "600",
   },
   trainingMeta: {
-    fontSize: 13,
-    marginTop: 2,
+    fontSize: 12,
   },
   checkIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
+  // No Trainings
+  noTrainingsContainer: { marginBottom: 24 },
+  noTrainingsCard: {
+    alignItems: "center",
+    padding: 24,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 8,
+  },
+  noTrainingsText: { fontSize: 15, fontWeight: "500" },
+  noTrainingsHint: { fontSize: 13 },
+
   // Summary
+  summarySection: { marginBottom: 20 },
   summaryCard: {
+    flexDirection: "row",
+    alignItems: "center",
     borderRadius: 14,
     borderWidth: 1,
     padding: 16,
-    marginBottom: 24,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 12,
   },
-  summaryContent: {
-    flex: 1,
-  },
-  summaryTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  summaryDesc: {
-    fontSize: 13,
-    marginTop: 2,
-  },
+  summaryContent: { flex: 1 },
+  summaryTitle: { fontSize: 16, fontWeight: "600" },
+  summaryDesc: { fontSize: 13, marginTop: 2 },
 
-  // Start Button
+  // Bottom
+  bottomContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 36,
+    borderTopWidth: 1,
+  },
   startButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     height: 56,
     borderRadius: 28,
     gap: 10,
-    marginBottom: 16,
   },
   startButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 17,
-    fontWeight: '600',
-  },
-
-  // Info
-  infoText: {
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 18,
+    fontWeight: "600",
   },
 });

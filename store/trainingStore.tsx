@@ -27,6 +27,10 @@ interface TrainingStore {
   loadingMyTrainings: boolean;
   loadingTeamTrainings: boolean;
   
+  // Initialization tracking
+  myTrainingsInitialized: boolean;
+  teamTrainingsInitialized: boolean;
+  
   // Error states
   error: string | null;
   
@@ -46,37 +50,52 @@ export const useTrainingStore = create<TrainingStore>((set, get) => ({
   teamTrainings: [],
   loadingMyTrainings: false,
   loadingTeamTrainings: false,
+  myTrainingsInitialized: false,
+  teamTrainingsInitialized: false,
   error: null,
 
   loadMyTrainings: async () => {
-    // Only show loading spinner on initial load, not refresh
-    const isInitialLoad = get().myTrainings.length === 0;
-    if (isInitialLoad) {
+    // Always show loading on first load
+    const { myTrainingsInitialized } = get();
+    if (!myTrainingsInitialized) {
       set({ loadingMyTrainings: true, error: null });
     }
     
     try {
       const trainings = await getMyTrainings();
-      set({ myTrainings: trainings, loadingMyTrainings: false });
+      set({ 
+        myTrainings: trainings, 
+        loadingMyTrainings: false, 
+        myTrainingsInitialized: true,
+        error: null,
+      });
     } catch (error: any) {
       console.error('Failed to load my trainings:', error);
-      set({ error: error.message, loadingMyTrainings: false });
+      set({ error: error.message, loadingMyTrainings: false, myTrainingsInitialized: true });
+      // DON'T clear data on error
     }
   },
 
   loadMyUpcomingTrainings: async () => {
-    // Only show loading spinner on initial load, not refresh
-    const isInitialLoad = get().myUpcomingTrainings.length === 0;
-    if (isInitialLoad) {
+    // Always show loading on first load
+    const { myTrainingsInitialized } = get();
+    if (!myTrainingsInitialized) {
       set({ loadingMyTrainings: true, error: null });
     }
     
     try {
-      const trainings = await getMyUpcomingTrainings(5);
-      set({ myUpcomingTrainings: trainings, loadingMyTrainings: false });
+      // Load more trainings for session selection (not just 5)
+      const trainings = await getMyUpcomingTrainings(50);
+      set({ 
+        myUpcomingTrainings: trainings, 
+        loadingMyTrainings: false,
+        myTrainingsInitialized: true,
+        error: null,
+      });
     } catch (error: any) {
       console.error('Failed to load upcoming trainings:', error);
-      set({ error: error.message, loadingMyTrainings: false });
+      set({ error: error.message, loadingMyTrainings: false, myTrainingsInitialized: true });
+      // DON'T clear data on error
     }
   },
 
@@ -86,6 +105,7 @@ export const useTrainingStore = create<TrainingStore>((set, get) => ({
       set({ myStats: stats });
     } catch (error: any) {
       console.error('Failed to load training stats:', error);
+      // DON'T clear stats on error
     }
   },
 
@@ -93,22 +113,28 @@ export const useTrainingStore = create<TrainingStore>((set, get) => ({
     const activeTeamId = teamId || useTeamStore.getState().activeTeamId;
     
     if (!activeTeamId) {
-      set({ teamTrainings: [], loadingTeamTrainings: false });
+      set({ teamTrainings: [], loadingTeamTrainings: false, teamTrainingsInitialized: true });
       return;
     }
 
-    // Only show loading spinner on initial load, not refresh
-    const isInitialLoad = get().teamTrainings.length === 0;
-    if (isInitialLoad) {
+    // Always show loading on first load
+    const { teamTrainingsInitialized } = get();
+    if (!teamTrainingsInitialized) {
       set({ loadingTeamTrainings: true, error: null });
     }
     
     try {
       const trainings = await getTeamTrainings(activeTeamId);
-      set({ teamTrainings: trainings, loadingTeamTrainings: false });
+      set({ 
+        teamTrainings: trainings, 
+        loadingTeamTrainings: false,
+        teamTrainingsInitialized: true,
+        error: null,
+      });
     } catch (error: any) {
       console.error('Failed to load team trainings:', error);
-      set({ error: error.message, loadingTeamTrainings: false });
+      set({ error: error.message, loadingTeamTrainings: false, teamTrainingsInitialized: true });
+      // DON'T clear data on error
     }
   },
 
@@ -128,6 +154,8 @@ export const useTrainingStore = create<TrainingStore>((set, get) => ({
     teamTrainings: [],
     loadingMyTrainings: false,
     loadingTeamTrainings: false,
+    myTrainingsInitialized: false,
+    teamTrainingsInitialized: false,
     error: null,
   }),
 }));

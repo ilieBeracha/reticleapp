@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { notifySessionStarted } from './notifications';
 
 export interface CreateSessionParams {
   team_id?: string | null;        // NULL for personal, UUID for team
@@ -259,10 +260,10 @@ export async function createTrainingSession(params: {
   drill_id?: string | null;
   session_mode?: 'solo' | 'group';
 }): Promise<SessionWithDetails> {
-  // First, get the training to know the team_id
+  // First, get the training to know the team_id and title
   const { data: training, error: trainingError } = await supabase
     .from('trainings')
-    .select('team_id')
+    .select('team_id, title')
     .eq('id', params.training_id)
     .single();
 
@@ -270,12 +271,42 @@ export async function createTrainingSession(params: {
     throw new Error('Training not found');
   }
 
-  return createSession({
+  const session = await createSession({
     team_id: training.team_id,
     training_id: params.training_id,
     drill_id: params.drill_id ?? null,
     session_mode: params.session_mode ?? 'solo',
   });
+
+  // Send notifications (non-blocking)
+  sendTrainingSessionNotifications(
+    params.training_id,
+    training.title,
+    session.user_full_name || 'A member'
+  ).catch(console.error);
+
+  return session;
+}
+
+/**
+ * Send notifications when a training session is started
+ */
+async function sendTrainingSessionNotifications(
+  trainingId: string,
+  trainingTitle: string,
+  memberName: string
+) {
+  // Notify the user who started (local)
+  await notifySessionStarted(trainingId);
+
+  // Log for commanders/owners - actual push needs server-side
+  console.log(`[Notification] ${memberName} started session in ${trainingTitle}`);
+
+  // TODO: To notify commanders/owners, create Supabase Edge Function that:
+  // 1. Gets team owner + commanders from team_members
+  // 2. Gets their push tokens
+  // 3. Sends push via Expo Push API
+  // Example: await supabase.functions.invoke('notify-training-session', { body: { ... } })
 }
 
 /**
