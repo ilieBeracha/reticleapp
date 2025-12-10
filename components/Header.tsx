@@ -2,23 +2,43 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { useTeamStore } from '@/store/teamStore';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
 import { usePathname } from 'expo-router';
 import { BellIcon } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { BaseAvatar } from './BaseAvatar';
 import { Text } from './ui/text';
   
 interface HeaderProps {
-  notificationCount?: number;
   onNotificationPress?: () => void;
   onUserPress?: () => void;
   onTeamPress?: () => void;
 }
 
-export function Header({ notificationCount = 0, onNotificationPress, onUserPress, onTeamPress }: HeaderProps) {
+export function Header({ onNotificationPress, onUserPress, onTeamPress }: HeaderProps) {
   const { user } = useAuth();
   const colors = useColors();
   const pathname = usePathname();
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  // Fetch pending notification count
+  useEffect(() => {
+    const fetchCount = async () => {
+      try {
+        const pending = await Notifications.getAllScheduledNotificationsAsync();
+        setNotificationCount(pending.length);
+      } catch (error) {
+        console.error('Failed to get notification count:', error);
+      }
+    };
+
+    fetchCount();
+    
+    // Refresh count when screen focuses
+    const interval = setInterval(fetchCount, 10000); // Check every 10s
+    return () => clearInterval(interval);
+  }, []);
   
   // Check if we're on the personal tab - show "Personal" regardless of activeTeamId
   const isPersonalRoute = pathname?.startsWith('/personal');
@@ -63,12 +83,19 @@ export function Header({ notificationCount = 0, onNotificationPress, onUserPress
       </View>
 
 
-        {/* Right Section */}
+        {/* Right Section - Notification Bell */}
         <TouchableOpacity
           onPress={onNotificationPress}
           style={styles.notification}
         >
           <BellIcon size={18} color={colors.tint} strokeWidth={2} />
+          {notificationCount > 0 && (
+            <View style={[styles.badge, { backgroundColor: colors.primary, borderColor: colors.background }]}>
+              <Text style={styles.badgeText}>
+                {notificationCount > 9 ? '9+' : notificationCount}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 

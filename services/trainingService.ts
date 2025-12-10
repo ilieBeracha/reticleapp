@@ -15,7 +15,8 @@ import type {
   TrainingWithDetails,
   UpdateTrainingInput,
 } from '@/types/workspace';
-import { notifyNewTrainingCreated, scheduleTrainingReminder } from './notifications';
+import { scheduleTrainingReminder } from './notifications';
+import { notifyTeamNewTraining, notifyTeamTrainingStarted } from './pushService';
 
 // =====================================================
 // TRAINING CRUD
@@ -43,6 +44,7 @@ export async function createTraining(input: CreateTrainingInput): Promise<Traini
       title: input.title,
       description: input.description || null,
       scheduled_at: input.scheduled_at,
+      manual_start: input.manual_start ?? false,
       status: 'planned',
       created_by: user.id,
     })
@@ -109,15 +111,17 @@ export async function createTraining(input: CreateTrainingInput): Promise<Traini
 
 /**
  * Send notifications when training is created
- * - Local notification for the creator (reminder 30 min before)
- * - TODO: Push notifications to all team members via server
+ * - Local reminder for the creator (30 min before)
+ * - Push notification to all team members via Edge Function
  */
 async function sendTrainingCreatedNotifications(training: TrainingWithDetails) {
+  const teamId = training.team_id || training.team?.id;
   const teamName = training.team?.name || 'Team';
+  const creatorId = training.created_by || training.creator?.id;
   const creatorName = training.creator?.full_name || 'Someone';
   const scheduledAt = new Date(training.scheduled_at);
 
-  // Schedule reminder for the creator (30 min before)
+  // Schedule local reminder for the creator (30 min before)
   await scheduleTrainingReminder(
     training.id,
     training.title,
@@ -125,19 +129,18 @@ async function sendTrainingCreatedNotifications(training: TrainingWithDetails) {
     scheduledAt
   );
 
-  // Local notification for confirmation
-  await notifyNewTrainingCreated(
-    training.id,
-    training.title,
-    teamName,
-    scheduledAt,
-    creatorName
-  );
-
-  // TODO: To notify ALL team members, create a Supabase Edge Function that:
-  // 1. Gets all team member push tokens
-  // 2. Sends push notifications to each via Expo Push API
-  // Example: await supabase.functions.invoke('notify-team', { body: { ... } })
+  // Send push notification to all team members (excluding creator)
+  if (teamId && creatorId) {
+    await notifyTeamNewTraining(
+      teamId,
+      training.id,
+      training.title,
+      teamName,
+      scheduledAt,
+      creatorId,
+      creatorName
+    );
+  }
 }
 
 /**
@@ -179,7 +182,7 @@ export async function getTeamTrainings(
   return (data || []).map((t: any) => ({
     ...t,
     drill_count: t.training_drills?.length || 0,
-    drills: undefined,
+    drills: t.training_drills || [],
     training_drills: undefined,
   })) as TrainingWithDetails[];
 }
@@ -228,7 +231,7 @@ export async function getUpcomingTrainings(
   return (data || []).map((t: any) => ({
     ...t,
     drill_count: t.training_drills?.length || 0,
-    drills: undefined,
+    drills: t.training_drills || [],
     training_drills: undefined,
   })) as TrainingWithDetails[];
 }
@@ -314,7 +317,27 @@ export async function deleteTraining(trainingId: string): Promise<void> {
  * Start a training (change status to ongoing)
  */
 export async function startTraining(trainingId: string): Promise<Training> {
-  return updateTraining(trainingId, { status: 'ongoing' });
+  const { data: { user } } = await supabase.auth.getUser();
+  const training = await updateTraining(trainingId, { status: 'ongoing' });
+
+  // Send push notification to team members
+  if (training.team_id && user?.id) {
+    const { data: teamData } = await supabase
+      .from('teams')
+      .select('name')
+      .eq('id', training.team_id)
+      .single();
+
+    notifyTeamTrainingStarted(
+      training.team_id,
+      trainingId,
+      training.title,
+      teamData?.name || 'Team',
+      user.id
+    ).catch(console.error);
+  }
+
+  return training;
 }
 
 /**
@@ -398,7 +421,7 @@ export async function getMyTrainings(
   return (data || []).map((t: any) => ({
     ...t,
     drill_count: t.training_drills?.length || 0,
-    drills: undefined,
+    drills: t.training_drills || [],
     training_drills: undefined,
   })) as TrainingWithDetails[];
 }
@@ -582,5 +605,72 @@ export async function reorderDrills(
     console.error('Failed to reorder drills:', errors);
     throw new Error('Failed to reorder drills');
   }
+}
+
+// =====================================================
+// DRILL PROGRESS TRACKING
+// =====================================================
+
+export interface DrillProgress {
+  drillId: string;
+  completed: boolean;
+  sessionId?: string;
+}
+
+/**
+ * Get current user's drill progress for a training
+ * Returns which drills have been completed (have a completed session)
+ */
+export async function getMyDrillProgress(trainingId: string): Promise<DrillProgress[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    throw new Error('Not authenticated');
+  }
+
+  // Get all drills for this training
+  const { data: drills, error: drillsError } = await supabase
+    .from('training_drills')
+    .select('id')
+    .eq('training_id', trainingId)
+    .order('order_index', { ascending: true });
+
+  if (drillsError) {
+    console.error('Failed to fetch drills:', drillsError);
+    throw new Error('Failed to fetch drills');
+  }
+
+  if (!drills || drills.length === 0) {
+    return [];
+  }
+
+  // Get completed sessions for this user in this training
+  const { data: sessions, error: sessionsError } = await supabase
+    .from('sessions')
+    .select('id, drill_id')
+    .eq('training_id', trainingId)
+    .eq('user_id', user.id)
+    .eq('status', 'completed')
+    .not('drill_id', 'is', null);
+
+  if (sessionsError) {
+    console.error('Failed to fetch sessions:', sessionsError);
+    throw new Error('Failed to fetch sessions');
+  }
+
+  // Create a map of drill_id -> session_id for completed drills
+  const completedDrills = new Map<string, string>();
+  (sessions || []).forEach(s => {
+    if (s.drill_id) {
+      completedDrills.set(s.drill_id, s.id);
+    }
+  });
+
+  // Build progress array
+  return drills.map(drill => ({
+    drillId: drill.id,
+    completed: completedDrills.has(drill.id),
+    sessionId: completedDrills.get(drill.id),
+  }));
 }
 

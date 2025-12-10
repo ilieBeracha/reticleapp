@@ -1,8 +1,9 @@
+import { useColors } from "@/hooks/ui/useColors";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import React from "react";
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { COLORS, DISTANCE_QUICK_PICKS } from "./types";
+import { DISTANCE_QUICK_PICKS } from "./types";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DISTANCE INPUT
@@ -18,28 +19,30 @@ export const DistanceInput = React.memo(function DistanceInput({
   distance,
   onDistanceChange,
 }: DistanceInputProps) {
+  const colors = useColors();
+  
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '25' }]}>
       <View style={styles.header}>
-        <Ionicons name="locate-outline" size={18} color={COLORS.primary} />
-        <Text style={styles.title}>Distance to Target</Text>
+        <Ionicons name="locate-outline" size={18} color={colors.primary} />
+        <Text style={[styles.title, { color: colors.text }]}>Distance to Target</Text>
       </View>
       
       <View style={styles.inputRow}>
         <TextInput
-          style={styles.mainInput}
+          style={[styles.mainInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
           value={String(distance)}
           onChangeText={(text) => {
             const val = parseInt(text) || 0;
             onDistanceChange(val);
           }}
           placeholder="0"
-          placeholderTextColor={COLORS.textDimmer}
+          placeholderTextColor={colors.textMuted}
           keyboardType="number-pad"
           returnKeyType="done"
           selectTextOnFocus
         />
-        <Text style={styles.unit}>meters</Text>
+        <Text style={[styles.unit, { color: colors.textMuted }]}>meters</Text>
       </View>
       
       <View style={styles.quickPicks}>
@@ -48,7 +51,8 @@ export const DistanceInput = React.memo(function DistanceInput({
             key={d}
             style={[
               styles.quickChip,
-              distance === d && styles.quickChipSelected,
+              { backgroundColor: colors.card, borderColor: colors.border },
+              distance === d && { backgroundColor: colors.primary, borderColor: colors.primary },
             ]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -59,6 +63,7 @@ export const DistanceInput = React.memo(function DistanceInput({
             <Text
               style={[
                 styles.quickText,
+                { color: colors.text },
                 distance === d && styles.quickTextSelected,
               ]}
             >
@@ -73,12 +78,10 @@ export const DistanceInput = React.memo(function DistanceInput({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "rgba(16, 185, 129, 0.06)",
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "rgba(16, 185, 129, 0.15)",
   },
   header: {
     flexDirection: "row",
@@ -89,7 +92,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: "600",
-    color: COLORS.white,
   },
   inputRow: {
     flexDirection: "row",
@@ -99,20 +101,16 @@ const styles = StyleSheet.create({
   },
   mainInput: {
     flex: 1,
-    backgroundColor: COLORS.card,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 24,
     fontWeight: "700",
-    color: COLORS.white,
     textAlign: "center",
     borderWidth: 1,
-    borderColor: COLORS.border,
   },
   unit: {
     fontSize: 16,
-    color: COLORS.textMuted,
     fontWeight: "500",
   },
   quickPicks: {
@@ -124,18 +122,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 16,
-    backgroundColor: COLORS.card,
     borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  quickChipSelected: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
   },
   quickText: {
     fontSize: 13,
     fontWeight: "600",
-    color: COLORS.text,
   },
   quickTextSelected: {
     color: "#000",

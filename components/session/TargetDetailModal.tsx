@@ -1,20 +1,21 @@
+import { useColors } from '@/hooks/ui/useColors';
 import { SessionTargetWithResults } from '@/services/sessionService';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  Dimensions,
-  Image,
-  Modal,
-  PanResponder,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
+    ActivityIndicator,
+    Animated,
+    Dimensions,
+    Image,
+    Modal,
+    PanResponder,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -39,15 +40,19 @@ const ResultRow = React.memo(function ResultRow({
   label,
   value,
   valueColor,
+  labelColor,
+  defaultValueColor,
 }: {
   label: string;
   value: string | number;
   valueColor?: string;
+  labelColor?: string;
+  defaultValueColor?: string;
 }) {
   return (
     <View style={styles.resultRow}>
-      <Text style={styles.resultLabel}>{label}</Text>
-      <Text style={[styles.resultValue, valueColor && { color: valueColor }]}>{value}</Text>
+      <Text style={[styles.resultLabel, labelColor && { color: labelColor }]}>{label}</Text>
+      <Text style={[styles.resultValue, { color: valueColor || defaultValueColor || '#fff' }]}>{value}</Text>
     </View>
   );
 });
@@ -61,6 +66,7 @@ export const TargetDetailModal = React.memo(function TargetDetailModal({
   visible,
   onClose,
 }: TargetDetailModalProps) {
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
@@ -178,6 +184,7 @@ export const TargetDetailModal = React.memo(function TargetDetailModal({
             height: SHEET_HEIGHT,
             paddingBottom: insets.bottom,
             transform: [{ translateY }],
+            backgroundColor: colors.background,
           },
         ]}
       >
@@ -209,7 +216,7 @@ export const TargetDetailModal = React.memo(function TargetDetailModal({
             )}
             {/* Gradient overlay for text readability */}
             <LinearGradient
-              colors={['transparent', 'rgba(15,15,15,0.8)', '#0F0F0F']}
+              colors={['transparent', 'rgba(15,15,15,0.7)', 'rgba(15,15,15,0.95)']}
               style={styles.imageGradient}
             />
             {/* Drag Handle on image */}
@@ -269,31 +276,31 @@ export const TargetDetailModal = React.memo(function TargetDetailModal({
         )}
 
         {/* Quick Stats Bar */}
-        <View style={[styles.quickStats, hasImage && styles.quickStatsWithImage]}>
+        <View style={[styles.quickStats, { backgroundColor: colors.card }, hasImage && styles.quickStatsWithImage]}>
           <View style={styles.quickStatItem}>
-            <Text style={styles.quickStatValue}>{shots}</Text>
-            <Text style={styles.quickStatLabel}>Shots</Text>
+            <Text style={[styles.quickStatValue, { color: colors.text }]}>{shots}</Text>
+            <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>Shots</Text>
           </View>
-          <View style={styles.quickStatDivider} />
+          <View style={[styles.quickStatDivider, { backgroundColor: colors.border }]} />
           <View style={styles.quickStatItem}>
-            <Text style={[styles.quickStatValue, { color: '#10B981' }]}>{hits}</Text>
-            <Text style={styles.quickStatLabel}>Hits</Text>
+            <Text style={[styles.quickStatValue, { color: colors.primary }]}>{hits}</Text>
+            <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>Hits</Text>
           </View>
-          <View style={styles.quickStatDivider} />
+          <View style={[styles.quickStatDivider, { backgroundColor: colors.border }]} />
           <View style={styles.quickStatItem}>
-            <Text style={[styles.quickStatValue, { color: accuracy >= 80 ? '#10B981' : accuracy >= 50 ? '#F59E0B' : '#EF4444' }]}>
+            <Text style={[styles.quickStatValue, { color: accuracy >= 80 ? colors.primary : accuracy >= 50 ? '#F59E0B' : '#EF4444' }]}>
               {accuracy}%
             </Text>
-            <Text style={styles.quickStatLabel}>Accuracy</Text>
+            <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>Accuracy</Text>
           </View>
           {isPaper && paperResult?.dispersion_cm != null && (
             <>
-              <View style={styles.quickStatDivider} />
+              <View style={[styles.quickStatDivider, { backgroundColor: colors.border }]} />
               <View style={styles.quickStatItem}>
                 <Text style={[styles.quickStatValue, { color: '#EF4444' }]}>
                   {paperResult.dispersion_cm.toFixed(1)}
                 </Text>
-                <Text style={styles.quickStatLabel}>Group (cm)</Text>
+                <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>Group (cm)</Text>
               </View>
             </>
           )}
@@ -307,30 +314,35 @@ export const TargetDetailModal = React.memo(function TargetDetailModal({
         >
           {/* DETAILED RESULTS */}
           <View style={styles.resultsSection}>
-            <Text style={styles.sectionLabel}>DETAILED RESULTS</Text>
-            <View style={styles.resultsCard}>
-              <ResultRow label="Shots Fired" value={shots} />
-              <ResultRow label="Hits" value={hits} valueColor="#10B981" />
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>DETAILED RESULTS</Text>
+            <View style={[styles.resultsCard, { backgroundColor: colors.card }]}>
+              <ResultRow label="Shots Fired" value={shots} labelColor={colors.textMuted} defaultValueColor={colors.text} />
+              <ResultRow label="Hits" value={hits} valueColor={colors.primary} labelColor={colors.textMuted} />
               {isPaper && paperResult?.hits_inside_scoring != null && (
-                <ResultRow label="Inside Scoring Zone" value={paperResult.hits_inside_scoring} />
+                <ResultRow label="Inside Scoring Zone" value={paperResult.hits_inside_scoring} labelColor={colors.textMuted} defaultValueColor={colors.text} />
               )}
               {isPaper && paperResult?.dispersion_cm != null && (
                 <ResultRow 
                   label="Group Size" 
                   value={`${paperResult.dispersion_cm.toFixed(1)} cm`} 
                   valueColor="#EF4444"
+                  labelColor={colors.textMuted}
                 />
               )}
               {isPaper && paperResult?.offset_right_cm != null && (
                 <ResultRow 
                   label="Horizontal Offset" 
-                  value={`${paperResult.offset_right_cm > 0 ? '+' : ''}${paperResult.offset_right_cm.toFixed(1)} cm`} 
+                  value={`${paperResult.offset_right_cm > 0 ? '+' : ''}${paperResult.offset_right_cm.toFixed(1)} cm`}
+                  labelColor={colors.textMuted}
+                  defaultValueColor={colors.text}
                 />
               )}
               {isPaper && paperResult?.offset_up_cm != null && (
                 <ResultRow 
                   label="Vertical Offset" 
-                  value={`${paperResult.offset_up_cm > 0 ? '+' : ''}${paperResult.offset_up_cm.toFixed(1)} cm`} 
+                  value={`${paperResult.offset_up_cm > 0 ? '+' : ''}${paperResult.offset_up_cm.toFixed(1)} cm`}
+                  labelColor={colors.textMuted}
+                  defaultValueColor={colors.text}
                 />
               )}
               {!isPaper && tacticalResult && (
@@ -338,10 +350,11 @@ export const TargetDetailModal = React.memo(function TargetDetailModal({
                   <ResultRow
                     label="Stage Cleared"
                     value={tacticalResult.is_stage_cleared ? 'Yes' : 'No'}
-                    valueColor={tacticalResult.is_stage_cleared ? '#10B981' : '#EF4444'}
+                    valueColor={tacticalResult.is_stage_cleared ? colors.primary : '#EF4444'}
+                    labelColor={colors.textMuted}
                   />
                   {tacticalResult.time_seconds && (
-                    <ResultRow label="Engagement Time" value={`${tacticalResult.time_seconds}s`} />
+                    <ResultRow label="Engagement Time" value={`${tacticalResult.time_seconds}s`} labelColor={colors.textMuted} defaultValueColor={colors.text} />
                   )}
                 </>
               )}
@@ -350,25 +363,25 @@ export const TargetDetailModal = React.memo(function TargetDetailModal({
 
           {/* DETAILS SECTION */}
           <View style={styles.detailsSection}>
-            <Text style={styles.sectionLabel}>TARGET INFO</Text>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>TARGET INFO</Text>
             <View style={styles.detailsGrid}>
-              <View style={styles.detailCard}>
+              <View style={[styles.detailCard, { backgroundColor: colors.card }]}>
                 <Ionicons name="resize-outline" size={20} color="#6366F1" />
-                <Text style={styles.detailValue}>{target.distance_m}m</Text>
-                <Text style={styles.detailLabel}>Distance</Text>
+                <Text style={[styles.detailValue, { color: colors.text }]}>{target.distance_m}m</Text>
+                <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Distance</Text>
               </View>
               {target.lane_number && (
-                <View style={styles.detailCard}>
+                <View style={[styles.detailCard, { backgroundColor: colors.card }]}>
                   <Ionicons name="flag-outline" size={20} color="#F59E0B" />
-                  <Text style={styles.detailValue}>{target.lane_number}</Text>
-                  <Text style={styles.detailLabel}>Lane</Text>
+                  <Text style={[styles.detailValue, { color: colors.text }]}>{target.lane_number}</Text>
+                  <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Lane</Text>
                 </View>
               )}
               {isPaper && paperResult?.paper_type && (
-                <View style={styles.detailCard}>
-                  <Ionicons name="document-outline" size={20} color="#10B981" />
-                  <Text style={styles.detailValue}>{paperResult.paper_type}</Text>
-                  <Text style={styles.detailLabel}>Type</Text>
+                <View style={[styles.detailCard, { backgroundColor: colors.card }]}>
+                  <Ionicons name="document-outline" size={20} color={colors.primary} />
+                  <Text style={[styles.detailValue, { color: colors.text }]}>{paperResult.paper_type}</Text>
+                  <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Type</Text>
                 </View>
               )}
             </View>
@@ -377,9 +390,9 @@ export const TargetDetailModal = React.memo(function TargetDetailModal({
           {/* NOTES SECTION */}
           {(target.notes || paperResult?.notes || tacticalResult?.notes) && (
             <View style={styles.notesSection}>
-              <Text style={styles.sectionLabel}>NOTES</Text>
-              <View style={styles.notesCard}>
-                <Text style={styles.notesText}>
+              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>NOTES</Text>
+              <View style={[styles.notesCard, { backgroundColor: colors.card }]}>
+                <Text style={[styles.notesText, { color: colors.text }]}>
                   {target.notes || paperResult?.notes || tacticalResult?.notes}
                 </Text>
               </View>

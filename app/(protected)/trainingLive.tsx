@@ -1,4 +1,5 @@
 import { BaseAvatar } from "@/components/BaseAvatar";
+import { usePermissions } from "@/hooks/usePermissions";
 import {
   createSession,
   getMyActiveSessionForTraining,
@@ -8,7 +9,9 @@ import {
 } from "@/services/sessionService";
 import { getTeamWithMembers } from "@/services/teamService";
 import {
+  DrillProgress,
   finishTraining,
+  getMyDrillProgress,
   getTrainingById,
   startTraining,
 } from "@/services/trainingService";
@@ -64,27 +67,68 @@ const InfoCard = React.memo(function InfoCard({
 });
 
 // ============================================================================
-// DRILL ITEM
+// DRILL ITEM - Interactive with completion status
 // ============================================================================
 const DrillItem = React.memo(function DrillItem({
   drill,
   index,
+  isCompleted,
+  onStart,
+  isLive,
+  loading,
 }: {
   drill: TrainingDrill;
   index: number;
+  isCompleted: boolean;
+  onStart: () => void;
+  isLive: boolean;
+  loading: boolean;
 }) {
   return (
-    <View style={styles.drillItem}>
-      <View style={styles.drillNumber}>
-        <Text style={styles.drillNumberText}>{index + 1}</Text>
+    <TouchableOpacity 
+      style={[
+        styles.drillItem, 
+        isCompleted && styles.drillItemCompleted
+      ]}
+      onPress={onStart}
+      disabled={!isLive || loading}
+      activeOpacity={0.7}
+    >
+      {/* Number or Checkmark */}
+      <View style={[
+        styles.drillNumber, 
+        isCompleted && styles.drillNumberCompleted
+      ]}>
+        {isCompleted ? (
+          <Ionicons name="checkmark" size={16} color="#10B981" />
+        ) : (
+          <Text style={[
+            styles.drillNumberText,
+            isCompleted && styles.drillNumberTextCompleted
+          ]}>{index + 1}</Text>
+        )}
       </View>
+      
       <View style={styles.drillInfo}>
-        <Text style={styles.drillName}>{drill.name}</Text>
+        <Text style={[
+          styles.drillName,
+          isCompleted && styles.drillNameCompleted
+        ]}>{drill.name}</Text>
         <Text style={styles.drillMeta}>
           {drill.distance_m}m • {drill.rounds_per_shooter} rounds • {drill.target_type}
         </Text>
       </View>
-    </View>
+      
+      {/* Action indicator */}
+      {isLive && !isCompleted && (
+        <View style={styles.drillAction}>
+          <Ionicons name="play-circle" size={24} color="#10B981" />
+        </View>
+      )}
+      {isCompleted && (
+        <Text style={styles.drillCompletedLabel}>Done</Text>
+      )}
+    </TouchableOpacity>
   );
 });
 
@@ -168,6 +212,7 @@ const EmptyState = React.memo(function EmptyState({
 export default function TrainingScreen() {
   const insets = useSafeAreaInsets();
   const { trainingId } = useLocalSearchParams<{ trainingId: string }>();
+  const { canManageTraining } = usePermissions();
 
   const [training, setTraining] = useState<TrainingWithDetails | null>(null);
   const [team, setTeam] = useState<TeamWithMembers | null>(null);
@@ -175,8 +220,10 @@ export default function TrainingScreen() {
   const [mySession, setMySession] = useState<SessionWithDetails | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [creatorName, setCreatorName] = useState<string | null>(null);
+  const [drillProgress, setDrillProgress] = useState<DrillProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [startingDrillId, setStartingDrillId] = useState<string | null>(null);
 
   // Load data
   const loadData = useCallback(async () => {
@@ -186,14 +233,16 @@ export default function TrainingScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUserId(user?.id || null);
 
-      const [trainingData, trainingSessions, activeSession] = await Promise.all([
+      const [trainingData, trainingSessions, activeSession, progress] = await Promise.all([
         getTrainingById(trainingId),
         getTrainingSessions(trainingId),
         getMyActiveSessionForTraining(trainingId),
+        getMyDrillProgress(trainingId),
       ]);
 
       setTraining(trainingData);
       setMySession(activeSession);
+      setDrillProgress(progress);
 
       // Get creator name
       if (trainingData?.created_by) {
@@ -300,6 +349,36 @@ export default function TrainingScreen() {
     });
   }, [mySession]);
 
+  // Start a session for a specific drill
+  const handleStartDrill = useCallback(async (drillId: string) => {
+    if (!training) return;
+    
+    // Check if already completed
+    const progress = drillProgress.find(p => p.drillId === drillId);
+    if (progress?.completed) {
+      // Allow redo - just start a new session
+    }
+    
+    setStartingDrillId(drillId);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      const session = await createSession({
+        training_id: training.id,
+        team_id: training.team_id || undefined,
+        drill_id: drillId,
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.push({
+        pathname: "/(protected)/activeSession",
+        params: { sessionId: session.id },
+      });
+    } catch (error: any) {
+      Alert.alert("Error", error.message);
+    } finally {
+      setStartingDrillId(null);
+    }
+  }, [training, drillProgress]);
+
   const handleEndTraining = useCallback(async () => {
     if (!training) return;
     Alert.alert("Mark as Completed?", "This will end the training for all participants.", [
@@ -404,11 +483,46 @@ export default function TrainingScreen() {
 
         {/* Drills Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Drills ({training.drills?.length || 0})</Text>
+          <View style={styles.drillsHeader}>
+            <Text style={styles.sectionTitle}>Drills</Text>
+            {training.drills && training.drills.length > 0 && (
+              <View style={styles.drillProgressBadge}>
+                <Text style={styles.drillProgressText}>
+                  {drillProgress.filter(p => p.completed).length}/{training.drills.length}
+                </Text>
+              </View>
+            )}
+          </View>
+          
+          {/* Progress Bar */}
+          {training.drills && training.drills.length > 0 && (
+            <View style={styles.progressBarContainer}>
+              <View 
+                style={[
+                  styles.progressBarFill, 
+                  { 
+                    width: `${(drillProgress.filter(p => p.completed).length / training.drills.length) * 100}%` 
+                  }
+                ]} 
+              />
+            </View>
+          )}
+          
           {training.drills && training.drills.length > 0 ? (
-            training.drills.map((drill, idx) => (
-              <DrillItem key={drill.id} drill={drill} index={idx} />
-            ))
+            training.drills.map((drill, idx) => {
+              const progress = drillProgress.find(p => p.drillId === drill.id);
+              return (
+                <DrillItem 
+                  key={drill.id} 
+                  drill={drill} 
+                  index={idx}
+                  isCompleted={progress?.completed || false}
+                  onStart={() => handleStartDrill(drill.id)}
+                  isLive={isLive}
+                  loading={startingDrillId === drill.id}
+                />
+              );
+            })
           ) : (
             <EmptyState icon="list-outline" text="No drills scheduled" />
           )}
@@ -440,8 +554,8 @@ export default function TrainingScreen() {
 
       {/* Bottom Actions */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
-        {/* Planned: Show Start Training */}
-        {isPlanned && (
+        {/* Planned: Show Start Training (Commander only) */}
+        {isPlanned && canManageTraining && (
           <TouchableOpacity
             style={styles.primaryBtn}
             onPress={handleStartTraining}
@@ -459,7 +573,15 @@ export default function TrainingScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Live: Show Enter/Continue Session + Mark Complete */}
+        {/* Planned: Soldier sees waiting message */}
+        {isPlanned && !canManageTraining && (
+          <View style={styles.finishedBar}>
+            <Ionicons name="time-outline" size={22} color="rgba(255,255,255,0.5)" />
+            <Text style={styles.finishedText}>Waiting for commander to start</Text>
+          </View>
+        )}
+
+        {/* Live: Show Enter/Continue Session + Mark Complete (Commander only) */}
         {isLive && (
           <View style={styles.liveActions}>
             <TouchableOpacity
@@ -483,13 +605,16 @@ export default function TrainingScreen() {
                 </>
               )}
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.completeBtn} 
-              onPress={handleEndTraining}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="checkmark" size={22} color="#10B981" />
-            </TouchableOpacity>
+            {/* Only commanders can mark training as complete */}
+            {canManageTraining && (
+              <TouchableOpacity 
+                style={styles.completeBtn} 
+                onPress={handleEndTraining}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="checkmark" size={22} color="#10B981" />
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -700,6 +825,60 @@ const styles = StyleSheet.create({
   drillMeta: {
     fontSize: 13,
     color: "rgba(255,255,255,0.4)",
+  },
+  drillItemCompleted: {
+    opacity: 0.6,
+  },
+  drillNumberCompleted: {
+    backgroundColor: "rgba(16, 185, 129, 0.25)",
+  },
+  drillNumberTextCompleted: {
+    color: "#10B981",
+  },
+  drillNameCompleted: {
+    textDecorationLine: "line-through",
+    color: "rgba(255,255,255,0.5)",
+  },
+  drillAction: {
+    padding: 4,
+  },
+  drillCompletedLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#10B981",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
+    borderRadius: 6,
+  },
+  drillsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  drillProgressBadge: {
+    backgroundColor: "rgba(16, 185, 129, 0.2)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  drillProgressText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#10B981",
+  },
+  progressBarContainer: {
+    height: 4,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 2,
+    marginBottom: 16,
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: "100%",
+    backgroundColor: "#10B981",
+    borderRadius: 2,
   },
 
   // Session Item

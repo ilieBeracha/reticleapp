@@ -10,13 +10,13 @@ import { router } from 'expo-router';
 import { Calendar, ChevronRight, Plus, Settings, Target, UserPlus, Users } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
@@ -124,7 +124,7 @@ export function TeamHomePage() {
   // Upcoming trainings
   const upcomingTrainings = useMemo(() => {
     return teamTrainings
-      .filter(t => t.status === 'scheduled' && t.scheduled_at)
+      .filter(t => t.status === 'planned' && t.scheduled_at)
       .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime())
       .slice(0, 3);
   }, [teamTrainings]);

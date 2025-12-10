@@ -1,18 +1,19 @@
+import { useColors } from "@/hooks/ui/useColors";
 import type { AnalyzeDocumentResponse, AnalyzeResponse } from "@/types/api";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Animated,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Animated,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import ViewShot from "react-native-view-shot";
 import { DetectionEditor } from "./DetectionEditor";
@@ -49,6 +50,7 @@ export const ResultCard = React.memo(function ResultCard({
   distance,
   onDistanceChange,
 }: ResultCardProps) {
+  const colors = useColors();
   const [editMode, setEditMode] = useState<EditMode>("add");
   const [editingEnabled, setEditingEnabled] = useState(false);
   const [editorModalVisible, setEditorModalVisible] = useState(false);
@@ -204,11 +206,11 @@ export const ResultCard = React.memo(function ResultCard({
   }, [editedDetections, hasChanges, capturedEditedImage, onDone]);
 
   return (
-    <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+    <ScrollView style={[styles.scrollView, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Review Detections</Text>
-        <Text style={styles.subtitle}>AI detected bullet holes</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Review Detections</Text>
+        <Text style={[styles.subtitle, { color: colors.textMuted }]}>AI detected bullet holes</Text>
       </View>
 
       {/* View-Only Preview */}
@@ -216,37 +218,37 @@ export const ResultCard = React.memo(function ResultCard({
 
       {/* Edit Toggle Button */}
       <TouchableOpacity
-        style={styles.editToggle}
+        style={[styles.editToggle, { backgroundColor: colors.card }]}
         onPress={handleToggleEditor}
         activeOpacity={0.7}
       >
-        <View style={[styles.editToggleIcon, editingEnabled && styles.editToggleIconActive]}>
-          <Ionicons name="pencil" size={16} color={editingEnabled ? "#000" : COLORS.textMuted} />
+        <View style={[styles.editToggleIcon, { backgroundColor: colors.secondary }, editingEnabled && styles.editToggleIconActive]}>
+          <Ionicons name="pencil" size={16} color={editingEnabled ? "#000" : colors.textMuted} />
         </View>
-        <Text style={styles.editToggleText}>
+        <Text style={[styles.editToggleText, { color: colors.text }]}>
           {editingEnabled ? "Editing..." : "Edit Detections"}
         </Text>
-        <Ionicons name="expand-outline" size={18} color={COLORS.textDim} />
+        <Ionicons name="expand-outline" size={18} color={colors.textMuted} />
       </TouchableOpacity>
 
       {/* Group Size Card - Dynamically calculated from CURRENT detections */}
       {groupSizeData?.maxDistanceCm != null && stats.total >= 2 && (
-        <View style={styles.groupSizeCard}>
+        <View style={[styles.groupSizeCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.groupSizeHeader}>
-            <View style={styles.groupSizeIconContainer}>
+            <View style={[styles.groupSizeIconContainer, { backgroundColor: colors.primary }]}>
               <Ionicons name="analytics" size={20} color="#fff" />
             </View>
             <View style={styles.groupSizeHeaderText}>
-              <Text style={styles.groupSizeTitle}>Group Size</Text>
-              <Text style={styles.groupSizeHint}>Furthest distance between any 2 bullets (circled above)</Text>
+              <Text style={[styles.groupSizeTitle, { color: colors.text }]}>Group Size</Text>
+              <Text style={[styles.groupSizeHint, { color: colors.textMuted }]}>Furthest distance between any 2 bullets (circled above)</Text>
             </View>
           </View>
           
           <View style={styles.groupSizeContent}>
-            <Text style={styles.groupSizeValue}>
+            <Text style={[styles.groupSizeValue, { color: colors.text }]}>
               {groupSizeData.maxDistanceCm.toFixed(1)}
             </Text>
-            <Text style={styles.groupSizeUnit}>cm</Text>
+            <Text style={[styles.groupSizeUnit, { color: colors.textMuted }]}>cm</Text>
           </View>
           
           {/* Visual quality indicator */}
@@ -276,9 +278,9 @@ export const ResultCard = React.memo(function ResultCard({
           
           {/* Min pair info if available */}
           {groupSizeData.minDistanceCm != null && (
-            <View style={styles.groupSizeExtra}>
-              <Text style={styles.groupSizeExtraLabel}>Tightest pair:</Text>
-              <Text style={styles.groupSizeExtraValue}>
+            <View style={[styles.groupSizeExtra, { borderTopColor: colors.border }]}>
+              <Text style={[styles.groupSizeExtraLabel, { color: colors.textMuted }]}>Tightest pair:</Text>
+              <Text style={[styles.groupSizeExtraValue, { color: colors.text }]}>
                 {groupSizeData.minDistanceCm.toFixed(1)} cm
               </Text>
             </View>
@@ -342,25 +344,25 @@ export const ResultCard = React.memo(function ResultCard({
       </Modal>
 
       {/* Live Stats */}
-      <View style={styles.statsContainer}>
+      <View style={[styles.statsContainer, { backgroundColor: colors.card }]}>
         <View style={styles.mainStat}>
-          <Text style={styles.mainStatValue}>{stats.total}</Text>
-          <Text style={styles.mainStatLabel}>
+          <Text style={[styles.mainStatValue, { color: colors.primary }]}>{stats.total}</Text>
+          <Text style={[styles.mainStatLabel, { color: colors.textMuted }]}>
             Total Hits{hasChanges ? " (edited)" : ""}
           </Text>
         </View>
 
-        <View style={styles.statsDivider} />
+        <View style={[styles.statsDivider, { backgroundColor: colors.border }]} />
 
         <View style={styles.breakdownStats}>
           <View style={styles.breakdownRow}>
-            <View style={[styles.statDot, { backgroundColor: COLORS.primary }]} />
-            <Text style={styles.breakdownText}>{stats.high - stats.manual} AI</Text>
+            <View style={[styles.statDot, { backgroundColor: colors.primary }]} />
+            <Text style={[styles.breakdownText, { color: colors.textMuted }]}>{stats.high - stats.manual} AI</Text>
           </View>
           {stats.manual > 0 && (
             <View style={styles.breakdownRow}>
               <View style={[styles.statDot, { backgroundColor: COLORS.info }]} />
-              <Text style={styles.breakdownText}>{stats.manual} Manual</Text>
+              <Text style={[styles.breakdownText, { color: colors.textMuted }]}>{stats.manual} Manual</Text>
             </View>
           )}
           {stats.medium > 0 && (
@@ -372,7 +374,7 @@ export const ResultCard = React.memo(function ResultCard({
           {stats.low > 0 && (
             <View style={styles.breakdownRow}>
               <View style={[styles.statDot, { backgroundColor: COLORS.danger }]} />
-              <Text style={styles.breakdownText}>{stats.low} Low</Text>
+              <Text style={[styles.breakdownText, { color: colors.textMuted }]}>{stats.low} Low</Text>
             </View>
           )}
         </View>
@@ -380,9 +382,9 @@ export const ResultCard = React.memo(function ResultCard({
 
       {/* Change Indicator */}
       {hasChanges && (
-        <View style={styles.changeIndicator}>
+        <View style={[styles.changeIndicator, { backgroundColor: colors.card }]}>
           <Ionicons name="pencil" size={14} color={COLORS.info} />
-          <Text style={styles.changeText}>
+          <Text style={[styles.changeText, { color: colors.text }]}>
             {result.detections.length > editedDetections.length
               ? `Removed ${result.detections.length - editedDetections.length + stats.manual} false detection${result.detections.length - editedDetections.length + stats.manual !== 1 ? "s" : ""}`
               : stats.manual > 0
@@ -394,8 +396,8 @@ export const ResultCard = React.memo(function ResultCard({
 
       {/* Processing Info */}
       <View style={styles.infoRow}>
-        <Ionicons name="time-outline" size={14} color={COLORS.textDim} />
-        <Text style={styles.infoText}>
+        <Ionicons name="time-outline" size={14} color={colors.textMuted} />
+        <Text style={[styles.infoText, { color: colors.textMuted }]}>
           AI processed in {result.processing_time_s.toFixed(2)}s
         </Text>
       </View>
@@ -408,7 +410,7 @@ export const ResultCard = React.memo(function ResultCard({
         disabled={saving}
       >
         <LinearGradient
-          colors={saving ? ["#6B7280", "#9CA3AF"] : [COLORS.primary, COLORS.primaryLight]}
+          colors={saving ? ["#6B7280", "#9CA3AF"] : ["rgba(255,255,255,0.95)", "rgba(147,197,253,0.85)", "rgba(156,163,175,0.9)"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.doneButtonGradient}
@@ -427,13 +429,13 @@ export const ResultCard = React.memo(function ResultCard({
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={styles.retakeButton}
+        style={[styles.retakeButton, { borderColor: colors.border }]}
         onPress={onRetake}
         activeOpacity={0.7}
         disabled={saving}
       >
-        <Ionicons name="camera-outline" size={18} color={COLORS.textMuted} />
-        <Text style={styles.retakeButtonText}>Retake Photo</Text>
+        <Ionicons name="camera-outline" size={18} color={colors.textMuted} />
+        <Text style={[styles.retakeButtonText, { color: colors.textMuted }]}>Retake Photo</Text>
       </TouchableOpacity>
     </ScrollView>
   );

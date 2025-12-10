@@ -1,0 +1,1 @@
+export { useInsightsData } from './useInsightsData';

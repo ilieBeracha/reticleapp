@@ -3,14 +3,14 @@ import { CameraView } from "expo-camera";
 import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
 import {
-  ActivityIndicator,
-  Dimensions,
-  Image,
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Dimensions,
+    Image,
+    Modal,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { COLORS, Step } from "./types";
 
@@ -120,7 +120,7 @@ export const CameraFlow = React.memo(function CameraFlow({
               <Text style={styles.previewHint}>Make sure the target is clearly visible</Text>
               <TouchableOpacity style={styles.submitBtn} onPress={onSubmitPhoto} activeOpacity={0.9}>
                 <LinearGradient
-                  colors={[COLORS.primary, COLORS.primaryLight]}
+                  colors={["rgba(255,255,255,0.95)", "rgba(147,197,253,0.85)", "rgba(156,163,175,0.9)"]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.submitBtnGradient}

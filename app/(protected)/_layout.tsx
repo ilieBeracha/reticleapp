@@ -1,6 +1,7 @@
 import { Header } from '@/components/Header';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { useColors } from '@/hooks/ui/useColors';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { router, Stack } from 'expo-router';
 
 /**
@@ -15,6 +16,9 @@ import { router, Stack } from 'expo-router';
  */
 export default function ProtectedLayout() {
   const colors = useColors();
+  
+  // Register push notifications on authenticated user
+  usePushNotifications();
 
   return (
     <ThemeProvider>
@@ -25,7 +29,7 @@ export default function ProtectedLayout() {
           headerShadowVisible: false,
           headerTitle: () => (
             <Header
-              onNotificationPress={() => {}}
+              onNotificationPress={() => router.push('/(protected)/notifications')}
               onUserPress={() => router.push('/(protected)/userMenu')}
               onTeamPress={() => router.push('/(protected)/teamSwitcher')}
             />
@@ -98,6 +102,21 @@ export default function ProtectedLayout() {
             sheetGrabberVisible: true,
             contentStyle: { backgroundColor: colors.card },
             sheetAllowedDetents: [0.5, 0.7],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+          }}
+        />
+
+        {/* Notifications */}
+        <Stack.Screen
+          name="notifications"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.7, 0.95],
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
           }}

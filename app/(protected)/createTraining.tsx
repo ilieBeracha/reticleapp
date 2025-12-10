@@ -9,17 +9,17 @@ import * as Haptics from 'expo-haptics';
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Keyboard,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Keyboard,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -136,6 +136,7 @@ export default function CreateTrainingSheet() {
     tomorrow.setHours(9, 0, 0, 0);
     return tomorrow;
   });
+  const [hasSpecificTime, setHasSpecificTime] = useState(false); // false = commander starts manually
   const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null);
   const [tempDate, setTempDate] = useState<Date>(scheduledDate);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
@@ -249,11 +250,19 @@ export default function CreateTrainingSheet() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
+      // If manual start, set time to start of day (midnight)
+      // This indicates "date only, no specific time"
+      const finalDate = new Date(scheduledDate);
+      if (!hasSpecificTime) {
+        finalDate.setHours(0, 0, 0, 0);
+      }
+
       await createTraining({
         team_id: selectedTeamId,
         title: title.trim(),
         description: description.trim() || undefined,
-        scheduled_at: scheduledDate.toISOString(),
+        scheduled_at: finalDate.toISOString(),
+        manual_start: !hasSpecificTime, // Pass flag to indicate manual start mode
         drills: drills.length > 0 ? drills.map(({ id, ...drill }) => drill) : undefined,
       });
 
@@ -347,61 +356,82 @@ export default function CreateTrainingSheet() {
               </View>
             </View>
 
-            {/* Team Selection */}
+           
+
+            {/* Date */}
             <View style={styles.section}>
-              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>SELECT TEAM</Text>
-              {loadingTeams ? (
-                <View style={[styles.loadingBox, { backgroundColor: colors.card }]}>
-                  <ActivityIndicator size="small" color={colors.primary} />
-                  <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading teams...</Text>
-                </View>
-              ) : availableTeams.length === 0 ? (
-                <View style={[styles.emptyBox, { backgroundColor: colors.card }]}>
-                  <Ionicons name="alert-circle-outline" size={20} color={colors.textMuted} />
-                  <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-                    {canCreateTraining ? "No teams found" : "No teams you command"}
-                  </Text>
-                </View>
-              ) : (
-                <View style={styles.teamList}>
-                  {availableTeams.map(team => (
-                    <TeamChip
-                      key={team.id}
-                      team={team}
-                      isSelected={selectedTeamId === team.id}
-                      onSelect={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setSelectedTeamId(team.id);
-                      }}
-                      colors={colors}
-                    />
-                  ))}
-                </View>
-              )}
+              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>DATE</Text>
+              <TouchableOpacity
+                style={[styles.dateTimeBox, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={openDatePicker}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="calendar" size={18} color={colors.primary} />
+                <Text style={[styles.dateTimeText, { color: colors.text }]}>{formatDateDisplay(scheduledDate)}</Text>
+              </TouchableOpacity>
             </View>
 
-            {/* Date & Time */}
+            {/* Start Time - Optional */}
             <View style={styles.section}>
-              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>WHEN</Text>
-              <View style={styles.dateTimeRow}>
+              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>START TIME</Text>
+              
+              {/* Toggle between Manual Start and Scheduled Time */}
+              <View style={styles.timeToggleRow}>
                 <TouchableOpacity
-                  style={[styles.dateTimeBox, { backgroundColor: colors.card, borderColor: colors.border }]}
-                  onPress={openDatePicker}
+                  style={[
+                    styles.timeToggleOption,
+                    !hasSpecificTime && styles.timeToggleOptionActive,
+                    { backgroundColor: !hasSpecificTime ? colors.primary : colors.card, borderColor: colors.border }
+                  ]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setHasSpecificTime(false);
+                  }}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name="calendar" size={18} color={colors.primary} />
-                  <Text style={[styles.dateTimeText, { color: colors.text }]}>{formatDateDisplay(scheduledDate)}</Text>
+                  <Ionicons name="hand-left" size={16} color={!hasSpecificTime ? '#fff' : colors.textMuted} />
+                  <Text style={[styles.timeToggleText, { color: !hasSpecificTime ? '#fff' : colors.text }]}>
+                    Manual Start
+                  </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.dateTimeBox, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  style={[
+                    styles.timeToggleOption,
+                    hasSpecificTime && styles.timeToggleOptionActive,
+                    { backgroundColor: hasSpecificTime ? colors.primary : colors.card, borderColor: colors.border }
+                  ]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setHasSpecificTime(true);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="time" size={16} color={hasSpecificTime ? '#fff' : colors.textMuted} />
+                  <Text style={[styles.timeToggleText, { color: hasSpecificTime ? '#fff' : colors.text }]}>
+                    Set Time
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Time Picker - only show if scheduled */}
+              {hasSpecificTime && (
+                <TouchableOpacity
+                  style={[styles.dateTimeBox, { backgroundColor: colors.card, borderColor: colors.primary, marginTop: 10 }]}
                   onPress={openTimePicker}
                   activeOpacity={0.7}
                 >
                   <Ionicons name="time" size={18} color={colors.primary} />
                   <Text style={[styles.dateTimeText, { color: colors.text }]}>{formatTimeDisplay(scheduledDate)}</Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} style={{ marginLeft: 'auto' }} />
                 </TouchableOpacity>
-              </View>
+              )}
+
+              <Text style={[styles.timeHint, { color: colors.textMuted }]}>
+                {hasSpecificTime 
+                  ? 'Training will auto-start at the scheduled time'
+                  : 'You will manually start the training when ready'}
+              </Text>
             </View>
           </View>
         )}
@@ -418,10 +448,19 @@ export default function CreateTrainingSheet() {
                 <View style={styles.summaryInfo}>
                   <Text style={[styles.summaryTitle, { color: colors.text }]}>{title}</Text>
                   <Text style={[styles.summaryMeta, { color: colors.textMuted }]}>
-                    {selectedTeam?.name} • {formatDateDisplay(scheduledDate)} at {formatTimeDisplay(scheduledDate)}
+                    {selectedTeam?.name} • {formatDateDisplay(scheduledDate)}
+                    {hasSpecificTime ? ` at ${formatTimeDisplay(scheduledDate)}` : ' • Manual Start'}
                   </Text>
                 </View>
               </View>
+              {!hasSpecificTime && (
+                <View style={[styles.manualStartBadge, { backgroundColor: colors.secondary }]}>
+                  <Ionicons name="hand-left" size={12} color={colors.primary} />
+                  <Text style={[styles.manualStartText, { color: colors.primary }]}>
+                    You'll start this training manually
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* Drills Section */}
@@ -713,7 +752,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   dateTimeBox: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
@@ -725,6 +763,32 @@ const styles = StyleSheet.create({
   dateTimeText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  timeToggleRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  timeToggleOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  timeToggleOptionActive: {
+    borderWidth: 0,
+  },
+  timeToggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  timeHint: {
+    fontSize: 12,
+    marginTop: 10,
+    fontStyle: 'italic',
   },
 
   // Loading/Empty
@@ -778,6 +842,19 @@ const styles = StyleSheet.create({
   },
   summaryMeta: {
     fontSize: 13,
+  },
+  manualStartBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  manualStartText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 
   // Drills

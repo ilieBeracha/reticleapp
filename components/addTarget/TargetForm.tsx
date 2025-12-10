@@ -1,15 +1,16 @@
+import { useColors } from "@/hooks/ui/useColors";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { Camera, Crosshair, Minus, Plus, Target, X } from "lucide-react-native";
 import React, { useCallback } from "react";
 import {
-    ActivityIndicator,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { COLORS, TargetType } from "./types";
 
@@ -151,6 +152,8 @@ export const TargetForm = React.memo(function TargetForm({
   onClose,
   saving,
 }: TargetFormProps) {
+  const colors = useColors();
+  
   // Handlers for stepper
   const handleBulletsIncrement = useCallback(() => {
     onBulletsSelect((selectedBullets ?? 5) + 1);
@@ -162,7 +165,7 @@ export const TargetForm = React.memo(function TargetForm({
 
   return (
     <ScrollView
-      style={styles.scrollView}
+      style={[styles.scrollView, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
@@ -170,16 +173,16 @@ export const TargetForm = React.memo(function TargetForm({
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <View style={styles.headerIconContainer}>
-            <Target size={24} color={COLORS.primary} />
+          <View style={[styles.headerIconContainer, { backgroundColor: colors.primary + '20' }]}>
+            <Target size={24} color={colors.primary} />
           </View>
           <View>
-            <Text style={styles.headerTitle}>Add Target</Text>
-            <Text style={styles.headerSubtitle}>Log shooting results</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Add Target</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>Log shooting results</Text>
           </View>
         </View>
-        <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-          <X size={20} color={COLORS.textMuted} />
+        <TouchableOpacity onPress={onClose} style={[styles.closeBtn, { backgroundColor: colors.card }]}>
+          <X size={20} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
 
@@ -355,7 +358,7 @@ export const TargetForm = React.memo(function TargetForm({
         disabled={saving}
       >
         <LinearGradient
-          colors={[COLORS.primary, COLORS.primaryLight, COLORS.primaryLighter]}
+          colors={saving ? ["#6B7280", "#9CA3AF"] : ["rgba(255,255,255,0.95)", "rgba(147,197,253,0.85)", "rgba(156,163,175,0.9)"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.submitBtnGradient}
@@ -378,7 +381,7 @@ export const TargetForm = React.memo(function TargetForm({
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.cancelBtn} onPress={onClose} activeOpacity={0.7}>
-        <Text style={styles.cancelBtnText}>Cancel</Text>
+        <Text style={[styles.cancelBtnText, { color: colors.textMuted }]}>Cancel</Text>
       </TouchableOpacity>
       
       <View style={{ height: 20 }} />

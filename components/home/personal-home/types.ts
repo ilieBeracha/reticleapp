@@ -1,66 +1,72 @@
-import type { Detection } from "@/types/api";
-import { Dimensions } from "react-native";
+import type { SessionWithDetails } from '@/services/sessionService';
+import type { LucideIcon } from 'lucide-react-native';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TARGET TYPES
+// DIAL MODE TYPES
 // ═══════════════════════════════════════════════════════════════════════════
-export type TargetType = "paper" | "tactical";
-export type Step = "form" | "camera" | "preview" | "analyzing" | "results" | "tactical_results";
-export type EditMode = "add" | "remove";
 
-// ═══════════════════════════════════════════════════════════════════════════
-// DETECTION TYPES
-// ═══════════════════════════════════════════════════════════════════════════
-export interface EditableDetection extends Detection {
-  id: string;
-  isManual: boolean;
+export type ActiveDialMode = 'time' | 'targets' | 'shots' | 'accuracy';
+export type IdleDialMode = 'sessions' | 'shots' | 'paper' | 'tactical';
+
+export interface DialModeConfig {
+  key: string;
+  label: string;
+  unit: string;
+  icon: LucideIcon;
+  color: string;
+  getProgress: (value: number, max: number) => number;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CONSTANTS
+// SESSION STATS
 // ═══════════════════════════════════════════════════════════════════════════
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-export const CANVAS_SIZE = SCREEN_WIDTH - 40;
-export const MARKER_RADIUS = 12;
+export interface SessionStats {
+  targetCount: number;
+  totalShotsFired: number;
+  totalHits: number;
+  paperTargets: number;
+  tacticalTargets: number;
+}
 
-// Preset values
-export const DISTANCE_PRESETS = [25, 50, 100, 200, 300, 500];
-export const DISTANCE_QUICK_PICKS = [5, 7, 10, 15, 25, 50, 100, 200, 300];
-export const BULLET_PRESETS = [1, 3, 5, 10];
+export interface WeeklyStats {
+  sessions: number;
+  totalShots: number;
+  paperTargets: number;
+  tacticalTargets: number;
+}
 
-// ═══════════════════════════════════════════════════════════════════════════
-// COLORS - DARK ONLY (for camera/scanning views)
-// ═══════════════════════════════════════════════════════════════════════════
-export const COLORS = {
-  primary: "#10B981",
-  primaryLight: "#34D399",
-  primaryLighter: "#6EE7B7",
-  warning: "#F59E0B",
-  danger: "#EF4444",
-  info: "#3B82F6",
-  white: "#fff",
-  text: "rgba(255,255,255,0.7)",
-  textMuted: "rgba(255,255,255,0.5)",
-  textDim: "rgba(255,255,255,0.4)",
-  textDimmer: "rgba(255,255,255,0.3)",
-  background: "#0f0f0f",
-  card: "rgba(255,255,255,0.05)",
-  cardHover: "rgba(255,255,255,0.08)",
-  border: "rgba(255,255,255,0.08)",
-  borderLight: "rgba(255,255,255,0.1)",
-} as const;
+export interface ElapsedTime {
+  minutes: number;
+  seconds: number;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
-// THEME-AWARE COLORS (for forms/results that need light mode support)
+// DIAL VALUE
 // ═══════════════════════════════════════════════════════════════════════════
+
+export interface DialValue {
+  value: number;
+  secondary?: number;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COLORS (from useColors hook)
+// ═══════════════════════════════════════════════════════════════════════════
+
 export interface ThemeColors {
   background: string;
-  card: string;
   text: string;
   textMuted: string;
+  card: string;
   border: string;
   primary: string;
   secondary: string;
+  [key: string]: string;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// RE-EXPORTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type { SessionWithDetails };

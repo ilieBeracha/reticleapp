@@ -1,3 +1,4 @@
+import { useColors } from "@/hooks/ui/useColors";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { ArrowLeft, Check, Crosshair, Minus, Plus, Target, Timer } from "lucide-react-native";
@@ -272,6 +273,7 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
   onBack,
   saving,
 }: TacticalResultsEntryProps) {
+  const colors = useColors();
   const hitsNum = parseInt(hits) || 0;
 
   const handleHitsChange = useCallback((value: number) => {
@@ -280,21 +282,21 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
 
   return (
     <ScrollView
-      style={styles.scrollView}
+      style={[styles.scrollView, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.scrollContent}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <ArrowLeft size={20} color={COLORS.white} />
+        <TouchableOpacity onPress={onBack} style={[styles.backBtn, { backgroundColor: colors.secondary }]}>
+          <ArrowLeft size={20} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Log Results</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Log Results</Text>
           <View style={styles.headerMeta}>
-            <Crosshair size={14} color={COLORS.primary} />
-            <Text style={styles.headerSubtitle}>
+            <Crosshair size={14} color={colors.primary} />
+            <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
               Tactical • {distance}m • {plannedRounds} rounds
             </Text>
           </View>
@@ -314,39 +316,39 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
       </View>
 
       {/* Time Input - Modern card style */}
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.cardHeader}>
-          <View style={styles.cardIconBox}>
-            <Timer size={18} color={COLORS.primary} />
+          <View style={[styles.cardIconBox, { backgroundColor: colors.primary + '20' }]}>
+            <Timer size={18} color={colors.primary} />
           </View>
           <View style={styles.cardHeaderText}>
-            <Text style={styles.cardTitle}>Engagement Time</Text>
-            <Text style={styles.cardHint}>Optional - how fast?</Text>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Engagement Time</Text>
+            <Text style={[styles.cardHint, { color: colors.textMuted }]}>Optional - how fast?</Text>
           </View>
         </View>
         <View style={styles.timeInputContainer}>
           <TextInput
-            style={styles.timeInput}
+            style={[styles.timeInput, { backgroundColor: colors.secondary, color: colors.text, borderColor: colors.border }]}
             value={time}
             onChangeText={setTime}
             placeholder="0.0"
-            placeholderTextColor={COLORS.textDim}
+            placeholderTextColor={colors.textMuted}
             keyboardType="decimal-pad"
             returnKeyType="done"
           />
-          <Text style={styles.timeUnit}>seconds</Text>
+          <Text style={[styles.timeUnit, { color: colors.textMuted }]}>seconds</Text>
         </View>
       </View>
 
       {/* Stage Cleared Toggle */}
-      <View style={styles.toggleCard}>
+      <View style={[styles.toggleCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.toggleLeft}>
-          <View style={[styles.cardIconBox, stageCleared && styles.cardIconBoxActive]}>
-            <Check size={18} color={stageCleared ? "#000" : COLORS.textMuted} />
+          <View style={[styles.cardIconBox, { backgroundColor: colors.secondary }, stageCleared && { backgroundColor: colors.primary }]}>
+            <Check size={18} color={stageCleared ? "#000" : colors.textMuted} />
           </View>
           <View>
-            <Text style={styles.toggleTitle}>Stage Cleared</Text>
-            <Text style={styles.toggleHint}>Completed tactical objective?</Text>
+            <Text style={[styles.toggleTitle, { color: colors.text }]}>Stage Cleared</Text>
+            <Text style={[styles.toggleHint, { color: colors.textMuted }]}>Completed tactical objective?</Text>
           </View>
         </View>
         <Switch
@@ -355,22 +357,22 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
             Haptics.selectionAsync();
             setStageCleared(val);
           }}
-          trackColor={{ false: COLORS.borderLight, true: `${COLORS.primary}50` }}
-          thumbColor={stageCleared ? COLORS.primary : "#6B7280"}
+          trackColor={{ false: colors.border, true: colors.primary + '50' }}
+          thumbColor={stageCleared ? colors.primary : "#6B7280"}
         />
       </View>
 
       {/* Notes */}
       <View style={styles.notesSection}>
-        <Text style={styles.notesLabel}>
-          Notes <Text style={styles.optionalLabel}>(optional)</Text>
+        <Text style={[styles.notesLabel, { color: colors.text }]}>
+          Notes <Text style={[styles.optionalLabel, { color: colors.textMuted }]}>(optional)</Text>
         </Text>
         <TextInput
-          style={styles.notesInput}
+          style={[styles.notesInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
           value={notes}
           onChangeText={setNotes}
           placeholder="Any notes about this engagement..."
-          placeholderTextColor={COLORS.textDim}
+          placeholderTextColor={colors.textMuted}
           multiline
           numberOfLines={3}
         />
@@ -384,7 +386,7 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
         disabled={saving}
       >
         <LinearGradient
-          colors={saving ? ["#6B7280", "#9CA3AF"] : [COLORS.primary, COLORS.primaryLight, COLORS.primaryLighter]}
+          colors={saving ? ["#6B7280", "#9CA3AF"] : ["rgba(255,255,255,0.95)", "rgba(147,197,253,0.85)", "rgba(156,163,175,0.9)"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.saveButtonGradient}
@@ -400,8 +402,8 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
         </LinearGradient>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.cancelButton} onPress={onBack} activeOpacity={0.7} disabled={saving}>
-        <Text style={styles.cancelButtonText}>Back to Setup</Text>
+      <TouchableOpacity style={[styles.cancelButton, { borderColor: colors.border }]} onPress={onBack} activeOpacity={0.7} disabled={saving}>
+        <Text style={[styles.cancelButtonText, { color: colors.textMuted }]}>Back to Setup</Text>
       </TouchableOpacity>
 
       <View style={{ height: 30 }} />

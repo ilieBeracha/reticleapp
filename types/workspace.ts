@@ -105,6 +105,7 @@ export interface Training {
   title: string;
   description?: string | null;
   scheduled_at: string;
+  manual_start?: boolean; // If true, commander starts training manually (no auto-start)
   status: TrainingStatus;
   created_by: string;
   created_at: string;
@@ -151,6 +152,7 @@ export interface CreateTrainingInput {
   title: string;
   description?: string;
   scheduled_at: string;
+  manual_start?: boolean; // If true, commander starts training manually (no auto-start)
   drills?: CreateDrillInput[];
 }
 

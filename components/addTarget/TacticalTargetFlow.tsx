@@ -502,7 +502,7 @@ export function TacticalTargetFlow({
         {/* Continue Button */}
         <TouchableOpacity style={styles.submitBtn} onPress={handleContinue} activeOpacity={0.9}>
           <LinearGradient
-            colors={[COLORS.primary, COLORS.primaryLight, COLORS.primaryLighter]}
+            colors={["rgba(255,255,255,0.95)", "rgba(147,197,253,0.85)", "rgba(156,163,175,0.9)"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.submitBtnGradient}
@@ -624,7 +624,7 @@ export function TacticalTargetFlow({
         disabled={saving}
       >
         <LinearGradient
-          colors={saving ? ["#6B7280", "#9CA3AF"] : [COLORS.primary, COLORS.primaryLight, COLORS.primaryLighter]}
+          colors={saving ? ["#6B7280", "#9CA3AF"] : ["rgba(255,255,255,0.95)", "rgba(147,197,253,0.85)", "rgba(156,163,175,0.9)"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.submitBtnGradient}
