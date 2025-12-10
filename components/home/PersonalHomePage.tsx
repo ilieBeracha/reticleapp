@@ -14,6 +14,7 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
+  Text,
   View,
 } from 'react-native';
 
@@ -27,7 +28,6 @@ import {
   UpcomingTrainingsSection,
   useDialState,
   useSessionStats,
-  useSessionTimer,
   useWeeklyStats,
 } from './personal-home';
 
@@ -92,9 +92,6 @@ export function PersonalHomePage() {
   // CUSTOM HOOKS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // Timer for active session
-  const { elapsed } = useSessionTimer(activeSession);
-
   // Session stats (targets, shots, accuracy)
   const { sessionStats, currentAccuracy } = useSessionStats(activeSession);
 
@@ -113,7 +110,6 @@ export function PersonalHomePage() {
     handleNextMode,
   } = useDialState({
     activeSession,
-    elapsed,
     sessionStats,
     currentAccuracy,
     weeklyStats,
@@ -182,7 +178,7 @@ export function PersonalHomePage() {
         }
       >
         <GreetingHeader firstName={firstName} colors={colors} />
-        {/* Status Dial - Always visible with session action */}
+        {/* Status Dial */}
         <StatusDial
           colors={colors}
           activeSession={activeSession}
@@ -198,27 +194,28 @@ export function PersonalHomePage() {
           activeDialMode={activeDialMode}
           onPrevMode={handlePrevMode}
           onNextMode={handleNextMode}
-          elapsed={elapsed}
           starting={starting}
           onStart={handleStart}
           onResume={handleResume}
           nextTraining={nextTraining}
         />
 
-        {/* Weekly Activity Chart */}
-        <View style={styles.chartSection}>
+        {/* Activity Section */}
+        <View style={styles.sectionContainer}>
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>ACTIVITY</Text>
           <WeeklyActivityChart sessions={sessions} colors={colors} />
         </View>
 
-        {/* Secondary Actions */}
-        <View style={styles.section}>
+        {/* Quick Actions Section */}
+        <View style={styles.sectionContainer}>
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>QUICK ACTIONS</Text>
           <SecondaryActionsRow colors={colors} />
         </View>
 
-        {/* Upcoming Trainings */}
+        {/* Upcoming Trainings - has its own title */}
         <UpcomingTrainingsSection colors={colors} trainings={myUpcomingTrainings} />
 
-        {/* Recent Sessions */}
+        {/* Recent Sessions - has its own title */}
         <RecentSessionsSection colors={colors} sessions={recentSessions} />
       </ScrollView>
     </View>
@@ -244,12 +241,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  section: {
+  sectionContainer: {
     paddingHorizontal: 20,
     marginBottom: 20,
   },
-  chartSection: {
-    paddingHorizontal: 20,
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1,
     marginBottom: 12,
   },
 });

@@ -5,7 +5,7 @@ import type { LucideIcon } from 'lucide-react-native';
 // DIAL MODE TYPES
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type ActiveDialMode = 'time' | 'targets' | 'shots' | 'accuracy';
+export type ActiveDialMode = 'targets' | 'shots' | 'accuracy';
 export type IdleDialMode = 'sessions' | 'shots' | 'paper' | 'tactical';
 
 export interface DialModeConfig {

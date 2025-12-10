@@ -5,7 +5,6 @@ import type {
     ActiveDialMode,
     DialModeConfig,
     DialValue,
-    ElapsedTime,
     IdleDialMode,
     SessionStats,
     SessionWithDetails,
@@ -14,7 +13,6 @@ import type {
 
 interface UseDialStateProps {
   activeSession: SessionWithDetails | undefined;
-  elapsed: ElapsedTime;
   sessionStats: SessionStats | null;
   currentAccuracy: number;
   weeklyStats: WeeklyStats;
@@ -26,12 +24,11 @@ interface UseDialStateProps {
  */
 export function useDialState({
   activeSession,
-  elapsed,
   sessionStats,
   currentAccuracy,
   weeklyStats,
 }: UseDialStateProps) {
-  const [activeDialMode, setActiveDialMode] = useState<ActiveDialMode>('time');
+  const [activeDialMode, setActiveDialMode] = useState<ActiveDialMode>('targets');
   const [idleDialMode, setIdleDialMode] = useState<IdleDialMode>('sessions');
 
   // Current mode configuration
@@ -43,8 +40,6 @@ export function useDialState({
   const dialValue: DialValue = useMemo(() => {
     if (activeSession) {
       switch (activeDialMode) {
-        case 'time':
-          return { value: elapsed.minutes, secondary: elapsed.seconds };
         case 'targets':
           return { value: sessionStats?.targetCount ?? 0 };
         case 'shots':
@@ -68,7 +63,7 @@ export function useDialState({
           return { value: 0 };
       }
     }
-  }, [activeSession, activeDialMode, idleDialMode, elapsed, sessionStats, currentAccuracy, weeklyStats]);
+  }, [activeSession, activeDialMode, idleDialMode, sessionStats, currentAccuracy, weeklyStats]);
 
   // Calculate dial progress (0-1)
   const dialProgress = useMemo(() => {

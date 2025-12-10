@@ -7,7 +7,6 @@ import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import type {
   DialModeConfig,
   DialValue,
-  ElapsedTime,
   SessionStats,
   SessionWithDetails,
   ThemeColors,
@@ -36,7 +35,6 @@ interface StatusDialProps {
   onPrevMode: () => void;
   onNextMode: () => void;
   // Session actions
-  elapsed: ElapsedTime;
   starting: boolean;
   onStart: () => void;
   onResume: () => void;
@@ -59,7 +57,6 @@ export function StatusDial({
   activeDialMode,
   onPrevMode,
   onNextMode,
-  elapsed,
   starting,
   onStart,
   onResume,
@@ -141,22 +138,12 @@ export function StatusDial({
                 {currentModeConfig.label}
               </Text>
 
-              {activeDialMode === 'time' && activeSession ? (
-                <Text style={[styles.dialValue, { color: colors.text }]}>
-                  {dialValue.value}
-                  <Text style={{ color: colors.textMuted }}>:</Text>
-                  <Text style={{ color: colors.textMuted }}>
-                    {(dialValue.secondary ?? 0).toString().padStart(2, '0')}
-                  </Text>
-                </Text>
-              ) : (
-                <Text style={[styles.dialValue, { color: colors.text }]}>
-                  {dialValue.value}
-                  {activeSession && activeDialMode === 'accuracy' && (
-                    <Text style={[styles.dialPercent, { color: colors.textMuted }]}>%</Text>
-                  )}
-                </Text>
-              )}
+              <Text style={[styles.dialValue, { color: colors.text }]}>
+                {dialValue.value}
+                {activeSession && activeDialMode === 'accuracy' && (
+                  <Text style={[styles.dialPercent, { color: colors.textMuted }]}>%</Text>
+                )}
+              </Text>
 
               <Text style={[styles.dialUnit, { color: colors.textMuted }]}>
                 {currentModeConfig.unit}
