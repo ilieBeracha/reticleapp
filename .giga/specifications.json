@@ -1,0 +1,22 @@
+[
+  {
+    "fileName": "main-overview.mdc",
+    "description": "Complete system overview documenting the training management architecture, component relationships, and key subsystems"
+  },
+  {
+    "fileName": "target-detection-algorithms.mdc",
+    "description": "Detailed documentation of bullet hole detection algorithms, coordinate mapping systems, and confidence scoring implementations"
+  },
+  {
+    "fileName": "training-session-model.mdc",
+    "description": "Comprehensive documentation of training session data models, state transitions, and validation workflows including drill progression tracking"
+  },
+  {
+    "fileName": "role-based-access-control.mdc",
+    "description": "Documentation of the military hierarchy-based permission system, role definitions, and access control implementations"
+  },
+  {
+    "fileName": "calendar-event-processing.mdc",
+    "description": "Technical documentation of calendar management system, event categorization, and training schedule processing algorithms"
+  }
+]

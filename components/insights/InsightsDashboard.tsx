@@ -1,15 +1,15 @@
 import { useColors } from '@/hooks/ui/useColors';
-import { Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import {
-  CompletionCard,
-  EmptyState,
-  HeroStatsRow,
-  InsightsHeader,
-  MiniStatsRow,
-  RecentSessionsSection,
-  StreakCard,
-  useInsightsData
+    CompletionCard,
+    EmptyState,
+    HeroStatsRow,
+    InsightsHeader,
+    MiniStatsRow,
+    RecentSessionsSection,
+    StreakCard,
+    useInsightsData
 } from './index';
 
 export function InsightsDashboard() {
@@ -22,9 +22,20 @@ export function InsightsDashboard() {
     completionRate,
     recentSessions,
     refreshing,
+    isLoading,
     onRefresh,
   } = useInsightsData();
 
+  // Loading state - show spinner
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.mutedForeground} />
+      </View>
+    );
+  }
+
+  // Data state - show content
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
@@ -43,7 +54,6 @@ export function InsightsDashboard() {
 
         <MiniStatsRow stats={stats} myStats={myStats} totalTime={totalTime} colors={colors} />
 
-
         <StreakCard sessions={sessions} colors={colors} />
 
         <RecentSessionsSection sessions={recentSessions} colors={colors} />
@@ -59,6 +69,10 @@ export function InsightsDashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scrollView: {
     flex: 1,

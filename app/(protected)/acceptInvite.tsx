@@ -99,7 +99,7 @@ export default function AcceptInviteSheet() {
             text: "Open Team",
             onPress: () => {
               useTeamStore.getState().setActiveTeam(result.team_id);
-              router.replace('/(protected)/team');
+              router.push('/(protected)/team');
             },
           },
           {

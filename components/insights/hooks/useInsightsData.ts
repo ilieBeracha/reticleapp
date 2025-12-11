@@ -1,10 +1,9 @@
 import { useSessionStats } from '@/hooks/useSessionStats';
-import { useWorkspaceData } from '@/hooks/useWorkspaceData';
 import { useSessionStore } from '@/store/sessionStore';
+import { useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
-import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SessionStats, TotalTime } from '../types';
 
 interface UseInsightsDataReturn {
@@ -15,30 +14,63 @@ interface UseInsightsDataReturn {
   completionRate: number;
   recentSessions: any[];
   refreshing: boolean;
+  isLoading: boolean;
   onRefresh: () => Promise<void>;
 }
 
 export function useInsightsData(): UseInsightsDataReturn {
   const [refreshing, setRefreshing] = useState(false);
-  const { sessions } = useWorkspaceData();
-  const { loadSessions } = useSessionStore();
+  const [isLoading, setIsLoading] = useState(true); // Start loading
+  const hasFetchedRef = useRef(false);
+  
+  // Get team context
+  const { activeTeamId } = useTeamStore();
+  
+  // Get data directly from stores
+  const { sessions, loadPersonalSessions, loadTeamSessions } = useSessionStore();
   const { loadMyStats, myStats } = useTrainingStore();
 
-  useFocusEffect(
-    useCallback(() => {
-      loadSessions();
-      loadMyStats();
-    }, [loadSessions, loadMyStats])
-  );
+  // Load correct sessions based on mode (personal vs team)
+  useEffect(() => {
+    let cancelled = false;
+    
+    const fetchData = async () => {
+      // Only show loading on first fetch of this mount
+      if (!hasFetchedRef.current) {
+        setIsLoading(true);
+      }
+      
+      try {
+        if (activeTeamId) {
+          await loadTeamSessions();
+        } else {
+          await loadPersonalSessions();
+        }
+        await loadMyStats();
+      } finally {
+        if (!cancelled) {
+          hasFetchedRef.current = true;
+          setIsLoading(false);
+        }
+      }
+    };
+    
+    fetchData();
+    
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTeamId, loadPersonalSessions, loadTeamSessions, loadMyStats]);
 
   const stats = useSessionStats(sessions);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await Promise.all([loadSessions(), loadMyStats()]);
+    const loadSessionsFn = activeTeamId ? loadTeamSessions : loadPersonalSessions;
+    await Promise.all([loadSessionsFn(), loadMyStats()]);
     setRefreshing(false);
-  }, [loadSessions, loadMyStats]);
+  }, [activeTeamId, loadPersonalSessions, loadTeamSessions, loadMyStats]);
 
   const totalTime = useMemo((): TotalTime => {
     const totalMinutes = sessions.reduce((acc, session) => {
@@ -71,6 +103,7 @@ export function useInsightsData(): UseInsightsDataReturn {
     completionRate,
     recentSessions,
     refreshing,
+    isLoading,
     onRefresh,
   };
 }
