@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Crosshair, Play, Target } from 'lucide-react-native';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInRight } from 'react-native-reanimated';
 import type { ThemeColors, TrainingDrill, TrainingStatus } from './types';
 
 interface DrillCardProps {
@@ -23,92 +24,103 @@ export function DrillCard({
   isCompleted,
 }: DrillCardProps) {
   const canStart = trainingStatus === 'ongoing' && onStartDrill && !isCompleted;
+  const isPaper = drill.target_type === 'paper';
+  const isLive = trainingStatus === 'ongoing';
 
   return (
-    <Animated.View entering={FadeInDown.delay(100 + index * 50)}>
-      <View
+    <Animated.View entering={FadeInRight.delay(50 + index * 40).springify()}>
+      <TouchableOpacity
         style={[
-          styles.card, 
-          { backgroundColor: colors.background, borderColor: colors.border },
+          styles.card,
+          { backgroundColor: colors.background, borderColor: isCompleted ? 'rgba(147,197,253,0.4)' : canStart ? colors.text : colors.border },
+          canStart && styles.cardActive,
           isCompleted && styles.cardCompleted,
         ]}
+        onPress={() => canStart && onStartDrill?.(drill)}
+        disabled={!canStart || isStarting}
+        activeOpacity={canStart ? 0.7 : 1}
       >
-        {/* Index or Checkmark */}
-        <View
-          style={[
-            styles.index,
-            { backgroundColor: isCompleted ? '#22C55E20' : canStart ? colors.primary + '20' : colors.secondary },
-          ]}
-        >
-          {isCompleted ? (
-            <Ionicons name="checkmark" size={16} color="#22C55E" />
-          ) : (
-            <Text style={[styles.indexText, { color: canStart ? colors.primary : colors.textMuted }]}>
-              #{index + 1}
-            </Text>
-          )}
-        </View>
-
-        <View style={styles.content}>
-          <Text style={[
-            styles.name, 
-            { color: colors.text },
-            isCompleted && styles.nameCompleted,
-          ]}>{drill.name}</Text>
-          <View style={styles.details}>
-            <View
-              style={[
-                styles.badge,
-                { backgroundColor: drill.target_type === 'paper' ? '#8B5CF620' : '#F59E0B20' },
-              ]}
-            >
-              <Ionicons
-                name={drill.target_type === 'paper' ? 'scan-outline' : 'flash-outline'}
-                size={12}
-                color={drill.target_type === 'paper' ? '#8B5CF6' : '#F59E0B'}
-              />
-              <Text
-                style={[
-                  styles.badgeText,
-                  { color: drill.target_type === 'paper' ? '#8B5CF6' : '#F59E0B' },
-                ]}
-              >
-                {drill.target_type}
+        {/* Left: Number + Icon */}
+        <View style={styles.leftSection}>
+          <View
+            style={[
+              styles.indexBadge,
+              { backgroundColor: isCompleted ? '#93C5FD' : canStart ? colors.text : colors.secondary },
+            ]}
+          >
+            {isCompleted ? (
+              <Ionicons name="checkmark" size={14} color="#000" />
+            ) : (
+              <Text style={[styles.indexText, { color: canStart ? colors.background : colors.textMuted }]}>
+                {index + 1}
               </Text>
-            </View>
-            <Text style={[styles.meta, { color: colors.textMuted }]}>{drill.distance_m}m</Text>
-            <Text style={[styles.meta, { color: colors.textMuted }]}>
-              {drill.rounds_per_shooter} rds
-            </Text>
+            )}
+          </View>
+          <View style={[styles.typeIcon, { backgroundColor: isPaper ? 'rgba(147,197,253,0.12)' : 'rgba(156,163,175,0.12)' }]}>
+            {isPaper ? (
+              <Target size={18} color="#93C5FD" />
+            ) : (
+              <Crosshair size={18} color={colors.textMuted} />
+            )}
           </View>
         </View>
 
-        {/* Completed badge */}
+        {/* Middle: Info */}
+        <View style={styles.content}>
+          <Text
+            style={[
+              styles.name,
+              { color: colors.text },
+              isCompleted && styles.nameCompleted,
+            ]}
+            numberOfLines={1}
+          >
+            {drill.name}
+          </Text>
+          <View style={styles.metaRow}>
+            <Text style={[styles.meta, { color: colors.textMuted }]}>{drill.distance_m}m</Text>
+            <View style={[styles.metaDot, { backgroundColor: colors.border }]} />
+            <Text style={[styles.meta, { color: colors.textMuted }]}>
+              {drill.rounds_per_shooter} rounds
+            </Text>
+            {drill.time_limit_seconds && (
+              <>
+                <View style={[styles.metaDot, { backgroundColor: colors.border }]} />
+                <Text style={[styles.meta, { color: colors.textMuted }]}>{drill.time_limit_seconds}s</Text>
+              </>
+            )}
+          </View>
+        </View>
+
+        {/* Right: Action */}
         {isCompleted && (
           <View style={styles.completedBadge}>
+            <Ionicons name="checkmark-circle" size={18} color="#93C5FD" />
             <Text style={styles.completedText}>Done</Text>
           </View>
         )}
 
-        {/* Start button */}
         {canStart && (
-          <TouchableOpacity
-            style={[styles.startButton, { backgroundColor: colors.primary }]}
-            onPress={() => onStartDrill(drill)}
-            disabled={isStarting}
-            activeOpacity={0.8}
-          >
+          <View style={[styles.startButton, { backgroundColor: colors.text }]}>
             {isStarting ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={colors.background} />
             ) : (
               <>
-                <Ionicons name="play" size={14} color="#fff" />
-                <Text style={styles.startText}>Start</Text>
+                <Play size={14} color={colors.background} fill={colors.background} />
+                <Text style={[styles.startText, { color: colors.background }]}>Start</Text>
               </>
             )}
-          </TouchableOpacity>
+          </View>
         )}
-      </View>
+
+        {!canStart && !isCompleted && trainingStatus !== 'ongoing' && (
+          <View style={[styles.statusBadge, { backgroundColor: colors.secondary }]}>
+            <Text style={[styles.statusText, { color: colors.textMuted }]}>
+              {trainingStatus === 'planned' ? 'Pending' : 'Inactive'}
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
     </Animated.View>
   );
 }
@@ -116,19 +128,27 @@ export function DrillCard({
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 0.5,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
     gap: 12,
     alignItems: 'center',
   },
-  cardCompleted: {
-    opacity: 0.7,
+  cardActive: {
+    borderWidth: 1.5,
   },
-  index: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  cardCompleted: {
+    opacity: 0.85,
+  },
+  leftSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  indexBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -136,65 +156,73 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  typeIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   content: {
     flex: 1,
+    gap: 4,
   },
   name: {
     fontSize: 15,
     fontWeight: '600',
-    marginBottom: 6,
   },
   nameCompleted: {
     textDecorationLine: 'line-through',
     opacity: 0.7,
   },
-  details: {
+  metaRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
-  badge: {
+  meta: {
+    fontSize: 13,
+  },
+  metaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+  },
+  completedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
-  meta: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  completedBadge: {
-    backgroundColor: '#22C55E20',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 8,
+    backgroundColor: 'rgba(147,197,253,0.15)',
+    borderRadius: 10,
   },
   completedText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#22C55E',
+    color: '#93C5FD',
   },
   startButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    minWidth: 70,
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    minWidth: 76,
     justifyContent: 'center',
   },
   startText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
 });

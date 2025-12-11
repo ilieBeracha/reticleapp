@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 12,
+
   },
   button: {
     flex: 1,

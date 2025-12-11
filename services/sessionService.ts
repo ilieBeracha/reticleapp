@@ -13,6 +13,32 @@ export interface CreateSessionParams {
   session_mode?: 'solo' | 'group';
 }
 
+/** Drill configuration embedded in session */
+export interface SessionDrillConfig {
+  id: string;
+  name: string;
+  target_type: 'paper' | 'tactical';
+  distance_m: number;
+  rounds_per_shooter: number;
+  time_limit_seconds?: number | null;
+  par_time_seconds?: number | null;
+  scoring_mode?: string | null;
+  min_accuracy_percent?: number | null;
+  target_count?: number | null;
+  target_size?: string | null;
+  shots_per_target?: number | null;
+  position?: string | null;
+  start_position?: string | null;
+  weapon_category?: string | null;
+  strings_count?: number | null;
+  reload_required?: boolean | null;
+  movement_type?: string | null;
+  difficulty?: string | null;
+  category?: string | null;
+  instructions?: string | null;
+  safety_notes?: string | null;
+}
+
 export interface SessionWithDetails {
   id: string;
   user_id: string;
@@ -23,6 +49,7 @@ export interface SessionWithDetails {
   training_title?: string | null;
   drill_id: string | null;
   drill_name?: string | null;
+  drill_config?: SessionDrillConfig | null; // Full drill configuration
   session_mode: 'solo' | 'group';
   status: 'active' | 'completed' | 'cancelled';
   started_at: string;
@@ -41,6 +68,35 @@ function mapSession(row: any): SessionWithDetails {
   const trainings = row.trainings ?? {};
   const drills = row.training_drills ?? {};
 
+  // Build drill config if drill exists
+  let drillConfig: SessionDrillConfig | null = null;
+  if (drills.id) {
+    drillConfig = {
+      id: drills.id,
+      name: drills.name,
+      target_type: drills.target_type,
+      distance_m: drills.distance_m,
+      rounds_per_shooter: drills.rounds_per_shooter,
+      time_limit_seconds: drills.time_limit_seconds ?? null,
+      par_time_seconds: drills.par_time_seconds ?? null,
+      scoring_mode: drills.scoring_mode ?? null,
+      min_accuracy_percent: drills.min_accuracy_percent ?? null,
+      target_count: drills.target_count ?? null,
+      target_size: drills.target_size ?? null,
+      shots_per_target: drills.shots_per_target ?? null,
+      position: drills.position ?? null,
+      start_position: drills.start_position ?? null,
+      weapon_category: drills.weapon_category ?? null,
+      strings_count: drills.strings_count ?? null,
+      reload_required: drills.reload_required ?? null,
+      movement_type: drills.movement_type ?? null,
+      difficulty: drills.difficulty ?? null,
+      category: drills.category ?? null,
+      instructions: drills.instructions ?? null,
+      safety_notes: drills.safety_notes ?? null,
+    };
+  }
+
   return {
     id: row.id,
     user_id: row.user_id,
@@ -51,6 +107,7 @@ function mapSession(row: any): SessionWithDetails {
     training_title: row.training_title ?? trainings.title ?? null,
     drill_id: row.drill_id ?? null,
     drill_name: row.drill_name ?? drills.name ?? null,
+    drill_config: drillConfig,
     session_mode: row.session_mode,
     status: row.status,
     started_at: row.started_at,
@@ -468,12 +525,63 @@ export async function deleteSession(sessionId: string): Promise<boolean> {
 
 /**
  * End a session (mark as completed)
+ * Also records drill completion if this was a drill session
  */
 export async function endSession(sessionId: string) {
-  return updateSession(sessionId, {
+  // First get the session to check if it's linked to a drill
+  const session = await getSessionById(sessionId);
+  
+  if (!session) {
+    throw new Error('Session not found');
+  }
+
+  // Update the session status
+  const updatedSession = await updateSession(sessionId, {
     status: 'completed',
     ended_at: new Date().toISOString(),
   });
+
+  // If session was linked to a training + drill, record the completion
+  if (session.training_id && session.drill_id) {
+    await recordDrillCompletion(sessionId, session.training_id, session.drill_id);
+  }
+
+  return updatedSession;
+}
+
+/**
+ * Record drill completion in user_drill_completions table
+ */
+async function recordDrillCompletion(
+  sessionId: string,
+  trainingId: string,
+  drillId: string
+): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  // Get session stats for this session
+  const stats = await calculateSessionStats(sessionId);
+
+  // Insert completion record
+  const { error } = await supabase
+    .from('user_drill_completions')
+    .insert({
+      user_id: user.id,
+      training_id: trainingId,
+      drill_id: drillId,
+      session_id: sessionId,
+      completed_at: new Date().toISOString(),
+      shots_fired: stats.totalShotsFired,
+      hits: stats.totalHits,
+      accuracy_pct: stats.accuracyPct,
+      time_seconds: stats.avgEngagementTimeSec,
+    });
+
+  if (error) {
+    console.error('Failed to record drill completion:', error);
+    // Don't throw - this is a secondary operation
+  }
 }
 
 // ============================================================================
@@ -582,7 +690,30 @@ export async function getSessionById(sessionId: string): Promise<SessionWithDeta
       profiles:user_id(full_name),
       teams:team_id(name),
       trainings:training_id(title),
-      training_drills:drill_id(name)
+      training_drills:drill_id(
+        id,
+        name,
+        target_type,
+        distance_m,
+        rounds_per_shooter,
+        time_limit_seconds,
+        par_time_seconds,
+        scoring_mode,
+        min_accuracy_percent,
+        target_count,
+        target_size,
+        shots_per_target,
+        position,
+        start_position,
+        weapon_category,
+        strings_count,
+        reload_required,
+        movement_type,
+        difficulty,
+        category,
+        instructions,
+        safety_notes
+      )
     `)
     .eq('id', sessionId)
     .single();

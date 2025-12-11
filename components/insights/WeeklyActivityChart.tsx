@@ -1,16 +1,22 @@
+/**
+ * ACTIVITY LOG
+ * Event-style display of this week's sessions
+ */
 import {
+  differenceInMinutes,
   eachDayOfInterval,
   endOfWeek,
   format,
-  isSameDay,
   isToday,
+  isYesterday,
   startOfWeek,
 } from 'date-fns';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Clock, Crosshair, Target } from 'lucide-react-native';
 import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import type { DailyCount, ThemeColors } from './types';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import type { ThemeColors } from './types';
 
 interface WeeklyActivityChartProps {
   sessions: any[];
@@ -18,90 +24,213 @@ interface WeeklyActivityChartProps {
 }
 
 export function WeeklyActivityChart({ sessions, colors }: WeeklyActivityChartProps) {
-  const { dailyCounts, weekSessionCount, maxCount } = useMemo(() => {
+  const { weekDays, recentSessions, weekSessionCount, streak } = useMemo(() => {
     const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
     const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });
-    const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+    const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
-    const counts: DailyCount[] = weekDays.map((day) => {
-      const count = sessions.filter((s) => isSameDay(new Date(s.started_at), day)).length;
-      return { day, count, label: format(day, 'EEE') };
+    // Map days with session counts
+    const dayData = days.map((day) => {
+      const daySessions = sessions.filter((s) => {
+        const sessionDate = new Date(s.started_at);
+        return (
+          sessionDate.getDate() === day.getDate() &&
+          sessionDate.getMonth() === day.getMonth() &&
+          sessionDate.getFullYear() === day.getFullYear()
+        );
+      });
+      return {
+        date: day,
+        dayLetter: format(day, 'EEEEE'),
+        count: daySessions.length,
+        isToday: isToday(day),
+        isFuture: day > new Date(),
+      };
     });
 
-    const weekCount = sessions.filter((s) => {
-      const d = new Date(s.started_at);
-      return d >= weekStart && d <= weekEnd;
-    }).length;
+    // Get this week's sessions, sorted by most recent
+    const weekSessions = sessions
+      .filter((s) => {
+        const d = new Date(s.started_at);
+        return d >= weekStart && d <= weekEnd;
+      })
+      .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())
+      .slice(0, 5); // Show last 5
+
+    // Calculate streak
+    let currentStreak = 0;
+    for (let i = dayData.length - 1; i >= 0; i--) {
+      const day = dayData[i];
+      if (day.isFuture) continue;
+      if (day.count > 0) {
+        currentStreak++;
+      } else if (!day.isToday) {
+        break;
+      }
+    }
 
     return {
-      dailyCounts: counts,
-      weekSessionCount: weekCount,
-      maxCount: Math.max(...counts.map((d) => d.count), 1),
+      weekDays: dayData,
+      recentSessions: weekSessions,
+      weekSessionCount: weekSessions.length,
+      streak: currentStreak,
     };
   }, [sessions]);
 
+  const formatSessionTime = (startedAt: string, endedAt?: string) => {
+    const start = new Date(startedAt);
+    if (isToday(start)) {
+      return `Today, ${format(start, 'h:mm a')}`;
+    } else if (isYesterday(start)) {
+      return `Yesterday, ${format(start, 'h:mm a')}`;
+    }
+    return format(start, 'EEE, MMM d · h:mm a');
+  };
+
+  const formatDuration = (startedAt: string, endedAt?: string) => {
+    if (!endedAt) return 'In progress';
+    const mins = differenceInMinutes(new Date(endedAt), new Date(startedAt));
+    if (mins < 60) return `${mins}m`;
+    const hrs = Math.floor(mins / 60);
+    const remainingMins = mins % 60;
+    return remainingMins > 0 ? `${hrs}h ${remainingMins}m` : `${hrs}h`;
+  };
+
   return (
-    <Animated.View entering={FadeInDown.delay(200).duration(400)}>
+    <Animated.View entering={FadeInDown.delay(150).duration(400)}>
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {/* Header with week strip */}
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>This Week</Text>
-          <Text style={[styles.badge, { color: colors.textMuted }]}>
-            {weekSessionCount} session{weekSessionCount !== 1 ? 's' : ''}
-          </Text>
-        </View>
-
-        <View style={styles.bars}>
-          {dailyCounts.map((item, index) => {
-            const height = maxCount > 0 ? (item.count / maxCount) * 70 : 4;
-            const barHeight = Math.max(height, 4);
-            const today = isToday(item.day);
-
-            return (
-              <Animated.View
-                key={item.label}
-                entering={FadeInDown.delay(250 + index * 40).duration(350)}
-                style={styles.barColumn}
-              >
-                <View style={styles.barWrapper}>
-                  {today && item.count > 0 ? (
-                    <Svg height={barHeight} width={16}>
-                      <Defs>
-                        <LinearGradient id={`barGrad${index}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                          <Stop offset="0%" stopColor="rgba(255,255,255,0.95)" />
-                          <Stop offset="50%" stopColor="rgba(147,197,253,0.7)" />
-                          <Stop offset="100%" stopColor="rgba(156,163,175,0.8)" />
-                        </LinearGradient>
-                      </Defs>
-                      <Rect 
-                        x="0" 
-                        y="0" 
-                        width="16" 
-                        height={barHeight} 
-                        rx="3" 
-                        fill={`url(#barGrad${index})`} 
-                      />
-                    </Svg>
-                  ) : (
-                    <View
-                      style={[
-                        styles.bar,
-                        {
-                          height: barHeight,
-                          backgroundColor: colors.border,
-                        },
-                      ]}
-                    />
-                  )}
-                </View>
-                <Text
-                  style={[styles.barLabel, { color: today ? colors.text : colors.textMuted }]}
-                >
-                  {item.label.charAt(0)}
+          <View style={styles.headerLeft}>
+            <Text style={[styles.title, { color: colors.text }]}>Activity</Text>
+            {streak > 1 && (
+              <View style={[styles.streakBadge, { backgroundColor: '#F59E0B20' }]}>
+                <Text style={styles.streakIcon}>🔥</Text>
+                <Text style={[styles.streakText, { color: '#F59E0B' }]}>{streak}</Text>
+              </View>
+            )}
+          </View>
+          
+          {/* Mini week strip */}
+          <View style={styles.weekStrip}>
+            {weekDays.map((day, i) => (
+              <View key={i} style={styles.weekDay}>
+                <Text style={[styles.weekDayLetter, { color: day.isToday ? colors.text : colors.textMuted }]}>
+                  {day.dayLetter}
                 </Text>
-              </Animated.View>
-            );
-          })}
+                <View
+                  style={[
+                    styles.weekDot,
+                    day.count > 0 && styles.weekDotActive,
+                    day.isToday && styles.weekDotToday,
+                    {
+                      backgroundColor: day.count > 0
+                        ? day.isToday ? colors.text : 'rgba(156,163,175,0.5)'
+                        : 'transparent',
+                      borderColor: day.isToday ? colors.text : colors.border,
+                    },
+                  ]}
+                />
+              </View>
+            ))}
+          </View>
         </View>
+
+        {/* Session Events Log */}
+        <View style={styles.eventLog}>
+          {recentSessions.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Target size={20} color={colors.textMuted} />
+              <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+                No sessions this week yet
+              </Text>
+            </View>
+          ) : (
+            recentSessions.map((session, index) => (
+              <Animated.View
+                key={session.id}
+                entering={FadeIn.delay(100 + index * 50).duration(300)}
+              >
+                <View
+                  style={[
+                    styles.eventRow,
+                    index < recentSessions.length - 1 && styles.eventRowBorder,
+                    { borderBottomColor: colors.border },
+                  ]}
+                >
+                  {/* Timeline dot */}
+                  <View style={styles.timelineCol}>
+                    {session.status === 'active' ? (
+                      <LinearGradient
+                        colors={['rgba(255,255,255,0.95)', 'rgba(147,197,253,0.85)', 'rgba(156,163,175,0.9)']}
+                        style={styles.timelineDotGradient}
+                      />
+                    ) : (
+                      <View style={[styles.timelineDot, { backgroundColor: colors.border }]} />
+                    )}
+                    {index < recentSessions.length - 1 && (
+                      <View style={[styles.timelineLine, { backgroundColor: colors.border }]} />
+                    )}
+                  </View>
+
+                  {/* Event Content */}
+                  <View style={styles.eventContent}>
+                    <View style={styles.eventHeader}>
+                      <Text style={[styles.eventTitle, { color: colors.text }]} numberOfLines={1}>
+                        {session.training_title || session.drill_name || 'Freestyle Session'}
+                      </Text>
+                      {session.status === 'active' && (
+                        <View style={styles.liveBadge}>
+                          <View style={styles.liveDot} />
+                          <Text style={styles.liveText}>LIVE</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    <Text style={[styles.eventTime, { color: colors.textMuted }]}>
+                      {formatSessionTime(session.started_at)}
+                    </Text>
+
+                    {/* Session Stats Row */}
+                    <View style={styles.statsRow}>
+                      <View style={styles.statItem}>
+                        <Clock size={12} color={colors.textMuted} />
+                        <Text style={[styles.statText, { color: colors.textMuted }]}>
+                          {formatDuration(session.started_at, session.ended_at)}
+                        </Text>
+                      </View>
+                      {session.targets && session.targets.length > 0 && (
+                        <>
+                          <View style={styles.statItem}>
+                            <Target size={12} color={colors.textMuted} />
+                            <Text style={[styles.statText, { color: colors.textMuted }]}>
+                              {session.targets.length}
+                            </Text>
+                          </View>
+                          <View style={styles.statItem}>
+                            <Crosshair size={12} color={colors.textMuted} />
+                            <Text style={[styles.statText, { color: colors.textMuted }]}>
+                              {session.targets.reduce((sum: number, t: any) => sum + (t.shots_fired || 0), 0)}
+                            </Text>
+                          </View>
+                        </>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              </Animated.View>
+            ))
+          )}
+        </View>
+
+        {/* Footer */}
+        {weekSessionCount > 0 && (
+          <View style={[styles.footer, { borderTopColor: colors.border }]}>
+            <Text style={[styles.footerText, { color: colors.textMuted }]}>
+              {weekSessionCount} session{weekSessionCount !== 1 ? 's' : ''} this week
+            </Text>
+          </View>
+        )}
       </View>
     </Animated.View>
   );
@@ -109,48 +238,176 @@ export function WeeklyActivityChart({ sessions, colors }: WeeklyActivityChartPro
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
-    padding: 12,
+    overflow: 'hidden',
   },
+  
+  // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    padding: 14,
+    paddingBottom: 12,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   title: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
   },
-  badge: {
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  streakIcon: {
+    fontSize: 10,
+  },
+  streakText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+
+  // Week Strip
+  weekStrip: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  weekDay: {
+    alignItems: 'center',
+    gap: 3,
+  },
+  weekDayLetter: {
+    fontSize: 9,
+    fontWeight: '600',
+  },
+  weekDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  weekDotActive: {},
+  weekDotToday: {
+    borderWidth: 2,
+  },
+
+  // Event Log
+  eventLog: {
+    paddingHorizontal: 14,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+    gap: 8,
+  },
+  emptyText: {
+    fontSize: 13,
+  },
+
+  // Event Row
+  eventRow: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+  },
+  eventRowBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+
+  // Timeline
+  timelineCol: {
+    width: 20,
+    alignItems: 'center',
+    paddingTop: 4,
+  },
+  timelineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  timelineDotGradient: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  timelineLine: {
+    width: 1,
+    flex: 1,
+    marginTop: 4,
+  },
+
+  // Event Content
+  eventContent: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  eventHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  eventTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1,
+  },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  liveDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#10B981',
+  },
+  liveText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#10B981',
+    letterSpacing: 0.5,
+  },
+  eventTime: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 6,
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statText: {
     fontSize: 11,
     fontWeight: '500',
   },
-  bars: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    height: 80,
-  },
-  barColumn: {
-    flex: 1,
+
+  // Footer
+  footer: {
+    padding: 12,
     alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  barWrapper: {
-    flex: 1,
-    width: '100%',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-  },
-  bar: {
-    width: '45%',
-    borderRadius: 3,
-    minHeight: 4,
-  },
-  barLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    marginTop: 6,
+  footerText: {
+    fontSize: 11,
+    fontWeight: '500',
   },
 });

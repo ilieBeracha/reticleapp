@@ -7,30 +7,30 @@
 
 import { useColors } from '@/hooks/ui/useColors';
 import {
-  calculateSessionStats,
-  endSession,
-  getSessionById,
-  getSessionTargetsWithResults,
-  SessionStats,
-  SessionTargetWithResults,
-  SessionWithDetails,
+    calculateSessionStats,
+    endSession,
+    getSessionById,
+    getSessionTargetsWithResults,
+    SessionStats,
+    SessionTargetWithResults,
+    SessionWithDetails
 } from '@/services/sessionService';
 import { useSessionStore } from '@/store/sessionStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Camera, Crosshair, Target, X } from 'lucide-react-native';
+import { Camera, CheckCircle, Clock, Crosshair, MapPin, Target, X, Zap } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,7 +42,7 @@ export default function ActiveSessionScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
-  const { loadSessions } = useSessionStore();
+  const { loadPersonalSessions, loadTeamSessions } = useSessionStore();
 
   // State
   const [session, setSession] = useState<SessionWithDetails | null>(null);
@@ -110,16 +110,44 @@ export default function ActiveSessionScreen() {
   // ============================================================================
   // COMPUTED VALUES
   // ============================================================================
+  const drill = session?.drill_config;
+  const hasDrill = !!drill;
+  
   const totalShots = stats?.totalShotsFired ?? 0;
   const totalHits = stats?.totalHits ?? 0;
   const accuracy = totalShots > 0 ? Math.round((totalHits / totalShots) * 100) : 0;
 
-  const avgDistance = useMemo(() => {
-    if (targets.length === 0) return 0;
-    return Math.round(
-      targets.reduce((sum, t) => sum + (t.distance_m || 0), 0) / targets.length
-    );
-  }, [targets]);
+  // Drill progress tracking
+  const drillProgress = useMemo(() => {
+    if (!drill) return null;
+    
+    const requiredRounds = drill.rounds_per_shooter;
+    const requiredTargets = drill.target_count || 1;
+    const shotsProgress = Math.min(100, Math.round((totalShots / requiredRounds) * 100));
+    const targetsProgress = Math.min(100, Math.round((targets.length / requiredTargets) * 100));
+    
+    const isComplete = totalShots >= requiredRounds && targets.length >= requiredTargets;
+    const meetsAccuracy = !drill.min_accuracy_percent || accuracy >= drill.min_accuracy_percent;
+    const meetsTime = !drill.time_limit_seconds || elapsedTime <= drill.time_limit_seconds;
+    
+    return {
+      requiredRounds,
+      requiredTargets,
+      shotsProgress,
+      targetsProgress,
+      isComplete,
+      meetsAccuracy,
+      meetsTime,
+      overTime: drill.time_limit_seconds ? elapsedTime > drill.time_limit_seconds : false,
+    };
+  }, [drill, totalShots, targets.length, accuracy, elapsedTime]);
+
+  const drillDistance = drill?.distance_m || 100;
+  const defaultDistance = useMemo(() => {
+    if (drill) return drill.distance_m;
+    if (targets.length === 0) return 100;
+    return Math.round(targets.reduce((sum, t) => sum + (t.distance_m || 0), 0) / targets.length);
+  }, [drill, targets]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -131,29 +159,29 @@ export default function ActiveSessionScreen() {
   // ACTIONS
   // ============================================================================
   
-  // Paper scan - goes directly to camera
+  // Paper scan - uses drill distance if available
   const handleScanPaper = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push({
       pathname: '/(protected)/scanTarget',
       params: {
         sessionId,
-        distance: avgDistance > 0 ? avgDistance.toString() : '100',
+        distance: defaultDistance.toString(),
       },
     });
-  }, [sessionId, avgDistance]);
+  }, [sessionId, defaultDistance]);
 
-  // Tactical entry - goes to form
+  // Tactical entry - uses drill distance if available
   const handleLogTactical = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push({
       pathname: '/(protected)/tacticalTarget',
       params: {
         sessionId,
-        distance: avgDistance > 0 ? avgDistance.toString() : '25',
+        distance: defaultDistance.toString(),
       },
     });
-  }, [sessionId, avgDistance]);
+  }, [sessionId, defaultDistance]);
 
   const handleTargetPress = useCallback((target: SessionTargetWithResults) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -175,9 +203,15 @@ export default function ActiveSessionScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             try {
               await endSession(sessionId!);
-              await loadSessions();
+              // Reload appropriate sessions based on session type
+              if (session?.team_id) {
+                await loadTeamSessions();
+                router.replace('/(protected)/team');
+              } else {
+                await loadPersonalSessions();
+                router.replace('/(protected)/personal');
+              }
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              router.replace('/(protected)/personal');
             } catch (error: any) {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
               Alert.alert('Error', error.message || 'Failed to end session');
@@ -187,7 +221,7 @@ export default function ActiveSessionScreen() {
         },
       ]
     );
-  }, [sessionId, targets.length, elapsedTime, loadSessions]);
+  }, [sessionId, targets.length, elapsedTime, session?.team_id, loadPersonalSessions, loadTeamSessions]);
 
   const handleClose = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -317,6 +351,12 @@ export default function ActiveSessionScreen() {
   // ============================================================================
   // MAIN RENDER
   // ============================================================================
+  // Determine which action buttons to show
+  const showPaper = !drill || drill.target_type === 'paper';
+  const showTactical = !drill || drill.target_type === 'tactical';
+  const isPaperDrill = drill?.target_type === 'paper';
+  const isTacticalDrill = drill?.target_type === 'tactical';
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
@@ -333,32 +373,103 @@ export default function ActiveSessionScreen() {
         
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-            {session.training_title || session.drill_name || 'Practice Session'}
+            {session.drill_name || session.training_title || 'Practice Session'}
           </Text>
         </View>
         
         <View style={styles.timerContainer}>
-          <View style={styles.liveDot} />
-          <Text style={[styles.timerText, { color: colors.text }]}>{formatTime(elapsedTime)}</Text>
+          <View style={[styles.liveDot, drillProgress?.overTime && { backgroundColor: '#EF4444' }]} />
+          <Text style={[styles.timerText, { color: drillProgress?.overTime ? '#EF4444' : colors.text }]}>
+            {formatTime(elapsedTime)}
+          </Text>
         </View>
       </Animated.View>
 
-      {/* Stats Ring */}
+      {/* Drill Requirements Banner */}
+      {hasDrill && drill && (
+        <Animated.View entering={FadeInDown.delay(50).duration(300)} style={styles.drillBanner}>
+          <View style={[styles.drillBannerInner, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {/* Drill Info Row */}
+            <View style={styles.drillInfoRow}>
+              <View style={[styles.drillTypeIcon, { backgroundColor: isPaperDrill ? 'rgba(147,197,253,0.15)' : 'rgba(156,163,175,0.15)' }]}>
+                {isPaperDrill ? <Target size={16} color="#93C5FD" /> : <Crosshair size={16} color={colors.textMuted} />}
+              </View>
+              <View style={styles.drillInfoText}>
+                <View style={styles.drillRequirements}>
+                  <View style={styles.drillReqItem}>
+                    <MapPin size={12} color={colors.textMuted} />
+                    <Text style={[styles.drillReqText, { color: colors.text }]}>{drill.distance_m}m</Text>
+                  </View>
+                  <View style={styles.drillReqItem}>
+                    <Zap size={12} color={colors.textMuted} />
+                    <Text style={[styles.drillReqText, { color: colors.text }]}>{drill.rounds_per_shooter} rds</Text>
+                  </View>
+                  {drill.time_limit_seconds && (
+                    <View style={styles.drillReqItem}>
+                      <Clock size={12} color={drillProgress?.overTime ? '#EF4444' : colors.textMuted} />
+                      <Text style={[styles.drillReqText, { color: drillProgress?.overTime ? '#EF4444' : colors.text }]}>
+                        {formatTime(drill.time_limit_seconds)}
+                      </Text>
+                    </View>
+                  )}
+                  {drill.min_accuracy_percent && (
+                    <View style={styles.drillReqItem}>
+                      <Target size={12} color={colors.textMuted} />
+                      <Text style={[styles.drillReqText, { color: colors.text }]}>{drill.min_accuracy_percent}%</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+              {drillProgress?.isComplete && (
+                <View style={[styles.drillCompleteBadge, { backgroundColor: 'rgba(147,197,253,0.15)' }]}>
+                  <CheckCircle size={14} color="#93C5FD" />
+                </View>
+              )}
+            </View>
+
+            {/* Progress Bar */}
+            <View style={styles.drillProgressContainer}>
+              <View style={[styles.drillProgressBg, { backgroundColor: colors.secondary }]}>
+                <View 
+                  style={[
+                    styles.drillProgressFill, 
+                    { 
+                      width: `${drillProgress?.shotsProgress || 0}%`,
+                      backgroundColor: drillProgress?.isComplete ? '#93C5FD' : colors.text,
+                    }
+                  ]} 
+                />
+              </View>
+              <Text style={[styles.drillProgressText, { color: colors.textMuted }]}>
+                {totalShots}/{drill.rounds_per_shooter} shots
+              </Text>
+            </View>
+          </View>
+        </Animated.View>
+      )}
+
+      {/* Stats Card */}
       <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.statsSection}>
         <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {/* Main Accuracy Display */}
           <View style={styles.accuracyCenter}>
-            <Text style={[styles.accuracyValue, { color: accuracy >= 70 ? '#10B981' : accuracy >= 50 ? '#F59E0B' : colors.text }]}>
+            <Text style={[styles.accuracyValue, { 
+              color: drill?.min_accuracy_percent 
+                ? (accuracy >= drill.min_accuracy_percent ? '#93C5FD' : accuracy >= drill.min_accuracy_percent * 0.8 ? '#F59E0B' : '#EF4444')
+                : (accuracy >= 70 ? '#93C5FD' : accuracy >= 50 ? '#F59E0B' : colors.text)
+            }]}>
               {accuracy}%
             </Text>
-            <Text style={[styles.accuracyLabel, { color: colors.textMuted }]}>accuracy</Text>
+            <Text style={[styles.accuracyLabel, { color: colors.textMuted }]}>
+              {drill?.min_accuracy_percent ? `goal: ${drill.min_accuracy_percent}%` : 'accuracy'}
+            </Text>
           </View>
           
           {/* Stats Row */}
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <View style={[styles.statIconBg, { backgroundColor: '#6366F110' }]}>
-                <Target size={16} color="#6366F1" />
+              <View style={[styles.statIconBg, { backgroundColor: 'rgba(147,197,253,0.1)' }]}>
+                <Target size={16} color="#93C5FD" />
               </View>
               <Text style={[styles.statValue, { color: colors.text }]}>{targets.length}</Text>
               <Text style={[styles.statLabel, { color: colors.textMuted }]}>targets</Text>
@@ -371,10 +482,10 @@ export default function ActiveSessionScreen() {
               <Text style={[styles.statLabel, { color: colors.textMuted }]}>shots</Text>
             </View>
             <View style={styles.statItem}>
-              <View style={[styles.statIconBg, { backgroundColor: '#10B98115' }]}>
-                <Ionicons name="checkmark" size={16} color="#10B981" />
+              <View style={[styles.statIconBg, { backgroundColor: 'rgba(147,197,253,0.1)' }]}>
+                <Ionicons name="checkmark" size={16} color="#93C5FD" />
               </View>
-              <Text style={[styles.statValue, { color: '#10B981' }]}>{totalHits}</Text>
+              <Text style={[styles.statValue, { color: '#93C5FD' }]}>{totalHits}</Text>
               <Text style={[styles.statLabel, { color: colors.textMuted }]}>hits</Text>
             </View>
           </View>
@@ -394,7 +505,7 @@ export default function ActiveSessionScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={[
             styles.listContent,
-            { paddingBottom: insets.bottom + 160 },
+            { paddingBottom: insets.bottom + 180 },
             targets.length === 0 && styles.listContentEmpty,
           ]}
           ListEmptyComponent={renderEmpty}
@@ -429,25 +540,31 @@ export default function ActiveSessionScreen() {
           {/* Divider */}
           <View style={[styles.actionDivider, { backgroundColor: colors.border }]} />
 
-          {/* Tactical */}
-          <TouchableOpacity
-            style={styles.tacticalButton}
-            onPress={handleLogTactical}
-            activeOpacity={0.8}
-          >
-            <Crosshair size={20} color="#F59E0B" />
-            <Text style={[styles.tacticalButtonText, { color: colors.text }]}>Manual</Text>
-          </TouchableOpacity>
+          {/* Show appropriate button(s) based on drill type */}
+          {showTactical && (
+            <TouchableOpacity
+              style={[styles.tacticalButton, isTacticalDrill && styles.primaryActionBtn]}
+              onPress={handleLogTactical}
+              activeOpacity={0.8}
+            >
+              <Crosshair size={20} color={isTacticalDrill ? '#fff' : colors.textMuted} />
+              <Text style={[styles.tacticalButtonText, { color: isTacticalDrill ? '#fff' : colors.text }]}>
+                {isTacticalDrill ? 'Log Target' : 'Manual'}
+              </Text>
+            </TouchableOpacity>
+          )}
 
-          {/* Scan Paper (Primary) */}
-          <TouchableOpacity
-            style={styles.scanButton}
-            onPress={handleScanPaper}
-            activeOpacity={0.8}
-          >
-            <Camera size={20} color="#fff" />
-            <Text style={styles.scanButtonText}>Scan</Text>
-          </TouchableOpacity>
+          {/* Scan Paper - Primary if paper drill or no drill */}
+          {showPaper && (
+            <TouchableOpacity
+              style={[styles.scanButton, isPaperDrill && styles.scanButtonPrimary]}
+              onPress={handleScanPaper}
+              activeOpacity={0.8}
+            >
+              <Camera size={20} color="#fff" />
+              <Text style={styles.scanButtonText}>{isPaperDrill ? 'Scan Target' : 'Scan'}</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </View>
@@ -506,6 +623,73 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
+  },
+
+  // Drill Banner
+  drillBanner: {
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  drillBannerInner: {
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+  },
+  drillInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  drillTypeIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  drillInfoText: {
+    flex: 1,
+  },
+  drillRequirements: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  drillReqItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  drillReqText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  drillCompleteBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  drillProgressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 10,
+  },
+  drillProgressBg: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  drillProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  drillProgressText: {
+    fontSize: 11,
+    fontWeight: '500',
   },
 
   // Stats
@@ -710,11 +894,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
+    borderRadius: 14,
     gap: 6,
   },
   tacticalButtonText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  primaryActionBtn: {
+    backgroundColor: '#93C5FD',
+    paddingVertical: 12,
   },
   scanButton: {
     flex: 1,
@@ -722,9 +911,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 14,
-    backgroundColor: '#10B981',
+    backgroundColor: '#93C5FD',
     paddingVertical: 12,
     gap: 6,
+  },
+  scanButtonPrimary: {
+    flex: 1.2,
   },
   scanButtonText: {
     color: '#fff',

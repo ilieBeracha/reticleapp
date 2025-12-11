@@ -577,10 +577,10 @@ export default function InviteTeamMemberSheet() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollView: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 100 },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 20 },
 
   // Header
-  header: { alignItems: 'center', paddingTop: 4, paddingBottom: 20 },
+  header: { alignItems: 'center', paddingTop: 20, paddingBottom: 20 },
   headerIcon: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   title: { fontSize: 22, fontWeight: '700', letterSpacing: -0.5 },
   subtitle: { fontSize: 14, marginTop: 4 },

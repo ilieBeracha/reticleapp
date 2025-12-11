@@ -7,13 +7,13 @@
 
 import { supabase } from '@/lib/supabase';
 import type {
-  CreateDrillInput,
-  CreateTrainingInput,
-  Training,
-  TrainingDrill,
-  TrainingStatus,
-  TrainingWithDetails,
-  UpdateTrainingInput,
+    CreateDrillInput,
+    CreateTrainingInput,
+    Training,
+    TrainingDrill,
+    TrainingStatus,
+    TrainingWithDetails,
+    UpdateTrainingInput,
 } from '@/types/workspace';
 import { scheduleTrainingReminder } from './notifications';
 import { notifyTeamNewTraining, notifyTeamTrainingStarted } from './pushService';
@@ -314,11 +314,29 @@ export async function deleteTraining(trainingId: string): Promise<void> {
 }
 
 /**
- * Start a training (change status to ongoing)
+ * Start a training (change status to ongoing, set started_at)
  */
 export async function startTraining(trainingId: string): Promise<Training> {
   const { data: { user } } = await supabase.auth.getUser();
-  const training = await updateTraining(trainingId, { status: 'ongoing' });
+  
+  // Update with started_at timestamp
+  const { data, error } = await supabase
+    .from('trainings')
+    .update({
+      status: 'ongoing',
+      started_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', trainingId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Failed to start training:', error);
+    throw new Error(error.message || 'Failed to start training');
+  }
+
+  const training = data as Training;
 
   // Send push notification to team members
   if (training.team_id && user?.id) {
@@ -341,10 +359,26 @@ export async function startTraining(trainingId: string): Promise<Training> {
 }
 
 /**
- * Finish a training (change status to finished)
+ * Finish a training (change status to finished, set ended_at)
  */
 export async function finishTraining(trainingId: string): Promise<Training> {
-  return updateTraining(trainingId, { status: 'finished' });
+  const { data, error } = await supabase
+    .from('trainings')
+    .update({
+      status: 'finished',
+      ended_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', trainingId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Failed to finish training:', error);
+    throw new Error(error.message || 'Failed to finish training');
+  }
+
+  return data as Training;
 }
 
 /**

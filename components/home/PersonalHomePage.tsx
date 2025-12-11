@@ -14,18 +14,15 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Text,
-  View,
+  View
 } from 'react-native';
 
 // Import extracted components and hooks
 import { WeeklyActivityChart } from '@/components/insights';
 import {
+  ActivityHub,
   GreetingHeader,
-  RecentSessionsSection,
   SecondaryActionsRow,
-  StatusDial,
-  UpcomingTrainingsSection,
   useSessionStats,
   useWeeklyStats,
 } from './personal-home';
@@ -39,7 +36,7 @@ export function PersonalHomePage() {
   const { fullName } = useAppContext();
   const { setOnSessionCreated, setOnTeamCreated } = useModals();
   const { sessions, sessionsLoading, loadTeams } = useWorkspaceData();
-  const { loadSessions, createSession } = useSessionStore();
+  const { loadPersonalSessions, createSession } = useSessionStore();
   const { myUpcomingTrainings, loadingMyTrainings, loadMyUpcomingTrainings, loadMyStats } =
     useTrainingStore();
 
@@ -53,34 +50,44 @@ export function PersonalHomePage() {
 
   useFocusEffect(
     useCallback(() => {
-      loadSessions();
+      loadPersonalSessions();
       loadMyUpcomingTrainings();
       loadMyStats();
-    }, [loadSessions, loadMyUpcomingTrainings, loadMyStats])
+    }, [loadPersonalSessions, loadMyUpcomingTrainings, loadMyStats])
   );
 
   useEffect(() => {
-    setOnSessionCreated(() => loadSessions);
+    setOnSessionCreated(() => loadPersonalSessions);
     setOnTeamCreated(() => loadTeams);
     return () => {
       setOnSessionCreated(null);
       setOnTeamCreated(null);
     };
-  }, [loadSessions, loadTeams, setOnSessionCreated, setOnTeamCreated]);
+  }, [loadPersonalSessions, loadTeams, setOnSessionCreated, setOnTeamCreated]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // DERIVED DATA
   // ═══════════════════════════════════════════════════════════════════════════
 
   const activeSession = useMemo(() => sessions.find((s) => s.status === 'active'), [sessions]);
-  const recentSessions = useMemo(
-    () => sessions.filter((s) => s.status === 'completed').slice(0, 4),
+  const lastSession = useMemo(
+    () => sessions.find((s) => s.status === 'completed'),
     [sessions]
   );
-  const lastSession = recentSessions[0];
   const nextTraining = useMemo(() => {
     // Get first live or upcoming training
-    return myUpcomingTrainings.find((t) => t.status === 'ongoing') || myUpcomingTrainings[0];
+    const training = myUpcomingTrainings.find((t) => t.status === 'ongoing') || myUpcomingTrainings[0];
+    if (!training) return undefined;
+    
+    // Map to ActivityHub format with team_name
+    return {
+      id: training.id,
+      title: training.title,
+      status: training.status,
+      scheduled_at: training.scheduled_at,
+      drill_count: training.drill_count || training.drills?.length || 0,
+      team_name: training.team?.name,
+    };
   }, [myUpcomingTrainings]);
   const sessionTitle = activeSession
     ? activeSession.training_title || activeSession.drill_name || 'Freestyle'
@@ -103,9 +110,9 @@ export function PersonalHomePage() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await Promise.all([loadSessions(), loadMyUpcomingTrainings(), loadMyStats()]);
+    await Promise.all([loadPersonalSessions(), loadMyUpcomingTrainings(), loadMyStats()]);
     setRefreshing(false);
-  }, [loadSessions, loadMyUpcomingTrainings, loadMyStats]);
+  }, [loadPersonalSessions, loadMyUpcomingTrainings, loadMyStats]);
 
   const handleStartSession = useCallback(async () => {
     if (starting) return;
@@ -157,36 +164,29 @@ export function PersonalHomePage() {
         }
       >
         <GreetingHeader firstName={firstName} colors={colors} />
-        {/* Action Cards */}
-        <StatusDial
+
+        {/* Activity Hub - Events & sessions */}
+        <ActivityHub
           colors={colors}
           activeSession={activeSession}
           sessionTitle={sessionTitle}
           sessionStats={sessionStats}
-          weeklyStats={weeklyStats}
           lastSession={lastSession}
+          weeklyStats={weeklyStats}
           starting={starting}
           onStart={handleStartSession}
           nextTraining={nextTraining}
         />
-
-        {/* Activity Section */}
+        {/* Quick Actions */}
         <View style={styles.sectionContainer}>
-          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>ACTIVITY</Text>
-          <WeeklyActivityChart sessions={sessions} colors={colors} />
-        </View>
-
-        {/* Quick Actions Section */}
-        <View style={styles.sectionContainer}>
-          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>QUICK ACTIONS</Text>
           <SecondaryActionsRow colors={colors} />
         </View>
 
-        {/* Upcoming Trainings - has its own title */}
-        <UpcomingTrainingsSection colors={colors} trainings={myUpcomingTrainings} />
+        {/* Weekly Calendar */}
+        <View style={styles.sectionContainer}>
+          <WeeklyActivityChart sessions={sessions} colors={colors} />
+        </View>
 
-        {/* Recent Sessions - has its own title */}
-        <RecentSessionsSection colors={colors} sessions={recentSessions} />
       </ScrollView>
     </View>
   );

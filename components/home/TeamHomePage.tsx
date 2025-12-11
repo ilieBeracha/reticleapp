@@ -6,19 +6,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Calendar, ChevronRight, Plus, Settings, Target, UserPlus, Users } from 'lucide-react-native';
+import { Calendar, ChevronRight, Play, Plus, Settings, UserPlus, Users } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+
+// Gradient colors (matching TacticalTargetFlow & PersonalHomePage)
+const GRADIENT_COLORS = ['rgba(255,255,255,0.95)', 'rgba(147,197,253,0.85)', 'rgba(156,163,175,0.9)'] as const;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
@@ -229,24 +233,22 @@ export function TeamHomePage() {
             QUICK ACTIONS
         ══════════════════════════════════════════════════════════════════════ */}
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>QUICK ACTIONS</Text>
           <View style={styles.actionsRow}>
-            {/* Start Session */}
+            {/* Start Session - Gradient Button */}
             <TouchableOpacity
               onPress={nav.startSession}
               activeOpacity={0.9}
-              style={[styles.actionCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              style={styles.actionCardGradient}
             >
-              <View style={[styles.actionIcon, { backgroundColor: '#10B98120' }]}>
-                <Target size={20} color="#10B981" />
-              </View>
-              <View style={styles.actionContent}>
-                <Text style={[styles.actionTitle, { color: colors.text }]}>Start Session</Text>
-                <Text style={[styles.actionDesc, { color: colors.textMuted }]}>Log targets</Text>
-              </View>
-              <View style={styles.actionIndicator}>
-                <View style={[styles.actionBar, { backgroundColor: '#10B981' }]} />
-              </View>
+              <LinearGradient
+                colors={[...GRADIENT_COLORS]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.actionGradientInner}
+              >
+                <Play size={18} color="#000" fill="#000" />
+                <Text style={styles.actionGradientText}>Start Session</Text>
+              </LinearGradient>
             </TouchableOpacity>
 
             {/* Create Training (if manager) or View Trainings */}
@@ -254,35 +256,19 @@ export function TeamHomePage() {
               <TouchableOpacity
                 onPress={nav.createTraining}
                 activeOpacity={0.9}
-                style={[styles.actionCard, styles.actionCardSecondary, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+                style={[styles.actionCardSecondary, { backgroundColor: colors.card, borderColor: colors.border }]}
               >
-                <View style={[styles.actionIcon, { backgroundColor: colors.card }]}>
-                  <Plus size={20} color="#3B82F6" />
-                </View>
-                <View style={styles.actionContent}>
-                  <Text style={[styles.actionTitle, { color: colors.text }]}>New Training</Text>
-                  <Text style={[styles.actionDesc, { color: colors.textMuted }]}>Schedule</Text>
-                </View>
-                <View style={styles.actionIndicator}>
-                  <View style={[styles.actionBar, { backgroundColor: colors.border }]} />
-                </View>
+                <Plus size={18} color={colors.text} />
+                <Text style={[styles.actionSecondaryText, { color: colors.text }]}>New Training</Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
                 onPress={() => router.push('/(protected)/team/trainings' as any)}
                 activeOpacity={0.9}
-                style={[styles.actionCard, styles.actionCardSecondary, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+                style={[styles.actionCardSecondary, { backgroundColor: colors.card, borderColor: colors.border }]}
               >
-                <View style={[styles.actionIcon, { backgroundColor: colors.card }]}>
-                  <Calendar size={20} color={colors.textMuted} />
-                </View>
-                <View style={styles.actionContent}>
-                  <Text style={[styles.actionTitle, { color: colors.text }]}>Trainings</Text>
-                  <Text style={[styles.actionDesc, { color: colors.textMuted }]}>View all</Text>
-                </View>
-                <View style={styles.actionIndicator}>
-                  <View style={[styles.actionBar, { backgroundColor: colors.border }]} />
-                </View>
+                <Calendar size={18} color={colors.text} />
+                <Text style={[styles.actionSecondaryText, { color: colors.text }]}>Trainings</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -293,18 +279,18 @@ export function TeamHomePage() {
         ══════════════════════════════════════════════════════════════════════ */}
         {canManage && (
           <TouchableOpacity
-            style={[styles.inviteButton, { backgroundColor: '#F59E0B15', borderColor: '#F59E0B30' }]}
+            style={[styles.inviteButton, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={nav.inviteMember}
             activeOpacity={0.7}
           >
-            <View style={[styles.inviteIcon, { backgroundColor: '#F59E0B20' }]}>
-              <UserPlus size={18} color="#F59E0B" />
+            <View style={[styles.inviteIcon, { backgroundColor: 'rgba(147,197,253,0.15)' }]}>
+              <UserPlus size={18} color="#93C5FD" />
             </View>
             <View style={styles.inviteContent}>
               <Text style={[styles.inviteTitle, { color: colors.text }]}>Invite Team Member</Text>
               <Text style={[styles.inviteDesc, { color: colors.textMuted }]}>Generate an invite code</Text>
             </View>
-            <ChevronRight size={18} color="#F59E0B" />
+            <ChevronRight size={18} color={colors.textMuted} />
           </TouchableOpacity>
         )}
 
@@ -328,8 +314,8 @@ export function TeamHomePage() {
                   style={[styles.listItem, { backgroundColor: colors.card, borderColor: colors.border }]}
                   onPress={() => nav.trainingDetail(training.id)}
                 >
-                  <View style={[styles.listItemIcon, { backgroundColor: '#3B82F620' }]}>
-                    <Calendar size={18} color="#3B82F6" />
+                  <View style={[styles.listItemIcon, { backgroundColor: 'rgba(147,197,253,0.15)' }]}>
+                    <Calendar size={18} color="#93C5FD" />
                   </View>
                   <View style={styles.listItemContent}>
                     <Text style={[styles.listItemTitle, { color: colors.text }]} numberOfLines={1}>
@@ -431,8 +417,8 @@ function EmptyState({
 }) {
   return (
     <View style={[styles.emptyContainer, { backgroundColor: colors.background }]}>
-      <View style={[styles.emptyIcon, { backgroundColor: colors.primary + '15' }]}>
-        <Users size={48} color={colors.primary} />
+      <View style={[styles.emptyIcon, { backgroundColor: 'rgba(147,197,253,0.15)' }]}>
+        <Users size={48} color="#93C5FD" />
       </View>
       <Text style={[styles.emptyTitle, { color: colors.text }]}>No team yet</Text>
       <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
@@ -441,16 +427,23 @@ function EmptyState({
       
       <View style={styles.emptyActions}>
         <TouchableOpacity
-          style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
+          style={styles.primaryBtnWrapper}
           onPress={onCreateTeam}
-          activeOpacity={0.8}
+          activeOpacity={0.9}
         >
-          <Plus size={20} color="#fff" />
-          <Text style={styles.primaryBtnText}>Create Team</Text>
+          <LinearGradient
+            colors={[...GRADIENT_COLORS]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.primaryBtnGradient}
+          >
+            <Plus size={20} color="#000" />
+            <Text style={styles.primaryBtnText}>Create Team</Text>
+          </LinearGradient>
         </TouchableOpacity>
         
         <TouchableOpacity
-          style={[styles.secondaryBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+          style={[styles.secondaryBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
           onPress={onJoinTeam}
           activeOpacity={0.7}
         >
@@ -466,11 +459,12 @@ function EmptyState({
 // HELPERS
 // ═══════════════════════════════════════════════════════════════════════════
 function getRoleColor(role: string | null): string {
+  // Muted, monochrome-ish role colors
   switch (role) {
-    case 'owner': return '#8B5CF6';  // Purple for owner
-    case 'commander': return '#EF4444';  // Red
-    case 'squad_commander': return '#F59E0B';  // Orange
-    case 'soldier': return '#10B981';  // Green
+    case 'owner': return '#93C5FD';  // Light blue
+    case 'commander': return '#A5B4FC';  // Light indigo
+    case 'squad_commander': return '#9CA3AF';  // Gray
+    case 'soldier': return '#6B7280';  // Darker gray
     default: return '#6B7280';
   }
 }
@@ -527,28 +521,38 @@ const styles = StyleSheet.create({
   statDivider: { width: 1, height: 32 },
 
   // Actions
-  actionsRow: { flexDirection: 'row', gap: 12 },
-  actionCard: {
+  actionsRow: { flexDirection: 'row', gap: 10 },
+  actionCardGradient: {
     flex: 1,
-    aspectRatio: 1,
-    borderRadius: 20,
-    padding: 16,
-    justifyContent: 'space-between',
-    borderWidth: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
-  actionCardSecondary: { opacity: 0.9 },
-  actionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  actionGradientInner: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
   },
-  actionContent: {},
-  actionTitle: { fontSize: 15, fontWeight: '600' },
-  actionDesc: { fontSize: 11, marginTop: 2 },
-  actionIndicator: { alignSelf: 'flex-end' },
-  actionBar: { width: 32, height: 4, borderRadius: 2 },
+  actionGradientText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#000',
+  },
+  actionCardSecondary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  actionSecondaryText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
 
   // Invite Button
   inviteButton: {
@@ -624,8 +628,9 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 24, fontWeight: '700', marginBottom: 8 },
   emptySubtitle: { fontSize: 15, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
   emptyActions: { width: '100%', gap: 12 },
-  primaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 52, borderRadius: 12, gap: 8 },
-  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  primaryBtnWrapper: { borderRadius: 12, overflow: 'hidden' },
+  primaryBtnGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 52, gap: 8 },
+  primaryBtnText: { color: '#000', fontSize: 16, fontWeight: '600' },
   secondaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 48, borderRadius: 12, borderWidth: 1, gap: 8 },
   secondaryBtnText: { fontSize: 15, fontWeight: '500' },
 });

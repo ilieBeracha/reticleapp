@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Target } from 'lucide-react-native';
 import { StyleSheet, Text, View } from 'react-native';
 import { DrillCard } from './DrillCard';
 import type { DrillProgress, ThemeColors, TrainingDrill, TrainingStatus } from './types';
@@ -22,38 +22,53 @@ export function DrillsSection({
 }: DrillsSectionProps) {
   const completedCount = drillProgress.filter(p => p.completed).length;
   const hasProgress = completedCount > 0;
+  const isOngoing = trainingStatus === 'ongoing';
+  const allCompleted = completedCount === drills.length && drills.length > 0;
 
   return (
-    <View style={styles.section}>
+    <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Drills</Text>
-        {drills.length > 0 && (
-          <View style={[styles.progressBadge, { backgroundColor: hasProgress ? '#22C55E20' : colors.secondary }]}>
-            <Text style={[styles.progressText, { color: hasProgress ? '#22C55E' : colors.textMuted }]}>
-              {completedCount}/{drills.length}
-            </Text>
-          </View>
-        )}
+        <View style={styles.headerLeft}>
+          <Text style={[styles.title, { color: colors.text }]}>Drills</Text>
+          {drills.length > 0 && (
+            <View style={[styles.countBadge, { backgroundColor: allCompleted ? 'rgba(147,197,253,0.2)' : colors.secondary }]}>
+              <Text style={[styles.countText, { color: allCompleted ? '#93C5FD' : colors.textMuted }]}>
+                {completedCount}/{drills.length}
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
 
       {/* Progress Bar */}
       {drills.length > 0 && (
         <View style={[styles.progressBar, { backgroundColor: colors.secondary }]}>
-          <View 
+          <View
             style={[
-              styles.progressFill, 
-              { width: `${(completedCount / drills.length) * 100}%` }
-            ]} 
+              styles.progressFill,
+              {
+                width: `${(completedCount / drills.length) * 100}%`,
+                backgroundColor: allCompleted ? '#93C5FD' : colors.textMuted,
+              },
+            ]}
           />
         </View>
       )}
 
-      {drills.length === 0 ? (
-        <View style={[styles.empty, { backgroundColor: colors.secondary }]}>
-          <Ionicons name="list-outline" size={24} color={colors.textMuted} />
-          <Text style={[styles.emptyText, { color: colors.textMuted }]}>No drills scheduled</Text>
+      {/* Empty State */}
+      {drills.length === 0 && (
+        <View style={[styles.empty, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Target size={28} color={colors.textMuted} />
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>No drills</Text>
+          <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
+            This training has no drills scheduled
+          </Text>
         </View>
-      ) : (
+      )}
+
+      {/* Drill List */}
+      {drills.length > 0 && (
         <View style={styles.list}>
           {drills.map((drill, index) => {
             const progress = drillProgress.find(p => p.drillId === drill.id);
@@ -73,17 +88,24 @@ export function DrillsSection({
         </View>
       )}
 
-      {trainingStatus === 'ongoing' && drills.length > 0 && completedCount < drills.length && (
+      {/* Hint */}
+      {isOngoing && drills.length > 0 && !allCompleted && (
         <Text style={[styles.hint, { color: colors.textMuted }]}>
           Tap a drill to start your session
         </Text>
+      )}
+
+      {allCompleted && (
+        <View style={[styles.allDoneBanner, { backgroundColor: 'rgba(147,197,253,0.15)' }]}>
+          <Text style={[styles.allDoneText, { color: '#93C5FD' }]}>All drills completed</Text>
+        </View>
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  section: {
+  container: {
     marginBottom: 24,
   },
   header: {
@@ -92,48 +114,67 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-  title: {
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: -0.2,
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
-  progressBadge: {
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  countBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 10,
   },
-  progressText: {
+  countText: {
     fontSize: 13,
     fontWeight: '700',
   },
   progressBar: {
-    height: 4,
-    borderRadius: 2,
+    height: 6,
+    borderRadius: 3,
     marginBottom: 16,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#22C55E',
-    borderRadius: 2,
+    borderRadius: 3,
   },
   list: {
     gap: 10,
   },
   empty: {
     alignItems: 'center',
-    padding: 24,
-    borderRadius: 12,
+    padding: 32,
+    borderRadius: 16,
+    borderWidth: 1,
     gap: 8,
   },
-  emptyText: {
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  emptyDesc: {
     fontSize: 13,
     textAlign: 'center',
   },
   hint: {
-    fontSize: 12,
+    fontSize: 13,
+    fontWeight: '500',
     textAlign: 'center',
-    marginTop: 12,
-    fontStyle: 'italic',
+    marginTop: 14,
+  },
+  allDoneBanner: {
+    marginTop: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  allDoneText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

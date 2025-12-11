@@ -7,6 +7,7 @@ interface SessionStore {
   loading: boolean;
   initialized: boolean;
   error: string | null;
+  loadPersonalSessions: () => Promise<void>;
   loadTeamSessions: () => Promise<void>;
   loadSessions: () => Promise<void>;
   createSession: (session: CreateSessionParams) => Promise<SessionWithDetails>;
@@ -58,6 +59,25 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     } catch (error: any) {
       set({ error: error.message, loading: false, initialized: true });
       // DON'T clear sessions on error - keep stale data
+    }
+  },
+  
+  loadPersonalSessions: async () => {
+    // Prevent duplicate loading
+    if (get().loading) return;
+    
+    // Always show loading on first load
+    const { initialized } = get();
+    if (!initialized) {
+      set({ loading: true, error: null });
+    }
+    
+    try {
+      // Pass null to get ONLY personal sessions (no team_id)
+      const sessions = await getSessions(null);
+      set({ sessions, loading: false, initialized: true, error: null });
+    } catch (error: any) {
+      set({ error: error.message, loading: false, initialized: true });
     }
   },
   

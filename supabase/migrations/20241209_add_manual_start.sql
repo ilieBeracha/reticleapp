@@ -8,3 +8,6 @@ ADD COLUMN IF NOT EXISTS manual_start boolean DEFAULT false;
 -- Add comment explaining the column
 COMMENT ON COLUMN public.trainings.manual_start IS 
 'If true, commander starts training manually. If false, training auto-starts at scheduled_at time.';
+
+
+

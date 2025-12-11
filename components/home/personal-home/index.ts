@@ -1,4 +1,5 @@
 // Components
+export { ActivityHub } from './ActivityHub';
 export { GreetingHeader } from './GreetingHeader';
 export { RecentSessionsSection } from './RecentSessionsSection';
 export { SecondaryActionsRow } from './SecondaryActionsRow';

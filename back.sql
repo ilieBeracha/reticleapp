@@ -727,6 +727,16 @@ $$;
 ALTER FUNCTION "public"."get_my_sessions"("p_limit" integer, "p_offset" integer) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."get_my_team_ids"() RETURNS SETOF "uuid"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    AS $$
+  SELECT team_id FROM public.team_members WHERE user_id = auth.uid();
+$$;
+
+
+ALTER FUNCTION "public"."get_my_team_ids"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."get_my_teams"() RETURNS TABLE("id" "uuid", "name" "text", "description" "text", "squads" "text"[], "team_type" "text", "created_by" "uuid", "created_at" timestamp with time zone, "my_role" "text", "member_count" bigint)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -1702,6 +1712,27 @@ Bypasses RLS for consistent validation across all users.';
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."drill_templates" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "team_id" "uuid" NOT NULL,
+    "created_by" "uuid" NOT NULL,
+    "name" "text" NOT NULL,
+    "description" "text",
+    "target_type" "text" NOT NULL,
+    "distance_m" integer NOT NULL,
+    "rounds_per_shooter" integer NOT NULL,
+    "time_limit_seconds" integer,
+    "position" "text",
+    "weapon_category" "text",
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"(),
+    CONSTRAINT "drill_templates_target_type_check" CHECK (("target_type" = ANY (ARRAY['paper'::"text", 'tactical'::"text"])))
+);
+
+
+ALTER TABLE "public"."drill_templates" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."notifications" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -1929,11 +1960,26 @@ CREATE TABLE IF NOT EXISTS "public"."trainings" (
     "created_by" "uuid" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"(),
     "updated_at" timestamp with time zone DEFAULT "now"(),
+    "manual_start" boolean DEFAULT false,
+    "started_at" timestamp with time zone,
+    "ended_at" timestamp with time zone,
     CONSTRAINT "trainings_status_check" CHECK (("status" = ANY (ARRAY['planned'::"text", 'ongoing'::"text", 'finished'::"text", 'cancelled'::"text"])))
 );
 
 
 ALTER TABLE "public"."trainings" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."trainings"."manual_start" IS 'If true, commander starts training manually. If false, training auto-starts at scheduled_at time.';
+
+
+
+COMMENT ON COLUMN "public"."trainings"."started_at" IS 'When the training was actually started by the commander';
+
+
+
+COMMENT ON COLUMN "public"."trainings"."ended_at" IS 'When the training was finished';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."user_drill_completions" (
@@ -1954,6 +2000,11 @@ ALTER TABLE "public"."user_drill_completions" OWNER TO "postgres";
 
 
 COMMENT ON TABLE "public"."user_drill_completions" IS 'Tracks which drills each user has completed within a training';
+
+
+
+ALTER TABLE ONLY "public"."drill_templates"
+    ADD CONSTRAINT "drill_templates_pkey" PRIMARY KEY ("id");
 
 
 
@@ -2072,6 +2123,10 @@ CREATE INDEX "idx_drill_completions_drill" ON "public"."user_drill_completions" 
 
 
 CREATE INDEX "idx_drill_completions_user_training" ON "public"."user_drill_completions" USING "btree" ("user_id", "training_id");
+
+
+
+CREATE INDEX "idx_drill_templates_team_id" ON "public"."drill_templates" USING "btree" ("team_id");
 
 
 
@@ -2223,6 +2278,16 @@ CREATE OR REPLACE TRIGGER "update_trainings_updated_at" BEFORE UPDATE ON "public
 
 
 
+ALTER TABLE ONLY "public"."drill_templates"
+    ADD CONSTRAINT "drill_templates_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id");
+
+
+
+ALTER TABLE ONLY "public"."drill_templates"
+    ADD CONSTRAINT "drill_templates_team_id_fkey" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."notifications"
     ADD CONSTRAINT "notifications_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
@@ -2357,6 +2422,12 @@ CREATE POLICY "Anyone can view pending invitations" ON "public"."team_invitation
 
 
 
+CREATE POLICY "Commanders can manage drill templates" ON "public"."drill_templates" USING ((EXISTS ( SELECT 1
+   FROM "public"."team_members"
+  WHERE (("team_members"."team_id" = "drill_templates"."team_id") AND ("team_members"."user_id" = "auth"."uid"()) AND ("team_members"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text"]))))));
+
+
+
 CREATE POLICY "Owners and commanders can add members" ON "public"."team_members" FOR INSERT WITH CHECK ("public"."is_team_admin"("team_id"));
 
 
@@ -2438,6 +2509,16 @@ CREATE POLICY "Owners can delete teams" ON "public"."teams" FOR DELETE USING (("
 
 
 CREATE POLICY "Owners can delete trainings" ON "public"."trainings" FOR DELETE USING (("created_by" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Team members can view drill templates" ON "public"."drill_templates" FOR SELECT USING ((EXISTS ( SELECT 1
+   FROM "public"."team_members"
+  WHERE (("team_members"."team_id" = "drill_templates"."team_id") AND ("team_members"."user_id" = "auth"."uid"())))));
+
+
+
+CREATE POLICY "Team members can view teammates" ON "public"."team_members" FOR SELECT USING (("team_id" IN ( SELECT "public"."get_my_team_ids"() AS "get_my_team_ids")));
 
 
 
@@ -2533,12 +2614,6 @@ CREATE POLICY "Users can view own and team sessions" ON "public"."sessions" FOR 
 
 
 
-CREATE POLICY "Users can view own memberships" ON "public"."team_members" FOR SELECT USING ((("user_id" = "auth"."uid"()) OR (EXISTS ( SELECT 1
-   FROM "public"."teams" "t"
-  WHERE (("t"."id" = "team_members"."team_id") AND ("t"."created_by" = "auth"."uid"()))))));
-
-
-
 CREATE POLICY "Users can view own notifications" ON "public"."notifications" FOR SELECT USING (("auth"."uid"() = "user_id"));
 
 
@@ -2589,6 +2664,9 @@ CREATE POLICY "Users can view training drills" ON "public"."training_drills" FOR
            FROM "public"."team_members" "tm"
           WHERE (("tm"."team_id" = "t"."team_id") AND ("tm"."user_id" = "auth"."uid"()))))))))));
 
+
+
+ALTER TABLE "public"."drill_templates" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."notifications" ENABLE ROW LEVEL SECURITY;
@@ -2729,6 +2807,12 @@ GRANT ALL ON FUNCTION "public"."generate_invite_code"() TO "service_role";
 GRANT ALL ON FUNCTION "public"."get_my_sessions"("p_limit" integer, "p_offset" integer) TO "anon";
 GRANT ALL ON FUNCTION "public"."get_my_sessions"("p_limit" integer, "p_offset" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_my_sessions"("p_limit" integer, "p_offset" integer) TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."get_my_team_ids"() TO "anon";
+GRANT ALL ON FUNCTION "public"."get_my_team_ids"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_my_team_ids"() TO "service_role";
 
 
 
@@ -2876,6 +2960,12 @@ GRANT ALL ON FUNCTION "public"."validate_invite_code"("p_invite_code" "text", "p
 
 
 
+GRANT ALL ON TABLE "public"."drill_templates" TO "anon";
+GRANT ALL ON TABLE "public"."drill_templates" TO "authenticated";
+GRANT ALL ON TABLE "public"."drill_templates" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."notifications" TO "anon";
 GRANT ALL ON TABLE "public"."notifications" TO "authenticated";
 GRANT ALL ON TABLE "public"."notifications" TO "service_role";
@@ -2978,10 +3068,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TAB
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "service_role";
-
-
-
-
 
 
 
