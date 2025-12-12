@@ -1,14 +1,13 @@
 import { useModals } from '@/contexts/ModalContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
-import { useWorkspaceData } from '@/hooks/useWorkspaceData';
 import { getMyActivePersonalSession } from '@/services/sessionService';
 import { useSessionStore } from '@/store/sessionStore';
+import { useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
-import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -35,26 +34,33 @@ export function PersonalHomePage() {
   const colors = useColors();
   const { fullName } = useAppContext();
   const { setOnSessionCreated, setOnTeamCreated } = useModals();
-  const { sessions, sessionsLoading, loadTeams } = useWorkspaceData();
-  const { loadPersonalSessions, createSession } = useSessionStore();
+  
+  // Direct store access - no useWorkspaceData() which is for team mode
+  const { sessions, loading: sessionsLoading, initialized, loadPersonalSessions, createSession } = useSessionStore();
+  const { loadTeams } = useTeamStore();
   const { myUpcomingTrainings, loadingMyTrainings, loadMyUpcomingTrainings, loadMyStats } =
     useTrainingStore();
 
   // Local UI state
   const [refreshing, setRefreshing] = useState(false);
   const [starting, setStarting] = useState(false);
+  
+  // Track if initial load has been triggered
+  const initialLoadDone = useRef(false);
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // DATA LOADING
+  // DATA LOADING - Only load once on mount, not on every focus
   // ═══════════════════════════════════════════════════════════════════════════
 
-  useFocusEffect(
-    useCallback(() => {
-      loadPersonalSessions();
-      loadMyUpcomingTrainings();
-      loadMyStats();
-    }, [loadPersonalSessions, loadMyUpcomingTrainings, loadMyStats])
-  );
+  useEffect(() => {
+    // Only load on first mount, not on every navigation
+    if (initialLoadDone.current) return;
+    initialLoadDone.current = true;
+    
+    loadPersonalSessions();
+    loadMyUpcomingTrainings();
+    loadMyStats();
+  }, [loadPersonalSessions, loadMyUpcomingTrainings, loadMyStats]);
 
   useEffect(() => {
     setOnSessionCreated(() => loadPersonalSessions);
@@ -137,9 +143,11 @@ export function PersonalHomePage() {
   // LOADING STATE
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const isLoading = sessionsLoading || loadingMyTrainings;
+  // Only show full-page loader on first load (before initialized)
+  // After that, data is available even during background refreshes
+  const showLoader = !initialized && sessionsLoading;
 
-  if (isLoading && sessions.length === 0) {
+  if (showLoader) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />

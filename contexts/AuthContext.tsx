@@ -14,6 +14,8 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   transitioning: boolean;
+  profileFullName: string | null;
+  profileAvatarUrl: string | null;
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithOAuth: (provider: 'google' | 'apple') => Promise<void>;
@@ -29,6 +31,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [transitioning, setTransitioning] = useState(false)
+  const [profileFullName, setProfileFullName] = useState<string | null>(null)
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null)
+
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name, avatar_url')
+        .eq('id', userId)
+        .maybeSingle()
+
+      if (error) {
+        console.warn("Auth: profile fetch error:", error.message)
+        return
+      }
+
+      setProfileFullName((data as any)?.full_name ?? null)
+      setProfileAvatarUrl((data as any)?.avatar_url ?? null)
+    } catch (e) {
+      console.warn("Auth: profile fetch exception:", e)
+    }
+  }
 
   // ═══════════════════════════════════════════════════
   // AUTH EVENT HANDLERS
@@ -40,6 +64,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const handleSignOut = () => {
     // Reset team state
     useTeamStore.getState().reset()
+    setProfileFullName(null)
+    setProfileAvatarUrl(null)
     // Reset initial session handler so next login works correctly
     initialSessionHandledRef.current = false
     // Transition to login
@@ -74,12 +100,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initialSessionHandledRef.current = true
 
     setTransitioning(true)
-    setLoading(false)
+    setLoading(true)
     
     // Load teams in background
     useTeamStore.getState().loadTeams().catch(err => 
       console.error("Background team load error:", err)
     )
+
+    // Hydrate profile before rendering home to avoid "blank then name" flash
+    await fetchProfile(session.user.id)
+    setLoading(false)
     
     // Navigate to home (always start in personal mode)
     setTimeout(() => {
@@ -95,12 +125,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!session?.user) return
 
     setTransitioning(true)
-    setLoading(false)
+    setLoading(true)
     
     // Load teams in background
     useTeamStore.getState().loadTeams().catch(err => 
       console.error("Background team load error:", err)
     )
+
+    // Hydrate profile before rendering home to avoid "blank then name" flash
+    await fetchProfile(session.user.id)
+    setLoading(false)
     
     // Navigate to home (always start in personal mode)
     setTimeout(() => {
@@ -184,15 +218,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      setLoading(true)
       setSession(session)
       setUser(session?.user ?? null)
-      setLoading(false)
-      
+
       if (session?.user) {
-        useTeamStore.getState().loadTeams().catch((err: Error) => 
+        useTeamStore.getState().loadTeams().catch((err: Error) =>
           console.error("Background team load error:", err)
         )
+        await fetchProfile(session.user.id)
+      } else {
+        setProfileFullName(null)
+        setProfileAvatarUrl(null)
       }
+
+      setLoading(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -269,6 +309,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session,
       loading,
       transitioning,
+      profileFullName,
+      profileAvatarUrl,
       signUp,
       signIn,
       signInWithOAuth,

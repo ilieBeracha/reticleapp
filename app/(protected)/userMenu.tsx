@@ -6,12 +6,12 @@ import * as Haptics from 'expo-haptics';
 import { router } from "expo-router";
 import { useCallback } from "react";
 import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from "react-native";
 
 /**
@@ -21,11 +21,12 @@ import {
  */
 export default function UserMenuSheet() {
   const colors = useColors();
-  const { user, signOut } = useAuth();
+  const { user, signOut, profileAvatarUrl, profileFullName } = useAuth();
 
-  const avatarUri = user?.user_metadata?.avatar_url;
+  const avatarUri = profileAvatarUrl ?? user?.user_metadata?.avatar_url;
   const fallbackInitial = user?.email?.charAt(0)?.toUpperCase() ?? "?";
-  const displayName = user?.user_metadata?.full_name || 
+  const displayName = profileFullName ||
+                      user?.user_metadata?.full_name || 
                       user?.email?.split('@')[0] || 
                       'User';
   const email = user?.email || '';

@@ -1,6 +1,7 @@
 import { useColors } from "@/hooks/ui/useColors";
 import { acceptTeamInvitation, getInvitationByCode } from "@/services/teamService";
 import { useTeamStore } from "@/store/teamStore";
+import { useTrainingStore } from "@/store/trainingStore";
 import type { TeamInvitation, TeamRole } from "@/types/workspace";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from 'expo-haptics';
@@ -33,6 +34,30 @@ export default function AcceptInviteSheet() {
   const [isAccepted, setIsAccepted] = useState(false);
   const [acceptedResult, setAcceptedResult] = useState<{ team_id: string; team_name: string; role: TeamRole } | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const handleCloseSheet = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (router.canGoBack()) {
+      router.back();
+    }
+  }, []);
+
+  const handleOpenTeam = useCallback((teamId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    // 1) Set active team + kick off refetches
+    useTeamStore.getState().setActiveTeam(teamId);
+    Promise.all([
+      useTeamStore.getState().loadActiveTeam(),
+      useTrainingStore.getState().loadTeamTrainings(teamId),
+    ]).catch((e) => console.warn("Post-invite refresh failed:", e));
+
+    // 2) Close the form sheet, then land on Team root
+    router.back();
+    setTimeout(() => {
+      router.replace('/(protected)/team');
+    }, 50);
+  }, []);
 
   const handleValidate = useCallback(async () => {
     const code = inviteCode.trim().toUpperCase();
@@ -90,29 +115,6 @@ export default function AcceptInviteSheet() {
       setIsAccepted(true);
       setIsAccepting(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
-      Alert.alert(
-        "Welcome!",
-        `You've successfully joined ${result.team_name}!`,
-        [
-          {
-            text: "Open Team",
-            onPress: () => {
-              useTeamStore.getState().setActiveTeam(result.team_id);
-              router.push('/(protected)/team');
-            },
-          },
-          {
-            text: "Stay Here",
-            style: "cancel",
-            onPress: () => {
-              if (router.canGoBack()) {
-                router.back();
-              }
-            },
-          },
-        ]
-      );
     } catch (error: any) {
       console.error("Failed to accept invitation:", error);
       Alert.alert("Error", error.message || "Failed to join team");
@@ -147,52 +149,92 @@ export default function AcceptInviteSheet() {
     setError(null);
   }, []);
 
-  const getRoleColor = (role: TeamRole) => {
-    const roleColors: Record<TeamRole, string> = {
+  const getRoleColor = (role: TeamRole | string | null | undefined) => {
+    // Accept both current (`team_commander`) and legacy (`commander`) strings.
+    const roleColors: Record<string, string> = {
       owner: '#5B6B8C',
       commander: '#7C3AED',
+      team_commander: '#7C3AED',
       squad_commander: '#3B82F6',
       soldier: '#6B8FA3',
     };
-    return roleColors[role] || '#6B8FA3';
+    if (!role) return '#6B8FA3';
+    return roleColors[String(role)] || '#6B8FA3';
   };
 
-  const getRoleIcon = (role: TeamRole): keyof typeof Ionicons.glyphMap => {
-    const icons: Record<TeamRole, keyof typeof Ionicons.glyphMap> = {
+  const getRoleIcon = (role: TeamRole | string | null | undefined): keyof typeof Ionicons.glyphMap => {
+    const icons: Record<string, keyof typeof Ionicons.glyphMap> = {
       owner: 'shield-checkmark',
       commander: 'shield',
+      team_commander: 'shield',
       squad_commander: 'shield-half',
       soldier: 'person',
     };
-    return icons[role] || 'person';
+    if (!role) return 'person';
+    return icons[String(role)] || 'person';
   };
 
-  const getRoleLabel = (role: TeamRole): string => {
-    const labels: Record<TeamRole, string> = {
+  const getRoleLabel = (role: TeamRole | string | null | undefined): string => {
+    const labels: Record<string, string> = {
       owner: 'Owner',
-      commander: 'Commander',
+      commander: 'Team Commander',
+      team_commander: 'Team Commander',
       squad_commander: 'Squad Commander',
       soldier: 'Soldier',
     };
-    return labels[role] || role;
+    // No "member" role anymore. If role missing, default label is Soldier (least-privileged).
+    if (!role) return 'Soldier';
+    return labels[String(role)] || String(role);
   };
 
   // Success state
   if (isAccepted && acceptedResult) {
     return (
       <View style={[styles.successContainer, { backgroundColor: colors.card }]}>
-        <View style={[styles.successIcon, { backgroundColor: colors.primary + '20' }]}>
-          <Ionicons name="checkmark-circle" size={64} color={colors.primary} />
+        <View style={styles.sheetHeader}>
+          <View style={[styles.grabber, { backgroundColor: colors.border }]} />
+          <TouchableOpacity
+            style={[styles.closeButton, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+            onPress={handleCloseSheet}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="close" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
         </View>
-        <Text style={[styles.successTitle, { color: colors.text }]}>Welcome!</Text>
-        <Text style={[styles.successTeam, { color: colors.text }]}>
+
+        <View style={[styles.successIcon, { backgroundColor: colors.primary + '18', borderColor: colors.border }]}>
+          <Ionicons name="checkmark-circle" size={66} color={colors.primary} />
+        </View>
+
+        <Text style={[styles.successTitle, { color: colors.text }]}>You’re in</Text>
+        <Text style={[styles.successTeam, { color: colors.text }]} numberOfLines={1}>
           {acceptedResult.team_name}
         </Text>
-        <View style={[styles.successBadge, { backgroundColor: getRoleColor(acceptedResult.role) + '20' }]}>
+
+        <View style={[styles.successBadge, { backgroundColor: getRoleColor(acceptedResult.role) + '18', borderColor: colors.border }]}>
           <Ionicons name={getRoleIcon(acceptedResult.role)} size={16} color={getRoleColor(acceptedResult.role)} />
           <Text style={[styles.successRole, { color: getRoleColor(acceptedResult.role) }]}>
             Joined as {getRoleLabel(acceptedResult.role)}
           </Text>
+        </View>
+
+        <View style={styles.successActions}>
+          <TouchableOpacity
+            style={[styles.primaryActionButton, { backgroundColor: colors.primary }]}
+            onPress={() => handleOpenTeam(acceptedResult.team_id)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="people" size={18} color="#fff" />
+            <Text style={styles.primaryActionText}>Open Team</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.secondaryActionButton, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+            onPress={handleCloseSheet}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.secondaryActionText, { color: colors.text }]}>Done</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -200,11 +242,23 @@ export default function AcceptInviteSheet() {
 
   return (
     <ScrollView 
-      style={styles.scrollView}
+      style={[styles.scrollView, { backgroundColor: colors.card }]}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
+      {/* Sheet header (grabber + close) */}
+      <View style={styles.sheetHeader}>
+        <View style={[styles.grabber, { backgroundColor: colors.border }]} />
+        <TouchableOpacity
+          style={[styles.closeButton, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+          onPress={handleCloseSheet}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="close" size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+      </View>
+
       {/* Header */}
       <View style={styles.headerSection}>
         <View style={[styles.headerIcon, { backgroundColor: colors.primary + '15' }]}>
@@ -254,6 +308,9 @@ export default function AcceptInviteSheet() {
                 autoFocus
               />
             </View>
+            <Text style={[styles.inputHint, { color: colors.textMuted }]}>
+              8 characters • letters and numbers
+            </Text>
             {error && (
               <View style={styles.errorContainer}>
                 <Ionicons name="alert-circle" size={14} color={colors.destructive} />
@@ -301,29 +358,63 @@ export default function AcceptInviteSheet() {
         // Step 2: Review and Accept
         <>
           <View style={[styles.teamCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={[styles.teamIcon, { backgroundColor: colors.primary + '20' }]}>
-              <Ionicons name="people" size={32} color={colors.primary} />
+            <View style={styles.inviteCardTopRow}>
+              <View style={[styles.sectionPill, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                <Text style={[styles.sectionPillText, { color: colors.textMuted }]}>INVITATION</Text>
+              </View>
             </View>
-            
-            <Text style={[styles.teamName, { color: colors.text }]}>
-              {validatedInvite.team_name || 'Team'}
-            </Text>
-            
-            <View style={[styles.roleIndicator, { backgroundColor: getRoleColor(validatedInvite.role) + '20' }]}>
-              <Ionicons 
-                name={getRoleIcon(validatedInvite.role)} 
-                size={18} 
-                color={getRoleColor(validatedInvite.role)} 
-              />
-              <Text style={[styles.roleText, { color: getRoleColor(validatedInvite.role) }]}>
-                You'll join as {getRoleLabel(validatedInvite.role)}
+
+            <View style={styles.teamHeaderRow}>
+              <View style={[styles.teamIcon, { backgroundColor: colors.primary + '18' }]}>
+                <Ionicons name="people" size={28} color={colors.primary} />
+              </View>
+
+              <View style={styles.teamHeaderText}>
+                <Text style={[styles.teamName, { color: colors.text }]} numberOfLines={1}>
+                  {validatedInvite.team_name || 'Team'}
+                </Text>
+                <Text style={[styles.teamSubtitle, { color: colors.textMuted }]}>
+                  Review details, then join the team
+                </Text>
+              </View>
+            </View>
+
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+            <View style={styles.detailRow}>
+              <View style={styles.detailLabelRow}>
+                <Ionicons name="shield-outline" size={14} color={colors.textMuted} />
+                <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Role</Text>
+              </View>
+              <View style={[styles.roleChip, { backgroundColor: getRoleColor(validatedInvite.role) + '18', borderColor: colors.border }]}>
+                <Ionicons
+                  name={getRoleIcon(validatedInvite.role)}
+                  size={14}
+                  color={getRoleColor(validatedInvite.role)}
+                />
+                <Text style={[styles.roleChipText, { color: getRoleColor(validatedInvite.role) }]}>
+                  {getRoleLabel(validatedInvite.role)}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.detailRow}>
+              <View style={styles.detailLabelRow}>
+                <Ionicons name="time-outline" size={14} color={colors.textMuted} />
+                <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Expires</Text>
+              </View>
+              <Text style={[styles.detailValue, { color: colors.text }]}>
+                {new Date(validatedInvite.expires_at).toLocaleDateString()}
               </Text>
             </View>
 
-            <View style={styles.metaRow}>
-              <Ionicons name="time-outline" size={14} color={colors.textMuted} />
-              <Text style={[styles.metaText, { color: colors.textMuted }]}>
-                Expires {new Date(validatedInvite.expires_at).toLocaleDateString()}
+            <View style={styles.detailRow}>
+              <View style={styles.detailLabelRow}>
+                <Ionicons name="key-outline" size={14} color={colors.textMuted} />
+                <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Code</Text>
+              </View>
+              <Text style={[styles.detailValueMono, { color: colors.text }]}>
+                •••• {String(validatedInvite.invite_code || '').slice(-4).toUpperCase()}
               </Text>
             </View>
           </View>
@@ -331,12 +422,18 @@ export default function AcceptInviteSheet() {
           {/* Accept/Decline Buttons */}
           <View style={styles.actionsContainer}>
             <TouchableOpacity
-              style={[styles.declineButton, { borderColor: colors.border }]}
+              style={[
+                styles.declineButton,
+                {
+                  borderColor: colors.border,
+                  backgroundColor: colors.secondary,
+                },
+              ]}
               onPress={handleDecline}
               disabled={isAccepting}
               activeOpacity={0.7}
             >
-              <Ionicons name="close" size={20} color={colors.text} />
+              <Ionicons name="close" size={18} color={colors.text} />
               <Text style={[styles.declineButtonText, { color: colors.text }]}>
                 Decline
               </Text>
@@ -358,8 +455,8 @@ export default function AcceptInviteSheet() {
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
                 <>
-                  <Ionicons name="checkmark-done" size={20} color="#fff" />
-                  <Text style={styles.acceptButtonText}>Accept & Join</Text>
+                  <Ionicons name="checkmark-done" size={18} color="#fff" />
+                  <Text style={styles.acceptButtonText}>Join Team</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -372,13 +469,37 @@ export default function AcceptInviteSheet() {
 
 const styles = StyleSheet.create({
   scrollView: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20 },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 28 },
+
+  // Sheet header
+  sheetHeader: {
+    paddingTop: 10,
+    paddingBottom: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  grabber: {
+    width: 44,
+    height: 5,
+    borderRadius: 999,
+  },
+  closeButton: {
+    position: 'absolute',
+    right: 16,
+    top: 6,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
 
   // Header
   headerSection: {
     alignItems: 'center',
-    paddingTop: 24,
-    paddingBottom: 20,
+    paddingTop: 16,
+    paddingBottom: 18,
   },
   headerIcon: {
     width: 64,
@@ -397,6 +518,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     textAlign: 'center',
+    lineHeight: 19,
   },
   resetBtn: {
     flexDirection: 'row',
@@ -418,6 +540,11 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     marginBottom: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 2,
   },
   inputLabel: {
     fontSize: 14,
@@ -436,6 +563,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 2,
     textAlign: 'center',
+  },
+  inputHint: {
+    marginTop: 10,
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+    letterSpacing: 0.2,
   },
   errorContainer: {
     flexDirection: 'row',
@@ -471,6 +605,11 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     gap: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 1,
   },
   helpContent: { flex: 1 },
   helpTitle: {
@@ -486,54 +625,108 @@ const styles = StyleSheet.create({
 
   // Team Card
   teamCard: {
-    alignItems: 'center',
     padding: 24,
     borderRadius: 16,
     borderWidth: 1,
     marginBottom: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 2,
+  },
+  inviteCardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  sectionPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  sectionPillText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+  teamHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   teamIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+  },
+  teamHeaderText: {
+    flex: 1,
+    minWidth: 0,
   },
   teamName: {
     fontSize: 22,
     fontWeight: '700',
-    marginBottom: 16,
-    textAlign: 'center',
+    letterSpacing: -0.3,
   },
-  roleIndicator: {
+  teamSubtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  divider: {
+    height: 1,
+    marginTop: 16,
+    marginBottom: 14,
+  },
+  detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    justifyContent: 'space-between',
     paddingVertical: 10,
-    borderRadius: 10,
-    gap: 8,
-    marginBottom: 16,
   },
-  roleText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  metaRow: {
+  detailLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 6,
   },
-  metaText: {
+  detailLabel: {
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '700',
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  detailValueMono: {
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+  roleChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  roleChipText: {
+    fontSize: 13,
+    fontWeight: '800',
   },
 
   // Actions
   actionsContainer: {
     flexDirection: 'row',
     gap: 12,
+    marginTop: 2,
   },
   declineButton: {
     flex: 1,
@@ -557,6 +750,11 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 12,
     gap: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 3,
   },
   acceptButtonText: {
     color: '#fff',
@@ -569,7 +767,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 40,
+    paddingHorizontal: 28,
+    paddingBottom: 32,
   },
   successIcon: {
     width: 100,
@@ -578,11 +777,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
+    borderWidth: 1,
   },
   successTitle: {
     fontSize: 28,
     fontWeight: '700',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   successTeam: {
     fontSize: 20,
@@ -596,9 +796,45 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 10,
     gap: 8,
+    borderWidth: 1,
   },
   successRole: {
     fontSize: 14,
+    fontWeight: '600',
+  },
+
+  successActions: {
+    width: '100%',
+    marginTop: 18,
+    gap: 10,
+  },
+  primaryActionButton: {
+    height: 52,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 3,
+  },
+  primaryActionText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  secondaryActionButton: {
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  secondaryActionText: {
+    fontSize: 15,
     fontWeight: '600',
   },
 });

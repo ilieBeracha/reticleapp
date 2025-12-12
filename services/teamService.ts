@@ -6,14 +6,52 @@
 
 import { supabase } from '@/lib/supabase';
 import type {
-    Team,
-    TeamInvitation,
-    TeamMember,
-    TeamMemberWithProfile,
-    TeamRole,
-    TeamWithMembers,
-    TeamWithRole,
+  Team,
+  TeamInvitation,
+  TeamMember,
+  TeamMemberWithProfile,
+  TeamRole,
+  TeamWithMembers,
+  TeamWithRole,
 } from '@/types/workspace';
+
+function normalizeTeamInvitation(row: any): TeamInvitation {
+  // DB column is `team_role`, app type expects `role`.
+  return {
+    id: row.id,
+    team_id: row.team_id,
+    invite_code: row.invite_code,
+    role: (row.role ?? row.team_role) as TeamRole,
+    details: row.details ?? null,
+    status: row.status,
+    invited_by: row.invited_by,
+    accepted_by: row.accepted_by ?? null,
+    accepted_at: row.accepted_at ?? null,
+    expires_at: row.expires_at,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function normalizeTeamMemberWithProfile(row: any): TeamMemberWithProfile {
+  // Role can arrive in multiple shapes depending on RPC/select:
+  // - string (e.g. "team_commander")
+  // - { role: "team_commander", squad_id?: ... }
+  const rawRole = row?.role?.role ?? row?.role ?? row?.team_role ?? null;
+  const rawSquadId = row?.role?.squad_id ?? row?.details?.squad_id ?? null;
+
+  return {
+    team_id: row.team_id,
+    user_id: row.user_id,
+    joined_at: row.joined_at,
+    details: row.details ?? null,
+    role: {
+      role: rawRole as any,
+      squad_id: rawSquadId ?? undefined,
+    },
+    profile: row.profile ?? row.profiles ?? {},
+  };
+}
 
 // =====================================================
 // TEAM CRUD
@@ -90,6 +128,25 @@ export async function getTeamWithMembers(teamId: string): Promise<TeamWithMember
 
   if (!data) return null;
 
+  // Normalize members returned by RPC (may have partial profile fields)
+  let members: TeamMemberWithProfile[] = (data.members || []).map(normalizeTeamMemberWithProfile);
+
+  // Some RPCs don't include `profiles.avatar_url` (or even profile at all).
+  // If profile data looks incomplete, fetch members via direct select to ensure
+  // consistent UI (avatars + names) across screens like TeamHomePage.
+  const hasCompleteProfiles =
+    members.length === 0 ||
+    members.every((m: TeamMemberWithProfile) => m.profile && ('avatar_url' in m.profile || 'full_name' in m.profile));
+
+  if (!hasCompleteProfiles) {
+    try {
+      members = await getTeamMembers(teamId);
+    } catch (e) {
+      // Keep RPC members if the fallback fetch fails.
+      console.warn('Failed to hydrate member profiles, using RPC members:', e);
+    }
+  }
+
   return {
     id: data.id,
     name: data.name,
@@ -99,8 +156,8 @@ export async function getTeamWithMembers(teamId: string): Promise<TeamWithMember
     created_by: data.created_by,
     created_at: data.created_at,
     updated_at: data.created_at,
-    members: data.members || [],
-    member_count: data.members?.length || 0,
+    members,
+    member_count: members.length || 0,
   };
 }
 
@@ -301,7 +358,7 @@ export async function createTeamInvitation(input: CreateInvitationInput): Promis
     throw new Error(error.message || 'Failed to create invitation');
   }
 
-  return data as TeamInvitation;
+  return normalizeTeamInvitation(data);
 }
 
 /**
@@ -346,7 +403,7 @@ export async function getInvitationByCode(inviteCode: string): Promise<TeamInvit
   }
 
   return {
-    ...data,
+    ...normalizeTeamInvitation(data),
     team_name: (data as any).team?.name,
   };
 }
@@ -383,7 +440,7 @@ export async function getTeamInvitations(teamId: string): Promise<TeamInvitation
     throw new Error(error.message || 'Failed to fetch invitations');
   }
 
-  return data || [];
+  return (data || []).map(normalizeTeamInvitation);
 }
 
 // =====================================================

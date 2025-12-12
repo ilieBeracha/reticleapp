@@ -7,33 +7,33 @@ import { formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import {
-  ChevronRight,
-  Crown,
-  Mail,
-  Search,
-  Settings,
-  Shield,
-  Sparkles,
-  Target,
-  UserPlus,
-  Users,
+    ChevronRight,
+    Crown,
+    Mail,
+    Search,
+    Settings,
+    Shield,
+    Sparkles,
+    Target,
+    UserPlus,
+    Users,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import Animated, {
-  FadeIn,
-  FadeInDown,
-  FadeInRight,
-  Layout,
+    FadeIn,
+    FadeInDown,
+    FadeInRight,
+    Layout,
 } from 'react-native-reanimated';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -50,12 +50,23 @@ const ROLE_CONFIG = {
     description: 'Full team control',
     order: 0,
   },
+  // Current name is `team_commander`; keep legacy `commander` compatibility.
+  team_commander: {
+    color: '#EF4444',
+    bg: '#EF444415',
+    bgSolid: '#EF444430',
+    label: 'Team Commander',
+    labelPlural: 'Team Commanders',
+    icon: Crown,
+    description: 'Manage trainings & members',
+    order: 1,
+  },
   commander: {
     color: '#EF4444',
     bg: '#EF444415',
     bgSolid: '#EF444430',
-    label: 'Commander',
-    labelPlural: 'Commanders',
+    label: 'Team Commander',
+    labelPlural: 'Team Commanders',
     icon: Crown,
     description: 'Manage trainings & members',
     order: 1,
@@ -84,7 +95,8 @@ const ROLE_CONFIG = {
 
 function getRoleConfig(role: string | undefined | null) {
   if (!role) return ROLE_CONFIG.soldier;
-  return ROLE_CONFIG[role as keyof typeof ROLE_CONFIG] || ROLE_CONFIG.soldier;
+  const normalized = role === 'commander' ? 'team_commander' : role;
+  return ROLE_CONFIG[normalized as keyof typeof ROLE_CONFIG] || ROLE_CONFIG.soldier;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -240,8 +252,10 @@ export default function TeamManageScreen() {
   const sortedMembers = useMemo(() => {
     return [...filteredMembers].sort((a, b) => {
       // First sort by role priority
-      const roleA = a.role?.role || 'soldier';
-      const roleB = b.role?.role || 'soldier';
+      const rawRoleA = a.role?.role || 'soldier';
+      const rawRoleB = b.role?.role || 'soldier';
+      const roleA = rawRoleA === 'commander' ? 'team_commander' : rawRoleA;
+      const roleB = rawRoleB === 'commander' ? 'team_commander' : rawRoleB;
       const orderA = ROLE_CONFIG[roleA as keyof typeof ROLE_CONFIG]?.order ?? 99;
       const orderB = ROLE_CONFIG[roleB as keyof typeof ROLE_CONFIG]?.order ?? 99;
       

@@ -10,7 +10,8 @@ import {
 import { useModals } from '@/contexts/ModalContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { usePermissions } from '@/hooks/usePermissions';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export default function TrainingDetailSheet() {
@@ -39,7 +40,26 @@ export default function TrainingDetailSheet() {
     onTrainingUpdated: getOnTrainingUpdated() ?? undefined,
   });
 
+  // Redirect soldiers to trainingLive when training is ongoing
+  useEffect(() => {
+    if (!loading && training && !canManageTraining && training.status === 'ongoing') {
+      router.replace({
+        pathname: '/(protected)/trainingLive',
+        params: { trainingId: training.id },
+      });
+    }
+  }, [loading, training, canManageTraining]);
+
   if (loading || !training) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  // If soldier and training is ongoing, show loader while redirecting
+  if (!canManageTraining && training.status === 'ongoing') {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />

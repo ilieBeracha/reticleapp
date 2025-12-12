@@ -31,7 +31,7 @@ export interface AppContext {
  * For permissions: use usePermissions()
  */
 export function useAppContext(): AppContext {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, profileFullName, profileAvatarUrl } = useAuth();
   const { teams, activeTeamId, loading: teamsLoading } = useTeamStore();
 
   if (!user) {
@@ -50,8 +50,8 @@ export function useAppContext(): AppContext {
   return {
     userId: user.id,
     email: user.email ?? null,
-    fullName: user.user_metadata?.full_name ?? null,
-    avatarUrl: user.user_metadata?.avatar_url ?? null,
+    fullName: profileFullName ?? user.user_metadata?.full_name ?? null,
+    avatarUrl: profileAvatarUrl ?? user.user_metadata?.avatar_url ?? null,
     isAuthenticated: true,
     activeTeamId,
     hasTeams: teams.length > 0,

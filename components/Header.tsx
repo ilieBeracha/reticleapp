@@ -17,7 +17,7 @@ interface HeaderProps {
 }
 
 export function Header({ onNotificationPress, onUserPress, onTeamPress }: HeaderProps) {
-  const { user } = useAuth();
+  const { user, profileAvatarUrl } = useAuth();
   const colors = useColors();
   const pathname = usePathname();
   const [notificationCount, setNotificationCount] = useState(0);
@@ -54,7 +54,7 @@ export function Header({ onNotificationPress, onUserPress, onTeamPress }: Header
   const displayName = isPersonalRoute ? 'Personal' : (teamName || 'Personal');
 
   const email = user?.email;
-  const avatarUrl = user?.user_metadata?.avatar_url;
+  const avatarUrl = profileAvatarUrl ?? user?.user_metadata?.avatar_url;
   const fallbackInitial = email?.charAt(0)?.toUpperCase() ?? '?';
 
 
