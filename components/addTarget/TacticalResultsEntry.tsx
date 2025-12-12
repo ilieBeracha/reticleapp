@@ -13,6 +13,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from "@/theme/colors";
 import { COLORS } from "./types";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -386,16 +387,16 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
         disabled={saving}
       >
         <LinearGradient
-          colors={saving ? ["#6B7280", "#9CA3AF"] : ["rgba(255,255,255,0.95)", "rgba(147,197,253,0.85)", "rgba(156,163,175,0.9)"]}
+          colors={saving ? [...BUTTON_GRADIENT_DISABLED] : [...BUTTON_GRADIENT]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.saveButtonGradient}
         >
           {saving ? (
-            <ActivityIndicator color="#000" size="small" />
+            <ActivityIndicator color="#fff" size="small" />
           ) : (
             <>
-              <Target size={20} color="#000" />
+              <Target size={20} color="#fff" />
               <Text style={styles.saveButtonText}>Save Target</Text>
             </>
           )}
@@ -601,7 +602,7 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#000",
+    color: "#fff",
   },
   cancelButton: {
     alignItems: "center",

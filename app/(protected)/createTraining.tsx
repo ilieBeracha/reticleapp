@@ -64,7 +64,7 @@ function DrillItem({
       <View style={styles.drillItemContent}>
         <Text style={[styles.drillItemName, { color: colors.text }]}>{drill.name}</Text>
         <Text style={[styles.drillItemMeta, { color: colors.textMuted }]}>
-          {drill.distance_m}m • {drill.rounds_per_shooter} rounds
+          {drill.distance_m}m • {drill.strings_count ?? 1} rounds • {drill.rounds_per_shooter} shots/round
           {drill.time_limit_seconds ? ` • ${drill.time_limit_seconds}s` : ''}
         </Text>
       </View>
@@ -168,6 +168,7 @@ export default function CreateTrainingScreen() {
         target_type: template.target_type,
         distance_m: template.distance_m,
         rounds_per_shooter: template.rounds_per_shooter,
+        strings_count: template.strings_count || 1,
         time_limit_seconds: template.time_limit_seconds || undefined,
         position: template.position || undefined,
         weapon_category: template.weapon_category || undefined,

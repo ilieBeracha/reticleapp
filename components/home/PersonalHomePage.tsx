@@ -1,6 +1,7 @@
 import { useModals } from '@/contexts/ModalContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { getMyActivePersonalSession } from '@/services/sessionService';
 import { useSessionStore } from '@/store/sessionStore';
 import { useTeamStore } from '@/store/teamStore';
@@ -34,11 +35,12 @@ export function PersonalHomePage() {
   const colors = useColors();
   const { fullName } = useAppContext();
   const { setOnSessionCreated, setOnTeamCreated } = useModals();
+  const { canManageTraining } = usePermissions();
   
   // Direct store access - no useWorkspaceData() which is for team mode
   const { sessions, loading: sessionsLoading, initialized, loadPersonalSessions, createSession } = useSessionStore();
   const { loadTeams } = useTeamStore();
-  const { myUpcomingTrainings, loadingMyTrainings, loadMyUpcomingTrainings, loadMyStats } =
+  const { myUpcomingTrainings, loadMyUpcomingTrainings, loadMyStats } =
     useTrainingStore();
 
   // Local UI state
@@ -120,7 +122,13 @@ export function PersonalHomePage() {
     setRefreshing(false);
   }, [loadPersonalSessions, loadMyUpcomingTrainings, loadMyStats]);
 
-  const handleStartSession = useCallback(async () => {
+  const handleOpenActiveSession = useCallback(() => {
+    if (!activeSession) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push(`/(protected)/activeSession?sessionId=${activeSession.id}` as any);
+  }, [activeSession]);
+
+  const handleStartSoloSession = useCallback(async () => {
     if (starting) return;
     setStarting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -128,10 +136,10 @@ export function PersonalHomePage() {
       const existing = await getMyActivePersonalSession();
       if (existing) {
         router.push(`/(protected)/activeSession?sessionId=${existing.id}` as any);
-      } else {
-        const newSession = await createSession({ session_mode: 'solo' });
-        router.push(`/(protected)/activeSession?sessionId=${newSession.id}` as any);
+        return;
       }
+      const newSession = await createSession({ session_mode: 'solo' });
+      router.push(`/(protected)/activeSession?sessionId=${newSession.id}` as any);
     } catch (error) {
       console.error('Failed to start session:', error);
     } finally {
@@ -182,8 +190,10 @@ export function PersonalHomePage() {
           lastSession={lastSession}
           weeklyStats={weeklyStats}
           starting={starting}
-          onStart={handleStartSession}
+          onOpenActiveSession={handleOpenActiveSession}
+          onStartSolo={handleStartSoloSession}
           nextTraining={nextTraining}
+          canManageTraining={canManageTraining}
         />
         {/* Quick Actions */}
         <View style={styles.sectionContainer}>

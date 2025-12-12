@@ -10,10 +10,11 @@ import { useLocalSearchParams } from "expo-router";
  * No target type selection needed.
  */
 export default function ScanTargetSheet() {
-  const { sessionId, distance, bullets } = useLocalSearchParams<{
+  const { sessionId, distance, bullets, locked } = useLocalSearchParams<{
     sessionId: string;
     distance?: string;
     bullets?: string;
+    locked?: string;
   }>();
 
   if (!sessionId) {
@@ -25,6 +26,7 @@ export default function ScanTargetSheet() {
       sessionId={sessionId}
       defaultDistance={distance ? parseInt(distance) : 100}
       defaultBullets={bullets ? parseInt(bullets) : 5}
+      lockDistance={locked === '1'}
     />
   );
 }

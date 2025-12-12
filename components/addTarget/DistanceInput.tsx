@@ -13,18 +13,20 @@ import { DISTANCE_QUICK_PICKS } from "./types";
 interface DistanceInputProps {
   distance: number;
   onDistanceChange: (distance: number) => void;
+  disabled?: boolean;
 }
 
 export const DistanceInput = React.memo(function DistanceInput({
   distance,
   onDistanceChange,
+  disabled = false,
 }: DistanceInputProps) {
   const colors = useColors();
   
   return (
     <View style={[styles.container, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '25' }]}>
       <View style={styles.header}>
-        <Ionicons name="locate-outline" size={18} color={colors.primary} />
+        <Ionicons name={disabled ? "lock-closed-outline" : "locate-outline"} size={18} color={colors.primary} />
         <Text style={[styles.title, { color: colors.text }]}>Distance to Target</Text>
       </View>
       
@@ -33,6 +35,7 @@ export const DistanceInput = React.memo(function DistanceInput({
           style={[styles.mainInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
           value={String(distance)}
           onChangeText={(text) => {
+            if (disabled) return;
             const val = parseInt(text) || 0;
             onDistanceChange(val);
           }}
@@ -40,7 +43,8 @@ export const DistanceInput = React.memo(function DistanceInput({
           placeholderTextColor={colors.textMuted}
           keyboardType="number-pad"
           returnKeyType="done"
-          selectTextOnFocus
+          selectTextOnFocus={!disabled}
+          editable={!disabled}
         />
         <Text style={[styles.unit, { color: colors.textMuted }]}>meters</Text>
       </View>
@@ -55,9 +59,11 @@ export const DistanceInput = React.memo(function DistanceInput({
               distance === d && { backgroundColor: colors.primary, borderColor: colors.primary },
             ]}
             onPress={() => {
+              if (disabled) return;
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               onDistanceChange(d);
             }}
+            disabled={disabled}
             activeOpacity={0.7}
           >
             <Text

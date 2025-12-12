@@ -13,6 +13,7 @@ import {
     Timer,
 } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
+import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from "@/theme/colors";
 import {
     ActivityIndicator,
     Alert,
@@ -45,6 +46,7 @@ interface StepperProps {
   max?: number;
   label: string;
   unit?: string;
+  disabled?: boolean;
 }
 
 const Stepper = React.memo(function Stepper({
@@ -54,29 +56,32 @@ const Stepper = React.memo(function Stepper({
   max = 100,
   label,
   unit,
+  disabled = false,
 }: StepperProps) {
   const handleDecrement = useCallback(() => {
+    if (disabled) return;
     if (value > min) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       onChange(value - 1);
     }
-  }, [value, min, onChange]);
+  }, [disabled, value, min, onChange]);
 
   const handleIncrement = useCallback(() => {
+    if (disabled) return;
     if (value < max) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       onChange(value + 1);
     }
-  }, [value, max, onChange]);
+  }, [disabled, value, max, onChange]);
 
   return (
     <View style={stepperStyles.container}>
       <Text style={stepperStyles.label}>{label}</Text>
       <View style={stepperStyles.row}>
         <TouchableOpacity
-          style={[stepperStyles.btn, value <= min && stepperStyles.btnDisabled]}
+          style={[stepperStyles.btn, (disabled || value <= min) && stepperStyles.btnDisabled]}
           onPress={handleDecrement}
-          disabled={value <= min}
+          disabled={disabled || value <= min}
           activeOpacity={0.7}
         >
           <Minus size={24} color={value <= min ? COLORS.textDim : COLORS.white} />
@@ -88,9 +93,9 @@ const Stepper = React.memo(function Stepper({
         </View>
 
         <TouchableOpacity
-          style={[stepperStyles.btn, value >= max && stepperStyles.btnDisabled]}
+          style={[stepperStyles.btn, (disabled || value >= max) && stepperStyles.btnDisabled]}
           onPress={handleIncrement}
-          disabled={value >= max}
+          disabled={disabled || value >= max}
           activeOpacity={0.7}
         >
           <Plus size={24} color={value >= max ? COLORS.textDim : COLORS.white} />
@@ -104,9 +109,11 @@ const Stepper = React.memo(function Stepper({
             key={num}
             style={[stepperStyles.quickBtn, value === num && stepperStyles.quickBtnActive]}
             onPress={() => {
+              if (disabled) return;
               Haptics.selectionAsync();
               onChange(num);
             }}
+            disabled={disabled}
             activeOpacity={0.7}
           >
             <Text style={[stepperStyles.quickText, value === num && stepperStyles.quickTextActive]}>
@@ -335,6 +342,8 @@ interface TacticalTargetFlowProps {
   sessionId: string;
   defaultDistance?: number;
   defaultBullets?: number;
+  lockDistance?: boolean;
+  lockBullets?: boolean;
   onComplete?: () => void;
   onCancel?: () => void;
 }
@@ -343,10 +352,13 @@ export function TacticalTargetFlow({
   sessionId,
   defaultDistance = 25,
   defaultBullets = 10,
+  lockDistance = false,
+  lockBullets = false,
   onComplete,
   onCancel,
 }: TacticalTargetFlowProps) {
-  const [step, setStep] = useState<FlowStep>("setup");
+  const setupLocked = lockDistance && lockBullets;
+  const [step, setStep] = useState<FlowStep>(setupLocked ? "results" : "setup");
   const [saving, setSaving] = useState(false);
 
   // Setup state
@@ -467,9 +479,11 @@ export function TacticalTargetFlow({
                     key={dist}
                     style={[styles.distanceChip, distance === dist && styles.distanceChipSelected]}
                     onPress={() => {
+                      if (lockDistance) return;
                       Haptics.selectionAsync();
                       setDistance(dist);
                     }}
+                    disabled={lockDistance}
                     activeOpacity={0.7}
                   >
                     <Text
@@ -492,23 +506,24 @@ export function TacticalTargetFlow({
           <Stepper
             label="Rounds to Fire"
             value={bullets}
-            onChange={setBullets}
-            min={1}
-            max={100}
+            onChange={lockBullets ? () => {} : setBullets}
+            min={lockBullets ? bullets : 1}
+            max={lockBullets ? bullets : 100}
             unit="rds"
+            disabled={lockBullets}
           />
         </View>
 
         {/* Continue Button */}
         <TouchableOpacity style={styles.submitBtn} onPress={handleContinue} activeOpacity={0.9}>
           <LinearGradient
-            colors={["rgba(255,255,255,0.95)", "rgba(147,197,253,0.85)", "rgba(156,163,175,0.9)"]}
+            colors={[...BUTTON_GRADIENT]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.submitBtnGradient}
           >
             <Text style={styles.submitBtnText}>Enter Results</Text>
-            <ChevronRight size={20} color="#000" />
+            <ChevronRight size={20} color="#fff" />
           </LinearGradient>
         </TouchableOpacity>
 
@@ -533,9 +548,13 @@ export function TacticalTargetFlow({
     >
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => setStep("setup")} style={styles.backBtn}>
-          <ArrowLeft size={20} color={COLORS.white} />
-        </TouchableOpacity>
+        {setupLocked ? (
+          <View style={{ width: 40 }} />
+        ) : (
+          <TouchableOpacity onPress={() => setStep("setup")} style={styles.backBtn}>
+            <ArrowLeft size={20} color={COLORS.white} />
+          </TouchableOpacity>
+        )}
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Log Results</Text>
           <View style={styles.headerMeta}>
@@ -624,30 +643,32 @@ export function TacticalTargetFlow({
         disabled={saving}
       >
         <LinearGradient
-          colors={saving ? ["#6B7280", "#9CA3AF"] : ["rgba(255,255,255,0.95)", "rgba(147,197,253,0.85)", "rgba(156,163,175,0.9)"]}
+          colors={saving ? [...BUTTON_GRADIENT_DISABLED] : [...BUTTON_GRADIENT]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.submitBtnGradient}
         >
           {saving ? (
-            <ActivityIndicator color="#000" size="small" />
+            <ActivityIndicator color="#fff" size="small" />
           ) : (
             <>
-              <Target size={20} color="#000" />
+              <Target size={20} color="#fff" />
               <Text style={styles.submitBtnText}>Save Target</Text>
             </>
           )}
         </LinearGradient>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.cancelBtn}
-        onPress={() => setStep("setup")}
-        activeOpacity={0.7}
-        disabled={saving}
-      >
-        <Text style={styles.cancelBtnText}>Back to Setup</Text>
-      </TouchableOpacity>
+      {!setupLocked && (
+        <TouchableOpacity
+          style={styles.cancelBtn}
+          onPress={() => setStep("setup")}
+          activeOpacity={0.7}
+          disabled={saving}
+        >
+          <Text style={styles.cancelBtnText}>Back to Setup</Text>
+        </TouchableOpacity>
+      )}
 
       <View style={{ height: 30 }} />
     </ScrollView>
@@ -848,7 +869,7 @@ const styles = StyleSheet.create({
     height: 54,
     gap: 10,
   },
-  submitBtnText: { fontSize: 16, fontWeight: "700", color: "#000" },
+  submitBtnText: { fontSize: 16, fontWeight: "700", color: "#fff" },
   cancelBtn: { alignItems: "center", paddingVertical: 12 },
   cancelBtnText: { fontSize: 14, fontWeight: "600", color: COLORS.textMuted },
 });

@@ -1,11 +1,12 @@
 /**
  * ACTIVITY HUB
- * Event-focused unified section:
- * - Active session (personal)
- * - Live/upcoming team training
- * - Last session summary
- * - Start session
+ * Shows the user's current training activity state:
+ * - Live team training (if any)
+ * - Active personal session (if any)
+ * - Last completed session
+ * - Start new session button
  */
+import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from '@/theme/colors';
 import { format, formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,21 +21,12 @@ import {
   Play,
   Target,
   User,
-  Users
+  Users,
 } from 'lucide-react-native';
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut } from 'react-native-reanimated';
 import type { SessionStats, SessionWithDetails, ThemeColors, WeeklyStats } from './types';
-
-// Gradient colors (matching TacticalTargetFlow)
-const GRADIENT_COLORS = ['rgba(255,255,255,0.95)', 'rgba(147,197,253,0.85)', 'rgba(156,163,175,0.9)'] as const;
 
 // ============================================================================
 // TYPES
@@ -51,17 +43,288 @@ interface UpcomingTraining {
 
 interface ActivityHubProps {
   colors: ThemeColors;
-  // Session
   activeSession: SessionWithDetails | undefined;
   sessionTitle: string;
   sessionStats: SessionStats | null;
   lastSession: SessionWithDetails | undefined;
   weeklyStats: WeeklyStats;
-  // Actions
   starting: boolean;
-  onStart: () => void;
-  // Training
+  /** Open the current active personal session */
+  onOpenActiveSession: () => void;
+  /** Start a solo personal session */
+  onStartSolo: () => void;
   nextTraining?: UpcomingTraining;
+  /** If true, user can manage training (commander). If false, user is soldier. */
+  canManageTraining?: boolean;
+}
+
+// ============================================================================
+// SUB-COMPONENTS
+// ============================================================================
+
+/** Shows when a team training is currently live */
+function LiveTrainingCard({
+  training,
+  colors,
+  onPress,
+}: {
+  training: UpcomingTraining;
+  colors: ThemeColors;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+      onPress={onPress}
+    >
+      {/* Header: Live badge + Team name */}
+      <View style={styles.cardHeader}>
+        <View style={styles.liveBadge}>
+          <View style={styles.liveDot} />
+          <Text style={styles.liveText}>LIVE</Text>
+        </View>
+        {training.team_name && (
+          <View style={[styles.teamBadge, { backgroundColor: colors.border }]}>
+            <Users size={10} color={colors.textMuted} />
+            <Text style={[styles.teamBadgeText, { color: colors.textMuted }]}>{training.team_name}</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Title */}
+      <Text style={[styles.cardTitle, { color: colors.text }]}>{training.title}</Text>
+
+      {/* Footer: Drill count + Join button */}
+      <View style={styles.cardFooter}>
+        <Text style={[styles.cardMeta, { color: colors.textMuted }]}>{training.drill_count || 0} drills</Text>
+        <View style={styles.joinButton}>
+          <Text style={styles.joinButtonText}>Join</Text>
+          <ArrowRight size={14} color="#fff" />
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+/** Shows the user's currently active personal session */
+function ActiveSessionCard({
+  session,
+  title,
+  stats,
+  colors,
+  onPress,
+}: {
+  session: SessionWithDetails;
+  title: string;
+  stats: SessionStats | null;
+  colors: ThemeColors;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity activeOpacity={0.85} style={styles.activeCard} onPress={onPress}>
+      {/* Header: Active badge + Duration */}
+      <View style={styles.cardHeader}>
+        <View style={styles.activeBadge}>
+          <View style={styles.liveDot} />
+          <Text style={styles.liveText}>ACTIVE SESSION</Text>
+        </View>
+        {session.started_at && (
+          <Text style={styles.durationText}>
+            {formatDistanceToNow(new Date(session.started_at), { addSuffix: false })}
+          </Text>
+        )}
+      </View>
+
+      {/* Title */}
+      <Text style={[styles.activeTitle, { color: colors.text }]}>{title}</Text>
+
+      {/* Stats row */}
+      <View style={styles.statsRow}>
+        <View style={styles.stat}>
+          <Target size={16} color="#10B981" />
+          <Text style={[styles.statValue, { color: colors.text }]}>{stats?.targetCount ?? 0}</Text>
+        </View>
+        <View style={styles.stat}>
+          <Crosshair size={16} color="#10B981" />
+          <Text style={[styles.statValue, { color: colors.text }]}>{stats?.totalShotsFired ?? 0}</Text>
+        </View>
+        <View style={styles.stat}>
+          <Text style={[styles.statValue, { color: colors.text }]}>{stats?.totalHits ?? 0}</Text>
+          <Text style={[styles.statLabel, { color: colors.textMuted }]}>hits</Text>
+        </View>
+      </View>
+
+      {/* Continue button */}
+      <View style={styles.continueRow}>
+        <Play size={14} color="#10B981" fill="#10B981" />
+        <Text style={styles.continueText}>Continue</Text>
+        <ArrowRight size={14} color="#10B981" />
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+/** Shows the user's last completed session */
+function LastSessionCard({
+  session,
+  weeklyCount,
+  colors,
+}: {
+  session: SessionWithDetails;
+  weeklyCount: number;
+  colors: ThemeColors;
+}) {
+  const sessionName = session.training_title || session.drill_name || 'Freestyle';
+  const sessionDate = format(new Date(session.created_at), 'EEE, MMM d · h:mm a');
+
+  return (
+    <Animated.View entering={FadeInDown.delay(150)}>
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.lastSessionContent}>
+          {/* Icon */}
+          <View style={styles.iconWrapper}>
+            <Clock size={16} color={colors.textMuted} />
+          </View>
+
+          {/* Info */}
+          <View style={styles.lastSessionInfo}>
+            <Text style={[styles.lastSessionLabel, { color: colors.textMuted }]}>Last Session</Text>
+            <Text style={[styles.lastSessionTitle, { color: colors.text }]} numberOfLines={1}>
+              {sessionName}
+            </Text>
+            <Text style={[styles.lastSessionDate, { color: colors.textMuted }]}>{sessionDate}</Text>
+          </View>
+
+          {/* Weekly count */}
+          <View style={styles.weeklyStats}>
+            <Text style={[styles.weeklyValue, { color: colors.text }]}>{weeklyCount}</Text>
+            <Text style={[styles.weeklyLabel, { color: colors.textMuted }]}>this week</Text>
+          </View>
+        </View>
+      </View>
+    </Animated.View>
+  );
+}
+
+/** Start session button with dropdown options (solo + training when available) */
+function StartSessionButton({
+  colors,
+  starting,
+  upcomingTraining,
+  onStartSolo,
+  onGoToTraining,
+}: {
+  colors: ThemeColors;
+  starting: boolean;
+  upcomingTraining?: UpcomingTraining;
+  onStartSolo: () => void;
+  onGoToTraining: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const hasTeamOption = !!upcomingTraining;
+
+  const handleToggleExpand = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setExpanded((v) => !v);
+  };
+
+  const handleSolo = () => {
+    setExpanded(false);
+    onStartSolo();
+  };
+
+  const handleTeam = () => {
+    setExpanded(false);
+    onGoToTraining();
+  };
+
+  return (
+    <View style={styles.startSection}>
+      {/* Start button (acts as dropdown trigger) */}
+      <TouchableOpacity activeOpacity={0.9} onPress={handleToggleExpand} style={styles.startButton}>
+        <LinearGradient
+          colors={starting ? [...BUTTON_GRADIENT_DISABLED] : [...BUTTON_GRADIENT]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.startGradient}
+        >
+          {starting ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Play size={18} color="#fff" fill="#fff" />
+              <Text style={styles.startText}>Start Session</Text>
+              {expanded ? (
+                <ChevronUp size={14} color="#fff" />
+              ) : (
+                <ChevronDown size={14} color="#fff" />
+              )}
+            </>
+          )}
+        </LinearGradient>
+      </TouchableOpacity>
+
+      {/* Dropdown */}
+      {expanded && (
+        <Animated.View
+          entering={FadeIn.duration(200)}
+          exiting={FadeOut.duration(150)}
+          style={[styles.dropdown, { backgroundColor: colors.card, borderColor: colors.border }]}
+        >
+          {/* Solo option */}
+          <TouchableOpacity activeOpacity={0.8} onPress={handleSolo} style={styles.dropdownRow}>
+            <View style={styles.dropdownIcon}>
+              <User size={16} color={colors.text} />
+            </View>
+            <View style={styles.dropdownContent}>
+              <Text style={[styles.dropdownTitle, { color: colors.text }]}>Solo Session</Text>
+              <Text style={[styles.dropdownMeta, { color: colors.textMuted }]}>Personal practice</Text>
+            </View>
+            <ChevronRight size={16} color={colors.textMuted} />
+          </TouchableOpacity>
+
+          {hasTeamOption && (
+            <>
+              <View style={[styles.dropdownDivider, { backgroundColor: colors.border }]} />
+
+              {/* Team training option */}
+              <TouchableOpacity activeOpacity={0.8} onPress={handleTeam} style={styles.dropdownRow}>
+                <View style={[styles.dropdownIcon, { backgroundColor: 'rgba(147,197,253,0.15)' }]}>
+                  <Users size={16} color="#93C5FD" />
+                </View>
+                <View style={styles.dropdownContent}>
+                  <Text style={[styles.dropdownTitle, { color: colors.text }]} numberOfLines={1}>
+                    {upcomingTraining.title}
+                  </Text>
+                  <Text style={[styles.dropdownMeta, { color: colors.textMuted }]}>
+                    {upcomingTraining.team_name && `${upcomingTraining.team_name} · `}
+                    {upcomingTraining.scheduled_at
+                      ? format(new Date(upcomingTraining.scheduled_at), 'EEE h:mm a')
+                      : 'Team training'}
+                  </Text>
+                </View>
+                <ChevronRight size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+            </>
+          )}
+        </Animated.View>
+      )}
+    </View>
+  );
+}
+
+/** Empty state when no sessions exist */
+function EmptyState({ colors }: { colors: ThemeColors }) {
+  return (
+    <Animated.View entering={FadeInDown.delay(150)}>
+      <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Target size={24} color={colors.textMuted} />
+        <Text style={[styles.emptyTitle, { color: colors.text }]}>Ready to train?</Text>
+        <Text style={[styles.emptyText, { color: colors.textMuted }]}>Start your first session above</Text>
+      </View>
+    </Animated.View>
+  );
 }
 
 // ============================================================================
@@ -76,266 +339,62 @@ export function ActivityHub({
   lastSession,
   weeklyStats,
   starting,
-  onStart,
+  onOpenActiveSession,
+  onStartSolo,
   nextTraining,
+  canManageTraining = false,
 }: ActivityHubProps) {
-  const [expanded, setExpanded] = useState(false);
-  
+  // Determine what to show
   const hasActiveSession = !!activeSession;
   const hasLiveTraining = nextTraining?.status === 'ongoing';
   const hasUpcomingTraining = nextTraining && nextTraining.status !== 'ongoing';
+  const showEmptyState = !lastSession && !hasActiveSession;
 
-  const handleToggleExpand = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setExpanded(!expanded);
-  };
-
-  const handleStartSolo = () => {
-    setExpanded(false);
-    onStart();
-  };
-
-  const handleGoToTraining = () => {
+  // Navigation handlers
+  const goToTraining = () => {
     if (!nextTraining) return;
-    setExpanded(false);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push(`/(protected)/trainingDetail?id=${nextTraining.id}` as any);
+
+    // If training is ongoing and user is NOT a commander, go directly to trainingLive
+    // This avoids the double navigation (trainingDetail opening then redirecting)
+    if (nextTraining.status === 'ongoing' && !canManageTraining) {
+      router.push(`/(protected)/trainingLive?trainingId=${nextTraining.id}` as any);
+    } else {
+      router.push(`/(protected)/trainingDetail?id=${nextTraining.id}` as any);
+    }
   };
 
   return (
     <Animated.View entering={FadeInUp.delay(100).duration(400)} style={styles.container}>
-      {/* ══════════════════════════════════════════════════════════════════════
-          SECTION 1: LIVE TRAINING (Team) - Highest Priority
-      ══════════════════════════════════════════════════════════════════════ */}
+      {/* 1. Live Team Training (highest priority) */}
       {hasLiveTraining && nextTraining && (
-        <TouchableOpacity
-          activeOpacity={0.85}
-          style={[styles.liveTrainingCard, { backgroundColor: colors.card }]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            router.push(`/(protected)/trainingDetail?id=${nextTraining.id}` as any);
-          }}
-        >
-          <View style={styles.liveTrainingHeader}>
-            <View style={styles.liveBadge}>
-              <View style={styles.liveDotRed} />
-              <Text style={styles.liveTextRed}>LIVE TRAINING</Text>
-            </View>
-            {nextTraining.team_name && (
-              <View style={styles.teamBadge}>
-                <Users size={10} color="rgba(255,255,255,0.7)" />
-                <Text style={styles.teamBadgeText}>{nextTraining.team_name}</Text>
-              </View>
-            )}
-          </View>
-          <Text style={styles.liveTrainingTitle}>{nextTraining.title}</Text>
-          <View style={styles.liveTrainingFooter}>
-            <Text style={styles.liveTrainingMeta}>
-              {nextTraining.drill_count || 0} drills
-            </Text>
-            <View style={styles.joinBtn}>
-              <Text style={styles.joinBtnText}>Join</Text>
-              <ArrowRight size={14} color="#fff" />
-            </View>
-          </View>
-        </TouchableOpacity>
+        <LiveTrainingCard training={nextTraining} colors={colors} onPress={goToTraining} />
       )}
-
-      {/* ══════════════════════════════════════════════════════════════════════
-          SECTION 2: ACTIVE PERSONAL SESSION
-      ══════════════════════════════════════════════════════════════════════ */}
+      {/* 2. Active Personal Session */}
       {hasActiveSession && (
-        <TouchableOpacity
-          activeOpacity={0.85}
-          style={styles.activeSessionCard}
-          onPress={onStart}
-        >
-          <View style={styles.activeHeader}>
-            <View style={styles.liveBadgeGreen}>
-              <View style={styles.liveDotGreen} />
-              <Text style={styles.liveTextGreen}>ACTIVE SESSION</Text>
-            </View>
-            {activeSession.started_at && (
-              <Text style={styles.elapsedText}>
-                {formatDistanceToNow(new Date(activeSession.started_at), { addSuffix: false })}
-              </Text>
-            )}
-          </View>
-          <Text style={[styles.activeTitle, { color: colors.text }]}>{sessionTitle}</Text>
-          
-          <View style={styles.activeStats}>
-            <View style={styles.activeStat}>
-              <Target size={16} color="#10B981" />
-              <Text style={[styles.activeStatValue, { color: colors.text }]}>
-                {sessionStats?.targetCount ?? 0}
-              </Text>
-            </View>
-            <View style={styles.activeStat}>
-              <Crosshair size={16} color="#10B981" />
-              <Text style={[styles.activeStatValue, { color: colors.text }]}>
-                {sessionStats?.totalShotsFired ?? 0}
-              </Text>
-            </View>
-            <View style={styles.activeStat}>
-              <Text style={[styles.activeStatValue, { color: colors.text }]}>
-                {sessionStats?.totalHits ?? 0}
-              </Text>
-              <Text style={[styles.activeStatLabel, { color: colors.textMuted }]}>hits</Text>
-            </View>
-          </View>
-
-          <View style={styles.continueRow}>
-            <Play size={14} color="#10B981" fill="#10B981" />
-            <Text style={styles.continueText}>Continue</Text>
-            <ArrowRight size={14} color="#10B981" />
-          </View>
-        </TouchableOpacity>
+        <ActiveSessionCard
+          session={activeSession}
+          title={sessionTitle}
+          stats={sessionStats}
+          colors={colors}
+          onPress={onOpenActiveSession}
+        />
       )}
-
-      {/* ══════════════════════════════════════════════════════════════════════
-          SECTION 3: START SESSION BUTTON (with collapsible training option)
-      ══════════════════════════════════════════════════════════════════════ */}
+      {/* 4. Start Session Button (only when no active session) */}
       {!hasActiveSession && (
-        <View style={styles.startSection}>
-          {/* Main Button Row */}
-          <View style={styles.startButtonRow}>
-            <TouchableOpacity
-              activeOpacity={0.9}
-              disabled={starting}
-              onPress={hasUpcomingTraining ? handleStartSolo : onStart}
-              style={[styles.startButtonWrapper, hasUpcomingTraining && styles.startButtonWithIcon]}
-            >
-              <LinearGradient
-                colors={starting ? ['#6B7280', '#9CA3AF'] : [...GRADIENT_COLORS]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.startButtonGradient}
-              >
-                {starting ? (
-                  <ActivityIndicator size="small" color="#000" />
-                ) : (
-                  <>
-                    <Play size={18} color="#000" fill="#000" />
-                    <Text style={styles.startLabel}>Start Session</Text>
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {/* Team Training Toggle Icon */}
-            {hasUpcomingTraining && (
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={handleToggleExpand}
-                style={[styles.teamToggleBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-              >
-                <Users size={18} color={colors.text} />
-                {expanded ? (
-                  <ChevronUp size={14} color={colors.textMuted} />
-                ) : (
-                  <ChevronDown size={14} color={colors.textMuted} />
-                )}
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Expanded Options */}
-          {expanded && hasUpcomingTraining && (
-            <Animated.View 
-              entering={FadeIn.duration(200)} 
-              exiting={FadeOut.duration(150)}
-              style={[styles.expandedOptions, { backgroundColor: colors.card, borderColor: colors.border }]}
-            >
-              {/* Solo Option */}
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={handleStartSolo}
-                style={styles.optionRow}
-              >
-                <View style={[styles.optionIcon, { backgroundColor: 'rgba(156,163,175,0.15)' }]}>
-                  <User size={16} color={colors.text} />
-                </View>
-                <View style={styles.optionContent}>
-                  <Text style={[styles.optionTitle, { color: colors.text }]}>Solo Session</Text>
-                  <Text style={[styles.optionMeta, { color: colors.textMuted }]}>Personal practice</Text>
-                </View>
-                <ChevronRight size={16} color={colors.textMuted} />
-              </TouchableOpacity>
-
-              <View style={[styles.optionDivider, { backgroundColor: colors.border }]} />
-
-              {/* Team Training Option */}
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={handleGoToTraining}
-                style={styles.optionRow}
-              >
-                <View style={[styles.optionIcon, { backgroundColor: 'rgba(147,197,253,0.15)' }]}>
-                  <Users size={16} color="#93C5FD" />
-                </View>
-                <View style={styles.optionContent}>
-                  <Text style={[styles.optionTitle, { color: colors.text }]} numberOfLines={1}>
-                    {nextTraining?.title}
-                  </Text>
-                  <Text style={[styles.optionMeta, { color: colors.textMuted }]}>
-                    {nextTraining?.team_name && `${nextTraining.team_name} · `}
-                    {nextTraining?.scheduled_at 
-                      ? format(new Date(nextTraining.scheduled_at), 'EEE h:mm a')
-                      : 'Team training'}
-                  </Text>
-                </View>
-                <ChevronRight size={16} color={colors.textMuted} />
-              </TouchableOpacity>
-            </Animated.View>
-          )}
-        </View>
+        <StartSessionButton
+          colors={colors}
+          starting={starting}
+          upcomingTraining={hasUpcomingTraining ? nextTraining : undefined}
+          onStartSolo={onStartSolo}
+          onGoToTraining={goToTraining}
+        />
       )}
-
-      {/* ══════════════════════════════════════════════════════════════════════
-          SECTION 4: LAST SESSION EVENT
-      ══════════════════════════════════════════════════════════════════════ */}
-      {lastSession && (
-        <Animated.View entering={FadeInDown.delay(150)}>
-          <View style={[styles.eventCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.eventLeft}>
-              <View style={[styles.eventIconWrap, { backgroundColor: 'rgba(156,163,175,0.15)' }]}>
-                <Clock size={16} color={colors.textMuted} />
-              </View>
-              <View style={styles.eventContent}>
-                <Text style={[styles.eventLabel, { color: colors.textMuted }]}>Last Session</Text>
-                <Text style={[styles.eventTitle, { color: colors.text }]} numberOfLines={1}>
-                  {lastSession.training_title || lastSession.drill_name || 'Freestyle'}
-                </Text>
-                <Text style={[styles.eventMeta, { color: colors.textMuted }]}>
-                  {format(new Date(lastSession.created_at), 'EEE, MMM d · h:mm a')}
-                </Text>
-              </View>
-            </View>
-            {/* Mini Stats */}
-            <View style={styles.miniStats}>
-              <View style={styles.miniStat}>
-                <Text style={[styles.miniStatValue, { color: colors.text }]}>
-                  {weeklyStats.sessions}
-                </Text>
-                <Text style={[styles.miniStatLabel, { color: colors.textMuted }]}>this week</Text>
-              </View>
-            </View>
-          </View>
-        </Animated.View>
-      )}
-
-      {/* Empty State */}
-      {!lastSession && !hasActiveSession && (
-        <Animated.View entering={FadeInDown.delay(150)}>
-          <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Target size={24} color={colors.textMuted} />
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>Ready to train?</Text>
-            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-              Start your first session above
-            </Text>
-          </View>
-        </Animated.View>
-      )}
+     
+      {/* 3. Last Session Summary */}
+      {lastSession && <LastSessionCard session={lastSession} weeklyCount={weeklyStats.sessions} colors={colors} />}
+      {/* 5. Empty State */}
+      {showEmptyState && <EmptyState colors={colors} />}
     </Animated.View>
   );
 }
@@ -345,46 +404,72 @@ export function ActivityHub({
 // ============================================================================
 
 const styles = StyleSheet.create({
+  // Container
   container: {
     paddingHorizontal: 20,
     marginBottom: 16,
     gap: 10,
   },
 
-  // Live Training Card (Team)
-  liveTrainingCard: {
-
+  // Shared card styles
+  card: {
     borderRadius: 14,
+    borderWidth: 1,
     padding: 16,
   },
-  liveTrainingHeader: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cardMeta: {
+    fontSize: 12,
+  },
+
+  // Live/Active badges
   liveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: '#10B98120',
   },
-  liveDotRed: {
+  activeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  liveDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#fff',
+    backgroundColor: '#10B981',
   },
-  liveTextRed: {
+  liveText: {
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1,
-    color: '#fff',
+    color: '#10B981',
   },
+
+  // Team badge
   teamBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
@@ -392,80 +477,45 @@ const styles = StyleSheet.create({
   teamBadgeText: {
     fontSize: 10,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.9)',
   },
-  liveTrainingTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 10,
-  },
-  liveTrainingFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  liveTrainingMeta: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
-  },
-  joinBtn: {
+
+  // Join button
+  joinButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.2)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
+    backgroundColor: '#10B981',
   },
-  joinBtnText: {
+  joinButtonText: {
     fontSize: 13,
     fontWeight: '600',
     color: '#fff',
   },
 
-  // Active Session Card
-  activeSessionCard: {
+  // Active session card
+  activeCard: {
     backgroundColor: 'rgba(16, 185, 129, 0.08)',
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: '#10B981',
     padding: 14,
   },
-  activeHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  liveBadgeGreen: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  liveDotGreen: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10B981',
-  },
-  liveTextGreen: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-    color: '#10B981',
-  },
-  elapsedText: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#10B981',
-  },
   activeTitle: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 12,
   },
-  activeStats: {
+  durationText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#10B981',
+  },
+
+  // Stats row
+  statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginBottom: 12,
@@ -473,19 +523,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(16, 185, 129, 0.08)',
     borderRadius: 8,
   },
-  activeStat: {
+  stat: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
   },
-  activeStatValue: {
+  statValue: {
     fontSize: 16,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
   },
-  activeStatLabel: {
+  statLabel: {
     fontSize: 11,
   },
+
+  // Continue row
   continueRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -501,35 +553,80 @@ const styles = StyleSheet.create({
     color: '#10B981',
   },
 
-  // Start Section (with expandable)
+  // Last session card
+  lastSessionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  iconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(156,163,175,0.15)',
+  },
+  lastSessionInfo: {
+    flex: 1,
+  },
+  lastSessionLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+ 
+  lastSessionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  lastSessionDate: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  weeklyStats: {
+    alignItems: 'flex-end',
+  },
+  weeklyValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  weeklyLabel: {
+    fontSize: 9,
+    letterSpacing: 0.3,
+  },
+
+  // Start button section
   startSection: {
     gap: 8,
   },
-  startButtonRow: {
+  buttonRow: {
     flexDirection: 'row',
     gap: 8,
   },
-  startButtonWrapper: {
+  startButton: {
     flex: 1,
     borderRadius: 12,
     overflow: 'hidden',
   },
-  startButtonWithIcon: {
+  startButtonFlex: {
     flex: 1,
   },
-  startButtonGradient: {
+  startGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 14,
   },
-  startLabel: {
+  startText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#000',
+    color: '#fff',
   },
-  teamToggleBtn: {
+  teamToggle: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -539,100 +636,54 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
 
-  // Expanded Options
-  expandedOptions: {
+  // Options toggle (always visible)
+  optionsToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+
+  // Dropdown
+  dropdown: {
     borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
   },
-  optionRow: {
+  dropdownRow: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
     gap: 12,
   },
-  optionIcon: {
+  dropdownIcon: {
     width: 36,
     height: 36,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(156,163,175,0.15)',
   },
-  optionContent: {
+  dropdownContent: {
     flex: 1,
   },
-  optionTitle: {
+  dropdownTitle: {
     fontSize: 14,
     fontWeight: '600',
   },
-  optionMeta: {
+  dropdownMeta: {
     fontSize: 11,
     marginTop: 1,
   },
-  optionDivider: {
+  dropdownDivider: {
     height: StyleSheet.hairlineWidth,
     marginHorizontal: 12,
   },
 
-  // Event Card (generic reusable)
-  eventCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  eventLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 12,
-  },
-  eventIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  eventContent: {
-    flex: 1,
-  },
-  eventLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  eventTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  eventMeta: {
-    fontSize: 11,
-    marginTop: 2,
-  },
-
-  // Mini Stats (inside event card)
-  miniStats: {
-    alignItems: 'flex-end',
-    marginLeft: 8,
-  },
-  miniStat: {
-    alignItems: 'flex-end',
-  },
-  miniStatValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-  },
-  miniStatLabel: {
-    fontSize: 9,
-    letterSpacing: 0.3,
-  },
-
-  // Empty State
+  // Empty state
   emptyCard: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -650,4 +701,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-

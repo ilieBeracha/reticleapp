@@ -29,6 +29,7 @@ interface PaperTargetFlowProps {
   sessionId: string;
   defaultDistance?: number;
   defaultBullets?: number;
+  lockDistance?: boolean;
   onComplete?: () => void;
   onCancel?: () => void;
 }
@@ -37,6 +38,7 @@ export function PaperTargetFlow({
   sessionId,
   defaultDistance = 100,
   defaultBullets = 5,
+  lockDistance = false,
   onComplete,
   onCancel,
 }: PaperTargetFlowProps) {
@@ -262,6 +264,7 @@ export function PaperTargetFlow({
         onDetectionsChange={setEditedDetections}
         distance={distance}
         onDistanceChange={setDistance}
+        distanceLocked={lockDistance}
       />
     );
   }

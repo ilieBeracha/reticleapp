@@ -66,12 +66,53 @@ export async function createTraining(input: CreateTrainingInput): Promise<Traini
       training_id: training.id,
       order_index: index + 1,
       name: drill.name,
+      description: drill.description || null,
+
+      // === BASIC CONFIG ===
       target_type: drill.target_type,
       distance_m: drill.distance_m,
+
+      // rounds_per_shooter = bullets per round (per entry)
       rounds_per_shooter: drill.rounds_per_shooter,
-      time_limit_seconds: drill.time_limit_seconds || null,
-      position: drill.position || null,
-      weapon_category: drill.weapon_category || null,
+
+      // === TIMING ===
+      time_limit_seconds: drill.time_limit_seconds ?? null,
+      par_time_seconds: drill.par_time_seconds ?? null,
+
+      // === SCORING ===
+      scoring_mode: drill.scoring_mode ?? null,
+      min_accuracy_percent: drill.min_accuracy_percent ?? null,
+      points_per_hit: drill.points_per_hit ?? null,
+      penalty_per_miss: drill.penalty_per_miss ?? null,
+
+      // === TARGET CONFIGURATION ===
+      target_count: drill.target_count ?? 1,
+      target_size: drill.target_size ?? null,
+      shots_per_target: drill.shots_per_target ?? null,
+      target_exposure_seconds: drill.target_exposure_seconds ?? null,
+
+      // === SHOOTING SETUP ===
+      position: drill.position ?? null,
+      start_position: drill.start_position ?? null,
+      weapon_category: drill.weapon_category ?? null,
+
+      // === STAGE SETUP ===
+      strings_count: drill.strings_count ?? 1,
+      reload_required: drill.reload_required ?? false,
+      movement_type: drill.movement_type ?? null,
+      movement_distance_m: drill.movement_distance_m ?? null,
+
+      // === DIFFICULTY & CATEGORY ===
+      difficulty: drill.difficulty ?? null,
+      category: drill.category ?? null,
+      tags: drill.tags ?? null,
+
+      // === RICH CONTENT ===
+      instructions: drill.instructions ?? null,
+      diagram_url: drill.diagram_url ?? null,
+      video_url: drill.video_url ?? null,
+      safety_notes: drill.safety_notes ?? null,
+
       notes: drill.notes || null,
     }));
 
@@ -542,12 +583,51 @@ export async function addDrill(
       training_id: trainingId,
       order_index: nextIndex,
       name: drill.name,
+      description: drill.description || null,
+
+      // === BASIC CONFIG ===
       target_type: drill.target_type,
       distance_m: drill.distance_m,
       rounds_per_shooter: drill.rounds_per_shooter,
-      time_limit_seconds: drill.time_limit_seconds || null,
-      position: drill.position || null,
-      weapon_category: drill.weapon_category || null,
+
+      // === TIMING ===
+      time_limit_seconds: drill.time_limit_seconds ?? null,
+      par_time_seconds: drill.par_time_seconds ?? null,
+
+      // === SCORING ===
+      scoring_mode: drill.scoring_mode ?? null,
+      min_accuracy_percent: drill.min_accuracy_percent ?? null,
+      points_per_hit: drill.points_per_hit ?? null,
+      penalty_per_miss: drill.penalty_per_miss ?? null,
+
+      // === TARGET CONFIGURATION ===
+      target_count: drill.target_count ?? 1,
+      target_size: drill.target_size ?? null,
+      shots_per_target: drill.shots_per_target ?? null,
+      target_exposure_seconds: drill.target_exposure_seconds ?? null,
+
+      // === SHOOTING SETUP ===
+      position: drill.position ?? null,
+      start_position: drill.start_position ?? null,
+      weapon_category: drill.weapon_category ?? null,
+
+      // === STAGE SETUP ===
+      strings_count: drill.strings_count ?? 1,
+      reload_required: drill.reload_required ?? false,
+      movement_type: drill.movement_type ?? null,
+      movement_distance_m: drill.movement_distance_m ?? null,
+
+      // === DIFFICULTY & CATEGORY ===
+      difficulty: drill.difficulty ?? null,
+      category: drill.category ?? null,
+      tags: drill.tags ?? null,
+
+      // === RICH CONTENT ===
+      instructions: drill.instructions ?? null,
+      diagram_url: drill.diagram_url ?? null,
+      video_url: drill.video_url ?? null,
+      safety_notes: drill.safety_notes ?? null,
+
       notes: drill.notes || null,
     })
     .select()
@@ -678,25 +758,24 @@ export async function getMyDrillProgress(trainingId: string): Promise<DrillProgr
     return [];
   }
 
-  // Get completed sessions for this user in this training
-  const { data: sessions, error: sessionsError } = await supabase
-    .from('sessions')
-    .select('id, drill_id')
+  // Drill completion is based on recorded completions (requirements met),
+  // NOT simply on any completed session.
+  const { data: completions, error: completionsError } = await supabase
+    .from('user_drill_completions')
+    .select('session_id, drill_id')
     .eq('training_id', trainingId)
-    .eq('user_id', user.id)
-    .eq('status', 'completed')
-    .not('drill_id', 'is', null);
+    .eq('user_id', user.id);
 
-  if (sessionsError) {
-    console.error('Failed to fetch sessions:', sessionsError);
-    throw new Error('Failed to fetch sessions');
+  if (completionsError) {
+    console.error('Failed to fetch drill completions:', completionsError);
+    throw new Error('Failed to fetch drill progress');
   }
 
   // Create a map of drill_id -> session_id for completed drills
   const completedDrills = new Map<string, string>();
-  (sessions || []).forEach(s => {
-    if (s.drill_id) {
-      completedDrills.set(s.drill_id, s.id);
+  (completions || []).forEach((c: any) => {
+    if (c.drill_id) {
+      completedDrills.set(c.drill_id, c.session_id);
     }
   });
 

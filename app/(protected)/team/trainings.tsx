@@ -195,7 +195,7 @@ function DrillTemplateCard({
         <View style={styles.drillTemplateInfo}>
           <Text style={[styles.drillTemplateName, { color: colors.text }]}>{drill.name}</Text>
           <Text style={[styles.drillTemplateMeta, { color: colors.textMuted }]}>
-            {drill.distance_m}m • {drill.rounds_per_shooter} rounds
+            {drill.distance_m}m • {drill.strings_count ?? 1} rounds • {drill.rounds_per_shooter} shots/round
             {drill.time_limit_seconds ? ` • ${drill.time_limit_seconds}s` : ''}
           </Text>
         </View>

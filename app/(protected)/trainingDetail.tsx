@@ -4,6 +4,7 @@ import {
   SessionsSection,
   TrainingActions,
   TrainingHeader,
+  TrainingSummary,
   useTrainingActions,
   useTrainingDetail,
 } from '@/components/training-detail';
@@ -92,6 +93,10 @@ export default function TrainingDetailSheet() {
         startingDrillId={startingDrillId}
         drillProgress={drillProgress}
       />
+
+      {canManageTraining && (
+        <TrainingSummary sessions={sessions} colors={colors} loading={loadingSessions} />
+      )}
 
       <SessionsSection sessions={sessions} loading={loadingSessions} colors={colors} />
 

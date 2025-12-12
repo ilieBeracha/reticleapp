@@ -81,7 +81,7 @@ export function DrillCard({
             <Text style={[styles.meta, { color: colors.textMuted }]}>{drill.distance_m}m</Text>
             <View style={[styles.metaDot, { backgroundColor: colors.border }]} />
             <Text style={[styles.meta, { color: colors.textMuted }]}>
-              {drill.rounds_per_shooter} rounds
+              {(drill.strings_count ?? 1)} rounds • {drill.rounds_per_shooter} shots/round
             </Text>
             {drill.time_limit_seconds && (
               <>

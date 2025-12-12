@@ -18,9 +18,7 @@ import {
   View,
 } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-
-// Gradient colors (matching TacticalTargetFlow & PersonalHomePage)
-const GRADIENT_COLORS = ['rgba(255,255,255,0.95)', 'rgba(147,197,253,0.85)', 'rgba(156,163,175,0.9)'] as const;
+import { BUTTON_GRADIENT } from '@/theme/colors';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
@@ -311,7 +309,7 @@ export function TeamHomePage() {
               activeOpacity={0.9}
             >
               <LinearGradient
-                colors={[...GRADIENT_COLORS]}
+                colors={[...BUTTON_GRADIENT]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.liveBannerInner}
@@ -323,7 +321,7 @@ export function TeamHomePage() {
                     <Text style={styles.liveBannerTitle} numberOfLines={1}>{liveTraining.title}</Text>
                   </View>
                 </View>
-                <ChevronRight size={20} color="#000" />
+                <ChevronRight size={20} color="#fff" />
               </LinearGradient>
             </TouchableOpacity>
           </Animated.View>
@@ -366,12 +364,12 @@ export function TeamHomePage() {
               style={styles.actionCardGradient}
             >
               <LinearGradient
-                colors={[...GRADIENT_COLORS]}
+                colors={[...BUTTON_GRADIENT]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.actionGradientInner}
               >
-                <Calendar size={18} color="#000" />
+                <Calendar size={18} color="#fff" />
                 <Text style={styles.actionGradientText}>All Trainings</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -544,12 +542,12 @@ function EmptyState({
           activeOpacity={0.9}
         >
           <LinearGradient
-            colors={[...GRADIENT_COLORS]}
+            colors={[...BUTTON_GRADIENT]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.primaryBtnGradient}
           >
-            <Plus size={20} color="#000" />
+            <Plus size={20} color="#fff" />
             <Text style={styles.primaryBtnText}>Create Team</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -644,7 +642,7 @@ const styles = StyleSheet.create({
   actionGradientText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#000',
+    color: '#fff',
   },
   actionCardSecondary: {
     flex: 1,
@@ -691,13 +689,13 @@ const styles = StyleSheet.create({
   liveBannerLabel: {
     fontSize: 10,
     fontWeight: '700',
-    color: 'rgba(0,0,0,0.6)',
+    color: 'rgba(255,255,255,0.7)',
     letterSpacing: 1,
   },
   liveBannerTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#000',
+    color: '#fff',
     marginTop: 2,
   },
 
@@ -867,7 +865,7 @@ const styles = StyleSheet.create({
   emptyActions: { width: '100%', gap: 12 },
   primaryBtnWrapper: { borderRadius: 12, overflow: 'hidden' },
   primaryBtnGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 52, gap: 8 },
-  primaryBtnText: { color: '#000', fontSize: 16, fontWeight: '600' },
+  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   secondaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 48, borderRadius: 12, borderWidth: 1, gap: 8 },
   secondaryBtnText: { fontSize: 15, fontWeight: '500' },
 });

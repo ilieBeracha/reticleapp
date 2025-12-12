@@ -121,16 +121,26 @@ export default function ActiveSessionScreen() {
   const drillProgress = useMemo(() => {
     if (!drill) return null;
     
-    const requiredRounds = drill.rounds_per_shooter;
-    const requiredTargets = drill.target_count || 1;
-    const shotsProgress = Math.min(100, Math.round((totalShots / requiredRounds) * 100));
-    const targetsProgress = Math.min(100, Math.round((targets.length / requiredTargets) * 100));
+    // === Drill semantics (IMPORTANT) ===
+    // - strings_count = how many rounds/repetitions
+    // - rounds_per_shooter = bullets per round (per entry)
+    // Each "round" corresponds to one target entry (user fills the form once per round).
+    const rounds = drill.strings_count && drill.strings_count > 0 ? drill.strings_count : 1;
+    const bulletsPerRound = drill.rounds_per_shooter;
+
+    const requiredRounds = bulletsPerRound * rounds; // total bullets required
+    const requiredTargets = rounds; // number of entries required
+
+    const shotsProgress = requiredRounds > 0 ? Math.min(100, Math.round((totalShots / requiredRounds) * 100)) : 0;
+    const targetsProgress = requiredTargets > 0 ? Math.min(100, Math.round((targets.length / requiredTargets) * 100)) : 0;
     
     const isComplete = totalShots >= requiredRounds && targets.length >= requiredTargets;
     const meetsAccuracy = !drill.min_accuracy_percent || accuracy >= drill.min_accuracy_percent;
     const meetsTime = !drill.time_limit_seconds || elapsedTime <= drill.time_limit_seconds;
     
     return {
+      rounds,
+      bulletsPerRound,
       requiredRounds,
       requiredTargets,
       shotsProgress,
@@ -141,6 +151,25 @@ export default function ActiveSessionScreen() {
       overTime: drill.time_limit_seconds ? elapsedTime > drill.time_limit_seconds : false,
     };
   }, [drill, totalShots, targets.length, accuracy, elapsedTime]);
+
+  // Next target planning (drill-driven)
+  const nextTargetPlan = useMemo(() => {
+    if (!drillProgress || !drill) return null;
+
+    const remainingShots = Math.max(0, drillProgress.requiredRounds - totalShots);
+    const remainingTargets = Math.max(0, drillProgress.requiredTargets - targets.length);
+
+    if (remainingShots <= 0 || remainingTargets <= 0) {
+      return { remainingShots, remainingTargets, nextBullets: 0 };
+    }
+
+    // Drill contract: fixed bullets per round
+    const nextBullets = remainingTargets === 1
+      ? remainingShots
+      : Math.min(remainingShots, drillProgress.bulletsPerRound);
+
+    return { remainingShots, remainingTargets, nextBullets };
+  }, [drillProgress, drill, totalShots, targets.length]);
 
   const drillDistance = drill?.distance_m || 100;
   const defaultDistance = useMemo(() => {
@@ -162,26 +191,66 @@ export default function ActiveSessionScreen() {
   // Paper scan - uses drill distance if available
   const handleScanPaper = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    // Enforce drill boundaries on the client
+    if (hasDrill && drill && nextTargetPlan) {
+      if (drill.target_type !== 'paper') {
+        Alert.alert('Wrong target type', 'This drill requires tactical targets.');
+        return;
+      }
+      if (nextTargetPlan.remainingShots <= 0 || nextTargetPlan.remainingTargets <= 0) {
+        Alert.alert(
+          'Drill complete',
+          'You have reached the required targets/rounds. End the session to submit.'
+        );
+        return;
+      }
+    }
+
     router.push({
       pathname: '/(protected)/scanTarget',
       params: {
         sessionId,
         distance: defaultDistance.toString(),
+        ...(hasDrill ? { locked: '1' } : {}),
+        ...(hasDrill && nextTargetPlan?.nextBullets
+          ? { bullets: String(nextTargetPlan.nextBullets) }
+          : {}),
       },
     });
-  }, [sessionId, defaultDistance]);
+  }, [sessionId, defaultDistance, hasDrill, drill, nextTargetPlan]);
 
   // Tactical entry - uses drill distance if available
   const handleLogTactical = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    // Enforce drill boundaries on the client
+    if (hasDrill && drill && nextTargetPlan) {
+      if (drill.target_type !== 'tactical') {
+        Alert.alert('Wrong target type', 'This drill requires paper targets.');
+        return;
+      }
+      if (nextTargetPlan.remainingShots <= 0 || nextTargetPlan.remainingTargets <= 0) {
+        Alert.alert(
+          'Drill complete',
+          'You have reached the required targets/rounds. End the session to submit.'
+        );
+        return;
+      }
+    }
+
     router.push({
       pathname: '/(protected)/tacticalTarget',
       params: {
         sessionId,
         distance: defaultDistance.toString(),
+        ...(hasDrill ? { locked: '1' } : {}),
+        ...(hasDrill && nextTargetPlan?.nextBullets
+          ? { bullets: String(nextTargetPlan.nextBullets) }
+          : {}),
       },
     });
-  }, [sessionId, defaultDistance]);
+  }, [sessionId, defaultDistance, hasDrill, drill, nextTargetPlan]);
 
   const handleTargetPress = useCallback((target: SessionTargetWithResults) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -190,13 +259,35 @@ export default function ActiveSessionScreen() {
 
   const handleEndSession = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    const isDrillSession = hasDrill && !!drill && !!drillProgress;
+    const drillMeetsRequirements = !!drillProgress && drillProgress.isComplete && drillProgress.meetsAccuracy && drillProgress.meetsTime;
+
+    const title = isDrillSession && !drillMeetsRequirements ? 'End Drill Early?' : 'End Session?';
+    const message = isDrillSession && drillProgress && !drillMeetsRequirements
+      ? [
+          `This drill has requirements that are not met yet.`,
+          ``,
+          `Shots: ${totalShots}/${drillProgress.requiredRounds}`,
+          `Targets: ${targets.length}/${drillProgress.requiredTargets}`,
+          ...(drill?.min_accuracy_percent
+            ? [`Accuracy: ${accuracy}% (min ${drill.min_accuracy_percent}%)`]
+            : []),
+          ...(drill?.time_limit_seconds
+            ? [`Time: ${formatTime(elapsedTime)} (limit ${formatTime(drill.time_limit_seconds)})`]
+            : []),
+          ``,
+          `Ending now will NOT count as a drill completion.`,
+        ].join('\n')
+      : `${targets.length} target${targets.length !== 1 ? 's' : ''} logged • ${formatTime(elapsedTime)} elapsed`;
+
     Alert.alert(
-      'End Session?',
-      `${targets.length} target${targets.length !== 1 ? 's' : ''} logged • ${formatTime(elapsedTime)} elapsed`,
+      title,
+      message,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'End Session',
+          text: isDrillSession && !drillMeetsRequirements ? 'End Anyway' : 'End Session',
           style: 'destructive',
           onPress: async () => {
             setEnding(true);
@@ -221,7 +312,19 @@ export default function ActiveSessionScreen() {
         },
       ]
     );
-  }, [sessionId, targets.length, elapsedTime, session?.team_id, loadPersonalSessions, loadTeamSessions]);
+  }, [
+    sessionId,
+    targets.length,
+    elapsedTime,
+    session?.team_id,
+    loadPersonalSessions,
+    loadTeamSessions,
+    hasDrill,
+    drill,
+    drillProgress,
+    totalShots,
+    accuracy,
+  ]);
 
   const handleClose = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -356,6 +459,8 @@ export default function ActiveSessionScreen() {
   const showTactical = !drill || drill.target_type === 'tactical';
   const isPaperDrill = drill?.target_type === 'paper';
   const isTacticalDrill = drill?.target_type === 'tactical';
+  const drillLimitReached =
+    !!drill && !!nextTargetPlan && (nextTargetPlan.remainingShots <= 0 || nextTargetPlan.remainingTargets <= 0);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -402,8 +507,18 @@ export default function ActiveSessionScreen() {
                   </View>
                   <View style={styles.drillReqItem}>
                     <Zap size={12} color={colors.textMuted} />
-                    <Text style={[styles.drillReqText, { color: colors.text }]}>{drill.rounds_per_shooter} rds</Text>
+                    <Text style={[styles.drillReqText, { color: colors.text }]}>
+                      {drillProgress?.bulletsPerRound ?? drill.rounds_per_shooter} shots/round
+                    </Text>
                   </View>
+                  {drillProgress?.rounds && drillProgress.rounds > 1 && (
+                    <View style={styles.drillReqItem}>
+                      <Ionicons name="repeat" size={12} color={colors.textMuted} />
+                      <Text style={[styles.drillReqText, { color: colors.text }]}>
+                        {drillProgress.rounds} rounds
+                      </Text>
+                    </View>
+                  )}
                   {drill.time_limit_seconds && (
                     <View style={styles.drillReqItem}>
                       <Clock size={12} color={drillProgress?.overTime ? '#EF4444' : colors.textMuted} />
@@ -434,14 +549,14 @@ export default function ActiveSessionScreen() {
                   style={[
                     styles.drillProgressFill, 
                     { 
-                      width: `${drillProgress?.shotsProgress || 0}%`,
+                      width: `${drillProgress?.targetsProgress || 0}%`,
                       backgroundColor: drillProgress?.isComplete ? '#93C5FD' : colors.text,
                     }
                   ]} 
                 />
               </View>
               <Text style={[styles.drillProgressText, { color: colors.textMuted }]}>
-                {totalShots}/{drill.rounds_per_shooter} shots
+                {targets.length}/{drillProgress?.requiredTargets ?? 1} rounds
               </Text>
             </View>
           </View>
@@ -472,7 +587,9 @@ export default function ActiveSessionScreen() {
                 <Target size={16} color="#93C5FD" />
               </View>
               <Text style={[styles.statValue, { color: colors.text }]}>{targets.length}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>targets</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                {hasDrill ? 'rounds' : 'targets'}
+              </Text>
             </View>
             <View style={styles.statItem}>
               <View style={[styles.statIconBg, { backgroundColor: colors.secondary }]}>
@@ -543,13 +660,22 @@ export default function ActiveSessionScreen() {
           {/* Show appropriate button(s) based on drill type */}
           {showTactical && (
             <TouchableOpacity
-              style={[styles.tacticalButton, isTacticalDrill && styles.primaryActionBtn]}
+              style={[
+                styles.tacticalButton,
+                isTacticalDrill && styles.primaryActionBtn,
+                drillLimitReached && { opacity: 0.5 },
+              ]}
               onPress={handleLogTactical}
+              disabled={drillLimitReached}
               activeOpacity={0.8}
             >
               <Crosshair size={20} color={isTacticalDrill ? '#fff' : colors.textMuted} />
               <Text style={[styles.tacticalButtonText, { color: isTacticalDrill ? '#fff' : colors.text }]}>
-                {isTacticalDrill ? 'Log Target' : 'Manual'}
+                {isTacticalDrill
+                  ? (nextTargetPlan?.nextBullets
+                      ? `Log (${nextTargetPlan.nextBullets}rds)`
+                      : 'Log Target')
+                  : 'Manual'}
               </Text>
             </TouchableOpacity>
           )}
@@ -557,12 +683,23 @@ export default function ActiveSessionScreen() {
           {/* Scan Paper - Primary if paper drill or no drill */}
           {showPaper && (
             <TouchableOpacity
-              style={[styles.scanButton, isPaperDrill && styles.scanButtonPrimary]}
+              style={[
+                styles.scanButton,
+                isPaperDrill && styles.scanButtonPrimary,
+                drillLimitReached && { opacity: 0.5 },
+              ]}
               onPress={handleScanPaper}
+              disabled={drillLimitReached}
               activeOpacity={0.8}
             >
               <Camera size={20} color="#fff" />
-              <Text style={styles.scanButtonText}>{isPaperDrill ? 'Scan Target' : 'Scan'}</Text>
+              <Text style={styles.scanButtonText}>
+                {isPaperDrill
+                  ? (nextTargetPlan?.nextBullets
+                      ? `Scan (${nextTargetPlan.nextBullets}rds)`
+                      : 'Scan Target')
+                  : 'Scan'}
+              </Text>
             </TouchableOpacity>
           )}
         </View>

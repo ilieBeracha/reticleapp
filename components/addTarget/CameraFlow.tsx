@@ -12,6 +12,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { BUTTON_GRADIENT } from "@/theme/colors";
 import { COLORS, Step } from "./types";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -120,12 +121,12 @@ export const CameraFlow = React.memo(function CameraFlow({
               <Text style={styles.previewHint}>Make sure the target is clearly visible</Text>
               <TouchableOpacity style={styles.submitBtn} onPress={onSubmitPhoto} activeOpacity={0.9}>
                 <LinearGradient
-                  colors={["rgba(255,255,255,0.95)", "rgba(147,197,253,0.85)", "rgba(156,163,175,0.9)"]}
+                  colors={[...BUTTON_GRADIENT]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.submitBtnGradient}
                 >
-                  <Ionicons name="scan" size={22} color="#000" />
+                  <Ionicons name="scan" size={22} color="#fff" />
                   <Text style={styles.submitBtnText}>Analyze Target</Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -328,7 +329,7 @@ const styles = StyleSheet.create({
   submitBtnText: {
     fontSize: 17,
     fontWeight: "700",
-    color: "#000",
+    color: "#fff",
   },
   retakeBtn: {
     flexDirection: "row",

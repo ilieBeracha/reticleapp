@@ -115,7 +115,7 @@ const DrillItem = React.memo(function DrillItem({
           isCompleted && styles.drillNameCompleted
         ]}>{drill.name}</Text>
         <Text style={styles.drillMeta}>
-          {drill.distance_m}m • {drill.rounds_per_shooter} rounds • {drill.target_type}
+          {drill.distance_m}m • {drill.strings_count ?? 1} rounds • {drill.rounds_per_shooter} shots/round • {drill.target_type}
         </Text>
       </View>
       
@@ -324,6 +324,30 @@ export default function TrainingScreen() {
     setActionLoading(true);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      // If this training has drills, always start via a drill (recommended: first incomplete)
+      if (training.drills && training.drills.length > 0) {
+        const nextDrill =
+          training.drills.find((d) => !drillProgress.find((p) => p.drillId === d.id)?.completed) ||
+          training.drills[0];
+
+        if (!nextDrill) {
+          throw new Error("No drills available for this training.");
+        }
+
+        const session = await createSession({
+          training_id: training.id,
+          team_id: training.team_id || undefined,
+          drill_id: nextDrill.id,
+        });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        router.push({
+          pathname: "/(protected)/activeSession",
+          params: { sessionId: session.id },
+        });
+        return;
+      }
+
+      // No drills configured: allow a generic training session
       const session = await createSession({
         training_id: training.id,
         team_id: training.team_id || undefined,
@@ -338,7 +362,7 @@ export default function TrainingScreen() {
     } finally {
       setActionLoading(false);
     }
-  }, [training]);
+  }, [training, drillProgress]);
 
   const handleContinueSession = useCallback(() => {
     if (!mySession) return;
@@ -595,12 +619,22 @@ export default function TrainingScreen() {
               ) : (
                 <>
                   <Ionicons 
-                    name={mySession ? "arrow-forward-circle" : "add-circle"} 
+                    name={
+                      mySession
+                        ? "arrow-forward-circle"
+                        : training?.drills && training.drills.length > 0
+                          ? "play-circle"
+                          : "add-circle"
+                    }
                     size={22} 
                     color="#000" 
                   />
                   <Text style={styles.primaryBtnText}>
-                    {mySession ? "Continue Session" : "Enter Session"}
+                    {mySession
+                      ? "Continue Session"
+                      : training?.drills && training.drills.length > 0
+                        ? "Start Next Drill"
+                        : "Enter Session"}
                   </Text>
                 </>
               )}

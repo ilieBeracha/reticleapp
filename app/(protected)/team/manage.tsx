@@ -142,7 +142,7 @@ function MemberCard({
             role={member.role?.role}
           />
           {isCurrentUser && (
-            <View style={[styles.currentUserBadge, { backgroundColor: colors.primary }]}>
+            <View style={[styles.currentUserBadge, { backgroundColor: colors.primary, borderColor: colors.card }]}>
               <Sparkles size={6} color="#FFF" />
             </View>
           )}
@@ -236,6 +236,15 @@ export default function TeamManageScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push('/(protected)/teamSettings' as any);
   }, []);
+
+  // Get current user's role
+  const currentUserRole = useMemo(() => {
+    if (!currentUserId) return null;
+    const currentMember = members.find((m) => m.user_id === currentUserId);
+    return currentMember?.role?.role || null;
+  }, [members, currentUserId]);
+
+  const isOwner = currentUserRole === 'owner';
 
   // Filter members by search
   const filteredMembers = useMemo(() => {
@@ -353,30 +362,32 @@ export default function TeamManageScreen() {
 
 
         {/* ══════════════════════════════════════════════════════════════════════
-            INVITE BUTTON
+            INVITE BUTTON (Owner only)
         ══════════════════════════════════════════════════════════════════════ */}
-        <Animated.View entering={FadeIn.delay(200)}>
-          <TouchableOpacity
-            style={[styles.inviteBtn, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '30' }]}
-            onPress={handleInviteMember}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.inviteIcon, { backgroundColor: colors.primary + '20' }]}>
-              <UserPlus size={20} color={colors.primary} />
-            </View>
-            <View style={styles.inviteContent}>
-              <Text style={[styles.inviteTitle, { color: colors.text }]}>
-                Invite New Member
-              </Text>
-              <Text style={[styles.inviteDesc, { color: colors.textMuted }]}>
-                Share invite code or send directly
-              </Text>
-            </View>
-            <View style={[styles.inviteArrow, { backgroundColor: colors.primary + '20' }]}>
-              <ChevronRight size={16} color={colors.primary} />
-            </View>
-          </TouchableOpacity>
-        </Animated.View>
+        {isOwner && (
+          <Animated.View entering={FadeIn.delay(200)}>
+            <TouchableOpacity
+              style={[styles.inviteBtn, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '30' }]}
+              onPress={handleInviteMember}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.inviteIcon, { backgroundColor: colors.primary + '20' }]}>
+                <UserPlus size={20} color={colors.primary} />
+              </View>
+              <View style={styles.inviteContent}>
+                <Text style={[styles.inviteTitle, { color: colors.text }]}>
+                  Invite New Member
+                </Text>
+                <Text style={[styles.inviteDesc, { color: colors.textMuted }]}>
+                  Share invite code or send directly
+                </Text>
+              </View>
+              <View style={[styles.inviteArrow, { backgroundColor: colors.primary + '20' }]}>
+                <ChevronRight size={16} color={colors.primary} />
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
 
         {/* ══════════════════════════════════════════════════════════════════════
             EMPTY STATE
@@ -400,15 +411,17 @@ export default function TeamManageScreen() {
             </View>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No members yet</Text>
             <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
-              Invite members to start training together
+              {isOwner ? 'Invite members to start training together' : 'No team members have joined yet'}
             </Text>
-            <TouchableOpacity
-              style={[styles.emptyBtn, { backgroundColor: colors.primary }]}
-              onPress={handleInviteMember}
-            >
-              <Mail size={16} color="#FFF" />
-              <Text style={styles.emptyBtnText}>Send Invite</Text>
-            </TouchableOpacity>
+            {isOwner && (
+              <TouchableOpacity
+                style={[styles.emptyBtn, { backgroundColor: colors.primary }]}
+                onPress={handleInviteMember}
+              >
+                <Mail size={16} color="#FFF" />
+                <Text style={styles.emptyBtnText}>Send Invite</Text>
+              </TouchableOpacity>
+            )}
           </Animated.View>
         )}
 
@@ -526,7 +539,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#000',
   },
   memberInfo: { flex: 1, gap: 3 },
   memberNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },

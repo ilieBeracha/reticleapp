@@ -325,6 +325,16 @@ export default function CreateSessionSheet() {
       return;
     }
 
+    // Drill-driven trainings: route to training drill selection instead of creating a generic training session
+    if (mode === "training" && selectedTraining && (selectedTraining.drill_count || 0) > 0) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      router.replace({
+        pathname: "/(protected)/trainingLive",
+        params: { trainingId: selectedTraining.id },
+      });
+      return;
+    }
+
     setIsCreating(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
@@ -358,6 +368,7 @@ export default function CreateSessionSheet() {
     selectedTraining,
     activeTeamId,
     loadSessions,
+    mode,
   ]);
 
   // ========== RENDER ==========
@@ -517,7 +528,11 @@ export default function CreateSessionSheet() {
             <>
               <Ionicons name="play" size={22} color="#fff" />
               <Text style={styles.startButtonText}>
-                {mode === "solo" ? "Start Solo Session" : "Join Training"}
+                {mode === "solo"
+                  ? "Start Solo Session"
+                  : (selectedTraining?.drill_count || 0) > 0
+                    ? "Choose Drill"
+                    : "Join Training"}
               </Text>
             </>
           )}

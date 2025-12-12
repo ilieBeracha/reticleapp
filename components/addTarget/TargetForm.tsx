@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from "@/theme/colors";
 import { COLORS, TargetType } from "./types";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -358,19 +359,19 @@ export const TargetForm = React.memo(function TargetForm({
         disabled={saving}
       >
         <LinearGradient
-          colors={saving ? ["#6B7280", "#9CA3AF"] : ["rgba(255,255,255,0.95)", "rgba(147,197,253,0.85)", "rgba(156,163,175,0.9)"]}
+          colors={saving ? [...BUTTON_GRADIENT_DISABLED] : [...BUTTON_GRADIENT]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.submitBtnGradient}
         >
           {saving ? (
-            <ActivityIndicator color="#000" size="small" />
+            <ActivityIndicator color="#fff" size="small" />
           ) : (
             <>
               {targetType === "paper" ? (
-                <Camera size={20} color="#000" />
+                <Camera size={20} color="#fff" />
               ) : (
-                <Crosshair size={20} color="#000" />
+                <Crosshair size={20} color="#fff" />
               )}
               <Text style={styles.submitBtnText}>
                 {targetType === "paper" ? "Open Camera" : "Enter Results"}
@@ -735,7 +736,7 @@ const styles = StyleSheet.create({
   submitBtnText: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#000",
+    color: "#fff",
   },
   cancelBtn: {
     alignItems: "center",

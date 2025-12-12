@@ -4,42 +4,42 @@
  */
 import { useColors } from '@/hooks/ui/useColors';
 import type {
-    CreateDrillInput,
-    DrillCategory,
-    DrillDifficulty,
-    MovementType,
-    ScoringMode,
-    ShootingPosition,
-    StartPosition,
-    TargetSize,
-    TargetType,
-    WeaponCategory,
+  CreateDrillInput,
+  DrillCategory,
+  DrillDifficulty,
+  MovementType,
+  ScoringMode,
+  ShootingPosition,
+  StartPosition,
+  TargetSize,
+  TargetType,
+  WeaponCategory,
 } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import {
-    ChevronDown,
-    ChevronUp,
-    Clock,
-    Crosshair,
-    Dumbbell,
-    FileText,
-    Move,
-    Target,
-    Trophy
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Crosshair,
+  Dumbbell,
+  FileText,
+  Move,
+  Target,
+  Trophy
 } from 'lucide-react-native';
 import { useState } from 'react';
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -435,7 +435,7 @@ export function EnhancedDrillModal({
               </View>
             </View>
 
-            {/* Distance, Rounds */}
+            {/* Distance, Shots */}
             <View style={styles.row}>
               <View style={[styles.fieldGroup, { flex: 1 }]}>
                 <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Distance (m)</Text>
@@ -447,7 +447,7 @@ export function EnhancedDrillModal({
                 />
               </View>
               <View style={[styles.fieldGroup, { flex: 1 }]}>
-                <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Rounds</Text>
+                <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Shots (bullets)</Text>
                 <TextInput
                   style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
                   value={rounds}
@@ -455,6 +455,17 @@ export function EnhancedDrillModal({
                   keyboardType="number-pad"
                 />
               </View>
+            </View>
+
+            {/* Rounds (repeats) - how many times the user must log results */}
+            <View style={styles.fieldGroup}>
+              <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Rounds (repeats)</Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+                value={stringsCount}
+                onChangeText={setStringsCount}
+                keyboardType="number-pad"
+              />
             </View>
           </View>
 
@@ -633,25 +644,14 @@ export function EnhancedDrillModal({
                 <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Weapon</Text>
                 <ChipSelector options={WEAPONS} value={weapon} onChange={setWeapon} colors={colors} />
               </View>
-              <View style={styles.row}>
-                <View style={[styles.fieldGroup, { flex: 1 }]}>
-                  <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Strings</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: colors.secondary, borderColor: colors.border, color: colors.text }]}
-                    value={stringsCount}
-                    onChangeText={setStringsCount}
-                    keyboardType="number-pad"
+              <View style={styles.fieldGroup}>
+                <View style={styles.switchRow}>
+                  <Text style={[styles.fieldLabel, { color: colors.textMuted, marginBottom: 0 }]}>Reload Required</Text>
+                  <Switch
+                    value={reloadRequired}
+                    onValueChange={setReloadRequired}
+                    trackColor={{ false: colors.secondary, true: '#93C5FD' }}
                   />
-                </View>
-                <View style={[styles.fieldGroup, { flex: 1, justifyContent: 'center' }]}>
-                  <View style={styles.switchRow}>
-                    <Text style={[styles.fieldLabel, { color: colors.textMuted, marginBottom: 0 }]}>Reload Required</Text>
-                    <Switch
-                      value={reloadRequired}
-                      onValueChange={setReloadRequired}
-                      trackColor={{ false: colors.secondary, true: '#93C5FD' }}
-                    />
-                  </View>
                 </View>
               </View>
               <View style={styles.fieldGroup}>

@@ -6,6 +6,7 @@ export { SessionCard } from './SessionCard';
 export { SessionsSection } from './SessionsSection';
 export { TrainingActions } from './TrainingActions';
 export { TrainingHeader } from './TrainingHeader';
+export { TrainingSummary } from './TrainingSummary';
 
 // Hooks
 export { useTrainingActions, useTrainingDetail } from './hooks';
@@ -22,4 +23,6 @@ export type {
     TrainingStatus,
     TrainingWithDetails
 } from './types';
+
+export type { ParticipantStats, AggregateStats } from './TrainingSummary';
 

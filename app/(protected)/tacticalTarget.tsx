@@ -10,10 +10,11 @@ import { useLocalSearchParams } from "expo-router";
  * No target type selection needed.
  */
 export default function TacticalTargetSheet() {
-  const { sessionId, distance, bullets } = useLocalSearchParams<{
+  const { sessionId, distance, bullets, locked } = useLocalSearchParams<{
     sessionId: string;
     distance?: string;
     bullets?: string;
+    locked?: string;
   }>();
 
   if (!sessionId) {
@@ -25,6 +26,8 @@ export default function TacticalTargetSheet() {
       sessionId={sessionId}
       defaultDistance={distance ? parseInt(distance) : 25}
       defaultBullets={bullets ? parseInt(bullets) : 10}
+      lockDistance={locked === '1'}
+      lockBullets={locked === '1'}
     />
   );
 }

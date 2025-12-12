@@ -19,6 +19,7 @@ import ViewShot from "react-native-view-shot";
 import { DetectionEditor } from "./DetectionEditor";
 import { DetectionPreview } from "./DetectionPreview";
 import { DistanceInput } from "./DistanceInput";
+import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from "@/theme/colors";
 import { COLORS, EditableDetection, EditMode } from "./types";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -38,6 +39,7 @@ interface ResultCardProps {
   onDetectionsChange: (detections: EditableDetection[]) => void;
   distance: number;
   onDistanceChange: (distance: number) => void;
+  distanceLocked?: boolean;
 }
 
 export const ResultCard = React.memo(function ResultCard({
@@ -49,6 +51,7 @@ export const ResultCard = React.memo(function ResultCard({
   onDetectionsChange,
   distance,
   onDistanceChange,
+  distanceLocked = false,
 }: ResultCardProps) {
   const colors = useColors();
   const [editMode, setEditMode] = useState<EditMode>("add");
@@ -289,7 +292,7 @@ export const ResultCard = React.memo(function ResultCard({
       )}
 
       {/* Distance Input */}
-      <DistanceInput distance={distance} onDistanceChange={onDistanceChange} />
+      <DistanceInput distance={distance} onDistanceChange={onDistanceChange} disabled={distanceLocked} />
 
       {/* Editor Modal */}
       <Modal
@@ -410,16 +413,16 @@ export const ResultCard = React.memo(function ResultCard({
         disabled={saving}
       >
         <LinearGradient
-          colors={saving ? ["#6B7280", "#9CA3AF"] : ["rgba(255,255,255,0.95)", "rgba(147,197,253,0.85)", "rgba(156,163,175,0.9)"]}
+          colors={saving ? [...BUTTON_GRADIENT_DISABLED] : [...BUTTON_GRADIENT]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.doneButtonGradient}
         >
           {saving ? (
-            <ActivityIndicator color="#000" size="small" />
+            <ActivityIndicator color="#fff" size="small" />
           ) : (
             <>
-              <Ionicons name="checkmark-circle" size={22} color="#000" />
+              <Ionicons name="checkmark-circle" size={22} color="#fff" />
               <Text style={styles.doneButtonText}>
                 {stats.total === 0 ? "Save (No Hits)" : `Save ${stats.total} Hit${stats.total !== 1 ? "s" : ""}`}
               </Text>
@@ -749,7 +752,7 @@ const styles = StyleSheet.create({
   doneButtonText: {
     fontSize: 17,
     fontWeight: "700",
-    color: "#000",
+    color: "#fff",
   },
   retakeButton: {
     flexDirection: "row",

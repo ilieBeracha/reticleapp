@@ -130,12 +130,48 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
     throw new Error('Not authenticated');
   }
 
-  // If joining a training, check if user already has an active session for it
+  // If joining a training, enforce drill-driven sessions and avoid drill mismatches
   if (params.training_id) {
     const existingSession = await getMyActiveSessionForTraining(params.training_id);
+
+    // If there's already an active session for this training, only allow:
+    // - continuing it (no drill specified), or
+    // - continuing it if the requested drill matches
     if (existingSession) {
-      // Return existing session instead of creating duplicate
-      return existingSession;
+      if (!params.drill_id || existingSession.drill_id === params.drill_id) {
+        return existingSession;
+      }
+
+      const existingLabel = existingSession.drill_name || existingSession.training_title || 'this training';
+      throw new Error(
+        `You already have an active session for "${existingLabel}". End it before starting a different drill.`
+      );
+    }
+
+    // No active session yet: if this training has drills, require selecting a drill
+    if (!params.drill_id) {
+      const { count, error: drillsCountError } = await supabase
+        .from('training_drills')
+        .select('*', { count: 'exact', head: true })
+        .eq('training_id', params.training_id);
+
+      // If we can't determine drill count, fail safe by allowing session creation.
+      // (UI should still route users through drill selection.)
+      if (!drillsCountError && (count ?? 0) > 0) {
+        throw new Error('This training uses drills. Start your session from a specific drill.');
+      }
+    } else {
+      // Validate drill belongs to training (prevents mixing drills across trainings)
+      const { data: drillRow, error: drillError } = await supabase
+        .from('training_drills')
+        .select('training_id')
+        .eq('id', params.drill_id)
+        .single();
+
+      if (drillError) throw drillError;
+      if (drillRow?.training_id !== params.training_id) {
+        throw new Error('Selected drill does not belong to this training.');
+      }
     }
   }
 
@@ -541,9 +577,43 @@ export async function endSession(sessionId: string) {
     ended_at: new Date().toISOString(),
   });
 
-  // If session was linked to a training + drill, record the completion
-  if (session.training_id && session.drill_id) {
-    await recordDrillCompletion(sessionId, session.training_id, session.drill_id);
+  // If session was linked to a training + drill, record completion ONLY if requirements were met
+  if (session.training_id && session.drill_id && session.drill_config) {
+    const drill = session.drill_config;
+    const stats = await calculateSessionStats(sessionId);
+
+    const rounds = drill.strings_count && drill.strings_count > 0 ? drill.strings_count : 1;
+    const requiredTargets = rounds;
+    const requiredShots = drill.rounds_per_shooter * rounds;
+
+    const meetsShotCount = stats.totalShotsFired >= requiredShots;
+    const meetsTargetCount = stats.targetCount >= requiredTargets;
+    const meetsAccuracy = !drill.min_accuracy_percent || stats.accuracyPct >= drill.min_accuracy_percent;
+
+    // Time limit enforcement: compare against session duration (not per-target engagement time)
+    const endedAt = updatedSession.ended_at ? new Date(updatedSession.ended_at).getTime() : Date.now();
+    const startedAt = session.started_at ? new Date(session.started_at).getTime() : endedAt;
+    const durationSeconds = Math.max(0, Math.floor((endedAt - startedAt) / 1000));
+    const meetsTime = !drill.time_limit_seconds || durationSeconds <= drill.time_limit_seconds;
+
+    if (meetsShotCount && meetsTargetCount && meetsAccuracy && meetsTime) {
+      await recordDrillCompletion({
+        sessionId,
+        trainingId: session.training_id,
+        drillId: session.drill_id,
+        stats,
+      });
+    } else {
+      console.log('[SessionService] Drill requirements not met; skipping completion record', {
+        sessionId,
+        requiredTargets,
+        requiredShots,
+        totalTargets: stats.targetCount,
+        totalShots: stats.totalShotsFired,
+        accuracyPct: stats.accuracyPct,
+        durationSeconds,
+      });
+    }
   }
 
   return updatedSession;
@@ -552,30 +622,28 @@ export async function endSession(sessionId: string) {
 /**
  * Record drill completion in user_drill_completions table
  */
-async function recordDrillCompletion(
-  sessionId: string,
-  trainingId: string,
-  drillId: string
-): Promise<void> {
+async function recordDrillCompletion(params: {
+  sessionId: string;
+  trainingId: string;
+  drillId: string;
+  stats: SessionStats;
+}): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-
-  // Get session stats for this session
-  const stats = await calculateSessionStats(sessionId);
 
   // Insert completion record
   const { error } = await supabase
     .from('user_drill_completions')
     .insert({
       user_id: user.id,
-      training_id: trainingId,
-      drill_id: drillId,
-      session_id: sessionId,
+      training_id: params.trainingId,
+      drill_id: params.drillId,
+      session_id: params.sessionId,
       completed_at: new Date().toISOString(),
-      shots_fired: stats.totalShotsFired,
-      hits: stats.totalHits,
-      accuracy_pct: stats.accuracyPct,
-      time_seconds: stats.avgEngagementTimeSec,
+      shots_fired: params.stats.totalShotsFired,
+      hits: params.stats.totalHits,
+      accuracy_pct: params.stats.accuracyPct,
+      time_seconds: params.stats.avgEngagementTimeSec,
     });
 
   if (error) {
@@ -1177,6 +1245,61 @@ export async function calculateSessionStats(sessionId: string): Promise<SessionS
   };
 }
 
+// ============================================================================
+// DRILL-BOUND SESSION ENFORCEMENT (Client-side)
+// ============================================================================
+
+async function enforceDrillLimitsForNewTarget(params: {
+  sessionId: string;
+  targetType: TargetType;
+  bulletsFired: number;
+}) {
+  const session = await getSessionById(params.sessionId);
+  if (!session) {
+    throw new Error('Session not found');
+  }
+
+  const drill = session.drill_config;
+  if (!drill) {
+    return; // No drill = no drill limits
+  }
+
+  // Enforce target type matches drill type
+  if (drill.target_type !== params.targetType) {
+    throw new Error(`This drill requires ${drill.target_type} targets.`);
+  }
+
+  const stats = await calculateSessionStats(params.sessionId);
+
+  const rounds = drill.strings_count && drill.strings_count > 0 ? drill.strings_count : 1;
+  const bulletsPerRound = drill.rounds_per_shooter;
+
+  // Contract: user must log exactly `rounds` entries, each with `bulletsPerRound` bullets.
+  const requiredTargets = rounds;
+  const requiredShots = bulletsPerRound * rounds;
+
+  const remainingTargets = requiredTargets - stats.targetCount;
+  const remainingShots = requiredShots - stats.totalShotsFired;
+
+  if (remainingTargets <= 0) {
+    throw new Error(`Target limit reached (${requiredTargets}).`);
+  }
+
+  if (remainingShots <= 0) {
+    throw new Error(`Round limit reached (${requiredShots}).`);
+  }
+
+  if (params.bulletsFired > remainingShots) {
+    throw new Error(`This target exceeds remaining rounds. Remaining: ${remainingShots}.`);
+  }
+
+  const expectedNext = remainingTargets === 1 ? remainingShots : bulletsPerRound;
+
+  if (params.bulletsFired !== expectedNext) {
+    throw new Error(`This drill expects ${expectedNext} bullets for the next round.`);
+  }
+}
+
 /**
  * Add a target with results in one operation
  * Useful for paper targets where we have AI detection results immediately
@@ -1200,6 +1323,12 @@ export async function addTargetWithPaperResult(params: {
   result_notes?: string | null;
 }): Promise<SessionTargetWithResults> {
   console.log('[SessionService] addTargetWithPaperResult called');
+
+  await enforceDrillLimitsForNewTarget({
+    sessionId: params.session_id,
+    targetType: 'paper',
+    bulletsFired: params.bullets_fired,
+  });
   
   // First create the target
   const target = await addSessionTarget({
@@ -1207,7 +1336,7 @@ export async function addTargetWithPaperResult(params: {
     target_type: 'paper',
     distance_m: params.distance_m,
     lane_number: params.lane_number,
-    planned_shots: params.planned_shots,
+    planned_shots: params.planned_shots ?? params.bullets_fired,
     notes: params.notes,
     target_data: params.target_data,
   });
@@ -1252,13 +1381,19 @@ export async function addTargetWithTacticalResult(params: {
   time_seconds?: number | null;
   result_notes?: string | null;
 }): Promise<SessionTargetWithResults> {
+  await enforceDrillLimitsForNewTarget({
+    sessionId: params.session_id,
+    targetType: 'tactical',
+    bulletsFired: params.bullets_fired,
+  });
+
   // First create the target
   const target = await addSessionTarget({
     session_id: params.session_id,
     target_type: 'tactical',
     distance_m: params.distance_m,
     lane_number: params.lane_number,
-    planned_shots: params.planned_shots,
+    planned_shots: params.planned_shots ?? params.bullets_fired,
     notes: params.notes,
     target_data: params.target_data,
   });

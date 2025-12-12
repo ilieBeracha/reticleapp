@@ -16,6 +16,7 @@ import { Clock, Crosshair, Target } from 'lucide-react-native';
 import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import { BUTTON_GRADIENT } from '@/theme/colors';
 import type { ThemeColors } from './types';
 
 interface WeeklyActivityChartProps {
@@ -162,7 +163,7 @@ export function WeeklyActivityChart({ sessions, colors }: WeeklyActivityChartPro
                   <View style={styles.timelineCol}>
                     {session.status === 'active' ? (
                       <LinearGradient
-                        colors={['rgba(255,255,255,0.95)', 'rgba(147,197,253,0.85)', 'rgba(156,163,175,0.9)']}
+                        colors={[...BUTTON_GRADIENT]}
                         style={styles.timelineDotGradient}
                       />
                     ) : (
