@@ -12,7 +12,6 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import {
-  Award,
   Calendar,
   ChevronRight,
   Clock,
@@ -229,71 +228,76 @@ function AggregatedStatsCard({
   ].filter((d) => d.value > 0);
 
   // Default data for empty state
-  const chartData = pieData.length > 0 ? pieData : [{ value: 1, color: colors.card }];
+  const chartData = pieData.length > 0 ? pieData : [{ value: 1, color: `${colors.text}10` }];
 
   return (
     <Animated.View entering={FadeIn.delay(100).duration(400)} style={styles.halfCard}>
       <View
         style={[
           styles.card,
-          { backgroundColor: colors.card, borderColor: colors.border, padding: 0, overflow: 'hidden' },
+          { 
+            backgroundColor: colors.card, 
+            borderColor: colors.border, 
+            padding: 0, 
+            overflow: 'hidden',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 8,
+            elevation: 2,
+            flex: 1, // Add flex: 1 here
+          },
         ]}
       >
         {/* Header / Chart Section */}
-        <View style={{ padding: 12, alignItems: 'center', flexDirection: 'row', gap: 16 }}>
+        <View style={{ padding: 12, paddingBottom: 0, alignItems: 'center', flexDirection: 'row', gap: 12 }}>
           {/* Chart */}
           <View>
             <PieChart
               data={chartData}
               donut
-              radius={28}
-              innerRadius={20}
+              radius={32}
+              innerRadius={24}
               showText={false}
               backgroundColor={colors.card}
             />
             <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
-              <Text style={{ fontSize: 9, fontWeight: '700', color: colors.textMuted }}>{allSessions.length}</Text>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: colors.textMuted }}>{allSessions.length}</Text>
             </View>
           </View>
 
           {/* Legend / Primary Stat */}
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 12, color: colors.textMuted, fontWeight: '500' }}>Accuracy</Text>
-            <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text, letterSpacing: -0.5 }}>
+          <View style={{ flex: 1, justifyContent: 'center' }}>
+            <Text style={{ fontSize: 11, color: colors.textMuted, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 2 }}>Accuracy</Text>
+            <Text style={{ fontSize: 26, fontWeight: '800', color: colors.text, letterSpacing: -1 }}>
               {accuracy}%
             </Text>
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-              {solo > 0 && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.indigo }} />
-                  <Text style={{ fontSize: 10, color: colors.textMuted }}>Solo</Text>
-                </View>
-              )}
-              {team > 0 && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.green }} />
-                  <Text style={{ fontSize: 10, color: colors.textMuted }}>Team</Text>
-                </View>
-              )}
-            </View>
           </View>
         </View>
 
         {/* Stats Grid */}
-        <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: colors.border }}>
+        <View style={{ flexDirection: 'row', padding: 12, gap: 8 }}>
           <View
             style={{
               flex: 1,
-              padding: 10,
+              padding: 8,
+              borderRadius: 8,
+              backgroundColor: `${colors.text}05`,
               alignItems: 'center',
             }}
           >
-            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>{shots.toLocaleString()}</Text>
-            <Text style={{ fontSize: 9, color: colors.textMuted, fontWeight: '600', marginTop: 2 }}>SHOTS</Text>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>{shots.toLocaleString()}</Text>
+            <Text style={{ fontSize: 9, color: colors.textMuted, fontWeight: '700', marginTop: 2, textTransform: 'uppercase' }}>Shots</Text>
           </View>
-          <View style={{ flex: 1, padding: 10, alignItems: 'center' }}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>{hits.toLocaleString()}</Text>
-            <Text style={{ fontSize: 9, color: colors.textMuted, fontWeight: '600', marginTop: 2 }}>HITS</Text>
+          <View style={{ 
+              flex: 1, 
+              padding: 8, 
+              borderRadius: 8,
+              backgroundColor: `${colors.text}05`,
+              alignItems: 'center' 
+            }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>{hits.toLocaleString()}</Text>
+            <Text style={{ fontSize: 9, color: colors.textMuted, fontWeight: '700', marginTop: 2, textTransform: 'uppercase' }}>Hits</Text>
           </View>
         </View>
       </View>
@@ -301,66 +305,135 @@ function AggregatedStatsCard({
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// INSIGHTS CARD - Quick stats overview
-// ═══════════════════════════════════════════════════════════════════════════
-
-function InsightsCard({
+function WeeklyHighlightsCard({
   colors,
-  allSessions,
-  trainingStats,
-  hasTeams,
+  sessions,
 }: {
   colors: ReturnType<typeof useColors>;
-  allSessions: SessionWithDetails[];
-  trainingStats: { upcoming: number; completed: number; total: number };
-  hasTeams: boolean;
+  sessions: SessionWithDetails[];
 }) {
-  const completedSessions = allSessions.filter((s) => s.status === 'completed').length;
-  const totalSessions = allSessions.length;
-  const personalSessions = allSessions.filter((s) => !s.team_id).length;
-  const teamSessions = allSessions.filter((s) => s.team_id).length;
+  const stats = useMemo(() => {
+    let totalTimeMs = 0;
+    let minDispersion = 1000;
+    let hasDispersion = false;
+    let totalDist = 0;
+    let distCount = 0;
 
-  const completionPercent = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
+    sessions.forEach((s) => {
+      // Time
+      if (s.started_at && s.ended_at) {
+        const diff = new Date(s.ended_at).getTime() - new Date(s.started_at).getTime();
+        if (diff > 0 && diff < 86400000) totalTimeMs += diff;
+      }
+
+      // Dispersion
+      if (s.stats?.best_dispersion_cm && s.stats.best_dispersion_cm > 0) {
+        hasDispersion = true;
+        minDispersion = Math.min(minDispersion, s.stats.best_dispersion_cm);
+      }
+
+      // Distance
+      if (s.stats?.avg_distance_m) {
+        totalDist += s.stats.avg_distance_m;
+        distCount++;
+      }
+    });
+
+    const hours = Math.floor(totalTimeMs / (1000 * 60 * 60));
+    const mins = Math.floor((totalTimeMs % (1000 * 60 * 60)) / (1000 * 60));
+    const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+
+    const bestGroup = hasDispersion ? `${minDispersion.toFixed(1)} cm` : '—';
+    const avgDist = distCount > 0 ? `${Math.round(totalDist / distCount)} m` : '—';
+
+    return { timeStr, bestGroup, avgDist };
+  }, [sessions]);
 
   return (
     <Animated.View entering={FadeIn.delay(150).duration(400)} style={styles.halfCard}>
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {/* Solo sessions */}
-        <TouchableOpacity style={[styles.statRow, { backgroundColor: colors.secondary }]} activeOpacity={0.7}>
-          <View style={[styles.statIcon, { backgroundColor: `${colors.indigo}22` }]}>
-            <Crosshair size={14} color={colors.indigo} />
-          </View>
-          <View style={styles.statContent}>
-            <Text style={[styles.statLabel, { color: colors.text }]}>Solo</Text>
-            <Text style={[styles.statValue, { color: colors.textMuted }]}>
-              {personalSessions} session{personalSessions !== 1 ? 's' : ''}
-            </Text>
-          </View>
-        </TouchableOpacity>
-
-        {/* Team sessions or trainings */}
-        <TouchableOpacity
-          style={[styles.statRow, { backgroundColor: colors.secondary, marginTop: 8 }]}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.statIcon, { backgroundColor: `${colors.green}22` }]}>
-            {hasTeams ? <Users size={14} color={colors.green} /> : <Award size={14} color={colors.green} />}
-          </View>
-          <View style={styles.statContent}>
-            <Text style={[styles.statLabel, { color: colors.text }]}>{hasTeams ? 'Team' : 'Trainings'}</Text>
-            <Text style={[styles.statValue, { color: colors.textMuted }]}>
-              {hasTeams ? `${teamSessions} session${teamSessions !== 1 ? 's' : ''}` : `${trainingStats.completed} completed`}
-            </Text>
-          </View>
-        </TouchableOpacity>
-
-        {/* Mini progress bar */}
-        <View style={styles.progressContainer}>
-          <View style={[styles.progressBg, { backgroundColor: colors.secondary }]}>
+      <View
+        style={[
+          styles.card,
+          {
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 8,
+            elevation: 2,
+            justifyContent: 'center',
+            paddingVertical: 16,
+            paddingHorizontal: 16,
+            flex: 1, // Add flex: 1 here
+          },
+        ]}
+      >
+        <View style={{ gap: 16 }}>
+          {/* Row 1: Time */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <View
-              style={[styles.progressFill, { backgroundColor: colors.indigo, width: `${completionPercent}%` }]}
-            />
+              style={[
+                styles.statIcon,
+                { backgroundColor: `${colors.orange}15`, width: 36, height: 36, borderRadius: 10 },
+              ]}
+            >
+              <Clock size={18} color={colors.orange} />
+            </View>
+            <View>
+              <Text
+                style={{ fontSize: 10, color: colors.textMuted, fontWeight: '700', textTransform: 'uppercase', marginBottom: 2 }}
+              >
+                Time Trained
+              </Text>
+              <Text style={{ fontSize: 17, fontWeight: '800', color: colors.text, letterSpacing: -0.5 }}>
+                {stats.timeStr}
+              </Text>
+            </View>
+          </View>
+
+          {/* Row 2: Best Group */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View
+              style={[
+                styles.statIcon,
+                { backgroundColor: `${colors.indigo}15`, width: 36, height: 36, borderRadius: 10 },
+              ]}
+            >
+              <Crosshair size={18} color={colors.indigo} />
+            </View>
+            <View>
+              <Text
+                style={{ fontSize: 10, color: colors.textMuted, fontWeight: '700', textTransform: 'uppercase', marginBottom: 2 }}
+              >
+                Best Group
+              </Text>
+              <Text style={{ fontSize: 17, fontWeight: '800', color: colors.text, letterSpacing: -0.5 }}>
+                {stats.bestGroup}
+              </Text>
+            </View>
+          </View>
+
+          {/* Row 3: Avg Distance */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View
+              style={[
+                styles.statIcon,
+                { backgroundColor: `${colors.green}15`, width: 36, height: 36, borderRadius: 10 },
+              ]}
+            >
+              <Target size={18} color={colors.green} />
+            </View>
+            <View>
+              <Text
+                style={{ fontSize: 10, color: colors.textMuted, fontWeight: '700', textTransform: 'uppercase', marginBottom: 2 }}
+              >
+                Avg Distance
+              </Text>
+              <Text style={{ fontSize: 17, fontWeight: '800', color: colors.text, letterSpacing: -0.5 }}>
+                {stats.avgDist}
+              </Text>
+            </View>
           </View>
         </View>
       </View>
@@ -941,7 +1014,7 @@ export function UnifiedHomePage() {
               <SectionHeader title="Weekly Overview" colors={colors} />
               <View style={styles.cardsRow}>
                 <AggregatedStatsCard colors={colors} allSessions={lastWeekSessions} trainingStats={myStats} />
-                <InsightsCard colors={colors} allSessions={lastWeekSessions} trainingStats={myStats} hasTeams={hasTeams} />
+                <WeeklyHighlightsCard colors={colors} sessions={lastWeekSessions} />
               </View>
             </View>
 

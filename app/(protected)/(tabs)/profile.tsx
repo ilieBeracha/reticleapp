@@ -29,7 +29,7 @@ import {
   UserPlus,
   Users,
 } from 'lucide-react-native';
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   Alert,
   Platform,
