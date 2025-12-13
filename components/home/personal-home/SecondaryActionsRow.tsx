@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { Calendar, Clock, ScanLine } from 'lucide-react-native';
+import { Calendar, BarChart3, ScanLine } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { ThemeColors } from './types';
 
@@ -26,21 +26,21 @@ export function SecondaryActionsRow({ colors }: SecondaryActionsRowProps) {
       </TouchableOpacity>
 
       <TouchableOpacity
-        onPress={() => handlePress('/(protected)/personal/history')}
+        onPress={() => handlePress('/(protected)/(tabs)/insights')}
         activeOpacity={0.7}
         style={[styles.button, { borderColor: colors.border }]}
       >
-        <Clock size={18} color={colors.text} strokeWidth={1.5} />
-        <Text style={[styles.label, { color: colors.text }]}>History</Text>
+        <BarChart3 size={18} color={colors.text} strokeWidth={1.5} />
+        <Text style={[styles.label, { color: colors.text }]}>Insights</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        onPress={() => handlePress('/(protected)/personal/trainings')}
+        onPress={() => handlePress('/(protected)/(tabs)/trainings')}
         activeOpacity={0.7}
         style={[styles.button, { borderColor: colors.border }]}
       >
         <Calendar size={18} color={colors.text} strokeWidth={1.5} />
-        <Text style={[styles.label, { color: colors.text }]}>Schedule</Text>
+        <Text style={[styles.label, { color: colors.text }]}>Trainings</Text>
       </TouchableOpacity>
     </View>
   );

@@ -141,62 +141,50 @@ FOLLOW THESE RULES STRICTLY AND EXACTLY.
 - Explain your OBSERVATIONS clearly, then provide REASONING to identify the exact issue. Add console logs when needed to gather more information.
 
 
-MAIN SYSTEM COMPONENTS
+Training Management System Core Architecture
 
-1. Target Analysis Core (95/100)
-components/addTarget/ResultCard.tsx
-- Bullet hole detection with AI-assisted processing
-- Shot pattern clustering and grouping analysis
-- Real-world measurement calibration 
-- Training data collection and validation
+1. Team Hierarchy & Role Management (85/100)
+- Military-style command structure implementation (owner -> commander -> squad_commander -> soldier)
+- Role-based permission system with chain-of-command validation
+- Squad organization with hierarchical team relationships
+- Custom validation rules enforcing military command protocols
 
-2. Training Session Management (90/100)
+2. Training Session Control (90/100)
 components/training-detail/hooks/useTrainingActions.ts
-- Training lifecycle orchestration (planned -> live -> completed)
-- Role-based access control for session management
-- Multi-participant coordination
-- Drill completion validation
-- Team vs personal training modes
+- Multi-state workflow management (planned → ongoing → finished/cancelled)
+- Drill progression tracking with completion validation
+- Performance metrics calculation including accuracy and timing
+- Team-aware session coordination and status management
 
-3. Military Team Hierarchy (85/100)
-- Structured role system:
-  * Owner: Full system control
-  * Commander: Training management
-  * Squad Commander: Squad-level leadership
-  * Soldier: Basic member status
-- Squad-based organization
-- Role-specific permissions and workflows
-- Team operation authorization
+3. Target Analysis System (85/100)
+services/detectionService.ts
+- Automated bullet hole detection and analysis
+- Group size calculations with distance-based categorization
+- Shot accuracy tracking and performance assessment
+- Training data collection for detection model improvement
 
-4. Training Analytics System (80/100)
-- Shot grouping metrics
-- Accuracy calculations across sessions
-- Performance tracking and progression
-- Distance-based categorization:
-  * CQB (Close Quarters Battle)
-  * Short-range
-  * Medium-range
-  * Long-range
-  * Sniper qualification
+4. Organization Authentication (80/100)
+contexts/AuthContext.tsx
+- Team-context aware authentication
+- Workspace switching with organizational hierarchy
+- Profile synchronization with active team context
+- Session management with membership validation
 
-5. Training Calendar System (75/100)
-components/ui/TrainingCalendar.tsx
-- Specialized event handling:
-  * Training sessions
-  * Assessments
-  * Qualifications
-  * Briefings
-- Multi-type event visualization
-- Training schedule conflict management
-- Role-based calendar views
+5. Notification Command Chain (75/100)
+services/pushService.ts
+- Hierarchical notification routing following command structure
+- Priority-based delivery system
+- Training event propagation through command levels
+- Team-aware notification management
 
 Core Domain Concepts:
-- Military training progression
-- Shooting performance analytics
-- Team-based training coordination
-- Role-based command structure
-- Qualification tracking
-- Target analysis and scoring
+- Military command structure enforcement
+- Training validation with accuracy requirements
+- Squad-based team organization
+- Cross-team coordination capabilities
+- Performance tracking and assessment
+
+The system implements specialized workflows for military/law enforcement training management, emphasizing strict hierarchical relationships, performance validation, and command chain communication.
 
 $END$
 

@@ -15,7 +15,7 @@ export default function AuthRoutesLayout() {
   // If user is already authenticated, redirect to app
   // AuthContext will handle the actual navigation
   if (user?.id) {
-    return <Redirect href="/(protected)/personal" />;
+    return <Redirect href="/(protected)/(tabs)" />;
   }
 
   return (

@@ -1,19 +1,11 @@
-import { Redirect } from 'expo-router';
+import { Redirect } from "expo-router";
 
 /**
- * Protected Index - Redirects to Home (personal folder)
+ * Protected Index - Redirect to Unified Tabs
  * 
- * This handles the root protected route and sends users to their home screen.
- * The personal/index.tsx will show PersonalHomePage or TeamHomePage based on activeTeam.
+ * This simply redirects to the unified tab layout.
+ * No more personal vs team mode selection.
  */
 export default function ProtectedIndex() {
-  return <Redirect href="/(protected)/personal" />;
+    return <Redirect href="/(protected)/(tabs)" />;
 }
-
-
-
-
-
-
-
-

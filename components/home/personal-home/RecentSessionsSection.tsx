@@ -41,7 +41,7 @@ export function RecentSessionsSection({ colors, sessions }: RecentSessionsSectio
           <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>RECENT</Text>
         </View>
         <TouchableOpacity
-          onPress={() => router.push('/(protected)/personal/history' as any)}
+          onPress={() => router.push('/(protected)/(tabs)/insights' )}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Text style={[styles.sectionLink, { color: colors.textMuted }]}>See all</Text>

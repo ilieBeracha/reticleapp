@@ -1,67 +1,67 @@
 ---
-description: Training session data model implementation, state transitions, and validation workflows for military/law enforcement training management.
+description: Defines core training session data models, validation rules and progression tracking for military/law enforcement training management
 ---
 
 
 # training-session-model
 
-Training Session Data Model Components:
+Core Training Session Model Implementation
 
-1. Session Lifecycle Management (Importance: 95/100)
-Path: components/training-detail/hooks/useTrainingActions.ts
-- Implements strict state machine for training sessions:
-  * PLANNED -> LIVE -> COMPLETED
-  * PLANNED -> CANCELLED
-  * LIVE -> SUSPENDED -> LIVE
-  * LIVE -> TERMINATED
-- Each transition requires validation of:
-  * Required participants present
-  * Equipment availability
-  * Range conditions met
-  * Commander authorization
+1. Session State Machine (Importance Score: 95)
+- States: planned -> ongoing -> finished/cancelled
+- Validation rules for state transitions
+- Required fields per state
+- Completion criteria enforcement
 
-2. Drill Progression Tracking (Importance: 90/100)
-Path: components/session/TargetDetailModal.tsx
-- Enforces sequential drill completion requirements:
-  * Qualification drills must follow prescribed order
-  * Training drills allow flexible sequencing
-  * Tactical drills require scenario completion validation
-- Tracks individual and team completion status
-- Manages drill-specific scoring metrics
-- Enforces retry limits based on drill type
+2. Drill Progress Tracking (Importance Score: 90) 
+- Individual drill completion status
+- Accuracy requirements validation
+- Time-based completion rules
+- Sequential progression enforcement
 
-3. Session Validation System (Importance: 85/100)
-Path: components/insights/hooks/useInsightsData.ts
-- Validates session completion criteria:
-  * Minimum required rounds fired
-  * Target acquisition requirements met
-  * Time constraints satisfied
-  * Safety protocols followed
-- Generates completion certificates
-- Records qualification achievements
-- Tracks certification expiration
+3. Session Types
+- Paper Target Training
+  - Group size calculations
+  - Shot pattern analysis
+  - Distance-based scoring
+- Tactical Training
+  - Stage completion tracking
+  - Hit/miss ratio requirements
+  - Time-based performance metrics
 
-4. Training Data Collection (Importance: 80/100)
-Path: components/session/ResultCard.tsx
-- Captures structured training metrics:
-  * Shot grouping measurements
-  * Target acquisition times
-  * Reaction speeds
-  * Accuracy percentages
-- Links biometric data to training performance
-- Tracks environmental conditions
-- Records equipment configurations
+4. Validation Rules
+- Minimum accuracy thresholds
+- Maximum completion times
+- Required drill sequences
+- Participant prerequisites
 
-5. Progress Tracking Model (Importance: 75/100)
-Path: components/training-detail/ProgressTracker.tsx
-- Implements multi-level progression system:
-  * Individual skill levels
-  * Team qualification status
-  * Certification requirements
-  * Refresher training schedules
-- Manages prerequisite requirements
-- Tracks continuing education credits
-- Handles qualification renewals
+5. Core Data Model
+```
+TrainingSession {
+  id: string
+  status: SessionStatus
+  type: SessionType
+  startTime: DateTime
+  endTime: DateTime?
+  drills: DrillProgress[]
+  participants: Participant[]
+  requirements: CompletionRequirements
+  metrics: SessionMetrics
+}
+```
+
+6. Progress Tracking
+- Per-participant completion status
+- Drill sequence validation
+- Cumulative accuracy calculations
+- Time-based performance metrics
+
+Key Business Rules:
+- Sessions must follow planned -> ongoing -> finished progression
+- Drills must be completed in defined sequence
+- Minimum accuracy requirements per drill type
+- Maximum time limits for tactical drills
+- Required participant roles for group sessions
 
 $END$
 

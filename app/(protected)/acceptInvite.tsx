@@ -55,7 +55,7 @@ export default function AcceptInviteSheet() {
     // 2) Close the form sheet, then land on Team root
     router.back();
     setTimeout(() => {
-      router.replace('/(protected)/team');
+      router.replace('/(protected)/(tabs)');
     }, 50);
   }, []);
 

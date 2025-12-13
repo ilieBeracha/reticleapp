@@ -757,20 +757,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerTitle: { 
-    fontSize: 18, 
+    fontSize: 17, 
     fontWeight: '700',
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
   },
   headerCancel: { 
-    fontSize: 16, 
+    fontSize: 15, 
     fontWeight: '500',
   },
   headerSave: { 
-    fontSize: 16, 
+    fontSize: 15, 
     fontWeight: '700',
   },
 
@@ -778,18 +778,18 @@ const styles = StyleSheet.create({
   body: { 
     flex: 1, 
     paddingHorizontal: 16, 
-    paddingTop: 20,
+    paddingTop: 16,
   },
 
   // Section
   section: { 
-    marginBottom: 24,
+    marginBottom: 20,
   },
   sectionLabel: { 
-    fontSize: 13, 
-    fontWeight: '600', 
-    letterSpacing: 0.5, 
-    marginBottom: 14,
+    fontSize: 11, 
+    fontWeight: '700', 
+    letterSpacing: 0.8, 
+    marginBottom: 12,
     textTransform: 'uppercase',
   },
 
@@ -798,33 +798,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 12,
     borderWidth: 1,
     marginBottom: 2,
   },
   sectionHeaderLeft: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    gap: 12,
+    gap: 10,
   },
   sectionHeaderTitle: { 
-    fontSize: 15, 
+    fontSize: 14, 
     fontWeight: '600',
   },
   hasValuesDot: { 
-    width: 8, 
-    height: 8, 
-    borderRadius: 4,
+    width: 6, 
+    height: 6, 
+    borderRadius: 3,
   },
 
   // Section Content
   sectionContent: {
-    padding: 16,
-    borderRadius: 14,
+    padding: 14,
+    borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 14,
+    marginBottom: 12,
     marginTop: -4,
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
@@ -832,74 +832,75 @@ const styles = StyleSheet.create({
 
   // Fields
   fieldGroup: { 
-    marginBottom: 18,
+    marginBottom: 14,
   },
   fieldLabel: { 
-    fontSize: 12, 
+    fontSize: 11, 
     fontWeight: '600', 
-    marginBottom: 10,
-    letterSpacing: 0.2,
+    marginBottom: 8,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
   },
   row: { 
     flexDirection: 'row', 
-    gap: 12,
+    gap: 10,
   },
 
   // Inputs
   input: {
-    height: 52,
-    borderRadius: 12,
+    height: 46,
+    borderRadius: 10,
     borderWidth: 1,
-    paddingHorizontal: 16,
-    fontSize: 16,
+    paddingHorizontal: 14,
+    fontSize: 15,
   },
   inputMultiline: {
-    height: 80,
-    paddingTop: 14,
-    paddingBottom: 14,
+    height: 72,
+    paddingTop: 12,
+    paddingBottom: 12,
     textAlignVertical: 'top',
   },
   inputLarge: {
-    height: 110,
-    paddingTop: 14,
-    paddingBottom: 14,
+    height: 100,
+    paddingTop: 12,
+    paddingBottom: 12,
     textAlignVertical: 'top',
   },
 
   // Type buttons
   typeRow: { 
     flexDirection: 'row', 
-    gap: 12,
+    gap: 10,
   },
   typeBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-    height: 54,
-    borderRadius: 12,
-    borderWidth: 2,
+    gap: 8,
+    height: 48,
+    borderRadius: 10,
+    borderWidth: 1.5,
   },
   typeBtnText: { 
-    fontSize: 15, 
-    fontWeight: '700',
+    fontSize: 14, 
+    fontWeight: '600',
   },
 
   // Chips
   chipRow: { 
     flexDirection: 'row', 
     flexWrap: 'wrap', 
-    gap: 10,
+    gap: 8,
   },
   chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1.5,
   },
   chipText: { 
-    fontSize: 13, 
+    fontSize: 12, 
     fontWeight: '600',
   },
 
@@ -908,6 +909,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 10,
+    paddingTop: 8,
   },
 });

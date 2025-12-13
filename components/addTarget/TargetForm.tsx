@@ -1,4 +1,5 @@
 import { useColors } from "@/hooks/ui/useColors";
+import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from "@/theme/colors";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
@@ -12,7 +13,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from "@/theme/colors";
 import { COLORS, TargetType } from "./types";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -406,8 +406,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 24,
-    marginTop: 16,
+    paddingVertical: 16,
   },
   headerLeft: {
     flexDirection: "row",

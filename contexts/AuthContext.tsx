@@ -113,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     // Navigate to home (always start in personal mode)
     setTimeout(() => {
-      router.replace("/(protected)/personal")
+      router.replace("/(protected)/(tabs)")
       setTransitioning(false)
     }, 100)
   }
@@ -138,7 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     // Navigate to home (always start in personal mode)
     setTimeout(() => {
-      router.replace("/(protected)/personal")
+      router.replace("/(protected)/(tabs)")
       setTransitioning(false)
     }, 800)
   }

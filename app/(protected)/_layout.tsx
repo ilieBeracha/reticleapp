@@ -5,14 +5,19 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { router, Stack } from 'expo-router';
 
 /**
- * Protected Layout - Team-First Architecture
+ * Protected Layout - Unified Architecture
  * 
  * This layout wraps all authenticated routes.
- * All sheets are now native form sheets via Stack.Screen.
+ * 
+ * Key change: No more "personal mode" vs "team mode".
+ * Single unified tab bar at /(protected)/(tabs)/.
  * 
  * Route Structure:
- * - /(protected)/personal/* - Personal mode (training alone)
- * - /(protected)/team/* - Team mode (active team context)
+ * - /(protected)/(tabs)/* - Main app tabs (Home, Trainings, Insights, Profile)
+ * - /(protected)/teamDetail - Team detail/management sheet
+ * - /(protected)/trainingDetail - Training detail sheet
+ * - /(protected)/activeSession - Active session (full screen)
+ * - etc.
  */
 export default function ProtectedLayout() {
   const colors = useColors();
@@ -30,8 +35,6 @@ export default function ProtectedLayout() {
           headerTitle: () => (
             <Header
               onNotificationPress={() => router.push('/(protected)/notifications')}
-              onUserPress={() => router.push('/(protected)/userMenu')}
-              onTeamPress={() => router.push('/(protected)/teamSwitcher')}
             />
           ),
           headerTitleAlign: 'left',
@@ -44,53 +47,14 @@ export default function ProtectedLayout() {
           options={{ headerShown: false }}
         />
         
-        {/* Personal Mode Tabs */}
+        {/* Unified Tabs */}
         <Stack.Screen 
-          name="personal" 
+          name="(tabs)" 
           options={{ 
             headerShown: true,
-            headerBackVisible: false,  // Never show back button on root tabs
+            headerBackVisible: false,
           }}
         />
-        
-        {/* Team Mode Tabs */}
-        <Stack.Screen
-          name="team" 
-          options={{ 
-            headerShown: true,
-            headerBackVisible: false,  // Never show back button on root tabs
-          }}
-        />
-        
-        {/* Team Switcher */}
-        <Stack.Screen
-          name="teamSwitcher"
-          options={{
-            headerShown: false,
-            presentation: "formSheet",
-            gestureEnabled: true,
-            sheetGrabberVisible: true,
-            contentStyle: { backgroundColor: colors.card },
-            sheetAllowedDetents: [0.5, 0.85, 1],
-            sheetInitialDetentIndex: 1,
-            sheetLargestUndimmedDetentIndex: -1,
-          }}
-        />
-        
-        {/* Accept Invite */}
-        <Stack.Screen
-          name="acceptInvite"
-          options={{
-            headerShown: false,
-            presentation: "formSheet",
-            gestureEnabled: true,
-            sheetGrabberVisible: true,
-            contentStyle: { backgroundColor: colors.card },
-            sheetAllowedDetents: [0.6, 0.85],
-            sheetInitialDetentIndex: 0,
-            sheetLargestUndimmedDetentIndex: -1,
-          }}
-      />
         
         {/* User Menu */}
         <Stack.Screen
@@ -122,6 +86,21 @@ export default function ProtectedLayout() {
           }}
         />
         
+        {/* Team Detail - View/manage a specific team */}
+        <Stack.Screen
+          name="teamDetail"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.92, 1],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+          }}
+        />
+        
         {/* Create Team */}
         <Stack.Screen
           name="createTeam"
@@ -135,6 +114,21 @@ export default function ProtectedLayout() {
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
         }}
+      />
+
+        {/* Accept Invite */}
+        <Stack.Screen
+          name="acceptInvite"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.6, 0.85],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+          }}
       />
         
         {/* Create Training */}
@@ -223,20 +217,31 @@ export default function ProtectedLayout() {
           }}
         />
         
-        {/* Training Detail */}
+        {/* Session Detail - Summary sheet */}
         <Stack.Screen
-          name="trainingDetail"
+          name="sessionDetail"
           options={{
             headerShown: false,
             presentation: "formSheet",
             gestureEnabled: true,
             sheetGrabberVisible: true,
             contentStyle: { backgroundColor: colors.card },
-            sheetAllowedDetents: [0.85, 0.95],
+            sheetAllowedDetents: [0.7, 0.95],
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
-        }}
-      />
+          }}
+        />
+        
+        {/* Training Detail - Full screen */}
+        <Stack.Screen
+          name="trainingDetail"
+          options={{
+            headerShown: false,
+            presentation: "card",
+            gestureEnabled: true,
+            contentStyle: { backgroundColor: colors.background },
+          }}
+        />
         
         {/* Active Session - Full screen */}
         <Stack.Screen
@@ -305,21 +310,6 @@ export default function ProtectedLayout() {
           }}
         />
 
-        {/* Session Detail - Sheet (TODO: create sessionDetail.tsx) */}
-        {/* <Stack.Screen
-          name="sessionDetail"
-          options={{
-            headerShown: false,
-            presentation: "formSheet",
-            gestureEnabled: true,
-            sheetGrabberVisible: true,
-            contentStyle: { backgroundColor: "#0a0a0a" },
-            sheetAllowedDetents: [0.9, 1],
-            sheetInitialDetentIndex: 0,
-            sheetLargestUndimmedDetentIndex: -1,
-          }}
-        /> */}
-
         {/* Scans Gallery - Full screen */}
         <Stack.Screen
           name="scans"
@@ -330,6 +320,7 @@ export default function ProtectedLayout() {
             contentStyle: { backgroundColor: colors.background },
           }}
         />
+
       </Stack>
     </ThemeProvider>
   );

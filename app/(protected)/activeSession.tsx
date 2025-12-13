@@ -7,13 +7,13 @@
 
 import { useColors } from '@/hooks/ui/useColors';
 import {
-    calculateSessionStats,
-    endSession,
-    getSessionById,
-    getSessionTargetsWithResults,
-    SessionStats,
-    SessionTargetWithResults,
-    SessionWithDetails
+  calculateSessionStats,
+  endSession,
+  getSessionById,
+  getSessionTargetsWithResults,
+  SessionStats,
+  SessionTargetWithResults,
+  SessionWithDetails
 } from '@/services/sessionService';
 import { useSessionStore } from '@/store/sessionStore';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,14 +23,14 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Camera, CheckCircle, Clock, Crosshair, MapPin, Target, X, Zap } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -294,14 +294,13 @@ export default function ActiveSessionScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             try {
               await endSession(sessionId!);
-              // Reload appropriate sessions based on session type
+              // Reload sessions and navigate back to home
               if (session?.team_id) {
                 await loadTeamSessions();
-                router.replace('/(protected)/team');
               } else {
                 await loadPersonalSessions();
-                router.replace('/(protected)/personal');
               }
+              router.replace('/(protected)/(tabs)');
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             } catch (error: any) {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);

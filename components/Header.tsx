@@ -1,26 +1,37 @@
-import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
-import { useTeamStore } from '@/store/teamStore';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { getMyActivePersonalSession } from '@/services/sessionService';
+import { useSessionStore } from '@/store/sessionStore';
+import { Button, ContextMenu, Host } from '@expo/ui/swift-ui';
+import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
-import { usePathname } from 'expo-router';
-import { BellIcon } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import { BaseAvatar } from './BaseAvatar';
-import { Text } from './ui/text';
-  
+import { router } from 'expo-router';
+import { Bell, Plus } from 'lucide-react-native';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  Image,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+
 interface HeaderProps {
   onNotificationPress?: () => void;
-  onUserPress?: () => void;
-  onTeamPress?: () => void;
 }
 
-export function Header({ onNotificationPress, onUserPress, onTeamPress }: HeaderProps) {
-  const { user, profileAvatarUrl } = useAuth();
+/**
+ * App Header Component
+ * 
+ * Brand header with:
+ * - App icon + "Reticle" brand name
+ * - Add button (native context menu with Session/Training options)
+ * - Notification bell with badge
+ */
+export function Header({ onNotificationPress }: HeaderProps) {
   const colors = useColors();
-  const pathname = usePathname();
   const [notificationCount, setNotificationCount] = useState(0);
+  const { createSession } = useSessionStore();
 
   // Fetch pending notification count
   useEffect(() => {
@@ -34,63 +45,100 @@ export function Header({ onNotificationPress, onUserPress, onTeamPress }: Header
     };
 
     fetchCount();
-    
-    // Refresh count when screen focuses
-    const interval = setInterval(fetchCount, 10000); // Check every 10s
+    const interval = setInterval(fetchCount, 10000);
     return () => clearInterval(interval);
   }, []);
-  
-  // Check if we're on the personal tab - show "Personal" regardless of activeTeamId
-  const isPersonalRoute = pathname?.startsWith('/personal');
-  
-  // Get team name from store
-  const teamName = useTeamStore(state => {
-    if (!state.activeTeamId) return null;
-    const team = state.teams.find(t => t.id === state.activeTeamId);
-    return team?.name || null;
-  });
-  
-  // Show "Personal" on personal routes, or when no team is active
-  const displayName = isPersonalRoute ? 'Personal' : (teamName || 'Personal');
 
-  const email = user?.email;
-  const avatarUrl = profileAvatarUrl ?? user?.user_metadata?.avatar_url;
-  const fallbackInitial = email?.charAt(0)?.toUpperCase() ?? '?';
+  const handleStartSession = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      const existing = await getMyActivePersonalSession();
+      if (existing) {
+        router.push(`/(protected)/activeSession?sessionId=${existing.id}` as any);
+        return;
+      }
+      const newSession = await createSession({ session_mode: 'solo' });
+      router.push(`/(protected)/activeSession?sessionId=${newSession.id}` as any);
+    } catch (error) {
+      console.error('Failed to start session:', error);
+    }
+  }, [createSession]);
 
+  const handleCreateTraining = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/(protected)/createTraining' as any);
+  }, []);
+
+  const handleNotificationPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onNotificationPress?.();
+  };
+
+  // Native add button with context menu (iOS only)
+  const AddButtonWithMenu = () => {
+    if (Platform.OS === 'ios') {
+      return (
+        <Host style={styles.addButtonHost}>
+          <ContextMenu>
+            <ContextMenu.Items>
+              <Button 
+                systemImage="target" 
+                onPress={handleStartSession}
+              >
+                Start Session
+              </Button>
+              <Button 
+                systemImage="calendar.badge.plus" 
+                onPress={handleCreateTraining}
+              >
+                New Training
+              </Button>
+            </ContextMenu.Items>
+            <ContextMenu.Trigger>
+              <View style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Plus size={18} color={colors.text} strokeWidth={2} />
+              </View>
+            </ContextMenu.Trigger>
+          </ContextMenu>
+        </Host>
+      );
+    }
+
+    // Android fallback - simple button that opens training
+    return (
+      <TouchableOpacity
+        style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+        onPress={handleCreateTraining}
+        activeOpacity={0.7}
+      >
+        <Plus size={18} color={colors.text} strokeWidth={2} />
+      </TouchableOpacity>
+    );
+  };
 
   return (
-    <View style={styles.wrapper}>
-      <View style={[styles.container]}>
-        {/* Left Section */}
-        <View style={styles.left}>
-          <TouchableOpacity onPress={onUserPress} style={[styles.avatar, { opacity:1 }]}>
-            <View style={[styles.avatarRing, { borderColor: colors.primary + '20' }]}>
-              <BaseAvatar
-                source={avatarUrl ? { uri: avatarUrl } : undefined}
-                fallbackText={fallbackInitial}
-                size="sm"
-                borderWidth={0}
-              />
-            </View>
-          </TouchableOpacity>
-
-      <TouchableOpacity style={styles.workspaceContainer} onPress={onTeamPress}  > 
-          <Text style={[styles.workspaceText, { color: colors.text}]}>
-            {displayName}
-          </Text> 
-          <MaterialCommunityIcons name="chevron-right" size={20} color={colors.text} />
-        </TouchableOpacity> 
+    <View style={styles.container}>
+      {/* Left - Brand */}
+      <View style={styles.left}>
+        <Image 
+          source={require('@/assets/images/icon.jpg')} 
+          style={styles.appIcon}
+        />
+        <Text style={[styles.brandName, { color: colors.text }]}>Reticle</Text>
       </View>
 
+      {/* Right - Action Buttons */}
+      <View style={styles.actions}>
+        <AddButtonWithMenu />
 
-        {/* Right Section - Notification Bell */}
         <TouchableOpacity
-          onPress={onNotificationPress}
-          style={styles.notification}
+          style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={handleNotificationPress}
+          activeOpacity={0.7}
         >
-          <BellIcon size={18} color={colors.tint} strokeWidth={2} />
+          <Bell size={18} color={colors.text} strokeWidth={2} />
           {notificationCount > 0 && (
-            <View style={[styles.badge, { backgroundColor: colors.primary, borderColor: colors.background }]}>
+            <View style={[styles.badge, { backgroundColor: colors.red, borderColor: colors.background }]}>
               <Text style={styles.badgeText}>
                 {notificationCount > 9 ? '9+' : notificationCount}
               </Text>
@@ -98,100 +146,70 @@ export function Header({ onNotificationPress, onUserPress, onTeamPress }: Header
           )}
         </TouchableOpacity>
       </View>
-
-      <View style={[styles.divider]} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    width: '100%',
-  },
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    display: 'flex',
+    justifyContent: 'space-between',
     width: '100%',
-  },
-  divider: {
-    height: 0.5,
-    opacity: 0.3,
+    paddingRight: 8,
   },
 
-  // Left Section
+  // Left section
   left: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 10,
     flex: 1,
   },
-  avatar: {
-    width: 40,
-    height: 40,
+  appIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
   },
-  avatarRing: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  workspace: {
-    display: 'flex',
-    flexDirection: 'row',
-  },
-  workspaceText: {
-    fontSize: 17,
-    lineHeight: 24,
-    fontWeight: '600',
+  brandName: {
+    fontSize: 20,
+    fontWeight: '700',
     letterSpacing: -0.5,
-    flexShrink: 1,
   },
-  chevronWrapper: {
-    justifyContent: 'center',
-    display: 'flex',
-    flexDirection: 'row',
 
-    gap: 2,
+  // Right section
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  addButtonHost: {
+    width: 38,
+    height: 38,
+  },
+  iconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
   },
   badge: {
     position: 'absolute',
     top: -4,
     right: -4,
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 6,
-    borderWidth: 2.5,
-    borderColor: '#FFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3,
-    elevation: 4,
+    paddingHorizontal: 4,
+    borderWidth: 2,
   },
   badgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     color: '#FFF',
-  },
-  notification: {
-    padding: 10,
-  },
-
-  workspaceContainer: {
-    flexDirection: 'row',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

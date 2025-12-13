@@ -358,9 +358,9 @@ export function ActivityHub({
     // If training is ongoing and user is NOT a commander, go directly to trainingLive
     // This avoids the double navigation (trainingDetail opening then redirecting)
     if (nextTraining.status === 'ongoing' && !canManageTraining) {
-      router.push(`/(protected)/trainingLive?trainingId=${nextTraining.id}` as any);
+      router.push(`/(protected)/trainingLive?trainingId=${nextTraining.id}`);
     } else {
-      router.push(`/(protected)/trainingDetail?id=${nextTraining.id}` as any);
+      router.push(`/(protected)/trainingDetail?id=${nextTraining.id}`);
     }
   };
 

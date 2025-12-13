@@ -1,51 +1,54 @@
 ---
-description: Defines rules and patterns for processing calendar events and training schedules in a military training context
+description: Specifications for processing calendar events, training schedules, and event categorization logic
 ---
 
 
 # calendar-event-processing
 
-Calendar Event Management System (Importance: 85/100)
-components/ui/TrainingCalendar.tsx:
-- Event categorization engine processes 5 distinct training types:
-  * Training sessions
-  * Assessments
-  * Briefings 
-  * Qualifications
-  * Standard sessions
-- Custom event grouping logic handles overlap resolution
-- Type-specific styling and indicator system
-- Role-based event visibility filtering
+CALENDAR MANAGEMENT SYSTEM
+Importance Score: 85/100
 
-Weekly Training Schedule (Importance: 80/100)
-components/ui/WeekCalendar.tsx:
-- Specialized marking system differentiates:
-  * Active training blocks
-  * Completed sessions
-  * Upcoming qualifications
-  * Required assessments
-- Training week calculations with military schedule constraints
-- Custom day state management for multiple concurrent events
+1. Multi-Type Event Processing (`Calendar.tsx`)
+- Custom event categorization system for training activities
+- Multiple event indicators per day with type-specific styling
+- Business-specific visualization rules for concurrent events
+- Training schedule conflict detection
 
-Multi-View Calendar Logic (Importance: 75/100) 
-components/ui/Calendar.tsx:
-- Training-specific dot indicator system
-- Event type prioritization for display
-- Custom day component with specialized training session rendering
-- Week/month view modes with training-specific layouts
+2. Training Calendar Implementation (`TrainingCalendar.tsx`)
+- Specialized handling of training event types:
+  - Group training sessions
+  - Individual practice slots
+  - Qualification assessments
+  - Tactical drills
+- Color-coded event visualization based on training categories
+- Custom grouping logic for related training activities
 
-Key Domain Workflows:
-1. Training Schedule Management
-   - Event type categorization
-   - Schedule conflict resolution
-   - Qualification tracking
-   - Assessment scheduling
+3. Week-Based Training View (`WeekCalendar.tsx`)
+- Training-specific week view implementation
+- Custom date range processing for training schedules
+- Specialized event visualization for week-based planning
+- Training slot allocation and availability management
 
-2. Training Progress Visualization  
-   - Status indicators
-   - Completion tracking
-   - Type-specific styling
-   - Role-based views
+Core Business Rules:
+1. Event Type Hierarchy:
+- Primary training sessions
+- Subordinate practice slots
+- Qualification events
+- Support activities
+
+2. Schedule Validation:
+- Training slot availability checking
+- Instructor schedule coordination
+- Resource allocation verification
+- Minimum spacing between sessions
+
+3. Event Categorization:
+- Training type classification
+- Priority-based event ordering
+- Visual indicator assignment
+- Status-based display rules
+
+The system implements specialized calendar management focused on military/law enforcement training coordination, with emphasis on proper scheduling hierarchy and event type management.
 
 $END$
 

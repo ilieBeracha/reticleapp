@@ -79,7 +79,7 @@ function TrainingCard({
                 {training.status === "ongoing" ? "Live" : "Scheduled"}
               </Text>
             </View>
-            {training.drill_count > 0 && (
+            {training.drill_count && training.drill_count > 0 && (
               <Text style={[styles.trainingMeta, { color: colors.textMuted }]}>
                 • {training.drill_count} drills
               </Text>

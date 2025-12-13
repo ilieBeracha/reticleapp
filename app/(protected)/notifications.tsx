@@ -173,13 +173,13 @@ export default function NotificationsSheet() {
             if (id) router.push({ pathname: '/(protected)/activeSession', params: { sessionId: id } });
             break;
           case 'team':
-            router.push('/(protected)/team');
+            router.push('/(protected)/(tabs)');
             break;
           case 'personal':
-            router.push('/(protected)/personal');
+            router.push('/(protected)/(tabs)');
             break;
           case 'insights':
-            router.push('/(protected)/personal/insights');
+            router.push('/(protected)/(tabs)/insights');
             break;
           default:
             break;
@@ -511,6 +511,8 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 });
+
+
 
 
 

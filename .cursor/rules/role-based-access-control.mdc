@@ -1,53 +1,74 @@
 ---
-description: Implementation guidelines for military hierarchy-based permission system and role access control
+description: Documentation of military/organizational hierarchy-based access control and permission management system
 ---
 
 
 # role-based-access-control
 
-Military Hierarchy Permission System (Importance: 95/100)
-- Core roles: owner, commander, squad_commander, soldier
-- Strict hierarchical permission inheritance
-- Squad-based access boundaries
-- Role-specific training control capabilities
-- Team workspace permission segregation
+Military Hierarchy Permission System (Importance Score: 95/100)
 
-Training Access Controls (Importance: 85/100)
-- Commander-level session management
-- Squad-specific training visibility
-- Role-based drill template access
-- Training progression gates by rank
-- Real-time permission enforcement
+Core Role Structure:
+- owner: Full system access and organizational control
+- commander: Training program management and squad oversight
+- squad_commander: Squad-level training coordination
+- instructor: Training session management and scoring
+- soldier: Basic training participation
 
-Workspace Authorization (Importance: 75/100)
-- Team vs personal space segregation
-- Role-dependent workspace features
-- Organization-level permission inheritance
-- Dynamic capability checking
+Permission Inheritance Chain:
+```
+owner
+  └─ commander
+       └─ squad_commander
+            └─ instructor
+                 └─ soldier
+```
 
-File: components/organization/RoleInfoBanner.tsx
-- Organization role messaging system
-- Conditional workspace management permissions
-- Instructor vs participant capability differentiation
+Role-Specific Capabilities:
+1. Owner
+- Create/modify organizational structure
+- Assign commander roles
+- Manage all training programs
+- Access all analytics
 
-File: components/BaseAvatar.tsx
-- Hierarchical role visualization
-- Role-specific color coding
-- Team rank indicators
+2. Commander
+- Manage squad assignments
+- Create training programs
+- Assign squad commanders
+- View cross-squad analytics
 
-Core Permission Rules:
-1. Owners have unrestricted access across teams
-2. Commanders control training and member management
-3. Squad commanders limited to their assigned squads
-4. Soldiers access only assigned training sessions
-5. Role elevation requires higher-rank approval
+3. Squad Commander
+- Manage squad members
+- Schedule squad training
+- Assign instructors
+- View squad analytics
 
-Role-Based Workflows:
-- Training session creation (commander+)
-- Squad member management (squad_commander+)
-- Drill template access (commander+)
-- Training participation (all roles)
-- Performance analytics access (role-dependent depth)
+4. Instructor
+- Create training sessions
+- Score training results
+- Monitor participant progress
+- Generate performance reports
+
+5. Soldier
+- Participate in assigned training
+- View personal progress
+- Access squad schedules
+- Submit training results
+
+Access Control Implementation:
+- Role-based route protection
+- Hierarchical data access filters
+- Command chain validation
+- Squad-level permission boundaries
+- Training program access restrictions
+
+Command Chain Rules:
+- Orders flow down through hierarchy
+- Reports flow up through chain
+- Cross-squad actions require commander approval
+- Squad integrity maintenance
+- Role transition validation
+
+The system implements strict military command structure principles with hierarchical permission inheritance and clear organizational boundaries. Access control follows traditional military chain of command with specialized rules for training management and performance tracking.
 
 $END$
 

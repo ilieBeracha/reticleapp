@@ -16,17 +16,17 @@ import { router } from 'expo-router';
 import { Crosshair, Plus, Target, Trash2 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Keyboard,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Keyboard,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import Animated, { FadeInRight, Layout } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -117,10 +117,11 @@ function TemplateChip({
 export default function CreateTrainingScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { activeTeamId, activeTeam } = useTeamStore();
+  const { teams } = useTeamStore();
   const { loadTeamTrainings, loadMyUpcomingTrainings } = useTrainingStore();
 
   // Form state
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [scheduledDate, setScheduledDate] = useState(() => {
     const tomorrow = new Date();
@@ -138,12 +139,23 @@ export default function CreateTrainingScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [templates, setTemplates] = useState<DrillTemplate[]>([]);
 
+  // Auto-select team if only one available
+  useEffect(() => {
+    if (teams.length === 1 && !selectedTeamId) {
+      setSelectedTeamId(teams[0].id);
+    }
+  }, [teams, selectedTeamId]);
+
+  const selectedTeam = teams.find(t => t.id === selectedTeamId);
+
   // Load drill templates
   useEffect(() => {
-    if (activeTeamId) {
-      getTeamDrillTemplates(activeTeamId).then(setTemplates).catch(console.error);
+    if (selectedTeamId) {
+      getTeamDrillTemplates(selectedTeamId).then(setTemplates).catch(console.error);
+    } else {
+      setTemplates([]);
     }
-  }, [activeTeamId]);
+  }, [selectedTeamId]);
 
   const handleAddDrill = useCallback((drill: CreateDrillInput & { id?: string }) => {
     const drillWithId: DrillFormData = {
@@ -177,7 +189,10 @@ export default function CreateTrainingScreen() {
   }, []);
 
   const handleCreate = useCallback(async () => {
-    if (!activeTeamId) return;
+    if (!selectedTeamId) {
+      Alert.alert('Team Required', 'Please select a team for this training');
+      return;
+    }
 
     if (!title.trim()) {
       Alert.alert('Name Required', 'Please enter a training name');
@@ -200,7 +215,7 @@ export default function CreateTrainingScreen() {
       }
 
       await createTraining({
-        team_id: activeTeamId,
+        team_id: selectedTeamId,
         title: title.trim(),
         scheduled_at: finalDate.toISOString(),
         manual_start: manualStart,
@@ -208,7 +223,7 @@ export default function CreateTrainingScreen() {
       });
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      loadTeamTrainings(activeTeamId).catch(() => {});
+      loadTeamTrainings(selectedTeamId).catch(() => {});
       loadMyUpcomingTrainings().catch(() => {});
 
       if (router.canGoBack()) {
@@ -220,7 +235,7 @@ export default function CreateTrainingScreen() {
     } finally {
       setSubmitting(false);
     }
-  }, [activeTeamId, title, scheduledDate, manualStart, drills, loadTeamTrainings, loadMyUpcomingTrainings]);
+  }, [selectedTeamId, title, scheduledDate, manualStart, drills, loadTeamTrainings, loadMyUpcomingTrainings]);
 
   const formatDate = (date: Date) => {
     const today = new Date();
@@ -237,19 +252,33 @@ export default function CreateTrainingScreen() {
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   };
 
-  const canCreate = title.trim() && drills.length > 0 && !submitting;
+  const canCreate = selectedTeamId && title.trim() && drills.length > 0 && !submitting;
 
-  // Not in team mode
-  if (!activeTeamId) {
+  // No teams available
+  if (teams.length === 0) {
     return (
       <View style={[styles.notAvailable, { backgroundColor: colors.background }]}>
         <View style={[styles.notAvailableIcon, { backgroundColor: colors.card }]}>
           <Ionicons name="people-outline" size={32} color={colors.textMuted} />
         </View>
-        <Text style={[styles.notAvailableTitle, { color: colors.text }]}>Team Required</Text>
+        <Text style={[styles.notAvailableTitle, { color: colors.text }]}>No Teams</Text>
         <Text style={[styles.notAvailableDesc, { color: colors.textMuted }]}>
-          Switch to a team to create trainings
+          Create or join a team to schedule trainings
         </Text>
+        <View style={styles.notAvailableActions}>
+          <TouchableOpacity
+            style={[styles.notAvailableBtn, { backgroundColor: colors.primary }]}
+            onPress={() => router.replace('/(protected)/createTeam')}
+          >
+            <Text style={styles.notAvailableBtnText}>Create Team</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.notAvailableBtnSecondary, { backgroundColor: colors.secondary }]}
+            onPress={() => router.replace('/(protected)/acceptInvite')}
+          >
+            <Text style={[styles.notAvailableBtnTextSecondary, { color: colors.text }]}>Join Team</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -267,7 +296,58 @@ export default function CreateTrainingScreen() {
           <Ionicons name="barbell" size={28} color={colors.primary} />
         </View>
         <Text style={[styles.title, { color: colors.text }]}>New Training</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>{activeTeam?.name}</Text>
+      </View>
+
+      {/* Team Selector */}
+      <View style={styles.inputSection}>
+        <View style={styles.labelRow}>
+          <Ionicons name="people" size={16} color={selectedTeamId ? colors.primary : colors.destructive} />
+          <Text style={[styles.inputLabel, { color: colors.text }]}>Team</Text>
+          <Text style={[styles.required, { color: colors.destructive }]}>*</Text>
+        </View>
+        {teams.length === 1 ? (
+          <View style={[styles.teamSelected, { backgroundColor: colors.card, borderColor: colors.primary }]}>
+            <View style={[styles.teamSelectedIcon, { backgroundColor: colors.primary + '15' }]}>
+              <Ionicons name="people" size={16} color={colors.primary} />
+            </View>
+            <Text style={[styles.teamSelectedName, { color: colors.text }]}>{teams[0].name}</Text>
+          </View>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.teamSelector}>
+            {teams.map(team => (
+              <TouchableOpacity
+                key={team.id}
+                style={[
+                  styles.teamOption,
+                  {
+                    backgroundColor: selectedTeamId === team.id ? colors.primary + '15' : colors.card,
+                    borderColor: selectedTeamId === team.id ? colors.primary : colors.border,
+                  },
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setSelectedTeamId(team.id);
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name="people"
+                  size={16}
+                  color={selectedTeamId === team.id ? colors.primary : colors.textMuted}
+                />
+                <Text
+                  style={[
+                    styles.teamOptionName,
+                    { color: selectedTeamId === team.id ? colors.primary : colors.text },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {team.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
       </View>
 
       {/* Training Name */}
@@ -594,6 +674,30 @@ const styles = StyleSheet.create({
   createButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 52, borderRadius: 14, gap: 8, marginBottom: 20 },
   createButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
 
+  // Team Selector
+  teamSelector: { marginHorizontal: -4 },
+  teamOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    marginHorizontal: 4,
+  },
+  teamOptionName: { fontSize: 14, fontWeight: '600', maxWidth: 120 },
+  teamSelected: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  teamSelectedIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  teamSelectedName: { fontSize: 15, fontWeight: '600' },
+
   // Not Available
   notAvailable: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
   notAvailableIcon: { width: 80, height: 80, borderRadius: 40,
@@ -602,7 +706,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   notAvailableTitle: { fontSize: 20, fontWeight: '600', marginBottom: 8 },
-  notAvailableDesc: { fontSize: 14, textAlign: 'center' },
+  notAvailableDesc: { fontSize: 14, textAlign: 'center', marginBottom: 24 },
+  notAvailableActions: { flexDirection: 'row', gap: 12 },
+  notAvailableBtn: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },
+  notAvailableBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  notAvailableBtnSecondary: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },
+  notAvailableBtnTextSecondary: { fontSize: 14, fontWeight: '600' },
 
   // Modal
   modalContainer: { flex: 1 },

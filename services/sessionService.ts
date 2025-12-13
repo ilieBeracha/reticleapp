@@ -39,6 +39,16 @@ export interface SessionDrillConfig {
   safety_notes?: string | null;
 }
 
+/** Aggregated session statistics (computed from targets) */
+export interface SessionAggregatedStats {
+  shots_fired: number;
+  hits_total: number;
+  accuracy_pct: number;
+  target_count: number;
+  best_dispersion_cm: number | null;
+  avg_distance_m: number | null;
+}
+
 export interface SessionWithDetails {
   id: string;
   user_id: string;
@@ -56,6 +66,8 @@ export interface SessionWithDetails {
   ended_at: string | null;
   created_at: string;
   updated_at?: string;
+  // Optional aggregated stats (populated when requested)
+  stats?: SessionAggregatedStats;
 }
 
 function mapSession(row: any): SessionWithDetails {
@@ -444,6 +456,147 @@ export async function getSessions(teamId?: string | null): Promise<SessionWithDe
 
   if (error) throw error;
   return (data ?? []).map(mapSession);
+}
+
+/**
+ * Get sessions with aggregated stats (for widgets/analytics)
+ * This fetches sessions and computes stats from session_targets
+ */
+export async function getSessionsWithStats(teamId?: string | null): Promise<SessionWithDetails[]> {
+  // First get all sessions
+  const sessions = await getSessions(teamId);
+  
+  if (sessions.length === 0) return sessions;
+  
+  // Fetch aggregated stats for all sessions in one query
+  const sessionIds = sessions.map(s => s.id);
+  
+  const { data: statsData, error: statsError } = await supabase
+    .from('session_targets')
+    .select(`
+      session_id,
+      distance_m,
+      paper_target_results(
+        bullets_fired,
+        hits_total,
+        dispersion_cm,
+        scanned_image_url
+      ),
+      tactical_target_results(
+        bullets_fired,
+        hits
+      )
+    `)
+    .in('session_id', sessionIds);
+  
+  if (statsError) {
+    console.error('Failed to fetch session stats:', statsError);
+    return sessions; // Return sessions without stats
+  }
+  
+  // Aggregate stats per session
+  // We track scanned vs manual separately for proper accuracy calculation
+  const statsMap = new Map<string, SessionAggregatedStats & { 
+    manual_shots: number; 
+    manual_hits: number;
+  }>();
+  
+  (statsData ?? []).forEach((target: any) => {
+    const sessionId = target.session_id;
+    if (!statsMap.has(sessionId)) {
+      statsMap.set(sessionId, {
+        shots_fired: 0,
+        hits_total: 0,
+        accuracy_pct: 0,
+        target_count: 0,
+        best_dispersion_cm: null,
+        avg_distance_m: null,
+        manual_shots: 0,
+        manual_hits: 0,
+      });
+    }
+    
+    const stats = statsMap.get(sessionId)!;
+    stats.target_count++;
+    
+    // Handle paper target results
+    const paperResult = target.paper_target_results;
+    if (paperResult) {
+      const bullets = paperResult.bullets_fired ?? 0;
+      stats.shots_fired += bullets;
+      
+      // Check if this is a scanned target (has scanned_image_url)
+      const isScanned = !!paperResult.scanned_image_url;
+      
+      const hits = paperResult.hits_total ?? 0;
+      
+      // Always add hits to total for display purposes
+      stats.hits_total += hits;
+      
+      // Track dispersion if available
+      if (paperResult.dispersion_cm != null) {
+        if (stats.best_dispersion_cm === null || paperResult.dispersion_cm < stats.best_dispersion_cm) {
+          stats.best_dispersion_cm = paperResult.dispersion_cm;
+        }
+      }
+      
+      if (!isScanned) {
+        // Only manual entry targets count towards accuracy calculation
+        stats.manual_shots += bullets;
+        stats.manual_hits += hits;
+      }
+      // Scanned targets: hits are shown but don't affect accuracy %
+      // because dispersion (group size) is the primary metric
+    }
+    
+    // Handle tactical target results (always manual, hits matter)
+    const tacticalResult = target.tactical_target_results;
+    if (tacticalResult) {
+      const bullets = tacticalResult.bullets_fired ?? 0;
+      const hits = tacticalResult.hits ?? 0;
+      stats.shots_fired += bullets;
+      stats.hits_total += hits;
+      stats.manual_shots += bullets;
+      stats.manual_hits += hits;
+    }
+    
+    // Track distances for average
+    if (target.distance_m) {
+      const currentAvg = stats.avg_distance_m ?? 0;
+      const count = stats.target_count;
+      stats.avg_distance_m = ((currentAvg * (count - 1)) + target.distance_m) / count;
+    }
+  });
+  
+  // Calculate accuracy percentages (only from manual targets where hits matter)
+  statsMap.forEach((stats) => {
+    if (stats.manual_shots > 0) {
+      stats.accuracy_pct = Math.round((stats.manual_hits / stats.manual_shots) * 100);
+    }
+  });
+  
+  // Attach stats to sessions (without the internal tracking fields)
+  return sessions.map(session => {
+    const rawStats = statsMap.get(session.id);
+    return {
+      ...session,
+      stats: rawStats ? {
+        shots_fired: rawStats.shots_fired,
+        hits_total: rawStats.hits_total,
+        accuracy_pct: rawStats.accuracy_pct,
+        target_count: rawStats.target_count,
+        best_dispersion_cm: rawStats.best_dispersion_cm,
+        avg_distance_m: rawStats.avg_distance_m,
+      } : {
+        shots_fired: 0,
+        hits_total: 0,
+        accuracy_pct: 0,
+        target_count: 0,
+        best_dispersion_cm: null,
+        avg_distance_m: null,
+      },
+    };
+  });
 }
 
 /**
@@ -1166,6 +1319,9 @@ export interface SessionStats {
 
 /**
  * Calculate comprehensive session stats from targets and results
+ * 
+ * IMPORTANT: Scanned paper targets (with scanned_image_url) measure group size (dispersion),
+ * not hits. Only manual entry targets should count towards accuracy calculations.
  */
 export async function calculateSessionStats(sessionId: string): Promise<SessionStats> {
   const targets = await getSessionTargetsWithResults(sessionId);
@@ -1174,6 +1330,8 @@ export async function calculateSessionStats(sessionId: string): Promise<SessionS
   let tacticalTargets = 0;
   let totalShotsFired = 0;
   let totalHits = 0;
+  let manualShotsFired = 0;  // Only shots from non-scanned targets (for accuracy)
+  let manualHits = 0;        // Only hits from non-scanned targets (for accuracy)
   let totalDispersion = 0;
   let dispersionCount = 0;
   let bestDispersion: number | null = null;
@@ -1186,9 +1344,18 @@ export async function calculateSessionStats(sessionId: string): Promise<SessionS
     if (target.target_type === 'paper') {
       paperTargets++;
       if (target.paper_result) {
-        totalShotsFired += target.paper_result.bullets_fired;
-        totalHits += target.paper_result.hits_total ?? 0;
+        const bullets = target.paper_result.bullets_fired;
+        totalShotsFired += bullets;
         
+        // Check if this is a scanned target
+        const isScanned = !!target.paper_result.scanned_image_url;
+        
+        const hits = target.paper_result.hits_total ?? 0;
+        
+        // Always add hits to total for display purposes
+        totalHits += hits;
+        
+        // Track dispersion if available
         if (target.paper_result.dispersion_cm != null) {
           totalDispersion += target.paper_result.dispersion_cm;
           dispersionCount++;
@@ -1196,12 +1363,23 @@ export async function calculateSessionStats(sessionId: string): Promise<SessionS
             bestDispersion = target.paper_result.dispersion_cm;
           }
         }
+        
+        if (!isScanned) {
+          // Only manual entry targets count towards accuracy calculation
+          manualShotsFired += bullets;
+          manualHits += hits;
+        }
+        // Scanned targets: hits are shown but don't affect accuracy %
       }
     } else if (target.target_type === 'tactical') {
       tacticalTargets++;
       if (target.tactical_result) {
-        totalShotsFired += target.tactical_result.bullets_fired;
-        totalHits += target.tactical_result.hits;
+        const bullets = target.tactical_result.bullets_fired;
+        const hits = target.tactical_result.hits;
+        totalShotsFired += bullets;
+        totalHits += hits;
+        manualShotsFired += bullets;
+        manualHits += hits;
         
         if (target.tactical_result.is_stage_cleared) {
           stagesCleared++;
@@ -1218,8 +1396,9 @@ export async function calculateSessionStats(sessionId: string): Promise<SessionS
     }
   }
 
-  const accuracyPct = totalShotsFired > 0 
-    ? Math.round((totalHits / totalShotsFired) * 100 * 100) / 100 
+  // Calculate accuracy only from manual entry targets (not scanned)
+  const accuracyPct = manualShotsFired > 0 
+    ? Math.round((manualHits / manualShotsFired) * 100 * 100) / 100 
     : 0;
 
   const avgDispersionCm = dispersionCount > 0 
