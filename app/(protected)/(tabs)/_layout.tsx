@@ -1,20 +1,21 @@
 import Tabs from '@/components/withLayoutContext';
 import { useColors } from '@/hooks/ui/useColors';
+import { useTeamStore } from '@/store/teamStore';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
 
 /**
- * Personal Mode Tabs Layout
+ * Unified Tabs Layout
  * 
- * Clean, simple tabs for personal mode:
- * - Home (PersonalHomePage)
- * - Insights (InsightsDashboard)
- * - Settings
+ * Single tab bar for the entire app - no more "personal mode" vs "team mode".
  * 
- * NO workspace context needed here.
+ * Tabs:
+ * - Home: Unified dashboard (active session, upcoming trainings, quick actions)
+ * - Schedule: Trainings across all teams
+ * - Insights: Your shooting stats
+ * - Profile: Account + team management
  */
 
-// Cross-platform icon helper
 const getTabIcon = (
   sfSymbol: string,
   ionicon: keyof typeof Ionicons.glyphMap,
@@ -25,8 +26,9 @@ const getTabIcon = (
   return { ionicon };
 };
 
-export default function PersonalLayout() {
+export default function TabsLayout() {
   const colors = useColors();
+  const { teamCount } = useTeamStore();
 
   return (
     <Tabs
@@ -46,6 +48,14 @@ export default function PersonalLayout() {
       />
 
       <Tabs.Screen
+        name="trainings"
+        options={{
+          title: 'Schedule',
+          tabBarIcon: ({ focused }) => getTabIcon('calendar', focused ? 'calendar' : 'calendar-outline'),
+        }}
+      />
+
+      <Tabs.Screen
         name="insights"
         options={{
           title: 'Insights',
@@ -54,10 +64,11 @@ export default function PersonalLayout() {
       />
 
       <Tabs.Screen
-        name="settings"
+        name="profile"
         options={{
-          title: 'Settings',
-          tabBarIcon: ({ focused }) => getTabIcon('gear', focused ? 'settings' : 'settings-outline'),
+          role: 'search',
+          title: 'Profile',
+          tabBarIcon: ({ focused }) => getTabIcon('person.circle', focused ? 'person-circle' : 'person-circle-outline'),
         }}
       />
     </Tabs>

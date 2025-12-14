@@ -1,6 +1,7 @@
 import { BaseAvatar } from '@/components/BaseAvatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from "@/hooks/ui/useColors";
+import { useTeamStore } from '@/store/teamStore';
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from 'expo-haptics';
 import { router } from "expo-router";
@@ -17,11 +18,12 @@ import {
 /**
  * USER MENU - Native Form Sheet
  * 
- * Account settings, workspace switch, logout.
+ * Quick access to account actions.
  */
 export default function UserMenuSheet() {
   const colors = useColors();
   const { user, signOut, profileAvatarUrl, profileFullName } = useAuth();
+  const { teams } = useTeamStore();
 
   const avatarUri = profileAvatarUrl ?? user?.user_metadata?.avatar_url;
   const fallbackInitial = user?.email?.charAt(0)?.toUpperCase() ?? "?";
@@ -53,15 +55,16 @@ export default function UserMenuSheet() {
     );
   }, [signOut]);
 
-  const handleSettings = useCallback(() => {
+  const handleProfile = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // TODO: Navigate to settings
-    Alert.alert("Coming Soon", "Settings will be available soon!");
+    router.dismiss();
+    router.push('/(protected)/(tabs)/profile' as any);
   }, []);
 
-  const handleSwitchTeam = useCallback(() => {
+  const handleTeams = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/(protected)/teamSwitcher' as any);
+    router.dismiss();
+    router.push('/(protected)/(tabs)/profile' as any);
   }, []);
 
   return (
@@ -76,7 +79,11 @@ export default function UserMenuSheet() {
         </View>
 
         {/* Profile Card */}
-        <View style={[styles.profileCard, { backgroundColor: colors.card }]}>
+        <TouchableOpacity 
+          style={[styles.profileCard, { backgroundColor: colors.card }]}
+          onPress={handleProfile}
+          activeOpacity={0.7}
+        >
           <BaseAvatar
             source={avatarUri ? { uri: avatarUri } : undefined}
             fallbackText={fallbackInitial}
@@ -91,22 +98,16 @@ export default function UserMenuSheet() {
               {email}
             </Text>
           </View>
-        </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </TouchableOpacity>
 
         {/* Menu Items */}
         <View style={[styles.menuGroup, { backgroundColor: colors.card }]}>
           <MenuItem
-            icon="settings-outline"
-            label="Settings"
-            onPress={handleSettings}
-            colors={colors}
-            showChevron
-          />
-          <View style={[styles.separator, { backgroundColor: colors.border }]} />
-          <MenuItem
-            icon="business-outline"
-            label="Switch Team"
-            onPress={handleSwitchTeam}
+            icon="people-outline"
+            label="Your Teams"
+            subtitle={teams.length > 0 ? `${teams.length} team${teams.length !== 1 ? 's' : ''}` : 'None yet'}
+            onPress={handleTeams}
             colors={colors}
             showChevron
           />
@@ -130,6 +131,7 @@ export default function UserMenuSheet() {
 function MenuItem({
   icon,
   label,
+  subtitle,
   onPress,
   colors,
   showChevron,
@@ -137,6 +139,7 @@ function MenuItem({
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
+  subtitle?: string;
   onPress: () => void;
   colors: ReturnType<typeof import("@/hooks/ui/useColors").useColors>;
   showChevron?: boolean;
@@ -153,7 +156,12 @@ function MenuItem({
       <View style={[styles.iconContainer, { backgroundColor: iconBgColor }]}>
         <Ionicons name={icon} size={18} color="#fff" />
       </View>
-      <Text style={[styles.menuItemText, { color: textColor }]}>{label}</Text>
+      <View style={styles.menuItemContent}>
+        <Text style={[styles.menuItemText, { color: textColor }]}>{label}</Text>
+        {subtitle && (
+          <Text style={[styles.menuItemSubtitle, { color: colors.textMuted }]}>{subtitle}</Text>
+        )}
+      </View>
       {showChevron && (
         <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
       )}
@@ -222,14 +230,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  menuItemText: {
+  menuItemContent: {
     flex: 1,
-    fontSize: 17,
     marginLeft: 16,
+  },
+  menuItemText: {
+    fontSize: 17,
+  },
+  menuItemSubtitle: {
+    fontSize: 13,
+    marginTop: 2,
   },
   separator: {
     height: StyleSheet.hairlineWidth,
     marginLeft: 60,
   },
 });
-

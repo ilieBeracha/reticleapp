@@ -5,32 +5,33 @@
  * Clear separation between Paper (scan) and Tactical (manual) target flows.
  */
 
+import { TargetCard } from '@/components/session/TargetCard';
 import { useColors } from '@/hooks/ui/useColors';
 import {
-    calculateSessionStats,
-    endSession,
-    getSessionById,
-    getSessionTargetsWithResults,
-    SessionStats,
-    SessionTargetWithResults,
-    SessionWithDetails
+  calculateSessionStats,
+  endSession,
+  getSessionById,
+  getSessionTargetsWithResults,
+  SessionStats,
+  SessionTargetWithResults,
+  SessionWithDetails
 } from '@/services/sessionService';
 import { useSessionStore } from '@/store/sessionStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Camera, CheckCircle, Clock, Crosshair, MapPin, Target, X, Zap } from 'lucide-react-native';
+import { Camera, CheckCircle, Clock, Crosshair, Focus, MapPin, Target, Trophy, X, Zap } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -216,6 +217,8 @@ export default function ActiveSessionScreen() {
         ...(hasDrill && nextTargetPlan?.nextBullets
           ? { bullets: String(nextTargetPlan.nextBullets) }
           : {}),
+        // Pass drill_goal so scanTarget knows whether to save as grouping or achievement
+        ...(drill?.drill_goal ? { drillGoal: drill.drill_goal } : {}),
       },
     });
   }, [sessionId, defaultDistance, hasDrill, drill, nextTargetPlan]);
@@ -294,14 +297,13 @@ export default function ActiveSessionScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             try {
               await endSession(sessionId!);
-              // Reload appropriate sessions based on session type
+              // Reload sessions and navigate back to home
               if (session?.team_id) {
                 await loadTeamSessions();
-                router.replace('/(protected)/team');
               } else {
                 await loadPersonalSessions();
-                router.replace('/(protected)/personal');
               }
+              router.replace('/(protected)/(tabs)');
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             } catch (error: any) {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -343,62 +345,18 @@ export default function ActiveSessionScreen() {
   // ============================================================================
   const renderTarget = useCallback(
     ({ item, index }: { item: SessionTargetWithResults; index: number }) => {
-      const isPaper = item.target_type === 'paper';
-      const hits = isPaper 
-        ? item.paper_result?.hits_total 
-        : item.tactical_result?.hits;
-      const shots = isPaper 
-        ? item.paper_result?.bullets_fired 
-        : item.tactical_result?.bullets_fired;
-      
+      // Use TargetCard component which properly handles grouping vs achievement display
       return (
         <Animated.View entering={FadeInDown.delay(index * 50).duration(300)}>
-          <TouchableOpacity
-            style={[styles.targetCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+          <TargetCard
+            target={item}
+            index={targets.length - index}
             onPress={() => handleTargetPress(item)}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.targetIcon, { backgroundColor: isPaper ? '#6366F120' : '#F59E0B20' }]}>
-              {isPaper ? (
-                <Target size={20} color="#6366F1" />
-              ) : (
-                <Crosshair size={20} color="#F59E0B" />
-              )}
-            </View>
-            
-            <View style={styles.targetInfo}>
-              <View style={styles.targetHeader}>
-                <Text style={[styles.targetTitle, { color: colors.text }]}>
-                  {isPaper ? 'Paper Target' : 'Tactical Target'}
-                </Text>
-                <Text style={[styles.targetIndex, { color: colors.textMuted }]}>
-                  #{targets.length - index}
-                </Text>
-              </View>
-              
-              <View style={styles.targetMeta}>
-                {item.distance_m && (
-                  <Text style={[styles.targetMetaText, { color: colors.textMuted }]}>
-                    {item.distance_m}m
-                  </Text>
-                )}
-                {shots && (
-                  <>
-                    <Text style={[styles.targetMetaDot, { color: colors.border }]}>•</Text>
-                    <Text style={[styles.targetMetaText, { color: colors.textMuted }]}>
-                      {hits ?? 0}/{shots} hits
-                    </Text>
-                  </>
-                )}
-              </View>
-            </View>
-            
-            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-          </TouchableOpacity>
+          />
         </Animated.View>
       );
     },
-    [colors, targets.length, handleTargetPress]
+    [targets.length, handleTargetPress]
   );
 
   const renderEmpty = useCallback(() => (
@@ -454,11 +412,28 @@ export default function ActiveSessionScreen() {
   // ============================================================================
   // MAIN RENDER
   // ============================================================================
-  // Determine which action buttons to show
-  const showPaper = !drill || drill.target_type === 'paper';
-  const showTactical = !drill || drill.target_type === 'tactical';
-  const isPaperDrill = drill?.target_type === 'paper';
-  const isTacticalDrill = drill?.target_type === 'tactical';
+  // Determine which action buttons to show based on drill_goal
+  // - Grouping drills: scan only (no hit % tracking)
+  // - Achievement drills: scan OR manual (tracks hit %)
+  // - No drill (free practice): both options available
+  const isGroupingDrill = drill?.drill_goal === 'grouping';
+  const isAchievementDrill = drill?.drill_goal === 'achievement';
+  
+  // Determine target type from drill config
+  const isPaperTarget = !drill || drill.target_type === 'paper';
+  const isTacticalTarget = drill?.target_type === 'tactical';
+  
+  // Show buttons based on target_type:
+  // - Paper targets (including paper+achievement): show scan
+  // - Tactical targets: show manual entry
+  // - No drill (free practice): show both
+  const showScan = !drill || isPaperTarget;
+  const showManual = !drill || isTacticalTarget;
+  
+  // Legacy compatibility - keep for UI color hints
+  const isPaperDrill = isGroupingDrill || drill?.target_type === 'paper';
+  const isTacticalDrill = isTacticalTarget;
+  
   const drillLimitReached =
     !!drill && !!nextTargetPlan && (nextTargetPlan.remainingShots <= 0 || nextTargetPlan.remainingTargets <= 0);
 
@@ -496,8 +471,8 @@ export default function ActiveSessionScreen() {
           <View style={[styles.drillBannerInner, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {/* Drill Info Row */}
             <View style={styles.drillInfoRow}>
-              <View style={[styles.drillTypeIcon, { backgroundColor: isPaperDrill ? 'rgba(147,197,253,0.15)' : 'rgba(156,163,175,0.15)' }]}>
-                {isPaperDrill ? <Target size={16} color="#93C5FD" /> : <Crosshair size={16} color={colors.textMuted} />}
+              <View style={[styles.drillTypeIcon, { backgroundColor: isGroupingDrill ? 'rgba(16,185,129,0.15)' : 'rgba(147,197,253,0.15)' }]}>
+                {isGroupingDrill ? <Focus size={16} color="#10B981" /> : <Trophy size={16} color="#93C5FD" />}
               </View>
               <View style={styles.drillInfoText}>
                 <View style={styles.drillRequirements}>
@@ -505,11 +480,21 @@ export default function ActiveSessionScreen() {
                     <MapPin size={12} color={colors.textMuted} />
                     <Text style={[styles.drillReqText, { color: colors.text }]}>{drill.distance_m}m</Text>
                   </View>
+                  {/* Show shots/round for tactical, or "Scan" for paper targets */}
                   <View style={styles.drillReqItem}>
-                    <Zap size={12} color={colors.textMuted} />
-                    <Text style={[styles.drillReqText, { color: colors.text }]}>
-                      {drillProgress?.bulletsPerRound ?? drill.rounds_per_shooter} shots/round
-                    </Text>
+                    {isTacticalDrill ? (
+                      <>
+                        <Zap size={12} color={colors.textMuted} />
+                        <Text style={[styles.drillReqText, { color: colors.text }]}>
+                          {drillProgress?.bulletsPerRound ?? drill.rounds_per_shooter} shots/round
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Camera size={12} color={colors.textMuted} />
+                        <Text style={[styles.drillReqText, { color: colors.text }]}>Scan</Text>
+                      </>
+                    )}
                   </View>
                   {drillProgress?.rounds && drillProgress.rounds > 1 && (
                     <View style={styles.drillReqItem}>
@@ -657,35 +642,36 @@ export default function ActiveSessionScreen() {
           {/* Divider */}
           <View style={[styles.actionDivider, { backgroundColor: colors.border }]} />
 
-          {/* Show appropriate button(s) based on drill type */}
-          {showTactical && (
+          {/* Show appropriate button(s) based on drill_goal */}
+          {/* Manual entry - only for achievement drills or free practice */}
+          {showManual && (
             <TouchableOpacity
               style={[
                 styles.tacticalButton,
-                isTacticalDrill && styles.primaryActionBtn,
+                isAchievementDrill && styles.primaryActionBtn,
                 drillLimitReached && { opacity: 0.5 },
               ]}
               onPress={handleLogTactical}
               disabled={drillLimitReached}
               activeOpacity={0.8}
             >
-              <Crosshair size={20} color={isTacticalDrill ? '#fff' : colors.textMuted} />
-              <Text style={[styles.tacticalButtonText, { color: isTacticalDrill ? '#fff' : colors.text }]}>
-                {isTacticalDrill
+              <Crosshair size={20} color={isAchievementDrill ? '#fff' : colors.textMuted} />
+              <Text style={[styles.tacticalButtonText, { color: isAchievementDrill ? '#fff' : colors.text }]}>
+                {isAchievementDrill
                   ? (nextTargetPlan?.nextBullets
-                      ? `Log (${nextTargetPlan.nextBullets}rds)`
-                      : 'Log Target')
+                      ? `Manual (${nextTargetPlan.nextBullets}rds)`
+                      : 'Manual Entry')
                   : 'Manual'}
               </Text>
             </TouchableOpacity>
           )}
 
-          {/* Scan Paper - Primary if paper drill or no drill */}
-          {showPaper && (
+          {/* Scan - Always available (primary for grouping drills) */}
+          {showScan && (
             <TouchableOpacity
               style={[
                 styles.scanButton,
-                isPaperDrill && styles.scanButtonPrimary,
+                isGroupingDrill && styles.scanButtonPrimary,
                 drillLimitReached && { opacity: 0.5 },
               ]}
               onPress={handleScanPaper}
@@ -694,10 +680,10 @@ export default function ActiveSessionScreen() {
             >
               <Camera size={20} color="#fff" />
               <Text style={styles.scanButtonText}>
-                {isPaperDrill
+                {isGroupingDrill
                   ? (nextTargetPlan?.nextBullets
                       ? `Scan (${nextTargetPlan.nextBullets}rds)`
-                      : 'Scan Target')
+                      : 'Scan Grouping')
                   : 'Scan'}
               </Text>
             </TouchableOpacity>
@@ -899,51 +885,6 @@ const styles = StyleSheet.create({
   listContentEmpty: {
     flex: 1,
     justifyContent: 'center',
-  },
-
-  // Target Card
-  targetCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 10,
-  },
-  targetIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  targetInfo: {
-    flex: 1,
-  },
-  targetHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  targetTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  targetIndex: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  targetMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-    gap: 6,
-  },
-  targetMetaText: {
-    fontSize: 12,
-  },
-  targetMetaDot: {
-    fontSize: 6,
   },
 
   // Empty State

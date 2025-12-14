@@ -1,67 +1,52 @@
 ---
-description: Training session data model implementation, state transitions, and validation workflows for military/law enforcement training management.
+description: Documentation for training session model structure, states, validation and drill tracking components
 ---
 
 
 # training-session-model
 
-Training Session Data Model Components:
+The training session model implements specialized tracking of shooting drills and progression states:
 
-1. Session Lifecycle Management (Importance: 95/100)
-Path: components/training-detail/hooks/useTrainingActions.ts
-- Implements strict state machine for training sessions:
-  * PLANNED -> LIVE -> COMPLETED
-  * PLANNED -> CANCELLED
-  * LIVE -> SUSPENDED -> LIVE
-  * LIVE -> TERMINATED
-- Each transition requires validation of:
-  * Required participants present
-  * Equipment availability
-  * Range conditions met
-  * Commander authorization
+## Core Session States
+1. Training Session Management (Importance: 90)
+- States: planned, ongoing, completed, cancelled
+- Supports dual-mode drills: grouping and achievement targets
+- Tracks drill completion criteria including rounds fired, accuracy thresholds
+- Validates time limits and required shooting positions
 
-2. Drill Progression Tracking (Importance: 90/100)
-Path: components/session/TargetDetailModal.tsx
-- Enforces sequential drill completion requirements:
-  * Qualification drills must follow prescribed order
-  * Training drills allow flexible sequencing
-  * Tactical drills require scenario completion validation
-- Tracks individual and team completion status
-- Manages drill-specific scoring metrics
-- Enforces retry limits based on drill type
+2. Drill Progression System (Importance: 85)
+- Maps sequential drill requirements and dependencies 
+- Enforces drill prerequisites and unlocking conditions
+- Tracks performance metrics per drill type
+- Manages drill template configurations and parameters
 
-3. Session Validation System (Importance: 85/100)
-Path: components/insights/hooks/useInsightsData.ts
-- Validates session completion criteria:
-  * Minimum required rounds fired
-  * Target acquisition requirements met
-  * Time constraints satisfied
-  * Safety protocols followed
-- Generates completion certificates
-- Records qualification achievements
-- Tracks certification expiration
+3. Session Validation Workflows (Importance: 80)
+- Enforces completion requirements per drill type:
+  - Grouping: Shot dispersion metrics
+  - Achievement: Accuracy percentages and hit counts
+- Validates time constraints and position requirements
+- Processes drill-specific scoring rules
 
-4. Training Data Collection (Importance: 80/100)
-Path: components/session/ResultCard.tsx
-- Captures structured training metrics:
-  * Shot grouping measurements
-  * Target acquisition times
-  * Reaction speeds
-  * Accuracy percentages
-- Links biometric data to training performance
-- Tracks environmental conditions
-- Records equipment configurations
+## Session Statistics
+- Real-time progress calculations against requirements
+- Aggregated completion rates across drill sequences
+- Distance-based performance categorization
+- Achievement vs grouping success ratios
 
-5. Progress Tracking Model (Importance: 75/100)
-Path: components/training-detail/ProgressTracker.tsx
-- Implements multi-level progression system:
-  * Individual skill levels
-  * Team qualification status
-  * Certification requirements
-  * Refresher training schedules
-- Manages prerequisite requirements
-- Tracks continuing education credits
-- Handles qualification renewals
+## Data Models
+1. TrainingSession
+- status: SessionStatus
+- drillProgression: DrillProgress[]
+- completionMetrics: CompletionStats
+- validationRules: ValidationConfig
+
+2. DrillProgress
+- drillType: 'grouping' | 'achievement'
+- requirements: DrillRequirements
+- completionState: CompletionState
+- validationResults: ValidationResult[]
+
+The model emphasizes strict progression tracking and validation workflows specific to firearms training scenarios, with particular focus on different drill types and their completion criteria.
 
 $END$
 

@@ -61,7 +61,7 @@ export const DetectionEditor = React.memo(function DetectionEditor({
       const displayWidth = CANVAS_SIZE;
       const displayHeight = CANVAS_SIZE / imgAspect;
       return {
-        x: displayWidth / imgWidth,
+        x: displayWidth / imgWidth ,
         y: displayHeight / imgHeight,
         offsetX: 0,
         offsetY: (CANVAS_SIZE - displayHeight) / 2,

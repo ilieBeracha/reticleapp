@@ -13,20 +13,20 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { Crosshair, Plus, Target, Trash2 } from 'lucide-react-native';
+import { Plus, Target, Trash2 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Keyboard,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Keyboard,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import Animated, { FadeInRight, Layout } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -49,7 +49,8 @@ function DrillItem({
   colors: ReturnType<typeof useColors>;
   onRemove: () => void;
 }) {
-  const isPaper = drill.target_type === 'paper';
+  const isGrouping = drill.drill_goal === 'grouping';
+  const goalColor = isGrouping ? '#10B981' : '#93C5FD';
 
   return (
     <Animated.View
@@ -57,14 +58,21 @@ function DrillItem({
       layout={Layout.springify()}
       style={[styles.drillItem, { backgroundColor: colors.card, borderColor: colors.border }]}
     >
-      <View style={[styles.drillItemIcon, { backgroundColor: isPaper ? '#6366F110' : '#F59E0B10' }]}>
-        {isPaper ? <Target size={18} color="#6366F1" /> : <Crosshair size={18} color="#F59E0B" />}
+      <View style={[styles.drillItemIcon, { backgroundColor: `${goalColor}10` }]}>
+        <Target size={18} color={goalColor} />
       </View>
 
       <View style={styles.drillItemContent}>
-        <Text style={[styles.drillItemName, { color: colors.text }]}>{drill.name}</Text>
+        <View style={styles.drillItemHeader}>
+          <Text style={[styles.drillItemName, { color: colors.text }]}>{drill.name}</Text>
+          <View style={[styles.drillItemBadge, { backgroundColor: `${goalColor}15` }]}>
+            <Text style={[styles.drillItemBadgeText, { color: goalColor }]}>
+              {isGrouping ? 'Grouping' : 'Achievement'}
+            </Text>
+          </View>
+        </View>
         <Text style={[styles.drillItemMeta, { color: colors.textMuted }]}>
-          {drill.distance_m}m • {drill.strings_count ?? 1} rounds • {drill.rounds_per_shooter} shots/round
+          {drill.distance_m}m • {drill.rounds_per_shooter} shots
           {drill.time_limit_seconds ? ` • ${drill.time_limit_seconds}s` : ''}
         </Text>
       </View>
@@ -92,7 +100,8 @@ function TemplateChip({
   colors: ReturnType<typeof useColors>;
   onAdd: () => void;
 }) {
-  const isPaper = template.target_type === 'paper';
+  const isGrouping = template.drill_goal === 'grouping';
+  const goalColor = isGrouping ? '#10B981' : '#93C5FD';
 
   return (
     <TouchableOpacity
@@ -100,12 +109,14 @@ function TemplateChip({
       onPress={onAdd}
       activeOpacity={0.7}
     >
-      <View style={[styles.templateChipIcon, { backgroundColor: isPaper ? '#6366F110' : '#F59E0B10' }]}>
-        {isPaper ? <Target size={14} color="#6366F1" /> : <Crosshair size={14} color="#F59E0B" />}
-      </View>
       <Text style={[styles.templateChipName, { color: colors.text }]} numberOfLines={1}>
         {template.name}
       </Text>
+      <View style={[styles.templateChipBadge, { backgroundColor: `${goalColor}15` }]}>
+        <Text style={[styles.templateChipBadgeText, { color: goalColor }]}>
+          {isGrouping ? 'GRP' : 'ACH'}
+        </Text>
+      </View>
       <Plus size={14} color={colors.primary} />
     </TouchableOpacity>
   );
@@ -117,10 +128,11 @@ function TemplateChip({
 export default function CreateTrainingScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { activeTeamId, activeTeam } = useTeamStore();
+  const { teams } = useTeamStore();
   const { loadTeamTrainings, loadMyUpcomingTrainings } = useTrainingStore();
 
   // Form state
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [scheduledDate, setScheduledDate] = useState(() => {
     const tomorrow = new Date();
@@ -138,12 +150,23 @@ export default function CreateTrainingScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [templates, setTemplates] = useState<DrillTemplate[]>([]);
 
+  // Auto-select team if only one available
+  useEffect(() => {
+    if (teams.length === 1 && !selectedTeamId) {
+      setSelectedTeamId(teams[0].id);
+    }
+  }, [teams, selectedTeamId]);
+
+  const selectedTeam = teams.find(t => t.id === selectedTeamId);
+
   // Load drill templates
   useEffect(() => {
-    if (activeTeamId) {
-      getTeamDrillTemplates(activeTeamId).then(setTemplates).catch(console.error);
+    if (selectedTeamId) {
+      getTeamDrillTemplates(selectedTeamId).then(setTemplates).catch(console.error);
+    } else {
+      setTemplates([]);
     }
-  }, [activeTeamId]);
+  }, [selectedTeamId]);
 
   const handleAddDrill = useCallback((drill: CreateDrillInput & { id?: string }) => {
     const drillWithId: DrillFormData = {
@@ -165,6 +188,7 @@ export default function CreateTrainingScreen() {
       {
         id: Date.now().toString(),
         name: template.name,
+        drill_goal: template.drill_goal,
         target_type: template.target_type,
         distance_m: template.distance_m,
         rounds_per_shooter: template.rounds_per_shooter,
@@ -177,7 +201,10 @@ export default function CreateTrainingScreen() {
   }, []);
 
   const handleCreate = useCallback(async () => {
-    if (!activeTeamId) return;
+    if (!selectedTeamId) {
+      Alert.alert('Team Required', 'Please select a team for this training');
+      return;
+    }
 
     if (!title.trim()) {
       Alert.alert('Name Required', 'Please enter a training name');
@@ -200,7 +227,7 @@ export default function CreateTrainingScreen() {
       }
 
       await createTraining({
-        team_id: activeTeamId,
+        team_id: selectedTeamId,
         title: title.trim(),
         scheduled_at: finalDate.toISOString(),
         manual_start: manualStart,
@@ -208,7 +235,7 @@ export default function CreateTrainingScreen() {
       });
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      loadTeamTrainings(activeTeamId).catch(() => {});
+      loadTeamTrainings(selectedTeamId).catch(() => {});
       loadMyUpcomingTrainings().catch(() => {});
 
       if (router.canGoBack()) {
@@ -220,7 +247,7 @@ export default function CreateTrainingScreen() {
     } finally {
       setSubmitting(false);
     }
-  }, [activeTeamId, title, scheduledDate, manualStart, drills, loadTeamTrainings, loadMyUpcomingTrainings]);
+  }, [selectedTeamId, title, scheduledDate, manualStart, drills, loadTeamTrainings, loadMyUpcomingTrainings]);
 
   const formatDate = (date: Date) => {
     const today = new Date();
@@ -237,19 +264,33 @@ export default function CreateTrainingScreen() {
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   };
 
-  const canCreate = title.trim() && drills.length > 0 && !submitting;
+  const canCreate = selectedTeamId && title.trim() && drills.length > 0 && !submitting;
 
-  // Not in team mode
-  if (!activeTeamId) {
+  // No teams available
+  if (teams.length === 0) {
     return (
       <View style={[styles.notAvailable, { backgroundColor: colors.background }]}>
         <View style={[styles.notAvailableIcon, { backgroundColor: colors.card }]}>
           <Ionicons name="people-outline" size={32} color={colors.textMuted} />
         </View>
-        <Text style={[styles.notAvailableTitle, { color: colors.text }]}>Team Required</Text>
+        <Text style={[styles.notAvailableTitle, { color: colors.text }]}>No Teams</Text>
         <Text style={[styles.notAvailableDesc, { color: colors.textMuted }]}>
-          Switch to a team to create trainings
+          Create or join a team to schedule trainings
         </Text>
+        <View style={styles.notAvailableActions}>
+          <TouchableOpacity
+            style={[styles.notAvailableBtn, { backgroundColor: colors.primary }]}
+            onPress={() => router.replace('/(protected)/createTeam')}
+          >
+            <Text style={styles.notAvailableBtnText}>Create Team</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.notAvailableBtnSecondary, { backgroundColor: colors.secondary }]}
+            onPress={() => router.replace('/(protected)/acceptInvite')}
+          >
+            <Text style={[styles.notAvailableBtnTextSecondary, { color: colors.text }]}>Join Team</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -267,7 +308,58 @@ export default function CreateTrainingScreen() {
           <Ionicons name="barbell" size={28} color={colors.primary} />
         </View>
         <Text style={[styles.title, { color: colors.text }]}>New Training</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>{activeTeam?.name}</Text>
+      </View>
+
+      {/* Team Selector */}
+      <View style={styles.inputSection}>
+        <View style={styles.labelRow}>
+          <Ionicons name="people" size={16} color={selectedTeamId ? colors.primary : colors.destructive} />
+          <Text style={[styles.inputLabel, { color: colors.text }]}>Team</Text>
+          <Text style={[styles.required, { color: colors.destructive }]}>*</Text>
+        </View>
+        {teams.length === 1 ? (
+          <View style={[styles.teamSelected, { backgroundColor: colors.card, borderColor: colors.primary }]}>
+            <View style={[styles.teamSelectedIcon, { backgroundColor: colors.primary + '15' }]}>
+              <Ionicons name="people" size={16} color={colors.primary} />
+            </View>
+            <Text style={[styles.teamSelectedName, { color: colors.text }]}>{teams[0].name}</Text>
+          </View>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.teamSelector}>
+            {teams.map(team => (
+              <TouchableOpacity
+                key={team.id}
+                style={[
+                  styles.teamOption,
+                  {
+                    backgroundColor: selectedTeamId === team.id ? colors.primary + '15' : colors.card,
+                    borderColor: selectedTeamId === team.id ? colors.primary : colors.border,
+                  },
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setSelectedTeamId(team.id);
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name="people"
+                  size={16}
+                  color={selectedTeamId === team.id ? colors.primary : colors.textMuted}
+                />
+                <Text
+                  style={[
+                    styles.teamOptionName,
+                    { color: selectedTeamId === team.id ? colors.primary : colors.text },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {team.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
       </View>
 
       {/* Training Name */}
@@ -387,20 +479,25 @@ export default function CreateTrainingScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.templateChipsScroll}
           >
-            {templates.map(template => (
-              <TouchableOpacity
-                key={template.id}
-                style={[styles.quickChip, { backgroundColor: colors.secondary }]}
-                onPress={() => handleAddTemplate(template)}
-              >
-                {template.target_type === 'paper' 
-                  ? <Target size={14} color="#93C5FD" />
-                  : <Crosshair size={14} color={colors.textMuted} />
-                }
-                <Text style={[styles.quickChipText, { color: colors.text }]}>{template.name}</Text>
-                <Plus size={12} color={colors.primary} />
-              </TouchableOpacity>
-            ))}
+            {templates.map(template => {
+              const isGrouping = template.drill_goal === 'grouping';
+              const goalColor = isGrouping ? '#10B981' : '#93C5FD';
+              return (
+                <TouchableOpacity
+                  key={template.id}
+                  style={[styles.quickChip, { backgroundColor: colors.secondary }]}
+                  onPress={() => handleAddTemplate(template)}
+                >
+                  <Text style={[styles.quickChipText, { color: colors.text }]}>{template.name}</Text>
+                  <View style={[styles.quickChipBadge, { backgroundColor: `${goalColor}20` }]}>
+                    <Text style={[styles.quickChipBadgeText, { color: goalColor }]}>
+                      {isGrouping ? 'G' : 'A'}
+                    </Text>
+                  </View>
+                  <Plus size={12} color={colors.primary} />
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
       )}
@@ -557,6 +654,8 @@ const styles = StyleSheet.create({
   templateChipsScroll: { gap: 8, paddingRight: 20 },
   quickChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10 },
   quickChipText: { fontSize: 13, fontWeight: '500' },
+  quickChipBadge: { width: 18, height: 18, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
+  quickChipBadgeText: { fontSize: 10, fontWeight: '700' },
 
   // Template Chip Component
   templateChip: {
@@ -569,8 +668,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginRight: 10,
   },
-  templateChipIcon: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  templateChipName: { fontSize: 14, fontWeight: '500', maxWidth: 120 },
+  templateChipName: { fontSize: 14, fontWeight: '500', maxWidth: 100 },
+  templateChipBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  templateChipBadgeText: { fontSize: 9, fontWeight: '700' },
 
   // Empty Drills
   emptyDrills: { alignItems: 'center', padding: 32, borderRadius: 16, gap: 8, marginBottom: 16 },
@@ -581,9 +681,12 @@ const styles = StyleSheet.create({
   drillsList: { gap: 10, marginBottom: 16 },
   drillItem: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1 },
   drillItemIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  drillItemContent: { flex: 1 },
+  drillItemContent: { flex: 1, gap: 4 },
+  drillItemHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   drillItemName: { fontSize: 15, fontWeight: '600' },
-  drillItemMeta: { fontSize: 13, marginTop: 2 },
+  drillItemBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  drillItemBadgeText: { fontSize: 10, fontWeight: '600' },
+  drillItemMeta: { fontSize: 13 },
   drillItemRemove: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
 
   // Info Card
@@ -594,6 +697,30 @@ const styles = StyleSheet.create({
   createButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 52, borderRadius: 14, gap: 8, marginBottom: 20 },
   createButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
 
+  // Team Selector
+  teamSelector: { marginHorizontal: -4 },
+  teamOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    marginHorizontal: 4,
+  },
+  teamOptionName: { fontSize: 14, fontWeight: '600', maxWidth: 120 },
+  teamSelected: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  teamSelectedIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  teamSelectedName: { fontSize: 15, fontWeight: '600' },
+
   // Not Available
   notAvailable: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
   notAvailableIcon: { width: 80, height: 80, borderRadius: 40,
@@ -602,7 +729,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   notAvailableTitle: { fontSize: 20, fontWeight: '600', marginBottom: 8 },
-  notAvailableDesc: { fontSize: 14, textAlign: 'center' },
+  notAvailableDesc: { fontSize: 14, textAlign: 'center', marginBottom: 24 },
+  notAvailableActions: { flexDirection: 'row', gap: 12 },
+  notAvailableBtn: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },
+  notAvailableBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  notAvailableBtnSecondary: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },
+  notAvailableBtnTextSecondary: { fontSize: 14, fontWeight: '600' },
 
   // Modal
   modalContainer: { flex: 1 },

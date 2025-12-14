@@ -1,140 +1,30 @@
 import { useColors } from "@/hooks/ui/useColors";
+import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from "@/theme/colors";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import { Camera, Crosshair, Minus, Plus, Target, X } from "lucide-react-native";
+import { Camera, Edit3, Focus, Target, Trophy, X } from "lucide-react-native";
 import React, { useCallback } from "react";
 import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
-import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from "@/theme/colors";
-import { COLORS, TargetType } from "./types";
-
-// ═══════════════════════════════════════════════════════════════════════════
-// DISTANCE CATEGORIES
-// ═══════════════════════════════════════════════════════════════════════════
-const DISTANCE_CATEGORIES = [
-  { label: "Close", range: "5-15m", distances: [5, 7, 10, 15] },
-  { label: "Medium", range: "25-50m", distances: [25, 35, 50] },
-  { label: "Long", range: "100m+", distances: [100, 200, 300] },
-];
-
-// ═══════════════════════════════════════════════════════════════════════════
-// STEPPER COMPONENT
-// ═══════════════════════════════════════════════════════════════════════════
-interface StepperProps {
-  value: number;
-  onIncrement: () => void;
-  onDecrement: () => void;
-  min?: number;
-  max?: number;
-  unit?: string;
-  label: string;
-}
-
-const Stepper = React.memo(function Stepper({
-  value,
-  onIncrement,
-  onDecrement,
-  min = 1,
-  max = 100,
-  unit = "",
-  label,
-}: StepperProps) {
-  const handleDecrement = useCallback(() => {
-    if (value > min) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      onDecrement();
-    }
-  }, [value, min, onDecrement]);
-
-  const handleIncrement = useCallback(() => {
-    if (value < max) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      onIncrement();
-    }
-  }, [value, max, onIncrement]);
-
-  return (
-    <View style={styles.stepperContainer}>
-      <Text style={styles.stepperLabel}>{label}</Text>
-      <View style={styles.stepperRow}>
-        <TouchableOpacity
-          style={[styles.stepperBtn, value <= min && styles.stepperBtnDisabled]}
-          onPress={handleDecrement}
-          disabled={value <= min}
-          activeOpacity={0.7}
-        >
-          <Minus size={24} color={value <= min ? COLORS.textDim : COLORS.white} />
-        </TouchableOpacity>
-
-        <View style={styles.stepperValueContainer}>
-          <Text style={styles.stepperValue}>{value}</Text>
-          {unit && <Text style={styles.stepperUnit}>{unit}</Text>}
-        </View>
-
-        <TouchableOpacity
-          style={[styles.stepperBtn, value >= max && styles.stepperBtnDisabled]}
-          onPress={handleIncrement}
-          disabled={value >= max}
-          activeOpacity={0.7}
-        >
-          <Plus size={24} color={value >= max ? COLORS.textDim : COLORS.white} />
-        </TouchableOpacity>
-      </View>
-      
-      {/* Quick select buttons */}
-      <View style={styles.quickSelectRow}>
-        {[5, 10, 20, 30].map((num) => (
-          <TouchableOpacity
-            key={num}
-            style={[styles.quickSelectBtn, value === num && styles.quickSelectBtnActive]}
-            onPress={() => {
-              Haptics.selectionAsync();
-              // Simulate setting value by incrementing/decrementing
-              const diff = num - value;
-              if (diff > 0) {
-                for (let i = 0; i < diff; i++) onIncrement();
-              } else {
-                for (let i = 0; i < -diff; i++) onDecrement();
-              }
-            }}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.quickSelectText, value === num && styles.quickSelectTextActive]}>
-              {num}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-});
+import { COLORS, InputMethod, TargetType } from "./types";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TARGET FORM
+// Now structured as Grouping vs Achievement with input method selection
 // ═══════════════════════════════════════════════════════════════════════════
 
 interface TargetFormProps {
   targetType: TargetType;
   onTargetTypeChange: (type: TargetType) => void;
-  selectedDistance: number | null;
-  onDistanceSelect: (distance: number) => void;
-  customDistance: string;
-  onCustomDistanceChange: (text: string) => void;
-  selectedBullets: number | null;
-  onBulletsSelect: (bullets: number) => void;
-  customBullets: string;
-  onCustomBulletsChange: (text: string) => void;
-  laneNumber: string;
-  onLaneNumberChange: (text: string) => void;
-  effectiveDistance: number;
-  effectiveBullets: number;
+  inputMethod: InputMethod;
+  onInputMethodChange: (method: InputMethod) => void;
   onSubmit: () => void;
   onClose: () => void;
   saving: boolean;
@@ -143,26 +33,41 @@ interface TargetFormProps {
 export const TargetForm = React.memo(function TargetForm({
   targetType,
   onTargetTypeChange,
-  selectedDistance,
-  onDistanceSelect,
-  selectedBullets,
-  onBulletsSelect,
-  effectiveDistance,
-  effectiveBullets,
+  inputMethod,
+  onInputMethodChange,
   onSubmit,
   onClose,
   saving,
 }: TargetFormProps) {
   const colors = useColors();
-  
-  // Handlers for stepper
-  const handleBulletsIncrement = useCallback(() => {
-    onBulletsSelect((selectedBullets ?? 5) + 1);
-  }, [selectedBullets, onBulletsSelect]);
 
-  const handleBulletsDecrement = useCallback(() => {
-    onBulletsSelect(Math.max(1, (selectedBullets ?? 5) - 1));
-  }, [selectedBullets, onBulletsSelect]);
+  const handleTargetTypeChange = useCallback((type: TargetType) => {
+    Haptics.selectionAsync();
+    onTargetTypeChange(type);
+  }, [onTargetTypeChange]);
+
+  const handleInputMethodChange = useCallback((method: InputMethod) => {
+    Haptics.selectionAsync();
+    onInputMethodChange(method);
+  }, [onInputMethodChange]);
+
+  // Determine button text based on selection
+  const getButtonText = () => {
+    if (targetType === "grouping") {
+      return "Scan Target";
+    }
+    if (inputMethod === "scan") {
+      return "Scan Target";
+    }
+    return "Enter Results";
+  };
+
+  const getButtonIcon = () => {
+    if (targetType === "grouping" || inputMethod === "scan") {
+      return <Camera size={20} color="#fff" />;
+    }
+    return <Edit3 size={20} color="#fff" />;
+  };
 
   return (
     <ScrollView
@@ -179,7 +84,7 @@ export const TargetForm = React.memo(function TargetForm({
           </View>
           <View>
             <Text style={[styles.headerTitle, { color: colors.text }]}>Add Target</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>Log shooting results</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>Choose your training goal</Text>
           </View>
         </View>
         <TouchableOpacity onPress={onClose} style={[styles.closeBtn, { backgroundColor: colors.card }]}>
@@ -187,46 +92,56 @@ export const TargetForm = React.memo(function TargetForm({
         </TouchableOpacity>
       </View>
 
-      {/* Target Type Selection */}
+      {/* Target Type Selection: Grouping vs Achievement */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Type</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Training Goal</Text>
         <View style={styles.typeRow}>
+          {/* Grouping Target */}
           <TouchableOpacity
-            style={[styles.typeCard, targetType === "paper" && styles.typeCardSelected]}
-            onPress={() => onTargetTypeChange("paper")}
+            style={[
+              styles.typeCard, 
+              { backgroundColor: colors.card, borderColor: 'transparent' },
+              targetType === "grouping" && styles.typeCardSelected
+            ]}
+            onPress={() => handleTargetTypeChange("grouping")}
             activeOpacity={0.8}
           >
-            <View style={[styles.typeIconBox, targetType === "paper" && styles.typeIconBoxSelected]}>
-              <Camera size={22} color={targetType === "paper" ? "#000" : COLORS.textMuted} />
+            <View style={[styles.typeIconBox, targetType === "grouping" && styles.typeIconBoxSelected]}>
+              <Focus size={22} color={targetType === "grouping" ? "#000" : colors.textMuted} />
             </View>
             <View style={styles.typeContent}>
-              <Text style={[styles.typeText, targetType === "paper" && styles.typeTextSelected]}>
-                Paper Target
+              <Text style={[styles.typeText, { color: colors.text }, targetType === "grouping" && styles.typeTextSelected]}>
+                Grouping
               </Text>
-              <Text style={styles.typeHint}>AI-powered scan</Text>
+              <Text style={[styles.typeHint, { color: colors.textMuted }]}>Measure shot consistency</Text>
             </View>
-            {targetType === "paper" && (
+            {targetType === "grouping" && (
               <View style={styles.typeCheck}>
                 <Ionicons name="checkmark" size={14} color="#000" />
               </View>
             )}
           </TouchableOpacity>
 
+          {/* Achievement Target */}
           <TouchableOpacity
-            style={[styles.typeCard, targetType === "tactical" && styles.typeCardSelected]}
-            onPress={() => onTargetTypeChange("tactical")}
+            style={[
+              styles.typeCard, 
+              { backgroundColor: colors.card, borderColor: 'transparent' },
+              targetType === "achievement" && styles.typeCardSelected
+            ]}
+            onPress={() => handleTargetTypeChange("achievement")}
             activeOpacity={0.8}
           >
-            <View style={[styles.typeIconBox, targetType === "tactical" && styles.typeIconBoxSelected]}>
-              <Crosshair size={22} color={targetType === "tactical" ? "#000" : COLORS.textMuted} />
+            <View style={[styles.typeIconBox, targetType === "achievement" && styles.typeIconBoxSelected]}>
+              <Trophy size={22} color={targetType === "achievement" ? "#000" : colors.textMuted} />
             </View>
             <View style={styles.typeContent}>
-              <Text style={[styles.typeText, targetType === "tactical" && styles.typeTextSelected]}>
-                Tactical
+              <Text style={[styles.typeText, { color: colors.text }, targetType === "achievement" && styles.typeTextSelected]}>
+                Achievement
               </Text>
-              <Text style={styles.typeHint}>Manual entry</Text>
+              <Text style={[styles.typeHint, { color: colors.textMuted }]}>Track hits & accuracy</Text>
             </View>
-            {targetType === "tactical" && (
+            {targetType === "achievement" && (
               <View style={styles.typeCheck}>
                 <Ionicons name="checkmark" size={14} color="#000" />
               </View>
@@ -235,116 +150,110 @@ export const TargetForm = React.memo(function TargetForm({
         </View>
       </View>
 
-      {/* Paper Target - Simple CTA */}
-      {targetType === "paper" && (
-        <View style={styles.paperSection}>
-          <View style={styles.paperCard}>
-            <View style={styles.paperIconRing}>
-              <View style={styles.paperIconInner}>
-                <Camera size={32} color={COLORS.primary} />
+      {/* Grouping - Scan Only CTA */}
+      {targetType === "grouping" && (
+        <View style={styles.infoSection}>
+          <View style={[styles.infoCard, { backgroundColor: `${colors.primary}08`, borderColor: `${colors.primary}25` }]}>
+            <View style={[styles.infoIconRing, { backgroundColor: `${colors.primary}15` }]}>
+              <View style={[styles.infoIconInner, { backgroundColor: `${colors.primary}20` }]}>
+                <Focus size={32} color={colors.primary} />
               </View>
             </View>
-            <Text style={styles.paperTitle}>Scan Your Target</Text>
-            <Text style={styles.paperDesc}>
-              Point your camera at a paper target. Our AI will detect bullet holes and calculate your score automatically.
+            <Text style={[styles.infoTitle, { color: colors.text }]}>Measure Your Grouping</Text>
+            <Text style={[styles.infoDesc, { color: colors.textMuted }]}>
+              Scan your paper target to measure shot dispersion and consistency. 
+              No hit percentage—just pure grouping analysis.
             </Text>
-            <View style={styles.paperFeatures}>
-              <View style={styles.paperFeature}>
-                <Ionicons name="flash" size={14} color={COLORS.primary} />
-                <Text style={styles.paperFeatureText}>Auto detection</Text>
+            <View style={styles.infoFeatures}>
+              <View style={styles.infoFeature}>
+                <Ionicons name="analytics" size={14} color={colors.primary} />
+                <Text style={[styles.infoFeatureText, { color: colors.text }]}>Dispersion (cm)</Text>
               </View>
-              <View style={styles.paperFeature}>
-                <Ionicons name="analytics" size={14} color={COLORS.primary} />
-                <Text style={styles.paperFeatureText}>Group analysis</Text>
+              <View style={styles.infoFeature}>
+                <Ionicons name="locate" size={14} color={colors.primary} />
+                <Text style={[styles.infoFeatureText, { color: colors.text }]}>Group size</Text>
               </View>
             </View>
           </View>
         </View>
       )}
 
-      {/* Tactical - Distance & Rounds */}
-      {targetType === "tactical" && (
+      {/* Achievement - Input Method Selection */}
+      {targetType === "achievement" && (
         <>
-          {/* Distance Selection */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Distance</Text>
-            {DISTANCE_CATEGORIES.map((category) => (
-              <View key={category.label} style={styles.distanceCategory}>
-                <View style={styles.distanceCategoryHeader}>
-                  <Text style={styles.distanceCategoryLabel}>{category.label}</Text>
-                  <Text style={styles.distanceCategoryRange}>{category.range}</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Input Method</Text>
+            <View style={styles.methodRow}>
+              {/* Scan Option */}
+              <TouchableOpacity
+                style={[
+                  styles.methodCard,
+                  { backgroundColor: colors.card, borderColor: 'transparent' },
+                  inputMethod === "scan" && styles.methodCardSelected
+                ]}
+                onPress={() => handleInputMethodChange("scan")}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.methodIconBox, inputMethod === "scan" && styles.methodIconBoxSelected]}>
+                  <Camera size={20} color={inputMethod === "scan" ? "#000" : colors.textMuted} />
                 </View>
-                <View style={styles.distanceChipsRow}>
-                  {category.distances.map((dist) => (
-                    <TouchableOpacity
-                      key={dist}
-                      style={[
-                        styles.distanceChip,
-                        selectedDistance === dist && styles.distanceChipSelected,
-                      ]}
-                      onPress={() => {
-                        Haptics.selectionAsync();
-                        onDistanceSelect(dist);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        style={[
-                          styles.distanceChipText,
-                          selectedDistance === dist && styles.distanceChipTextSelected,
-                        ]}
-                      >
-                        {dist}m
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                <Text style={[styles.methodText, { color: colors.text }, inputMethod === "scan" && styles.methodTextSelected]}>
+                  Scan
+                </Text>
+                <Text style={[styles.methodHint, { color: colors.textMuted }]}>AI detection</Text>
+              </TouchableOpacity>
+
+              {/* Manual Option */}
+              <TouchableOpacity
+                style={[
+                  styles.methodCard,
+                  { backgroundColor: colors.card, borderColor: 'transparent' },
+                  inputMethod === "manual" && styles.methodCardSelected
+                ]}
+                onPress={() => handleInputMethodChange("manual")}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.methodIconBox, inputMethod === "manual" && styles.methodIconBoxSelected]}>
+                  <Edit3 size={20} color={inputMethod === "manual" ? "#000" : colors.textMuted} />
                 </View>
-              </View>
-            ))}
+                <Text style={[styles.methodText, { color: colors.text }, inputMethod === "manual" && styles.methodTextSelected]}>
+                  Manual
+                </Text>
+                <Text style={[styles.methodHint, { color: colors.textMuted }]}>Enter counts</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
-          {/* Rounds Stepper */}
-          <View style={styles.section}>
-            <Stepper
-              label="Rounds to Fire"
-              value={effectiveBullets}
-              onIncrement={handleBulletsIncrement}
-              onDecrement={handleBulletsDecrement}
-              min={1}
-              max={100}
-              unit="rds"
-            />
-          </View>
-
-          {/* Summary */}
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryItem}>
-              <View style={styles.summaryIconBox}>
-                <Target size={16} color={COLORS.primary} />
+          {/* Achievement Info Card */}
+          <View style={styles.infoSection}>
+            <View style={[styles.infoCard, { backgroundColor: `${colors.primary}08`, borderColor: `${colors.primary}25` }]}>
+              <View style={[styles.infoIconRing, { backgroundColor: `${colors.primary}15` }]}>
+                <View style={[styles.infoIconInner, { backgroundColor: `${colors.primary}20` }]}>
+                  {inputMethod === "scan" ? (
+                    <Camera size={32} color={colors.primary} />
+                  ) : (
+                    <Edit3 size={32} color={colors.primary} />
+                  )}
+                </View>
               </View>
-              <View>
-                <Text style={styles.summaryLabel}>Target</Text>
-                <Text style={styles.summaryValue}>Tactical</Text>
-              </View>
-            </View>
-            <View style={styles.summaryDivider} />
-            <View style={styles.summaryItem}>
-              <View style={styles.summaryIconBox}>
-                <Ionicons name="resize-outline" size={16} color={COLORS.primary} />
-              </View>
-              <View>
-                <Text style={styles.summaryLabel}>Distance</Text>
-                <Text style={styles.summaryValue}>{effectiveDistance}m</Text>
-              </View>
-            </View>
-            <View style={styles.summaryDivider} />
-            <View style={styles.summaryItem}>
-              <View style={styles.summaryIconBox}>
-                <Ionicons name="ellipse" size={16} color={COLORS.primary} />
-              </View>
-              <View>
-                <Text style={styles.summaryLabel}>Rounds</Text>
-                <Text style={styles.summaryValue}>{effectiveBullets}</Text>
+              <Text style={[styles.infoTitle, { color: colors.text }]}>
+                {inputMethod === "scan" ? "Scan Your Target" : "Enter Your Results"}
+              </Text>
+              <Text style={[styles.infoDesc, { color: colors.textMuted }]}>
+                {inputMethod === "scan" 
+                  ? "AI will detect bullet holes and calculate your hit percentage automatically."
+                  : "Manually enter the number of rounds fired and hits to track your accuracy."
+                }
+              </Text>
+              <View style={styles.infoFeatures}>
+                <View style={styles.infoFeature}>
+                  <Ionicons name="checkmark-circle" size={14} color={colors.primary} />
+                  <Text style={[styles.infoFeatureText, { color: colors.text }]}>Hit count</Text>
+                </View>
+                <View style={styles.infoFeature}>
+                  <Ionicons name="pie-chart" size={14} color={colors.primary} />
+                  <Text style={[styles.infoFeatureText, { color: colors.text }]}>Hit percentage</Text>
+                </View>
               </View>
             </View>
           </View>
@@ -368,14 +277,8 @@ export const TargetForm = React.memo(function TargetForm({
             <ActivityIndicator color="#fff" size="small" />
           ) : (
             <>
-              {targetType === "paper" ? (
-                <Camera size={20} color="#fff" />
-              ) : (
-                <Crosshair size={20} color="#fff" />
-              )}
-              <Text style={styles.submitBtnText}>
-                {targetType === "paper" ? "Open Camera" : "Enter Results"}
-              </Text>
+              {getButtonIcon()}
+              <Text style={styles.submitBtnText}>{getButtonText()}</Text>
             </>
           )}
         </LinearGradient>
@@ -406,8 +309,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 24,
-    marginTop: 16,
+    paddingVertical: 16,
   },
   headerLeft: {
     flexDirection: "row",
@@ -418,25 +320,21 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: `${COLORS.primary}20`,
     alignItems: "center",
     justifyContent: "center",
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: "700",
-    color: COLORS.white,
   },
   headerSubtitle: {
     fontSize: 13,
-    color: COLORS.textMuted,
     marginTop: 1,
   },
   closeBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: COLORS.card,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -448,25 +346,22 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 12,
     fontWeight: "600",
-    color: COLORS.textMuted,
     marginBottom: 12,
     textTransform: "uppercase",
     letterSpacing: 0.8,
   },
 
-  // Target Type
+  // Target Type Cards
   typeRow: {
     gap: 10,
   },
   typeCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.card,
     borderRadius: 14,
     padding: 14,
     gap: 12,
     borderWidth: 1.5,
-    borderColor: "transparent",
   },
   typeCardSelected: {
     borderColor: COLORS.primary,
@@ -489,14 +384,12 @@ const styles = StyleSheet.create({
   typeText: {
     fontSize: 15,
     fontWeight: "600",
-    color: COLORS.text,
   },
   typeTextSelected: {
     color: COLORS.white,
   },
   typeHint: {
     fontSize: 12,
-    color: COLORS.textDim,
     marginTop: 2,
   },
   typeCheck: {
@@ -508,216 +401,92 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  // Paper Section
-  paperSection: {
+  // Input Method Cards (for Achievement)
+  methodRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  methodCard: {
+    flex: 1,
+    alignItems: "center",
+    borderRadius: 14,
+    padding: 16,
+    gap: 8,
+    borderWidth: 1.5,
+  },
+  methodCardSelected: {
+    borderColor: COLORS.primary,
+    backgroundColor: `${COLORS.primary}15`,
+  },
+  methodIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: COLORS.cardHover,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  methodIconBoxSelected: {
+    backgroundColor: COLORS.primary,
+  },
+  methodText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  methodTextSelected: {
+    color: COLORS.white,
+  },
+  methodHint: {
+    fontSize: 11,
+  },
+
+  // Info Section (replaces paperSection)
+  infoSection: {
     marginBottom: 24,
   },
-  paperCard: {
+  infoCard: {
     alignItems: "center",
-    backgroundColor: `${COLORS.primary}08`,
     borderRadius: 20,
     padding: 28,
     borderWidth: 1,
-    borderColor: `${COLORS.primary}25`,
   },
-  paperIconRing: {
+  infoIconRing: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: `${COLORS.primary}15`,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
   },
-  paperIconInner: {
+  infoIconInner: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: `${COLORS.primary}20`,
     alignItems: "center",
     justifyContent: "center",
   },
-  paperTitle: {
+  infoTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: COLORS.white,
     marginBottom: 8,
   },
-  paperDesc: {
+  infoDesc: {
     fontSize: 14,
-    color: COLORS.textMuted,
     textAlign: "center",
     lineHeight: 20,
     marginBottom: 16,
   },
-  paperFeatures: {
+  infoFeatures: {
     flexDirection: "row",
     gap: 20,
   },
-  paperFeature: {
+  infoFeature: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
-  paperFeatureText: {
+  infoFeatureText: {
     fontSize: 12,
-    color: COLORS.text,
-  },
-
-  // Distance
-  distanceCategory: {
-    marginBottom: 16,
-  },
-  distanceCategoryHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  distanceCategoryLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.text,
-  },
-  distanceCategoryRange: {
-    fontSize: 11,
-    color: COLORS.textDim,
-  },
-  distanceChipsRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  distanceChip: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-    backgroundColor: COLORS.card,
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "transparent",
-  },
-  distanceChipSelected: {
-    backgroundColor: `${COLORS.primary}20`,
-    borderColor: COLORS.primary,
-  },
-  distanceChipText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.textMuted,
-  },
-  distanceChipTextSelected: {
-    color: COLORS.white,
-  },
-
-  // Stepper
-  stepperContainer: {
-    alignItems: "center",
-  },
-  stepperLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.textMuted,
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-    marginBottom: 16,
-  },
-  stepperRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 20,
-  },
-  stepperBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: COLORS.card,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: COLORS.borderLight,
-  },
-  stepperBtnDisabled: {
-    opacity: 0.4,
-  },
-  stepperValueContainer: {
-    alignItems: "center",
-    minWidth: 80,
-  },
-  stepperValue: {
-    fontSize: 48,
-    fontWeight: "700",
-    color: COLORS.white,
-    fontVariant: ["tabular-nums"],
-  },
-  stepperUnit: {
-    fontSize: 14,
-    color: COLORS.textMuted,
-    marginTop: -4,
-  },
-  quickSelectRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 20,
-  },
-  quickSelectBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 16,
-    backgroundColor: COLORS.card,
-  },
-  quickSelectBtnActive: {
-    backgroundColor: `${COLORS.primary}30`,
-  },
-  quickSelectText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.textMuted,
-  },
-  quickSelectTextActive: {
-    color: COLORS.primary,
-  },
-
-  // Summary
-  summaryCard: {
-    flexDirection: "row",
-    backgroundColor: `${COLORS.primary}10`,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: `${COLORS.primary}20`,
-  },
-  summaryItem: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  summaryIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: `${COLORS.primary}20`,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  summaryDivider: {
-    width: 1,
-    height: 32,
-    backgroundColor: `${COLORS.primary}30`,
-    marginHorizontal: 8,
-  },
-  summaryLabel: {
-    fontSize: 10,
-    color: COLORS.textDim,
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
-  },
-  summaryValue: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.white,
   },
 
   // Buttons
@@ -745,6 +514,5 @@ const styles = StyleSheet.create({
   cancelBtnText: {
     fontSize: 14,
     fontWeight: "600",
-    color: COLORS.textMuted,
   },
 });

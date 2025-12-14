@@ -1,4 +1,5 @@
 import { useColors } from "@/hooks/ui/useColors";
+import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from "@/theme/colors";
 import type { AnalyzeDocumentResponse, AnalyzeResponse } from "@/types/api";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -19,12 +20,12 @@ import ViewShot from "react-native-view-shot";
 import { DetectionEditor } from "./DetectionEditor";
 import { DetectionPreview } from "./DetectionPreview";
 import { DistanceInput } from "./DistanceInput";
-import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from "@/theme/colors";
-import { COLORS, EditableDetection, EditMode } from "./types";
+import { COLORS, EditableDetection, EditMode, TargetType } from "./types";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // RESULT CARD
 // Displays AI detection results with editing capabilities
+// Adapts display based on target type (grouping vs achievement)
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** Union type for detection results - supports both legacy and document analysis */
@@ -40,6 +41,8 @@ interface ResultCardProps {
   distance: number;
   onDistanceChange: (distance: number) => void;
   distanceLocked?: boolean;
+  /** Target type determines what metrics to show */
+  targetType?: TargetType;
 }
 
 export const ResultCard = React.memo(function ResultCard({
@@ -52,6 +55,7 @@ export const ResultCard = React.memo(function ResultCard({
   distance,
   onDistanceChange,
   distanceLocked = false,
+  targetType = "grouping",
 }: ResultCardProps) {
   const colors = useColors();
   const [editMode, setEditMode] = useState<EditMode>("add");
@@ -59,7 +63,7 @@ export const ResultCard = React.memo(function ResultCard({
   const [editorModalVisible, setEditorModalVisible] = useState(false);
   
   // Ref for capturing the edited image
-  const editorCaptureRef = useRef<ViewShot>(null);
+  const editorCaptureRef = useRef<ViewShot | null>(null);
   
   // Store captured image when modal closes
   const [capturedEditedImage, setCapturedEditedImage] = useState<string | null>(null);
@@ -212,8 +216,14 @@ export const ResultCard = React.memo(function ResultCard({
     <ScrollView style={[styles.scrollView, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Review Detections</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>AI detected bullet holes</Text>
+        <Text style={[styles.title, { color: colors.text }]}>
+          {targetType === "grouping" ? "Grouping Analysis" : "Achievement Results"}
+        </Text>
+        <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+          {targetType === "grouping" 
+            ? "Measuring shot consistency" 
+            : "AI detected bullet holes"}
+        </Text>
       </View>
 
       {/* View-Only Preview */}
@@ -327,7 +337,7 @@ export const ResultCard = React.memo(function ResultCard({
               onDetectionsChange={onDetectionsChange}
               editMode={editMode}
               onModeChange={setEditMode}
-              captureRef={editorCaptureRef}
+              captureRef={editorCaptureRef as React.RefObject<ViewShot>}
             />
 
             {/* Stats in Modal */}
@@ -346,39 +356,67 @@ export const ResultCard = React.memo(function ResultCard({
         </Animated.View>
       </Modal>
 
-      {/* Live Stats */}
+      {/* Live Stats - Different display for Grouping vs Achievement */}
       <View style={[styles.statsContainer, { backgroundColor: colors.card }]}>
         <View style={styles.mainStat}>
           <Text style={[styles.mainStatValue, { color: colors.primary }]}>{stats.total}</Text>
           <Text style={[styles.mainStatLabel, { color: colors.textMuted }]}>
-            Total Hits{hasChanges ? " (edited)" : ""}
+            {targetType === "grouping" ? "Total Shots" : "Total Hits"}
+            {hasChanges ? " (edited)" : ""}
           </Text>
         </View>
 
         <View style={[styles.statsDivider, { backgroundColor: colors.border }]} />
 
         <View style={styles.breakdownStats}>
-          <View style={styles.breakdownRow}>
-            <View style={[styles.statDot, { backgroundColor: colors.primary }]} />
-            <Text style={[styles.breakdownText, { color: colors.textMuted }]}>{stats.high - stats.manual} AI</Text>
-          </View>
-          {stats.manual > 0 && (
-            <View style={styles.breakdownRow}>
-              <View style={[styles.statDot, { backgroundColor: COLORS.info }]} />
-              <Text style={[styles.breakdownText, { color: colors.textMuted }]}>{stats.manual} Manual</Text>
-            </View>
-          )}
-          {stats.medium > 0 && (
-            <View style={styles.breakdownRow}>
-              <View style={[styles.statDot, { backgroundColor: COLORS.warning }]} />
-              <Text style={styles.breakdownText}>{stats.medium} Med</Text>
-            </View>
-          )}
-          {stats.low > 0 && (
-            <View style={styles.breakdownRow}>
-              <View style={[styles.statDot, { backgroundColor: COLORS.danger }]} />
-              <Text style={[styles.breakdownText, { color: colors.textMuted }]}>{stats.low} Low</Text>
-            </View>
+          {targetType === "grouping" ? (
+            // Grouping: Show shot count and dispersion info only
+            <>
+              <View style={styles.breakdownRow}>
+                <View style={[styles.statDot, { backgroundColor: colors.primary }]} />
+                <Text style={[styles.breakdownText, { color: colors.textMuted }]}>{stats.high - stats.manual} AI detected</Text>
+              </View>
+              {stats.manual > 0 && (
+                <View style={styles.breakdownRow}>
+                  <View style={[styles.statDot, { backgroundColor: COLORS.info }]} />
+                  <Text style={[styles.breakdownText, { color: colors.textMuted }]}>{stats.manual} Added</Text>
+                </View>
+              )}
+              {groupSizeData?.maxDistanceCm != null && (
+                <View style={styles.breakdownRow}>
+                  <View style={[styles.statDot, { backgroundColor: COLORS.warning }]} />
+                  <Text style={[styles.breakdownText, { color: colors.textMuted }]}>
+                    {groupSizeData.maxDistanceCm.toFixed(1)}cm spread
+                  </Text>
+                </View>
+              )}
+            </>
+          ) : (
+            // Achievement: Show hit confidence breakdown
+            <>
+              <View style={styles.breakdownRow}>
+                <View style={[styles.statDot, { backgroundColor: colors.primary }]} />
+                <Text style={[styles.breakdownText, { color: colors.textMuted }]}>{stats.high - stats.manual} AI</Text>
+              </View>
+              {stats.manual > 0 && (
+                <View style={styles.breakdownRow}>
+                  <View style={[styles.statDot, { backgroundColor: COLORS.info }]} />
+                  <Text style={[styles.breakdownText, { color: colors.textMuted }]}>{stats.manual} Manual</Text>
+                </View>
+              )}
+              {stats.medium > 0 && (
+                <View style={styles.breakdownRow}>
+                  <View style={[styles.statDot, { backgroundColor: COLORS.warning }]} />
+                  <Text style={styles.breakdownText}>{stats.medium} Med</Text>
+                </View>
+              )}
+              {stats.low > 0 && (
+                <View style={styles.breakdownRow}>
+                  <View style={[styles.statDot, { backgroundColor: COLORS.danger }]} />
+                  <Text style={[styles.breakdownText, { color: colors.textMuted }]}>{stats.low} Low</Text>
+                </View>
+              )}
+            </>
           )}
         </View>
       </View>
@@ -424,7 +462,9 @@ export const ResultCard = React.memo(function ResultCard({
             <>
               <Ionicons name="checkmark-circle" size={22} color="#fff" />
               <Text style={styles.doneButtonText}>
-                {stats.total === 0 ? "Save (No Hits)" : `Save ${stats.total} Hit${stats.total !== 1 ? "s" : ""}`}
+                {targetType === "grouping" 
+                  ? (stats.total === 0 ? "Save (No Shots)" : `Save ${stats.total} Shot${stats.total !== 1 ? "s" : ""}`)
+                  : (stats.total === 0 ? "Save (No Hits)" : `Save ${stats.total} Hit${stats.total !== 1 ? "s" : ""}`)}
               </Text>
             </>
           )}

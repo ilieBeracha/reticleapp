@@ -1,49 +1,56 @@
 ---
-description: Specifications for bullet hole detection algorithms, target analysis, and coordinate mapping systems.
+description: Specifications for bullet hole detection algorithms, coordinate mapping, and confidence scoring systems
 ---
 
 
 # target-detection-algorithms
 
-Core detection system components:
+Core Target Detection Components:
 
-1. Bullet Hole Detection Engine (Importance: 95/100)
-Path: components/addTarget/DetectionEditor.tsx
-- Coordinate mapping between original and display image spaces
-- Manual and AI-detected bullet hole processing
-- Confidence scoring system for detected hits
-- Custom marker visualization with draggable correction
+1. Detection Analysis System
+- Bullet hole detection with confidence scoring
+- Coordinate mapping between image and real-world space
+- Legacy and document analysis detection modes
+- Manual override capabilities for low-confidence detections
+Importance Score: 90/100
 
-2. Target Analysis System (Importance: 90/100) 
-Path: components/addTarget/ResultCard.tsx
-- Group size calculations from bullet hole patterns 
-- Multi-mode detection editing interface
-- Shot pattern analysis and validation
-- Target data submission pipeline
+2. Shot Pattern Analysis
+- Group size calculations based on detected holes
+- Shot dispersion metrics computation
+- Pattern quality assessment algorithms
+- Distance-based scaling adjustments
+Importance Score: 85/100
 
-Key Detection Workflows:
-- AI-assisted initial hole detection
-- Manual correction and validation
-- Coordinate space transformations
-- Pattern recognition and grouping
-- Confidence score calculation
+3. Target Type Processing
+- Achievement vs grouping target differentiation
+- Specialized scoring zones handling 
+- Distance category validation
+- Accuracy threshold calculations
+Importance Score: 80/100
 
-Detection Modes:
-- Paper target scanning
-- Tactical target manual entry
-- Mixed-mode validation
+Key Domain-Specific Components:
 
-Coordinate Systems:
-- Original image space
-- Display/UI space  
-- Real-world measurements
+1. Target Coordinate System
+- Maps pixel coordinates to physical measurements
+- Handles perspective correction
+- Maintains shot pattern geometry
+- Supports multiple scoring zone layouts
+Importance Score: 85/100
 
-The system implements specialized bullet hole detection with:
-- Manual/AI hybrid approach
-- Confidence-based validation
-- Multi-coordinate space handling
-- Pattern analysis algorithms
-- Target type-specific processing
+2. Confidence Scoring
+- Multi-factor detection confidence calculation
+- Edge case handling for overlapping shots
+- Manual verification thresholds
+- Historical detection improvement tracking
+Importance Score: 80/100
+
+Detection Workflow:
+1. Initial image processing for bullet hole candidates
+2. Confidence score calculation per detection
+3. Coordinate mapping to physical space
+4. Pattern analysis and grouping calculations
+5. Score zone mapping and accuracy computation
+6. Manual verification for low-confidence detections
 
 $END$
 

@@ -10,14 +10,25 @@ export interface CreateSessionParams {
   team_id?: string | null;        // NULL for personal, UUID for team
   training_id?: string | null;    // Link session to a training
   drill_id?: string | null;       // Link session to a specific drill
+  drill_template_id?: string | null; // For quick practice from template
   session_mode?: 'solo' | 'group';
+  // Custom drill config for quick practice (inline, no template)
+  custom_drill_config?: {
+    name: string;
+    drill_goal: 'grouping' | 'achievement';
+    target_type: 'paper' | 'tactical';
+    distance_m: number;
+    rounds_per_shooter: number;
+    time_limit_seconds?: number | null;
+  };
 }
 
 /** Drill configuration embedded in session */
 export interface SessionDrillConfig {
   id: string;
   name: string;
-  target_type: 'paper' | 'tactical';
+  drill_goal: 'grouping' | 'achievement';  // Primary: what the drill measures
+  target_type: 'paper' | 'tactical';       // Secondary: input method hint
   distance_m: number;
   rounds_per_shooter: number;
   time_limit_seconds?: number | null;
@@ -39,6 +50,16 @@ export interface SessionDrillConfig {
   safety_notes?: string | null;
 }
 
+/** Aggregated session statistics (computed from targets) */
+export interface SessionAggregatedStats {
+  shots_fired: number;
+  hits_total: number;
+  accuracy_pct: number;
+  target_count: number;
+  best_dispersion_cm: number | null;
+  avg_distance_m: number | null;
+}
+
 export interface SessionWithDetails {
   id: string;
   user_id: string;
@@ -56,6 +77,8 @@ export interface SessionWithDetails {
   ended_at: string | null;
   created_at: string;
   updated_at?: string;
+  // Optional aggregated stats (populated when requested)
+  stats?: SessionAggregatedStats;
 }
 
 function mapSession(row: any): SessionWithDetails {
@@ -67,35 +90,72 @@ function mapSession(row: any): SessionWithDetails {
   const teams = row.teams ?? {};
   const trainings = row.trainings ?? {};
   const drills = row.training_drills ?? {};
+  const drillTemplate = row.drill_templates ?? {};
+  const customConfig = row.custom_drill_config;
 
-  // Build drill config if drill exists
+  // Build drill config from training_drills, drill_templates, OR custom_drill_config
   let drillConfig: SessionDrillConfig | null = null;
-  if (drills.id) {
+  
+  // Priority: training_drills > drill_templates > custom_drill_config
+  const drillSource = drills.id ? drills : (drillTemplate.id ? drillTemplate : null);
+  
+  if (drillSource) {
     drillConfig = {
-      id: drills.id,
-      name: drills.name,
-      target_type: drills.target_type,
-      distance_m: drills.distance_m,
-      rounds_per_shooter: drills.rounds_per_shooter,
-      time_limit_seconds: drills.time_limit_seconds ?? null,
-      par_time_seconds: drills.par_time_seconds ?? null,
-      scoring_mode: drills.scoring_mode ?? null,
-      min_accuracy_percent: drills.min_accuracy_percent ?? null,
-      target_count: drills.target_count ?? null,
-      target_size: drills.target_size ?? null,
-      shots_per_target: drills.shots_per_target ?? null,
-      position: drills.position ?? null,
-      start_position: drills.start_position ?? null,
-      weapon_category: drills.weapon_category ?? null,
-      strings_count: drills.strings_count ?? null,
-      reload_required: drills.reload_required ?? null,
-      movement_type: drills.movement_type ?? null,
-      difficulty: drills.difficulty ?? null,
-      category: drills.category ?? null,
-      instructions: drills.instructions ?? null,
-      safety_notes: drills.safety_notes ?? null,
+      id: drillSource.id,
+      name: drillSource.name,
+      drill_goal: drillSource.drill_goal ?? 'achievement',
+      target_type: drillSource.target_type,
+      distance_m: drillSource.distance_m,
+      rounds_per_shooter: drillSource.rounds_per_shooter,
+      time_limit_seconds: drillSource.time_limit_seconds ?? null,
+      par_time_seconds: drillSource.par_time_seconds ?? null,
+      scoring_mode: drillSource.scoring_mode ?? null,
+      min_accuracy_percent: drillSource.min_accuracy_percent ?? null,
+      target_count: drillSource.target_count ?? null,
+      target_size: drillSource.target_size ?? null,
+      shots_per_target: drillSource.shots_per_target ?? null,
+      position: drillSource.position ?? null,
+      start_position: drillSource.start_position ?? null,
+      weapon_category: drillSource.weapon_category ?? null,
+      strings_count: drillSource.strings_count ?? null,
+      reload_required: drillSource.reload_required ?? null,
+      movement_type: drillSource.movement_type ?? null,
+      difficulty: drillSource.difficulty ?? null,
+      category: drillSource.category ?? null,
+      instructions: drillSource.instructions ?? null,
+      safety_notes: drillSource.safety_notes ?? null,
+    };
+  } else if (customConfig) {
+    // Use custom drill config (inline, no template)
+    drillConfig = {
+      id: 'custom',
+      name: customConfig.name ?? 'Quick Practice',
+      drill_goal: customConfig.drill_goal ?? 'grouping',
+      target_type: customConfig.target_type ?? 'paper',
+      distance_m: customConfig.distance_m ?? 25,
+      rounds_per_shooter: customConfig.rounds_per_shooter ?? 5,
+      time_limit_seconds: customConfig.time_limit_seconds ?? null,
+      par_time_seconds: null,
+      scoring_mode: null,
+      min_accuracy_percent: null,
+      target_count: null,
+      target_size: null,
+      shots_per_target: null,
+      position: null,
+      start_position: null,
+      weapon_category: null,
+      strings_count: null,
+      reload_required: null,
+      movement_type: null,
+      difficulty: null,
+      category: null,
+      instructions: null,
+      safety_notes: null,
     };
   }
+
+  // Determine drill name: prefer training_drills > drill_templates > custom
+  const drillName = drills.name ?? drillTemplate.name ?? customConfig?.name ?? null;
 
   return {
     id: row.id,
@@ -106,7 +166,7 @@ function mapSession(row: any): SessionWithDetails {
     training_id: row.training_id ?? null,
     training_title: row.training_title ?? trainings.title ?? null,
     drill_id: row.drill_id ?? null,
-    drill_name: row.drill_name ?? drills.name ?? null,
+    drill_name: row.drill_name ?? drillName,
     drill_config: drillConfig,
     session_mode: row.session_mode,
     status: row.status,
@@ -118,16 +178,29 @@ function mapSession(row: any): SessionWithDetails {
 }
 
 /**
- * Create a new session - supports both personal and org sessions
- * Can be linked to a training and/or drill
+ * Create a new session - DRILL-FIRST architecture
  * 
- * IMPORTANT: If joining a training, checks for existing active session first
+ * Every session MUST have a drill configuration:
+ * - drill_id: For training drills (from a scheduled training)
+ * - drill_template_id: For quick practice (from drill library)
+ * - custom_drill_config: For quick/custom drill (inline config)
+ * 
+ * The session's configuration is determined by the drill parameters.
  */
 export async function createSession(params: CreateSessionParams): Promise<SessionWithDetails> {
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) {
     throw new Error('Not authenticated');
+  }
+
+  // DRILL-FIRST: Every session must have a drill source
+  const hasCustomConfig = params.custom_drill_config && 
+    params.custom_drill_config.distance_m > 0 && 
+    params.custom_drill_config.rounds_per_shooter > 0;
+    
+  if (!params.drill_id && !params.drill_template_id && !hasCustomConfig) {
+    throw new Error('A drill configuration is required. Use custom drill, training drill, or drill template.');
   }
 
   // If joining a training, enforce drill-driven sessions and avoid drill mismatches
@@ -175,6 +248,16 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
     }
   }
 
+  // Build custom drill config for inline storage
+  const customDrillConfig = hasCustomConfig ? {
+    name: params.custom_drill_config!.name || 'Quick Practice',
+    drill_goal: params.custom_drill_config!.drill_goal,
+    target_type: params.custom_drill_config!.target_type || 'paper',
+    distance_m: params.custom_drill_config!.distance_m,
+    rounds_per_shooter: params.custom_drill_config!.rounds_per_shooter,
+    time_limit_seconds: params.custom_drill_config!.time_limit_seconds ?? null,
+  } : null;
+
   // Direct insert for all sessions (RLS handles permissions)
   const { data, error } = await supabase
     .from('sessions')
@@ -183,6 +266,8 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
       team_id: params.team_id ?? null,
       training_id: params.training_id ?? null,
       drill_id: params.drill_id ?? null,
+      drill_template_id: params.drill_template_id ?? null,
+      custom_drill_config: customDrillConfig,
       session_mode: params.session_mode ?? 'solo',
       status: 'active',
       started_at: new Date().toISOString(),
@@ -193,6 +278,8 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
       team_id,
       training_id,
       drill_id,
+      drill_template_id,
+      custom_drill_config,
       session_mode,
       status,
       started_at,
@@ -202,12 +289,55 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
       profiles:user_id(full_name),
       teams:team_id(name),
       trainings:training_id(title),
-      training_drills:drill_id(name)
+      training_drills:drill_id(*),
+      drill_templates:drill_template_id(*)
     `)
     .single();
 
   if (error) throw error;
   return mapSession(data);
+}
+
+/**
+ * Start a quick practice session from a drill template
+ * This is the primary way for soldiers to practice drills outside of scheduled trainings
+ */
+export async function startQuickPractice(drillTemplateId: string): Promise<SessionWithDetails> {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    throw new Error('Not authenticated');
+  }
+
+  // Load drill template to get team_id
+  const { data: template, error: templateError } = await supabase
+    .from('drill_templates')
+    .select('id, team_id, name')
+    .eq('id', drillTemplateId)
+    .single();
+
+  if (templateError || !template) {
+    throw new Error('Drill template not found');
+  }
+
+  // Verify user is a member of the team (for RLS)
+  const { data: membership, error: memberError } = await supabase
+    .from('team_members')
+    .select('user_id')
+    .eq('team_id', template.team_id)
+    .eq('user_id', user.id)
+    .single();
+
+  if (memberError || !membership) {
+    throw new Error('You are not a member of this team');
+  }
+
+  // Create session with drill_template_id
+  return createSession({
+    team_id: template.team_id,
+    drill_template_id: drillTemplateId,
+    session_mode: 'solo',
+  });
 }
 
 /**
@@ -228,6 +358,7 @@ export async function getMyActiveSessionForTraining(trainingId: string): Promise
       team_id,
       training_id,
       drill_id,
+      custom_drill_config,
       session_mode,
       status,
       started_at,
@@ -269,6 +400,7 @@ export async function getMyActiveSession(): Promise<SessionWithDetails | null> {
       team_id,
       training_id,
       drill_id,
+      custom_drill_config,
       session_mode,
       status,
       started_at,
@@ -313,6 +445,7 @@ export async function getMyActivePersonalSession(): Promise<SessionWithDetails |
       team_id,
       training_id,
       drill_id,
+      custom_drill_config,
       session_mode,
       status,
       started_at,
@@ -415,6 +548,7 @@ export async function getSessions(teamId?: string | null): Promise<SessionWithDe
       team_id,
       training_id,
       drill_id,
+      custom_drill_config,
       session_mode,
       status,
       started_at,
@@ -447,6 +581,147 @@ export async function getSessions(teamId?: string | null): Promise<SessionWithDe
 }
 
 /**
+ * Get sessions with aggregated stats (for widgets/analytics)
+ * This fetches sessions and computes stats from session_targets
+ */
+export async function getSessionsWithStats(teamId?: string | null): Promise<SessionWithDetails[]> {
+  // First get all sessions
+  const sessions = await getSessions(teamId);
+  
+  if (sessions.length === 0) return sessions;
+  
+  // Fetch aggregated stats for all sessions in one query
+  const sessionIds = sessions.map(s => s.id);
+  
+  const { data: statsData, error: statsError } = await supabase
+    .from('session_targets')
+    .select(`
+      session_id,
+      distance_m,
+      paper_target_results(
+        bullets_fired,
+        hits_total,
+        dispersion_cm,
+        scanned_image_url
+      ),
+      tactical_target_results(
+        bullets_fired,
+        hits
+      )
+    `)
+    .in('session_id', sessionIds);
+  
+  if (statsError) {
+    console.error('Failed to fetch session stats:', statsError);
+    return sessions; // Return sessions without stats
+  }
+  
+  // Aggregate stats per session
+  // We track scanned vs manual separately for proper accuracy calculation
+  const statsMap = new Map<string, SessionAggregatedStats & { 
+    manual_shots: number; 
+    manual_hits: number;
+  }>();
+  
+  (statsData ?? []).forEach((target: any) => {
+    const sessionId = target.session_id;
+    if (!statsMap.has(sessionId)) {
+      statsMap.set(sessionId, {
+        shots_fired: 0,
+        hits_total: 0,
+        accuracy_pct: 0,
+        target_count: 0,
+        best_dispersion_cm: null,
+        avg_distance_m: null,
+        manual_shots: 0,
+        manual_hits: 0,
+      });
+    }
+    
+    const stats = statsMap.get(sessionId)!;
+    stats.target_count++;
+    
+    // Handle paper target results
+    const paperResult = target.paper_target_results;
+    if (paperResult) {
+      const bullets = paperResult.bullets_fired ?? 0;
+      stats.shots_fired += bullets;
+      
+      // Check if this is a scanned target (has scanned_image_url)
+      const isScanned = !!paperResult.scanned_image_url;
+      
+      const hits = paperResult.hits_total ?? 0;
+      
+      // Always add hits to total for display purposes
+      stats.hits_total += hits;
+      
+      // Track dispersion if available
+      if (paperResult.dispersion_cm != null) {
+        if (stats.best_dispersion_cm === null || paperResult.dispersion_cm < stats.best_dispersion_cm) {
+          stats.best_dispersion_cm = paperResult.dispersion_cm;
+        }
+      }
+      
+      if (!isScanned) {
+        // Only manual entry targets count towards accuracy calculation
+        stats.manual_shots += bullets;
+        stats.manual_hits += hits;
+      }
+      // Scanned targets: hits are shown but don't affect accuracy %
+      // because dispersion (group size) is the primary metric
+    }
+    
+    // Handle tactical target results (always manual, hits matter)
+    const tacticalResult = target.tactical_target_results;
+    if (tacticalResult) {
+      const bullets = tacticalResult.bullets_fired ?? 0;
+      const hits = tacticalResult.hits ?? 0;
+      stats.shots_fired += bullets;
+      stats.hits_total += hits;
+      stats.manual_shots += bullets;
+      stats.manual_hits += hits;
+    }
+    
+    // Track distances for average
+    if (target.distance_m) {
+      const currentAvg = stats.avg_distance_m ?? 0;
+      const count = stats.target_count;
+      stats.avg_distance_m = ((currentAvg * (count - 1)) + target.distance_m) / count;
+    }
+  });
+  
+  // Calculate accuracy percentages (only from manual targets where hits matter)
+  statsMap.forEach((stats) => {
+    if (stats.manual_shots > 0) {
+      stats.accuracy_pct = Math.round((stats.manual_hits / stats.manual_shots) * 100);
+    }
+  });
+  
+  // Attach stats to sessions (without the internal tracking fields)
+  return sessions.map(session => {
+    const rawStats = statsMap.get(session.id);
+    return {
+      ...session,
+      stats: rawStats ? {
+        shots_fired: rawStats.shots_fired,
+        hits_total: rawStats.hits_total,
+        accuracy_pct: rawStats.accuracy_pct,
+        target_count: rawStats.target_count,
+        best_dispersion_cm: rawStats.best_dispersion_cm,
+        avg_distance_m: rawStats.avg_distance_m,
+      } : {
+        shots_fired: 0,
+        hits_total: 0,
+        accuracy_pct: 0,
+        target_count: 0,
+        best_dispersion_cm: null,
+        avg_distance_m: null,
+      },
+    };
+  });
+}
+
+/**
  * Get sessions for a specific training
  */
 export async function getTrainingSessions(trainingId: string): Promise<SessionWithDetails[]> {
@@ -458,6 +733,7 @@ export async function getTrainingSessions(trainingId: string): Promise<SessionWi
       team_id,
       training_id,
       drill_id,
+      custom_drill_config,
       session_mode,
       status,
       started_at,
@@ -495,6 +771,7 @@ export async function getTeamSessions(teamId: string): Promise<SessionWithDetail
       team_id,
       training_id,
       drill_id,
+      custom_drill_config,
       session_mode,
       status,
       started_at,
@@ -749,6 +1026,7 @@ export async function getSessionById(sessionId: string): Promise<SessionWithDeta
       team_id,
       training_id,
       drill_id,
+      custom_drill_config,
       session_mode,
       status,
       started_at,
@@ -761,6 +1039,7 @@ export async function getSessionById(sessionId: string): Promise<SessionWithDeta
       training_drills:drill_id(
         id,
         name,
+        drill_goal,
         target_type,
         distance_m,
         rounds_per_shooter,
@@ -1166,6 +1445,11 @@ export interface SessionStats {
 
 /**
  * Calculate comprehensive session stats from targets and results
+ * 
+ * IMPORTANT: 
+ * - Grouping targets (paper_type='grouping') measure consistency/dispersion only
+ * - Achievement targets (paper_type='achievement') count towards accuracy calculations
+ * - Tactical targets always count towards accuracy
  */
 export async function calculateSessionStats(sessionId: string): Promise<SessionStats> {
   const targets = await getSessionTargetsWithResults(sessionId);
@@ -1174,6 +1458,8 @@ export async function calculateSessionStats(sessionId: string): Promise<SessionS
   let tacticalTargets = 0;
   let totalShotsFired = 0;
   let totalHits = 0;
+  let achievementShotsFired = 0;  // Only shots from achievement targets (for accuracy)
+  let achievementHits = 0;        // Only hits from achievement targets (for accuracy)
   let totalDispersion = 0;
   let dispersionCount = 0;
   let bestDispersion: number | null = null;
@@ -1186,9 +1472,18 @@ export async function calculateSessionStats(sessionId: string): Promise<SessionS
     if (target.target_type === 'paper') {
       paperTargets++;
       if (target.paper_result) {
-        totalShotsFired += target.paper_result.bullets_fired;
-        totalHits += target.paper_result.hits_total ?? 0;
+        const bullets = target.paper_result.bullets_fired;
+        totalShotsFired += bullets;
         
+        // Check paper_type to determine if this is achievement or grouping
+        const isAchievementTarget = target.paper_result.paper_type === 'achievement';
+        
+        const hits = target.paper_result.hits_total ?? 0;
+        
+        // Always add hits to total for display purposes
+        totalHits += hits;
+        
+        // Track dispersion if available (applies to both grouping and achievement)
         if (target.paper_result.dispersion_cm != null) {
           totalDispersion += target.paper_result.dispersion_cm;
           dispersionCount++;
@@ -1196,12 +1491,24 @@ export async function calculateSessionStats(sessionId: string): Promise<SessionS
             bestDispersion = target.paper_result.dispersion_cm;
           }
         }
+        
+        if (isAchievementTarget) {
+          // Only achievement targets count towards accuracy calculation
+          achievementShotsFired += bullets;
+          achievementHits += hits;
+        }
+        // Grouping targets: only track dispersion, no accuracy calculation
       }
     } else if (target.target_type === 'tactical') {
       tacticalTargets++;
       if (target.tactical_result) {
-        totalShotsFired += target.tactical_result.bullets_fired;
-        totalHits += target.tactical_result.hits;
+        const bullets = target.tactical_result.bullets_fired;
+        const hits = target.tactical_result.hits;
+        totalShotsFired += bullets;
+        totalHits += hits;
+        // Tactical targets always count towards accuracy
+        achievementShotsFired += bullets;
+        achievementHits += hits;
         
         if (target.tactical_result.is_stage_cleared) {
           stagesCleared++;
@@ -1218,8 +1525,9 @@ export async function calculateSessionStats(sessionId: string): Promise<SessionS
     }
   }
 
-  const accuracyPct = totalShotsFired > 0 
-    ? Math.round((totalHits / totalShotsFired) * 100 * 100) / 100 
+  // Calculate accuracy only from achievement/tactical targets (not grouping)
+  const accuracyPct = achievementShotsFired > 0 
+    ? Math.round((achievementHits / achievementShotsFired) * 100 * 100) / 100 
     : 0;
 
   const avgDispersionCm = dispersionCount > 0 
@@ -1285,19 +1593,24 @@ async function enforceDrillLimitsForNewTarget(params: {
     throw new Error(`Target limit reached (${requiredTargets}).`);
   }
 
-  if (remainingShots <= 0) {
-    throw new Error(`Round limit reached (${requiredShots}).`);
-  }
+  // For paper targets (scans), don't enforce exact bullet count - the scan determines the count
+  // Only enforce limits for tactical targets (manual entry)
+  if (params.targetType === 'tactical') {
+    if (remainingShots <= 0) {
+      throw new Error(`Round limit reached (${requiredShots}).`);
+    }
 
-  if (params.bulletsFired > remainingShots) {
-    throw new Error(`This target exceeds remaining rounds. Remaining: ${remainingShots}.`);
-  }
+    if (params.bulletsFired > remainingShots) {
+      throw new Error(`This target exceeds remaining rounds. Remaining: ${remainingShots}.`);
+    }
 
-  const expectedNext = remainingTargets === 1 ? remainingShots : bulletsPerRound;
+    const expectedNext = remainingTargets === 1 ? remainingShots : bulletsPerRound;
 
-  if (params.bulletsFired !== expectedNext) {
-    throw new Error(`This drill expects ${expectedNext} bullets for the next round.`);
+    if (params.bulletsFired !== expectedNext) {
+      throw new Error(`This drill expects ${expectedNext} bullets for the next round.`);
+    }
   }
+  // Paper targets: just enforce target count limit, not bullet count
 }
 
 /**

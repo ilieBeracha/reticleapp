@@ -70,6 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initialSessionHandledRef.current = false
     // Transition to login
     setTransitioning(true)
+    
     setTimeout(() => {
       router.replace("/auth/sign-in")
       // Small delay before removing overlay to ensure navigation completes
@@ -113,34 +114,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     // Navigate to home (always start in personal mode)
     setTimeout(() => {
-      router.replace("/(protected)/personal")
+      router.replace("/(protected)/(tabs)")
       setTransitioning(false)
     }, 100)
   }
 
   /**
    * Handle new sign in - redirect to home
+   * Note: We don't await fetchProfile here because the Supabase client
+   * may not be fully ready for authenticated requests right after setSession.
+   * The profile loads in background while user sees the home screen.
    */
   const handleSignIn = async (session: Session | null) => {
-    if (!session?.user) return
+    if (!session?.access_token) {
+      setLoading(false)
+      return
+    }
 
     setTransitioning(true)
-    setLoading(true)
     
-    // Load teams in background
+    // Load teams in background (don't await - let it happen while navigating)
     useTeamStore.getState().loadTeams().catch(err => 
       console.error("Background team load error:", err)
     )
 
-    // Hydrate profile before rendering home to avoid "blank then name" flash
-    await fetchProfile(session.user.id)
-    setLoading(false)
+    // Fetch profile in background (don't block navigation)
+    fetchProfile(session.user.id).catch(err => 
+      console.warn("Background profile fetch error:", err)
+    )
     
-    // Navigate to home (always start in personal mode)
+    // Navigate to home immediately (profile will load in background)
+    setLoading(false)
     setTimeout(() => {
-      router.replace("/(protected)/personal")
+      router.replace("/(protected)/(tabs)")
       setTransitioning(false)
-    }, 800)
+    }, 300)
   }
 
   /**
@@ -217,24 +225,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // ═══════════════════════════════════════════════════
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setLoading(true)
-      setSession(session)
-      setUser(session?.user ?? null)
-
-      if (session?.user) {
-        useTeamStore.getState().loadTeams().catch((err: Error) =>
-          console.error("Background team load error:", err)
-        )
-        await fetchProfile(session.user.id)
-      } else {
-        setProfileFullName(null)
-        setProfileAvatarUrl(null)
-      }
-
-      setLoading(false)
-    })
-
+    // Only set up the auth state listener - let INITIAL_SESSION handle everything
+    // This prevents duplicate session handling and race conditions
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       handleAuthStateChange
     )
@@ -288,17 +280,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     )
 
     if (result.type === "success" && result.url) {
-      const params = new URLSearchParams(result.url.split('#')[1])
+      const access_token = result.url.split('access_token=')[1].split('&')[0]
+      const refresh_token = result.url.split('refresh_token=')[1].split('&')[0]
       await supabase.auth.setSession({
-        access_token: params.get("access_token")!,
-        refresh_token: params.get("refresh_token")!,
+        access_token: access_token!,
+        refresh_token: refresh_token!,
       })
     }
   }
 
   const signOut = async () => {
     useTeamStore.getState().reset()
-    await supabase.auth.signOut()
+    await supabase.auth.signOut(
+      {scope: 'global'}
+    )
     setUser(null)
     setSession(null)
   }

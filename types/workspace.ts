@@ -94,7 +94,16 @@ export interface WorkspaceInvitationWithDetails extends TeamInvitationWithDetail
 // =====================================================
 
 export type TrainingStatus = 'planned' | 'ongoing' | 'finished' | 'cancelled';
+
+/** @deprecated Use DrillGoal for primary classification */
 export type TargetType = 'paper' | 'tactical';
+
+/**
+ * DrillGoal - Primary classification for drills
+ * - grouping: Measure shot consistency/dispersion (scan-only, no hit %)
+ * - achievement: Measure accuracy/hits (scan OR manual, tracks hit %)
+ */
+export type DrillGoal = 'grouping' | 'achievement';
 
 // =====================================================
 // ENHANCED DRILL TYPES
@@ -159,16 +168,26 @@ export interface TrainingWithDetails extends Training {
 /**
  * TrainingDrill - Individual drill within a training
  * Enhanced with comprehensive shooting drill configuration
+ * 
+ * If drill_template_id is set, template values are used as defaults.
+ * Inline values can override template values.
  */
 export interface TrainingDrill {
   id: string;
   training_id: string;
   order_index: number;
+  
+  // Template reference (optional - if set, uses template as source)
+  drill_template_id?: string | null;
+  
   name: string;
   description?: string | null;
   
+  // === PRIMARY CLASSIFICATION ===
+  drill_goal: DrillGoal;              // Primary: grouping vs achievement
+  
   // === BASIC CONFIG ===
-  target_type: TargetType;
+  target_type: TargetType;            // Secondary: paper vs tactical (for input method hints)
   distance_m: number;
   rounds_per_shooter: number;
   
@@ -233,8 +252,11 @@ export interface CreateDrillInput {
   name: string;
   description?: string;
   
+  // === PRIMARY CLASSIFICATION ===
+  drill_goal: DrillGoal;              // Primary: grouping vs achievement
+  
   // === BASIC CONFIG ===
-  target_type: TargetType;
+  target_type: TargetType;            // Secondary: paper vs tactical
   distance_m: number;
   rounds_per_shooter: number;
   
@@ -304,8 +326,11 @@ export interface DrillTemplate {
   name: string;
   description?: string | null;
   
+  // === PRIMARY CLASSIFICATION ===
+  drill_goal: DrillGoal;              // Primary: grouping vs achievement
+  
   // === BASIC CONFIG ===
-  target_type: TargetType;
+  target_type: TargetType;            // Secondary: paper vs tactical
   distance_m: number;
   rounds_per_shooter: number;
   
@@ -358,8 +383,11 @@ export interface CreateDrillTemplateInput {
   name: string;
   description?: string;
   
+  // === PRIMARY CLASSIFICATION ===
+  drill_goal: DrillGoal;              // Primary: grouping vs achievement
+  
   // === BASIC CONFIG ===
-  target_type: TargetType;
+  target_type: TargetType;            // Secondary: paper vs tactical
   distance_m: number;
   rounds_per_shooter: number;
   

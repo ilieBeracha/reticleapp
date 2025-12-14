@@ -1,28 +1,29 @@
 import {
-    addTeamMember as addTeamMemberService,
-    createTeam as createTeamService,
-    deleteTeam as deleteTeamService,
-    getMyTeams,
-    getTeamMembers,
-    getTeamWithMembers,
-    removeTeamMember as removeTeamMemberService,
-    updateTeamMemberRole as updateMemberRoleService,
-    updateTeam as updateTeamService,
-    type AddTeamMemberInput,
-    type CreateTeamInput,
-    type UpdateTeamInput,
+  addTeamMember as addTeamMemberService,
+  createTeam as createTeamService,
+  deleteTeam as deleteTeamService,
+  getMyTeams,
+  getTeamMembers,
+  getTeamWithMembers,
+  removeTeamMember as removeTeamMemberService,
+  updateTeamMemberRole as updateMemberRoleService,
+  updateTeam as updateTeamService,
+  type AddTeamMemberInput,
+  type CreateTeamInput,
+  type UpdateTeamInput,
 } from '@/services/teamService';
 import type {
-    TeamMemberWithProfile,
-    TeamRole,
-    TeamWithMembers,
-    TeamWithRole
+  TeamMemberWithProfile,
+  TeamRole,
+  TeamWithMembers,
+  TeamWithRole
 } from '@/types/workspace';
 import { create } from 'zustand';
 
 interface TeamStore {
   // State
   teams: TeamWithRole[];
+  teamCount: number;
   activeTeamId: string | null;
   activeTeam: TeamWithMembers | null;
   members: TeamMemberWithProfile[];
@@ -54,6 +55,7 @@ interface TeamStore {
 
 export const useTeamStore = create<TeamStore>((set, get) => ({
   teams: [],
+  teamCount: 0,
   activeTeamId: null,
   activeTeam: null,
   members: [],
@@ -77,7 +79,7 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session?.user) {
-        set({ loading: false, initialized: true, teams: [], activeTeamId: null });
+        set({ loading: false, initialized: true, teams: [], activeTeamId: null, teamCount: 0 });
         return;
       }
 
@@ -100,6 +102,7 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
         loading: false,
         initialized: true,
         error: null,
+        teamCount: teams.length,  
       });
 
       // Load active team details if one is selected

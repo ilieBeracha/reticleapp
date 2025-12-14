@@ -480,12 +480,17 @@ CREATE TABLE IF NOT EXISTS "public"."sessions" (
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "training_id" "uuid",
     "drill_id" "uuid",
+    "drill_template_id" "uuid",
     CONSTRAINT "sessions_session_mode_check" CHECK (("session_mode" = ANY (ARRAY['solo'::"text", 'group'::"text"]))),
     CONSTRAINT "sessions_status_check" CHECK (("status" = ANY (ARRAY['active'::"text", 'completed'::"text", 'cancelled'::"text"])))
 );
 
 
 ALTER TABLE "public"."sessions" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."sessions"."drill_template_id" IS 'For quick practice sessions started directly from a drill template.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."create_session"("p_workspace_type" "text", "p_workspace_owner_id" "uuid" DEFAULT NULL::"uuid", "p_org_workspace_id" "uuid" DEFAULT NULL::"uuid", "p_team_id" "uuid" DEFAULT NULL::"uuid", "p_session_mode" "text" DEFAULT 'solo'::"text", "p_session_data" "jsonb" DEFAULT NULL::"jsonb") RETURNS "public"."sessions"
@@ -1747,8 +1752,10 @@ CREATE TABLE IF NOT EXISTS "public"."drill_templates" (
     "diagram_url" "text",
     "video_url" "text",
     "safety_notes" "text",
+    "drill_goal" "text" DEFAULT 'achievement'::"text" NOT NULL,
     CONSTRAINT "drill_templates_category_check" CHECK ((("category" IS NULL) OR ("category" = ANY (ARRAY['fundamentals'::"text", 'speed'::"text", 'accuracy'::"text", 'stress'::"text", 'tactical'::"text", 'competition'::"text", 'qualification'::"text"])))),
     CONSTRAINT "drill_templates_difficulty_check" CHECK ((("difficulty" IS NULL) OR ("difficulty" = ANY (ARRAY['beginner'::"text", 'intermediate'::"text", 'advanced'::"text", 'expert'::"text"])))),
+    CONSTRAINT "drill_templates_drill_goal_check" CHECK (("drill_goal" = ANY (ARRAY['grouping'::"text", 'achievement'::"text"]))),
     CONSTRAINT "drill_templates_min_accuracy_percent_check" CHECK ((("min_accuracy_percent" IS NULL) OR (("min_accuracy_percent" >= 0) AND ("min_accuracy_percent" <= 100)))),
     CONSTRAINT "drill_templates_movement_type_check" CHECK ((("movement_type" IS NULL) OR ("movement_type" = ANY (ARRAY['none'::"text", 'advance'::"text", 'retreat'::"text", 'lateral'::"text", 'diagonal'::"text", 'freestyle'::"text"])))),
     CONSTRAINT "drill_templates_position_check" CHECK ((("position" IS NULL) OR ("position" = ANY (ARRAY['standing'::"text", 'kneeling'::"text", 'prone'::"text", 'sitting'::"text", 'barricade'::"text", 'transition'::"text", 'freestyle'::"text"])))),
@@ -2008,8 +2015,11 @@ CREATE TABLE IF NOT EXISTS "public"."training_drills" (
     "diagram_url" "text",
     "video_url" "text",
     "safety_notes" "text",
+    "drill_goal" "text" DEFAULT 'achievement'::"text" NOT NULL,
+    "drill_template_id" "uuid",
     CONSTRAINT "training_drills_category_check" CHECK ((("category" IS NULL) OR ("category" = ANY (ARRAY['fundamentals'::"text", 'speed'::"text", 'accuracy'::"text", 'stress'::"text", 'tactical'::"text", 'competition'::"text", 'qualification'::"text"])))),
     CONSTRAINT "training_drills_difficulty_check" CHECK ((("difficulty" IS NULL) OR ("difficulty" = ANY (ARRAY['beginner'::"text", 'intermediate'::"text", 'advanced'::"text", 'expert'::"text"])))),
+    CONSTRAINT "training_drills_drill_goal_check" CHECK (("drill_goal" = ANY (ARRAY['grouping'::"text", 'achievement'::"text"]))),
     CONSTRAINT "training_drills_min_accuracy_percent_check" CHECK ((("min_accuracy_percent" IS NULL) OR (("min_accuracy_percent" >= 0) AND ("min_accuracy_percent" <= 100)))),
     CONSTRAINT "training_drills_movement_type_check" CHECK ((("movement_type" IS NULL) OR ("movement_type" = ANY (ARRAY['none'::"text", 'advance'::"text", 'retreat'::"text", 'lateral'::"text", 'diagonal'::"text", 'freestyle'::"text"])))),
     CONSTRAINT "training_drills_position_check" CHECK ((("position" IS NULL) OR ("position" = ANY (ARRAY['standing'::"text", 'kneeling'::"text", 'prone'::"text", 'sitting'::"text", 'barricade'::"text", 'transition'::"text", 'freestyle'::"text"])))),
@@ -2022,6 +2032,10 @@ CREATE TABLE IF NOT EXISTS "public"."training_drills" (
 
 
 ALTER TABLE "public"."training_drills" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."training_drills"."drill_template_id" IS 'Reference to source drill template. If set, template values are used as defaults.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."trainings" (
@@ -2242,6 +2256,10 @@ CREATE INDEX "idx_sessions_drill" ON "public"."sessions" USING "btree" ("drill_i
 
 
 
+CREATE INDEX "idx_sessions_drill_template" ON "public"."sessions" USING "btree" ("drill_template_id");
+
+
+
 CREATE INDEX "idx_sessions_started" ON "public"."sessions" USING "btree" ("started_at");
 
 
@@ -2275,6 +2293,10 @@ CREATE INDEX "idx_team_members_user" ON "public"."team_members" USING "btree" ("
 
 
 CREATE INDEX "idx_training_drills_order" ON "public"."training_drills" USING "btree" ("training_id", "order_index");
+
+
+
+CREATE INDEX "idx_training_drills_template" ON "public"."training_drills" USING "btree" ("drill_template_id");
 
 
 
@@ -2382,7 +2404,7 @@ ALTER TABLE ONLY "public"."notifications"
 
 
 ALTER TABLE ONLY "public"."paper_target_results"
-    ADD CONSTRAINT "paper_target_results_session_target_id_fkey" FOREIGN KEY ("session_target_id") REFERENCES "public"."session_targets"("id");
+    ADD CONSTRAINT "paper_target_results_session_target_id_fkey" FOREIGN KEY ("session_target_id") REFERENCES "public"."session_targets"("id") ON DELETE CASCADE;
 
 
 
@@ -2427,6 +2449,11 @@ ALTER TABLE ONLY "public"."sessions"
 
 
 ALTER TABLE ONLY "public"."sessions"
+    ADD CONSTRAINT "sessions_drill_template_id_fkey" FOREIGN KEY ("drill_template_id") REFERENCES "public"."drill_templates"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."sessions"
     ADD CONSTRAINT "sessions_team_id_fkey" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE SET NULL;
 
 
@@ -2458,6 +2485,11 @@ ALTER TABLE ONLY "public"."team_members"
 
 ALTER TABLE ONLY "public"."teams"
     ADD CONSTRAINT "teams_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id");
+
+
+
+ALTER TABLE ONLY "public"."training_drills"
+    ADD CONSTRAINT "training_drills_drill_template_id_fkey" FOREIGN KEY ("drill_template_id") REFERENCES "public"."drill_templates"("id") ON DELETE SET NULL;
 
 
 

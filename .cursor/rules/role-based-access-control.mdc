@@ -1,53 +1,65 @@
 ---
-description: Implementation guidelines for military hierarchy-based permission system and role access control
+description: Defines military-style hierarchical role management and permissions for training management system.
 ---
 
 
 # role-based-access-control
 
-Military Hierarchy Permission System (Importance: 95/100)
-- Core roles: owner, commander, squad_commander, soldier
-- Strict hierarchical permission inheritance
-- Squad-based access boundaries
-- Role-specific training control capabilities
-- Team workspace permission segregation
+Military-style hierarchical permission system with strictly defined roles and access levels:
 
-Training Access Controls (Importance: 85/100)
-- Commander-level session management
-- Squad-specific training visibility
-- Role-based drill template access
-- Training progression gates by rank
-- Real-time permission enforcement
+## Role Hierarchy
+1. Owner (Top Level)
+   - Full system access
+   - Can modify all roles below
+   - Organization management capabilities
+   - Importance Score: 95/100
 
-Workspace Authorization (Importance: 75/100)
-- Team vs personal space segregation
-- Role-dependent workspace features
-- Organization-level permission inheritance
-- Dynamic capability checking
+2. Commander
+   - Team-wide training management
+   - Can modify squad commander and soldier roles
+   - Access to all team analytics
+   - Importance Score: 85/100
 
-File: components/organization/RoleInfoBanner.tsx
-- Organization role messaging system
-- Conditional workspace management permissions
-- Instructor vs participant capability differentiation
+3. Squad Commander
+   - Squad-level training coordination
+   - Member management within assigned squad
+   - Training session oversight
+   - Importance Score: 80/100
 
-File: components/BaseAvatar.tsx
-- Hierarchical role visualization
-- Role-specific color coding
-- Team rank indicators
+4. Soldier (Base Level)
+   - Personal training participation
+   - Individual performance tracking
+   - Limited team view access
+   - Importance Score: 70/100
 
-Core Permission Rules:
-1. Owners have unrestricted access across teams
-2. Commanders control training and member management
-3. Squad commanders limited to their assigned squads
-4. Soldiers access only assigned training sessions
-5. Role elevation requires higher-rank approval
+## Permission Implementation 
+Key paths: components/organization/TeamsSection.tsx, services/roleService.ts
 
-Role-Based Workflows:
-- Training session creation (commander+)
-- Squad member management (squad_commander+)
-- Drill template access (commander+)
-- Training participation (all roles)
-- Performance analytics access (role-dependent depth)
+Core permission rules:
+- Higher ranks can modify/manage lower ranks only
+- Squad-based organization with strict hierarchy
+- Role-specific training capabilities
+- Team-specific calendar and resource access
+- Session management restrictions by role level
+
+Color-coding system for visual role identification:
+- Owner: Deep Blue (#003366)
+- Commander: Dark Red (#660000)
+- Squad Commander: Forest Green (#006600)
+- Soldier: Standard Gray (#444444)
+
+Team Management Controls:
+- Role assignment validation
+- Squad membership constraints
+- Training schedule access levels
+- Performance metrics visibility
+
+## Critical Business Rules
+1. Single-root organization structure
+2. Hierarchical command chain for approvals
+3. Squad-based member organization
+4. Role-specific training coordination rights
+5. Specialized notification routing by rank
 
 $END$
 

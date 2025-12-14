@@ -110,11 +110,11 @@ function handleNotificationNavigation(data: NotificationData) {
       break;
 
     case 'team':
-      router.push('/(protected)/team');
+      router.push('/(protected)/(tabs)');
       break;
 
     case 'personal':
-      router.push('/(protected)/personal');
+      router.push('/(protected)/(tabs)');
       break;
 
     default:

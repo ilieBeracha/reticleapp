@@ -4,8 +4,11 @@ import { Dimensions } from "react-native";
 // ═══════════════════════════════════════════════════════════════════════════
 // TARGET TYPES
 // ═══════════════════════════════════════════════════════════════════════════
-export type TargetType = "paper" | "tactical";
-export type Step = "form" | "camera" | "preview" | "analyzing" | "results" | "tactical_results";
+/** Target type based on training goal */
+export type TargetType = "grouping" | "achievement";
+/** Input method for achievement targets */
+export type InputMethod = "scan" | "manual";
+export type Step = "form" | "camera" | "preview" | "analyzing" | "results" | "manual_entry";
 export type EditMode = "add" | "remove";
 
 // ═══════════════════════════════════════════════════════════════════════════

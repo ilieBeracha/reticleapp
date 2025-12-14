@@ -1,7 +1,8 @@
 import {
-    shouldSubmitForTraining,
-    submitTrainingData,
-    TrainingDataPayload,
+  shouldSubmitForTraining,
+  submitTrainingData,
+  TrainingDataPayload,
+  uploadScannedTargetImage,
 } from "@/services/detectionService";
 import { addTargetWithPaperResult, PaperType } from "@/services/sessionService";
 import { useDetectionStore } from "@/store/detectionStore";
@@ -11,9 +12,9 @@ import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    StyleSheet,
-    View
+  Alert,
+  StyleSheet,
+  View
 } from "react-native";
 import { CameraFlow } from "./CameraFlow";
 import { ResultCard } from "./ResultCard";
@@ -30,6 +31,7 @@ interface PaperTargetFlowProps {
   defaultDistance?: number;
   defaultBullets?: number;
   lockDistance?: boolean;
+  paperType?: PaperType;  // grouping (dispersion) or achievement (hit %)
   onComplete?: () => void;
   onCancel?: () => void;
 }
@@ -39,6 +41,7 @@ export function PaperTargetFlow({
   defaultDistance = 100,
   defaultBullets = 5,
   lockDistance = false,
+  paperType: propPaperType = 'grouping',
   onComplete,
   onCancel,
 }: PaperTargetFlowProps) {
@@ -66,8 +69,8 @@ export function PaperTargetFlow({
   const [distance, setDistance] = useState(defaultDistance);
   const [bullets] = useState(defaultBullets);
 
-  // Paper settings
-  const [paperType] = useState<PaperType>("grouping");
+  // Paper settings - use prop value
+  const paperType = propPaperType;
   const [paperNotes] = useState("");
 
   // Auto-start camera on mount
@@ -185,7 +188,9 @@ export function PaperTargetFlow({
         const rawHighConfHits = finalDetections.filter(
           (d) => d.isManual || d.confidence >= 0.6
         ).length;
-        const highConfHits = Math.min(rawHighConfHits, bullets);
+        // For scanned targets: detected holes = bullets fired = hits
+        // High-confidence hits are already counted from detection
+        const highConfHits = rawHighConfHits;
         const manualCount = finalDetections.filter((d) => d.isManual).length;
 
         const trainingData =
@@ -210,21 +215,33 @@ export function PaperTargetFlow({
         const finalImageBase64 = editedImageBase64 || result?.annotated_image_base64;
         const groupSizeCm = result?.overall_stats_mm?.max_pair?.distance_cm ?? null;
 
+        // Upload image to Supabase Storage instead of storing base64 in DB
+        let scannedImageUrl: string | null = null;
+        if (finalImageBase64) {
+          console.log("[PaperTargetFlow] Uploading scanned target image to storage...");
+          scannedImageUrl = await uploadScannedTargetImage(finalImageBase64, sessionId);
+          if (!scannedImageUrl) {
+            console.warn("[PaperTargetFlow] Failed to upload image, saving without image");
+          }
+        }
+
+        // For scanned targets:
+        // - bullets_fired = detected holes (what the scan found)
+        // - hits_total = detected holes (all detected are hits on paper)
+        // - planned_shots = drill's rounds_per_shooter for tracking (if provided)
         await addTargetWithPaperResult({
           session_id: sessionId,
           distance_m: distance,
           lane_number: null,
-          planned_shots: bullets,
+          planned_shots: bullets > 0 ? bullets : null, // From drill config if available
           notes: paperNotes || null,
           target_data: null,
           paper_type: paperType,
-          bullets_fired: bullets,
-          hits_total: Math.min(detectionCount, bullets),
+          bullets_fired: detectionCount, // Scan determines actual shots
+          hits_total: detectionCount, // All detected holes are hits
           hits_inside_scoring: highConfHits,
           dispersion_cm: groupSizeCm,
-          scanned_image_url: finalImageBase64
-            ? `data:image/jpeg;base64,${finalImageBase64}`
-            : null,
+          scanned_image_url: scannedImageUrl,
           result_notes: paperNotes || null,
         });
 
@@ -265,6 +282,7 @@ export function PaperTargetFlow({
         distance={distance}
         onDistanceChange={setDistance}
         distanceLocked={lockDistance}
+        targetType={paperType} // Pass paper_type to show appropriate metrics
       />
     );
   }

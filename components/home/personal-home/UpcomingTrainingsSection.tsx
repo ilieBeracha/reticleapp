@@ -42,7 +42,7 @@ export function UpcomingTrainingsSection({ colors, trainings }: UpcomingTraining
           <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>UPCOMING</Text>
         </View>
         <TouchableOpacity
-          onPress={() => router.push('/(protected)/personal/trainings' as any)}
+          onPress={() => router.push('/(protected)/(tabs)/trainings' as any)}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Text style={[styles.sectionLink, { color: colors.textMuted }]}>See all</Text>
@@ -72,7 +72,7 @@ function TrainingItem({ training, colors, isFirst }: { training: UpcomingTrainin
       ]}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        router.push(`/(protected)/trainingDetail?id=${training.id}` as any);
+        router.push(`/(protected)/trainingDetail?id=${training.id}`);
       }}
     >
       {/* Left accent */}
