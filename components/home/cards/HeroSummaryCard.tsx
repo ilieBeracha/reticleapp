@@ -22,15 +22,23 @@ interface HeroSummaryCardProps {
   onPress: () => void;
 }
 
-export function HeroSummaryCard({
+function HeroSummaryCard({
+  colors,
+  upcomingCount,
   allSessions,
   activeSession,
-  upcomingCount,
   hasTeams,
   teamCount,
   onPress,
-}: HeroSummaryCardProps) {
-  const colors = useColors();
+}: {
+  colors: ReturnType<typeof useColors>;
+  upcomingCount: number;
+  allSessions: SessionWithDetails[];
+  activeSession: SessionWithDetails | null;
+  hasTeams: boolean;
+  teamCount: number;
+  onPress: () => void;
+}) {
   const totalSessions = allSessions.length;
   const today = new Date();
   const dateStr = format(today, 'd MMMM');
@@ -136,25 +144,28 @@ export function HeroSummaryCard({
       </TouchableOpacity>
     </Animated.View>
   );
-}
+} 
 
-const styles = StyleSheet.create({
+export default HeroSummaryCard;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STYLES
+// ═══════════════════════════════════════════════════════════════════════════
+ // Section
+ const styles = StyleSheet.create({
+
+
+  // Hero Card
   heroCard: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 10,
+    borderRadius: 16,
+    padding: 16,
+    minHeight: 130,
   },
   heroTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   heroDateRow: {
     flexDirection: 'row',
@@ -162,71 +173,61 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   heroDate: {
-    color: 'rgba(255,255,255,0.7)',
     fontSize: 13,
     fontWeight: '600',
+    color: 'rgba(255,255,255,0.9)',
   },
   heroBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(34, 197, 94, 0.25)',
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 4,
     borderRadius: 20,
   },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#4ADE80',
-  },
   heroBadgeText: {
-    color: '#fff',
     fontSize: 11,
     fontWeight: '700',
-    textTransform: 'uppercase',
+    color: '#22C55E',
     letterSpacing: 0.5,
   },
   heroContent: {
-    marginBottom: 16,
+    flex: 1,
   },
   heroLabel: {
-    color: 'rgba(255,255,255,0.6)',
     fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 6,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.6)',
+    marginBottom: 4,
   },
   heroTitle: {
-    color: '#fff',
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '700',
-    letterSpacing: -0.5,
-    lineHeight: 28,
+    color: '#fff',
+    letterSpacing: -0.3,
+    lineHeight: 24,
   },
   heroHighlight: {
-    color: '#fff',
-    fontWeight: '800',
+    color: '#7DD3FC',
   },
   heroFooter: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
+    marginTop: 12,
   },
   heroAction: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
   },
   heroActionText: {
-    color: 'rgba(255,255,255,0.9)',
     fontSize: 13,
     fontWeight: '600',
+    color: 'rgba(255,255,255,0.8)',
   },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#22C55E',
+  }
 });
-

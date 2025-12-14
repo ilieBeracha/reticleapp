@@ -1,202 +1,64 @@
 /**
  * Enhanced Drill Modal
- * Comprehensive drill creation/editing with all configuration options
+ * Compact, elegant stepper-based drill creation
  */
 import { useColors } from '@/hooks/ui/useColors';
 import type {
   CreateDrillInput,
-  DrillCategory,
-  DrillDifficulty,
-  MovementType,
-  ScoringMode,
-  ShootingPosition,
-  StartPosition,
-  TargetSize,
+  DrillGoal,
   TargetType,
-  WeaponCategory,
 } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
+import { ArrowLeft, ArrowRight, Check } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
 import {
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  Crosshair,
-  Dumbbell,
-  FileText,
-  Move,
-  Target,
-  Trophy
-} from 'lucide-react-native';
-import { useState } from 'react';
-import {
-  Alert,
+  Dimensions,
   KeyboardAvoidingView,
   Modal,
   Platform,
-  ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import Animated, { FadeInRight, FadeOutLeft } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// ============================================================================
-// OPTION CONFIGS
-// ============================================================================
-
-const SCORING_MODES: { value: ScoringMode; label: string; desc: string }[] = [
-  { value: 'accuracy', label: 'Accuracy', desc: 'Hits / Shots fired' },
-  { value: 'speed', label: 'Speed', desc: 'Time-based scoring' },
-  { value: 'combined', label: 'Combined', desc: 'Time + Accuracy' },
-  { value: 'pass_fail', label: 'Pass/Fail', desc: 'Meet threshold or not' },
-  { value: 'points', label: 'Points', desc: 'Custom point scoring' },
-];
-
-const DIFFICULTIES: { value: DrillDifficulty; label: string; color: string }[] = [
-  { value: 'beginner', label: 'Beginner', color: '#22C55E' },
-  { value: 'intermediate', label: 'Intermediate', color: '#F59E0B' },
-  { value: 'advanced', label: 'Advanced', color: '#EF4444' },
-  { value: 'expert', label: 'Expert', color: '#7C3AED' },
-];
-
-const CATEGORIES: { value: DrillCategory; label: string }[] = [
-  { value: 'fundamentals', label: 'Fundamentals' },
-  { value: 'speed', label: 'Speed' },
-  { value: 'accuracy', label: 'Accuracy' },
-  { value: 'stress', label: 'Stress/Pressure' },
-  { value: 'tactical', label: 'Tactical' },
-  { value: 'competition', label: 'Competition' },
-  { value: 'qualification', label: 'Qualification' },
-];
-
-const POSITIONS: { value: ShootingPosition; label: string }[] = [
-  { value: 'standing', label: 'Standing' },
-  { value: 'kneeling', label: 'Kneeling' },
-  { value: 'prone', label: 'Prone' },
-  { value: 'sitting', label: 'Sitting' },
-  { value: 'barricade', label: 'Barricade' },
-  { value: 'transition', label: 'Transition' },
-  { value: 'freestyle', label: 'Freestyle' },
-];
-
-const START_POSITIONS: { value: StartPosition; label: string }[] = [
-  { value: 'low_ready', label: 'Low Ready' },
-  { value: 'high_ready', label: 'High Ready' },
-  { value: 'holstered', label: 'Holstered' },
-  { value: 'compressed_ready', label: 'Compressed' },
-  { value: 'table_start', label: 'Table Start' },
-  { value: 'surrender', label: 'Surrender' },
-];
-
-const WEAPONS: { value: WeaponCategory; label: string }[] = [
-  { value: 'any', label: 'Any' },
-  { value: 'rifle', label: 'Rifle' },
-  { value: 'pistol', label: 'Pistol' },
-  { value: 'carbine', label: 'Carbine' },
-  { value: 'shotgun', label: 'Shotgun' },
-  { value: 'precision_rifle', label: 'Precision' },
-];
-
-const TARGET_SIZES: { value: TargetSize; label: string }[] = [
-  { value: 'full', label: 'Full' },
-  { value: 'half', label: 'Half' },
-  { value: 'head', label: 'Head' },
-  { value: 'a_zone', label: 'A-Zone' },
-  { value: 'c_zone', label: 'C-Zone' },
-  { value: 'steel_8in', label: '8" Steel' },
-  { value: 'steel_10in', label: '10" Steel' },
-];
-
-const MOVEMENT_TYPES: { value: MovementType; label: string }[] = [
-  { value: 'none', label: 'None' },
-  { value: 'advance', label: 'Advance' },
-  { value: 'retreat', label: 'Retreat' },
-  { value: 'lateral', label: 'Lateral' },
-  { value: 'diagonal', label: 'Diagonal' },
-  { value: 'freestyle', label: 'Freestyle' },
-];
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ============================================================================
-// SECTION HEADER COMPONENT
+// TYPES
 // ============================================================================
-function SectionHeader({
-  title,
-  icon: Icon,
-  isExpanded,
-  onToggle,
-  colors,
-  hasValues,
-}: {
-  title: string;
-  icon: any;
-  isExpanded: boolean;
-  onToggle: () => void;
-  colors: ReturnType<typeof useColors>;
-  hasValues?: boolean;
-}) {
-  return (
-    <TouchableOpacity
-      style={[styles.sectionHeader, { backgroundColor: colors.card, borderColor: colors.border }]}
-      onPress={onToggle}
-      activeOpacity={0.7}
-    >
-      <View style={styles.sectionHeaderLeft}>
-        <Icon size={18} color={hasValues ? '#93C5FD' : colors.textMuted} />
-        <Text style={[styles.sectionHeaderTitle, { color: colors.text }]}>{title}</Text>
-        {hasValues && <View style={[styles.hasValuesDot, { backgroundColor: '#93C5FD' }]} />}
-      </View>
-      {isExpanded ? (
-        <ChevronUp size={18} color={colors.textMuted} />
-      ) : (
-        <ChevronDown size={18} color={colors.textMuted} />
-      )}
-    </TouchableOpacity>
-  );
+type Step = 1 | 2 | 3 | 4;
+
+interface EnhancedDrillModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onSave: (drill: CreateDrillInput & { id?: string }) => void;
+  initialData?: Partial<CreateDrillInput> & { id?: string };
+  mode?: 'add' | 'edit';
 }
 
 // ============================================================================
-// CHIP SELECTOR COMPONENT
+// STEP INDICATOR
 // ============================================================================
-function ChipSelector<T extends string>({
-  options,
-  value,
-  onChange,
-  colors,
-}: {
-  options: { value: T; label: string; color?: string }[];
-  value: T | undefined;
-  onChange: (val: T | undefined) => void;
-  colors: ReturnType<typeof useColors>;
-}) {
+function StepIndicator({ current, total, colors }: { current: number; total: number; colors: ReturnType<typeof useColors> }) {
   return (
-    <View style={styles.chipRow}>
-      {options.map((opt) => {
-        const isSelected = value === opt.value;
-        const chipColor = opt.color || '#93C5FD';
-        return (
-          <TouchableOpacity
-            key={opt.value}
+    <View style={styles.stepIndicator}>
+      {Array.from({ length: total }, (_, i) => i + 1).map((step) => (
+        <View key={step} style={styles.stepDotContainer}>
+          <View
             style={[
-              styles.chip,
+              styles.stepDot,
               {
-                backgroundColor: isSelected ? `${chipColor}20` : colors.secondary,
-                borderColor: isSelected ? chipColor : 'transparent',
+                backgroundColor: step <= current ? '#93C5FD' : colors.border,
+                width: step === current ? 16 : 6,
               },
             ]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              onChange(isSelected ? undefined : opt.value);
-            }}
-          >
-            <Text style={[styles.chipText, { color: isSelected ? chipColor : colors.text }]}>
-              {opt.label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
+          />
+        </View>
+      ))}
     </View>
   );
 }
@@ -204,14 +66,6 @@ function ChipSelector<T extends string>({
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
-export interface EnhancedDrillModalProps {
-  visible: boolean;
-  onClose: () => void;
-  onSave: (drill: CreateDrillInput & { id?: string }) => void;
-  initialData?: Partial<CreateDrillInput & { id?: string }>;
-  mode?: 'add' | 'edit';
-}
-
 export function EnhancedDrillModal({
   visible,
   onClose,
@@ -222,123 +76,406 @@ export function EnhancedDrillModal({
   const colors = useColors();
   const insets = useSafeAreaInsets();
 
-  // Expanded sections
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  // Step state
+  const [step, setStep] = useState<Step>(1);
 
-  // === BASIC ===
-  const [name, setName] = useState(initialData?.name || '');
-  const [description, setDescription] = useState(initialData?.description || '');
+  // Form state
+  const [drillGoal, setDrillGoal] = useState<DrillGoal>(initialData?.drill_goal || 'grouping');
   const [targetType, setTargetType] = useState<TargetType>(initialData?.target_type || 'paper');
-  const [distance, setDistance] = useState(String(initialData?.distance_m || 100));
+  const [name, setName] = useState(initialData?.name || '');
+  const [distance, setDistance] = useState(String(initialData?.distance_m || 25));
   const [rounds, setRounds] = useState(String(initialData?.rounds_per_shooter || 5));
-
-  // === TIMING ===
   const [timeLimit, setTimeLimit] = useState(initialData?.time_limit_seconds ? String(initialData.time_limit_seconds) : '');
-  const [parTime, setParTime] = useState(initialData?.par_time_seconds ? String(initialData.par_time_seconds) : '');
-
-  // === SCORING ===
-  const [scoringMode, setScoringMode] = useState<ScoringMode | undefined>(initialData?.scoring_mode);
   const [minAccuracy, setMinAccuracy] = useState(initialData?.min_accuracy_percent ? String(initialData.min_accuracy_percent) : '');
-  const [pointsPerHit, setPointsPerHit] = useState(initialData?.points_per_hit ? String(initialData.points_per_hit) : '');
-  const [penaltyPerMiss, setPenaltyPerMiss] = useState(initialData?.penalty_per_miss ? String(initialData.penalty_per_miss) : '');
 
-  // === TARGETS ===
-  const [targetCount, setTargetCount] = useState(initialData?.target_count ? String(initialData.target_count) : '1');
-  const [targetSize, setTargetSize] = useState<TargetSize | undefined>(initialData?.target_size);
-  const [shotsPerTarget, setShotsPerTarget] = useState(initialData?.shots_per_target ? String(initialData.shots_per_target) : '');
-  const [targetExposure, setTargetExposure] = useState(initialData?.target_exposure_seconds ? String(initialData.target_exposure_seconds) : '');
-
-  // === STAGE SETUP ===
-  const [position, setPosition] = useState<ShootingPosition | undefined>(initialData?.position);
-  const [startPosition, setStartPosition] = useState<StartPosition | undefined>(initialData?.start_position);
-  const [weapon, setWeapon] = useState<WeaponCategory | undefined>(initialData?.weapon_category);
-  const [stringsCount, setStringsCount] = useState(initialData?.strings_count ? String(initialData.strings_count) : '1');
-  const [reloadRequired, setReloadRequired] = useState(initialData?.reload_required || false);
-  const [movementType, setMovementType] = useState<MovementType | undefined>(initialData?.movement_type);
-  const [movementDistance, setMovementDistance] = useState(initialData?.movement_distance_m ? String(initialData.movement_distance_m) : '');
-
-  // === DIFFICULTY ===
-  const [difficulty, setDifficulty] = useState<DrillDifficulty | undefined>(initialData?.difficulty);
-  const [category, setCategory] = useState<DrillCategory | undefined>(initialData?.category);
-
-  // === CONTENT ===
-  const [instructions, setInstructions] = useState(initialData?.instructions || '');
-  const [safetyNotes, setSafetyNotes] = useState(initialData?.safety_notes || '');
-
-  const toggleSection = (section: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setExpandedSections((prev) => {
-      const next = new Set(prev);
-      if (next.has(section)) {
-        next.delete(section);
+  // Reset on open
+  useEffect(() => {
+    if (visible) {
+      if (initialData) {
+        setDrillGoal(initialData.drill_goal || 'grouping');
+        setTargetType(initialData.target_type || 'paper');
+        setName(initialData.name || '');
+        setDistance(String(initialData.distance_m || 25));
+        setRounds(String(initialData.rounds_per_shooter || 5));
+        setTimeLimit(initialData.time_limit_seconds ? String(initialData.time_limit_seconds) : '');
+        setMinAccuracy(initialData.min_accuracy_percent ? String(initialData.min_accuracy_percent) : '');
+        setStep(1);
       } else {
-        next.add(section);
+        setDrillGoal('grouping');
+        setTargetType('paper');
+        setName('');
+        setDistance('25');
+        setRounds('5');
+        setTimeLimit('');
+        setMinAccuracy('');
+        setStep(1);
       }
-      return next;
-    });
+    }
+  }, [visible, initialData]);
+
+  const canProceed = () => {
+    switch (step) {
+      case 1: return true; // Goal is always selected
+      case 2: return parseInt(distance) > 0 && parseInt(rounds) > 0;
+      case 3: return true; // Optional settings
+      case 4: return name.trim().length > 0;
+      default: return false;
+    }
+  };
+
+  const handleNext = () => {
+    if (!canProceed()) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (step < 4) {
+      setStep((step + 1) as Step);
+    } else {
+      handleSave();
+    }
+  };
+
+  const handleBack = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (step > 1) {
+      setStep((step - 1) as Step);
+    } else {
+      onClose();
+    }
   };
 
   const handleSave = () => {
-    if (!name.trim()) {
-      Alert.alert('Name Required', 'Please enter a drill name');
-      return;
-    }
-
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
     const drill: CreateDrillInput & { id?: string } = {
       id: initialData?.id || Date.now().toString(),
       name: name.trim(),
-      description: description.trim() || undefined,
-      target_type: targetType,
-      distance_m: parseInt(distance, 10) || 100,
+      drill_goal: drillGoal,
+      target_type: drillGoal === 'grouping' ? 'paper' : targetType,
+      distance_m: parseInt(distance, 10) || 25,
       rounds_per_shooter: parseInt(rounds, 10) || 5,
-
-      // Timing
       time_limit_seconds: timeLimit ? parseInt(timeLimit, 10) : undefined,
-      par_time_seconds: parTime ? parseInt(parTime, 10) : undefined,
-
-      // Scoring
-      scoring_mode: scoringMode,
       min_accuracy_percent: minAccuracy ? parseInt(minAccuracy, 10) : undefined,
-      points_per_hit: pointsPerHit ? parseInt(pointsPerHit, 10) : undefined,
-      penalty_per_miss: penaltyPerMiss ? parseInt(penaltyPerMiss, 10) : undefined,
-
-      // Targets
-      target_count: targetCount ? parseInt(targetCount, 10) : undefined,
-      target_size: targetSize,
-      shots_per_target: shotsPerTarget ? parseInt(shotsPerTarget, 10) : undefined,
-      target_exposure_seconds: targetExposure ? parseInt(targetExposure, 10) : undefined,
-
-      // Stage
-      position,
-      start_position: startPosition,
-      weapon_category: weapon,
-      strings_count: stringsCount ? parseInt(stringsCount, 10) : undefined,
-      reload_required: reloadRequired || undefined,
-      movement_type: movementType,
-      movement_distance_m: movementDistance ? parseInt(movementDistance, 10) : undefined,
-
-      // Difficulty
-      difficulty,
-      category,
-
-      // Content
-      instructions: instructions.trim() || undefined,
-      safety_notes: safetyNotes.trim() || undefined,
     };
 
     onSave(drill);
     onClose();
   };
 
-  // Check if sections have values
-  const hasTimingValues = !!timeLimit || !!parTime;
-  const hasScoringValues = !!scoringMode || !!minAccuracy || !!pointsPerHit;
-  const hasTargetValues = (targetCount && targetCount !== '1') || !!targetSize || !!shotsPerTarget || !!targetExposure;
-  const hasStageValues = !!position || !!startPosition || !!weapon || !!reloadRequired || !!movementType;
-  const hasDifficultyValues = !!difficulty || !!category;
-  const hasContentValues = !!instructions || !!safetyNotes;
+  const goalColor = drillGoal === 'grouping' ? '#10B981' : '#93C5FD';
+
+  // ============================================================================
+  // STEP 1: Choose Goal
+  // ============================================================================
+  const renderStep1 = () => (
+    <Animated.View entering={FadeInRight.duration(300)} exiting={FadeOutLeft.duration(200)} style={styles.stepContent}>
+      <Text style={[styles.stepTitle, { color: colors.text }]}>What to measure?</Text>
+      <Text style={[styles.stepSubtitle, { color: colors.textMuted }]}>Choose the goal for this drill</Text>
+
+      <View style={styles.goalCards}>
+        {/* Grouping */}
+        <TouchableOpacity
+          style={[
+            styles.goalCard,
+            {
+              backgroundColor: drillGoal === 'grouping' ? '#10B98115' : colors.card,
+              borderColor: drillGoal === 'grouping' ? '#10B981' : colors.border,
+            },
+          ]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            setDrillGoal('grouping');
+          }}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.goalCardHeader, { borderBottomColor: drillGoal === 'grouping' ? '#10B98130' : colors.border }]}>
+            <Text style={[styles.goalCardEmoji]}>🎯</Text>
+            <View>
+              <Text style={[styles.goalCardTitle, { color: drillGoal === 'grouping' ? '#10B981' : colors.text }]}>
+                Grouping
+              </Text>
+              <Text style={[styles.goalCardDesc, { color: colors.textMuted }]}>How tight are my shots?</Text>
+            </View>
+          </View>
+          
+          <View style={styles.goalCardFeatures}>
+            <Text style={[styles.goalCardFeature, { color: colors.textMuted }]}>• Measures dispersion</Text>
+            <Text style={[styles.goalCardFeature, { color: colors.textMuted }]}>• No hit counting</Text>
+          </View>
+          
+          {drillGoal === 'grouping' && (
+            <View style={[styles.goalCardCheck, { backgroundColor: '#10B981' }]}>
+              <Check size={10} color="#fff" />
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {/* Achievement */}
+        <TouchableOpacity
+          style={[
+            styles.goalCard,
+            {
+              backgroundColor: drillGoal === 'achievement' ? '#93C5FD15' : colors.card,
+              borderColor: drillGoal === 'achievement' ? '#93C5FD' : colors.border,
+            },
+          ]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            setDrillGoal('achievement');
+          }}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.goalCardHeader, { borderBottomColor: drillGoal === 'achievement' ? '#93C5FD30' : colors.border }]}>
+            <Text style={[styles.goalCardEmoji]}>🏆</Text>
+            <View>
+              <Text style={[styles.goalCardTitle, { color: drillGoal === 'achievement' ? '#93C5FD' : colors.text }]}>
+                Achievement
+              </Text>
+              <Text style={[styles.goalCardDesc, { color: colors.textMuted }]}>How many did I hit?</Text>
+            </View>
+          </View>
+
+          <View style={styles.goalCardFeatures}>
+            <Text style={[styles.goalCardFeature, { color: colors.textMuted }]}>• Counts hits & accuracy</Text>
+            <Text style={[styles.goalCardFeature, { color: colors.textMuted }]}>• Scan or manual entry</Text>
+          </View>
+          
+          {drillGoal === 'achievement' && (
+            <View style={[styles.goalCardCheck, { backgroundColor: '#93C5FD' }]}>
+              <Check size={10} color="#fff" />
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+    </Animated.View>
+  );
+
+  // ============================================================================
+  // STEP 2: Distance & Shots
+  // ============================================================================
+  const renderStep2 = () => (
+    <Animated.View entering={FadeInRight.duration(300)} exiting={FadeOutLeft.duration(200)} style={styles.stepContent}>
+      <Text style={[styles.stepTitle, { color: colors.text }]}>Parameters</Text>
+      <Text style={[styles.stepSubtitle, { color: colors.textMuted }]}>Distance and shots configuration</Text>
+
+      {/* Distance */}
+      <View style={styles.paramSection}>
+        <Text style={[styles.paramLabel, { color: colors.text }]}>Distance</Text>
+        <View style={styles.paramGrid}>
+          {[7, 15, 25, 50, 100, 200].map((d) => (
+            <TouchableOpacity
+              key={d}
+              style={[
+                styles.paramBtn,
+                {
+                  backgroundColor: parseInt(distance) === d ? goalColor : colors.card,
+                  borderColor: parseInt(distance) === d ? goalColor : colors.border,
+                },
+              ]}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setDistance(String(d));
+              }}
+            >
+              <Text style={[styles.paramBtnValue, { color: parseInt(distance) === d ? '#fff' : colors.text }]}>
+                {d}
+              </Text>
+              <Text style={[styles.paramBtnUnit, { color: parseInt(distance) === d ? '#ffffffcc' : colors.textMuted }]}>
+                m
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* Shots */}
+      <View style={styles.paramSection}>
+        <Text style={[styles.paramLabel, { color: colors.text }]}>Shots per round</Text>
+        <View style={styles.paramGrid}>
+          {[3, 5, 10, 15, 20, 30].map((s) => (
+            <TouchableOpacity
+              key={s}
+              style={[
+                styles.paramBtn,
+                {
+                  backgroundColor: parseInt(rounds) === s ? goalColor : colors.card,
+                  borderColor: parseInt(rounds) === s ? goalColor : colors.border,
+                },
+              ]}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setRounds(String(s));
+              }}
+            >
+              <Text style={[styles.paramBtnValue, { color: parseInt(rounds) === s ? '#fff' : colors.text }]}>
+                {s}
+              </Text>
+              <Text style={[styles.paramBtnUnit, { color: parseInt(rounds) === s ? '#ffffffcc' : colors.textMuted }]}>
+                rds
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* Input method for achievement */}
+      {drillGoal === 'achievement' && (
+        <View style={styles.paramSection}>
+          <Text style={[styles.paramLabel, { color: colors.text }]}>Logging Method</Text>
+          <View style={styles.methodRow}>
+            <TouchableOpacity
+              style={[
+                styles.methodBtn,
+                {
+                  backgroundColor: targetType === 'paper' ? '#93C5FD15' : colors.card,
+                  borderColor: targetType === 'paper' ? '#93C5FD' : colors.border,
+                },
+              ]}
+              onPress={() => setTargetType('paper')}
+            >
+              <Text style={styles.methodEmoji}>📷</Text>
+              <Text style={[styles.methodLabel, { color: targetType === 'paper' ? '#93C5FD' : colors.text }]}>
+                Scan
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.methodBtn,
+                {
+                  backgroundColor: targetType === 'tactical' ? colors.text + '15' : colors.card,
+                  borderColor: targetType === 'tactical' ? colors.text : colors.border,
+                },
+              ]}
+              onPress={() => setTargetType('tactical')}
+            >
+              <Text style={styles.methodEmoji}>✏️</Text>
+              <Text style={[styles.methodLabel, { color: colors.text }]}>
+                Manual
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+    </Animated.View>
+  );
+
+  // ============================================================================
+  // STEP 3: Optional Settings
+  // ============================================================================
+  const renderStep3 = () => (
+    <Animated.View entering={FadeInRight.duration(300)} exiting={FadeOutLeft.duration(200)} style={styles.stepContent}>
+      <Text style={[styles.stepTitle, { color: colors.text }]}>Requirements</Text>
+      <Text style={[styles.stepSubtitle, { color: colors.textMuted }]}>Optional limits and thresholds</Text>
+
+      {/* Time Limit */}
+      <View style={styles.optionalField}>
+        <Text style={[styles.optionalLabel, { color: colors.text }]}>Time limit (seconds)</Text>
+        <TextInput
+          style={[styles.optionalInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+          placeholder="No limit"
+          placeholderTextColor={colors.textMuted}
+          value={timeLimit}
+          onChangeText={setTimeLimit}
+          keyboardType="number-pad"
+        />
+        <View style={styles.optionalHints}>
+          {[10, 30, 60, 120].map((t) => (
+            <TouchableOpacity
+              key={t}
+              style={[styles.hintChip, { backgroundColor: timeLimit === String(t) ? goalColor : colors.secondary }]}
+              onPress={() => setTimeLimit(timeLimit === String(t) ? '' : String(t))}
+            >
+              <Text style={[styles.hintChipText, { color: timeLimit === String(t) ? '#fff' : colors.textMuted }]}>
+                {t}s
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* Min Accuracy (only for achievement) */}
+      {drillGoal === 'achievement' && (
+        <View style={styles.optionalField}>
+          <Text style={[styles.optionalLabel, { color: colors.text }]}>Minimum accuracy %</Text>
+          <TextInput
+            style={[styles.optionalInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+            placeholder="No minimum"
+            placeholderTextColor={colors.textMuted}
+            value={minAccuracy}
+            onChangeText={setMinAccuracy}
+            keyboardType="number-pad"
+          />
+          <View style={styles.optionalHints}>
+            {[50, 70, 80, 90].map((a) => (
+              <TouchableOpacity
+                key={a}
+                style={[styles.hintChip, { backgroundColor: minAccuracy === String(a) ? goalColor : colors.secondary }]}
+                onPress={() => setMinAccuracy(minAccuracy === String(a) ? '' : String(a))}
+              >
+                <Text style={[styles.hintChipText, { color: minAccuracy === String(a) ? '#fff' : colors.textMuted }]}>
+                  {a}%
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
+
+      <View style={[styles.skipHint, { backgroundColor: colors.secondary }]}>
+        <Text style={[styles.skipHintText, { color: colors.textMuted }]}>
+          Optional. Skip if you don't need limits.
+        </Text>
+      </View>
+    </Animated.View>
+  );
+
+  // ============================================================================
+  // STEP 4: Name & Save
+  // ============================================================================
+  const renderStep4 = () => (
+    <Animated.View entering={FadeInRight.duration(300)} exiting={FadeOutLeft.duration(200)} style={styles.stepContent}>
+      <Text style={[styles.stepTitle, { color: colors.text }]}>Drill Name</Text>
+      <Text style={[styles.stepSubtitle, { color: colors.textMuted }]}>Give it a memorable name</Text>
+
+      <TextInput
+        style={[styles.nameInput, { backgroundColor: colors.card, borderColor: name.trim() ? goalColor : colors.border, color: colors.text }]}
+        placeholder="e.g., Qualification Test"
+        placeholderTextColor={colors.textMuted}
+        value={name}
+        onChangeText={setName}
+        autoFocus
+      />
+
+      {/* Summary */}
+      <View style={[styles.summary, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.summaryTitle, { color: colors.textMuted }]}>Summary</Text>
+        <View style={styles.summaryRow}>
+          <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Type</Text>
+          <Text style={[styles.summaryValue, { color: goalColor }]}>
+            {drillGoal === 'grouping' ? '🎯 Grouping' : '🏆 Achievement'}
+          </Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Distance</Text>
+          <Text style={[styles.summaryValue, { color: colors.text }]}>{distance}m</Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Shots</Text>
+          <Text style={[styles.summaryValue, { color: colors.text }]}>{rounds}</Text>
+        </View>
+        {timeLimit && (
+          <View style={styles.summaryRow}>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Time limit</Text>
+            <Text style={[styles.summaryValue, { color: colors.text }]}>{timeLimit}s</Text>
+          </View>
+        )}
+        {minAccuracy && drillGoal === 'achievement' && (
+          <View style={styles.summaryRow}>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Min accuracy</Text>
+            <Text style={[styles.summaryValue, { color: colors.text }]}>{minAccuracy}%</Text>
+          </View>
+        )}
+      </View>
+    </Animated.View>
+  );
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -348,567 +485,327 @@ export function EnhancedDrillModal({
       >
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={onClose}>
-            <Text style={[styles.headerCancel, { color: colors.textMuted }]}>Cancel</Text>
-          </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
-            {mode === 'edit' ? 'Edit Drill' : 'Add Drill'}
+            {mode === 'edit' ? 'Edit Drill' : 'New Drill'}
           </Text>
-          <TouchableOpacity onPress={handleSave} disabled={!name.trim()}>
-            <Text style={[styles.headerSave, { color: name.trim() ? '#93C5FD' : colors.textMuted }]}>
-              {mode === 'edit' ? 'Save' : 'Add'}
-            </Text>
+          <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+            <Text style={[styles.closeBtnText, { color: colors.textMuted }]}>Cancel</Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView
-          style={styles.body}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* ================================================================
-              BASIC (Always visible)
-          ================================================================ */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>BASIC</Text>
+        {/* Step Indicator */}
+        <StepIndicator current={step} total={4} colors={colors} />
 
-            {/* Name */}
-            <View style={styles.fieldGroup}>
-              <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Drill Name *</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-                placeholder="e.g., Precision at 100m"
-                placeholderTextColor={colors.textMuted}
-                value={name}
-                onChangeText={setName}
-              />
-            </View>
+        {/* Content */}
+        <View style={styles.body}>
+          {step === 1 && renderStep1()}
+          {step === 2 && renderStep2()}
+          {step === 3 && renderStep3()}
+          {step === 4 && renderStep4()}
+        </View>
 
-            {/* Description */}
-            <View style={styles.fieldGroup}>
-              <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Description</Text>
-              <TextInput
-                style={[styles.input, styles.inputMultiline, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-                placeholder="Brief description..."
-                placeholderTextColor={colors.textMuted}
-                value={description}
-                onChangeText={setDescription}
-                multiline
-                numberOfLines={2}
-              />
-            </View>
+        {/* Footer */}
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 16, borderTopColor: colors.border }]}>
+          <TouchableOpacity
+            style={[styles.backBtn, { backgroundColor: colors.secondary }]}
+            onPress={handleBack}
+          >
+            <ArrowLeft size={18} color={colors.text} />
+            <Text style={[styles.backBtnText, { color: colors.text }]}>
+              {step === 1 ? 'Cancel' : 'Back'}
+            </Text>
+          </TouchableOpacity>
 
-            {/* Target Type */}
-            <View style={styles.fieldGroup}>
-              <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Target Type</Text>
-              <View style={styles.typeRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.typeBtn,
-                    {
-                      backgroundColor: targetType === 'paper' ? 'rgba(147,197,253,0.15)' : colors.card,
-                      borderColor: targetType === 'paper' ? '#93C5FD' : colors.border,
-                    },
-                  ]}
-                  onPress={() => setTargetType('paper')}
-                >
-                  <Target size={20} color={targetType === 'paper' ? '#93C5FD' : colors.textMuted} />
-                  <Text style={[styles.typeBtnText, { color: targetType === 'paper' ? '#93C5FD' : colors.text }]}>
-                    Paper
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.typeBtn,
-                    {
-                      backgroundColor: targetType === 'tactical' ? 'rgba(156,163,175,0.15)' : colors.card,
-                      borderColor: targetType === 'tactical' ? colors.textMuted : colors.border,
-                    },
-                  ]}
-                  onPress={() => setTargetType('tactical')}
-                >
-                  <Crosshair size={20} color={targetType === 'tactical' ? colors.text : colors.textMuted} />
-                  <Text style={[styles.typeBtnText, { color: targetType === 'tactical' ? colors.text : colors.text }]}>
-                    Tactical
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Distance, Shots */}
-            <View style={styles.row}>
-              <View style={[styles.fieldGroup, { flex: 1 }]}>
-                <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Distance (m)</Text>
-                <TextInput
-                  style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-                  value={distance}
-                  onChangeText={setDistance}
-                  keyboardType="number-pad"
-                />
-              </View>
-              <View style={[styles.fieldGroup, { flex: 1 }]}>
-                <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Shots (bullets)</Text>
-                <TextInput
-                  style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-                  value={rounds}
-                  onChangeText={setRounds}
-                  keyboardType="number-pad"
-                />
-              </View>
-            </View>
-
-            {/* Rounds (repeats) - how many times the user must log results */}
-            <View style={styles.fieldGroup}>
-              <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Rounds (repeats)</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-                value={stringsCount}
-                onChangeText={setStringsCount}
-                keyboardType="number-pad"
-              />
-            </View>
-          </View>
-
-          {/* ================================================================
-              TIMING
-          ================================================================ */}
-          <SectionHeader
-            title="Timing"
-            icon={Clock}
-            isExpanded={expandedSections.has('timing')}
-            onToggle={() => toggleSection('timing')}
-            colors={colors}
-            hasValues={hasTimingValues}
-          />
-          {expandedSections.has('timing') && (
-            <View style={[styles.sectionContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.row}>
-                <View style={[styles.fieldGroup, { flex: 1 }]}>
-                  <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Time Limit (s)</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: colors.secondary, borderColor: colors.border, color: colors.text }]}
-                    placeholder="Max time"
-                    placeholderTextColor={colors.textMuted}
-                    value={timeLimit}
-                    onChangeText={setTimeLimit}
-                    keyboardType="number-pad"
-                  />
-                </View>
-                <View style={[styles.fieldGroup, { flex: 1 }]}>
-                  <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Par Time (s)</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: colors.secondary, borderColor: colors.border, color: colors.text }]}
-                    placeholder="Target time"
-                    placeholderTextColor={colors.textMuted}
-                    value={parTime}
-                    onChangeText={setParTime}
-                    keyboardType="number-pad"
-                  />
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* ================================================================
-              SCORING
-          ================================================================ */}
-          <SectionHeader
-            title="Scoring"
-            icon={Trophy}
-            isExpanded={expandedSections.has('scoring')}
-            onToggle={() => toggleSection('scoring')}
-            colors={colors}
-            hasValues={hasScoringValues}
-          />
-          {expandedSections.has('scoring') && (
-            <View style={[styles.sectionContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.fieldGroup}>
-                <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Scoring Mode</Text>
-                <ChipSelector options={SCORING_MODES} value={scoringMode} onChange={setScoringMode} colors={colors} />
-              </View>
-              <View style={styles.row}>
-                <View style={[styles.fieldGroup, { flex: 1 }]}>
-                  <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Min Accuracy %</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: colors.secondary, borderColor: colors.border, color: colors.text }]}
-                    placeholder="80"
-                    placeholderTextColor={colors.textMuted}
-                    value={minAccuracy}
-                    onChangeText={setMinAccuracy}
-                    keyboardType="number-pad"
-                  />
-                </View>
-                <View style={[styles.fieldGroup, { flex: 1 }]}>
-                  <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Pts/Hit</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: colors.secondary, borderColor: colors.border, color: colors.text }]}
-                    placeholder="10"
-                    placeholderTextColor={colors.textMuted}
-                    value={pointsPerHit}
-                    onChangeText={setPointsPerHit}
-                    keyboardType="number-pad"
-                  />
-                </View>
-                <View style={[styles.fieldGroup, { flex: 1 }]}>
-                  <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Penalty</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: colors.secondary, borderColor: colors.border, color: colors.text }]}
-                    placeholder="-5"
-                    placeholderTextColor={colors.textMuted}
-                    value={penaltyPerMiss}
-                    onChangeText={setPenaltyPerMiss}
-                    keyboardType="numbers-and-punctuation"
-                  />
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* ================================================================
-              TARGETS
-          ================================================================ */}
-          <SectionHeader
-            title="Targets"
-            icon={Target}
-            isExpanded={expandedSections.has('targets')}
-            onToggle={() => toggleSection('targets')}
-            colors={colors}
-            hasValues={hasTargetValues}
-          />
-          {expandedSections.has('targets') && (
-            <View style={[styles.sectionContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.row}>
-                <View style={[styles.fieldGroup, { flex: 1 }]}>
-                  <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Target Count</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: colors.secondary, borderColor: colors.border, color: colors.text }]}
-                    value={targetCount}
-                    onChangeText={setTargetCount}
-                    keyboardType="number-pad"
-                  />
-                </View>
-                <View style={[styles.fieldGroup, { flex: 1 }]}>
-                  <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Shots/Target</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: colors.secondary, borderColor: colors.border, color: colors.text }]}
-                    placeholder="2"
-                    placeholderTextColor={colors.textMuted}
-                    value={shotsPerTarget}
-                    onChangeText={setShotsPerTarget}
-                    keyboardType="number-pad"
-                  />
-                </View>
-              </View>
-              <View style={styles.fieldGroup}>
-                <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Target Size</Text>
-                <ChipSelector options={TARGET_SIZES} value={targetSize} onChange={setTargetSize} colors={colors} />
-              </View>
-              {targetType === 'tactical' && (
-                <View style={styles.fieldGroup}>
-                  <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Exposure Time (s)</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: colors.secondary, borderColor: colors.border, color: colors.text }]}
-                    placeholder="How long target is visible"
-                    placeholderTextColor={colors.textMuted}
-                    value={targetExposure}
-                    onChangeText={setTargetExposure}
-                    keyboardType="number-pad"
-                  />
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* ================================================================
-              STAGE SETUP
-          ================================================================ */}
-          <SectionHeader
-            title="Stage Setup"
-            icon={Move}
-            isExpanded={expandedSections.has('stage')}
-            onToggle={() => toggleSection('stage')}
-            colors={colors}
-            hasValues={hasStageValues}
-          />
-          {expandedSections.has('stage') && (
-            <View style={[styles.sectionContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.fieldGroup}>
-                <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Shooting Position</Text>
-                <ChipSelector options={POSITIONS} value={position} onChange={setPosition} colors={colors} />
-              </View>
-              <View style={styles.fieldGroup}>
-                <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Start Position</Text>
-                <ChipSelector options={START_POSITIONS} value={startPosition} onChange={setStartPosition} colors={colors} />
-              </View>
-              <View style={styles.fieldGroup}>
-                <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Weapon</Text>
-                <ChipSelector options={WEAPONS} value={weapon} onChange={setWeapon} colors={colors} />
-              </View>
-              <View style={styles.fieldGroup}>
-                <View style={styles.switchRow}>
-                  <Text style={[styles.fieldLabel, { color: colors.textMuted, marginBottom: 0 }]}>Reload Required</Text>
-                  <Switch
-                    value={reloadRequired}
-                    onValueChange={setReloadRequired}
-                    trackColor={{ false: colors.secondary, true: '#93C5FD' }}
-                  />
-                </View>
-              </View>
-              <View style={styles.fieldGroup}>
-                <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Movement</Text>
-                <ChipSelector options={MOVEMENT_TYPES} value={movementType} onChange={setMovementType} colors={colors} />
-              </View>
-              {movementType && movementType !== 'none' && (
-                <View style={styles.fieldGroup}>
-                  <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Movement Distance (m)</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: colors.secondary, borderColor: colors.border, color: colors.text }]}
-                    placeholder="Distance to move"
-                    placeholderTextColor={colors.textMuted}
-                    value={movementDistance}
-                    onChangeText={setMovementDistance}
-                    keyboardType="number-pad"
-                  />
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* ================================================================
-              DIFFICULTY & CATEGORY
-          ================================================================ */}
-          <SectionHeader
-            title="Difficulty & Category"
-            icon={Dumbbell}
-            isExpanded={expandedSections.has('difficulty')}
-            onToggle={() => toggleSection('difficulty')}
-            colors={colors}
-            hasValues={hasDifficultyValues}
-          />
-          {expandedSections.has('difficulty') && (
-            <View style={[styles.sectionContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.fieldGroup}>
-                <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Difficulty</Text>
-                <ChipSelector options={DIFFICULTIES} value={difficulty} onChange={setDifficulty} colors={colors} />
-              </View>
-              <View style={styles.fieldGroup}>
-                <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Category</Text>
-                <ChipSelector options={CATEGORIES} value={category} onChange={setCategory} colors={colors} />
-              </View>
-            </View>
-          )}
-
-          {/* ================================================================
-              CONTENT
-          ================================================================ */}
-          <SectionHeader
-            title="Instructions & Notes"
-            icon={FileText}
-            isExpanded={expandedSections.has('content')}
-            onToggle={() => toggleSection('content')}
-            colors={colors}
-            hasValues={hasContentValues}
-          />
-          {expandedSections.has('content') && (
-            <View style={[styles.sectionContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.fieldGroup}>
-                <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Instructions</Text>
-                <TextInput
-                  style={[styles.input, styles.inputLarge, { backgroundColor: colors.secondary, borderColor: colors.border, color: colors.text }]}
-                  placeholder="Step-by-step instructions..."
-                  placeholderTextColor={colors.textMuted}
-                  value={instructions}
-                  onChangeText={setInstructions}
-                  multiline
-                  numberOfLines={4}
-                  textAlignVertical="top"
-                />
-              </View>
-              <View style={styles.fieldGroup}>
-                <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Safety Notes</Text>
-                <TextInput
-                  style={[styles.input, styles.inputMultiline, { backgroundColor: colors.secondary, borderColor: colors.border, color: colors.text }]}
-                  placeholder="Important safety considerations..."
-                  placeholderTextColor={colors.textMuted}
-                  value={safetyNotes}
-                  onChangeText={setSafetyNotes}
-                  multiline
-                  numberOfLines={2}
-                  textAlignVertical="top"
-                />
-              </View>
-            </View>
-          )}
-        </ScrollView>
+          <TouchableOpacity
+            style={[
+              styles.nextBtn,
+              { backgroundColor: canProceed() ? goalColor : colors.border },
+            ]}
+            onPress={handleNext}
+            disabled={!canProceed()}
+          >
+            <Text style={[styles.nextBtnText, { color: canProceed() ? '#fff' : colors.textMuted }]}>
+              {step === 4 ? 'Save Drill' : 'Next'}
+            </Text>
+            {step < 4 ? (
+              <ArrowRight size={18} color={canProceed() ? '#fff' : colors.textMuted} />
+            ) : (
+              <Check size={18} color={canProceed() ? '#fff' : colors.textMuted} />
+            )}
+          </TouchableOpacity>
+        </View>
       </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 // ============================================================================
-// STYLES
+// COMPACT STYLES
 // ============================================================================
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-
-  // Header
+  container: {
+    flex: 1,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerTitle: { 
-    fontSize: 17, 
-    fontWeight: '700',
-    letterSpacing: -0.4,
-  },
-  headerCancel: { 
-    fontSize: 15, 
-    fontWeight: '500',
-  },
-  headerSave: { 
-    fontSize: 15, 
-    fontWeight: '700',
-  },
-
-  // Body
-  body: { 
-    flex: 1, 
-    paddingHorizontal: 16, 
-    paddingTop: 16,
-  },
-
-  // Section
-  section: { 
-    marginBottom: 20,
-  },
-  sectionLabel: { 
-    fontSize: 11, 
-    fontWeight: '700', 
-    letterSpacing: 0.8, 
-    marginBottom: 12,
-    textTransform: 'uppercase',
-  },
-
-  // Section Header (collapsible)
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 2,
-  },
-  sectionHeaderLeft: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 10,
-  },
-  sectionHeaderTitle: { 
-    fontSize: 14, 
+  headerTitle: {
+    fontSize: 15,
     fontWeight: '600',
   },
-  hasValuesDot: { 
-    width: 6, 
-    height: 6, 
+  closeBtn: {
+    position: 'absolute',
+    right: 16,
+  },
+  closeBtnText: {
+    fontSize: 14,
+  },
+
+  // Step Indicator
+  stepIndicator: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 12,
+    gap: 6,
+  },
+  stepDotContainer: {
+    alignItems: 'center',
+  },
+  stepDot: {
+    height: 6,
     borderRadius: 3,
   },
 
-  // Section Content
-  sectionContent: {
+  // Body
+  body: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  stepContent: {
+    flex: 1,
+    paddingTop: 8,
+  },
+  stepTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  stepSubtitle: {
+    fontSize: 14,
+    marginBottom: 20,
+  },
+
+  // Goal Cards (Compact)
+  goalCards: {
+    gap: 12,
+  },
+  goalCard: {
     padding: 14,
     borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 12,
-    marginTop: -4,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
+    borderWidth: 1.5,
+    position: 'relative',
   },
-
-  // Fields
-  fieldGroup: { 
-    marginBottom: 14,
-  },
-  fieldLabel: { 
-    fontSize: 11, 
-    fontWeight: '600', 
+  goalCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingBottom: 8,
     marginBottom: 8,
-    letterSpacing: 0.3,
-    textTransform: 'uppercase',
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  row: { 
-    flexDirection: 'row', 
-    gap: 10,
+  goalCardEmoji: {
+    fontSize: 24,
   },
-
-  // Inputs
-  input: {
-    height: 46,
+  goalCardTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  goalCardDesc: {
+    fontSize: 13,
+  },
+  goalCardFeatures: {
+    gap: 4,
+  },
+  goalCardFeature: {
+    fontSize: 13,
+  },
+  goalCardCheck: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 20,
+    height: 20,
     borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    fontSize: 15,
-  },
-  inputMultiline: {
-    height: 72,
-    paddingTop: 12,
-    paddingBottom: 12,
-    textAlignVertical: 'top',
-  },
-  inputLarge: {
-    height: 100,
-    paddingTop: 12,
-    paddingBottom: 12,
-    textAlignVertical: 'top',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
-  // Type buttons
-  typeRow: { 
-    flexDirection: 'row', 
+  // Params (Compact)
+  paramSection: {
+    marginBottom: 20,
+  },
+  paramLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  paramGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
   },
-  typeBtn: {
+  paramBtn: {
+    width: (SCREEN_WIDTH - 40 - 20) / 3, // tighter width
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    alignItems: 'center',
+  },
+  paramBtnValue: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  paramBtnUnit: {
+    fontSize: 11,
+    marginTop: 0,
+  },
+
+  // Method (Compact)
+  methodRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  methodBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    height: 48,
+    paddingVertical: 12,
     borderRadius: 10,
     borderWidth: 1.5,
   },
-  typeBtnText: { 
-    fontSize: 14, 
+  methodEmoji: {
+    fontSize: 18,
+  },
+  methodLabel: {
+    fontSize: 14,
     fontWeight: '600',
   },
 
-  // Chips
-  chipRow: { 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
+  // Optional (Compact)
+  optionalField: {
+    marginBottom: 20,
+  },
+  optionalLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  optionalInput: {
+    fontSize: 16,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  optionalHints: {
+    flexDirection: 'row',
     gap: 8,
   },
-  chip: {
+  hintChip: {
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1.5,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
-  chipText: { 
-    fontSize: 12, 
+  hintChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  skipHint: {
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 10,
+  },
+  skipHintText: {
+    fontSize: 13,
+    textAlign: 'center',
+  },
+
+  // Name (Compact)
+  nameInput: {
+    fontSize: 18,
+    fontWeight: '600',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    marginBottom: 24,
+  },
+
+  // Summary (Compact)
+  summary: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 10,
+  },
+  summaryTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  summaryLabel: {
+    fontSize: 14,
+  },
+  summaryValue: {
+    fontSize: 14,
     fontWeight: '600',
   },
 
-  // Switch
-  switchRow: {
+  // Footer (Compact)
+  footer: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  backBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 8,
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+  },
+  backBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  nextBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  nextBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

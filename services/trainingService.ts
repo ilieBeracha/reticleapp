@@ -68,6 +68,9 @@ export async function createTraining(input: CreateTrainingInput): Promise<Traini
       name: drill.name,
       description: drill.description || null,
 
+      // === PRIMARY CLASSIFICATION ===
+      drill_goal: drill.drill_goal,
+
       // === BASIC CONFIG ===
       target_type: drill.target_type,
       distance_m: drill.distance_m,
@@ -584,6 +587,9 @@ export async function addDrill(
       order_index: nextIndex,
       name: drill.name,
       description: drill.description || null,
+
+      // === PRIMARY CLASSIFICATION ===
+      drill_goal: drill.drill_goal,
 
       // === BASIC CONFIG ===
       target_type: drill.target_type,

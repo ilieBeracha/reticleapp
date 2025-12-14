@@ -147,6 +147,17 @@ export const TargetDetailModal = React.memo(function TargetDetailModal({
   const isPaper = target.target_type === 'paper';
   const paperResult = target.paper_result;
   const tacticalResult = target.tactical_result;
+  
+  // Determine target purpose
+  const isGroupingTarget = isPaper && paperResult?.paper_type === 'grouping';
+  const isAchievementTarget = isPaper && paperResult?.paper_type === 'achievement';
+  
+  // Get display label for target type
+  const targetTypeLabel = isGroupingTarget 
+    ? 'Grouping' 
+    : isAchievementTarget 
+      ? 'Achievement' 
+      : (isPaper ? 'Paper' : 'Tactical');
 
   // Calculate stats
   let hits = 0;
@@ -160,7 +171,8 @@ export const TargetDetailModal = React.memo(function TargetDetailModal({
     shots = tacticalResult.bullets_fired;
   }
 
-  const accuracy = shots > 0 ? Math.round((hits / shots) * 100) : 0;
+  // Only calculate accuracy for achievement/tactical targets
+  const accuracy = (!isGroupingTarget && shots > 0) ? Math.round((hits / shots) * 100) : 0;
   const hasImage = isPaper && paperResult?.scanned_image_url;
 
   return (
@@ -239,7 +251,7 @@ export const TargetDetailModal = React.memo(function TargetDetailModal({
               <View>
                 <Text style={styles.titleOnImage}>Target #{index}</Text>
                 <Text style={styles.subtitleOnImage}>
-                  {isPaper ? 'Paper Target' : 'Tactical'} • {target.distance_m}m
+                  {targetTypeLabel} • {target.distance_m}m
                 </Text>
               </View>
             </View>

@@ -16,6 +16,7 @@ export { DetectionPreview } from "./DetectionPreview";
 
 // Page Components
 export { CameraFlow } from "./CameraFlow";
+export { ManualAchievementEntry } from "./ManualAchievementEntry";
 export { ResultCard } from "./ResultCard";
 export { TacticalResultsEntry } from "./TacticalResultsEntry";
 export { TargetForm } from "./TargetForm";

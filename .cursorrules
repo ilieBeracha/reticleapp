@@ -141,50 +141,55 @@ FOLLOW THESE RULES STRICTLY AND EXACTLY.
 - Explain your OBSERVATIONS clearly, then provide REASONING to identify the exact issue. Add console logs when needed to gather more information.
 
 
-Training Management System Core Architecture
+Core Business Domain: Military/Tactical Training Management System
 
-1. Team Hierarchy & Role Management (85/100)
-- Military-style command structure implementation (owner -> commander -> squad_commander -> soldier)
-- Role-based permission system with chain-of-command validation
-- Squad organization with hierarchical team relationships
-- Custom validation rules enforcing military command protocols
+Primary Business Logic Modules:
 
-2. Training Session Control (90/100)
-components/training-detail/hooks/useTrainingActions.ts
-- Multi-state workflow management (planned → ongoing → finished/cancelled)
-- Drill progression tracking with completion validation
-- Performance metrics calculation including accuracy and timing
-- Team-aware session coordination and status management
+1. Target Analysis System (85/100)
+- Bullet hole detection with confidence scoring
+- Shot grouping calculations and accuracy metrics
+- Distance-based performance categorization
+- Achievement vs grouping target handling
 
-3. Target Analysis System (85/100)
-services/detectionService.ts
-- Automated bullet hole detection and analysis
-- Group size calculations with distance-based categorization
-- Shot accuracy tracking and performance assessment
-- Training data collection for detection model improvement
+2. Training Session Management (90/100)
+- Multi-stage training workflow (planned → ongoing → finished)
+- Complex drill completion criteria
+- Time-based performance tracking
+- Real-time progress calculations
+- Specialized scoring modes for different drill types
 
-4. Organization Authentication (80/100)
-contexts/AuthContext.tsx
-- Team-context aware authentication
-- Workspace switching with organizational hierarchy
-- Profile synchronization with active team context
-- Session management with membership validation
+3. Team Hierarchy System (80/100)
+- Military-style command structure:
+  - Owner → Commander → Squad Commander → Soldier
+- Role-based access control
+- Squad-based organization
+- Team-specific training capabilities
 
-5. Notification Command Chain (75/100)
-services/pushService.ts
-- Hierarchical notification routing following command structure
-- Priority-based delivery system
-- Training event propagation through command levels
-- Team-aware notification management
+4. Training Analytics (75/100)
+- Session activity tracking
+- Performance trending analysis
+- Weekly statistics aggregation
+- Training streak calculations
+- Distance-based performance breakdowns
 
-Core Domain Concepts:
-- Military command structure enforcement
-- Training validation with accuracy requirements
-- Squad-based team organization
-- Cross-team coordination capabilities
-- Performance tracking and assessment
+Key Integration Points:
+1. Training Calendar Management
+- Multi-dot event indicators
+- Training type categorization
+- Event grouping visualization
+- Status tracking
 
-The system implements specialized workflows for military/law enforcement training management, emphasizing strict hierarchical relationships, performance validation, and command chain communication.
+2. Notification System
+- Role-based notification routing
+- Training event notifications
+- Team-specific alerts
+- Achievement notifications
+
+Domain-Specific Patterns:
+- Dual-mode training (Grouping vs Achievement)
+- Military hierarchy implementation
+- Complex drill validation rules
+- Squad-based organization model
 
 $END$
 

@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { Crosshair, Plus, Target, Trash2 } from 'lucide-react-native';
+import { Plus, Target, Trash2 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -49,7 +49,8 @@ function DrillItem({
   colors: ReturnType<typeof useColors>;
   onRemove: () => void;
 }) {
-  const isPaper = drill.target_type === 'paper';
+  const isGrouping = drill.drill_goal === 'grouping';
+  const goalColor = isGrouping ? '#10B981' : '#93C5FD';
 
   return (
     <Animated.View
@@ -57,14 +58,21 @@ function DrillItem({
       layout={Layout.springify()}
       style={[styles.drillItem, { backgroundColor: colors.card, borderColor: colors.border }]}
     >
-      <View style={[styles.drillItemIcon, { backgroundColor: isPaper ? '#6366F110' : '#F59E0B10' }]}>
-        {isPaper ? <Target size={18} color="#6366F1" /> : <Crosshair size={18} color="#F59E0B" />}
+      <View style={[styles.drillItemIcon, { backgroundColor: `${goalColor}10` }]}>
+        <Target size={18} color={goalColor} />
       </View>
 
       <View style={styles.drillItemContent}>
-        <Text style={[styles.drillItemName, { color: colors.text }]}>{drill.name}</Text>
+        <View style={styles.drillItemHeader}>
+          <Text style={[styles.drillItemName, { color: colors.text }]}>{drill.name}</Text>
+          <View style={[styles.drillItemBadge, { backgroundColor: `${goalColor}15` }]}>
+            <Text style={[styles.drillItemBadgeText, { color: goalColor }]}>
+              {isGrouping ? 'Grouping' : 'Achievement'}
+            </Text>
+          </View>
+        </View>
         <Text style={[styles.drillItemMeta, { color: colors.textMuted }]}>
-          {drill.distance_m}m • {drill.strings_count ?? 1} rounds • {drill.rounds_per_shooter} shots/round
+          {drill.distance_m}m • {drill.rounds_per_shooter} shots
           {drill.time_limit_seconds ? ` • ${drill.time_limit_seconds}s` : ''}
         </Text>
       </View>
@@ -92,7 +100,8 @@ function TemplateChip({
   colors: ReturnType<typeof useColors>;
   onAdd: () => void;
 }) {
-  const isPaper = template.target_type === 'paper';
+  const isGrouping = template.drill_goal === 'grouping';
+  const goalColor = isGrouping ? '#10B981' : '#93C5FD';
 
   return (
     <TouchableOpacity
@@ -100,12 +109,14 @@ function TemplateChip({
       onPress={onAdd}
       activeOpacity={0.7}
     >
-      <View style={[styles.templateChipIcon, { backgroundColor: isPaper ? '#6366F110' : '#F59E0B10' }]}>
-        {isPaper ? <Target size={14} color="#6366F1" /> : <Crosshair size={14} color="#F59E0B" />}
-      </View>
       <Text style={[styles.templateChipName, { color: colors.text }]} numberOfLines={1}>
         {template.name}
       </Text>
+      <View style={[styles.templateChipBadge, { backgroundColor: `${goalColor}15` }]}>
+        <Text style={[styles.templateChipBadgeText, { color: goalColor }]}>
+          {isGrouping ? 'GRP' : 'ACH'}
+        </Text>
+      </View>
       <Plus size={14} color={colors.primary} />
     </TouchableOpacity>
   );
@@ -177,6 +188,7 @@ export default function CreateTrainingScreen() {
       {
         id: Date.now().toString(),
         name: template.name,
+        drill_goal: template.drill_goal,
         target_type: template.target_type,
         distance_m: template.distance_m,
         rounds_per_shooter: template.rounds_per_shooter,
@@ -467,20 +479,25 @@ export default function CreateTrainingScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.templateChipsScroll}
           >
-            {templates.map(template => (
-              <TouchableOpacity
-                key={template.id}
-                style={[styles.quickChip, { backgroundColor: colors.secondary }]}
-                onPress={() => handleAddTemplate(template)}
-              >
-                {template.target_type === 'paper' 
-                  ? <Target size={14} color="#93C5FD" />
-                  : <Crosshair size={14} color={colors.textMuted} />
-                }
-                <Text style={[styles.quickChipText, { color: colors.text }]}>{template.name}</Text>
-                <Plus size={12} color={colors.primary} />
-              </TouchableOpacity>
-            ))}
+            {templates.map(template => {
+              const isGrouping = template.drill_goal === 'grouping';
+              const goalColor = isGrouping ? '#10B981' : '#93C5FD';
+              return (
+                <TouchableOpacity
+                  key={template.id}
+                  style={[styles.quickChip, { backgroundColor: colors.secondary }]}
+                  onPress={() => handleAddTemplate(template)}
+                >
+                  <Text style={[styles.quickChipText, { color: colors.text }]}>{template.name}</Text>
+                  <View style={[styles.quickChipBadge, { backgroundColor: `${goalColor}20` }]}>
+                    <Text style={[styles.quickChipBadgeText, { color: goalColor }]}>
+                      {isGrouping ? 'G' : 'A'}
+                    </Text>
+                  </View>
+                  <Plus size={12} color={colors.primary} />
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
       )}
@@ -637,6 +654,8 @@ const styles = StyleSheet.create({
   templateChipsScroll: { gap: 8, paddingRight: 20 },
   quickChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10 },
   quickChipText: { fontSize: 13, fontWeight: '500' },
+  quickChipBadge: { width: 18, height: 18, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
+  quickChipBadgeText: { fontSize: 10, fontWeight: '700' },
 
   // Template Chip Component
   templateChip: {
@@ -649,8 +668,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginRight: 10,
   },
-  templateChipIcon: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  templateChipName: { fontSize: 14, fontWeight: '500', maxWidth: 120 },
+  templateChipName: { fontSize: 14, fontWeight: '500', maxWidth: 100 },
+  templateChipBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  templateChipBadgeText: { fontSize: 9, fontWeight: '700' },
 
   // Empty Drills
   emptyDrills: { alignItems: 'center', padding: 32, borderRadius: 16, gap: 8, marginBottom: 16 },
@@ -661,9 +681,12 @@ const styles = StyleSheet.create({
   drillsList: { gap: 10, marginBottom: 16 },
   drillItem: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1 },
   drillItemIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  drillItemContent: { flex: 1 },
+  drillItemContent: { flex: 1, gap: 4 },
+  drillItemHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   drillItemName: { fontSize: 15, fontWeight: '600' },
-  drillItemMeta: { fontSize: 13, marginTop: 2 },
+  drillItemBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  drillItemBadgeText: { fontSize: 10, fontWeight: '600' },
+  drillItemMeta: { fontSize: 13 },
   drillItemRemove: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
 
   // Info Card

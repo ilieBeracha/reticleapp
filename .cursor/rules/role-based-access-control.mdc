@@ -1,74 +1,65 @@
 ---
-description: Documentation of military/organizational hierarchy-based access control and permission management system
+description: Defines military-style hierarchical role management and permissions for training management system.
 ---
 
 
 # role-based-access-control
 
-Military Hierarchy Permission System (Importance Score: 95/100)
+Military-style hierarchical permission system with strictly defined roles and access levels:
 
-Core Role Structure:
-- owner: Full system access and organizational control
-- commander: Training program management and squad oversight
-- squad_commander: Squad-level training coordination
-- instructor: Training session management and scoring
-- soldier: Basic training participation
-
-Permission Inheritance Chain:
-```
-owner
-  └─ commander
-       └─ squad_commander
-            └─ instructor
-                 └─ soldier
-```
-
-Role-Specific Capabilities:
-1. Owner
-- Create/modify organizational structure
-- Assign commander roles
-- Manage all training programs
-- Access all analytics
+## Role Hierarchy
+1. Owner (Top Level)
+   - Full system access
+   - Can modify all roles below
+   - Organization management capabilities
+   - Importance Score: 95/100
 
 2. Commander
-- Manage squad assignments
-- Create training programs
-- Assign squad commanders
-- View cross-squad analytics
+   - Team-wide training management
+   - Can modify squad commander and soldier roles
+   - Access to all team analytics
+   - Importance Score: 85/100
 
 3. Squad Commander
-- Manage squad members
-- Schedule squad training
-- Assign instructors
-- View squad analytics
+   - Squad-level training coordination
+   - Member management within assigned squad
+   - Training session oversight
+   - Importance Score: 80/100
 
-4. Instructor
-- Create training sessions
-- Score training results
-- Monitor participant progress
-- Generate performance reports
+4. Soldier (Base Level)
+   - Personal training participation
+   - Individual performance tracking
+   - Limited team view access
+   - Importance Score: 70/100
 
-5. Soldier
-- Participate in assigned training
-- View personal progress
-- Access squad schedules
-- Submit training results
+## Permission Implementation 
+Key paths: components/organization/TeamsSection.tsx, services/roleService.ts
 
-Access Control Implementation:
-- Role-based route protection
-- Hierarchical data access filters
-- Command chain validation
-- Squad-level permission boundaries
-- Training program access restrictions
+Core permission rules:
+- Higher ranks can modify/manage lower ranks only
+- Squad-based organization with strict hierarchy
+- Role-specific training capabilities
+- Team-specific calendar and resource access
+- Session management restrictions by role level
 
-Command Chain Rules:
-- Orders flow down through hierarchy
-- Reports flow up through chain
-- Cross-squad actions require commander approval
-- Squad integrity maintenance
-- Role transition validation
+Color-coding system for visual role identification:
+- Owner: Deep Blue (#003366)
+- Commander: Dark Red (#660000)
+- Squad Commander: Forest Green (#006600)
+- Soldier: Standard Gray (#444444)
 
-The system implements strict military command structure principles with hierarchical permission inheritance and clear organizational boundaries. Access control follows traditional military chain of command with specialized rules for training management and performance tracking.
+Team Management Controls:
+- Role assignment validation
+- Squad membership constraints
+- Training schedule access levels
+- Performance metrics visibility
+
+## Critical Business Rules
+1. Single-root organization structure
+2. Hierarchical command chain for approvals
+3. Squad-based member organization
+4. Role-specific training coordination rights
+5. Specialized notification routing by rank
 
 $END$
 

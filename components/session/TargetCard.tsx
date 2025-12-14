@@ -21,15 +21,21 @@ export const TargetCard = React.memo(function TargetCard({
   onPress,
 }: TargetCardProps) {
   const isPaper = target.target_type === 'paper';
+  
+  // Determine target purpose: grouping (consistency) vs achievement (accuracy)
+  const isGroupingTarget = isPaper && target.paper_result?.paper_type === 'grouping';
+  const isAchievementTarget = isPaper && target.paper_result?.paper_type === 'achievement';
 
   // Extract results
   let hits = 0;
   let shots = 0;
+  let dispersionCm: number | null = null;
   const hasImage = isPaper && target.paper_result?.scanned_image_url;
 
   if (isPaper && target.paper_result) {
     hits = target.paper_result.hits_total ?? 0;
     shots = target.paper_result.bullets_fired;
+    dispersionCm = target.paper_result.dispersion_cm;
   } else if (!isPaper && target.tactical_result) {
     hits = target.tactical_result.hits;
     shots = target.tactical_result.bullets_fired;
@@ -64,14 +70,22 @@ export const TargetCard = React.memo(function TargetCard({
 
       {/* Content */}
       <View style={styles.content}>
-        {/* Main line: hits/shots */}
+        {/* Main line: different display for grouping vs achievement */}
         <View style={styles.header}>
           {hasResult ? (
-            <Text style={styles.title}>{hits}/{shots} hits</Text>
+            isGroupingTarget ? (
+              // Grouping: show shot count and dispersion
+              <Text style={styles.title}>
+                {shots} shots{dispersionCm != null ? ` • ${dispersionCm.toFixed(1)}cm` : ''}
+              </Text>
+            ) : (
+              // Achievement/Tactical: show hits
+              <Text style={styles.title}>{hits}/{shots} hits</Text>
+            )
           ) : (
             <Text style={styles.title}>No result</Text>
           )}
-          {hasImage && !target.paper_result?.scanned_image_url && (
+          {hasImage && (
             <View style={styles.imageTag}>
               <Ionicons name="image" size={12} color="#fff" />
             </View>
@@ -80,8 +94,8 @@ export const TargetCard = React.memo(function TargetCard({
 
         {/* Meta line */}
         <View style={styles.meta}>
-          <Text style={[styles.typeTag, isPaper ? styles.typeTagPaper : styles.typeTagTactical]}>
-            {isPaper ? 'Paper' : 'Tactical'}
+          <Text style={[styles.typeTag, isGroupingTarget ? styles.typeTagGrouping : (isAchievementTarget ? styles.typeTagAchievement : styles.typeTagTactical)]}>
+            {isGroupingTarget ? 'Grouping' : (isAchievementTarget ? 'Achievement' : (isPaper ? 'Paper' : 'Tactical'))}
           </Text>
           {laneInfo && (
             <>
@@ -204,7 +218,11 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     overflow: 'hidden',
   },
-  typeTagPaper: {
+  typeTagGrouping: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    color: '#34D399',
+  },
+  typeTagAchievement: {
     backgroundColor: 'rgba(59, 130, 246, 0.2)',
     color: '#60A5FA',
   },

@@ -2,10 +2,10 @@ import {
   shouldSubmitForTraining,
   submitTrainingData,
   TrainingDataPayload,
+  uploadScannedTargetImage,
 } from "@/services/detectionService";
 import {
   addTargetWithPaperResult,
-  addTargetWithTacticalResult,
   PaperType,
 } from "@/services/sessionService";
 import { useDetectionStore } from "@/store/detectionStore";
@@ -20,16 +20,17 @@ import { Alert } from "react-native";
 import {
   CameraFlow,
   EditableDetection,
+  InputMethod,
+  ManualAchievementEntry,
   ResultCard,
   Step,
-  TacticalResultsEntry,
   TargetForm,
   TargetType,
 } from "@/components/addTarget";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ADD TARGET SHEET
-// Main orchestrator component for adding targets to a session
+// Main orchestrator for adding targets with Grouping vs Achievement selection
 // ═══════════════════════════════════════════════════════════════════════════
 
 export default function AddTargetSheet() {
@@ -57,93 +58,46 @@ export default function AddTargetSheet() {
     setError,
   } = useDetectionStore();
 
-  // Navigation state - skip form for paper targets, go directly to camera
-  const [step, setStep] = useState<Step>(
-    (defaultTargetType as TargetType) === "paper" ? "camera" : "form"
-  );
+  // Navigation state
+  const [step, setStep] = useState<Step>("form");
   const [saving, setSaving] = useState(false);
   const [capturedUri, setCapturedUri] = useState<string | null>(null);
 
-  // Form state
+  // Form state - NEW: Grouping vs Achievement
   const [targetType, setTargetType] = useState<TargetType>(
-    (defaultTargetType as TargetType) || "paper"
+    (defaultTargetType as TargetType) || "grouping"
   );
-  const [selectedDistance, setSelectedDistance] = useState<number | null>(
+  const [inputMethod, setInputMethod] = useState<InputMethod>("scan");
+  
+  // Distance state (used for scanned targets)
+  const [selectedDistance, setSelectedDistance] = useState<number>(
     defaultDistance ? parseInt(defaultDistance) : 100
   );
-  const [customDistance, setCustomDistance] = useState("");
-  const [selectedBullets, setSelectedBullets] = useState<number | null>(5);
-  const [customBullets, setCustomBullets] = useState("");
-  const [laneNumber, setLaneNumber] = useState("");
-  
-  // Tactical results state
-  const [tacticalHits, setTacticalHits] = useState("");
-  const [tacticalTime, setTacticalTime] = useState("");
-  const [stageCleared, setStageCleared] = useState(false);
-  const [tacticalNotes, setTacticalNotes] = useState("");
-  
-  // Paper results state
-  const [paperType] = useState<PaperType>("grouping");
-  const [paperNotes] = useState("");
 
-  // Editable detections state
+  // Editable detections state (for scan results)
   const [editedDetections, setEditedDetections] = useState<EditableDetection[]>([]);
 
-  // Auto-start camera capture when landing on camera step directly
+  // Auto-start camera if defaulting to grouping (scan-only)
   useEffect(() => {
-    if (step === "camera" && targetType === "paper") {
-      // Request camera permission if needed
-      const initCamera = async () => {
-        if (!permission?.granted) {
-          const { granted } = await requestPermission();
-          if (!granted) {
-            Alert.alert("Camera Permission", "Camera access is required to scan paper targets.");
-            router.back();
-            return;
-          }
-        }
-        startCapture();
-      };
-      initCamera();
+    if (defaultTargetType === "grouping") {
+      handleStartCamera();
     }
   }, []);
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // COMPUTED VALUES
-  // ═══════════════════════════════════════════════════════════════════════════
-  
-  const effectiveDistance = customDistance ? parseInt(customDistance) : selectedDistance ?? 100;
-  const effectiveBullets = customBullets ? parseInt(customBullets) : selectedBullets ?? 5;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLERS
   // ═══════════════════════════════════════════════════════════════════════════
 
   const handleTargetTypeChange = useCallback((type: TargetType) => {
-    Haptics.selectionAsync();
     setTargetType(type);
+    // Reset input method when changing target type
+    if (type === "grouping") {
+      setInputMethod("scan"); // Grouping is always scan
+    }
   }, []);
 
-  const handleDistanceSelect = useCallback((distance: number) => {
-    Haptics.selectionAsync();
-    setSelectedDistance(distance);
-    setCustomDistance("");
-  }, []);
-
-  const handleBulletsSelect = useCallback((bullets: number) => {
-    Haptics.selectionAsync();
-    setSelectedBullets(bullets);
-    setCustomBullets("");
-  }, []);
-
-  const handleCustomDistanceChange = useCallback((text: string) => {
-    setCustomDistance(text);
-    if (text) setSelectedDistance(null);
-  }, []);
-
-  const handleCustomBulletsChange = useCallback((text: string) => {
-    setCustomBullets(text);
-    if (text) setSelectedBullets(null);
+  const handleInputMethodChange = useCallback((method: InputMethod) => {
+    setInputMethod(method);
   }, []);
 
   const handleClose = useCallback(() => {
@@ -152,6 +106,18 @@ export default function AddTargetSheet() {
     router.back();
   }, [resetDetection]);
 
+  const handleStartCamera = useCallback(async () => {
+    if (!permission?.granted) {
+      const { granted } = await requestPermission();
+      if (!granted) {
+        Alert.alert("Camera Permission", "Camera access is required to scan targets.");
+        return;
+      }
+    }
+    startCapture();
+    setStep("camera");
+  }, [permission, requestPermission, startCapture]);
+
   // ═══════════════════════════════════════════════════════════════════════════
   // FORM SUBMISSION
   // ═══════════════════════════════════════════════════════════════════════════
@@ -159,49 +125,34 @@ export default function AddTargetSheet() {
   const handleSubmit = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    if (targetType === "paper") {
-      // Open camera for paper targets
-      if (!permission?.granted) {
-        const { granted } = await requestPermission();
-        if (!granted) {
-          Alert.alert("Camera Permission", "Camera access is required to scan paper targets.");
-          return;
-        }
+    if (targetType === "grouping") {
+      // Grouping: always scan
+      await handleStartCamera();
+    } else if (targetType === "achievement") {
+      if (inputMethod === "scan") {
+        // Achievement + Scan: open camera
+        await handleStartCamera();
+      } else {
+        // Achievement + Manual: go to manual entry form
+        setStep("manual_entry");
       }
-      startCapture();
-      setStep("camera");
-    } else {    
-      // Tactical: validate and go to results entry
-      if (!effectiveDistance || effectiveDistance <= 0) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        Alert.alert("Invalid Distance", "Please enter a valid distance.");
-        return;
-      }
-
-      if (!effectiveBullets || effectiveBullets <= 0) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        Alert.alert("Invalid Bullets", "Please enter a valid number of bullets.");
-        return;
-      }
-
-      setStep("tactical_results");
     }
-  }, [targetType, effectiveDistance, effectiveBullets, permission, requestPermission, startCapture]);
+  }, [targetType, inputMethod, handleStartCamera]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CAMERA HANDLERS
   // ═══════════════════════════════════════════════════════════════════════════
 
   const handlePickImage = useCallback(async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
+    const pickerResult = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsEditing: false,
       quality: 0.9,
     });
 
-    if (!result.canceled && result.assets[0]?.uri) {
-      setCapturedUri(result.assets[0].uri);
-      setImage(result.assets[0].uri);
+    if (!pickerResult.canceled && pickerResult.assets[0]?.uri) {
+      setCapturedUri(pickerResult.assets[0].uri);
+      setImage(pickerResult.assets[0].uri);
       setStep("preview");
     }
   }, [setImage]);
@@ -267,24 +218,28 @@ export default function AddTargetSheet() {
   // SAVE HANDLERS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const savePaperTarget = useCallback(
+  /**
+   * Save a scanned target (Grouping or Achievement+Scan)
+   * Both use paper_target_results with appropriate paper_type
+   */
+  const saveScannedTarget = useCallback(
     async (finalDetections: EditableDetection[], editedImageBase64?: string) => {
-    if (!sessionId) {
-      Alert.alert("Error", "Session ID missing");
-      return;
-    }
+      if (!sessionId) {
+        Alert.alert("Error", "Session ID missing");
+        return;
+      }
 
-    setSaving(true);
+      setSaving(true);
 
-    try {
-      // Calculate stats from edited detections
-      const detectionCount = finalDetections.length;
+      try {
+        const detectionCount = finalDetections.length;
         const rawHighConfHits = finalDetections.filter(
           (d) => d.isManual || d.confidence >= 0.6
         ).length;
-        // Cap hits to not exceed bullets fired
-        const highConfHits = Math.min(rawHighConfHits, effectiveBullets);
         const manualCount = finalDetections.filter((d) => d.isManual).length;
+
+        // Determine paper_type based on target type selection
+        const paperType: PaperType = targetType === "grouping" ? "grouping" : "achievement";
 
         // Build training data if user made corrections
         const trainingData =
@@ -312,27 +267,37 @@ export default function AddTargetSheet() {
         // Get group size from overall_stats_mm (furthest distance between any 2 bullets)
         const groupSizeCm = result?.overall_stats_mm?.max_pair?.distance_cm ?? null;
 
+        // Upload image to Supabase Storage
+        let scannedImageUrl: string | null = null;
+        if (finalImageBase64) {
+          console.log("[AddTarget] Uploading scanned target image to storage...");
+          scannedImageUrl = await uploadScannedTargetImage(finalImageBase64, sessionId);
+          if (!scannedImageUrl) {
+            console.warn("[AddTarget] Failed to upload image, saving without image");
+          }
+        }
+
+        // For grouping targets, we don't track hits - only dispersion
+        // For achievement targets, we track both
         const saveParams = {
           session_id: sessionId,
-          distance_m: effectiveDistance,
-          lane_number: laneNumber ? parseInt(laneNumber) : null,
-          planned_shots: effectiveBullets,
-          notes: paperNotes || null,
+          distance_m: selectedDistance,
+          lane_number: null,
+          planned_shots: detectionCount, // Use detection count as bullets
+          notes: null,
           target_data: null,
           paper_type: paperType,
-          bullets_fired: effectiveBullets,
-          hits_total: Math.min(detectionCount, effectiveBullets),
-          hits_inside_scoring: highConfHits,
-          dispersion_cm: groupSizeCm, // Group size = max distance between any 2 bullets
-          scanned_image_url: finalImageBase64
-            ? `data:image/jpeg;base64,${finalImageBase64}`
-            : null,
-          result_notes: paperNotes || null,
+          bullets_fired: detectionCount,
+          // For grouping: hits don't matter, set to detection count
+          // For achievement: use high confidence hits
+          hits_total: paperType === "grouping" ? detectionCount : Math.min(rawHighConfHits, detectionCount),
+          hits_inside_scoring: paperType === "grouping" ? null : rawHighConfHits,
+          dispersion_cm: groupSizeCm,
+          scanned_image_url: scannedImageUrl,
+          result_notes: null,
         };
 
-     
-
-        const savedTarget = await addTargetWithPaperResult(saveParams);
+        await addTargetWithPaperResult(saveParams);
 
         // Submit corrections for model training (fire-and-forget)
         if (trainingData && shouldSubmitForTraining(trainingData as TrainingDataPayload)) {
@@ -341,132 +306,105 @@ export default function AddTargetSheet() {
             .catch((err) => console.log("[Training] Failed:", err));
         }
 
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      resetDetection();
-      router.back();
-    } catch (error: any) {
-      console.error("Failed to add paper target:", error);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Error", error.message || "Failed to add target");
-      setSaving(false);
-    }
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        resetDetection();
+        router.back();
+      } catch (error: any) {
+        console.error("Failed to save scanned target:", error);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert("Error", error.message || "Failed to save target");
+        setSaving(false);
+      }
     },
-    [sessionId, effectiveDistance, effectiveBullets, laneNumber, result, paperType, paperNotes, resetDetection]
+    [sessionId, selectedDistance, targetType, result, resetDetection]
   );
 
-  const saveTacticalTarget = useCallback(async () => {
-    if (!sessionId) {
-      Alert.alert("Error", "Session ID missing");
-      return;
-    }
+  /**
+   * Save a manually entered achievement target
+   */
+  const saveManualAchievement = useCallback(
+    async (data: { bulletsFired: number; hits: number; distance: number }) => {
+      if (!sessionId) {
+        Alert.alert("Error", "Session ID missing");
+        return;
+      }
 
-    const hits = parseInt(tacticalHits) || 0;
-    const bulletsFired = effectiveBullets;
+      setSaving(true);
 
-    if (hits > bulletsFired) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert("Invalid Hits", "Hits cannot exceed rounds fired.");
-      return;
-    }
+      try {
+        // Manual achievement: paper_type = 'achievement', no image
+        const saveParams = {
+          session_id: sessionId,
+          distance_m: data.distance,
+          lane_number: null,
+          planned_shots: data.bulletsFired,
+          notes: null,
+          target_data: null,
+          paper_type: "achievement" as PaperType,
+          bullets_fired: data.bulletsFired,
+          hits_total: data.hits,
+          hits_inside_scoring: data.hits,
+          dispersion_cm: null, // No dispersion for manual entry
+          scanned_image_url: null, // No image for manual entry
+          result_notes: null,
+        };
 
-    setSaving(true);
+        await addTargetWithPaperResult(saveParams);
 
-    try {
-      await addTargetWithTacticalResult({
-        session_id: sessionId,
-        distance_m: effectiveDistance,
-        lane_number: laneNumber ? parseInt(laneNumber) : null,
-        planned_shots: effectiveBullets,
-        bullets_fired: bulletsFired,
-        hits: hits,
-        is_stage_cleared: stageCleared,
-        time_seconds: tacticalTime ? parseFloat(tacticalTime) : null,
-        result_notes: tacticalNotes || null,
-      });
-
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      resetDetection();
-      router.back();
-    } catch (error: any) {
-      console.error("Failed to add tactical target:", error);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Error", error.message || "Failed to add target");
-      setSaving(false);
-    }
-  }, [
-    sessionId,
-    effectiveDistance,
-    effectiveBullets,
-    laneNumber,
-    tacticalHits,
-    tacticalTime,
-    stageCleared,
-    tacticalNotes,
-    resetDetection,
-  ]);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        resetDetection();
+        router.back();
+      } catch (error: any) {
+        console.error("Failed to save manual achievement:", error);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert("Error", error.message || "Failed to save target");
+        setSaving(false);
+      }
+    },
+    [sessionId, resetDetection]
+  );
 
   // ═══════════════════════════════════════════════════════════════════════════
   // RENDER
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // Results view
+  // Results view (after scanning)
   if (step === "results" && result) {
-  return (
-        <ResultCard 
-          result={result} 
-          onDone={savePaperTarget} 
-          onRetake={handleRetake} 
-          saving={saving}
-          editedDetections={editedDetections}
-          onDetectionsChange={setEditedDetections}
-        distance={effectiveDistance}
-        onDistanceChange={(d) => {
-          setSelectedDistance(d);
-          setCustomDistance("");
-        }}
+    return (
+      <ResultCard 
+        result={result} 
+        onDone={saveScannedTarget} 
+        onRetake={handleRetake} 
+        saving={saving}
+        editedDetections={editedDetections}
+        onDetectionsChange={setEditedDetections}
+        distance={selectedDistance}
+        onDistanceChange={setSelectedDistance}
+        targetType={targetType}
       />
     );
   }
 
-  // Tactical results entry
-  if (step === "tactical_results") {
+  // Manual entry view (Achievement + Manual)
+  if (step === "manual_entry") {
     return (
-        <TacticalResultsEntry
-          distance={effectiveDistance}
-          plannedRounds={effectiveBullets}
-          hits={tacticalHits}
-          setHits={setTacticalHits}
-          time={tacticalTime}
-          setTime={setTacticalTime}
-          stageCleared={stageCleared}
-          setStageCleared={setStageCleared}
-          notes={tacticalNotes}
-          setNotes={setTacticalNotes}
-          onSave={saveTacticalTarget}
-          onBack={() => setStep("form")}
-          saving={saving}
-        />
+      <ManualAchievementEntry
+        onSave={saveManualAchievement}
+        onBack={() => setStep("form")}
+        saving={saving}
+        defaultDistance={selectedDistance}
+      />
     );
   }
 
-  // Default: Target form
+  // Default: Target form + Camera flow
   return (
     <>
       <TargetForm
         targetType={targetType}
         onTargetTypeChange={handleTargetTypeChange}
-        selectedDistance={selectedDistance}
-        onDistanceSelect={handleDistanceSelect}
-        customDistance={customDistance}
-        onCustomDistanceChange={handleCustomDistanceChange}
-        selectedBullets={selectedBullets}
-        onBulletsSelect={handleBulletsSelect}
-        customBullets={customBullets}
-        onCustomBulletsChange={handleCustomBulletsChange}
-        laneNumber={laneNumber}
-        onLaneNumberChange={setLaneNumber}
-        effectiveDistance={effectiveDistance}
-        effectiveBullets={effectiveBullets}
+        inputMethod={inputMethod}
+        onInputMethodChange={handleInputMethodChange}
         onSubmit={handleSubmit}
         onClose={handleClose}
         saving={saving}

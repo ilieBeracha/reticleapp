@@ -48,6 +48,8 @@ export async function createDrillTemplate(
       created_by: user.id,
       name: input.name,
       description: input.description || null,
+      // === PRIMARY CLASSIFICATION ===
+      drill_goal: input.drill_goal,
       // === BASIC CONFIG ===
       target_type: input.target_type,
       distance_m: input.distance_m,
@@ -148,6 +150,7 @@ export async function deleteDrillTemplate(templateId: string): Promise<void> {
 export function templateToDrillInput(template: DrillTemplate) {
   return {
     name: template.name,
+    drill_goal: template.drill_goal,
     target_type: template.target_type,
     distance_m: template.distance_m,
     rounds_per_shooter: template.rounds_per_shooter,

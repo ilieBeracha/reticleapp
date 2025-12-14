@@ -6,37 +6,37 @@
  */
 import { useColors } from '@/hooks/ui/useColors';
 import {
-  calculateSessionStats,
-  getSessionById,
-  getSessionTargetsWithResults,
-  type SessionStats,
-  type SessionTargetWithResults,
-  type SessionWithDetails,
+    calculateSessionStats,
+    getSessionById,
+    getSessionTargetsWithResults,
+    type SessionStats,
+    type SessionTargetWithResults,
+    type SessionWithDetails,
 } from '@/services/sessionService';
 import { format, intervalToDuration } from 'date-fns';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
-  Award,
-  Calendar,
-  ChevronRight,
-  Clock,
-  Crosshair,
-  Target,
-  TrendingUp,
-  Users,
-  Zap,
+    Award,
+    Calendar,
+    ChevronRight,
+    Clock,
+    Crosshair,
+    Target,
+    TrendingUp,
+    Users,
+    Zap,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Dimensions,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Dimensions,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -89,6 +89,8 @@ export default function SessionDetailScreen() {
         sequence: t.sequence_in_session,
         hits: t.paper_result?.hits_total ?? 0,
         shots: t.paper_result?.bullets_fired ?? 0,
+        isGrouping: t.paper_result?.paper_type === 'grouping',
+        dispersion: t.paper_result?.dispersion_cm,
       }));
   }, [targets]);
 
@@ -274,7 +276,10 @@ export default function SessionDetailScreen() {
                   <View style={styles.imageOverlay}>
                     <Text style={styles.imageLabel}>#{img.sequence || index + 1}</Text>
                     <Text style={styles.imageHits}>
-                      {img.hits}/{img.shots}
+                      {img.isGrouping 
+                        ? (img.dispersion != null ? `${img.dispersion.toFixed(1)}cm` : `${img.shots} shots`)
+                        : `${img.hits}/${img.shots}`
+                      }
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -293,7 +298,13 @@ export default function SessionDetailScreen() {
                 const result = isPaper ? target.paper_result : target.tactical_result;
                 const shots = result?.bullets_fired;
                 const hits = isPaper ? target.paper_result?.hits_total : target.tactical_result?.hits;
-                const accuracy = shots && hits ? Math.round((hits / shots) * 100) : null;
+                
+                // Determine if this is a grouping or achievement target
+                const isGroupingTarget = isPaper && target.paper_result?.paper_type === 'grouping';
+                const dispersion = target.paper_result?.dispersion_cm;
+                
+                // Only calculate accuracy for achievement/tactical targets
+                const accuracy = !isGroupingTarget && shots && hits ? Math.round((hits / shots) * 100) : null;
 
                 return (
                   <View key={target.id} style={styles.timelineItem}>
@@ -303,7 +314,7 @@ export default function SessionDetailScreen() {
                     )}
 
                     {/* Dot */}
-                    <View style={[styles.timelineDot, { backgroundColor: colors.indigo }]}>
+                    <View style={[styles.timelineDot, { backgroundColor: isGroupingTarget ? colors.green : colors.indigo }]}>
                       <Text style={styles.timelineDotText}>{index + 1}</Text>
                     </View>
 
@@ -315,13 +326,13 @@ export default function SessionDetailScreen() {
                         <View
                           style={[
                             styles.targetTypeBadge,
-                            { backgroundColor: isPaper ? `${colors.indigo}22` : `${colors.orange}22` },
+                            { backgroundColor: isGroupingTarget ? `${colors.green}22` : (isPaper ? `${colors.indigo}22` : `${colors.orange}22`) },
                           ]}
                         >
                           <Text
-                            style={[styles.targetTypeText, { color: isPaper ? colors.indigo : colors.orange }]}
+                            style={[styles.targetTypeText, { color: isGroupingTarget ? colors.green : (isPaper ? colors.indigo : colors.orange) }]}
                           >
-                            {isPaper ? 'Paper' : 'Tactical'}
+                            {isGroupingTarget ? 'Grouping' : (isPaper ? 'Achievement' : 'Tactical')}
                           </Text>
                         </View>
                         {target.distance_m && (
@@ -337,25 +348,40 @@ export default function SessionDetailScreen() {
                             <Text style={[styles.timelineStatValue, { color: colors.text }]}>{shots || 0}</Text>
                             <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>shots</Text>
                           </View>
-                          <View style={styles.timelineStat}>
-                            <Text style={[styles.timelineStatValue, { color: colors.text }]}>{hits || 0}</Text>
-                            <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>hits</Text>
-                          </View>
-                          {accuracy !== null && (
-                            <View style={styles.timelineStat}>
-                              <Text
-                                style={[
-                                  styles.timelineStatValue,
-                                  {
-                                    color:
-                                      accuracy >= 70 ? colors.green : accuracy >= 50 ? colors.orange : colors.red,
-                                  },
-                                ]}
-                              >
-                                {accuracy}%
-                              </Text>
-                              <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>acc</Text>
-                            </View>
+                          
+                          {/* Grouping: show dispersion instead of hits/accuracy */}
+                          {isGroupingTarget ? (
+                            dispersion != null && (
+                              <View style={styles.timelineStat}>
+                                <Text style={[styles.timelineStatValue, { color: colors.green }]}>
+                                  {dispersion.toFixed(1)}cm
+                                </Text>
+                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>group</Text>
+                              </View>
+                            )
+                          ) : (
+                            <>
+                              <View style={styles.timelineStat}>
+                                <Text style={[styles.timelineStatValue, { color: colors.text }]}>{hits || 0}</Text>
+                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>hits</Text>
+                              </View>
+                              {accuracy !== null && (
+                                <View style={styles.timelineStat}>
+                                  <Text
+                                    style={[
+                                      styles.timelineStatValue,
+                                      {
+                                        color:
+                                          accuracy >= 70 ? colors.green : accuracy >= 50 ? colors.orange : colors.red,
+                                      },
+                                    ]}
+                                  >
+                                    {accuracy}%
+                                  </Text>
+                                  <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>acc</Text>
+                                </View>
+                              )}
+                            </>
                           )}
                         </View>
                       )}

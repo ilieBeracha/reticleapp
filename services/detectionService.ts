@@ -37,7 +37,7 @@ export interface TrainingDataPayload {
   };
 }
 
-// Storage bucket name for training images
+// Storage bucket name (shared for all detection-related images)
 const TRAINING_BUCKET = "training-corrections";
   
   const API_URL = process.env.EXPO_PUBLIC_DETECT_BASE_URL || ""; // your FastAPI endpoint
@@ -410,6 +410,55 @@ async function uploadTrainingImage(
     return urlData.publicUrl;
   } catch (err: any) {
     console.warn("[Storage] Upload error:", err.message);
+    return null;
+  }
+}
+
+/**
+ * Upload a scanned target image to Supabase Storage
+ * @param base64Image - Base64 encoded image (with or without data URI prefix)
+ * @param sessionId - The session ID for organizing images
+ * @returns Public URL of the uploaded image, or null if upload failed
+ */
+export async function uploadScannedTargetImage(
+  base64Image: string,
+  sessionId: string
+): Promise<string | null> {
+  try {
+    // Strip data URI prefix if present
+    const base64Data = base64Image.includes(",")
+      ? base64Image.split(",")[1]
+      : base64Image;
+
+    // Convert base64 to ArrayBuffer
+    const arrayBuffer = decode(base64Data);
+
+    // Generate unique filename
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const filename = `${sessionId}/${timestamp}.jpg`;
+
+    // Upload to Supabase Storage (using same bucket as training, different folder)
+    const { data, error } = await supabase.storage
+      .from(TRAINING_BUCKET)
+      .upload(`targets/${filename}`, arrayBuffer, {
+        contentType: "image/jpeg",
+        upsert: false,
+      });
+
+    if (error) {
+      console.warn("[Storage] Scanned target upload failed:", error.message);
+      return null;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from(TRAINING_BUCKET)
+      .getPublicUrl(`targets/${filename}`);
+
+    console.log("[Storage] Scanned target uploaded:", urlData.publicUrl);
+    return urlData.publicUrl;
+  } catch (err: any) {
+    console.warn("[Storage] Scanned target upload error:", err.message);
     return null;
   }
 }

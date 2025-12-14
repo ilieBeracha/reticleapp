@@ -1,67 +1,52 @@
 ---
-description: Defines core training session data models, validation rules and progression tracking for military/law enforcement training management
+description: Documentation for training session model structure, states, validation and drill tracking components
 ---
 
 
 # training-session-model
 
-Core Training Session Model Implementation
+The training session model implements specialized tracking of shooting drills and progression states:
 
-1. Session State Machine (Importance Score: 95)
-- States: planned -> ongoing -> finished/cancelled
-- Validation rules for state transitions
-- Required fields per state
-- Completion criteria enforcement
+## Core Session States
+1. Training Session Management (Importance: 90)
+- States: planned, ongoing, completed, cancelled
+- Supports dual-mode drills: grouping and achievement targets
+- Tracks drill completion criteria including rounds fired, accuracy thresholds
+- Validates time limits and required shooting positions
 
-2. Drill Progress Tracking (Importance Score: 90) 
-- Individual drill completion status
-- Accuracy requirements validation
-- Time-based completion rules
-- Sequential progression enforcement
+2. Drill Progression System (Importance: 85)
+- Maps sequential drill requirements and dependencies 
+- Enforces drill prerequisites and unlocking conditions
+- Tracks performance metrics per drill type
+- Manages drill template configurations and parameters
 
-3. Session Types
-- Paper Target Training
-  - Group size calculations
-  - Shot pattern analysis
-  - Distance-based scoring
-- Tactical Training
-  - Stage completion tracking
-  - Hit/miss ratio requirements
-  - Time-based performance metrics
+3. Session Validation Workflows (Importance: 80)
+- Enforces completion requirements per drill type:
+  - Grouping: Shot dispersion metrics
+  - Achievement: Accuracy percentages and hit counts
+- Validates time constraints and position requirements
+- Processes drill-specific scoring rules
 
-4. Validation Rules
-- Minimum accuracy thresholds
-- Maximum completion times
-- Required drill sequences
-- Participant prerequisites
+## Session Statistics
+- Real-time progress calculations against requirements
+- Aggregated completion rates across drill sequences
+- Distance-based performance categorization
+- Achievement vs grouping success ratios
 
-5. Core Data Model
-```
-TrainingSession {
-  id: string
-  status: SessionStatus
-  type: SessionType
-  startTime: DateTime
-  endTime: DateTime?
-  drills: DrillProgress[]
-  participants: Participant[]
-  requirements: CompletionRequirements
-  metrics: SessionMetrics
-}
-```
+## Data Models
+1. TrainingSession
+- status: SessionStatus
+- drillProgression: DrillProgress[]
+- completionMetrics: CompletionStats
+- validationRules: ValidationConfig
 
-6. Progress Tracking
-- Per-participant completion status
-- Drill sequence validation
-- Cumulative accuracy calculations
-- Time-based performance metrics
+2. DrillProgress
+- drillType: 'grouping' | 'achievement'
+- requirements: DrillRequirements
+- completionState: CompletionState
+- validationResults: ValidationResult[]
 
-Key Business Rules:
-- Sessions must follow planned -> ongoing -> finished progression
-- Drills must be completed in defined sequence
-- Minimum accuracy requirements per drill type
-- Maximum time limits for tactical drills
-- Required participant roles for group sessions
+The model emphasizes strict progression tracking and validation workflows specific to firearms training scenarios, with particular focus on different drill types and their completion criteria.
 
 $END$
 
