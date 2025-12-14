@@ -1,6 +1,5 @@
 import { useColors } from '@/hooks/ui/useColors';
 import { getMyActivePersonalSession } from '@/services/sessionService';
-import { useSessionStore } from '@/store/sessionStore';
 import { Button, ContextMenu, Host } from '@expo/ui/swift-ui';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
@@ -8,12 +7,12 @@ import { router } from 'expo-router';
 import { Bell, Plus } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Image,
-  Platform,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Image,
+    Platform,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
 interface HeaderProps {
@@ -31,7 +30,6 @@ interface HeaderProps {
 export function Header({ onNotificationPress }: HeaderProps) {
   const colors = useColors();
   const [notificationCount, setNotificationCount] = useState(0);
-  const { createSession } = useSessionStore();
 
   // Fetch pending notification count
   useEffect(() => {
@@ -52,17 +50,18 @@ export function Header({ onNotificationPress }: HeaderProps) {
   const handleStartSession = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
+      // Check for existing active session first
       const existing = await getMyActivePersonalSession();
       if (existing) {
         router.push(`/(protected)/activeSession?sessionId=${existing.id}` as any);
         return;
       }
-      const newSession = await createSession({ session_mode: 'solo' });
-      router.push(`/(protected)/activeSession?sessionId=${newSession.id}` as any);
+      // Drill-first: route to drill selection screen
+      router.push('/(protected)/createSession' as any);
     } catch (error) {
       console.error('Failed to start session:', error);
     }
-  }, [createSession]);
+  }, []);
 
   const handleCreateTraining = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

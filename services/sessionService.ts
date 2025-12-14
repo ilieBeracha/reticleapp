@@ -10,8 +10,17 @@ export interface CreateSessionParams {
   team_id?: string | null;        // NULL for personal, UUID for team
   training_id?: string | null;    // Link session to a training
   drill_id?: string | null;       // Link session to a specific drill
-  drill_template_id?: string | null; // NEW: For quick practice from template
+  drill_template_id?: string | null; // For quick practice from template
   session_mode?: 'solo' | 'group';
+  // Custom drill config for quick practice (inline, no template)
+  custom_drill_config?: {
+    name: string;
+    drill_goal: 'grouping' | 'achievement';
+    target_type: 'paper' | 'tactical';
+    distance_m: number;
+    rounds_per_shooter: number;
+    time_limit_seconds?: number | null;
+  };
 }
 
 /** Drill configuration embedded in session */
@@ -82,18 +91,19 @@ function mapSession(row: any): SessionWithDetails {
   const trainings = row.trainings ?? {};
   const drills = row.training_drills ?? {};
   const drillTemplate = row.drill_templates ?? {};
+  const customConfig = row.custom_drill_config;
 
-  // Build drill config from training_drills OR drill_templates (for quick practice)
+  // Build drill config from training_drills, drill_templates, OR custom_drill_config
   let drillConfig: SessionDrillConfig | null = null;
   
-  // Priority: training_drills > drill_templates
+  // Priority: training_drills > drill_templates > custom_drill_config
   const drillSource = drills.id ? drills : (drillTemplate.id ? drillTemplate : null);
   
   if (drillSource) {
     drillConfig = {
       id: drillSource.id,
       name: drillSource.name,
-      drill_goal: drillSource.drill_goal ?? 'achievement', // Default to achievement for backward compat
+      drill_goal: drillSource.drill_goal ?? 'achievement',
       target_type: drillSource.target_type,
       distance_m: drillSource.distance_m,
       rounds_per_shooter: drillSource.rounds_per_shooter,
@@ -115,10 +125,37 @@ function mapSession(row: any): SessionWithDetails {
       instructions: drillSource.instructions ?? null,
       safety_notes: drillSource.safety_notes ?? null,
     };
+  } else if (customConfig) {
+    // Use custom drill config (inline, no template)
+    drillConfig = {
+      id: 'custom',
+      name: customConfig.name ?? 'Quick Practice',
+      drill_goal: customConfig.drill_goal ?? 'grouping',
+      target_type: customConfig.target_type ?? 'paper',
+      distance_m: customConfig.distance_m ?? 25,
+      rounds_per_shooter: customConfig.rounds_per_shooter ?? 5,
+      time_limit_seconds: customConfig.time_limit_seconds ?? null,
+      par_time_seconds: null,
+      scoring_mode: null,
+      min_accuracy_percent: null,
+      target_count: null,
+      target_size: null,
+      shots_per_target: null,
+      position: null,
+      start_position: null,
+      weapon_category: null,
+      strings_count: null,
+      reload_required: null,
+      movement_type: null,
+      difficulty: null,
+      category: null,
+      instructions: null,
+      safety_notes: null,
+    };
   }
 
-  // Determine drill name: prefer training_drills, then drill_templates
-  const drillName = drills.name ?? drillTemplate.name ?? null;
+  // Determine drill name: prefer training_drills > drill_templates > custom
+  const drillName = drills.name ?? drillTemplate.name ?? customConfig?.name ?? null;
 
   return {
     id: row.id,
@@ -141,16 +178,29 @@ function mapSession(row: any): SessionWithDetails {
 }
 
 /**
- * Create a new session - supports both personal and org sessions
- * Can be linked to a training and/or drill
+ * Create a new session - DRILL-FIRST architecture
  * 
- * IMPORTANT: If joining a training, checks for existing active session first
+ * Every session MUST have a drill configuration:
+ * - drill_id: For training drills (from a scheduled training)
+ * - drill_template_id: For quick practice (from drill library)
+ * - custom_drill_config: For quick/custom drill (inline config)
+ * 
+ * The session's configuration is determined by the drill parameters.
  */
 export async function createSession(params: CreateSessionParams): Promise<SessionWithDetails> {
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) {
     throw new Error('Not authenticated');
+  }
+
+  // DRILL-FIRST: Every session must have a drill source
+  const hasCustomConfig = params.custom_drill_config && 
+    params.custom_drill_config.distance_m > 0 && 
+    params.custom_drill_config.rounds_per_shooter > 0;
+    
+  if (!params.drill_id && !params.drill_template_id && !hasCustomConfig) {
+    throw new Error('A drill configuration is required. Use custom drill, training drill, or drill template.');
   }
 
   // If joining a training, enforce drill-driven sessions and avoid drill mismatches
@@ -198,6 +248,16 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
     }
   }
 
+  // Build custom drill config for inline storage
+  const customDrillConfig = hasCustomConfig ? {
+    name: params.custom_drill_config!.name || 'Quick Practice',
+    drill_goal: params.custom_drill_config!.drill_goal,
+    target_type: params.custom_drill_config!.target_type || 'paper',
+    distance_m: params.custom_drill_config!.distance_m,
+    rounds_per_shooter: params.custom_drill_config!.rounds_per_shooter,
+    time_limit_seconds: params.custom_drill_config!.time_limit_seconds ?? null,
+  } : null;
+
   // Direct insert for all sessions (RLS handles permissions)
   const { data, error } = await supabase
     .from('sessions')
@@ -207,6 +267,7 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
       training_id: params.training_id ?? null,
       drill_id: params.drill_id ?? null,
       drill_template_id: params.drill_template_id ?? null,
+      custom_drill_config: customDrillConfig,
       session_mode: params.session_mode ?? 'solo',
       status: 'active',
       started_at: new Date().toISOString(),
@@ -218,6 +279,7 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
       training_id,
       drill_id,
       drill_template_id,
+      custom_drill_config,
       session_mode,
       status,
       started_at,
@@ -296,6 +358,7 @@ export async function getMyActiveSessionForTraining(trainingId: string): Promise
       team_id,
       training_id,
       drill_id,
+      custom_drill_config,
       session_mode,
       status,
       started_at,
@@ -337,6 +400,7 @@ export async function getMyActiveSession(): Promise<SessionWithDetails | null> {
       team_id,
       training_id,
       drill_id,
+      custom_drill_config,
       session_mode,
       status,
       started_at,
@@ -381,6 +445,7 @@ export async function getMyActivePersonalSession(): Promise<SessionWithDetails |
       team_id,
       training_id,
       drill_id,
+      custom_drill_config,
       session_mode,
       status,
       started_at,
@@ -483,6 +548,7 @@ export async function getSessions(teamId?: string | null): Promise<SessionWithDe
       team_id,
       training_id,
       drill_id,
+      custom_drill_config,
       session_mode,
       status,
       started_at,
@@ -667,6 +733,7 @@ export async function getTrainingSessions(trainingId: string): Promise<SessionWi
       team_id,
       training_id,
       drill_id,
+      custom_drill_config,
       session_mode,
       status,
       started_at,
@@ -704,6 +771,7 @@ export async function getTeamSessions(teamId: string): Promise<SessionWithDetail
       team_id,
       training_id,
       drill_id,
+      custom_drill_config,
       session_mode,
       status,
       started_at,
@@ -958,6 +1026,7 @@ export async function getSessionById(sessionId: string): Promise<SessionWithDeta
       team_id,
       training_id,
       drill_id,
+      custom_drill_config,
       session_mode,
       status,
       started_at,
@@ -1524,19 +1593,24 @@ async function enforceDrillLimitsForNewTarget(params: {
     throw new Error(`Target limit reached (${requiredTargets}).`);
   }
 
-  if (remainingShots <= 0) {
-    throw new Error(`Round limit reached (${requiredShots}).`);
-  }
+  // For paper targets (scans), don't enforce exact bullet count - the scan determines the count
+  // Only enforce limits for tactical targets (manual entry)
+  if (params.targetType === 'tactical') {
+    if (remainingShots <= 0) {
+      throw new Error(`Round limit reached (${requiredShots}).`);
+    }
 
-  if (params.bulletsFired > remainingShots) {
-    throw new Error(`This target exceeds remaining rounds. Remaining: ${remainingShots}.`);
-  }
+    if (params.bulletsFired > remainingShots) {
+      throw new Error(`This target exceeds remaining rounds. Remaining: ${remainingShots}.`);
+    }
 
-  const expectedNext = remainingTargets === 1 ? remainingShots : bulletsPerRound;
+    const expectedNext = remainingTargets === 1 ? remainingShots : bulletsPerRound;
 
-  if (params.bulletsFired !== expectedNext) {
-    throw new Error(`This drill expects ${expectedNext} bullets for the next round.`);
+    if (params.bulletsFired !== expectedNext) {
+      throw new Error(`This drill expects ${expectedNext} bullets for the next round.`);
+    }
   }
+  // Paper targets: just enforce target count limit, not bullet count
 }
 
 /**

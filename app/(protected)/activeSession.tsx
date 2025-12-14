@@ -419,14 +419,20 @@ export default function ActiveSessionScreen() {
   const isGroupingDrill = drill?.drill_goal === 'grouping';
   const isAchievementDrill = drill?.drill_goal === 'achievement';
   
-  // Scan button always shown (both grouping and achievement use it)
-  const showScan = true;
-  // Manual entry only for achievement drills or free practice (not for grouping)
-  const showManual = !drill || isAchievementDrill;
+  // Determine target type from drill config
+  const isPaperTarget = !drill || drill.target_type === 'paper';
+  const isTacticalTarget = drill?.target_type === 'tactical';
+  
+  // Show buttons based on target_type:
+  // - Paper targets (including paper+achievement): show scan
+  // - Tactical targets: show manual entry
+  // - No drill (free practice): show both
+  const showScan = !drill || isPaperTarget;
+  const showManual = !drill || isTacticalTarget;
   
   // Legacy compatibility - keep for UI color hints
   const isPaperDrill = isGroupingDrill || drill?.target_type === 'paper';
-  const isTacticalDrill = !isPaperDrill && (isAchievementDrill || drill?.target_type === 'tactical');
+  const isTacticalDrill = isTacticalTarget;
   
   const drillLimitReached =
     !!drill && !!nextTargetPlan && (nextTargetPlan.remainingShots <= 0 || nextTargetPlan.remainingTargets <= 0);
@@ -474,11 +480,21 @@ export default function ActiveSessionScreen() {
                     <MapPin size={12} color={colors.textMuted} />
                     <Text style={[styles.drillReqText, { color: colors.text }]}>{drill.distance_m}m</Text>
                   </View>
+                  {/* Show shots/round for tactical, or "Scan" for paper targets */}
                   <View style={styles.drillReqItem}>
-                    <Zap size={12} color={colors.textMuted} />
-                    <Text style={[styles.drillReqText, { color: colors.text }]}>
-                      {drillProgress?.bulletsPerRound ?? drill.rounds_per_shooter} shots/round
-                    </Text>
+                    {isTacticalDrill ? (
+                      <>
+                        <Zap size={12} color={colors.textMuted} />
+                        <Text style={[styles.drillReqText, { color: colors.text }]}>
+                          {drillProgress?.bulletsPerRound ?? drill.rounds_per_shooter} shots/round
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Camera size={12} color={colors.textMuted} />
+                        <Text style={[styles.drillReqText, { color: colors.text }]}>Scan</Text>
+                      </>
+                    )}
                   </View>
                   {drillProgress?.rounds && drillProgress.rounds > 1 && (
                     <View style={styles.drillReqItem}>

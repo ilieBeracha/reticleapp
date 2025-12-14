@@ -50,7 +50,6 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="trainings"
         options={{
-          tabBarItemHidden: teamCount > 0 ? false : true,
           title: 'Schedule',
           tabBarIcon: ({ focused }) => getTabIcon('calendar', focused ? 'calendar' : 'calendar-outline'),
         }}

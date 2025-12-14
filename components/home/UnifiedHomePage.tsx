@@ -247,28 +247,7 @@ function WeeklyHighlightsCard({
         ]}
       >
         <View style={{ gap: 16 }}>
-          {/* Row 1: Time */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <View
-              style={[
-                styles.statIcon,
-                { backgroundColor: `${colors.orange}15`, width: 36, height: 36, borderRadius: 10 },
-              ]}
-            >
-              <Clock size={18} color={colors.orange} />
-            </View>
-            <View>
-              <Text
-                style={{ fontSize: 10, color: colors.textMuted, fontWeight: '700', textTransform: 'uppercase', marginBottom: 2 }}
-              >
-                Time Trained
-              </Text>
-              <Text style={{ fontSize: 17, fontWeight: '800', color: colors.text, letterSpacing: -0.5 }}>
-                {stats.timeStr}
-              </Text>
-            </View>
-          </View>
-
+        
           {/* Row 2: Best Group */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <View
@@ -714,7 +693,7 @@ export function UnifiedHomePage() {
   const fallbackInitial = profileFullName?.charAt(0)?.toUpperCase() ?? email?.charAt(0)?.toUpperCase() ?? '?';
 
   // Stores
-  const { sessions, loading: sessionsLoading, initialized, createSession } = useSessionStore();
+  const { sessions, loading: sessionsLoading, initialized } = useSessionStore();
   const { teams, loadTeams } = useTeamStore();
   const { myUpcomingTrainings, myStats, loadMyUpcomingTrainings, loadMyStats } = useTrainingStore();
 
@@ -808,19 +787,20 @@ export function UnifiedHomePage() {
     setStarting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
+      // Check for existing active session first
       const existing = await getMyActivePersonalSession();
       if (existing) {
         router.push(`/(protected)/activeSession?sessionId=${existing.id}`);
         return;
       }
-      const newSession = await createSession({ session_mode: 'solo' });
-      router.push(`/(protected)/activeSession?sessionId=${newSession.id}`);
+      // Drill-first: route to drill selection screen
+      router.push('/(protected)/createSession');
     } catch (error) {
       console.error('Failed to start session:', error);
     } finally {
       setStarting(false);
     }
-  }, [starting, createSession]);
+  }, [starting]);
 
   const handleOpenSessionDetail = useCallback((session: SessionWithDetails) => {
     router.push(`/(protected)/sessionDetail?sessionId=${session.id}`);
@@ -877,9 +857,6 @@ export function UnifiedHomePage() {
             onPress={handleHeroPress}
           />
         </View>
-
-
-          
 
         {/* Show empty state or activity */}
         {!hasActivity && !activeSession ? (
@@ -992,7 +969,7 @@ const styles = StyleSheet.create({
     borderRadius: CARD_RADIUS,
     padding: 14,
     borderWidth: 1,
-    minHeight: 160,
+    minHeight: 140,
   },
 
   // Radial Progress

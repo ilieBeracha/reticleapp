@@ -1,11 +1,9 @@
 /**
- * Schedule Screen - Redesigned
+ * Schedule Screen - Exercise Library Style
  * 
- * Simplified architecture:
- * - Single view with team filter (no confusing tabs)
- * - Drill Library visible to everyone (role-based edit)
- * - Quick Practice from templates
- * - Upcoming trainings from all teams
+ * Two main sections:
+ * - Trainings: Scheduled team events
+ * - Drill Library: Browsable exercise catalog
  */
 import { EnhancedDrillModal } from '@/components/drills/EnhancedDrillModal';
 import { useColors } from '@/hooks/ui/useColors';
@@ -20,6 +18,7 @@ import { useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
 import type {
   CreateDrillInput,
+  DrillCategory,
   DrillTemplate,
   TeamRole,
   TeamWithRole,
@@ -29,55 +28,170 @@ import { useFocusEffect } from '@react-navigation/native';
 import { format, isToday, isYesterday } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import {
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Play,
-  Plus,
-  X,
-} from 'lucide-react-native';
+import { Check, ChevronDown, ChevronRight, Play, Plus, Search, X } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const CARD_WIDTH = (SCREEN_WIDTH - 48) / 2; // 2 columns with padding
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TYPES
+// ─────────────────────────────────────────────────────────────────────────────
+
+type MainTab = 'trainings' | 'library';
+type LibraryFilter = 'all' | 'grouping' | 'achievement';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
-
-function getRoleBadge(role: TeamRole | null): { label: string; color: string; icon: string } {
-  switch (role) {
-    case 'owner':
-      return { label: 'Owner', color: '#F59E0B', icon: 'crown' };
-    case 'commander':
-      return { label: 'Commander', color: '#10B981', icon: 'star' };
-    case 'squad_commander':
-      return { label: 'Squad Cmdr', color: '#6366F1', icon: 'ribbon' };
-    case 'soldier':
-    default:
-      return { label: 'Soldier', color: '#6B7280', icon: 'person' };
-  }
-}
 
 function canManageTeam(role: TeamRole | null): boolean {
   return role === 'owner' || role === 'commander';
 }
 
+function getCategoryLabel(category: DrillCategory | null | undefined): string {
+  switch (category) {
+    case 'fundamentals': return 'Fundamentals';
+    case 'speed': return 'Speed';
+    case 'accuracy': return 'Accuracy';
+    case 'stress': return 'Stress';
+    case 'tactical': return 'Tactical';
+    case 'competition': return 'Competition';
+    case 'qualification': return 'Qualification';
+    default: return 'General';
+  }
+}
+
+function getDifficultyLabel(difficulty: string | null | undefined): { label: string; color: string } {
+  switch (difficulty) {
+    case 'beginner': return { label: 'Beginner', color: '#10B981' };
+    case 'intermediate': return { label: 'Intermediate', color: '#F59E0B' };
+    case 'advanced': return { label: 'Advanced', color: '#EF4444' };
+    case 'expert': return { label: 'Expert', color: '#7C3AED' };
+    default: return { label: '', color: '' };
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// TEAM FILTER DROPDOWN
+// MAIN TAB SELECTOR
 // ─────────────────────────────────────────────────────────────────────────────
 
-function TeamFilterDropdown({
+function MainTabSelector({
+  activeTab,
+  onTabChange,
+  colors,
+  libraryCount,
+}: {
+  activeTab: MainTab;
+  onTabChange: (tab: MainTab) => void;
+  colors: ReturnType<typeof useColors>;
+  libraryCount: number;
+}) {
+  return (
+    <View style={[styles.tabContainer, { backgroundColor: colors.secondary }]}>
+      <TouchableOpacity
+        style={[styles.tab, activeTab === 'trainings' && [styles.tabActive, { backgroundColor: colors.card }]]}
+        onPress={() => {
+          Haptics.selectionAsync();
+          onTabChange('trainings');
+        }}
+      >
+        <Text style={[styles.tabText, { color: activeTab === 'trainings' ? colors.text : colors.textMuted }]}>
+          Trainings
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.tab, activeTab === 'library' && [styles.tabActive, { backgroundColor: colors.card }]]}
+        onPress={() => {
+          Haptics.selectionAsync();
+          onTabChange('library');
+        }}
+      >
+        <Text style={[styles.tabText, { color: activeTab === 'library' ? colors.text : colors.textMuted }]}>
+          Drill Library
+        </Text>
+        {libraryCount > 0 && (
+          <View style={[styles.tabBadge, { backgroundColor: colors.primary }]}>
+            <Text style={styles.tabBadgeText}>{libraryCount}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LIBRARY FILTER CHIPS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function LibraryFilterChips({
+  activeFilter,
+  onFilterChange,
+  colors,
+}: {
+  activeFilter: LibraryFilter;
+  onFilterChange: (filter: LibraryFilter) => void;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const filters: { key: LibraryFilter; label: string; color?: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'grouping', label: 'Grouping', color: '#10B981' },
+    { key: 'achievement', label: 'Achievement', color: '#93C5FD' },
+  ];
+
+  return (
+    <View style={styles.filterChips}>
+      {filters.map(({ key, label, color }) => {
+        const isActive = activeFilter === key;
+        return (
+          <TouchableOpacity
+            key={key}
+            style={[
+              styles.filterChip,
+              {
+                backgroundColor: isActive ? (color || colors.primary) + '20' : colors.secondary,
+                borderColor: isActive ? (color || colors.primary) : colors.border,
+              },
+            ]}
+            onPress={() => {
+              Haptics.selectionAsync();
+              onFilterChange(key);
+            }}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                { color: isActive ? (color || colors.primary) : colors.textMuted },
+              ]}
+            >
+              {label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TEAM DROPDOWN (for Library)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function TeamDropdown({
   teams,
   selectedTeamId,
   onSelect,
@@ -91,20 +205,19 @@ function TeamFilterDropdown({
   const [visible, setVisible] = useState(false);
   const insets = useSafeAreaInsets();
 
-  const selectedTeam = teams.find(t => t.id === selectedTeamId);
+  const selectedTeam = teams.find((t) => t.id === selectedTeamId);
   const label = selectedTeam?.name || 'All Teams';
 
   return (
     <>
       <TouchableOpacity
-        style={[styles.filterBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+        style={[styles.teamDropdownBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}
         onPress={() => {
           Haptics.selectionAsync();
           setVisible(true);
         }}
-        activeOpacity={0.7}
       >
-        <Text style={[styles.filterBtnText, { color: colors.text }]} numberOfLines={1}>
+        <Text style={[styles.teamDropdownText, { color: colors.text }]} numberOfLines={1}>
           {label}
         </Text>
         <ChevronDown size={14} color={colors.textMuted} />
@@ -119,14 +232,13 @@ function TeamFilterDropdown({
             ]}
           >
             <View style={[styles.dropdownHeader, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.dropdownTitle, { color: colors.text }]}>Filter by Team</Text>
+              <Text style={[styles.dropdownTitle, { color: colors.text }]}>Select Team</Text>
               <TouchableOpacity onPress={() => setVisible(false)}>
                 <X size={20} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={{ maxHeight: 400 }}>
-              {/* All Teams option */}
               <TouchableOpacity
                 style={[
                   styles.dropdownItem,
@@ -144,10 +256,8 @@ function TeamFilterDropdown({
                 {selectedTeamId === null && <Check size={18} color={colors.primary} />}
               </TouchableOpacity>
 
-              {/* Individual teams */}
               {teams.map((team) => {
                 const isActive = team.id === selectedTeamId;
-                const badge = getRoleBadge(team.my_role);
                 return (
                   <TouchableOpacity
                     key={team.id}
@@ -158,14 +268,9 @@ function TeamFilterDropdown({
                       setVisible(false);
                     }}
                   >
-                    <View style={styles.dropdownItemContent}>
-                      <Text style={[styles.dropdownItemText, { color: isActive ? colors.primary : colors.text }]}>
-                        {team.name}
-                      </Text>
-                      <View style={[styles.roleBadge, { backgroundColor: badge.color + '20' }]}>
-                        <Text style={[styles.roleBadgeText, { color: badge.color }]}>{badge.label}</Text>
-                      </View>
-                    </View>
+                    <Text style={[styles.dropdownItemText, { color: isActive ? colors.primary : colors.text }]}>
+                      {team.name}
+                    </Text>
                     {isActive && <Check size={18} color={colors.primary} />}
                   </TouchableOpacity>
                 );
@@ -185,51 +290,40 @@ function TeamFilterDropdown({
 function TrainingRow({
   training,
   colors,
-  userRole,
   onPress,
 }: {
   training: TrainingWithDetails;
   colors: ReturnType<typeof useColors>;
-  userRole?: TeamRole | null;
   onPress: () => void;
 }) {
   const isLive = training.status === 'ongoing';
-  const statusColor = isLive ? colors.green : training.status === 'planned' ? colors.primary : colors.textMuted;
-  const badge = getRoleBadge(userRole || null);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    if (isToday(date)) return format(date, 'HH:mm');
+    if (isToday(date)) return `Today ${format(date, 'HH:mm')}`;
     if (isYesterday(date)) return 'Yesterday';
-    return format(date, 'MMM d');
+    return format(date, 'MMM d, HH:mm');
   };
 
   return (
     <TouchableOpacity
-      style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}
+      style={[styles.trainingRow, { backgroundColor: colors.card, borderColor: colors.border }]}
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <View style={styles.rowContent}>
-        <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>
+      <View style={styles.trainingRowContent}>
+        <Text style={[styles.trainingTitle, { color: colors.text }]} numberOfLines={1}>
           {training.title}
         </Text>
-        <View style={styles.rowMetaRow}>
-          <Text style={[styles.rowMeta, { color: colors.textMuted }]}>
-            {formatDate(training.scheduled_at)}
-          </Text>
-          {training.team?.name && (
-            <>
-              <Text style={[styles.rowMetaDot, { color: colors.border }]}>•</Text>
-              <Text style={[styles.rowMeta, { color: colors.textMuted }]}>{training.team.name}</Text>
-            </>
-          )}
-        </View>
+        <Text style={[styles.trainingMeta, { color: colors.textMuted }]}>
+          {formatDate(training.scheduled_at)} · {training.team?.name || 'Team'}
+          {training.drill_count ? ` · ${training.drill_count} drills` : ''}
+        </Text>
       </View>
       {isLive && (
-        <View style={[styles.liveBadge, { backgroundColor: `${colors.green}18` }]}>
-          <View style={[styles.liveDot, { backgroundColor: colors.green }]} />
-          <Text style={[styles.liveText, { color: colors.green }]}>Live</Text>
+        <View style={[styles.liveBadge, { backgroundColor: '#10B98120' }]}>
+          <View style={styles.liveDot} />
+          <Text style={styles.liveText}>Live</Text>
         </View>
       )}
       <ChevronRight size={18} color={colors.textMuted} />
@@ -238,84 +332,112 @@ function TrainingRow({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DRILL TEMPLATE CARD (with Quick Practice)
+// EXERCISE CARD (Drill Template)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function DrillTemplateCard({
-  template,
+function ExerciseCard({
+  drill,
+  teamName,
   colors,
-  userRole,
+  canEdit,
   onEdit,
   onDelete,
   onPractice,
   practicing,
 }: {
-  template: DrillTemplate;
+  drill: DrillTemplate;
+  teamName: string;
   colors: ReturnType<typeof useColors>;
-  userRole?: TeamRole | null;
+  canEdit: boolean;
   onEdit?: () => void;
   onDelete?: () => void;
   onPractice: () => void;
   practicing: boolean;
 }) {
-  const isGrouping = template.drill_goal === 'grouping';
+  const isGrouping = drill.drill_goal === 'grouping';
   const goalColor = isGrouping ? '#10B981' : '#93C5FD';
-  const canEdit = canManageTeam(userRole ?? null);
+  const difficulty = getDifficultyLabel(drill.difficulty);
+  const category = getCategoryLabel(drill.category);
 
   return (
-    <View style={[styles.drillCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      {/* Content */}
-      <TouchableOpacity
-        style={styles.drillCardContent}
-        onPress={canEdit && onEdit ? onEdit : onPractice}
-        onLongPress={() => {
-          if (!canEdit) return;
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          Alert.alert(template.name, 'What would you like to do?', [
-            { text: 'Edit', onPress: onEdit },
-            { text: 'Delete', style: 'destructive', onPress: onDelete },
-            { text: 'Cancel', style: 'cancel' },
-          ]);
-        }}
-        activeOpacity={0.7}
-      >
-        <View style={styles.drillMainRow}>
-          <View style={[styles.drillTypeBadge, { backgroundColor: `${goalColor}15` }]}>
-            <Text style={[styles.drillTypeLetter, { color: goalColor }]}>
-              {isGrouping ? 'G' : 'A'}
-            </Text>
-          </View>
-          <View style={styles.drillInfo}>
-            <Text style={[styles.drillName, { color: colors.text }]} numberOfLines={1}>
-              {template.name}
-            </Text>
-            <Text style={[styles.drillMeta, { color: colors.textMuted }]}>
-              {template.distance_m}m • {template.rounds_per_shooter} shots
-              {template.time_limit_seconds ? ` • ${template.time_limit_seconds}s` : ''}
-            </Text>
-          </View>
+    <TouchableOpacity
+      style={[styles.exerciseCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+      onPress={onPractice}
+      onLongPress={() => {
+        if (!canEdit) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        Alert.alert(drill.name, 'What would you like to do?', [
+          { text: 'Edit', onPress: onEdit },
+          { text: 'Delete', style: 'destructive', onPress: onDelete },
+          { text: 'Cancel', style: 'cancel' },
+        ]);
+      }}
+      activeOpacity={0.8}
+    >
+      {/* Header with type badge */}
+      <View style={styles.exerciseHeader}>
+        <View style={[styles.exerciseTypeBadge, { backgroundColor: goalColor + '20' }]}>
+          <Text style={[styles.exerciseTypeText, { color: goalColor }]}>
+            {isGrouping ? 'Grouping' : 'Achievement'}
+          </Text>
         </View>
-      </TouchableOpacity>
-
-      {/* Quick Practice Button */}
-      <TouchableOpacity
-        style={[styles.practiceBtn, { backgroundColor: goalColor }]}
-        onPress={onPractice}
-        disabled={practicing}
-        activeOpacity={0.8}
-      >
-        {practicing ? (
-          <ActivityIndicator size="small" color="#fff" />
-        ) : (
-          <Play size={16} color="#fff" fill="#fff" />
+        {difficulty.label && (
+          <Text style={[styles.exerciseDifficulty, { color: difficulty.color }]}>
+            {difficulty.label}
+          </Text>
         )}
-      </TouchableOpacity>
-    </View>
+      </View>
+
+      {/* Name */}
+      <Text style={[styles.exerciseName, { color: colors.text }]} numberOfLines={2}>
+        {drill.name}
+      </Text>
+
+      {/* Stats Row */}
+      <View style={styles.exerciseStats}>
+        <Text style={[styles.exerciseStat, { color: colors.textMuted }]}>
+          {drill.distance_m}m
+        </Text>
+        <Text style={[styles.exerciseStatDot, { color: colors.border }]}>·</Text>
+        <Text style={[styles.exerciseStat, { color: colors.textMuted }]}>
+          {drill.rounds_per_shooter} shots
+        </Text>
+        {drill.time_limit_seconds && (
+          <>
+            <Text style={[styles.exerciseStatDot, { color: colors.border }]}>·</Text>
+            <Text style={[styles.exerciseStat, { color: colors.textMuted }]}>
+              {drill.time_limit_seconds}s
+            </Text>
+          </>
+        )}
+      </View>
+
+      {/* Footer */}
+      <View style={styles.exerciseFooter}>
+        <Text style={[styles.exerciseTeam, { color: colors.textMuted }]} numberOfLines={1}>
+          {teamName}
+        </Text>
+        <TouchableOpacity
+          style={[styles.exercisePlayBtn, { backgroundColor: goalColor }]}
+          onPress={(e) => {
+            e.stopPropagation?.();
+            onPractice();
+          }}
+          disabled={practicing}
+        >
+          {practicing ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Play size={14} color="#fff" fill="#fff" />
+          )}
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SESSION ROW (for solo users without teams)
+// SESSION ROW (for solo users)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function SessionRow({
@@ -328,7 +450,6 @@ function SessionRow({
   onPress: () => void;
 }) {
   const isActive = session.status === 'active';
-  const statusColor = isActive ? colors.green : colors.primary;
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -339,65 +460,24 @@ function SessionRow({
 
   return (
     <TouchableOpacity
-      style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}
+      style={[styles.trainingRow, { backgroundColor: colors.card, borderColor: colors.border }]}
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <View style={styles.rowContent}>
-        <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>
+      <View style={styles.trainingRowContent}>
+        <Text style={[styles.trainingTitle, { color: colors.text }]} numberOfLines={1}>
           {session.drill_name || session.training_title || 'Solo Practice'}
         </Text>
-        <Text style={[styles.rowMeta, { color: colors.textMuted }]}>{formatDate(session.started_at)}</Text>
+        <Text style={[styles.trainingMeta, { color: colors.textMuted }]}>{formatDate(session.started_at)}</Text>
       </View>
       {isActive && (
-        <View style={[styles.liveBadge, { backgroundColor: `${colors.green}18` }]}>
-          <View style={[styles.liveDot, { backgroundColor: colors.green }]} />
-          <Text style={[styles.liveText, { color: colors.green }]}>Active</Text>
+        <View style={[styles.liveBadge, { backgroundColor: '#10B98120' }]}>
+          <View style={styles.liveDot} />
+          <Text style={styles.liveText}>Active</Text>
         </View>
       )}
       <ChevronRight size={18} color={colors.textMuted} />
     </TouchableOpacity>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SECTION HEADER
-// ─────────────────────────────────────────────────────────────────────────────
-
-function SectionHeader({
-  title,
-  count,
-  action,
-  actionLabel,
-  colors,
-}: {
-  title: string;
-  count?: number;
-  action?: () => void;
-  actionLabel?: string;
-  colors: ReturnType<typeof useColors>;
-}) {
-  return (
-    <View style={styles.sectionHeader}>
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>
-        {title}
-        {count !== undefined && count > 0 && (
-          <Text style={{ color: colors.textMuted }}> ({count})</Text>
-        )}
-      </Text>
-      {action && actionLabel && (
-        <TouchableOpacity
-          style={[styles.sectionAction, { backgroundColor: colors.primary }]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            action();
-          }}
-        >
-          <Plus size={12} color="#fff" />
-          <Text style={styles.sectionActionText}>{actionLabel}</Text>
-        </TouchableOpacity>
-      )}
-    </View>
   );
 }
 
@@ -408,16 +488,29 @@ function SectionHeader({
 function EmptyState({
   title,
   description,
+  action,
+  actionLabel,
   colors,
 }: {
   title: string;
   description: string;
+  action?: () => void;
+  actionLabel?: string;
   colors: ReturnType<typeof useColors>;
 }) {
   return (
     <View style={styles.empty}>
       <Text style={[styles.emptyTitle, { color: colors.text }]}>{title}</Text>
       <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>{description}</Text>
+      {action && actionLabel && (
+        <TouchableOpacity
+          style={[styles.emptyAction, { backgroundColor: colors.primary }]}
+          onPress={action}
+        >
+          <Plus size={16} color="#fff" />
+          <Text style={styles.emptyActionText}>{actionLabel}</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -432,29 +525,30 @@ export default function ScheduleScreen() {
   const { teams } = useTeamStore();
   const { myUpcomingTrainings, myTrainingsInitialized, loadMyUpcomingTrainings } = useTrainingStore();
 
-  // Filter state
+  // Tab state
+  const [activeTab, setActiveTab] = useState<MainTab>('library');
+  
+  // Library filters
+  const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>('all');
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Sessions for solo users
+  // Data state
+  const [refreshing, setRefreshing] = useState(false);
   const [sessions, setSessions] = useState<SessionWithDetails[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
-
-  // Drill templates (from all teams or filtered team)
   const [allDrillTemplates, setAllDrillTemplates] = useState<Map<string, DrillTemplate[]>>(new Map());
   const [loadingTemplates, setLoadingTemplates] = useState(false);
 
-  // Drill modal
+  // Modal state
   const [drillModalVisible, setDrillModalVisible] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<DrillTemplate | null>(null);
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
-
-  // Quick practice
   const [practicingDrillId, setPracticingDrillId] = useState<string | null>(null);
 
   const hasTeams = teams.length > 0;
 
-  // Find user's role for each team
+  // Get user's role for a team
   const getTeamRole = useCallback(
     (teamId: string): TeamRole | null => {
       const team = teams.find((t) => t.id === teamId);
@@ -468,7 +562,7 @@ export default function ScheduleScreen() {
     return teams.some((t) => canManageTeam(t.my_role));
   }, [teams]);
 
-  // Load sessions for solo users
+  // Load sessions
   const loadSessions = useCallback(async () => {
     try {
       const data = await getSessions(null);
@@ -480,7 +574,7 @@ export default function ScheduleScreen() {
     }
   }, []);
 
-  // Load drill templates for all teams
+  // Load all drill templates
   const loadAllDrillTemplates = useCallback(async () => {
     if (teams.length === 0) return;
 
@@ -527,46 +621,56 @@ export default function ScheduleScreen() {
     setRefreshing(false);
   }, [hasTeams, loadMyUpcomingTrainings, loadSessions, loadAllDrillTemplates]);
 
-  // Filter trainings by selected team
+  // Filter trainings
   const filteredTrainings = useMemo(() => {
-    let trainings = [...myUpcomingTrainings];
-    if (selectedTeamId) {
-      trainings = trainings.filter((t) => t.team_id === selectedTeamId);
-    }
-    return trainings.sort((a, b) => {
+    return [...myUpcomingTrainings].sort((a, b) => {
       if (a.status === 'ongoing' && b.status !== 'ongoing') return -1;
       if (b.status === 'ongoing' && a.status !== 'ongoing') return 1;
       return new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime();
     });
-  }, [myUpcomingTrainings, selectedTeamId]);
+  }, [myUpcomingTrainings]);
 
-  // Filter drill templates by selected team
-  const filteredDrillTemplates = useMemo(() => {
-    const result: { team: TeamWithRole; templates: DrillTemplate[] }[] = [];
+  // Flatten and filter drill templates
+  const filteredDrills = useMemo(() => {
+    const allDrills: { drill: DrillTemplate; teamName: string; teamId: string }[] = [];
 
-    if (selectedTeamId) {
-      const team = teams.find((t) => t.id === selectedTeamId);
-      const templates = allDrillTemplates.get(selectedTeamId) || [];
-      if (team) {
-        result.push({ team, templates });
-      }
-    } else {
-      teams.forEach((team) => {
-        const templates = allDrillTemplates.get(team.id) || [];
-        if (templates.length > 0) {
-          result.push({ team, templates });
-        }
+    teams.forEach((team) => {
+      const templates = allDrillTemplates.get(team.id) || [];
+      templates.forEach((drill) => {
+        allDrills.push({ drill, teamName: team.name, teamId: team.id });
       });
-    }
+    });
 
-    return result;
-  }, [teams, allDrillTemplates, selectedTeamId]);
+    return allDrills.filter(({ drill }) => {
+      // Team filter
+      if (selectedTeamId && drill.team_id !== selectedTeamId) return false;
 
-  const totalTemplateCount = useMemo(() => {
-    return filteredDrillTemplates.reduce((sum, group) => sum + group.templates.length, 0);
-  }, [filteredDrillTemplates]);
+      // Type filter
+      if (libraryFilter === 'grouping' && drill.drill_goal !== 'grouping') return false;
+      if (libraryFilter === 'achievement' && drill.drill_goal !== 'achievement') return false;
 
-  // Sort sessions: active first, then by date
+      // Search filter
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const matchesName = drill.name.toLowerCase().includes(query);
+        const matchesCategory = (drill.category || '').toLowerCase().includes(query);
+        if (!matchesName && !matchesCategory) return false;
+      }
+
+      return true;
+    });
+  }, [teams, allDrillTemplates, selectedTeamId, libraryFilter, searchQuery]);
+
+  // Total drill count (unfiltered)
+  const totalDrillCount = useMemo(() => {
+    let count = 0;
+    allDrillTemplates.forEach((templates) => {
+      count += templates.length;
+    });
+    return count;
+  }, [allDrillTemplates]);
+
+  // Sort sessions
   const sortedSessions = useMemo(() => {
     return [...sessions].sort((a, b) => {
       if (a.status === 'active' && b.status !== 'active') return -1;
@@ -598,9 +702,17 @@ export default function ScheduleScreen() {
     router.push('/(protected)/createTraining' as any);
   };
 
-  const handleCreateDrill = (teamId: string) => {
+  const handleCreateDrill = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setEditingTeamId(teamId);
+    // Use selected team or first manageable team
+    const targetTeam = selectedTeamId
+      ? teams.find((t) => t.id === selectedTeamId)
+      : teams.find((t) => canManageTeam(t.my_role));
+    if (!targetTeam) {
+      Alert.alert('No Team', 'You need commander access to create drills.');
+      return;
+    }
+    setEditingTeamId(targetTeam.id);
     setEditingTemplate(null);
     setDrillModalVisible(true);
   };
@@ -623,7 +735,7 @@ export default function ScheduleScreen() {
             await loadAllDrillTemplates();
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to delete template');
+            Alert.alert('Error', error.message || 'Failed to delete');
           }
         },
       },
@@ -642,20 +754,20 @@ export default function ScheduleScreen() {
       await loadAllDrillTemplates();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to save drill template');
+      Alert.alert('Error', error.message || 'Failed to save');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
 
-  const handleQuickPractice = async (template: DrillTemplate) => {
+  const handleQuickPractice = async (drill: DrillTemplate) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setPracticingDrillId(template.id);
+    setPracticingDrillId(drill.id);
 
     try {
-      const session = await startQuickPractice(template.id);
+      const session = await startQuickPractice(drill.id);
       router.push(`/(protected)/activeSession?sessionId=${session.id}` as any);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to start practice session');
+      Alert.alert('Error', error.message || 'Failed to start practice');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setPracticingDrillId(null);
@@ -678,21 +790,18 @@ export default function ScheduleScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <View>
-            <Text style={[styles.title, { color: colors.text }]}>Schedule</Text>
-            <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-              {hasTeams ? 'Trainings & drill library' : 'Your practice sessions'}
-            </Text>
-          </View>
-          {hasTeams && teams.length > 1 && (
-            <TeamFilterDropdown
-              teams={teams}
-              selectedTeamId={selectedTeamId}
-              onSelect={setSelectedTeamId}
-              colors={colors}
-            />
-          )}
+          <Text style={[styles.title, { color: colors.text }]}>Schedule</Text>
         </View>
+
+        {/* Main Tabs (only for team users) */}
+        {hasTeams && (
+          <MainTabSelector
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            colors={colors}
+            libraryCount={totalDrillCount}
+          />
+        )}
 
         {/* Loading */}
         {isLoading && (
@@ -701,94 +810,137 @@ export default function ScheduleScreen() {
           </View>
         )}
 
-        {/* TEAM USERS */}
-        {hasTeams && !isLoading && (
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* TRAININGS TAB */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {hasTeams && activeTab === 'trainings' && !isLoading && (
           <>
-            {/* Upcoming Trainings */}
-            <SectionHeader
-              title="Upcoming"
-              count={filteredTrainings.length}
-              action={canManageAnyTeam ? handleCreateTraining : undefined}
-              actionLabel="New"
-              colors={colors}
-            />
+            {/* Section Header */}
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Upcoming Trainings</Text>
+              {canManageAnyTeam && (
+                <TouchableOpacity
+                  style={[styles.addBtn, { backgroundColor: colors.primary }]}
+                  onPress={handleCreateTraining}
+                >
+                  <Plus size={14} color="#fff" />
+                  <Text style={styles.addBtnText}>New</Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
             {filteredTrainings.length === 0 ? (
               <EmptyState
                 title="No upcoming trainings"
-                description={selectedTeamId ? 'No trainings for this team' : "You're all caught up!"}
+                description="You're all caught up!"
+                action={canManageAnyTeam ? handleCreateTraining : undefined}
+                actionLabel="Schedule Training"
                 colors={colors}
               />
             ) : (
               <View style={styles.list}>
                 {filteredTrainings.map((t) => (
-                  <TrainingRow
-                    key={t.id}
-                    training={t}
-                    colors={colors}
-                    userRole={getTeamRole(t.team_id!)}
-                    onPress={() => handleTrainingPress(t)}
-                  />
+                  <TrainingRow key={t.id} training={t} colors={colors} onPress={() => handleTrainingPress(t)} />
                 ))}
               </View>
-            )}
-
-            {/* Drill Library */}
-            <View style={styles.sectionSpacer} />
-            <SectionHeader
-              title="Drill Library"
-              count={totalTemplateCount}
-              colors={colors}
-            />
-
-            {filteredDrillTemplates.length === 0 ? (
-              <EmptyState
-                title="No drills yet"
-                description={canManageAnyTeam ? 'Create reusable drills for your teams' : 'No drills available'}
-                colors={colors}
-              />
-            ) : (
-              filteredDrillTemplates.map(({ team, templates }) => (
-                <View key={team.id} style={styles.drillGroup}>
-                  <View style={styles.drillGroupHeader}>
-                    <Text style={[styles.drillGroupTeam, { color: colors.textMuted }]}>{team.name}</Text>
-                    {canManageTeam(team.my_role) && (
-                      <TouchableOpacity
-                        style={[styles.drillGroupAdd, { backgroundColor: colors.secondary }]}
-                        onPress={() => handleCreateDrill(team.id)}
-                      >
-                        <Plus size={12} color={colors.primary} />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                  <View style={styles.drillList}>
-                    {templates.map((t) => (
-                      <DrillTemplateCard
-                        key={t.id}
-                        template={t}
-                        colors={colors}
-                        userRole={team.my_role}
-                        onEdit={canManageTeam(team.my_role) ? () => handleEditTemplate(t) : undefined}
-                        onDelete={canManageTeam(team.my_role) ? () => handleDeleteTemplate(t) : undefined}
-                        onPractice={() => handleQuickPractice(t)}
-                        practicing={practicingDrillId === t.id}
-                      />
-                    ))}
-                  </View>
-                </View>
-              ))
             )}
           </>
         )}
 
-        {/* SOLO USERS (no teams) */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* DRILL LIBRARY TAB */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {hasTeams && activeTab === 'library' && !isLoading && (
+          <>
+            {/* Filters Row */}
+            <View style={styles.libraryFilters}>
+              <LibraryFilterChips
+                activeFilter={libraryFilter}
+                onFilterChange={setLibraryFilter}
+                colors={colors}
+              />
+              {teams.length > 1 && (
+                <TeamDropdown
+                  teams={teams}
+                  selectedTeamId={selectedTeamId}
+                  onSelect={setSelectedTeamId}
+                  colors={colors}
+                />
+              )}
+            </View>
+
+            {/* Search */}
+            <View style={[styles.searchContainer, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+              <Search size={16} color={colors.textMuted} />
+              <TextInput
+                style={[styles.searchInput, { color: colors.text }]}
+                placeholder="Search drills..."
+                placeholderTextColor={colors.textMuted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <X size={16} color={colors.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Results Header */}
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                {filteredDrills.length} {filteredDrills.length === 1 ? 'exercise' : 'exercises'}
+              </Text>
+              {canManageAnyTeam && (
+                <TouchableOpacity
+                  style={[styles.addBtn, { backgroundColor: colors.primary }]}
+                  onPress={handleCreateDrill}
+                >
+                  <Plus size={14} color="#fff" />
+                  <Text style={styles.addBtnText}>New</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Exercise Grid */}
+            {filteredDrills.length === 0 ? (
+              <EmptyState
+                title="No drills found"
+                description={searchQuery ? 'Try a different search' : 'Create your first drill exercise'}
+                action={canManageAnyTeam ? handleCreateDrill : undefined}
+                actionLabel="Create Drill"
+                colors={colors}
+              />
+            ) : (
+              <View style={styles.exerciseGrid}>
+                {filteredDrills.map(({ drill, teamName, teamId }) => (
+                  <ExerciseCard
+                    key={drill.id}
+                    drill={drill}
+                    teamName={teamName}
+                    colors={colors}
+                    canEdit={canManageTeam(getTeamRole(teamId))}
+                    onEdit={() => handleEditTemplate(drill)}
+                    onDelete={() => handleDeleteTemplate(drill)}
+                    onPractice={() => handleQuickPractice(drill)}
+                    practicing={practicingDrillId === drill.id}
+                  />
+                ))}
+              </View>
+            )}
+          </>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* SOLO USER (no teams) */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
         {!hasTeams && !isLoading && (
           <>
-            <SectionHeader
-              title="Recent Sessions"
-              count={sortedSessions.length}
-              colors={colors}
-            />
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Recent Sessions ({sortedSessions.length})
+              </Text>
+            </View>
 
             {sortedSessions.length === 0 ? (
               <EmptyState
@@ -804,12 +956,12 @@ export default function ScheduleScreen() {
               </View>
             )}
 
-            {/* Join Team Prompt */}
+            {/* Join Team Card */}
             <View style={[styles.joinTeamCard, { backgroundColor: colors.secondary }]}>
               <View style={styles.joinTeamContent}>
                 <Text style={[styles.joinTeamTitle, { color: colors.text }]}>Join a Team</Text>
                 <Text style={[styles.joinTeamDesc, { color: colors.textMuted }]}>
-                  Access team trainings and drills
+                  Access team drill library and trainings
                 </Text>
               </View>
               <TouchableOpacity
@@ -823,7 +975,7 @@ export default function ScheduleScreen() {
         )}
       </ScrollView>
 
-      {/* Drill Template Modal */}
+      {/* Drill Modal */}
       <EnhancedDrillModal
         visible={drillModalVisible}
         onClose={() => {
@@ -875,29 +1027,76 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 16, paddingTop: 8 },
 
   // Header
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 20,
-  },
+  header: { marginBottom: 16 },
   title: { fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
-  subtitle: { fontSize: 14, marginTop: 2 },
 
-  // Team Filter
-  filterBtn: {
+  // Tab Selector
+  tabContainer: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 16,
+  },
+  tab: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 10,
-    borderWidth: 1,
-    maxWidth: 150,
   },
-  filterBtnText: { fontSize: 13, fontWeight: '500', flex: 1 },
+  tabActive: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  tabText: { fontSize: 14, fontWeight: '600' },
+  tabBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  tabBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
 
-  // Dropdown
+  // Library Filters
+  libraryFilters: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    gap: 12,
+  },
+  filterChips: {
+    flexDirection: 'row',
+    gap: 8,
+    flex: 1,
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  filterChipText: { fontSize: 13, fontWeight: '500' },
+
+  // Team Dropdown
+  teamDropdownBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  teamDropdownText: { fontSize: 13, fontWeight: '500' },
+
+  // Dropdown Modal
   dropdownOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -926,24 +1125,30 @@ const styles = StyleSheet.create({
     marginVertical: 4,
     borderRadius: 12,
   },
-  dropdownItemContent: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   dropdownItemText: { fontSize: 16, fontWeight: '500' },
-  roleBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  roleBadgeText: { fontSize: 11, fontWeight: '600' },
 
-  // Section
+  // Search
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  searchInput: { flex: 1, fontSize: 15 },
+
+  // Section Header
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-  sectionTitle: { fontSize: 15, fontWeight: '700' },
-  sectionAction: {
+  sectionTitle: { fontSize: 15, fontWeight: '600' },
+  addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -951,12 +1156,13 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 8,
   },
-  sectionActionText: { fontSize: 12, fontWeight: '600', color: '#fff' },
-  sectionSpacer: { height: 24 },
+  addBtnText: { fontSize: 13, fontWeight: '600', color: '#fff' },
 
-  // List & Rows
+  // List
   list: { gap: 10 },
-  row: {
+
+  // Training Row
+  trainingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 14,
@@ -964,11 +1170,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 12,
   },
-  rowContent: { flex: 1 },
-  rowTitle: { fontSize: 15, fontWeight: '600' },
-  rowMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  rowMeta: { fontSize: 13 },
-  rowMetaDot: { fontSize: 8 },
+  trainingRowContent: { flex: 1 },
+  trainingTitle: { fontSize: 15, fontWeight: '600' },
+  trainingMeta: { fontSize: 13, marginTop: 2 },
 
   // Live Badge
   liveBadge: {
@@ -979,63 +1183,72 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     gap: 4,
   },
-  liveDot: { width: 6, height: 6, borderRadius: 3 },
-  liveText: { fontSize: 11, fontWeight: '700' },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981' },
+  liveText: { fontSize: 11, fontWeight: '700', color: '#10B981' },
 
-  // Drill Cards
-  drillGroup: { marginBottom: 16 },
-  drillGroupHeader: {
+  // Exercise Grid
+  exerciseGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
+    flexWrap: 'wrap',
+    gap: 12,
   },
-  drillGroupTeam: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  drillGroupAdd: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  drillList: { gap: 8 },
-  drillCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 14,
+
+  // Exercise Card
+  exerciseCard: {
+    width: CARD_WIDTH,
+    padding: 14,
+    borderRadius: 16,
     borderWidth: 1,
     gap: 10,
   },
-  drillCardContent: { flex: 1 },
-  drillMainRow: {
+  exerciseHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    justifyContent: 'space-between',
   },
-  drillTypeBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+  exerciseTypeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  exerciseTypeText: { fontSize: 10, fontWeight: '700' },
+  exerciseDifficulty: { fontSize: 10, fontWeight: '600' },
+  exerciseName: { fontSize: 15, fontWeight: '600', lineHeight: 20 },
+  exerciseStats: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    flexWrap: 'wrap',
   },
-  drillTypeLetter: { fontSize: 16, fontWeight: '700' },
-  drillInfo: { flex: 1, gap: 2 },
-  drillName: { fontSize: 15, fontWeight: '600' },
-  drillMeta: { fontSize: 12 },
-  practiceBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  exerciseStat: { fontSize: 12 },
+  exerciseStatDot: { fontSize: 8, marginHorizontal: 4 },
+  exerciseFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  exerciseTeam: { fontSize: 11, flex: 1 },
+  exercisePlayBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   // Empty State
-  empty: { alignItems: 'center', paddingVertical: 40 },
-  emptyTitle: { fontSize: 16, fontWeight: '600', marginBottom: 4 },
-  emptyDesc: { fontSize: 13, textAlign: 'center' },
+  empty: { alignItems: 'center', paddingVertical: 48 },
+  emptyTitle: { fontSize: 16, fontWeight: '600', marginBottom: 6 },
+  emptyDesc: { fontSize: 13, textAlign: 'center', marginBottom: 16 },
+  emptyAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  emptyActionText: { fontSize: 14, fontWeight: '600', color: '#fff' },
 
   // Loading
   loading: { paddingVertical: 60 },

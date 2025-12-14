@@ -188,7 +188,9 @@ export function PaperTargetFlow({
         const rawHighConfHits = finalDetections.filter(
           (d) => d.isManual || d.confidence >= 0.6
         ).length;
-        const highConfHits = Math.min(rawHighConfHits, bullets);
+        // For scanned targets: detected holes = bullets fired = hits
+        // High-confidence hits are already counted from detection
+        const highConfHits = rawHighConfHits;
         const manualCount = finalDetections.filter((d) => d.isManual).length;
 
         const trainingData =
@@ -223,16 +225,20 @@ export function PaperTargetFlow({
           }
         }
 
+        // For scanned targets:
+        // - bullets_fired = detected holes (what the scan found)
+        // - hits_total = detected holes (all detected are hits on paper)
+        // - planned_shots = drill's rounds_per_shooter for tracking (if provided)
         await addTargetWithPaperResult({
           session_id: sessionId,
           distance_m: distance,
           lane_number: null,
-          planned_shots: bullets,
+          planned_shots: bullets > 0 ? bullets : null, // From drill config if available
           notes: paperNotes || null,
           target_data: null,
           paper_type: paperType,
-          bullets_fired: bullets,
-          hits_total: Math.min(detectionCount, bullets),
+          bullets_fired: detectionCount, // Scan determines actual shots
+          hits_total: detectionCount, // All detected holes are hits
           hits_inside_scoring: highConfHits,
           dispersion_cm: groupSizeCm,
           scanned_image_url: scannedImageUrl,
