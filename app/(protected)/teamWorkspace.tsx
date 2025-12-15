@@ -23,6 +23,7 @@ import type {
     TeamMemberWithProfile,
     TrainingWithDetails
 } from '@/types/workspace';
+import { formatMaxShots } from '@/utils/drillShots';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { format } from 'date-fns';
@@ -218,7 +219,11 @@ function ExerciseCard({
       <View style={styles.exerciseStats}>
         <Text style={[styles.exerciseStat, { color: colors.textMuted }]}>{drill.distance_m}m</Text>
         <Text style={[styles.exerciseStatDot, { color: colors.border }]}>·</Text>
-        <Text style={[styles.exerciseStat, { color: colors.textMuted }]}>{drill.rounds_per_shooter} shots</Text>
+        <Text style={[styles.exerciseStat, { color: colors.textMuted }]}>
+          {drill.target_type === 'paper'
+            ? `Scan (max ${formatMaxShots(drill.rounds_per_shooter)})`
+            : `${drill.rounds_per_shooter} shots`}
+        </Text>
         {drill.time_limit_seconds && (
           <>
             <Text style={[styles.exerciseStatDot, { color: colors.border }]}>·</Text>

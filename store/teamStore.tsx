@@ -1,22 +1,23 @@
 import {
-  addTeamMember as addTeamMemberService,
-  createTeam as createTeamService,
-  deleteTeam as deleteTeamService,
-  getMyTeams,
-  getTeamMembers,
-  getTeamWithMembers,
-  removeTeamMember as removeTeamMemberService,
-  updateTeamMemberRole as updateMemberRoleService,
-  updateTeam as updateTeamService,
-  type AddTeamMemberInput,
-  type CreateTeamInput,
-  type UpdateTeamInput,
+    addTeamMember as addTeamMemberService,
+    createTeam as createTeamService,
+    deleteTeam as deleteTeamService,
+    getMyTeams,
+    getTeamMembers,
+    getTeamWithMembers,
+    removeTeamMember as removeTeamMemberService,
+    updateTeamMemberRole as updateMemberRoleService,
+    updateTeam as updateTeamService,
+    type AddTeamMemberInput,
+    type CreateTeamInput,
+    type UpdateTeamInput,
 } from '@/services/teamService';
+import { shouldShowInitialLoading } from '@/store/_shared/asyncState';
 import type {
-  TeamMemberWithProfile,
-  TeamRole,
-  TeamWithMembers,
-  TeamWithRole
+    TeamMemberWithProfile,
+    TeamRole,
+    TeamWithMembers,
+    TeamWithRole
 } from '@/types/workspace';
 import { create } from 'zustand';
 
@@ -71,7 +72,7 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
     try {
       // Always show loading on first load, or if no teams yet
       const { initialized } = get();
-      if (!initialized) {
+      if (shouldShowInitialLoading(initialized)) {
         set({ loading: true, error: null });
       }
 

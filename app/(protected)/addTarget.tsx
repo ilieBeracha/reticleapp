@@ -378,8 +378,6 @@ export default function AddTargetSheet() {
         saving={saving}
         editedDetections={editedDetections}
         onDetectionsChange={setEditedDetections}
-        distance={selectedDistance}
-        onDistanceChange={setSelectedDistance}
         targetType={targetType}
       />
     );

@@ -9,6 +9,7 @@ import { createTraining } from '@/services/trainingService';
 import { useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
 import type { CreateDrillInput, DrillTemplate } from '@/types/workspace';
+import { formatMaxShots } from '@/utils/drillShots';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
@@ -72,7 +73,10 @@ function DrillItem({
           </View>
         </View>
         <Text style={[styles.drillItemMeta, { color: colors.textMuted }]}>
-          {drill.distance_m}m • {drill.rounds_per_shooter} shots
+          {drill.distance_m}m •{' '}
+          {drill.target_type === 'paper'
+            ? `Scan (max ${formatMaxShots(drill.rounds_per_shooter)})`
+            : `${drill.rounds_per_shooter} shots`}
           {drill.time_limit_seconds ? ` • ${drill.time_limit_seconds}s` : ''}
         </Text>
       </View>

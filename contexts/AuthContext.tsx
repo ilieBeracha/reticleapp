@@ -1,6 +1,5 @@
 // contexts/AuthContext.tsx
 import { supabase } from '@/lib/supabase'
-import { AuthenticatedClient } from '@/services/authenticatedClient'
 import { useTeamStore } from '@/store/teamStore'
 import { Session, User } from '@supabase/supabase-js'
 import { router } from 'expo-router'
@@ -233,27 +232,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe()
   }, [])
-
-  // Initialize AuthenticatedClient
-  useEffect(() => {
-    AuthenticatedClient.initialize(
-      async () => {
-        const { data: { session } } = await supabase.auth.getSession()
-        return session?.access_token ?? ""
-      },
-      () => {
-        const currentUser = user
-        if (!currentUser) return null
-        
-        const activeTeamId = useTeamStore.getState().activeTeamId
-        
-        return {
-          userId: currentUser.id,
-          teamId: activeTeamId
-        }
-      }
-    )
-  }, [user])
 
   const signUp = async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email, password })

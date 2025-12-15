@@ -5,6 +5,7 @@ import {
     getTeamTrainings,
 } from "@/services/trainingService";
 import type { TrainingWithDetails } from "@/types/workspace";
+import { shouldShowInitialLoading } from "@/store/_shared/asyncState";
 import { create } from "zustand";
 import { useTeamStore } from "./teamStore";
 
@@ -57,7 +58,7 @@ export const useTrainingStore = create<TrainingStore>((set, get) => ({
   loadMyTrainings: async () => {
     // Always show loading on first load
     const { myTrainingsInitialized } = get();
-    if (!myTrainingsInitialized) {
+    if (shouldShowInitialLoading(myTrainingsInitialized)) {
       set({ loadingMyTrainings: true, error: null });
     }
     
@@ -79,7 +80,7 @@ export const useTrainingStore = create<TrainingStore>((set, get) => ({
   loadMyUpcomingTrainings: async () => {
     // Always show loading on first load
     const { myTrainingsInitialized } = get();
-    if (!myTrainingsInitialized) {
+    if (shouldShowInitialLoading(myTrainingsInitialized)) {
       set({ loadingMyTrainings: true, error: null });
     }
     
@@ -119,7 +120,7 @@ export const useTrainingStore = create<TrainingStore>((set, get) => ({
 
     // Always show loading on first load
     const { teamTrainingsInitialized } = get();
-    if (!teamTrainingsInitialized) {
+    if (shouldShowInitialLoading(teamTrainingsInitialized)) {
       set({ loadingTeamTrainings: true, error: null });
     }
     

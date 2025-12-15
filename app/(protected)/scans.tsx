@@ -1,6 +1,6 @@
 import { Colors } from "@/constants/Colors";
 import { useTheme } from "@/contexts/ThemeContext";
-import { supabase } from "@/lib/supabase";
+import { getMyRecentPaperScans } from "@/services/sessionService";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
@@ -399,73 +399,18 @@ export default function ScansPage() {
   // ═══ DATA LOADING ═══
   const loadScans = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      // First get user's sessions
-      const { data: sessions, error: sessionsError } = await supabase
-        .from("sessions")
-        .select("id")
-        .eq("user_id", user.id);
-
-      if (sessionsError) {
-        setLoading(false);
-        return;
-      }
-
-      if (!sessions || sessions.length === 0) {
-        setScans([]);
-        setLoading(false);
-        return;
-      }
-
-      const sessionIds = sessions.map((s) => s.id);
-
-      // Get paper targets from those sessions
-      const { data: targets, error: targetsError } = await supabase
-        .from("session_targets")
-        .select(`
-          id,
-          session_id,
-          target_type,
-          distance_m,
-          lane_number,
-          notes,
-          paper_target_results(bullets_fired, hits_inside_scoring, scanned_image_url, dispersion_cm)
-        `)
-        .in("session_id", sessionIds)
-        .eq("target_type", "paper")
-        .limit(100);
-
-      if (targetsError) {
-        setLoading(false);
-        return;
-      }
-
-      if (targets && targets.length > 0) {
-        const mapped = targets.map((t: any) => {
-          const paperResult = Array.isArray(t.paper_target_results)
-            ? t.paper_target_results[0]
-            : t.paper_target_results;
-
-          return {
-            id: t.id,
-            session_id: t.session_id,
-            scanned_image_url: paperResult?.scanned_image_url ?? null,
-            distance_meters: t.distance_m,
-            lane_number: t.lane_number,
-            shots_fired: paperResult?.bullets_fired ?? null,
-            hits: paperResult?.hits_inside_scoring ?? null,
-            group_size_cm: paperResult?.dispersion_cm ?? null,
-          };
-        });
-        setScans(mapped);
-      } else {
-        setScans([]);
-      }
+      const targets = await getMyRecentPaperScans({ sessionLimit: 200, targetLimit: 100 });
+      const mapped = targets.map((t) => ({
+        id: t.id,
+        session_id: t.session_id,
+        scanned_image_url: t.scanned_image_url,
+        distance_meters: t.distance_m,
+        lane_number: t.lane_number,
+        shots_fired: t.bullets_fired,
+        hits: t.hits_inside_scoring,
+        group_size_cm: t.dispersion_cm,
+      }));
+      setScans(mapped);
     } catch (err) {
       console.error("[ScansPage] Error:", err);
     } finally {

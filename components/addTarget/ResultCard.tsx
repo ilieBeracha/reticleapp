@@ -6,20 +6,19 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Animated,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Animated,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import ViewShot from "react-native-view-shot";
 import { DetectionEditor } from "./DetectionEditor";
 import { DetectionPreview } from "./DetectionPreview";
-import { DistanceInput } from "./DistanceInput";
 import { COLORS, EditableDetection, EditMode, TargetType } from "./types";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -38,9 +37,6 @@ interface ResultCardProps {
   saving: boolean;
   editedDetections: EditableDetection[];
   onDetectionsChange: (detections: EditableDetection[]) => void;
-  distance: number;
-  onDistanceChange: (distance: number) => void;
-  distanceLocked?: boolean;
   /** Target type determines what metrics to show */
   targetType?: TargetType;
 }
@@ -52,9 +48,6 @@ export const ResultCard = React.memo(function ResultCard({
   saving,
   editedDetections,
   onDetectionsChange,
-  distance,
-  onDistanceChange,
-  distanceLocked = false,
   targetType = "grouping",
 }: ResultCardProps) {
   const colors = useColors();
@@ -302,7 +295,7 @@ export const ResultCard = React.memo(function ResultCard({
       )}
 
       {/* Distance Input */}
-      <DistanceInput distance={distance} onDistanceChange={onDistanceChange} disabled={distanceLocked} />
+      {/* <DistanceInput distance={distance} onDistanceChange={onDistanceChange} disabled={distanceLocked} /> */}
 
       {/* Editor Modal */}
       <Modal

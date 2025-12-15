@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { Calendar, ChevronRight, Clock, Target, Users } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SectionHeader } from '../_shared/SectionHeader';
 import type { ThemeColors } from './types';
 
 interface UpcomingTraining {
@@ -36,18 +37,18 @@ export function UpcomingTrainingsSection({ colors, trainings }: UpcomingTraining
 
   return (
     <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <View style={styles.headerLeft}>
-          <Calendar size={14} color={colors.textMuted} />
-          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>UPCOMING</Text>
-        </View>
-        <TouchableOpacity
-          onPress={() => router.push('/(protected)/(tabs)/trainings' as any)}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Text style={[styles.sectionLink, { color: colors.textMuted }]}>See all</Text>
-        </TouchableOpacity>
-      </View>
+      <SectionHeader
+        left={<Calendar size={14} color={colors.textMuted} />}
+        title={<Text style={[styles.sectionLabel, { color: colors.textMuted }]}>UPCOMING</Text>}
+        right={
+          <TouchableOpacity
+            onPress={() => router.push('/(protected)/(tabs)/trainings' as any)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={[styles.sectionLink, { color: colors.textMuted }]}>See all</Text>
+          </TouchableOpacity>
+        }
+      />
 
       <View style={styles.list}>
         {sortedTrainings.slice(0, 3).map((training, index) => (
@@ -150,17 +151,6 @@ const styles = StyleSheet.create({
   section: {
     paddingHorizontal: 20,
     marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
   },
   sectionLabel: {
     fontSize: 11,

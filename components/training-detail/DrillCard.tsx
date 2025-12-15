@@ -3,6 +3,7 @@ import { Crosshair, Play, Target } from 'lucide-react-native';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInRight } from 'react-native-reanimated';
 import type { ThemeColors, TrainingDrill, TrainingStatus } from './types';
+import { formatMaxShots } from '@/utils/drillShots';
 
 interface DrillCardProps {
   drill: TrainingDrill;
@@ -81,7 +82,10 @@ export function DrillCard({
             <Text style={[styles.meta, { color: colors.textMuted }]}>{drill.distance_m}m</Text>
             <View style={[styles.metaDot, { backgroundColor: colors.border }]} />
             <Text style={[styles.meta, { color: colors.textMuted }]}>
-              {(drill.strings_count ?? 1)} rounds • {drill.rounds_per_shooter} shots/round
+              {(drill.strings_count ?? 1)} rounds •{' '}
+              {isPaper
+                ? `Scan (max ${formatMaxShots(drill.rounds_per_shooter)})`
+                : `${drill.rounds_per_shooter} shots/round`}
             </Text>
             {drill.time_limit_seconds && (
               <>

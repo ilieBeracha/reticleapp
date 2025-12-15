@@ -372,16 +372,16 @@ getDateRange('2024-11-01', '2024-11-05');
 ## Integration with Backend
 
 ```tsx
+import { supabase } from '@/lib/supabase'
+
 // services/trainingService.ts
 export async function getTrainingEvents(userId: string, orgId?: string) {
-  const client = await AuthenticatedClient.getClient();
-  
-  const { data, error } = await client
+  const { data, error } = await supabase
     .from('trainings')
     .select('*')
     .eq(orgId ? 'org_id' : 'created_by', orgId || userId);
 
-  if (error) throw new DatabaseError(error.message);
+  if (error) throw error;
 
   // Transform to CalendarEvent format
   return data.map(training => ({

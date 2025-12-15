@@ -2,19 +2,18 @@
 
 ## ✨ THE GOLDEN RULE
 
-**There is ONE place to get user and workspace data. Use it everywhere.**
+**Keep a strict layer boundary: services talk to Supabase, stores manage state, screens/components stay thin.**
 
 ```typescript
-// In Components (THE ONLY WAY)
-import { useAppContext } from '@/hooks/useAppContext'
-const { userId, workspaceId, activeWorkspace, isPersonal } = useAppContext()
-
 // In Services (THE ONLY WAY)
-import { getContext } from '@/services/authenticatedClient'
-const { userId, workspaceId } = getContext()
-```
+import { supabase } from '@/lib/supabase'
+// ... queries/mutations here ...
 
-**That's it. No other way exists. Perfect sync guaranteed.**
+// In Screens/Components
+import { useTeamStore } from '@/store/teamStore'
+import { useSessionStore } from '@/store/sessionStore'
+// ... call store actions, render UI ...
+```
 
 ---
 
@@ -47,24 +46,18 @@ export function MyComponent() {
 }
 ```
 
-### Create Context-Aware Service
+### Create a Service (Supabase access)
 
 ```typescript
-import { AuthenticatedClient, getContext } from './authenticatedClient'
+import { supabase } from '@/lib/supabase'
 
 export async function getMyDataService() {
-  const { userId, workspaceId } = getContext()  // ✨ Automatic!
-  const client = await AuthenticatedClient.getClient()
-  
-  let query = client.from("my_table").select("*")
-  
-  if (workspaceId) {
-    query = query.eq("organization_id", workspaceId)  // Org
-  } else {
-    query = query.eq("created_by", userId).is("organization_id", null)  // Personal
-  }
-  
-  const { data } = await query
+  // Use auth-backed Supabase session (persisted in AsyncStorage)
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { data, error } = await supabase.from('my_table').select('*').eq('created_by', user.id)
+  if (error) throw error
   return data
 }
 ```
@@ -85,13 +78,14 @@ hooks/
   useAppContext.ts             ← ✨ THE SINGLE SOURCE OF TRUTH (use everywhere)
 
 services/
-  authenticatedClient.ts       ← Context injection (getContext for services)
+  ...                          ← Supabase queries/mutations (imports `@/lib/supabase`)
   
 contexts/
   AuthContext.tsx              ← Auth management (internal use only)
 
 store/
-  useWorkspaceStore.tsx        ← Workspace cache (internal use only)
+  teamStore.tsx                ← Team + activeTeam state
+  sessionStore.tsx             ← Sessions state
 ```
 
 ---
@@ -100,9 +94,9 @@ store/
 
 ### ✅ DO
 
-1. **Use `useAppContext()` in ALL components**
-2. **Use `getContext()` in ALL services**
-3. **Trust the data - always fresh and synced**
+1. **Keep route files thin** (compose components + call store actions)
+2. **Put DB logic only in `services/`** (import `@/lib/supabase`)
+3. **Extract pure logic into `helpers/`** (no React, no Supabase)
 
 ### ❌ DON'T
 
@@ -140,15 +134,15 @@ WHERE organization_id = workspaceId
 ## Complete System
 
 ```
-useAppContext() (Components)
+app routes (thin)
       ↓
-  getContext() (Services)
+components + hooks (UI + local behavior)
       ↓
-AuthenticatedClient (Auto-injects token + context)
+zustand stores (state + orchestration)
       ↓
-   Supabase
+services (Supabase queries/mutations)
       ↓
-   Database
+Supabase
+      ↓
+Database
 ```
-
-**ONE source → Perfect sync → Simple for devs** ✨

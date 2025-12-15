@@ -18,6 +18,7 @@ import { useSessionStore } from '@/store/sessionStore';
 import { useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
 import type { DrillTemplate, TrainingDrill } from '@/types/workspace';
+import { formatMaxShots, INFINITE_SHOTS_SENTINEL, isInfiniteShots } from '@/utils/drillShots';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
@@ -56,6 +57,7 @@ interface TrainingDrillOption {
   id: string;
   name: string;
   drill_goal: DrillGoal;
+  target_type: TargetType;
   distance_m: number;
   rounds_per_shooter: number;
   time_limit_seconds?: number | null;
@@ -71,6 +73,8 @@ interface TrainingDrillOption {
 const DISTANCE_PRESETS = [10, 15, 25, 50, 100];
 const SHOTS_PRESETS = [5, 10, 15, 20, 30];
 const TIME_PRESETS = [30, 60, 90, 120];
+const MAX_SHOTS_STEP = 1;
+const MAX_SHOTS_LIMIT = 500;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
@@ -98,7 +102,7 @@ export default function CreateSessionScreen() {
     drill_goal: 'grouping',
     target_type: 'paper',
     distance_m: 25,
-    rounds_per_shooter: 5,
+    rounds_per_shooter: INFINITE_SHOTS_SENTINEL, // paper(scan) drills default to infinite max
     time_limit_seconds: null,
   });
 
@@ -109,6 +113,8 @@ export default function CreateSessionScreen() {
   const [drillTemplates, setDrillTemplates] = useState<DrillTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<DrillTemplate | null>(null);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const isPaperDrill = customDrill.target_type === 'paper';
+  const maxShotsIsInfinite = isPaperDrill && isInfiniteShots(customDrill.rounds_per_shooter);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // DATA LOADING
@@ -198,6 +204,7 @@ export default function CreateSessionScreen() {
             id: drill.id,
             name: drill.name,
             drill_goal: drill.drill_goal || 'achievement',
+            target_type: drill.target_type,
             distance_m: drill.distance_m,
             rounds_per_shooter: drill.rounds_per_shooter,
             time_limit_seconds: drill.time_limit_seconds,
@@ -365,7 +372,12 @@ export default function CreateSessionScreen() {
               onPress={() => {
                 Haptics.selectionAsync();
                 // Grouping is always paper
-                setCustomDrill((prev) => ({ ...prev, drill_goal: 'grouping', target_type: 'paper' }));
+                setCustomDrill((prev) => ({
+                  ...prev,
+                  drill_goal: 'grouping',
+                  target_type: 'paper',
+                  rounds_per_shooter: INFINITE_SHOTS_SENTINEL,
+                }));
                 setSelectedTrainingDrill(null);
               }}
             >
@@ -411,7 +423,12 @@ export default function CreateSessionScreen() {
                 ]}
                 onPress={() => {
                   Haptics.selectionAsync();
-                  setCustomDrill((prev) => ({ ...prev, target_type: 'paper' }));
+                  setCustomDrill((prev) => ({
+                    ...prev,
+                    target_type: 'paper',
+                    // When switching to scan drills, default max shots to infinite.
+                    rounds_per_shooter: INFINITE_SHOTS_SENTINEL,
+                  }));
                 }}
               >
                 <Camera size={18} color={customDrill.target_type === 'paper' ? colors.primary : colors.textMuted} />
@@ -429,7 +446,12 @@ export default function CreateSessionScreen() {
                 ]}
                 onPress={() => {
                   Haptics.selectionAsync();
-                  setCustomDrill((prev) => ({ ...prev, target_type: 'tactical' }));
+                  setCustomDrill((prev) => ({
+                    ...prev,
+                    target_type: 'tactical',
+                    // Tactical drills require a concrete rounds-per-round value.
+                    rounds_per_shooter: Math.max(1, Math.min(100, prev.rounds_per_shooter || 5)),
+                  }));
                 }}
               >
                 <Crosshair size={18} color={customDrill.target_type === 'tactical' ? colors.primary : colors.textMuted} />
@@ -491,33 +513,76 @@ export default function CreateSessionScreen() {
           </View>
         </View>
 
-        {/* Shots - Only for tactical targets (paper targets get shots from scan) */}
-        {customDrill.target_type === 'tactical' && (
-          <View style={styles.inputRow}>
-            <View style={styles.inputLabelRow}>
-              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Shots</Text>
-              <View style={[styles.stepper, { backgroundColor: colors.card }]}>
-                <TouchableOpacity
-                  style={styles.stepperBtn}
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    setCustomDrill((prev) => ({ ...prev, rounds_per_shooter: Math.max(1, prev.rounds_per_shooter - 1) }));
-                  }}
-                >
-                  <Minus size={16} color={colors.text} />
-                </TouchableOpacity>
-                <Text style={[styles.stepperValue, { color: colors.text }]}>{customDrill.rounds_per_shooter}</Text>
-                <TouchableOpacity
-                  style={styles.stepperBtn}
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    setCustomDrill((prev) => ({ ...prev, rounds_per_shooter: Math.min(100, prev.rounds_per_shooter + 1) }));
-                  }}
-                >
-                  <Plus size={16} color={colors.text} />
-                </TouchableOpacity>
-              </View>
+        {/* Shots / Max shots */}
+        <View style={styles.inputRow}>
+          <View style={styles.inputLabelRow}>
+            <Text style={[styles.inputLabel, { color: colors.textMuted }]}>
+              {isPaperDrill ? 'Max shots' : 'Shots'}
+            </Text>
+            {isPaperDrill && (
+              <TouchableOpacity
+                style={[
+                  styles.toggleChip,
+                  { backgroundColor: maxShotsIsInfinite ? colors.primary : colors.card },
+                ]}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setCustomDrill((prev) => ({
+                    ...prev,
+                    rounds_per_shooter: isInfiniteShots(prev.rounds_per_shooter) ? 20 : INFINITE_SHOTS_SENTINEL,
+                  }));
+                }}
+              >
+                <Text style={{ color: maxShotsIsInfinite ? '#fff' : colors.textMuted, fontWeight: '600', fontSize: 13 }}>
+                  {maxShotsIsInfinite ? 'Infinite' : 'Set infinite'}
+                </Text>
+              </TouchableOpacity>
+            )}
+            <View style={[styles.stepper, { backgroundColor: colors.card, opacity: isPaperDrill && maxShotsIsInfinite ? 0.85 : 1 }]}>
+              <TouchableOpacity
+                style={styles.stepperBtn}
+                disabled={isPaperDrill && maxShotsIsInfinite}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setCustomDrill((prev) => ({
+                    ...prev,
+                    rounds_per_shooter: Math.max(
+                      1,
+                      Math.min(
+                        isPaperDrill ? MAX_SHOTS_LIMIT : 100,
+                        prev.rounds_per_shooter - MAX_SHOTS_STEP
+                      )
+                    ),
+                  }));
+                }}
+              >
+                <Minus size={16} color={colors.text} />
+              </TouchableOpacity>
+              <Text style={[styles.stepperValue, { color: colors.text }]}>
+                {isPaperDrill ? formatMaxShots(customDrill.rounds_per_shooter) : customDrill.rounds_per_shooter}
+              </Text>
+              <TouchableOpacity
+                style={styles.stepperBtn}
+                disabled={isPaperDrill && maxShotsIsInfinite}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setCustomDrill((prev) => ({
+                    ...prev,
+                    rounds_per_shooter: Math.max(
+                      1,
+                      Math.min(
+                        isPaperDrill ? MAX_SHOTS_LIMIT : 100,
+                        prev.rounds_per_shooter + MAX_SHOTS_STEP
+                      )
+                    ),
+                  }));
+                }}
+              >
+                <Plus size={16} color={colors.text} />
+              </TouchableOpacity>
             </View>
+          </View>
+          {(!isPaperDrill || !maxShotsIsInfinite) && (
             <View style={styles.presetRow}>
               {SHOTS_PRESETS.map((val) => (
                 <TouchableOpacity
@@ -540,8 +605,8 @@ export default function CreateSessionScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
-        )}
+          )}
+        </View>
 
         {/* Time Limit */}
         <View style={styles.inputRow}>
@@ -634,7 +699,10 @@ export default function CreateSessionScreen() {
                         {template.name}
                       </Text>
                       <Text style={[styles.trainingMeta, { color: colors.textMuted }]}>
-                        {template.distance_m}m · {template.rounds_per_shooter} shots
+                        {template.distance_m}m ·{' '}
+                        {template.target_type === 'paper'
+                          ? `Scan (max ${formatMaxShots(template.rounds_per_shooter)})`
+                          : `${template.rounds_per_shooter} shots`}
                         {template.time_limit_seconds ? ` · ${template.time_limit_seconds}s` : ''}
                       </Text>
                       <Text style={[styles.trainingSource, { color: colors.textMuted }]} numberOfLines={1}>
@@ -695,7 +763,10 @@ export default function CreateSessionScreen() {
                       {drill.name}
                     </Text>
                     <Text style={[styles.trainingMeta, { color: colors.textMuted }]}>
-                      {drill.distance_m}m · {drill.rounds_per_shooter} shots
+                      {drill.distance_m}m ·{' '}
+                      {drill.target_type === 'paper'
+                        ? `Scan (max ${formatMaxShots(drill.rounds_per_shooter)})`
+                        : `${drill.rounds_per_shooter} shots`}
                       {drill.time_limit_seconds ? ` · ${drill.time_limit_seconds}s` : ''}
                     </Text>
                     <Text style={[styles.trainingSource, { color: colors.textMuted }]} numberOfLines={1}>
@@ -736,7 +807,7 @@ export default function CreateSessionScreen() {
                 : selectedTemplate
                 ? `Start: ${selectedTemplate.name}`
                 : customDrill.target_type === 'paper'
-                ? `Start: ${customDrill.distance_m}m · Scan`
+                ? `Start: ${customDrill.distance_m}m · Scan (max ${formatMaxShots(customDrill.rounds_per_shooter)})`
                 : `Start: ${customDrill.distance_m}m · ${customDrill.rounds_per_shooter} shots`}
             </Text>
           </>

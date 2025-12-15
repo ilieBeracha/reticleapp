@@ -5,15 +5,17 @@ import { useLocalSearchParams } from "expo-router";
 /**
  * SCAN TARGET - Paper Target Scanning
  * 
- * Route: /(protected)/scanTarget?sessionId=xxx&distance=100&bullets=5&drillGoal=grouping
+ * Route: /(protected)/scanTarget?sessionId=xxx&distance=100&maxShots=30&drillGoal=grouping
  * 
  * Goes directly to camera for scanning paper targets.
  * drillGoal determines whether to save as grouping (dispersion only) or achievement (hit %)
  */
 export default function ScanTargetSheet() {
-  const { sessionId, distance, bullets, locked, drillGoal } = useLocalSearchParams<{
+  const { sessionId, distance, maxShots, bullets, locked, drillGoal } = useLocalSearchParams<{
     sessionId: string;
     distance?: string;
+    maxShots?: string;
+    /** Back-compat (old param name). */
     bullets?: string;
     locked?: string;
     drillGoal?: 'grouping' | 'achievement';
@@ -33,7 +35,7 @@ export default function ScanTargetSheet() {
     <PaperTargetFlow
       sessionId={sessionId}
       defaultDistance={distance ? parseInt(distance) : 100}
-      defaultBullets={bullets ? parseInt(bullets) : 5}
+      defaultMaxShots={maxShots ? parseInt(maxShots) : bullets ? parseInt(bullets) : undefined}
       lockDistance={locked === '1'}
       paperType={paperType}
     />

@@ -540,22 +540,25 @@ export async function getMyTrainingStats(): Promise<{
     return { upcoming: 0, completed: 0, total: 0 };
   }
 
-  // Count trainings by status
-  const { data, error } = await supabase
-    .from('trainings')
-    .select('status')
-    .in('team_id', teamIds);
+  // Count trainings by status without fetching rows (bounded payload).
+  const base = supabase.from('trainings').select('id', { count: 'exact', head: true }).in('team_id', teamIds);
 
-  if (error) {
-    console.error('Failed to fetch training stats:', error);
+  const [{ count: totalCount, error: totalError }, { count: upcomingCount, error: upcomingError }, { count: completedCount, error: completedError }] =
+    await Promise.all([
+      base,
+      base.in('status', ['planned', 'ongoing']),
+      base.eq('status', 'finished'),
+    ]);
+
+  if (totalError || upcomingError || completedError) {
+    console.error('Failed to fetch training stats:', totalError || upcomingError || completedError);
     return { upcoming: 0, completed: 0, total: 0 };
   }
 
-  const trainings = data || [];
   return {
-    upcoming: trainings.filter(t => t.status === 'planned' || t.status === 'ongoing').length,
-    completed: trainings.filter(t => t.status === 'finished').length,
-    total: trainings.length,
+    upcoming: upcomingCount ?? 0,
+    completed: completedCount ?? 0,
+    total: totalCount ?? 0,
   };
 }
 

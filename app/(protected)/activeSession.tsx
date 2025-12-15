@@ -17,6 +17,7 @@ import {
   SessionWithDetails
 } from '@/services/sessionService';
 import { useSessionStore } from '@/store/sessionStore';
+import { formatMaxShots, isInfiniteShots } from '@/utils/drillShots';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
@@ -129,18 +130,23 @@ export default function ActiveSessionScreen() {
     
     // === Drill semantics (IMPORTANT) ===
     // - strings_count = how many rounds/repetitions
-    // - rounds_per_shooter = bullets per round (per entry)
+    // - tactical: rounds_per_shooter = bullets per round (per entry)
+    // - paper(scan): rounds_per_shooter = MAX allowed shots cap (default: infinite)
     // Each "round" corresponds to one target entry (user fills the form once per round).
     const rounds = drill.strings_count && drill.strings_count > 0 ? drill.strings_count : 1;
+    const isPaper = drill.target_type === 'paper';
     const bulletsPerRound = drill.rounds_per_shooter;
 
-    const requiredRounds = bulletsPerRound * rounds; // total bullets required
     const requiredTargets = rounds; // number of entries required
+    const requiredRounds = isPaper ? 0 : bulletsPerRound * rounds; // paper drills are target-count based
 
-    const shotsProgress = requiredRounds > 0 ? Math.min(100, Math.round((totalShots / requiredRounds) * 100)) : 0;
+    const shotsProgress =
+      !isPaper && requiredRounds > 0 ? Math.min(100, Math.round((totalShots / requiredRounds) * 100)) : 0;
     const targetsProgress = requiredTargets > 0 ? Math.min(100, Math.round((targets.length / requiredTargets) * 100)) : 0;
     
-    const isComplete = totalShots >= requiredRounds && targets.length >= requiredTargets;
+    const isComplete = isPaper
+      ? targets.length >= requiredTargets
+      : totalShots >= requiredRounds && targets.length >= requiredTargets;
     const meetsAccuracy = !drill.min_accuracy_percent || accuracy >= drill.min_accuracy_percent;
     const meetsTime = !drill.time_limit_seconds || elapsedTime <= drill.time_limit_seconds;
     
@@ -155,6 +161,7 @@ export default function ActiveSessionScreen() {
       meetsAccuracy,
       meetsTime,
       overTime: drill.time_limit_seconds ? elapsedTime > drill.time_limit_seconds : false,
+      isPaper,
     };
   }, [drill, totalShots, targets.length, accuracy, elapsedTime]);
 
@@ -162,8 +169,13 @@ export default function ActiveSessionScreen() {
   const nextTargetPlan = useMemo(() => {
     if (!drillProgress || !drill) return null;
 
-    const remainingShots = Math.max(0, drillProgress.requiredRounds - totalShots);
     const remainingTargets = Math.max(0, drillProgress.requiredTargets - targets.length);
+    if (drill.target_type === 'paper') {
+      // Paper drills are target-count based; shots are detected from scan and not pre-planned.
+      return { remainingShots: 0, remainingTargets, nextBullets: 0 };
+    }
+
+    const remainingShots = Math.max(0, drillProgress.requiredRounds - totalShots);
 
     if (remainingShots <= 0 || remainingTargets <= 0) {
       return { remainingShots, remainingTargets, nextBullets: 0 };
@@ -250,7 +262,7 @@ export default function ActiveSessionScreen() {
         Alert.alert('Wrong target type', 'This drill requires tactical targets.');
         return;
       }
-      if (nextTargetPlan.remainingShots <= 0 || nextTargetPlan.remainingTargets <= 0) {
+      if (nextTargetPlan.remainingTargets <= 0) {
         Alert.alert(
           'Drill complete',
           'You have reached the required targets/rounds. End the session to submit.'
@@ -265,8 +277,8 @@ export default function ActiveSessionScreen() {
         sessionId,
         distance: defaultDistance.toString(),
         ...(hasDrill ? { locked: '1' } : {}),
-        ...(hasDrill && nextTargetPlan?.nextBullets
-          ? { bullets: String(nextTargetPlan.nextBullets) }
+        ...(hasDrill && drill && !isInfiniteShots(drill.rounds_per_shooter)
+          ? { maxShots: String(drill.rounds_per_shooter) }
           : {}),
         // Pass drill_goal so scanTarget knows whether to save as grouping or achievement
         ...(drill?.drill_goal ? { drillGoal: drill.drill_goal } : {}),
@@ -322,8 +334,15 @@ export default function ActiveSessionScreen() {
       ? [
           `This drill has requirements that are not met yet.`,
           ``,
-          `Shots: ${totalShots}/${drillProgress.requiredRounds}`,
-          `Targets: ${targets.length}/${drillProgress.requiredTargets}`,
+          ...(drill?.target_type === 'paper'
+            ? [
+                `Targets: ${targets.length}/${drillProgress.requiredTargets}`,
+                `Max shots: ${formatMaxShots(drill.rounds_per_shooter)}`,
+              ]
+            : [
+                `Shots: ${totalShots}/${drillProgress.requiredRounds}`,
+                `Targets: ${targets.length}/${drillProgress.requiredTargets}`,
+              ]),
           ...(drill?.min_accuracy_percent
             ? [`Accuracy: ${accuracy}% (min ${drill.min_accuracy_percent}%)`]
             : []),
@@ -486,7 +505,11 @@ export default function ActiveSessionScreen() {
   const isTacticalDrill = isTacticalTarget;
   
   const drillLimitReached =
-    !!drill && !!nextTargetPlan && (nextTargetPlan.remainingShots <= 0 || nextTargetPlan.remainingTargets <= 0);
+    !!drill &&
+    !!nextTargetPlan &&
+    (drill.target_type === 'paper'
+      ? nextTargetPlan.remainingTargets <= 0
+      : nextTargetPlan.remainingShots <= 0 || nextTargetPlan.remainingTargets <= 0);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -543,7 +566,9 @@ export default function ActiveSessionScreen() {
                     ) : (
                       <>
                         <Camera size={12} color={colors.textMuted} />
-                        <Text style={[styles.drillReqText, { color: colors.text }]}>Scan</Text>
+                        <Text style={[styles.drillReqText, { color: colors.text }]}>
+                          Scan (max {formatMaxShots(drill.rounds_per_shooter)})
+                        </Text>
                       </>
                     )}
                   </View>
@@ -731,11 +756,11 @@ export default function ActiveSessionScreen() {
             >
               <Camera size={20} color="#fff" />
               <Text style={styles.scanButtonText}>
-                {isGroupingDrill
-                  ? (nextTargetPlan?.nextBullets
-                      ? `Scan (${nextTargetPlan.nextBullets}rds)`
-                      : 'Scan Grouping')
-                  : 'Scan'}
+                {hasDrill && drill?.target_type === 'paper'
+                  ? `Scan (max ${formatMaxShots(drill.rounds_per_shooter)})`
+                  : isGroupingDrill
+                    ? 'Scan Grouping'
+                    : 'Scan'}
               </Text>
             </TouchableOpacity>
           )}

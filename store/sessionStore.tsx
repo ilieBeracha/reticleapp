@@ -1,4 +1,5 @@
-import { createSession, CreateSessionParams, getSessions, getTeamSessions, SessionWithDetails } from "@/services/sessionService";
+import { createSession, CreateSessionParams, getSessionsPage, getTeamSessionsPage, SessionWithDetails } from "@/services/sessionService";
+import { defaultAsyncState, shouldShowInitialLoading } from "@/store/_shared/asyncState";
 import { create } from "zustand";
 import { useTeamStore } from "./teamStore";
 
@@ -24,9 +25,7 @@ interface SessionStore {
  */
 export const useSessionStore = create<SessionStore>((set, get) => ({
   sessions: [],
-  loading: false,
-  initialized: false,
-  error: null,
+  ...defaultAsyncState,
   
   createSession: async (params: CreateSessionParams) => {
     set({ loading: true, error: null });
@@ -49,12 +48,12 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     
     // Always show loading on first load
     const { initialized } = get();
-    if (!initialized) {
+    if (shouldShowInitialLoading(initialized)) {
       set({ loading: true, error: null });
     }
     
     try {
-      const sessions = await getSessions();
+      const sessions = await getSessionsPage({ limit: 50 });
       set({ sessions, loading: false, initialized: true, error: null });
     } catch (error: any) {
       set({ error: error.message, loading: false, initialized: true });
@@ -68,13 +67,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     
     // Always show loading on first load
     const { initialized } = get();
-    if (!initialized) {
+    if (shouldShowInitialLoading(initialized)) {
       set({ loading: true, error: null });
     }
     
     try {
       // Pass null to get ONLY personal sessions (no team_id)
-      const sessions = await getSessions(null);
+      const sessions = await getSessionsPage({ teamId: null, limit: 50 });
       set({ sessions, loading: false, initialized: true, error: null });
     } catch (error: any) {
       set({ error: error.message, loading: false, initialized: true });
@@ -94,12 +93,12 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
     // Always show loading on first load
     const { initialized } = get();
-    if (!initialized) {
+    if (shouldShowInitialLoading(initialized)) {
       set({ loading: true, error: null });
     }
     
     try {
-      const sessions = await getTeamSessions(teamId);
+      const sessions = await getTeamSessionsPage(teamId, { limit: 50 });
       set({ sessions, loading: false, initialized: true, error: null });
     } catch (error: any) {
       set({ error: error.message, loading: false, initialized: true });
@@ -107,5 +106,5 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }
   },
   
-  reset: () => set({ sessions: [], loading: false, initialized: false, error: null }),
+  reset: () => set({ sessions: [], ...defaultAsyncState }),
 }));

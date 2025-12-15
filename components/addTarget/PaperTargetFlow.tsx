@@ -6,6 +6,7 @@ import {
 } from "@/services/detectionService";
 import { addTargetWithPaperResult, PaperType } from "@/services/sessionService";
 import { useDetectionStore } from "@/store/detectionStore";
+import { finiteShotsOrNull, INFINITE_SHOTS_SENTINEL } from "@/utils/drillShots";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
@@ -29,7 +30,8 @@ import { COLORS, EditableDetection, Step } from "./types";
 interface PaperTargetFlowProps {
   sessionId: string;
   defaultDistance?: number;
-  defaultBullets?: number;
+  /** Drill cap for scan targets (max shots). Use `undefined` for infinite. */
+  defaultMaxShots?: number;
   lockDistance?: boolean;
   paperType?: PaperType;  // grouping (dispersion) or achievement (hit %)
   onComplete?: () => void;
@@ -39,7 +41,7 @@ interface PaperTargetFlowProps {
 export function PaperTargetFlow({
   sessionId,
   defaultDistance = 100,
-  defaultBullets = 5,
+  defaultMaxShots,
   lockDistance = false,
   paperType: propPaperType = 'grouping',
   onComplete,
@@ -67,7 +69,7 @@ export function PaperTargetFlow({
   
   // Configurable values
   const [distance, setDistance] = useState(defaultDistance);
-  const [bullets] = useState(defaultBullets);
+  const [maxShots] = useState(defaultMaxShots ?? INFINITE_SHOTS_SENTINEL);
 
   // Paper settings - use prop value
   const paperType = propPaperType;
@@ -228,12 +230,12 @@ export function PaperTargetFlow({
         // For scanned targets:
         // - bullets_fired = detected holes (what the scan found)
         // - hits_total = detected holes (all detected are hits on paper)
-        // - planned_shots = drill's rounds_per_shooter for tracking (if provided)
+        // - planned_shots = drill's max shots cap for tracking (null = infinite)
         await addTargetWithPaperResult({
           session_id: sessionId,
           distance_m: distance,
           lane_number: null,
-          planned_shots: bullets > 0 ? bullets : null, // From drill config if available
+          planned_shots: finiteShotsOrNull(maxShots),
           notes: paperNotes || null,
           target_data: null,
           paper_type: paperType,
@@ -266,7 +268,7 @@ export function PaperTargetFlow({
         setSaving(false);
       }
     },
-    [sessionId, distance, bullets, result, paperType, paperNotes, resetDetection, onComplete]
+    [sessionId, distance, maxShots, result, paperType, paperNotes, resetDetection, onComplete]
   );
 
   // Results view
@@ -279,9 +281,6 @@ export function PaperTargetFlow({
         saving={saving}
         editedDetections={editedDetections}
         onDetectionsChange={setEditedDetections}
-        distance={distance}
-        onDistanceChange={setDistance}
-        distanceLocked={lockDistance}
         targetType={paperType} // Pass paper_type to show appropriate metrics
       />
     );

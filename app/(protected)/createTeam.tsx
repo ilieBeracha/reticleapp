@@ -1,13 +1,8 @@
+import { useCreateTeamForm } from "@/hooks/team/useCreateTeamForm";
 import { useColors } from "@/hooks/ui/useColors";
-import { useTeamStore } from "@/store/teamStore";
 import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from 'expo-haptics';
-import { router } from "expo-router";
-import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
-  Keyboard,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,94 +11,34 @@ import {
   View,
 } from "react-native";
 
-// Squad templates
-const SQUAD_TEMPLATES = [
-  { label: 'Alpha, Bravo, Charlie', squads: ['Alpha', 'Bravo', 'Charlie'] },
-  { label: '1st, 2nd, 3rd', squads: ['1st Squad', '2nd Squad', '3rd Squad'] },
-  { label: 'Red, Blue, Green', squads: ['Red', 'Blue', 'Green'] },
-];
-
 /**
  * CREATE TEAM - Native Form Sheet
  * Team-First Architecture: Teams are the primary entity
  */
 export default function CreateTeamSheet() {
   const colors = useColors();
-  const { createTeam, setActiveTeam } = useTeamStore();
-
-  const [teamName, setTeamName] = useState("");
-  const [teamDescription, setTeamDescription] = useState("");
-  const [squads, setSquads] = useState<string[]>([]);
-  const [newSquadName, setNewSquadName] = useState("");
-  const [showSquadSection, setShowSquadSection] = useState(false);
-  const [step, setStep] = useState<'form' | 'success'>('form');
-  const [createdTeam, setCreatedTeam] = useState<{ id: string; name: string } | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleCreate = useCallback(async () => {
-    if (!teamName.trim()) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert("Team Name Required", "Please enter a name for your team.");
-      return;
-    }
-
-    Keyboard.dismiss();
-    setSubmitting(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    try {
-      const team = await createTeam({
-        name: teamName.trim(),
-        description: teamDescription.trim() || undefined,
-        squads: squads.length > 0 ? squads : undefined,
-      });
-
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setCreatedTeam({ id: team.id, name: team.name });
-      setStep('success');
-    } catch (error: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Error", error.message || "Failed to create team");
-    } finally {
-      setSubmitting(false);
-    }
-  }, [teamName, teamDescription, squads, createTeam]);
-
-  const handleOpenTeam = useCallback(() => {
-    if (!createdTeam) return;
-    
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setActiveTeam(createdTeam.id);
-    
-    // Navigate to home (dismiss the sheet)
-    if (router.canDismiss()) {
-      router.dismiss();
-    }
-  }, [createdTeam, setActiveTeam]);
-
-  const handleAddSquad = useCallback(() => {
-    const trimmedName = newSquadName.trim();
-    if (!trimmedName) return;
-
-    if (squads.includes(trimmedName)) {
-      Alert.alert("Duplicate", "This squad name already exists");
-      return;
-    }
-
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSquads([...squads, trimmedName]);
-    setNewSquadName("");
-  }, [newSquadName, squads]);
-
-  const handleRemoveSquad = useCallback((squadName: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSquads(squads.filter(s => s !== squadName));
-  }, [squads]);
-
-  const handleApplyTemplate = useCallback((template: string[]) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSquads(template);
-  }, []);
+  const {
+    teamName,
+    teamDescription,
+    squads,
+    newSquadName,
+    showSquadSection,
+    step,
+    createdTeam,
+    submitting,
+    canSubmit,
+    squadTemplates,
+    setTeamName,
+    setTeamDescription,
+    setNewSquadName,
+    toggleSquadSection,
+    handleCreate,
+    handleOpenTeam,
+    handleAddSquad,
+    handleRemoveSquad,
+    handleApplyTemplate,
+    clearAllSquads,
+  } = useCreateTeamForm();
 
   // Success state
   if (step === 'success' && createdTeam) {
@@ -199,7 +134,7 @@ export default function CreateTeamSheet() {
         {/* Squads Toggle */}
         <TouchableOpacity
           style={[styles.squadToggle, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={() => setShowSquadSection(!showSquadSection)}
+          onPress={toggleSquadSection}
           activeOpacity={0.7}
         >
           <View style={styles.squadToggleLeft}>
@@ -224,7 +159,7 @@ export default function CreateTeamSheet() {
               <View style={styles.templatesSection}>
                 <Text style={[styles.templatesLabel, { color: colors.textMuted }]}>Quick templates:</Text>
                 <View style={styles.templateChips}>
-                  {SQUAD_TEMPLATES.map((template, index) => (
+                  {squadTemplates.map((template, index) => (
                     <TouchableOpacity
                       key={index}
                       style={[styles.templateChip, { backgroundColor: colors.secondary }]}
@@ -277,7 +212,7 @@ export default function CreateTeamSheet() {
 
             {/* Clear All */}
             {squads.length > 0 && (
-              <TouchableOpacity style={styles.clearAllBtn} onPress={() => setSquads([])}>
+              <TouchableOpacity style={styles.clearAllBtn} onPress={clearAllSquads}>
                 <Ionicons name="trash-outline" size={14} color={colors.destructive} />
                 <Text style={[styles.clearAllText, { color: colors.destructive }]}>Clear all</Text>
               </TouchableOpacity>
@@ -303,7 +238,7 @@ export default function CreateTeamSheet() {
             }
           ]}
           onPress={handleCreate}
-          disabled={!teamName.trim() || submitting}
+          disabled={!canSubmit}
           activeOpacity={0.8}
         >
           {submitting ? (

@@ -1,6 +1,14 @@
 import { AuthenticationError } from "@/lib/errors";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
+/**
+ * @deprecated
+ * This repo standardizes on `@/lib/supabase` for all services.
+ * Do not introduce new usage of `AuthenticatedClient`.
+ *
+ * Kept temporarily for legacy references/documentation cleanup.
+ */
+
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 

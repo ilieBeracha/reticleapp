@@ -1,5 +1,5 @@
 import { useColors } from '@/hooks/ui/useColors';
-import { getSessionsWithStats, type SessionWithDetails } from '@/services/sessionService';
+import { getRecentSessionsWithStats, type SessionWithDetails } from '@/services/sessionService';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -150,7 +150,7 @@ export function InsightsDashboard() {
 
   const loadSessionsWithStats = useCallback(async () => {
     try {
-      const sessions = await getSessionsWithStats();
+      const sessions = await getRecentSessionsWithStats({ days: 365, limit: 500 });
       setSessionsWithStats(sessions);
     } catch (error) {
       console.error('Failed to load sessions with stats:', error);

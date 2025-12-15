@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { ChevronRight, Clock, History, Target, Zap } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SectionHeader } from '../_shared/SectionHeader';
 import type { SessionWithDetails, ThemeColors } from './types';
 
 interface RecentSessionsSectionProps {
@@ -14,12 +15,10 @@ export function RecentSessionsSection({ colors, sessions }: RecentSessionsSectio
   if (sessions.length === 0) {
     return (
       <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <View style={styles.headerLeft}>
-            <History size={14} color={colors.textMuted} />
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>RECENT</Text>
-          </View>
-        </View>
+        <SectionHeader
+          left={<History size={14} color={colors.textMuted} />}
+          title={<Text style={[styles.sectionLabel, { color: colors.textMuted }]}>RECENT</Text>}
+        />
         <View style={[styles.emptyState, { borderColor: colors.border, backgroundColor: colors.card }]}>
           <Zap size={20} color={colors.textMuted} />
           <Text style={[styles.emptyText, { color: colors.textMuted }]}>
@@ -35,18 +34,18 @@ export function RecentSessionsSection({ colors, sessions }: RecentSessionsSectio
 
   return (
     <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <View style={styles.headerLeft}>
-          <History size={14} color={colors.textMuted} />
-          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>RECENT</Text>
-        </View>
-        <TouchableOpacity
-          onPress={() => router.push('/(protected)/(tabs)/insights' )}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Text style={[styles.sectionLink, { color: colors.textMuted }]}>See all</Text>
-        </TouchableOpacity>
-      </View>
+      <SectionHeader
+        left={<History size={14} color={colors.textMuted} />}
+        title={<Text style={[styles.sectionLabel, { color: colors.textMuted }]}>RECENT</Text>}
+        right={
+          <TouchableOpacity
+            onPress={() => router.push('/(protected)/(tabs)/insights')}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={[styles.sectionLink, { color: colors.textMuted }]}>See all</Text>
+          </TouchableOpacity>
+        }
+      />
 
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {sessions.map((session, index) => (
@@ -126,17 +125,6 @@ const styles = StyleSheet.create({
   section: {
     paddingHorizontal: 20,
     marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
   },
   sectionLabel: {
     fontSize: 11,

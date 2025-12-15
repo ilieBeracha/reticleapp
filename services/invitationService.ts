@@ -1,5 +1,5 @@
 import type { TeamInvitation, TeamInvitationWithDetails, TeamMemberShip } from '@/types/workspace';
-import { AuthenticatedClient } from './authenticatedClient';
+import { supabase } from '@/lib/supabase';
 import { notifyInviteAccepted } from './notifications';
 
 /**
@@ -24,8 +24,6 @@ export async function createInvitation(
     teamRole?: TeamMemberShip | null,
     teamDetails?: Record<string, any>
   ): Promise<TeamInvitation> {
-  const supabase = await AuthenticatedClient.getClient();
-
   if (!teamId) {
     throw new Error('Team ID is required to create an invitation');
   }
@@ -94,8 +92,6 @@ export async function createInvitation(
  * Get all invitations for a team (team-first architecture)
  */
 export async function getTeamInvitations(teamId: string): Promise<TeamInvitationWithDetails[]> {
-  const supabase = await AuthenticatedClient.getClient();
-
   const { data, error } = await supabase
     .from('team_invitations')
     .select(`
@@ -155,8 +151,6 @@ export async function getPendingInvitations(teamId: string): Promise<TeamInvitat
  * Cancel an invitation
  */
 export async function cancelInvitation(invitationId: string): Promise<void> {
-  const supabase = await AuthenticatedClient.getClient();
-
   const { error } = await supabase
     .from('team_invitations')
     .update({
@@ -176,8 +170,6 @@ export async function cancelInvitation(invitationId: string): Promise<void> {
  * Validate an invite code - direct query approach
  */
 export async function validateInviteCode(inviteCode: string): Promise<TeamInvitationWithDetails | null> {
-  const supabase = await AuthenticatedClient.getClient();
-
   // Get current user
   const {
     data: { user },
@@ -235,8 +227,6 @@ export async function validateInviteCode(inviteCode: string): Promise<TeamInvita
  * Accept an invitation and add user to team using RPC (atomic operation)
  */
 export async function acceptInvitation(inviteCode: string): Promise<void> {
-  const supabase = await AuthenticatedClient.getClient();
-
   // Get current user
   const {
     data: { user },
@@ -291,8 +281,6 @@ export async function acceptInvitation(inviteCode: string): Promise<void> {
  * Delete an invitation (hard delete)
  */
 export async function deleteInvitation(invitationId: string): Promise<void> {
-  const supabase = await AuthenticatedClient.getClient();
-
   const { error } = await supabase.from('team_invitations').delete().eq('id', invitationId);
 
   if (error) {
@@ -305,8 +293,6 @@ export async function deleteInvitation(invitationId: string): Promise<void> {
  * Expire old invitations (utility function)
  */
 export async function expireOldInvitations(): Promise<number> {
-  const supabase = await AuthenticatedClient.getClient();
-
   const { data, error } = await supabase
     .from('team_invitations')
     .update({
