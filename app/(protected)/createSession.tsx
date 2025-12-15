@@ -10,6 +10,7 @@ import { useColors } from '@/hooks/ui/useColors';
 import { getTeamDrillTemplates } from '@/services/drillTemplateService';
 import {
   createSession,
+  deleteSession,
   getMyActiveSession,
   type SessionWithDetails,
 } from '@/services/sessionService';
@@ -121,7 +122,7 @@ export default function CreateSessionScreen() {
           if (activeSession) {
             Alert.alert(
               'Active Session',
-              `You have an active session${activeSession.drill_name ? ` for "${activeSession.drill_name}"` : ''}. Continue it?`,
+              `You have an active session${activeSession.drill_name ? ` for "${activeSession.drill_name}"` : ''}. What would you like to do?`,
               [
                 {
                   text: 'Continue',
@@ -130,6 +131,20 @@ export default function CreateSessionScreen() {
                       pathname: '/(protected)/activeSession',
                       params: { sessionId: activeSession.id },
                     });
+                  },
+                },
+                {
+                  text: 'Delete & Start New',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await deleteSession(activeSession.id);
+                      setCheckingSession(false);
+                    } catch (err) {
+                      console.error('Failed to delete session:', err);
+                      Alert.alert('Error', 'Failed to delete session');
+                      router.back();
+                    }
                   },
                 },
                 { text: 'Cancel', style: 'cancel', onPress: () => router.back() },

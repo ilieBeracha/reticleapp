@@ -1,5 +1,5 @@
 import { useColors } from '@/hooks/ui/useColors';
-import { getMyActivePersonalSession } from '@/services/sessionService';
+import { deleteSession, getMyActivePersonalSession } from '@/services/sessionService';
 import { Button, ContextMenu, Host } from '@expo/ui/swift-ui';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
@@ -7,12 +7,13 @@ import { router } from 'expo-router';
 import { Bell, Plus } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    Image,
-    Platform,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Image,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 interface HeaderProps {
@@ -53,7 +54,32 @@ export function Header({ onNotificationPress }: HeaderProps) {
       // Check for existing active session first
       const existing = await getMyActivePersonalSession();
       if (existing) {
-        router.push(`/(protected)/activeSession?sessionId=${existing.id}` as any);
+        Alert.alert(
+          'Active Session',
+          `You have an active session${existing.drill_name ? ` for "${existing.drill_name}"` : ''}. What would you like to do?`,
+          [
+            {
+              text: 'Continue',
+              onPress: () => {
+                router.push(`/(protected)/activeSession?sessionId=${existing.id}` as any);
+              },
+            },
+            {
+              text: 'Delete & Start New',
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  await deleteSession(existing.id);
+                  router.push('/(protected)/createSession' as any);
+                } catch (err) {
+                  console.error('Failed to delete session:', err);
+                  Alert.alert('Error', 'Failed to delete session');
+                }
+              },
+            },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
         return;
       }
       // Drill-first: route to drill selection screen

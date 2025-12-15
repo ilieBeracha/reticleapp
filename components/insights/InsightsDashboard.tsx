@@ -1,7 +1,51 @@
 import { useColors } from '@/hooks/ui/useColors';
 import { getSessionsWithStats, type SessionWithDetails } from '@/services/sessionService';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+// Time filter type
+type TimeFilter = 'week' | 'month' | 'year' | 'all';
+
+// Time filter button component
+function TimeFilterButton({ 
+  filter, 
+  selected, 
+  onPress, 
+  colors 
+}: { 
+  filter: TimeFilter; 
+  selected: boolean; 
+  onPress: () => void;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const labels: Record<TimeFilter, string> = {
+    week: '7D',
+    month: '30D',
+    year: '1Y',
+    all: 'All',
+  };
+  
+  return (
+    <TouchableOpacity
+      style={[
+        styles.filterButton,
+        { 
+          backgroundColor: selected ? colors.primary : colors.card,
+          borderColor: selected ? colors.primary : colors.border,
+        }
+      ]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <Text style={[
+        styles.filterButtonText,
+        { color: selected ? '#fff' : colors.textMuted }
+      ]}>
+        {labels[filter]}
+      </Text>
+    </TouchableOpacity>
+  );
+}
 
 import {
   EmptyState,
@@ -41,13 +85,22 @@ function CompactStatsRow({ sessions }: { sessions: SessionWithDetails[] }) {
         acc.shots += s.stats.shots_fired;
         acc.hits += s.stats.hits_total;
         acc.targets += s.stats.target_count;
+        // Collect dispersion values for avg grouping
+        if (s.stats.best_dispersion_cm != null) {
+          acc.dispersions.push(s.stats.best_dispersion_cm);
+        }
       }
       return acc;
     },
-    { completed: 0, shots: 0, hits: 0, targets: 0 }
+    { completed: 0, shots: 0, hits: 0, targets: 0, dispersions: [] as number[] }
   );
 
   const accuracy = stats.shots > 0 ? Math.round((stats.hits / stats.shots) * 100) : 0;
+  
+  // Calculate avg grouping from best dispersions
+  const avgGrouping = stats.dispersions.length > 0
+    ? (stats.dispersions.reduce((a, b) => a + b, 0) / stats.dispersions.length).toFixed(1)
+    : null;
 
   return (
     <View style={[styles.compactStatsRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -57,18 +110,20 @@ function CompactStatsRow({ sessions }: { sessions: SessionWithDetails[] }) {
       </View>
       <View style={[styles.compactStatDivider, { backgroundColor: colors.border }]} />
       <View style={styles.compactStat}>
-        <Text style={[styles.compactStatValue, { color: colors.text }]}>{stats.shots.toLocaleString()}</Text>
-        <Text style={[styles.compactStatLabel, { color: colors.textMuted }]}>Shots</Text>
-      </View>
-      <View style={[styles.compactStatDivider, { backgroundColor: colors.border }]} />
-      <View style={styles.compactStat}>
         <Text style={[styles.compactStatValue, { color: colors.text }]}>{accuracy}%</Text>
         <Text style={[styles.compactStatLabel, { color: colors.textMuted }]}>Accuracy</Text>
       </View>
       <View style={[styles.compactStatDivider, { backgroundColor: colors.border }]} />
       <View style={styles.compactStat}>
-        <Text style={[styles.compactStatValue, { color: colors.text }]}>{stats.targets}</Text>
-        <Text style={[styles.compactStatLabel, { color: colors.textMuted }]}>Targets</Text>
+        <Text style={[styles.compactStatValue, { color: avgGrouping ? colors.text : colors.textMuted }]}>
+          {avgGrouping ? `${avgGrouping}cm` : '—'}
+        </Text>
+        <Text style={[styles.compactStatLabel, { color: colors.textMuted }]}>Avg Group</Text>
+      </View>
+      <View style={[styles.compactStatDivider, { backgroundColor: colors.border }]} />
+      <View style={styles.compactStat}>
+        <Text style={[styles.compactStatValue, { color: colors.text }]}>{stats.shots.toLocaleString()}</Text>
+        <Text style={[styles.compactStatLabel, { color: colors.textMuted }]}>Shots</Text>
       </View>
     </View>
   );
@@ -89,6 +144,9 @@ export function InsightsDashboard() {
   const [sessionsWithStats, setSessionsWithStats] = useState<SessionWithDetails[]>([]);
   const [loadingStats, setLoadingStats] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Time filter state
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
 
   const loadSessionsWithStats = useCallback(async () => {
     try {
@@ -110,6 +168,22 @@ export function InsightsDashboard() {
     await Promise.all([storeRefresh(), loadSessionsWithStats()]);
     setRefreshing(false);
   }, [storeRefresh, loadSessionsWithStats]);
+
+  // Filter sessions based on time selection
+  const filteredSessions = useMemo(() => {
+    if (timeFilter === 'all') return sessionsWithStats;
+    
+    const now = new Date();
+    const thresholdDays: Record<Exclude<TimeFilter, 'all'>, number> = {
+      week: 7,
+      month: 30,
+      year: 365,
+    };
+    const days = thresholdDays[timeFilter];
+    const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    
+    return sessionsWithStats.filter(s => new Date(s.started_at) >= cutoff);
+  }, [sessionsWithStats, timeFilter]);
 
   const isLoading = storeLoading || loadingStats;
 
@@ -133,33 +207,46 @@ export function InsightsDashboard() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.text} />
         }
       >
-        {/* Header */}
-        <Text style={[styles.pageTitle, { color: colors.text }]}>Insights</Text>
+        {/* Header with Filter */}
+        <View style={styles.headerRow}>
+          <Text style={[styles.pageTitle, { color: colors.text }]}>Insights</Text>
+          <View style={styles.filterRow}>
+            {(['week', 'month', 'year', 'all'] as TimeFilter[]).map((filter) => (
+              <TimeFilterButton
+                key={filter}
+                filter={filter}
+                selected={timeFilter === filter}
+                onPress={() => setTimeFilter(filter)}
+                colors={colors}
+              />
+            ))}
+          </View>
+        </View>
 
         {hasData ? (
           <>
             {/* Overview Section */}
             <SectionHeader title="Overview" />
-            <CompactStatsRow sessions={sessionsWithStats} />
+            <CompactStatsRow sessions={filteredSessions} />
 
             {/* Trends Section */}
             <SectionHeader title="Trends" subtitle="Your progress over time" />
             <View style={styles.cardGroup}>
-              <MonthlyComparisonCard sessions={sessionsWithStats} />
-              <ShotGoalCard sessions={sessionsWithStats} monthlyGoal={1000} />
+              <MonthlyComparisonCard sessions={filteredSessions} />
+              <ShotGoalCard sessions={filteredSessions} monthlyGoal={1000} />
               <StreakCard sessions={storeSessions} colors={colors} />
             </View>
 
             {/* Performance Section */}
             <SectionHeader title="Performance" subtitle="Detailed breakdown" />
             <View style={styles.cardGroup}>
-              <DistanceBreakdownCard sessions={sessionsWithStats} />
-              <SessionTypeCard sessions={sessionsWithStats} />
+              <DistanceBreakdownCard sessions={filteredSessions} />
+              <SessionTypeCard sessions={filteredSessions} />
             </View>
 
             {/* All-Time Section */}
             <SectionHeader title="All-Time" subtitle="Lifetime statistics" />
-            <AllTimeStatsCard sessions={sessionsWithStats} />
+            <AllTimeStatsCard sessions={filteredSessions} />
           </>
         ) : (
           <EmptyState colors={colors} />
@@ -186,11 +273,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'ios' ? 8 : 16,
   },
+  
+  // Header with filter
+  headerRow: {
+    marginBottom: 8,
+  },
   pageTitle: {
     fontSize: 28,
     fontWeight: '800',
     letterSpacing: -0.5,
-    marginBottom: 20,
+    marginBottom: 12,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  filterButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  filterButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 
   // Section Header

@@ -175,6 +175,36 @@ export default function ProtectedLayout() {
             sheetLargestUndimmedDetentIndex: -1,
           }}
         />
+
+        {/* Team Members */}
+        <Stack.Screen
+          name="teamMembers"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.7, 0.95],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+          }}
+        />
+
+        {/* Team Settings */}
+        <Stack.Screen
+          name="teamSettings"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.85, 0.95],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+          }}
+        />
         
         {/* Team Preview */}
         <Stack.Screen

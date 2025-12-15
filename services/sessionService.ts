@@ -722,6 +722,187 @@ export async function getSessionsWithStats(teamId?: string | null): Promise<Sess
 }
 
 /**
+ * Get recent sessions with aggregated stats - OPTIMIZED for home page
+ * Filters at SQL level for better performance
+ * 
+ * @param options.days - Number of days to look back (default: 7)
+ * @param options.limit - Maximum number of sessions to return (default: 20)
+ * @param options.teamId - Optional team filter (null = personal only, undefined = all)
+ */
+export async function getRecentSessionsWithStats(options: {
+  days?: number;
+  limit?: number;
+  teamId?: string | null;
+} = {}): Promise<SessionWithDetails[]> {
+  const { days = 7, limit = 20, teamId } = options;
+  
+  // Calculate date threshold
+  const dateThreshold = new Date();
+  dateThreshold.setDate(dateThreshold.getDate() - days);
+  const dateThresholdISO = dateThreshold.toISOString();
+
+  // Build base query with date filter
+  let query = supabase
+    .from('sessions')
+    .select(`
+      id,
+      user_id,
+      team_id,
+      training_id,
+      drill_id,
+      custom_drill_config,
+      session_mode,
+      status,
+      started_at,
+      ended_at,
+      created_at,
+      updated_at,
+      profiles:user_id(full_name),
+      teams:team_id(name),
+      trainings:training_id(title),
+      training_drills:drill_id(name)
+    `)
+    .or(`started_at.gte.${dateThresholdISO},status.eq.active`)
+    .order('started_at', { ascending: false })
+    .limit(limit);
+
+  // Filter by team if provided
+  if (teamId !== undefined) {
+    if (teamId === null) {
+      query = query.is('team_id', null);
+    } else {
+      query = query.eq('team_id', teamId);
+    }
+  }
+
+  const { data, error } = await query;
+
+  if (error) throw error;
+  
+  const sessions = (data ?? []).map(mapSession);
+  
+  if (sessions.length === 0) return sessions;
+  
+  // Fetch aggregated stats for all sessions in one query
+  const sessionIds = sessions.map(s => s.id);
+  
+  const { data: statsData, error: statsError } = await supabase
+    .from('session_targets')
+    .select(`
+      session_id,
+      distance_m,
+      paper_target_results(
+        bullets_fired,
+        hits_total,
+        dispersion_cm,
+        scanned_image_url
+      ),
+      tactical_target_results(
+        bullets_fired,
+        hits
+      )
+    `)
+    .in('session_id', sessionIds);
+  
+  if (statsError) {
+    console.error('Failed to fetch session stats:', statsError);
+    return sessions;
+  }
+  
+  // Aggregate stats per session
+  const statsMap = new Map<string, SessionAggregatedStats & { 
+    manual_shots: number; 
+    manual_hits: number;
+  }>();
+  
+  (statsData ?? []).forEach((target: any) => {
+    const sessionId = target.session_id;
+    if (!statsMap.has(sessionId)) {
+      statsMap.set(sessionId, {
+        shots_fired: 0,
+        hits_total: 0,
+        accuracy_pct: 0,
+        target_count: 0,
+        best_dispersion_cm: null,
+        avg_distance_m: null,
+        manual_shots: 0,
+        manual_hits: 0,
+      });
+    }
+    
+    const stats = statsMap.get(sessionId)!;
+    stats.target_count++;
+    
+    const paperResult = target.paper_target_results;
+    if (paperResult) {
+      const bullets = paperResult.bullets_fired ?? 0;
+      stats.shots_fired += bullets;
+      
+      const isScanned = !!paperResult.scanned_image_url;
+      const hits = paperResult.hits_total ?? 0;
+      stats.hits_total += hits;
+      
+      if (paperResult.dispersion_cm != null) {
+        if (stats.best_dispersion_cm === null || paperResult.dispersion_cm < stats.best_dispersion_cm) {
+          stats.best_dispersion_cm = paperResult.dispersion_cm;
+        }
+      }
+      
+      if (!isScanned) {
+        stats.manual_shots += bullets;
+        stats.manual_hits += hits;
+      }
+    }
+    
+    const tacticalResult = target.tactical_target_results;
+    if (tacticalResult) {
+      const bullets = tacticalResult.bullets_fired ?? 0;
+      const hits = tacticalResult.hits ?? 0;
+      stats.shots_fired += bullets;
+      stats.hits_total += hits;
+      stats.manual_shots += bullets;
+      stats.manual_hits += hits;
+    }
+    
+    if (target.distance_m) {
+      const currentAvg = stats.avg_distance_m ?? 0;
+      const count = stats.target_count;
+      stats.avg_distance_m = ((currentAvg * (count - 1)) + target.distance_m) / count;
+    }
+  });
+  
+  // Calculate accuracy percentages
+  statsMap.forEach((stats) => {
+    if (stats.manual_shots > 0) {
+      stats.accuracy_pct = Math.round((stats.manual_hits / stats.manual_shots) * 100);
+    }
+  });
+  
+  // Attach stats to sessions
+  return sessions.map(session => {
+    const rawStats = statsMap.get(session.id);
+    return {
+      ...session,
+      stats: rawStats ? {
+        shots_fired: rawStats.shots_fired,
+        hits_total: rawStats.hits_total,
+        accuracy_pct: rawStats.accuracy_pct,
+        target_count: rawStats.target_count,
+        best_dispersion_cm: rawStats.best_dispersion_cm,
+        avg_distance_m: rawStats.avg_distance_m,
+      } : {
+        shots_fired: 0,
+        hits_total: 0,
+        accuracy_pct: 0,
+        target_count: 0,
+        best_dispersion_cm: null,
+        avg_distance_m: null,
+      },
+    };
+  });
+}
+
+/**
  * Get sessions for a specific training
  */
 export async function getTrainingSessions(trainingId: string): Promise<SessionWithDetails[]> {
@@ -1447,9 +1628,9 @@ export interface SessionStats {
  * Calculate comprehensive session stats from targets and results
  * 
  * IMPORTANT: 
- * - Grouping targets (paper_type='grouping') measure consistency/dispersion only
- * - Achievement targets (paper_type='achievement') count towards accuracy calculations
- * - Tactical targets always count towards accuracy
+ * - Scanned paper targets → dispersion only, NO accuracy (AI detects all holes as "hits")
+ * - Manual paper targets → accuracy is meaningful (user reports actual hits/misses)
+ * - Tactical targets → always count towards accuracy (manual entry)
  */
 export async function calculateSessionStats(sessionId: string): Promise<SessionStats> {
   const targets = await getSessionTargetsWithResults(sessionId);
@@ -1458,8 +1639,8 @@ export async function calculateSessionStats(sessionId: string): Promise<SessionS
   let tacticalTargets = 0;
   let totalShotsFired = 0;
   let totalHits = 0;
-  let achievementShotsFired = 0;  // Only shots from achievement targets (for accuracy)
-  let achievementHits = 0;        // Only hits from achievement targets (for accuracy)
+  let manualShotsFired = 0;  // Only shots from manual entry (for accuracy)
+  let manualHits = 0;        // Only hits from manual entry (for accuracy)
   let totalDispersion = 0;
   let dispersionCount = 0;
   let bestDispersion: number | null = null;
@@ -1475,15 +1656,15 @@ export async function calculateSessionStats(sessionId: string): Promise<SessionS
         const bullets = target.paper_result.bullets_fired;
         totalShotsFired += bullets;
         
-        // Check paper_type to determine if this is achievement or grouping
-        const isAchievementTarget = target.paper_result.paper_type === 'achievement';
+        // Check if this was scanned (AI detection) vs manual entry
+        const isScanned = !!target.paper_result.scanned_image_url;
         
         const hits = target.paper_result.hits_total ?? 0;
         
         // Always add hits to total for display purposes
         totalHits += hits;
         
-        // Track dispersion if available (applies to both grouping and achievement)
+        // Track dispersion if available (applies to both scanned and manual)
         if (target.paper_result.dispersion_cm != null) {
           totalDispersion += target.paper_result.dispersion_cm;
           dispersionCount++;
@@ -1492,12 +1673,12 @@ export async function calculateSessionStats(sessionId: string): Promise<SessionS
           }
         }
         
-        if (isAchievementTarget) {
-          // Only achievement targets count towards accuracy calculation
-          achievementShotsFired += bullets;
-          achievementHits += hits;
+        if (!isScanned) {
+          // Only manual entry targets count towards accuracy calculation
+          // Scanned targets: AI detects all holes, so accuracy is always ~100% (not meaningful)
+          manualShotsFired += bullets;
+          manualHits += hits;
         }
-        // Grouping targets: only track dispersion, no accuracy calculation
       }
     } else if (target.target_type === 'tactical') {
       tacticalTargets++;
@@ -1506,9 +1687,9 @@ export async function calculateSessionStats(sessionId: string): Promise<SessionS
         const hits = target.tactical_result.hits;
         totalShotsFired += bullets;
         totalHits += hits;
-        // Tactical targets always count towards accuracy
-        achievementShotsFired += bullets;
-        achievementHits += hits;
+        // Tactical targets always count towards accuracy (always manual entry)
+        manualShotsFired += bullets;
+        manualHits += hits;
         
         if (target.tactical_result.is_stage_cleared) {
           stagesCleared++;
@@ -1525,9 +1706,10 @@ export async function calculateSessionStats(sessionId: string): Promise<SessionS
     }
   }
 
-  // Calculate accuracy only from achievement/tactical targets (not grouping)
-  const accuracyPct = achievementShotsFired > 0 
-    ? Math.round((achievementHits / achievementShotsFired) * 100 * 100) / 100 
+  // Calculate accuracy only from manual entry targets (not scanned)
+  // Scanned targets always show ~100% because AI detects all holes
+  const accuracyPct = manualShotsFired > 0 
+    ? Math.round((manualHits / manualShotsFired) * 100 * 100) / 100 
     : 0;
 
   const avgDispersionCm = dispersionCount > 0 

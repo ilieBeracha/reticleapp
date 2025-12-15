@@ -29,7 +29,7 @@ const SQUAD_TEMPLATES = [
  */
 export default function CreateTeamSheet() {
   const colors = useColors();
-  const { createTeam, setActiveTeam, loading } = useTeamStore();
+  const { createTeam, setActiveTeam } = useTeamStore();
 
   const [teamName, setTeamName] = useState("");
   const [teamDescription, setTeamDescription] = useState("");
@@ -38,6 +38,7 @@ export default function CreateTeamSheet() {
   const [showSquadSection, setShowSquadSection] = useState(false);
   const [step, setStep] = useState<'form' | 'success'>('form');
   const [createdTeam, setCreatedTeam] = useState<{ id: string; name: string } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleCreate = useCallback(async () => {
     if (!teamName.trim()) {
@@ -47,6 +48,7 @@ export default function CreateTeamSheet() {
     }
 
     Keyboard.dismiss();
+    setSubmitting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
@@ -62,6 +64,8 @@ export default function CreateTeamSheet() {
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert("Error", error.message || "Failed to create team");
+    } finally {
+      setSubmitting(false);
     }
   }, [teamName, teamDescription, squads, createTeam]);
 
@@ -291,13 +295,22 @@ export default function CreateTeamSheet() {
 
         {/* Create Button */}
         <TouchableOpacity
-          style={[styles.createButton, { backgroundColor: (!teamName.trim() || loading) ? colors.muted : colors.primary }]}
+          style={[
+            styles.createButton, 
+            { 
+              backgroundColor: teamName.trim() ? colors.primary : colors.muted,
+              opacity: submitting ? 0.85 : 1,
+            }
+          ]}
           onPress={handleCreate}
-          disabled={!teamName.trim() || loading}
+          disabled={!teamName.trim() || submitting}
           activeOpacity={0.8}
         >
-          {loading ? (
-            <ActivityIndicator color="#fff" size="small" />
+          {submitting ? (
+            <>
+              <ActivityIndicator color="#fff" size="small" />
+              <Text style={styles.createButtonText}>Creating...</Text>
+            </>
           ) : (
             <>
               <Ionicons name="add-circle" size={20} color="#fff" />

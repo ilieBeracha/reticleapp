@@ -27,6 +27,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
   RefreshControl,
   StyleSheet,
   Text,
@@ -52,6 +53,10 @@ export default function ActiveSessionScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [ending, setEnding] = useState(false);
+  
+  // Drill completion modal
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const completionShownRef = useRef(false);
 
   // Live timer
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -184,6 +189,52 @@ export default function ActiveSessionScreen() {
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  // ============================================================================
+  // AUTO-COMPLETION DETECTION
+  // ============================================================================
+  // Show completion modal when drill requirements are met
+  useEffect(() => {
+    if (!hasDrill || !drillProgress) return;
+    
+    // Only show once per session
+    if (completionShownRef.current) return;
+    
+    // Check if drill is complete (all requirements met)
+    if (drillProgress.isComplete && drillProgress.meetsAccuracy && drillProgress.meetsTime) {
+      completionShownRef.current = true;
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowCompletionModal(true);
+    }
+  }, [hasDrill, drillProgress]);
+
+  // Handle completing the drill from the modal
+  const handleCompleteDrill = useCallback(async () => {
+    setShowCompletionModal(false);
+    setEnding(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await endSession(sessionId!);
+      // Reload sessions and navigate back
+      if (session?.team_id) {
+        await loadTeamSessions();
+      } else {
+        await loadPersonalSessions();
+      }
+      router.replace('/(protected)/(tabs)');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert('Error', error.message || 'Failed to end session');
+      setEnding(false);
+    }
+  }, [sessionId, session?.team_id, loadPersonalSessions, loadTeamSessions]);
+
+  // Handle fixing results (dismiss modal, continue editing)
+  const handleFixResults = useCallback(() => {
+    setShowCompletionModal(false);
+    // User can continue editing targets
+  }, []);
 
   // ============================================================================
   // ACTIONS
@@ -690,6 +741,75 @@ export default function ActiveSessionScreen() {
           )}
         </View>
       </View>
+
+      {/* Drill Completion Modal */}
+      <Modal
+        visible={showCompletionModal}
+        transparent
+        animationType="fade"
+        onRequestClose={handleFixResults}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            {/* Success Icon */}
+            <View style={styles.modalIconContainer}>
+              <CheckCircle size={56} color="#10B981" />
+            </View>
+            
+            {/* Title */}
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              Drill Complete!
+            </Text>
+            
+            {/* Stats Summary */}
+            <View style={styles.modalStats}>
+              <View style={styles.modalStatRow}>
+                <Text style={[styles.modalStatLabel, { color: colors.textMuted }]}>Targets</Text>
+                <Text style={[styles.modalStatValue, { color: colors.text }]}>{targets.length}</Text>
+              </View>
+              <View style={styles.modalStatRow}>
+                <Text style={[styles.modalStatLabel, { color: colors.textMuted }]}>Shots</Text>
+                <Text style={[styles.modalStatValue, { color: colors.text }]}>{totalShots}</Text>
+              </View>
+              <View style={styles.modalStatRow}>
+                <Text style={[styles.modalStatLabel, { color: colors.textMuted }]}>Accuracy</Text>
+                <Text style={[styles.modalStatValue, { color: colors.text }]}>{accuracy}%</Text>
+              </View>
+              {stats?.bestDispersionCm && (
+                <View style={styles.modalStatRow}>
+                  <Text style={[styles.modalStatLabel, { color: colors.textMuted }]}>Best Group</Text>
+                  <Text style={[styles.modalStatValue, { color: colors.text }]}>{stats.bestDispersionCm.toFixed(1)}cm</Text>
+                </View>
+              )}
+              <View style={styles.modalStatRow}>
+                <Text style={[styles.modalStatLabel, { color: colors.textMuted }]}>Time</Text>
+                <Text style={[styles.modalStatValue, { color: colors.text }]}>{formatTime(elapsedTime)}</Text>
+              </View>
+            </View>
+            
+            {/* Actions */}
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalSecondaryButton, { borderColor: colors.border }]}
+                onPress={handleFixResults}
+              >
+                <Text style={[styles.modalSecondaryButtonText, { color: colors.text }]}>Fix Results</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalPrimaryButton}
+                onPress={handleCompleteDrill}
+                disabled={ending}
+              >
+                {ending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.modalPrimaryButtonText}>Done</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1000,5 +1120,78 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '700',
+  },
+
+  // Completion Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+  },
+  modalIconContainer: {
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    marginBottom: 20,
+  },
+  modalStats: {
+    width: '100%',
+    gap: 12,
+    marginBottom: 24,
+  },
+  modalStatRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  modalStatLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  modalStatValue: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  modalSecondaryButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSecondaryButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  modalPrimaryButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#10B981',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalPrimaryButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
   },
 });

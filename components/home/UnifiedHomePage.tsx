@@ -1,11 +1,12 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useModals } from '@/contexts/ModalContext';
 import { useColors } from '@/hooks/ui/useColors';
-import { getMyActivePersonalSession, getSessionsWithStats, type SessionWithDetails } from '@/services/sessionService';
+import { deleteSession, getMyActivePersonalSession, getRecentSessionsWithStats, type SessionWithDetails } from '@/services/sessionService';
 import { useSessionStore } from '@/store/sessionStore';
 import { useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
 import type { TrainingWithDetails } from '@/types/workspace';
+import { useFocusEffect } from '@react-navigation/native';
 import { format, isToday, isYesterday } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -21,6 +22,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -704,10 +706,12 @@ export function UnifiedHomePage() {
   const [loadingAllSessions, setLoadingAllSessions] = useState(true);
   const initialLoadDone = useRef(false);
 
-  // Load ALL sessions (personal + team) for unified view
+  // Load recent sessions (personal + team) for unified view - OPTIMIZED with SQL limits
   const loadAllSessions = useCallback(async () => {
     try {
-      const sessions = await getSessionsWithStats(); // All sessions with stats
+      // Fetch only last 7 days of sessions with a reasonable limit
+      // Active sessions are always included regardless of date
+      const sessions = await getRecentSessionsWithStats({ days: 7, limit: 20 });
       setAllSessions(sessions);
     } catch (error) {
       console.error('Failed to load all sessions:', error);
@@ -716,16 +720,26 @@ export function UnifiedHomePage() {
     }
   }, []);
 
-  // Data loading
-  useEffect(() => {
-    if (initialLoadDone.current) return;
-    initialLoadDone.current = true;
-
-    loadAllSessions();
-    loadMyUpcomingTrainings();
-    loadMyStats();
-    loadTeams();
-  }, [loadAllSessions, loadMyUpcomingTrainings, loadMyStats, loadTeams]);
+  // Use useFocusEffect to refresh data when screen regains focus
+  // This ensures data is fresh when navigating back from completing a session
+  useFocusEffect(
+    useCallback(() => {
+      // Only do background refresh if already loaded once (avoid double-loading on initial mount)
+      if (initialLoadDone.current) {
+        // Background refresh - don't reset loadingAllSessions to avoid flashing
+        loadAllSessions();
+        loadMyUpcomingTrainings();
+        loadMyStats();
+        return;
+      }
+      
+      initialLoadDone.current = true;
+      loadAllSessions();
+      loadMyUpcomingTrainings();
+      loadMyStats();
+      loadTeams();
+    }, [loadAllSessions, loadMyUpcomingTrainings, loadMyStats, loadTeams])
+  );
 
   useEffect(() => {
     setOnSessionCreated(() => loadAllSessions);
@@ -747,14 +761,10 @@ export function UnifiedHomePage() {
   }, [myUpcomingTrainings]);
   const hasActivity = allSessions.length > 0 || upcomingTrainings.length > 0;
 
-  // Filter sessions for the last 7 days
-  const lastWeekSessions = useMemo(() => {
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    return allSessions.filter((s) => {
-      const date = new Date(s.ended_at || s.started_at);
-      return date >= oneWeekAgo;
-    });
+  // Sessions are already filtered to last 7 days at SQL level by getRecentSessionsWithStats()
+  // No client-side filtering needed - just filter completed for weekly stats display
+  const completedSessions = useMemo(() => {
+    return allSessions.filter((s) => s.status === 'completed');
   }, [allSessions]);
 
   // Handlers
@@ -790,7 +800,34 @@ export function UnifiedHomePage() {
       // Check for existing active session first
       const existing = await getMyActivePersonalSession();
       if (existing) {
-        router.push(`/(protected)/activeSession?sessionId=${existing.id}`);
+        setStarting(false);
+        Alert.alert(
+          'Active Session',
+          `You have an active session${existing.drill_name ? ` for "${existing.drill_name}"` : ''}. What would you like to do?`,
+          [
+            {
+              text: 'Continue',
+              onPress: () => {
+                router.push(`/(protected)/activeSession?sessionId=${existing.id}`);
+              },
+            },
+            {
+              text: 'Delete & Start New',
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  await deleteSession(existing.id);
+                  await loadAllSessions();
+                  router.push('/(protected)/createSession');
+                } catch (err) {
+                  console.error('Failed to delete session:', err);
+                  Alert.alert('Error', 'Failed to delete session');
+                }
+              },
+            },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
         return;
       }
       // Drill-first: route to drill selection screen
@@ -800,13 +837,17 @@ export function UnifiedHomePage() {
     } finally {
       setStarting(false);
     }
-  }, [starting]);
+  }, [starting, loadAllSessions]);
 
   const handleOpenSessionDetail = useCallback((session: SessionWithDetails) => {
     router.push(`/(protected)/sessionDetail?sessionId=${session.id}`);
   }, []);
 
-  if (!initialized && (sessionsLoading || loadingAllSessions)) {
+  // Show loading spinner when data is loading AND we have no sessions to display
+  const shouldShowLoading = (loadingAllSessions && allSessions.length === 0) || 
+                            (!initialized && sessionsLoading);
+  
+  if (shouldShowLoading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -867,8 +908,8 @@ export function UnifiedHomePage() {
             <View style={styles.section}>
               <SectionHeader title="Weekly Overview" colors={colors} />
               <View style={styles.cardsRow}>
-                <AggregatedStatsCard colors={colors} allSessions={lastWeekSessions} trainingStats={myStats} />
-                <WeeklyHighlightsCard colors={colors} sessions={lastWeekSessions} />
+                <AggregatedStatsCard colors={colors} allSessions={completedSessions} trainingStats={myStats} />
+                <WeeklyHighlightsCard colors={colors} sessions={completedSessions} />
               </View>
             </View>
 

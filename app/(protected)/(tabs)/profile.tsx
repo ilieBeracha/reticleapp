@@ -1,9 +1,9 @@
 /**
  * Profile Tab
  * 
- * Clean account settings screen with:
+ * Personal account settings:
  * - Profile info
- * - Quick team access (compact)
+ * - Insights (shooting stats)
  * - Settings (notifications, appearance)
  * - Sign out
  */
@@ -13,7 +13,6 @@ import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { sendTestNotification } from '@/services/notifications';
-import { useTeamStore } from '@/store/teamStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -21,13 +20,7 @@ import {
   Bell,
   BellRing,
   ChevronRight,
-  Crown,
   LogOut,
-  Plus,
-  Shield,
-  Target,
-  UserPlus,
-  Users,
 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
@@ -44,24 +37,6 @@ import {
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ROLE CONFIGURATION
-// ═══════════════════════════════════════════════════════════════════════════
-
-const ROLE_CONFIG: Record<string, { color: string; icon: any }> = {
-  owner: { color: '#8B5CF6', icon: Crown },
-  commander: { color: '#EF4444', icon: Crown },
-  team_commander: { color: '#EF4444', icon: Crown },
-  squad_commander: { color: '#F59E0B', icon: Shield },
-  soldier: { color: '#10B981', icon: Target },
-};
-
-function getRoleConfig(role: string | null | undefined) {
-  if (!role) return ROLE_CONFIG.soldier;
-  const normalized = role === 'commander' ? 'team_commander' : role;
-  return ROLE_CONFIG[normalized] || ROLE_CONFIG.soldier;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -70,16 +45,15 @@ export default function ProfileScreen() {
   const { fullName, email } = useAppContext();
   const { signOut, profileAvatarUrl } = useAuth();
   const { isEnabled: notificationsEnabled, requestPermission } = useNotifications();
-  const { teams, loadTeams } = useTeamStore();
 
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await loadTeams();
+    // Could refresh user data here
     setRefreshing(false);
-  }, [loadTeams]);
+  }, []);
 
   const handleTestNotification = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -146,99 +120,6 @@ export default function ProfileScreen() {
             <ChevronRight size={20} color={colors.textMuted} />
           </TouchableOpacity>
         </Animated.View>
-
-        {/* Teams Section - Compact */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionHeaderLeft}>
-              <Users size={16} color={colors.textMuted} />
-              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>TEAMS</Text>
-            </View>
-            {teams.length > 0 && (
-              <TouchableOpacity
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  // Could open a teams management sheet in the future
-                }}
-              >
-                <Text style={[styles.sectionLink, { color: colors.primary }]}>{teams.length}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Team Preview Row */}
-          {teams.length > 0 ? (
-            <View style={[styles.teamsPreview, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.teamsPreviewScroll}
-              >
-                {teams.slice(0, 5).map((team) => {
-                  const roleConfig = getRoleConfig(team.my_role);
-                  return (
-                    <TouchableOpacity
-                      key={team.id}
-                      style={[styles.teamChip, { backgroundColor: colors.background }]}
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        router.push(`/(protected)/teamDetail?id=${team.id}` as any);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[styles.teamChipIcon, { backgroundColor: colors.primary + '15' }]}>
-                        <Users size={14} color={colors.primary} />
-                      </View>
-                      <View style={styles.teamChipContent}>
-                        <Text style={[styles.teamChipName, { color: colors.text }]} numberOfLines={1}>
-                          {team.name}
-                        </Text>
-                        <View style={styles.teamChipRole}>
-                          <View style={[styles.roleDot, { backgroundColor: roleConfig.color }]} />
-                          <Text style={[styles.teamChipRoleText, { color: colors.textMuted }]}>
-                            {team.my_role?.replace('_', ' ')}
-                          </Text>
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-                {teams.length > 5 && (
-                  <View style={[styles.teamChipMore, { backgroundColor: colors.background }]}>
-                    <Text style={[styles.teamChipMoreText, { color: colors.textMuted }]}>+{teams.length - 5}</Text>
-                  </View>
-                )}
-              </ScrollView>
-            </View>
-          ) : null}
-
-          {/* Team Actions */}
-          <View style={styles.teamActions}>
-            <TouchableOpacity
-              style={[styles.teamActionBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                router.push('/(protected)/createTeam' as any);
-              }}
-              activeOpacity={0.7}
-            >
-              <Plus size={16} color={colors.primary} />
-              <Text style={[styles.teamActionText, { color: colors.text }]}>Create</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.teamActionBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                router.push('/(protected)/acceptInvite' as any);
-              }}
-              activeOpacity={0.7}
-            >
-              <UserPlus size={16} color={colors.text} />
-              <Text style={[styles.teamActionText, { color: colors.text }]}>Join</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
 
         {/* Settings Section */}
         <View style={styles.section}>
@@ -366,7 +247,6 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   sectionTitle: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5 },
-  sectionLink: { fontSize: 13, fontWeight: '600' },
 
   // Profile Card
   profileCard: {
@@ -380,81 +260,6 @@ const styles = StyleSheet.create({
   profileInfo: { flex: 1, gap: 2 },
   profileName: { fontSize: 18, fontWeight: '700', letterSpacing: -0.3 },
   profileEmail: { fontSize: 14 },
-
-  // Teams Preview
-  teamsPreview: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 10,
-    marginBottom: 10,
-  },
-  teamsPreviewScroll: {
-    gap: 8,
-  },
-  teamChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 10,
-    gap: 8,
-    minWidth: 140,
-  },
-  teamChipIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  teamChipContent: {
-    flex: 1,
-  },
-  teamChipName: {
-    fontSize: 13,
-    fontWeight: '600',
-    maxWidth: 100,
-  },
-  teamChipRole: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  roleDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  teamChipRoleText: {
-    fontSize: 11,
-    textTransform: 'capitalize',
-  },
-  teamChipMore: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  teamChipMoreText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-
-  // Team Actions
-  teamActions: { flexDirection: 'row', gap: 10 },
-  teamActionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  teamActionText: { fontSize: 14, fontWeight: '600' },
 
   // Settings
   settingItem: {

@@ -12,7 +12,7 @@ import type { CreateDrillInput, DrillTemplate } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Plus, Target, Trash2 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -128,11 +128,15 @@ function TemplateChip({
 export default function CreateTrainingScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { teamId: teamIdParam } = useLocalSearchParams<{ teamId?: string }>();
   const { teams } = useTeamStore();
   const { loadTeamTrainings, loadMyUpcomingTrainings } = useTrainingStore();
 
-  // Form state
-  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  // Determine if team is locked (came from teamWorkspace with specific team)
+  const isTeamLocked = !!teamIdParam;
+
+  // Form state - pre-select team if passed via URL param
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(teamIdParam ?? null);
   const [title, setTitle] = useState('');
   const [scheduledDate, setScheduledDate] = useState(() => {
     const tomorrow = new Date();
@@ -150,14 +154,24 @@ export default function CreateTrainingScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [templates, setTemplates] = useState<DrillTemplate[]>([]);
 
-  // Auto-select team if only one available
+  // Sync selectedTeamId with URL param when it loads
   useEffect(() => {
-    if (teams.length === 1 && !selectedTeamId) {
+    if (teamIdParam && !selectedTeamId) {
+      setSelectedTeamId(teamIdParam);
+    }
+  }, [teamIdParam, selectedTeamId]);
+
+  // Auto-select team if only one available (and no URL param was provided)
+  useEffect(() => {
+    if (teams.length === 1 && !selectedTeamId && !teamIdParam) {
       setSelectedTeamId(teams[0].id);
     }
-  }, [teams, selectedTeamId]);
+  }, [teams, selectedTeamId, teamIdParam]);
 
   const selectedTeam = teams.find(t => t.id === selectedTeamId);
+  
+  // Show team selection prompt when no team selected and multiple teams exist
+  const needsTeamSelection = !selectedTeamId && teams.length > 1 && !isTeamLocked;
 
   // Load drill templates
   useEffect(() => {
@@ -264,7 +278,8 @@ export default function CreateTrainingScreen() {
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   };
 
-  const canCreate = selectedTeamId && title.trim() && drills.length > 0 && !submitting;
+  const isFormValid = selectedTeamId && title.trim() && drills.length > 0;
+  const canCreate = isFormValid && !submitting;
 
   // No teams available
   if (teams.length === 0) {
@@ -297,18 +312,18 @@ export default function CreateTrainingScreen() {
 
   return (
     <ScrollView
-      style={styles.scrollView}
+      style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={[styles.headerIcon, { backgroundColor: colors.primary + '15' }]}>
-          <Ionicons name="barbell" size={28} color={colors.primary} />
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={[styles.headerIcon, { backgroundColor: colors.primary + '15' }]}>
+            <Ionicons name="barbell" size={28} color={colors.primary} />
+          </View>
+          <Text style={[styles.title, { color: colors.text }]}>New Training</Text>
         </View>
-        <Text style={[styles.title, { color: colors.text }]}>New Training</Text>
-      </View>
 
       {/* Team Selector */}
       <View style={styles.inputSection}>
@@ -316,49 +331,77 @@ export default function CreateTrainingScreen() {
           <Ionicons name="people" size={16} color={selectedTeamId ? colors.primary : colors.destructive} />
           <Text style={[styles.inputLabel, { color: colors.text }]}>Team</Text>
           <Text style={[styles.required, { color: colors.destructive }]}>*</Text>
+          {isTeamLocked && (
+            <View style={[styles.lockedBadge, { backgroundColor: colors.secondary }]}>
+              <Ionicons name="lock-closed" size={10} color={colors.textMuted} />
+            </View>
+          )}
         </View>
-        {teams.length === 1 ? (
+        
+        {/* Locked state: team passed via URL param OR only 1 team */}
+        {(isTeamLocked || teams.length === 1) && selectedTeam ? (
           <View style={[styles.teamSelected, { backgroundColor: colors.card, borderColor: colors.primary }]}>
             <View style={[styles.teamSelectedIcon, { backgroundColor: colors.primary + '15' }]}>
               <Ionicons name="people" size={16} color={colors.primary} />
             </View>
-            <Text style={[styles.teamSelectedName, { color: colors.text }]}>{teams[0].name}</Text>
+            <Text style={[styles.teamSelectedName, { color: colors.text }]}>{selectedTeam.name}</Text>
+            {isTeamLocked && (
+              <Ionicons name="checkmark-circle" size={18} color={colors.primary} style={{ marginLeft: 'auto' }} />
+            )}
           </View>
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.teamSelector}>
-            {teams.map(team => (
-              <TouchableOpacity
-                key={team.id}
-                style={[
-                  styles.teamOption,
-                  {
-                    backgroundColor: selectedTeamId === team.id ? colors.primary + '15' : colors.card,
-                    borderColor: selectedTeamId === team.id ? colors.primary : colors.border,
-                  },
-                ]}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setSelectedTeamId(team.id);
-                }}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name="people"
-                  size={16}
-                  color={selectedTeamId === team.id ? colors.primary : colors.textMuted}
-                />
-                <Text
-                  style={[
-                    styles.teamOptionName,
-                    { color: selectedTeamId === team.id ? colors.primary : colors.text },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {team.name}
+          /* Selector: multiple teams, no locked param */
+          <>
+            {needsTeamSelection && (
+              <View style={[styles.teamPrompt, { backgroundColor: colors.yellow + '15', borderColor: colors.yellow }]}>
+                <Ionicons name="information-circle" size={16} color={colors.yellow} />
+                <Text style={[styles.teamPromptText, { color: colors.text }]}>
+                  Select a team to see available drills
                 </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+              </View>
+            )}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.teamSelector}>
+              {teams.map(team => (
+                <TouchableOpacity
+                  key={team.id}
+                  style={[
+                    styles.teamOption,
+                    {
+                      backgroundColor: selectedTeamId === team.id ? colors.primary + '15' : colors.card,
+                      borderColor: selectedTeamId === team.id ? colors.primary : colors.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setSelectedTeamId(team.id);
+                    // Clear drills when switching teams
+                    if (team.id !== selectedTeamId) {
+                      setDrills([]);
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name="people"
+                    size={16}
+                    color={selectedTeamId === team.id ? colors.primary : colors.textMuted}
+                  />
+                  <Text
+                    style={[
+                      styles.teamOptionName,
+                      { color: selectedTeamId === team.id ? colors.primary : colors.text },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {team.name}
+                  </Text>
+                  {selectedTeamId === team.id && (
+                    <Ionicons name="checkmark-circle" size={14} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </>
         )}
       </View>
 
@@ -506,9 +549,14 @@ export default function CreateTrainingScreen() {
       {drills.length === 0 && templates.length === 0 && (
         <View style={[styles.emptyDrills, { backgroundColor: colors.secondary }]}>
           <Target size={32} color={colors.textMuted} />
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>No drills yet</Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>
+            {!selectedTeamId ? 'Select a team first' : 'No drills yet'}
+          </Text>
           <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
-            Add drills to define what your team will practice
+            {!selectedTeamId 
+              ? 'Choose a team above to see available drill templates' 
+              : 'Add drills to define what your team will practice'
+            }
           </Text>
         </View>
       )}
@@ -523,24 +571,38 @@ export default function CreateTrainingScreen() {
 
       {/* Create Button */}
       <TouchableOpacity
-        style={[styles.createButton, { backgroundColor: canCreate ? colors.primary : colors.muted }]}
+        style={[
+          styles.createButton, 
+          { 
+            backgroundColor: isFormValid ? colors.primary : colors.muted,
+            opacity: submitting ? 0.85 : 1,
+          }
+        ]}
         onPress={handleCreate}
         disabled={!canCreate}
         activeOpacity={0.8}
       >
         {submitting ? (
-          <ActivityIndicator color="#fff" size="small" />
+          <>
+            <ActivityIndicator color="#fff" size="small" />
+            <Text style={styles.createButtonText}>Creating...</Text>
+          </>
         ) : (
           <>
             <Ionicons name="add-circle" size={20} color="#fff" />
             <Text style={styles.createButtonText}>
-              {drills.length === 0 ? 'Add Drills First' : 'Create Training'}
+              {!selectedTeamId 
+                ? 'Select Team First'
+                : drills.length === 0 
+                  ? 'Add Drills First' 
+                  : 'Create Training'
+              }
             </Text>
           </>
         )}
       </TouchableOpacity>
 
-      {/* Modals - inside ScrollView since we removed the wrapper View */}
+      {/* Modals */}
       <EnhancedDrillModal
         visible={showAddDrill}
         onClose={() => setShowAddDrill(false)}
@@ -610,6 +672,7 @@ export default function CreateTrainingScreen() {
 // STYLES (matching createTeam.tsx pattern)
 // ============================================================================
 const styles = StyleSheet.create({
+  container: { flex: 1 },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 20 },
 
@@ -709,7 +772,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     marginHorizontal: 4,
   },
-  teamOptionName: { fontSize: 14, fontWeight: '600', maxWidth: 120 },
+  teamOptionName: { fontSize: 14, fontWeight: '600', maxWidth: 100 },
   teamSelected: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -720,6 +783,24 @@ const styles = StyleSheet.create({
   },
   teamSelectedIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   teamSelectedName: { fontSize: 15, fontWeight: '600' },
+  lockedBadge: { 
+    width: 18, 
+    height: 18, 
+    borderRadius: 9, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    marginLeft: 4,
+  },
+  teamPrompt: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  teamPromptText: { fontSize: 13, flex: 1 },
 
   // Not Available
   notAvailable: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },

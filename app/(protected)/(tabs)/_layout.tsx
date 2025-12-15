@@ -1,19 +1,17 @@
 import Tabs from '@/components/withLayoutContext';
 import { useColors } from '@/hooks/ui/useColors';
-import { useTeamStore } from '@/store/teamStore';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
 
 /**
- * Unified Tabs Layout
+ * Main Tab Layout
  * 
- * Single tab bar for the entire app - no more "personal mode" vs "team mode".
- * 
- * Tabs:
- * - Home: Unified dashboard (active session, upcoming trainings, quick actions)
- * - Schedule: Trainings across all teams
- * - Insights: Your shooting stats
- * - Profile: Account + team management
+ * 5 tabs in order:
+ * - Training: Training list, drills, exercises
+ * - Insight: Shooting stats and analytics
+ * - Home: Dashboard (center)
+ * - Team: Team management, members, invites
+ * - Profile: Personal settings
  */
 
 const getTabIcon = (
@@ -28,7 +26,6 @@ const getTabIcon = (
 
 export default function TabsLayout() {
   const colors = useColors();
-  const { teamCount } = useTeamStore();
 
   return (
     <Tabs
@@ -40,6 +37,22 @@ export default function TabsLayout() {
       tabBarInactiveTintColor={colors.textMuted}
     >
       <Tabs.Screen
+        name="trainings"
+        options={{
+          title: 'Training',
+          tabBarIcon: ({ focused }) => getTabIcon('target', focused ? 'fitness' : 'fitness-outline'),
+        }}
+      />
+
+      <Tabs.Screen
+        name="insights"
+        options={{
+          title: 'Insight',
+          tabBarIcon: ({ focused }) => getTabIcon('chart.bar', focused ? 'bar-chart' : 'bar-chart-outline'),
+        }}
+      />
+
+      <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
@@ -48,25 +61,16 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen
-        name="trainings"
+        name="teams"
         options={{
-          title: 'Schedule',
-          tabBarIcon: ({ focused }) => getTabIcon('calendar', focused ? 'calendar' : 'calendar-outline'),
-        }}
-      />
-
-      <Tabs.Screen
-        name="insights"
-        options={{
-          title: 'Insights',
-          tabBarIcon: ({ focused }) => getTabIcon('chart.bar', focused ? 'bar-chart' : 'bar-chart-outline'),
+          title: 'Team',
+          tabBarIcon: ({ focused }) => getTabIcon('person.2', focused ? 'people' : 'people-outline'),
         }}
       />
 
       <Tabs.Screen
         name="profile"
         options={{
-          role: 'search',
           title: 'Profile',
           tabBarIcon: ({ focused }) => getTabIcon('person.circle', focused ? 'person-circle' : 'person-circle-outline'),
         }}
