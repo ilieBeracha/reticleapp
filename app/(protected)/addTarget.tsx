@@ -34,10 +34,17 @@ import {
 // ═══════════════════════════════════════════════════════════════════════════
 
 export default function AddTargetSheet() {
-  const { sessionId, defaultTargetType, defaultDistance } = useLocalSearchParams<{
+  const { sessionId, defaultTargetType, defaultDistance, defaultInputMethod, startInManual, locked, maxShots } = useLocalSearchParams<{
     sessionId: string;
     defaultTargetType?: string;
     defaultDistance?: string;
+    defaultInputMethod?: 'scan' | 'manual';
+    /** If '1', go directly to the manual achievement entry screen (when applicable). */
+    startInManual?: string;
+    /** If '1', lock drill-driven fields like distance/bullets. */
+    locked?: string;
+    /** Optional max shots cap (used to cap manual entry too). */
+    maxShots?: string;
   }>();
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -59,7 +66,11 @@ export default function AddTargetSheet() {
   } = useDetectionStore();
 
   // Navigation state
-  const [step, setStep] = useState<Step>("form");
+  const initialStep: Step =
+    startInManual === '1' && defaultTargetType === 'achievement' && defaultInputMethod === 'manual'
+      ? 'manual_entry'
+      : 'form';
+  const [step, setStep] = useState<Step>(initialStep);
   const [saving, setSaving] = useState(false);
   const [capturedUri, setCapturedUri] = useState<string | null>(null);
 
@@ -67,12 +78,16 @@ export default function AddTargetSheet() {
   const [targetType, setTargetType] = useState<TargetType>(
     (defaultTargetType as TargetType) || "grouping"
   );
-  const [inputMethod, setInputMethod] = useState<InputMethod>("scan");
+  const [inputMethod, setInputMethod] = useState<InputMethod>(
+    (defaultInputMethod as InputMethod) || "scan"
+  );
   
   // Distance state (used for scanned targets)
   const [selectedDistance, setSelectedDistance] = useState<number>(
     defaultDistance ? parseInt(defaultDistance) : 100
   );
+  const isLocked = locked === '1';
+  const maxShotsCap = maxShots ? parseInt(maxShots) : null;
 
   // Editable detections state (for scan results)
   const [editedDetections, setEditedDetections] = useState<EditableDetection[]>([]);
@@ -391,6 +406,9 @@ export default function AddTargetSheet() {
         onBack={() => setStep("form")}
         saving={saving}
         defaultDistance={selectedDistance}
+        lockDistance={isLocked}
+        defaultBullets={maxShotsCap && maxShotsCap > 0 ? Math.min(5, maxShotsCap) : undefined}
+        maxBullets={maxShotsCap && maxShotsCap > 0 ? maxShotsCap : 100}
       />
     );
   }

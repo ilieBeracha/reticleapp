@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { notifySessionStarted } from '../notifications';
+import { getDrillRequirements } from './drillContract';
 import { mapSession } from './mappers';
 import {
   getMyActiveSessionForTraining,
@@ -11,7 +12,6 @@ import {
   savePaperTargetResult,
   saveTacticalTargetResult,
 } from './targets';
-import { isInfiniteShots } from '@/utils/drillShots';
 import type {
   CreateSessionParams,
   PaperType,
@@ -261,7 +261,34 @@ export async function updateSession(
     updatePayload.ended_at = updates.ended_at;
   }
 
-  const { data, error } = await supabase.from('sessions').update(updatePayload).eq('id', sessionId).select().single();
+  // Return a fully-hydrated session payload so callers don't lose drill context after updates.
+  const { data, error } = await supabase
+    .from('sessions')
+    .update(updatePayload)
+    .eq('id', sessionId)
+    .select(
+      `
+      id,
+      user_id,
+      team_id,
+      training_id,
+      drill_id,
+      drill_template_id,
+      custom_drill_config,
+      session_mode,
+      status,
+      started_at,
+      ended_at,
+      created_at,
+      updated_at,
+      profiles:user_id(full_name),
+      teams:team_id(name),
+      trainings:training_id(title),
+      training_drills:drill_id(*),
+      drill_templates:drill_template_id(*)
+    `
+    )
+    .single();
 
   if (error) throw error;
   return mapSession(data);
@@ -300,10 +327,7 @@ export async function endSession(sessionId: string) {
     const drill = session.drill_config;
     const stats = await calculateSessionStats(sessionId);
 
-    const rounds = drill.strings_count && drill.strings_count > 0 ? drill.strings_count : 1;
-    const requiredTargets = rounds;
-    const isPaper = drill.target_type === 'paper';
-    const requiredShots = isPaper ? 0 : drill.rounds_per_shooter * rounds;
+    const { requiredTargets, requiredShots, isPaper } = getDrillRequirements(drill);
 
     const meetsShotCount = isPaper ? true : stats.totalShotsFired >= requiredShots;
     const meetsTargetCount = stats.targetCount >= requiredTargets;
@@ -386,6 +410,8 @@ async function enforceDrillLimitsForNewTarget(params: { sessionId: string; targe
     return; // No drill = no drill limits
   }
 
+  const { rounds, requiredTargets, requiredShots, isPaper, bulletsPerRound } = getDrillRequirements(drill);
+
   // Enforce target type matches drill type
   if (drill.target_type !== params.targetType) {
     throw new Error(`This drill requires ${drill.target_type} targets.`);
@@ -393,8 +419,6 @@ async function enforceDrillLimitsForNewTarget(params: { sessionId: string; targe
 
   const stats = await calculateSessionStats(params.sessionId);
 
-  const rounds = drill.strings_count && drill.strings_count > 0 ? drill.strings_count : 1;
-  const requiredTargets = rounds;
   const remainingTargets = requiredTargets - stats.targetCount;
 
   if (remainingTargets <= 0) {
@@ -409,8 +433,6 @@ async function enforceDrillLimitsForNewTarget(params: { sessionId: string; targe
   }
 
   // Tactical targets (manual): strict bullet contract.
-  const bulletsPerRound = drill.rounds_per_shooter;
-  const requiredShots = bulletsPerRound * rounds;
   const remainingShots = requiredShots - stats.totalShotsFired;
 
   if (remainingShots <= 0) {

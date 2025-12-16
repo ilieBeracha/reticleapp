@@ -4,10 +4,12 @@
  */
 import { useColors } from '@/hooks/ui/useColors';
 import type {
-  CreateDrillInput,
+  CreateTrainingDrillInput,
   DrillGoal,
+  ScoringMode,
   TargetType,
 } from '@/types/workspace';
+import { INFINITE_SHOTS_SENTINEL, isInfiniteShots } from '@/utils/drillShots';
 import * as Haptics from 'expo-haptics';
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
@@ -35,8 +37,8 @@ type Step = 1 | 2 | 3 | 4;
 interface EnhancedDrillModalProps {
   visible: boolean;
   onClose: () => void;
-  onSave: (drill: CreateDrillInput & { id?: string }) => void;
-  initialData?: Partial<CreateDrillInput> & { id?: string };
+  onSave: (drill: CreateTrainingDrillInput & { id?: string }) => void;
+  initialData?: Partial<CreateTrainingDrillInput> & { id?: string };
   mode?: 'add' | 'edit';
 }
 
@@ -83,10 +85,28 @@ export function EnhancedDrillModal({
   const [drillGoal, setDrillGoal] = useState<DrillGoal>(initialData?.drill_goal || 'grouping');
   const [targetType, setTargetType] = useState<TargetType>(initialData?.target_type || 'paper');
   const [name, setName] = useState(initialData?.name || '');
+  // Session defaults (kept for DB compatibility, but not required to configure here)
   const [distance, setDistance] = useState(String(initialData?.distance_m || 25));
   const [rounds, setRounds] = useState(String(initialData?.rounds_per_shooter || 5));
+  const [shotsPolicy, setShotsPolicy] = useState<'fixed' | 'flexible'>(
+    initialData?.rounds_per_shooter != null && isInfiniteShots(initialData.rounds_per_shooter) ? 'flexible' : 'fixed'
+  );
+  const [showDefaults, setShowDefaults] = useState(false);
+  const [stringsCount, setStringsCount] = useState(String(initialData?.strings_count || 1));
+  const [targetCount, setTargetCount] = useState(String(initialData?.target_count || 1));
   const [timeLimit, setTimeLimit] = useState(initialData?.time_limit_seconds ? String(initialData.time_limit_seconds) : '');
+  const [parTime, setParTime] = useState(initialData?.par_time_seconds ? String(initialData.par_time_seconds) : '');
   const [minAccuracy, setMinAccuracy] = useState(initialData?.min_accuracy_percent ? String(initialData.min_accuracy_percent) : '');
+  const [scoringMode, setScoringMode] = useState<ScoringMode | ''>((initialData?.scoring_mode as ScoringMode) || '');
+  const [pointsPerHit, setPointsPerHit] = useState(
+    initialData?.points_per_hit != null ? String(initialData.points_per_hit) : ''
+  );
+  const [penaltyPerMiss, setPenaltyPerMiss] = useState(
+    initialData?.penalty_per_miss != null ? String(initialData.penalty_per_miss) : ''
+  );
+  const [shotsPerTarget, setShotsPerTarget] = useState(
+    initialData?.shots_per_target != null ? String(initialData.shots_per_target) : ''
+  );
 
   // Reset on open
   useEffect(() => {
@@ -97,8 +117,19 @@ export function EnhancedDrillModal({
         setName(initialData.name || '');
         setDistance(String(initialData.distance_m || 25));
         setRounds(String(initialData.rounds_per_shooter || 5));
+        setShotsPolicy(
+          initialData.rounds_per_shooter != null && isInfiniteShots(initialData.rounds_per_shooter) ? 'flexible' : 'fixed'
+        );
+        setShowDefaults(false);
+        setStringsCount(String(initialData.strings_count || 1));
+        setTargetCount(String(initialData.target_count || 1));
         setTimeLimit(initialData.time_limit_seconds ? String(initialData.time_limit_seconds) : '');
+        setParTime(initialData.par_time_seconds ? String(initialData.par_time_seconds) : '');
         setMinAccuracy(initialData.min_accuracy_percent ? String(initialData.min_accuracy_percent) : '');
+        setScoringMode((initialData.scoring_mode as ScoringMode) || '');
+        setPointsPerHit(initialData.points_per_hit != null ? String(initialData.points_per_hit) : '');
+        setPenaltyPerMiss(initialData.penalty_per_miss != null ? String(initialData.penalty_per_miss) : '');
+        setShotsPerTarget(initialData.shots_per_target != null ? String(initialData.shots_per_target) : '');
         setStep(1);
       } else {
         setDrillGoal('grouping');
@@ -106,8 +137,17 @@ export function EnhancedDrillModal({
         setName('');
         setDistance('25');
         setRounds('5');
+        setShotsPolicy('flexible'); // default: decide shots per session
+        setShowDefaults(false);
+        setStringsCount('1');
+        setTargetCount('1');
         setTimeLimit('');
+        setParTime('');
         setMinAccuracy('');
+        setScoringMode('');
+        setPointsPerHit('');
+        setPenaltyPerMiss('');
+        setShotsPerTarget('');
         setStep(1);
       }
     }
@@ -145,15 +185,26 @@ export function EnhancedDrillModal({
   const handleSave = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     
-    const drill: CreateDrillInput & { id?: string } = {
+    const drill: CreateTrainingDrillInput & { id?: string } = {
       id: initialData?.id || Date.now().toString(),
       name: name.trim(),
       drill_goal: drillGoal,
       target_type: drillGoal === 'grouping' ? 'paper' : targetType,
+      // Stored as defaults; sessions/targets can override in practice.
       distance_m: parseInt(distance, 10) || 25,
-      rounds_per_shooter: parseInt(rounds, 10) || 5,
+      rounds_per_shooter:
+        shotsPolicy === 'flexible'
+          ? INFINITE_SHOTS_SENTINEL
+          : (parseInt(rounds, 10) || 5),
+      strings_count: Math.max(1, parseInt(stringsCount, 10) || 1),
+      target_count: Math.max(1, parseInt(targetCount, 10) || 1),
       time_limit_seconds: timeLimit ? parseInt(timeLimit, 10) : undefined,
+      par_time_seconds: parTime ? parseInt(parTime, 10) : undefined,
       min_accuracy_percent: minAccuracy ? parseInt(minAccuracy, 10) : undefined,
+      scoring_mode: scoringMode || undefined,
+      points_per_hit: scoringMode === 'points' && pointsPerHit ? parseInt(pointsPerHit, 10) : undefined,
+      penalty_per_miss: scoringMode === 'points' && penaltyPerMiss ? parseInt(penaltyPerMiss, 10) : undefined,
+      shots_per_target: shotsPerTarget ? parseInt(shotsPerTarget, 10) : undefined,
     };
 
     onSave(drill);
@@ -253,63 +304,65 @@ export function EnhancedDrillModal({
   // ============================================================================
   const renderStep2 = () => (
     <Animated.View entering={FadeInRight.duration(300)} exiting={FadeOutLeft.duration(200)} style={styles.stepContent}>
-      <Text style={[styles.stepTitle, { color: colors.text }]}>Parameters</Text>
-      <Text style={[styles.stepSubtitle, { color: colors.textMuted }]}>Distance and shots configuration</Text>
+      <Text style={[styles.stepTitle, { color: colors.text }]}>Structure</Text>
+      <Text style={[styles.stepSubtitle, { color: colors.textMuted }]}>
+        Define what the drill is. Session settings can be adjusted each time you run it.
+      </Text>
 
-      {/* Distance */}
+      {/* Rounds (strings) */}
       <View style={styles.paramSection}>
-        <Text style={[styles.paramLabel, { color: colors.text }]}>Distance</Text>
+        <Text style={[styles.paramLabel, { color: colors.text }]}>Rounds (strings)</Text>
         <View style={styles.paramGrid}>
-          {[7, 15, 25, 50, 100, 200].map((d) => (
+          {[1, 2, 3, 4, 5].map((n) => (
             <TouchableOpacity
-              key={d}
+              key={n}
               style={[
                 styles.paramBtn,
                 {
-                  backgroundColor: parseInt(distance) === d ? goalColor : colors.card,
-                  borderColor: parseInt(distance) === d ? goalColor : colors.border,
+                  backgroundColor: parseInt(stringsCount) === n ? goalColor : colors.card,
+                  borderColor: parseInt(stringsCount) === n ? goalColor : colors.border,
                 },
               ]}
               onPress={() => {
                 Haptics.selectionAsync();
-                setDistance(String(d));
+                setStringsCount(String(n));
               }}
             >
-              <Text style={[styles.paramBtnValue, { color: parseInt(distance) === d ? '#fff' : colors.text }]}>
-                {d}
+              <Text style={[styles.paramBtnValue, { color: parseInt(stringsCount) === n ? '#fff' : colors.text }]}>
+                {n}
               </Text>
-              <Text style={[styles.paramBtnUnit, { color: parseInt(distance) === d ? '#ffffffcc' : colors.textMuted }]}>
-                m
+              <Text style={[styles.paramBtnUnit, { color: parseInt(stringsCount) === n ? '#ffffffcc' : colors.textMuted }]}>
+                x
               </Text>
             </TouchableOpacity>
           ))}
         </View>
       </View>
 
-      {/* Shots */}
+      {/* Targets per round */}
       <View style={styles.paramSection}>
-        <Text style={[styles.paramLabel, { color: colors.text }]}>Shots per round</Text>
+        <Text style={[styles.paramLabel, { color: colors.text }]}>Targets per round</Text>
         <View style={styles.paramGrid}>
-          {[3, 5, 10, 15, 20, 30].map((s) => (
+          {[1, 2, 3, 4].map((n) => (
             <TouchableOpacity
-              key={s}
+              key={n}
               style={[
                 styles.paramBtn,
                 {
-                  backgroundColor: parseInt(rounds) === s ? goalColor : colors.card,
-                  borderColor: parseInt(rounds) === s ? goalColor : colors.border,
+                  backgroundColor: parseInt(targetCount) === n ? goalColor : colors.card,
+                  borderColor: parseInt(targetCount) === n ? goalColor : colors.border,
                 },
               ]}
               onPress={() => {
                 Haptics.selectionAsync();
-                setRounds(String(s));
+                setTargetCount(String(n));
               }}
             >
-              <Text style={[styles.paramBtnValue, { color: parseInt(rounds) === s ? '#fff' : colors.text }]}>
-                {s}
+              <Text style={[styles.paramBtnValue, { color: parseInt(targetCount) === n ? '#fff' : colors.text }]}>
+                {n}
               </Text>
-              <Text style={[styles.paramBtnUnit, { color: parseInt(rounds) === s ? '#ffffffcc' : colors.textMuted }]}>
-                rds
+              <Text style={[styles.paramBtnUnit, { color: parseInt(targetCount) === n ? '#ffffffcc' : colors.textMuted }]}>
+                tgt
               </Text>
             </TouchableOpacity>
           ))}
@@ -354,6 +407,127 @@ export function EnhancedDrillModal({
           </View>
         </View>
       )}
+
+      {/* Defaults (optional) */}
+      <View style={[styles.optionalField, { marginTop: 8 }]}>
+        <TouchableOpacity
+          style={[styles.defaultsToggle, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+          onPress={() => setShowDefaults((v) => !v)}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.defaultsToggleText, { color: colors.text }]}>
+            {showDefaults ? 'Hide session defaults' : 'Show session defaults (optional)'}
+          </Text>
+          <Text style={[styles.defaultsToggleHint, { color: colors.textMuted }]}>
+            {showDefaults ? 'These are suggestions' : 'Distance & shot plan'}
+          </Text>
+        </TouchableOpacity>
+
+        {showDefaults && (
+          <>
+            {/* Distance default */}
+            <View style={[styles.paramSection, { marginTop: 14 }]}>
+              <Text style={[styles.paramLabel, { color: colors.text }]}>Default distance (optional)</Text>
+              <View style={styles.paramGrid}>
+                {[7, 15, 25, 50, 100, 200].map((d) => (
+                  <TouchableOpacity
+                    key={d}
+                    style={[
+                      styles.paramBtn,
+                      {
+                        backgroundColor: parseInt(distance) === d ? goalColor : colors.card,
+                        borderColor: parseInt(distance) === d ? goalColor : colors.border,
+                      },
+                    ]}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setDistance(String(d));
+                    }}
+                  >
+                    <Text style={[styles.paramBtnValue, { color: parseInt(distance) === d ? '#fff' : colors.text }]}>
+                      {d}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.paramBtnUnit,
+                        { color: parseInt(distance) === d ? '#ffffffcc' : colors.textMuted },
+                      ]}
+                    >
+                      m
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Shots policy */}
+            <View style={styles.paramSection}>
+              <Text style={[styles.paramLabel, { color: colors.text }]}>Shots per entry</Text>
+              <View style={styles.methodRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.methodBtn,
+                    {
+                      backgroundColor: shotsPolicy === 'flexible' ? goalColor + '15' : colors.card,
+                      borderColor: shotsPolicy === 'flexible' ? goalColor : colors.border,
+                    },
+                  ]}
+                  onPress={() => setShotsPolicy('flexible')}
+                >
+                  <Text style={styles.methodEmoji}>🧩</Text>
+                  <Text style={[styles.methodLabel, { color: colors.text }]}>Flexible</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.methodBtn,
+                    {
+                      backgroundColor: shotsPolicy === 'fixed' ? goalColor + '15' : colors.card,
+                      borderColor: shotsPolicy === 'fixed' ? goalColor : colors.border,
+                    },
+                  ]}
+                  onPress={() => setShotsPolicy('fixed')}
+                >
+                  <Text style={styles.methodEmoji}>🎯</Text>
+                  <Text style={[styles.methodLabel, { color: colors.text }]}>Fixed</Text>
+                </TouchableOpacity>
+              </View>
+
+              {shotsPolicy === 'fixed' && (
+                <View style={[styles.paramGrid, { marginTop: 10 }]}>
+                  {[3, 5, 10, 15, 20, 30].map((s) => (
+                    <TouchableOpacity
+                      key={s}
+                      style={[
+                        styles.paramBtn,
+                        {
+                          backgroundColor: parseInt(rounds) === s ? goalColor : colors.card,
+                          borderColor: parseInt(rounds) === s ? goalColor : colors.border,
+                        },
+                      ]}
+                      onPress={() => {
+                        Haptics.selectionAsync();
+                        setRounds(String(s));
+                      }}
+                    >
+                      <Text style={[styles.paramBtnValue, { color: parseInt(rounds) === s ? '#fff' : colors.text }]}>
+                        {s}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.paramBtnUnit,
+                          { color: parseInt(rounds) === s ? '#ffffffcc' : colors.textMuted },
+                        ]}
+                      >
+                        rds
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          </>
+        )}
+      </View>
     </Animated.View>
   );
 
@@ -390,6 +564,80 @@ export function EnhancedDrillModal({
           ))}
         </View>
       </View>
+
+      {/* Par Time */}
+      <View style={styles.optionalField}>
+        <Text style={[styles.optionalLabel, { color: colors.text }]}>Par time (seconds)</Text>
+        <TextInput
+          style={[styles.optionalInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+          placeholder="Optional"
+          placeholderTextColor={colors.textMuted}
+          value={parTime}
+          onChangeText={setParTime}
+          keyboardType="number-pad"
+        />
+      </View>
+
+      {/* Scoring */}
+      <View style={styles.optionalField}>
+        <Text style={[styles.optionalLabel, { color: colors.text }]}>Scoring mode</Text>
+        <View style={styles.optionalHints}>
+          {(['accuracy', 'speed', 'combined', 'pass_fail', 'points'] as ScoringMode[]).map((m) => (
+            <TouchableOpacity
+              key={m}
+              style={[styles.hintChip, { backgroundColor: scoringMode === m ? goalColor : colors.secondary }]}
+              onPress={() => setScoringMode(scoringMode === m ? '' : m)}
+            >
+              <Text style={[styles.hintChipText, { color: scoringMode === m ? '#fff' : colors.textMuted }]}>
+                {m.replace('_', ' ')}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* Points scoring params */}
+      {scoringMode === 'points' && (
+        <>
+          <View style={styles.optionalField}>
+            <Text style={[styles.optionalLabel, { color: colors.text }]}>Points per hit</Text>
+            <TextInput
+              style={[styles.optionalInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+              placeholder="e.g. 5"
+              placeholderTextColor={colors.textMuted}
+              value={pointsPerHit}
+              onChangeText={setPointsPerHit}
+              keyboardType="number-pad"
+            />
+          </View>
+          <View style={styles.optionalField}>
+            <Text style={[styles.optionalLabel, { color: colors.text }]}>Penalty per miss</Text>
+            <TextInput
+              style={[styles.optionalInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+              placeholder="e.g. 1"
+              placeholderTextColor={colors.textMuted}
+              value={penaltyPerMiss}
+              onChangeText={setPenaltyPerMiss}
+              keyboardType="number-pad"
+            />
+          </View>
+        </>
+      )}
+
+      {/* Hits required per target (achievement) */}
+      {drillGoal === 'achievement' && (
+        <View style={styles.optionalField}>
+          <Text style={[styles.optionalLabel, { color: colors.text }]}>Hits required per target (optional)</Text>
+          <TextInput
+            style={[styles.optionalInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+            placeholder="e.g. 5"
+            placeholderTextColor={colors.textMuted}
+            value={shotsPerTarget}
+            onChangeText={setShotsPerTarget}
+            keyboardType="number-pad"
+          />
+        </View>
+      )}
 
       {/* Min Accuracy (only for achievement) */}
       {drillGoal === 'achievement' && (
@@ -461,10 +709,30 @@ export function EnhancedDrillModal({
           <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Shots</Text>
           <Text style={[styles.summaryValue, { color: colors.text }]}>{rounds}</Text>
         </View>
+        <View style={styles.summaryRow}>
+          <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Rounds</Text>
+          <Text style={[styles.summaryValue, { color: colors.text }]}>{stringsCount}</Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Targets/round</Text>
+          <Text style={[styles.summaryValue, { color: colors.text }]}>{targetCount}</Text>
+        </View>
         {timeLimit && (
           <View style={styles.summaryRow}>
             <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Time limit</Text>
             <Text style={[styles.summaryValue, { color: colors.text }]}>{timeLimit}s</Text>
+          </View>
+        )}
+        {parTime && (
+          <View style={styles.summaryRow}>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Par time</Text>
+            <Text style={[styles.summaryValue, { color: colors.text }]}>{parTime}s</Text>
+          </View>
+        )}
+        {scoringMode && (
+          <View style={styles.summaryRow}>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Scoring</Text>
+            <Text style={[styles.summaryValue, { color: colors.text }]}>{scoringMode.replace('_', ' ')}</Text>
           </View>
         )}
         {minAccuracy && drillGoal === 'achievement' && (
@@ -702,6 +970,21 @@ const styles = StyleSheet.create({
   // Optional (Compact)
   optionalField: {
     marginBottom: 20,
+  },
+  defaultsToggle: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 2,
+  },
+  defaultsToggleText: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  defaultsToggleHint: {
+    fontSize: 12,
+    fontWeight: '500',
   },
   optionalLabel: {
     fontSize: 14,

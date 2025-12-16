@@ -1,14 +1,19 @@
 /**
  * CREATE TRAINING
  * Drill-first training creation flow
+ * 
+ * ARCHITECTURE:
+ * - Drills: Core definitions (static properties) - selected from team's drill library
+ * - Instances: Variable configuration per training (distance, shots, time)
  */
-import { EnhancedDrillModal } from '@/components/drills/EnhancedDrillModal';
+import { DrillEditorModal } from '@/components/drills/DrillEditorModal';
+import { DrillInstanceModal } from '@/components/drills/DrillInstanceModal';
 import { useColors } from '@/hooks/ui/useColors';
-import { getTeamDrillTemplates } from '@/services/drillTemplateService';
+import { createDrill, drillToTrainingInput, getTeamDrills } from '@/services/drillService';
 import { createTraining } from '@/services/trainingService';
 import { useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
-import type { CreateDrillInput, DrillTemplate } from '@/types/workspace';
+import type { CreateDrillInput, CreateTrainingDrillInput, Drill, DrillInstanceConfig } from '@/types/workspace';
 import { formatMaxShots } from '@/utils/drillShots';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -17,22 +22,22 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Plus, Target, Trash2 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Keyboard,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Keyboard,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import Animated, { FadeInRight, Layout } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-interface DrillFormData extends CreateDrillInput {
+interface DrillFormData extends CreateTrainingDrillInput {
   id: string;
 }
 
@@ -93,31 +98,32 @@ function DrillItem({
 }
 
 // ============================================================================
-// TEMPLATE CHIP
+// DRILL CHIP (from team library)
 // ============================================================================
-function TemplateChip({
-  template,
+function DrillChip({
+  drill,
   colors,
   onAdd,
 }: {
-  template: DrillTemplate;
+  drill: Drill;
   colors: ReturnType<typeof useColors>;
   onAdd: () => void;
 }) {
-  const isGrouping = template.drill_goal === 'grouping';
+  const isGrouping = drill.drill_goal === 'grouping';
   const goalColor = isGrouping ? '#10B981' : '#93C5FD';
 
   return (
     <TouchableOpacity
-      style={[styles.templateChip, { backgroundColor: colors.card, borderColor: colors.border }]}
+      style={[styles.drillChip, { backgroundColor: colors.card, borderColor: colors.border }]}
       onPress={onAdd}
       activeOpacity={0.7}
     >
-      <Text style={[styles.templateChipName, { color: colors.text }]} numberOfLines={1}>
-        {template.name}
+      {drill.icon && <Text style={styles.drillChipIcon}>{drill.icon}</Text>}
+      <Text style={[styles.drillChipName, { color: colors.text }]} numberOfLines={1}>
+        {drill.name}
       </Text>
-      <View style={[styles.templateChipBadge, { backgroundColor: `${goalColor}15` }]}>
-        <Text style={[styles.templateChipBadgeText, { color: goalColor }]}>
+      <View style={[styles.drillChipBadge, { backgroundColor: `${goalColor}15` }]}>
+        <Text style={[styles.drillChipBadgeText, { color: goalColor }]}>
           {isGrouping ? 'GRP' : 'ACH'}
         </Text>
       </View>
@@ -152,11 +158,16 @@ export default function CreateTrainingScreen() {
   const [drills, setDrills] = useState<DrillFormData[]>([]);
 
   // UI state
-  const [showAddDrill, setShowAddDrill] = useState(false);
+  const [showCreateDrill, setShowCreateDrill] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [templates, setTemplates] = useState<DrillTemplate[]>([]);
+  
+  // Drill library and instance configuration
+  const [teamDrills, setTeamDrills] = useState<Drill[]>([]);
+  const [selectedDrill, setSelectedDrill] = useState<Drill | null>(null);
+  const [showInstanceModal, setShowInstanceModal] = useState(false);
+  const [pendingNewDrill, setPendingNewDrill] = useState<Drill | null>(null);
 
   // Sync selectedTeamId with URL param when it loads
   useEffect(() => {
@@ -177,46 +188,60 @@ export default function CreateTrainingScreen() {
   // Show team selection prompt when no team selected and multiple teams exist
   const needsTeamSelection = !selectedTeamId && teams.length > 1 && !isTeamLocked;
 
-  // Load drill templates
+  // Load team's drill library
   useEffect(() => {
     if (selectedTeamId) {
-      getTeamDrillTemplates(selectedTeamId).then(setTemplates).catch(console.error);
+      getTeamDrills(selectedTeamId).then(setTeamDrills).catch(console.error);
     } else {
-      setTemplates([]);
+      setTeamDrills([]);
     }
   }, [selectedTeamId]);
 
-  const handleAddDrill = useCallback((drill: CreateDrillInput & { id?: string }) => {
-    const drillWithId: DrillFormData = {
-      ...drill,
-      id: drill.id || Date.now().toString(),
-    };
-    setDrills(prev => [...prev, drillWithId]);
-  }, []);
+  // Handle creating a new drill (saves to library, then opens instance config)
+  const handleCreateDrill = useCallback(async (input: CreateDrillInput) => {
+    if (!selectedTeamId) return;
+    
+    try {
+      const newDrill = await createDrill(selectedTeamId, input);
+      // Add to local list
+      setTeamDrills(prev => [newDrill, ...prev]);
+      // Store and open instance modal to configure for this training
+      setPendingNewDrill(newDrill);
+      setSelectedDrill(newDrill);
+      setShowInstanceModal(true);
+    } catch (error) {
+      console.error('Failed to create drill:', error);
+      Alert.alert('Error', 'Failed to create drill');
+    }
+  }, [selectedTeamId]);
 
   const handleRemoveDrill = useCallback((drillId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setDrills(prev => prev.filter(d => d.id !== drillId));
   }, []);
 
-  const handleAddTemplate = useCallback((template: DrillTemplate) => {
+  // Handle selecting a drill from library (opens instance config modal)
+  const handleSelectDrill = useCallback((drill: Drill) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedDrill(drill);
+    setShowInstanceModal(true);
+  }, []);
+
+  // Handle instance configuration complete (add to training)
+  const handleInstanceConfirm = useCallback((instanceConfig: DrillInstanceConfig) => {
+    if (!selectedDrill) return;
+    
+    const trainingDrill = drillToTrainingInput(selectedDrill, instanceConfig);
     setDrills(prev => [
       ...prev,
       {
         id: Date.now().toString(),
-        name: template.name,
-        drill_goal: template.drill_goal,
-        target_type: template.target_type,
-        distance_m: template.distance_m,
-        rounds_per_shooter: template.rounds_per_shooter,
-        strings_count: template.strings_count || 1,
-        time_limit_seconds: template.time_limit_seconds || undefined,
-        position: template.position || undefined,
-        weapon_category: template.weapon_category || undefined,
+        ...trainingDrill,
       },
     ]);
-  }, []);
+    setSelectedDrill(null);
+    setPendingNewDrill(null);
+  }, [selectedDrill]);
 
   const handleCreate = useCallback(async () => {
     if (!selectedTeamId) {
@@ -488,7 +513,7 @@ export default function CreateTrainingScreen() {
           style={[styles.addBtn, { backgroundColor: colors.primary }]}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            setShowAddDrill(true);
+            setShowCreateDrill(true);
           }}
         >
           <Plus size={16} color="#fff" />
@@ -515,27 +540,28 @@ export default function CreateTrainingScreen() {
         </View>
       )}
 
-      {/* Quick Templates - Always visible when there are templates */}
-      {templates.length > 0 && (
-        <View style={styles.templatesSection}>
-          <Text style={[styles.templatesLabel, { color: colors.textMuted }]}>
-            {drills.length === 0 ? 'Quick add from library:' : 'Add more from library:'}
+      {/* Drill Library - Select from team's saved drills */}
+      {teamDrills.length > 0 && (
+        <View style={styles.drillLibrarySection}>
+          <Text style={[styles.drillLibraryLabel, { color: colors.textMuted }]}>
+            {drills.length === 0 ? 'Select from drill library:' : 'Add more drills:'}
           </Text>
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.templateChipsScroll}
+            contentContainerStyle={styles.drillChipsScroll}
           >
-            {templates.map(template => {
-              const isGrouping = template.drill_goal === 'grouping';
+            {teamDrills.map(drill => {
+              const isGrouping = drill.drill_goal === 'grouping';
               const goalColor = isGrouping ? '#10B981' : '#93C5FD';
               return (
                 <TouchableOpacity
-                  key={template.id}
+                  key={drill.id}
                   style={[styles.quickChip, { backgroundColor: colors.secondary }]}
-                  onPress={() => handleAddTemplate(template)}
+                  onPress={() => handleSelectDrill(drill)}
                 >
-                  <Text style={[styles.quickChipText, { color: colors.text }]}>{template.name}</Text>
+                  {drill.icon && <Text style={styles.quickChipIcon}>{drill.icon}</Text>}
+                  <Text style={[styles.quickChipText, { color: colors.text }]}>{drill.name}</Text>
                   <View style={[styles.quickChipBadge, { backgroundColor: `${goalColor}20` }]}>
                     <Text style={[styles.quickChipBadgeText, { color: goalColor }]}>
                       {isGrouping ? 'G' : 'A'}
@@ -550,16 +576,16 @@ export default function CreateTrainingScreen() {
       )}
 
       {/* Empty State */}
-      {drills.length === 0 && templates.length === 0 && (
+      {drills.length === 0 && teamDrills.length === 0 && (
         <View style={[styles.emptyDrills, { backgroundColor: colors.secondary }]}>
           <Target size={32} color={colors.textMuted} />
           <Text style={[styles.emptyTitle, { color: colors.text }]}>
-            {!selectedTeamId ? 'Select a team first' : 'No drills yet'}
+            {!selectedTeamId ? 'Select a team first' : 'No drills in library'}
           </Text>
           <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
             {!selectedTeamId 
-              ? 'Choose a team above to see available drill templates' 
-              : 'Add drills to define what your team will practice'
+              ? 'Choose a team above to see available drills' 
+              : 'Create drills in your team library to reuse them across trainings'
             }
           </Text>
         </View>
@@ -607,11 +633,24 @@ export default function CreateTrainingScreen() {
       </TouchableOpacity>
 
       {/* Modals */}
-      <EnhancedDrillModal
-        visible={showAddDrill}
-        onClose={() => setShowAddDrill(false)}
-        onSave={handleAddDrill}
-        mode="add"
+      {/* Create new drill (saves to library) */}
+      <DrillEditorModal
+        visible={showCreateDrill}
+        onClose={() => setShowCreateDrill(false)}
+        onSave={handleCreateDrill}
+        mode="create"
+      />
+
+      {/* Drill instance configuration (new architecture) */}
+      <DrillInstanceModal
+        visible={showInstanceModal}
+        onClose={() => {
+          setShowInstanceModal(false);
+          setSelectedDrill(null);
+          setPendingNewDrill(null);
+        }}
+        onConfirm={handleInstanceConfirm}
+        drill={selectedDrill}
       />
 
       {showDatePicker && (
@@ -715,17 +754,17 @@ const styles = StyleSheet.create({
   addBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
   addBtnText: { fontSize: 13, fontWeight: '600', color: '#fff' },
 
-  // Templates
-  templatesSection: { marginBottom: 16 },
-  templatesLabel: { fontSize: 12, fontWeight: '500', marginBottom: 8 },
-  templateChipsScroll: { gap: 8, paddingRight: 20 },
+  // Drill Library
+  drillLibrarySection: { marginBottom: 16 },
+  drillLibraryLabel: { fontSize: 12, fontWeight: '500', marginBottom: 8 },
+  drillChipsScroll: { gap: 8, paddingRight: 20 },
   quickChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10 },
   quickChipText: { fontSize: 13, fontWeight: '500' },
   quickChipBadge: { width: 18, height: 18, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
   quickChipBadgeText: { fontSize: 10, fontWeight: '700' },
 
-  // Template Chip Component
-  templateChip: {
+  // Drill Chip Component
+  drillChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -735,9 +774,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginRight: 10,
   },
-  templateChipName: { fontSize: 14, fontWeight: '500', maxWidth: 100 },
-  templateChipBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  templateChipBadgeText: { fontSize: 9, fontWeight: '700' },
+  drillChipIcon: { fontSize: 14 },
+  drillChipName: { fontSize: 14, fontWeight: '500', maxWidth: 100 },
+  drillChipBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  drillChipBadgeText: { fontSize: 9, fontWeight: '700' },
+  quickChipIcon: { fontSize: 14 },
 
   // Empty Drills
   emptyDrills: { alignItems: 'center', padding: 32, borderRadius: 16, gap: 8, marginBottom: 16 },

@@ -53,3 +53,5 @@ This document inventories **Supabase queries and RPC calls** in the **core train
 | UI-02 | `ScansPage.loadScans()` (`app/(protected)/scans.tsx`) | direct in screen | `sessions` then `session_targets` | phase1: sessions `select(id)` (no limit); phase2: targets `.in(session_id, ids)`, `limit 100` | potentially huge `.in()` + unbounded phase1 |
 
 
+
+

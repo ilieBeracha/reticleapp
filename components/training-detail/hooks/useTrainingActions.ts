@@ -1,5 +1,10 @@
 import { createTrainingSession } from '@/services/sessionService';
-import { cancelTraining, finishTraining, startTraining } from '@/services/trainingService';
+import {
+    cancelTraining,
+    DrillInstanceOverrides,
+    finishTraining,
+    startTrainingWithConfig
+} from '@/services/trainingService';
 import type { TrainingDrill, TrainingWithDetails } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -15,7 +20,10 @@ interface UseTrainingActionsProps {
 interface UseTrainingActionsReturn {
   actionLoading: boolean;
   startingDrillId: string | null;
-  handleStartTraining: () => void;
+  showStartModal: boolean;
+  setShowStartModal: (show: boolean) => void;
+  handleOpenStartModal: () => void;
+  handleStartTraining: (drillOverrides?: Map<string, DrillInstanceOverrides>) => Promise<void>;
   handleFinishTraining: () => void;
   handleCancelTraining: () => void;
   handleStartDrill: (drill: TrainingDrill) => void;
@@ -28,30 +36,32 @@ export function useTrainingActions({
 }: UseTrainingActionsProps): UseTrainingActionsReturn {
   const [actionLoading, setActionLoading] = useState(false);
   const [startingDrillId, setStartingDrillId] = useState<string | null>(null);
+  const [showStartModal, setShowStartModal] = useState(false);
 
-  const handleStartTraining = useCallback(() => {
+  // Open the start modal (for commanders to configure drill instances)
+  const handleOpenStartModal = useCallback(() => {
+    if (!training) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowStartModal(true);
+  }, [training]);
+
+  // Start training with optional drill overrides
+  const handleStartTraining = useCallback(async (drillOverrides?: Map<string, DrillInstanceOverrides>) => {
     if (!training) return;
 
-    Alert.alert('Start Training', 'Are you sure you want to start this training?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Start',
-        onPress: async () => {
-          setActionLoading(true);
-          try {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            await startTraining(training.id);
-            setTraining((prev) => (prev ? { ...prev, status: 'ongoing' } : null));
-            onTrainingUpdated?.();
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to start training');
-          } finally {
-            setActionLoading(false);
-          }
-        },
-      },
-    ]);
+    setActionLoading(true);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await startTrainingWithConfig(training.id, drillOverrides);
+      setTraining((prev) => (prev ? { ...prev, status: 'ongoing' } : null));
+      setShowStartModal(false);
+      onTrainingUpdated?.();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to start training');
+    } finally {
+      setActionLoading(false);
+    }
   }, [training, setTraining, onTrainingUpdated]);
 
   const handleFinishTraining = useCallback(() => {
@@ -138,6 +148,9 @@ export function useTrainingActions({
   return {
     actionLoading,
     startingDrillId,
+    showStartModal,
+    setShowStartModal,
+    handleOpenStartModal,
     handleStartTraining,
     handleFinishTraining,
     handleCancelTraining,

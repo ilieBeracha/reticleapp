@@ -6,12 +6,12 @@ import { LinearGradient } from "expo-linear-gradient";
 import { ArrowLeft, Minus, Plus, Trophy } from "lucide-react-native";
 import React, { useCallback, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { COLORS } from "./types";
 
@@ -167,6 +167,10 @@ interface ManualAchievementEntryProps {
   onBack: () => void;
   saving: boolean;
   defaultDistance?: number;
+  lockDistance?: boolean;
+  defaultBullets?: number;
+  maxBullets?: number;
+  lockBullets?: boolean;
 }
 
 export const ManualAchievementEntry = React.memo(function ManualAchievementEntry({
@@ -174,21 +178,27 @@ export const ManualAchievementEntry = React.memo(function ManualAchievementEntry
   onBack,
   saving,
   defaultDistance = 100,
+  lockDistance = false,
+  defaultBullets,
+  maxBullets = 100,
+  lockBullets = false,
 }: ManualAchievementEntryProps) {
   const colors = useColors();
   
   // State
-  const [bulletsFired, setBulletsFired] = useState(5);
+  const initialBullets = Math.max(1, Math.min(defaultBullets ?? 5, maxBullets));
+  const [bulletsFired, setBulletsFired] = useState(initialBullets);
   const [hits, setHits] = useState(0);
   const [distance, setDistance] = useState(defaultDistance);
 
   // Keep hits <= bulletsFired
   const handleBulletsChange = useCallback((value: number) => {
+    if (lockBullets) return;
     setBulletsFired(value);
     if (hits > value) {
       setHits(value);
     }
-  }, [hits]);
+  }, [hits, lockBullets]);
 
   const handleHitsChange = useCallback((value: number) => {
     setHits(Math.min(value, bulletsFired));
@@ -244,9 +254,11 @@ export const ManualAchievementEntry = React.memo(function ManualAchievementEntry
                     distance === dist && styles.distanceChipSelected,
                   ]}
                   onPress={() => {
+                    if (lockDistance) return;
                     Haptics.selectionAsync();
                     setDistance(dist);
                   }}
+                  disabled={lockDistance}
                   activeOpacity={0.7}
                 >
                   <Text
@@ -270,8 +282,8 @@ export const ManualAchievementEntry = React.memo(function ManualAchievementEntry
         <Stepper
           value={bulletsFired}
           min={1}
-          max={100}
-          onChange={handleBulletsChange}
+          max={maxBullets}
+          onChange={(v) => handleBulletsChange(v)}
           label="Rounds Fired"
         />
         {/* Quick select for bullets */}
@@ -284,7 +296,12 @@ export const ManualAchievementEntry = React.memo(function ManualAchievementEntry
                 { backgroundColor: colors.secondary },
                 bulletsFired === num && styles.bulletsQuickBtnActive
               ]}
-              onPress={() => { Haptics.selectionAsync(); handleBulletsChange(num); }}
+              onPress={() => { 
+                if (lockBullets) return;
+                Haptics.selectionAsync(); 
+                handleBulletsChange(Math.min(num, maxBullets)); 
+              }}
+              disabled={lockBullets}
             >
               <Text style={[
                 styles.bulletsQuickText, 

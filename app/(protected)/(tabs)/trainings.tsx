@@ -12,7 +12,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { format, isToday, isYesterday } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { Calendar, ChevronRight, Plus } from 'lucide-react-native';
+import { BookOpen, Calendar, ChevronRight, Plus } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -134,6 +134,11 @@ export default function TrainingsScreen() {
     router.push('/(protected)/createTraining' as any);
   };
 
+  const handleOpenLibrary = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/(protected)/drillLibrary' as any);
+  };
+
   const isLoading = hasTeams && !myTrainingsInitialized;
 
   return (
@@ -156,6 +161,24 @@ export default function TrainingsScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Quick Access: Drill Library */}
+        <TouchableOpacity
+          style={[styles.libraryCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={handleOpenLibrary}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.libraryIcon, { backgroundColor: '#3B82F615' }]}>
+            <BookOpen size={20} color="#3B82F6" />
+          </View>
+          <View style={styles.libraryContent}>
+            <Text style={[styles.libraryTitle, { color: colors.text }]}>Drill Library</Text>
+            <Text style={[styles.libraryDesc, { color: colors.textMuted }]}>
+              Browse prebuilt drills and templates
+            </Text>
+          </View>
+          <ChevronRight size={18} color={colors.textMuted} />
+        </TouchableOpacity>
 
         {/* Loading */}
         {isLoading && (
@@ -262,6 +285,35 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  // Library Card
+  libraryCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 12,
+    marginBottom: 20,
+  },
+  libraryIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  libraryContent: {
+    flex: 1,
+  },
+  libraryTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  libraryDesc: {
+    fontSize: 13,
+    marginTop: 2,
   },
 
   // Section

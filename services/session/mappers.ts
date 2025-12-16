@@ -10,13 +10,17 @@ export function mapSession(row: any): SessionWithDetails {
   const trainings = row.trainings ?? {};
   const drills = row.training_drills ?? {};
   const drillTemplate = row.drill_templates ?? {};
+  // NEW: Support fetching linked Drill definition via drill_id
+  const linkedDrill = row.drills ?? {};
   const customConfig = row.custom_drill_config;
 
-  // Build drill config from training_drills, drill_templates, OR custom_drill_config
+  // Build drill config from training_drills, drill_templates, drills, OR custom_drill_config
   let drillConfig: SessionDrillConfig | null = null;
 
-  // Priority: training_drills > drill_templates > custom_drill_config
-  const drillSource = drills.id ? drills : drillTemplate.id ? drillTemplate : null;
+  // Priority: training_drills > drills (via drill_id) > drill_templates > custom_drill_config
+  // training_drills contains INSTANCE config (distance, shots, time)
+  // drills contains STATIC config (name, goal, scoring rules) - merged if drill_id is set
+  const drillSource = drills.id ? drills : drillTemplate.id ? drillTemplate : linkedDrill.id ? linkedDrill : null;
 
   if (drillSource) {
     drillConfig = {
@@ -30,15 +34,19 @@ export function mapSession(row: any): SessionWithDetails {
       par_time_seconds: drillSource.par_time_seconds ?? null,
       scoring_mode: drillSource.scoring_mode ?? null,
       min_accuracy_percent: drillSource.min_accuracy_percent ?? null,
+      points_per_hit: drillSource.points_per_hit ?? null,
+      penalty_per_miss: drillSource.penalty_per_miss ?? null,
       target_count: drillSource.target_count ?? null,
       target_size: drillSource.target_size ?? null,
       shots_per_target: drillSource.shots_per_target ?? null,
+      target_exposure_seconds: drillSource.target_exposure_seconds ?? null,
       position: drillSource.position ?? null,
       start_position: drillSource.start_position ?? null,
       weapon_category: drillSource.weapon_category ?? null,
       strings_count: drillSource.strings_count ?? null,
       reload_required: drillSource.reload_required ?? null,
       movement_type: drillSource.movement_type ?? null,
+      movement_distance_m: drillSource.movement_distance_m ?? null,
       difficulty: drillSource.difficulty ?? null,
       category: drillSource.category ?? null,
       instructions: drillSource.instructions ?? null,
@@ -57,15 +65,19 @@ export function mapSession(row: any): SessionWithDetails {
       par_time_seconds: null,
       scoring_mode: null,
       min_accuracy_percent: null,
+      points_per_hit: null,
+      penalty_per_miss: null,
       target_count: null,
       target_size: null,
       shots_per_target: null,
+      target_exposure_seconds: null,
       position: null,
       start_position: null,
       weapon_category: null,
       strings_count: null,
       reload_required: null,
       movement_type: null,
+      movement_distance_m: null,
       difficulty: null,
       category: null,
       instructions: null,

@@ -1,4 +1,4 @@
-import type { TeamInvitation, TeamInvitationWithDetails, TeamMemberShip } from '@/types/workspace';
+import type { TeamInvitation, TeamInvitationWithDetails, TeamRole } from '@/types/workspace';
 import { supabase } from '@/lib/supabase';
 import { notifyInviteAccepted } from './notifications';
 
@@ -21,7 +21,7 @@ export async function createInvitation(
     _orgWorkspaceId: string | null, // Legacy param, ignored in team-first
     _role: string = 'member', // Legacy param, ignored in team-first
     teamId: string | null,
-    teamRole?: TeamMemberShip | null,
+    teamRole?: TeamRole | null,
     teamDetails?: Record<string, any>
   ): Promise<TeamInvitation> {
   if (!teamId) {
@@ -125,15 +125,6 @@ export async function getTeamInvitations(teamId: string): Promise<TeamInvitation
     invited_by_name: inv.invited_by_profile?.full_name || inv.invited_by_profile?.email,
     accepted_by_name: inv.accepted_by_profile?.full_name || inv.accepted_by_profile?.email,
   }));
-}
-
-/**
- * @deprecated Use getTeamInvitations instead
- */
-export async function getWorkspaceInvitations(orgWorkspaceId: string): Promise<TeamInvitationWithDetails[]> {
-  // Legacy function - return empty array since workspace_invitations table no longer exists
-  console.warn('getWorkspaceInvitations is deprecated, use getTeamInvitations instead');
-  return [];
 }
 
 /**

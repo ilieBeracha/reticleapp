@@ -48,17 +48,17 @@ function TimeFilterButton({
 }
 
 import {
-  EmptyState,
-  StreakCard,
-  useInsightsData,
+    EmptyState,
+    StreakCard,
+    useInsightsData,
 } from './index';
 
 import {
-  AllTimeStatsCard,
-  DistanceBreakdownCard,
-  MonthlyComparisonCard,
-  SessionTypeCard,
-  ShotGoalCard,
+    AllTimeStatsCard,
+    DistanceBreakdownCard,
+    MonthlyComparisonCard,
+    SessionTypeCard,
+    ShotGoalCard,
 } from './widgets';
 
 // Compact Section Header

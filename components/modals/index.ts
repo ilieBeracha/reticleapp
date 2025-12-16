@@ -6,7 +6,6 @@ export type { BaseDetachedBottomSheetRef } from './BaseDetachedBottomSheet';
 
 // Remaining sheets
 export { ComingSoonSheet } from './ComingSoonSheet';
-export { default as WorkspaceItem } from './WorkspaceItem';
 
 /**
  * All sheets have been migrated to native form sheet routes:

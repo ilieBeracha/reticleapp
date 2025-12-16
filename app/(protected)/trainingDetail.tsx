@@ -4,8 +4,8 @@
  * Visual, immersive design with 3D effects and bold typography.
  */
 import {
-  useTrainingActions,
-  useTrainingDetail,
+    useTrainingActions,
+    useTrainingDetail,
 } from '@/components/training-detail';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModals } from '@/contexts/ModalContext';
@@ -16,28 +16,29 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
-  ArrowLeft,
-  Calendar,
-  Check,
-  ChevronRight,
-  Clock,
-  Play,
-  Target,
-  Users,
+    ArrowLeft,
+    Calendar,
+    Check,
+    ChevronRight,
+    Clock,
+    Play,
+    Target,
+    Users,
 } from 'lucide-react-native';
+import { useEffect, useRef } from 'react';
 import {
-  ActivityIndicator,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import Animated, {
-  FadeIn,
-  FadeInDown,
-  FadeInUp,
+    FadeIn,
+    FadeInDown,
+    FadeInUp,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -140,11 +141,14 @@ export default function TrainingDetailScreen() {
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
   const { canManageTraining: canManageByRole } = usePermissions();
-  const { id: trainingIdParam } = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{ id?: string; startDrillId?: string }>();
+  const trainingIdParam = params.id;
+  const startDrillIdParam = params.startDrillId;
   const { selectedTraining: contextTraining, getOnTrainingUpdated } = useModals();
 
   const trainingId = trainingIdParam || contextTraining?.id;
   const { training, drillProgress, loading, setTraining } = useTrainingDetail(trainingId, contextTraining);
+  const handledAutoStartRef = useRef<string | null>(null);
   
   const isCreator = training?.creator?.id === session?.user?.id;
   const canManageTraining = canManageByRole || isCreator;
@@ -161,6 +165,37 @@ export default function TrainingDetailScreen() {
     setTraining,
     onTrainingUpdated: getOnTrainingUpdated() ?? undefined,
   });
+
+  // If we navigated here with a specific drill intent (e.g. from Create Session),
+  // auto-start that drill once the training loads.
+  useEffect(() => {
+    const startDrillId = Array.isArray(startDrillIdParam) ? startDrillIdParam[0] : startDrillIdParam;
+    if (!startDrillId) return;
+    if (!training) return;
+
+    // Only handle once per navigation param value.
+    if (handledAutoStartRef.current === startDrillId) return;
+    handledAutoStartRef.current = startDrillId;
+
+    const drill = (training.drills || []).find((d) => d.id === startDrillId);
+
+    // If drill isn't present (stale param), just clear it.
+    if (!drill) {
+      router.replace(`/(protected)/trainingDetail?id=${training.id}`);
+      return;
+    }
+
+    // Respect the same rule as the UI: drills can be started only when training is ongoing.
+    if (training.status !== 'ongoing') {
+      Alert.alert('Training not started', 'Start the training first to begin a drill session.');
+      router.replace(`/(protected)/trainingDetail?id=${training.id}`);
+      return;
+    }
+
+    // Kick off drill session creation + navigation (handled in useTrainingActions).
+    handleStartDrill(drill);
+    // We don't need to clear params here because we navigate away to the session screen.
+  }, [startDrillIdParam, training, handleStartDrill]);
 
   const handleBack = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -397,7 +432,7 @@ export default function TrainingDetailScreen() {
             <TouchableOpacity
               style={styles.mainBtn}
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 handleStartTraining();
               }}
               disabled={actionLoading}

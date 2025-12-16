@@ -2,7 +2,7 @@ import { Text } from "@/components/ui/text";
 import { useColors } from "@/hooks/ui/useColors";
 import { createInvitation } from "@/services/invitationService";
 import { useTeamStore } from "@/store/teamStore";
-import type { TeamMemberShip } from "@/types/workspace";
+import type { TeamRole } from "@/types/workspace";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
@@ -76,7 +76,7 @@ export default function InviteTeamMemberSheet() {
   // Computed values
   const selectedTeam = useMemo(() => teams.find(t => t.id === selectedTeamId), [teams, selectedTeamId]);
   
-  const finalTeamRole = useMemo((): TeamMemberShip => {
+  const finalTeamRole = useMemo((): TeamRole => {
     if (assignToSquad && makeSquadCommander) return 'squad_commander';
     return 'soldier';
   }, [assignToSquad, makeSquadCommander]);

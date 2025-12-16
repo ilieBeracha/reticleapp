@@ -1,11 +1,8 @@
 /**
  * 🎭 ROLE MANAGEMENT SERVICE
- * 
- * Comprehensive role hierarchy and permissions system
- * 
- * TWO-LEVEL ROLE SYSTEM:
- * 1. Organization Roles (stored in `profiles` table)
- * 2. Team Roles (stored in `team_members` table)
+ *
+ * Team-first role hierarchy and permissions system.
+ * Roles are stored in `team_members` table.
  */
 
 // =====================================================
@@ -13,15 +10,9 @@
 // =====================================================
 
 /**
- * Organization-level roles
- * Stored in: profiles.role
- * Scope: Entire organization
- */
-
-/**
- * Team-level roles
+ * Team roles
  * Stored in: team_members.role
- * Scope: Specific team (standalone, no organization)
+ * Scope: Specific team
  */
 export type TeamRole = 'owner' | 'commander' | 'squad_commander' | 'soldier';
 
@@ -103,22 +94,21 @@ export function hasTeamPermission(
 }
 
 /**
- * Check if org role A can modify org role B
+ * Check if role A can modify role B
  * (Used for role updates and member removal)
  */
 export function canModifyRole(actorRole: TeamRole, targetRole: TeamRole): boolean {
-  const actorLevel = TEAM_ROLE_HIERARCHY[actorRole];
   const targetLevel = TEAM_ROLE_HIERARCHY[targetRole];
-  
+
   // Owners can modify anyone
   if (actorRole === 'owner') return true;
-  
-  // Admins can modify instructor and member, but not owner or other admins
+
+  // Commanders can modify squad_commander and soldier
   if (actorRole === 'commander') {
     return targetLevel < TEAM_ROLE_HIERARCHY.commander;
   }
-  
-  // Instructors and members cannot modify roles
+
+  // Squad commanders and soldiers cannot modify roles
   return false;
 }
 
@@ -174,11 +164,10 @@ export function validateRoleChange(
 }
 
 /**
- * Check if user can be assigned to a team based on org role
+ * Check if a role can be assigned when joining a team
  */
 export function canBeAssignedToTeam(teamRole: TeamRole): boolean {
-  // Only members can be assigned to teams
-
+  // New members typically join as soldiers
   return teamRole === 'soldier';
 }
 
@@ -187,7 +176,7 @@ export function canBeAssignedToTeam(teamRole: TeamRole): boolean {
 // =====================================================
 
 /**
- * Get color for organization role
+ * Get color for team role
  */
 export function getTeamRoleColor(role: TeamRole): string {
   switch (role) {

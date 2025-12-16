@@ -80,15 +80,6 @@ export interface TeamInvitationWithDetails extends TeamInvitation {
   accepted_by_name?: string;
 }
 
-/** @deprecated Use TeamInvitation instead */
-export interface WorkspaceInvitation extends TeamInvitation {}
-
-/** @deprecated Use TeamInvitationWithDetails instead */
-export interface WorkspaceInvitationWithDetails extends TeamInvitationWithDetails {
-  org_workspace_id?: string;
-  workspace_name?: string;
-}
-
 // =====================================================
 // TRAINING TYPES
 // =====================================================
@@ -106,31 +97,31 @@ export type TargetType = 'paper' | 'tactical';
 export type DrillGoal = 'grouping' | 'achievement';
 
 // =====================================================
-// ENHANCED DRILL TYPES
+// DRILL TYPES (SIMPLIFIED)
 // =====================================================
 
-/** How the drill is scored */
+/** @deprecated Use simple accuracy tracking instead */
 export type ScoringMode = 'accuracy' | 'speed' | 'combined' | 'pass_fail' | 'points';
 
-/** Difficulty level */
+/** @deprecated Removed - use tags if needed */
 export type DrillDifficulty = 'beginner' | 'intermediate' | 'advanced' | 'expert';
 
-/** Category of drill */
+/** @deprecated Removed - use tags if needed */
 export type DrillCategory = 'fundamentals' | 'speed' | 'accuracy' | 'stress' | 'tactical' | 'competition' | 'qualification';
 
-/** Shooting positions */
+/** @deprecated Simplified - just use freestyle/any */
 export type ShootingPosition = 'standing' | 'kneeling' | 'prone' | 'sitting' | 'barricade' | 'transition' | 'freestyle';
 
-/** Start position before drill begins */
+/** @deprecated Removed */
 export type StartPosition = 'holstered' | 'low_ready' | 'high_ready' | 'table_start' | 'surrender' | 'compressed_ready';
 
-/** Weapon categories */
+/** @deprecated Removed - weapon is implicit */
 export type WeaponCategory = 'rifle' | 'pistol' | 'shotgun' | 'carbine' | 'precision_rifle' | 'any';
 
-/** Target size options */
+/** @deprecated Removed */
 export type TargetSize = 'full' | 'half' | 'head' | 'a_zone' | 'c_zone' | 'steel_8in' | 'steel_10in' | 'custom';
 
-/** Movement types */
+/** @deprecated Removed */
 export type MovementType = 'none' | 'advance' | 'retreat' | 'lateral' | 'diagonal' | 'freestyle';
 
 /**
@@ -166,70 +157,68 @@ export interface TrainingWithDetails extends Training {
 }
 
 /**
- * TrainingDrill - Individual drill within a training
- * Enhanced with comprehensive shooting drill configuration
+ * TrainingDrill - Individual drill instance within a training.
  * 
- * If drill_template_id is set, template values are used as defaults.
- * Inline values can override template values.
+ * NEW ARCHITECTURE:
+ * - drill_id: Reference to the source Drill definition (static properties)
+ * - Instance fields: Variable properties configured for this training
+ * 
+ * LEGACY:
+ * - drill_template_id: Old reference (deprecated, use drill_id)
+ * - Inline fields: All fields present for backwards compatibility
  */
 export interface TrainingDrill {
   id: string;
   training_id: string;
   order_index: number;
   
-  // Template reference (optional - if set, uses template as source)
+  // === DRILL REFERENCE (NEW) ===
+  drill_id?: string | null;                // Reference to source Drill
+  
+  // === LEGACY REFERENCE ===
+  /** @deprecated Use drill_id */
   drill_template_id?: string | null;
   
+  // === INLINE DRILL DATA (from linked drill or legacy) ===
   name: string;
   description?: string | null;
+  drill_goal: DrillGoal;
+  target_type: TargetType;
   
-  // === PRIMARY CLASSIFICATION ===
-  drill_goal: DrillGoal;              // Primary: grouping vs achievement
-  
-  // === BASIC CONFIG ===
-  target_type: TargetType;            // Secondary: paper vs tactical (for input method hints)
+  // === INSTANCE CONFIGURATION (variable per training) ===
   distance_m: number;
   rounds_per_shooter: number;
+  time_limit_seconds?: number | null;
+  par_time_seconds?: number | null;
+  strings_count?: number | null;
+  target_count?: number | null;
+  min_accuracy_percent?: number | null;
+  shots_per_target?: number | null;
+  target_size?: TargetSize | null;
+  target_exposure_seconds?: number | null;
+  movement_distance_m?: number | null;
   
-  // === TIMING ===
-  time_limit_seconds?: number | null;      // Max time allowed
-  par_time_seconds?: number | null;        // Target time to beat
+  // === INSTANCE-SPECIFIC ===
+  instance_notes?: string | null;          // Notes specific to this training
+  notes?: string | null;                   // Legacy notes field
   
-  // === SCORING ===
-  scoring_mode?: ScoringMode | null;       // How drill is scored
-  min_accuracy_percent?: number | null;    // Minimum to pass (0-100)
-  points_per_hit?: number | null;          // Points awarded per hit
-  penalty_per_miss?: number | null;        // Penalty for misses
+  // === STATIC FIELDS (from linked drill or legacy inline) ===
+  scoring_mode?: ScoringMode | null;
+  points_per_hit?: number | null;
+  penalty_per_miss?: number | null;
+  position?: ShootingPosition | null;
+  start_position?: StartPosition | null;
+  weapon_category?: WeaponCategory | null;
+  reload_required?: boolean | null;
+  movement_type?: MovementType | null;
+  difficulty?: DrillDifficulty | null;
+  category?: DrillCategory | null;
+  tags?: string[] | null;
+  instructions?: string | null;
+  diagram_url?: string | null;
+  video_url?: string | null;
+  safety_notes?: string | null;
   
-  // === TARGET CONFIGURATION ===
-  target_count?: number | null;            // Number of targets (default 1)
-  target_size?: TargetSize | null;         // Target size
-  shots_per_target?: number | null;        // Hits required per target
-  target_exposure_seconds?: number | null; // For tactical - how long visible
-  
-  // === SHOOTING SETUP ===
-  position?: ShootingPosition | null;      // Shooting position
-  start_position?: StartPosition | null;   // Where shooter starts
-  weapon_category?: WeaponCategory | null; // Weapon type
-  
-  // === STAGE SETUP ===
-  strings_count?: number | null;           // Number of repetitions/strings
-  reload_required?: boolean | null;        // Must reload during drill
-  movement_type?: MovementType | null;     // Movement required
-  movement_distance_m?: number | null;     // Distance to move
-  
-  // === DIFFICULTY & CATEGORY ===
-  difficulty?: DrillDifficulty | null;     // Skill level
-  category?: DrillCategory | null;         // Type of drill
-  tags?: string[] | null;                  // Custom tags
-  
-  // === RICH CONTENT ===
-  instructions?: string | null;            // Step-by-step instructions
-  diagram_url?: string | null;             // Reference diagram
-  video_url?: string | null;               // Demo video link
-  safety_notes?: string | null;            // Safety considerations
-  
-  notes?: string | null;                   // General notes
   created_at: string;
 }
 
@@ -242,63 +231,66 @@ export interface CreateTrainingInput {
   description?: string;
   scheduled_at: string;
   manual_start?: boolean; // If true, commander starts training manually (no auto-start)
-  drills?: CreateDrillInput[];
+  drills?: CreateTrainingDrillInput[];
 }
 
 /**
- * Input for creating a drill - Enhanced with all configuration options
+ * Input for adding a drill instance to a training.
+ * 
+ * NEW ARCHITECTURE:
+ * - Provide drill_id to link to an existing Drill definition
+ * - Instance fields (distance, shots, time) are configured here
+ * 
+ * LEGACY:
+ * - All fields inline for backwards compatibility
  */
-export interface CreateDrillInput {
+export interface CreateTrainingDrillInput {
+  // === DRILL REFERENCE (preferred) ===
+  drill_id?: string;                      // Reference to source Drill
+  
+  // === LEGACY REFERENCE ===
+  /** @deprecated Use drill_id */
+  drill_template_id?: string;
+  
+  // === INLINE DRILL DATA (required if no drill_id) ===
   name: string;
+  drill_goal: DrillGoal;
+  target_type: TargetType;
   description?: string;
   
-  // === PRIMARY CLASSIFICATION ===
-  drill_goal: DrillGoal;              // Primary: grouping vs achievement
-  
-  // === BASIC CONFIG ===
-  target_type: TargetType;            // Secondary: paper vs tactical
+  // === INSTANCE CONFIGURATION (variable per training) ===
   distance_m: number;
   rounds_per_shooter: number;
-  
-  // === TIMING ===
   time_limit_seconds?: number;
   par_time_seconds?: number;
-  
-  // === SCORING ===
-  scoring_mode?: ScoringMode;
+  strings_count?: number;
+  target_count?: number;
   min_accuracy_percent?: number;
+  shots_per_target?: number;
+  target_size?: TargetSize;
+  target_exposure_seconds?: number;
+  movement_distance_m?: number;
+  
+  // === INSTANCE-SPECIFIC ===
+  instance_notes?: string;
+  notes?: string;                         // Legacy
+  
+  // === STATIC FIELDS (from linked drill or inline) ===
+  scoring_mode?: ScoringMode;
   points_per_hit?: number;
   penalty_per_miss?: number;
-  
-  // === TARGET CONFIGURATION ===
-  target_count?: number;
-  target_size?: TargetSize;
-  shots_per_target?: number;
-  target_exposure_seconds?: number;
-  
-  // === SHOOTING SETUP ===
   position?: ShootingPosition;
   start_position?: StartPosition;
   weapon_category?: WeaponCategory;
-  
-  // === STAGE SETUP ===
-  strings_count?: number;
   reload_required?: boolean;
   movement_type?: MovementType;
-  movement_distance_m?: number;
-  
-  // === DIFFICULTY & CATEGORY ===
   difficulty?: DrillDifficulty;
   category?: DrillCategory;
   tags?: string[];
-  
-  // === RICH CONTENT ===
   instructions?: string;
   diagram_url?: string;
   video_url?: string;
   safety_notes?: string;
-  
-  notes?: string;
 }
 
 /**
@@ -312,130 +304,208 @@ export interface UpdateTrainingInput {
 }
 
 // =====================================================
-// DRILL TEMPLATE TYPES
+// DRILL TYPES (Core Drill Definition)
 // =====================================================
 
 /**
- * DrillTemplate - Reusable drill that commanders can save and use across trainings
- * Enhanced with comprehensive configuration options
+ * Drill - Simplified drill definition.
+ *
+ * ESSENTIAL PROPERTIES ONLY:
+ * - name, goal, target_type (what kind of drill)
+ * - distance, shots, time_limit, strings (how to run it)
  */
-export interface DrillTemplate {
+export interface Drill {
   id: string;
   team_id: string;
   created_by: string;
+
+  // === ESSENTIAL ===
   name: string;
   description?: string | null;
-  
-  // === PRIMARY CLASSIFICATION ===
-  drill_goal: DrillGoal;              // Primary: grouping vs achievement
-  
-  // === BASIC CONFIG ===
-  target_type: TargetType;            // Secondary: paper vs tactical
-  distance_m: number;
-  rounds_per_shooter: number;
-  
-  // === TIMING ===
-  time_limit_seconds?: number | null;
-  par_time_seconds?: number | null;
-  
-  // === SCORING ===
-  scoring_mode?: ScoringMode | null;
-  min_accuracy_percent?: number | null;
-  points_per_hit?: number | null;
-  penalty_per_miss?: number | null;
-  
-  // === TARGET CONFIGURATION ===
-  target_count?: number | null;
-  target_size?: TargetSize | null;
-  shots_per_target?: number | null;
-  target_exposure_seconds?: number | null;
-  
-  // === SHOOTING SETUP ===
-  position?: ShootingPosition | null;
-  start_position?: StartPosition | null;
-  weapon_category?: WeaponCategory | null;
-  
-  // === STAGE SETUP ===
-  strings_count?: number | null;
-  reload_required?: boolean | null;
-  movement_type?: MovementType | null;
-  movement_distance_m?: number | null;
-  
-  // === DIFFICULTY & CATEGORY ===
-  difficulty?: DrillDifficulty | null;
-  category?: DrillCategory | null;
-  tags?: string[] | null;
-  
-  // === RICH CONTENT ===
-  instructions?: string | null;
-  diagram_url?: string | null;
-  video_url?: string | null;
-  safety_notes?: string | null;
+  drill_goal: DrillGoal;                 // grouping vs achievement
+  target_type: TargetType;               // paper vs tactical
+
+  // === DEFAULTS FOR INSTANCES ===
+  distance_m: number;                    // Default distance in meters
+  rounds_per_shooter: number;            // Default shots per run
+  time_limit_seconds?: number | null;    // Optional time limit
+  strings_count?: number | null;         // Rounds/repetitions (default 1)
+
+  // === LEGACY FIELDS (kept for backwards compatibility) ===
+  /** @deprecated */ icon?: string | null;
+  /** @deprecated */ scoring_mode?: ScoringMode | null;
+  /** @deprecated */ points_per_hit?: number | null;
+  /** @deprecated */ penalty_per_miss?: number | null;
+  /** @deprecated */ position?: ShootingPosition | null;
+  /** @deprecated */ start_position?: StartPosition | null;
+  /** @deprecated */ weapon_category?: WeaponCategory | null;
+  /** @deprecated */ reload_required?: boolean | null;
+  /** @deprecated */ movement_type?: MovementType | null;
+  /** @deprecated */ difficulty?: DrillDifficulty | null;
+  /** @deprecated */ category?: DrillCategory | null;
+  /** @deprecated */ tags?: string[] | null;
+  /** @deprecated */ instructions?: string | null;
+  /** @deprecated */ safety_notes?: string | null;
+  /** @deprecated */ par_time_seconds?: number | null;
+  /** @deprecated */ target_count?: number | null;
+  /** @deprecated */ min_accuracy_percent?: number | null;
+  /** @deprecated */ shots_per_target?: number | null;
+  /** @deprecated */ target_size?: TargetSize | null;
+  /** @deprecated */ target_exposure_seconds?: number | null;
+  /** @deprecated */ movement_distance_m?: number | null;
+  /** @deprecated */ default_distance_m?: number | null;
+  /** @deprecated */ default_rounds_per_shooter?: number | null;
+  /** @deprecated */ default_time_limit_seconds?: number | null;
+  /** @deprecated */ default_par_time_seconds?: number | null;
+  /** @deprecated */ default_strings_count?: number | null;
+  /** @deprecated */ default_target_count?: number | null;
+  /** @deprecated */ default_min_accuracy_percent?: number | null;
+  /** @deprecated */ default_shots_per_target?: number | null;
+  /** @deprecated */ default_target_size?: TargetSize | null;
+  /** @deprecated */ default_target_exposure_seconds?: number | null;
+  /** @deprecated */ default_movement_distance_m?: number | null;
+  /** @deprecated */ diagram_url?: string | null;
+  /** @deprecated */ video_url?: string | null;
   
   created_at: string;
   updated_at: string;
 }
 
 /**
- * Input for creating a drill template - Enhanced with all options
+ * Instance-specific configuration for a drill within a training.
+ * SIMPLIFIED: Only essential run-time properties.
  */
-export interface CreateDrillTemplateInput {
+export interface DrillInstanceConfig {
+  distance_m: number;                    // Distance in meters
+  rounds_per_shooter: number;            // Shots per entry
+  time_limit_seconds?: number | null;    // Max time allowed
+  strings_count?: number | null;         // Number of rounds (default 1)
+
+  // Legacy (kept for backwards compatibility)
+  /** @deprecated */ par_time_seconds?: number | null;
+  /** @deprecated */ target_count?: number | null;
+  /** @deprecated */ min_accuracy_percent?: number | null;
+  /** @deprecated */ shots_per_target?: number | null;
+  /** @deprecated */ target_size?: TargetSize | null;
+  /** @deprecated */ target_exposure_seconds?: number | null;
+  /** @deprecated */ movement_distance_m?: number | null;
+}
+
+/**
+ * Training Drill Instance - Links a drill to a training with instance config.
+ * 
+ * This is the junction table entry that combines:
+ * - Reference to the source Drill (static definition)
+ * - Instance-specific configuration (variable per training)
+ * - Training-specific notes
+ */
+export interface TrainingDrillInstance extends DrillInstanceConfig {
+  id: string;
+  training_id: string;
+  drill_id?: string | null;              // Reference to source Drill (null for legacy inline)
+  order_index: number;
+  
+  // === INLINE DRILL DATA (for display, copied from drill or legacy) ===
+  name: string;
+  drill_goal: DrillGoal;
+  target_type: TargetType;
+  
+  // Optional static fields (from linked drill or legacy inline)
+  scoring_mode?: ScoringMode | null;
+  position?: ShootingPosition | null;
+  start_position?: StartPosition | null;
+  weapon_category?: WeaponCategory | null;
+  reload_required?: boolean | null;
+  movement_type?: MovementType | null;
+  difficulty?: DrillDifficulty | null;
+  category?: DrillCategory | null;
+  tags?: string[] | null;
+  instructions?: string | null;
+  diagram_url?: string | null;
+  video_url?: string | null;
+  safety_notes?: string | null;
+  points_per_hit?: number | null;
+  penalty_per_miss?: number | null;
+  
+  // === INSTANCE-SPECIFIC ===
+  instance_notes?: string | null;        // Notes specific to this training
+  description?: string | null;           // Legacy notes field
+  
+  // === LEGACY ===
+  /** @deprecated Use drill_id */
+  drill_template_id?: string | null;
+  notes?: string | null;
+  
+  created_at: string;
+}
+
+/**
+ * Input for creating a Drill - SIMPLIFIED
+ * Only 6 essential fields: name, goal, target_type, distance, shots, time
+ */
+export interface CreateDrillInput {
+  // === ESSENTIAL ===
   name: string;
   description?: string;
-  
-  // === PRIMARY CLASSIFICATION ===
-  drill_goal: DrillGoal;              // Primary: grouping vs achievement
-  
-  // === BASIC CONFIG ===
-  target_type: TargetType;            // Secondary: paper vs tactical
+  drill_goal: DrillGoal;
+  target_type: TargetType;
   distance_m: number;
   rounds_per_shooter: number;
-  
-  // === TIMING ===
   time_limit_seconds?: number;
-  par_time_seconds?: number;
-  
-  // === SCORING ===
-  scoring_mode?: ScoringMode;
-  min_accuracy_percent?: number;
-  points_per_hit?: number;
-  penalty_per_miss?: number;
-  
-  // === TARGET CONFIGURATION ===
-  target_count?: number;
-  target_size?: TargetSize;
-  shots_per_target?: number;
-  target_exposure_seconds?: number;
-  
-  // === SHOOTING SETUP ===
-  position?: ShootingPosition;
-  start_position?: StartPosition;
-  weapon_category?: WeaponCategory;
-  
-  // === STAGE SETUP ===
   strings_count?: number;
-  reload_required?: boolean;
-  movement_type?: MovementType;
-  movement_distance_m?: number;
+
+  // === LEGACY (kept for backwards compatibility) ===
+  /** @deprecated */ icon?: string;
+  /** @deprecated */ scoring_mode?: ScoringMode;
+  /** @deprecated */ points_per_hit?: number;
+  /** @deprecated */ penalty_per_miss?: number;
+  /** @deprecated */ position?: ShootingPosition;
+  /** @deprecated */ start_position?: StartPosition;
+  /** @deprecated */ weapon_category?: WeaponCategory;
+  /** @deprecated */ reload_required?: boolean;
+  /** @deprecated */ movement_type?: MovementType;
+  /** @deprecated */ difficulty?: DrillDifficulty;
+  /** @deprecated */ category?: DrillCategory;
+  /** @deprecated */ tags?: string[];
+  /** @deprecated */ instructions?: string;
+  /** @deprecated */ diagram_url?: string;
+  /** @deprecated */ video_url?: string;
+  /** @deprecated */ safety_notes?: string;
+  /** @deprecated */ default_distance_m?: number;
+  /** @deprecated */ default_rounds_per_shooter?: number;
+  /** @deprecated */ default_time_limit_seconds?: number;
+  /** @deprecated */ default_par_time_seconds?: number;
+  /** @deprecated */ default_strings_count?: number;
+  /** @deprecated */ default_target_count?: number;
+  /** @deprecated */ default_min_accuracy_percent?: number;
+  /** @deprecated */ default_shots_per_target?: number;
+  /** @deprecated */ default_target_size?: TargetSize;
+  /** @deprecated */ default_target_exposure_seconds?: number;
+  /** @deprecated */ default_movement_distance_m?: number;
+}
+
+/**
+ * Input for creating a drill instance within a training
+ */
+export interface CreateDrillInstanceInput extends DrillInstanceConfig {
+  drill_id?: string;                     // Reference to source Drill (optional for inline)
   
-  // === DIFFICULTY & CATEGORY ===
-  difficulty?: DrillDifficulty;
-  category?: DrillCategory;
-  tags?: string[];
+  // === INLINE FIELDS (required if no drill_id) ===
+  name?: string;
+  drill_goal?: DrillGoal;
+  target_type?: TargetType;
   
-  // === RICH CONTENT ===
-  instructions?: string;
-  diagram_url?: string;
-  video_url?: string;
-  safety_notes?: string;
+  // === INSTANCE-SPECIFIC ===
+  instance_notes?: string;
 }
 
 // =====================================================
-// LEGACY/DEPRECATED - Keep for migration compatibility
+// LEGACY ALIASES (for backwards compatibility)
 // =====================================================
 
-/** @deprecated Use TeamRole instead */
-export type WorkspaceRole = 'owner' | 'admin' | 'instructor' | 'member' | 'attached';
+/** @deprecated Use Drill instead */
+export type DrillTemplate = Drill;
 
-/** @deprecated Use TeamRole instead */
-export type TeamMemberShip = TeamRole;
+/** @deprecated Use CreateDrillInput instead */
+export interface CreateDrillTemplateInput extends CreateDrillInput {}
+

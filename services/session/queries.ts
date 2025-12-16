@@ -24,6 +24,7 @@ export async function getMyActiveSessionForTraining(trainingId: string): Promise
       team_id,
       training_id,
       drill_id,
+      drill_template_id,
       custom_drill_config,
       session_mode,
       status,
@@ -34,7 +35,8 @@ export async function getMyActiveSessionForTraining(trainingId: string): Promise
       profiles:user_id(full_name),
       teams:team_id(name),
       trainings:training_id(title),
-      training_drills:drill_id(name)
+      training_drills:drill_id(name),
+      drill_templates:drill_template_id(name)
     `
     )
     .eq('training_id', trainingId)
@@ -70,6 +72,7 @@ export async function getMyActiveSession(): Promise<SessionWithDetails | null> {
       team_id,
       training_id,
       drill_id,
+      drill_template_id,
       custom_drill_config,
       session_mode,
       status,
@@ -80,7 +83,8 @@ export async function getMyActiveSession(): Promise<SessionWithDetails | null> {
       profiles:user_id(full_name),
       teams:team_id(name),
       trainings:training_id(title),
-      training_drills:drill_id(name)
+      training_drills:drill_id(name),
+      drill_templates:drill_template_id(name)
     `
     )
     .eq('user_id', user.id)
@@ -119,6 +123,7 @@ export async function getMyActivePersonalSession(): Promise<SessionWithDetails |
       team_id,
       training_id,
       drill_id,
+      drill_template_id,
       custom_drill_config,
       session_mode,
       status,
@@ -129,7 +134,8 @@ export async function getMyActivePersonalSession(): Promise<SessionWithDetails |
       profiles:user_id(full_name),
       teams:team_id(name),
       trainings:training_id(title),
-      training_drills:drill_id(name)
+      training_drills:drill_id(name),
+      drill_templates:drill_template_id(name)
     `
     )
     .eq('user_id', user.id)
@@ -166,6 +172,7 @@ export async function getSessions(teamId?: string | null): Promise<SessionWithDe
       team_id,
       training_id,
       drill_id,
+      drill_template_id,
       custom_drill_config,
       session_mode,
       status,
@@ -176,7 +183,8 @@ export async function getSessions(teamId?: string | null): Promise<SessionWithDe
       profiles:user_id(full_name),
       teams:team_id(name),
       trainings:training_id(title),
-      training_drills:drill_id(name)
+      training_drills:drill_id(name),
+      drill_templates:drill_template_id(name)
     `
     )
     .order('started_at', { ascending: false });
@@ -224,6 +232,7 @@ export async function getSessionsPage(options: {
         team_id,
         training_id,
         drill_id,
+        drill_template_id,
         custom_drill_config,
         session_mode,
         status,
@@ -234,7 +243,8 @@ export async function getSessionsPage(options: {
         profiles:user_id(full_name),
         teams:team_id(name),
         trainings:training_id(title),
-        training_drills:drill_id(name)
+        training_drills:drill_id(name),
+        drill_templates:drill_template_id(name)
       `
       )
       .order('started_at', { ascending: false })
@@ -441,6 +451,7 @@ export async function getRecentSessionsWithStats(
         team_id,
         training_id,
         drill_id,
+        drill_template_id,
         custom_drill_config,
         session_mode,
         status,
@@ -451,7 +462,8 @@ export async function getRecentSessionsWithStats(
         profiles:user_id(full_name),
         teams:team_id(name),
         trainings:training_id(title),
-        training_drills:drill_id(name)
+        training_drills:drill_id(name),
+        drill_templates:drill_template_id(name)
       `
       )
       .or(`started_at.gte.${dateThresholdISO},status.eq.active`)
@@ -615,6 +627,7 @@ export async function getTrainingSessions(trainingId: string): Promise<SessionWi
       team_id,
       training_id,
       drill_id,
+      drill_template_id,
       custom_drill_config,
       session_mode,
       status,
@@ -625,7 +638,8 @@ export async function getTrainingSessions(trainingId: string): Promise<SessionWi
       profiles:user_id(full_name),
       teams:team_id(name),
       trainings:training_id(title),
-      training_drills:drill_id(name)
+      training_drills:drill_id(name),
+      drill_templates:drill_template_id(name)
     `
     )
     .eq('training_id', trainingId)
@@ -655,6 +669,7 @@ export async function getTeamSessions(teamId: string): Promise<SessionWithDetail
       team_id,
       training_id,
       drill_id,
+      drill_template_id,
       custom_drill_config,
       session_mode,
       status,
@@ -665,7 +680,8 @@ export async function getTeamSessions(teamId: string): Promise<SessionWithDetail
       profiles:user_id(full_name),
       teams:team_id(name),
       trainings:training_id(title),
-      training_drills:drill_id(name)
+      training_drills:drill_id(name),
+      drill_templates:drill_template_id(name)
     `
     )
     .eq('team_id', teamId)
@@ -688,6 +704,7 @@ export async function getSessionById(sessionId: string): Promise<SessionWithDeta
       team_id,
       training_id,
       drill_id,
+      drill_template_id,
       custom_drill_config,
       session_mode,
       status,
@@ -699,6 +716,31 @@ export async function getSessionById(sessionId: string): Promise<SessionWithDeta
       teams:team_id(name),
       trainings:training_id(title),
       training_drills:drill_id(
+        id,
+        name,
+        drill_goal,
+        target_type,
+        distance_m,
+        rounds_per_shooter,
+        time_limit_seconds,
+        par_time_seconds,
+        scoring_mode,
+        min_accuracy_percent,
+        target_count,
+        target_size,
+        shots_per_target,
+        position,
+        start_position,
+        weapon_category,
+        strings_count,
+        reload_required,
+        movement_type,
+        difficulty,
+        category,
+        instructions,
+        safety_notes
+      ),
+      drill_templates:drill_template_id(
         id,
         name,
         drill_goal,

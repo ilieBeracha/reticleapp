@@ -11,7 +11,7 @@
  * - Getter functions to access current callback values
  */
 
-import type { Team, TrainingWithDetails, WorkspaceMemberWithTeams } from '@/types/workspace';
+import type { Team, TeamMemberWithProfile, TrainingWithDetails } from '@/types/workspace';
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 
 type TeamWithMemberCount = Team & { member_count?: number };
@@ -20,8 +20,8 @@ interface ModalContextType {
   // Selected items for preview sheets
   selectedTeam: TeamWithMemberCount | null;
   setSelectedTeam: (team: TeamWithMemberCount | null) => void;
-  selectedMember: WorkspaceMemberWithTeams | null;
-  setSelectedMember: (member: WorkspaceMemberWithTeams | null) => void;
+  selectedMember: TeamMemberWithProfile | null;
+  setSelectedMember: (member: TeamMemberWithProfile | null) => void;
   selectedTraining: TrainingWithDetails | null;
   setSelectedTraining: (training: TrainingWithDetails | null) => void;
   
@@ -58,7 +58,7 @@ const ModalContext = createContext<ModalContextType | null>(null);
 export function ModalProvider({ children }: { children: ReactNode }) {
   // Selected items - need state since they affect UI
   const [selectedTeam, setSelectedTeam] = useState<TeamWithMemberCount | null>(null);
-  const [selectedMember, setSelectedMember] = useState<WorkspaceMemberWithTeams | null>(null);
+  const [selectedMember, setSelectedMember] = useState<TeamMemberWithProfile | null>(null);
   const [selectedTraining, setSelectedTraining] = useState<TrainingWithDetails | null>(null);
   
   // Callback refs - updating these doesn't cause re-renders

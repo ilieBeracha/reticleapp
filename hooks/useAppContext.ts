@@ -58,19 +58,3 @@ export function useAppContext(): AppContext {
     loading: authLoading || teamsLoading,
   };
 }
-
-// =====================================================
-// LEGACY EXPORTS - For backwards compatibility
-// =====================================================
-
-/** @deprecated Use activeTeamId from useAppContext() or useTeamStore */
-export const useActiveWorkspaceId = () => useTeamStore(s => s.activeTeamId);
-
-/** @deprecated Use useActiveTeam() from store */
-export const useActiveWorkspace = () => {
-  const { teams, activeTeamId } = useTeamStore();
-  return teams.find(t => t.id === activeTeamId) || null;
-};
-
-/** @deprecated Use useTeamStore().teams */
-export const useWorkspaces = () => useTeamStore(s => s.teams);

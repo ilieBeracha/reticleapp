@@ -7,8 +7,16 @@
 import { Redirect, useLocalSearchParams } from 'expo-router';
 
 export default function TrainingLiveRedirect() {
-  const { trainingId } = useLocalSearchParams<{ trainingId: string }>();
+  const { trainingId, drillId } = useLocalSearchParams<{ trainingId: string; drillId?: string }>();
 
   // Redirect to the unified training detail page
-  return <Redirect href={`/(protected)/trainingDetail?id=${trainingId}`} />;
+  return (
+    <Redirect
+      href={
+        drillId
+          ? `/(protected)/trainingDetail?id=${trainingId}&startDrillId=${drillId}`
+          : `/(protected)/trainingDetail?id=${trainingId}`
+      }
+    />
+  );
 }

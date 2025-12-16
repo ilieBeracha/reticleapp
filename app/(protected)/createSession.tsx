@@ -7,17 +7,17 @@
  * 3. Pick from Active Training Drills
  */
 import { useColors } from '@/hooks/ui/useColors';
-import { getTeamDrillTemplates } from '@/services/drillTemplateService';
+import { getTeamDrills } from '@/services/drillService';
 import {
-  createSession,
-  deleteSession,
-  getMyActiveSession,
-  type SessionWithDetails,
+    createSession,
+    deleteSession,
+    getMyActiveSession,
+    type SessionWithDetails,
 } from '@/services/sessionService';
 import { useSessionStore } from '@/store/sessionStore';
 import { useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
-import type { DrillTemplate, TrainingDrill } from '@/types/workspace';
+import type { Drill, TrainingDrill } from '@/types/workspace';
 import { formatMaxShots, INFINITE_SHOTS_SENTINEL, isInfiniteShots } from '@/utils/drillShots';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -26,14 +26,14 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Camera, ChevronRight, Crosshair, Minus, Play, Plus } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -109,9 +109,9 @@ export default function CreateSessionScreen() {
   // Training drill selection
   const [selectedTrainingDrill, setSelectedTrainingDrill] = useState<TrainingDrillOption | null>(null);
 
-  // Drill library (templates)
-  const [drillTemplates, setDrillTemplates] = useState<DrillTemplate[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<DrillTemplate | null>(null);
+  // Drill library (core drill definitions)
+  const [drillTemplates, setDrillTemplates] = useState<Drill[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<Drill | null>(null);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const isPaperDrill = customDrill.target_type === 'paper';
   const maxShotsIsInfinite = isPaperDrill && isInfiniteShots(customDrill.rounds_per_shooter);
@@ -164,18 +164,18 @@ export default function CreateSessionScreen() {
         }
       };
 
-      const loadDrillTemplates = async () => {
+      const loadDrillLibrary = async () => {
         if (teams.length === 0) return;
         
         setLoadingTemplates(true);
         try {
-          // Load templates from all teams
-          const allTemplates: DrillTemplate[] = [];
+          // Load drills from all teams
+          const allDrills: Drill[] = [];
           for (const team of teams) {
-            const teamTemplates = await getTeamDrillTemplates(team.id);
-            allTemplates.push(...teamTemplates);
+            const teamDrills = await getTeamDrills(team.id);
+            allDrills.push(...teamDrills);
           }
-          setDrillTemplates(allTemplates);
+          setDrillTemplates(allDrills);
         } catch (err) {
           console.error('Failed to load drill templates:', err);
         } finally {
@@ -185,7 +185,7 @@ export default function CreateSessionScreen() {
 
       checkActiveSession();
       loadMyUpcomingTrainings();
-      loadDrillTemplates();
+      loadDrillLibrary();
     }, [loadMyUpcomingTrainings, teams])
   );
 
@@ -231,7 +231,7 @@ export default function CreateSessionScreen() {
     setSelectedTemplate(null);
   }, []);
 
-  const handleTemplateSelect = useCallback((template: DrillTemplate) => {
+  const handleTemplateSelect = useCallback((template: Drill) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedTemplate((prev) => (prev?.id === template.id ? null : template));
     // Clear training drill selection when template is selected

@@ -7,7 +7,7 @@
 
 import { supabase } from '@/lib/supabase';
 import type {
-    CreateDrillInput,
+    CreateTrainingDrillInput,
     CreateTrainingInput,
     Training,
     TrainingDrill,
@@ -65,6 +65,10 @@ export async function createTraining(input: CreateTrainingInput): Promise<Traini
     const drillsToInsert = input.drills.map((drill, index) => ({
       training_id: training.id,
       order_index: index + 1,
+      // NEW: drill_id references core Drill definition
+      drill_id: drill.drill_id ?? null,
+      // LEGACY: drill_template_id for backwards compatibility
+      drill_template_id: drill.drill_template_id ?? drill.drill_id ?? null,
       name: drill.name,
       description: drill.description || null,
 
@@ -567,11 +571,15 @@ export async function getMyTrainingStats(): Promise<{
 // =====================================================
 
 /**
- * Add a drill to a training
+ * Add a drill instance to a training.
+ * 
+ * NEW ARCHITECTURE:
+ * - drill_id: Reference to core Drill definition
+ * - Instance fields: Configured for this specific training
  */
 export async function addDrill(
   trainingId: string,
-  drill: CreateDrillInput
+  drill: CreateTrainingDrillInput
 ): Promise<TrainingDrill> {
   // Get the current max order_index
   const { data: existingDrills } = await supabase
@@ -588,6 +596,10 @@ export async function addDrill(
     .insert({
       training_id: trainingId,
       order_index: nextIndex,
+      // NEW: drill_id references core Drill definition
+      drill_id: drill.drill_id ?? null,
+      // LEGACY: drill_template_id for backwards compatibility
+      drill_template_id: drill.drill_template_id ?? drill.drill_id ?? null,
       name: drill.name,
       description: drill.description || null,
 
@@ -669,11 +681,11 @@ export async function getTrainingDrills(trainingId: string): Promise<TrainingDri
 }
 
 /**
- * Update a drill
+ * Update a drill instance within a training
  */
 export async function updateDrill(
   drillId: string,
-  updates: Partial<CreateDrillInput>
+  updates: Partial<CreateTrainingDrillInput>
 ): Promise<TrainingDrill> {
   const { data, error } = await supabase
     .from('training_drills')
@@ -728,6 +740,78 @@ export async function reorderDrills(
     console.error('Failed to reorder drills:', errors);
     throw new Error('Failed to reorder drills');
   }
+}
+
+/**
+ * Batch update drill instance configurations.
+ * 
+ * Used by commanders to set instance values (distance, shots, time)
+ * before starting a training.
+ */
+export interface DrillInstanceOverrides {
+  distance_m?: number;
+  rounds_per_shooter?: number;
+  time_limit_seconds?: number | null;
+  strings_count?: number | null;
+  par_time_seconds?: number | null;
+  min_accuracy_percent?: number | null;
+}
+
+export async function updateTrainingDrills(
+  trainingId: string,
+  drillOverrides: Map<string, DrillInstanceOverrides>
+): Promise<void> {
+  if (drillOverrides.size === 0) return;
+
+  const updates = Array.from(drillOverrides.entries()).map(([drillId, overrides]) => {
+    const updateData: Record<string, unknown> = {};
+    
+    if (overrides.distance_m !== undefined) updateData.distance_m = overrides.distance_m;
+    if (overrides.rounds_per_shooter !== undefined) updateData.rounds_per_shooter = overrides.rounds_per_shooter;
+    if (overrides.time_limit_seconds !== undefined) updateData.time_limit_seconds = overrides.time_limit_seconds;
+    if (overrides.strings_count !== undefined) updateData.strings_count = overrides.strings_count;
+    if (overrides.par_time_seconds !== undefined) updateData.par_time_seconds = overrides.par_time_seconds;
+    if (overrides.min_accuracy_percent !== undefined) updateData.min_accuracy_percent = overrides.min_accuracy_percent;
+
+    // Only update if there are actual changes
+    if (Object.keys(updateData).length === 0) return null;
+
+    return supabase
+      .from('training_drills')
+      .update(updateData)
+      .eq('id', drillId)
+      .eq('training_id', trainingId);
+  }).filter(Boolean);
+
+  if (updates.length === 0) return;
+
+  const results = await Promise.all(updates);
+  const errors = results.filter(r => r?.error);
+  
+  if (errors.length > 0) {
+    console.error('Failed to update drill instances:', errors);
+    throw new Error('Failed to update some drill configurations');
+  }
+}
+
+/**
+ * Start a training with optional drill instance overrides.
+ * 
+ * This is the main flow for commanders to configure and start a training.
+ * 1. Apply any drill overrides (distance, shots, time)
+ * 2. Change training status to ongoing
+ */
+export async function startTrainingWithConfig(
+  trainingId: string,
+  drillOverrides?: Map<string, DrillInstanceOverrides>
+): Promise<Training> {
+  // First, apply any drill overrides
+  if (drillOverrides && drillOverrides.size > 0) {
+    await updateTrainingDrills(trainingId, drillOverrides);
+  }
+
+  // Then start the training
+  return startTraining(trainingId);
 }
 
 // =====================================================

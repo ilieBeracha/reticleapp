@@ -1,10 +1,19 @@
 /**
  * DRILL TEMPLATE SERVICE
- * Manages reusable drill templates for teams
+ * @deprecated Use drillService.ts instead - the new normalized architecture
+ *
+ * This service is kept for backwards compatibility only.
+ * New code should use:
+ * - drillService.ts for core Drill definitions (static properties)
+ * - trainingService.ts for drill instances within trainings (variable properties)
  */
 
 import { supabase } from '@/lib/supabase';
-import type { CreateDrillTemplateInput, DrillTemplate } from '@/types/workspace';
+import type { CreateDrillInput, Drill } from '@/types/workspace';
+
+// Type alias for backwards compatibility
+export type DrillTemplate = Drill;
+export type CreateDrillTemplateInput = CreateDrillInput;
 
 // =====================================================
 // CRUD OPERATIONS
@@ -12,6 +21,7 @@ import type { CreateDrillTemplateInput, DrillTemplate } from '@/types/workspace'
 
 /**
  * Get all drill templates for a team
+ * @deprecated Use getTeamDrills from drillService.ts
  */
 export async function getTeamDrillTemplates(teamId: string): Promise<DrillTemplate[]> {
   const { data, error } = await supabase
@@ -30,13 +40,16 @@ export async function getTeamDrillTemplates(teamId: string): Promise<DrillTempla
 
 /**
  * Create a new drill template
+ * @deprecated Use createDrill from drillService.ts
  */
 export async function createDrillTemplate(
   teamId: string,
   input: CreateDrillTemplateInput
 ): Promise<DrillTemplate> {
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     throw new Error('Not authenticated');
   }
@@ -46,52 +59,22 @@ export async function createDrillTemplate(
     .insert({
       team_id: teamId,
       created_by: user.id,
+
+      // === ESSENTIAL FIELDS ===
       name: input.name,
       description: input.description || null,
-      // === PRIMARY CLASSIFICATION ===
       drill_goal: input.drill_goal,
-      // === BASIC CONFIG ===
       target_type: input.target_type,
       distance_m: input.distance_m,
       rounds_per_shooter: input.rounds_per_shooter,
+      time_limit_seconds: input.time_limit_seconds || null,
+      strings_count: input.strings_count || 1,
 
-      // === TIMING ===
-      time_limit_seconds: input.time_limit_seconds ?? null,
-      par_time_seconds: input.par_time_seconds ?? null,
-
-      // === SCORING ===
-      scoring_mode: input.scoring_mode ?? null,
-      min_accuracy_percent: input.min_accuracy_percent ?? null,
-      points_per_hit: input.points_per_hit ?? null,
-      penalty_per_miss: input.penalty_per_miss ?? null,
-
-      // === TARGET CONFIGURATION ===
-      target_count: input.target_count ?? 1,
-      target_size: input.target_size ?? null,
-      shots_per_target: input.shots_per_target ?? null,
-      target_exposure_seconds: input.target_exposure_seconds ?? null,
-
-      // === SHOOTING SETUP ===
-      position: input.position ?? null,
-      start_position: input.start_position ?? null,
-      weapon_category: input.weapon_category ?? null,
-
-      // === STAGE SETUP ===
-      strings_count: input.strings_count ?? 1,
-      reload_required: input.reload_required ?? false,
-      movement_type: input.movement_type ?? null,
-      movement_distance_m: input.movement_distance_m ?? null,
-
-      // === DIFFICULTY & CATEGORY ===
-      difficulty: input.difficulty ?? null,
-      category: input.category ?? null,
-      tags: input.tags ?? null,
-
-      // === RICH CONTENT ===
-      instructions: input.instructions ?? null,
-      diagram_url: input.diagram_url ?? null,
-      video_url: input.video_url ?? null,
-      safety_notes: input.safety_notes ?? null,
+      // Legacy defaults (same values)
+      default_distance_m: input.distance_m,
+      default_rounds_per_shooter: input.rounds_per_shooter,
+      default_time_limit_seconds: input.time_limit_seconds || null,
+      default_strings_count: input.strings_count || 1,
     })
     .select()
     .single();
@@ -106,17 +89,42 @@ export async function createDrillTemplate(
 
 /**
  * Update a drill template
+ * @deprecated Use updateDrill from drillService.ts
  */
 export async function updateDrillTemplate(
   templateId: string,
   updates: Partial<CreateDrillTemplateInput>
 ): Promise<DrillTemplate> {
+  const updateData: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+
+  // Essential fields
+  if (updates.name !== undefined) updateData.name = updates.name;
+  if (updates.description !== undefined) updateData.description = updates.description;
+  if (updates.drill_goal !== undefined) updateData.drill_goal = updates.drill_goal;
+  if (updates.target_type !== undefined) updateData.target_type = updates.target_type;
+
+  if (updates.distance_m !== undefined) {
+    updateData.distance_m = updates.distance_m;
+    updateData.default_distance_m = updates.distance_m;
+  }
+  if (updates.rounds_per_shooter !== undefined) {
+    updateData.rounds_per_shooter = updates.rounds_per_shooter;
+    updateData.default_rounds_per_shooter = updates.rounds_per_shooter;
+  }
+  if (updates.time_limit_seconds !== undefined) {
+    updateData.time_limit_seconds = updates.time_limit_seconds;
+    updateData.default_time_limit_seconds = updates.time_limit_seconds;
+  }
+  if (updates.strings_count !== undefined) {
+    updateData.strings_count = updates.strings_count;
+    updateData.default_strings_count = updates.strings_count;
+  }
+
   const { data, error } = await supabase
     .from('drill_templates')
-    .update({
-      ...updates,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq('id', templateId)
     .select()
     .single();
@@ -131,12 +139,10 @@ export async function updateDrillTemplate(
 
 /**
  * Delete a drill template
+ * @deprecated Use deleteDrill from drillService.ts
  */
 export async function deleteDrillTemplate(templateId: string): Promise<void> {
-  const { error } = await supabase
-    .from('drill_templates')
-    .delete()
-    .eq('id', templateId);
+  const { error } = await supabase.from('drill_templates').delete().eq('id', templateId);
 
   if (error) {
     console.error('Failed to delete drill template:', error);
@@ -145,36 +151,18 @@ export async function deleteDrillTemplate(templateId: string): Promise<void> {
 }
 
 /**
- * Convert a drill template to CreateDrillInput for use in training
+ * Convert a drill template to CreateTrainingDrillInput for use in training
+ * @deprecated Use drillToTrainingInput from drillService.ts
  */
 export function templateToDrillInput(template: DrillTemplate) {
   return {
     name: template.name,
+    drill_id: template.id,
     drill_goal: template.drill_goal,
     target_type: template.target_type,
     distance_m: template.distance_m,
     rounds_per_shooter: template.rounds_per_shooter,
     time_limit_seconds: template.time_limit_seconds || undefined,
-    position: template.position || undefined,
-    weapon_category: template.weapon_category || undefined,
-    // Preserve round semantics (strings_count = rounds)
-    strings_count: template.strings_count || undefined,
-    target_count: template.target_count || undefined,
-    shots_per_target: template.shots_per_target || undefined,
-    min_accuracy_percent: template.min_accuracy_percent || undefined,
-    par_time_seconds: template.par_time_seconds || undefined,
-    scoring_mode: (template.scoring_mode as any) || undefined,
-    start_position: template.start_position || undefined,
-    reload_required: template.reload_required || undefined,
-    movement_type: template.movement_type || undefined,
-    movement_distance_m: template.movement_distance_m || undefined,
-    difficulty: (template.difficulty as any) || undefined,
-    category: (template.category as any) || undefined,
-    tags: template.tags || undefined,
-    instructions: template.instructions || undefined,
-    diagram_url: template.diagram_url || undefined,
-    video_url: template.video_url || undefined,
-    safety_notes: template.safety_notes || undefined,
-    notes: template.description || undefined,
+    strings_count: template.strings_count || 1,
   };
 }

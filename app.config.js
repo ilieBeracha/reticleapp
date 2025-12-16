@@ -25,19 +25,20 @@ const getAppName = () => {
 const getBundleIdentifier = () => {
   if (IS_DEV) return 'com.retic.app.development';
   if (IS_PREVIEW) return 'com.retic.app';
-  return 'com.Reticled.app';
+  return 'com.reticled.app';
 };
 
 const getAndroidPackage = () => {
   if (IS_DEV) return 'com.retic.app.development';
   if (IS_PREVIEW) return 'com.retic.app';
-  return 'com.Reticled.app';
+  return 'com.reticled.app';
 };
 
 const getScheme = () => {
   if (IS_DEV) return 'retic-dev';
   if (IS_PREVIEW) return 'retic';
-  return 'Reticled';
+  // Must be lowercase and match: ^[a-z][a-z0-9+.-]*$
+  return 'reticled';
 };
 
 export default ({ config }) => {

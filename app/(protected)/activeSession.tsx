@@ -7,6 +7,8 @@
 
 import { TargetCard } from '@/components/session/TargetCard';
 import { useColors } from '@/hooks/ui/useColors';
+import { getDrillInputRoutes } from '@/services/session/drillInputRecipe';
+import { computeSessionScore } from '@/services/session/scoring';
 import {
   calculateSessionStats,
   endSession,
@@ -134,11 +136,13 @@ export default function ActiveSessionScreen() {
     // - paper(scan): rounds_per_shooter = MAX allowed shots cap (default: infinite)
     // Each "round" corresponds to one target entry (user fills the form once per round).
     const rounds = drill.strings_count && drill.strings_count > 0 ? drill.strings_count : 1;
+    const targetsPerRound = drill.target_count && drill.target_count > 0 ? drill.target_count : 1;
     const isPaper = drill.target_type === 'paper';
     const bulletsPerRound = drill.rounds_per_shooter;
 
-    const requiredTargets = rounds; // number of entries required
-    const requiredRounds = isPaper ? 0 : bulletsPerRound * rounds; // paper drills are target-count based
+    // If target_count is set, drills may require multiple target entries per round/string.
+    const requiredTargets = rounds * targetsPerRound;
+    const requiredRounds = isPaper ? 0 : bulletsPerRound * requiredTargets; // tactical: fixed bullets per target entry
 
     const shotsProgress =
       !isPaper && requiredRounds > 0 ? Math.min(100, Math.round((totalShots / requiredRounds) * 100)) : 0;
@@ -152,6 +156,7 @@ export default function ActiveSessionScreen() {
     
     return {
       rounds,
+      targetsPerRound,
       bulletsPerRound,
       requiredRounds,
       requiredTargets,
@@ -191,9 +196,12 @@ export default function ActiveSessionScreen() {
 
   const drillDistance = drill?.distance_m || 100;
   const defaultDistance = useMemo(() => {
-    if (drill) return drill.distance_m;
-    if (targets.length === 0) return 100;
-    return Math.round(targets.reduce((sum, t) => sum + (t.distance_m || 0), 0) / targets.length);
+    // Session-first: prefer the most recent target distance if available
+    const last = targets.length > 0 ? targets[targets.length - 1] : null;
+    if (last?.distance_m) return last.distance_m;
+    // Otherwise fall back to the drill's suggested distance (if any), else a sane default.
+    if (drill?.distance_m) return drill.distance_m;
+    return 100;
   }, [drill, targets]);
 
   const formatTime = (seconds: number) => {
@@ -411,6 +419,59 @@ export default function ActiveSessionScreen() {
   }, []);
 
   // ============================================================================
+  // DRILL-DRIVEN INPUT (A) + SCORING (B)
+  // ============================================================================
+  // NOTE: These hooks MUST be above early-return render branches (loading/not-found),
+  // otherwise React will detect hook order changes across renders.
+  const isGroupingDrill = drill?.drill_goal === 'grouping';
+  const isAchievementDrill = drill?.drill_goal === 'achievement';
+
+  // Legacy compatibility - keep for UI color hints
+  const isPaperDrill = isGroupingDrill || drill?.target_type === 'paper';
+  const isTacticalDrill = drill?.target_type === 'tactical';
+
+  const drillLimitReached =
+    !!drill &&
+    !!nextTargetPlan &&
+    (drill.target_type === 'paper'
+      ? nextTargetPlan.remainingTargets <= 0
+      : nextTargetPlan.remainingShots <= 0 || nextTargetPlan.remainingTargets <= 0);
+
+  const inputRoutes = useMemo(() => {
+    if (!sessionId) return null;
+    return getDrillInputRoutes({
+      sessionId,
+      defaultDistance,
+      drill: drill ?? null,
+      nextBullets: nextTargetPlan?.nextBullets ?? null,
+      allowMoreTargets: !drillLimitReached,
+    });
+  }, [sessionId, defaultDistance, drill, nextTargetPlan?.nextBullets, drillLimitReached]);
+
+  const manualRoute = inputRoutes?.primary.kind === 'manual_tactical' ? inputRoutes.primary : inputRoutes?.secondary;
+  const scanRoute = inputRoutes?.primary.kind === 'scan_paper' ? inputRoutes.primary : undefined;
+
+  const showManual = !!manualRoute;
+  const showScan = !!scanRoute;
+
+  const handleManualRoute = useCallback(() => {
+    if (!manualRoute) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push({ pathname: manualRoute.pathname, params: manualRoute.params } as any);
+  }, [manualRoute]);
+
+  const handleScanRoute = useCallback(() => {
+    if (!scanRoute) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push({ pathname: scanRoute.pathname, params: scanRoute.params } as any);
+  }, [scanRoute]);
+
+  const score = useMemo(() => {
+    if (!stats) return null;
+    return computeSessionScore(stats, drill ?? null);
+  }, [stats, drill]);
+
+  // ============================================================================
   // RENDER HELPERS
   // ============================================================================
   const renderTarget = useCallback(
@@ -482,35 +543,6 @@ export default function ActiveSessionScreen() {
   // ============================================================================
   // MAIN RENDER
   // ============================================================================
-  // Determine which action buttons to show based on drill_goal
-  // - Grouping drills: scan only (no hit % tracking)
-  // - Achievement drills: scan OR manual (tracks hit %)
-  // - No drill (free practice): both options available
-  const isGroupingDrill = drill?.drill_goal === 'grouping';
-  const isAchievementDrill = drill?.drill_goal === 'achievement';
-  
-  // Determine target type from drill config
-  const isPaperTarget = !drill || drill.target_type === 'paper';
-  const isTacticalTarget = drill?.target_type === 'tactical';
-  
-  // Show buttons based on target_type:
-  // - Paper targets (including paper+achievement): show scan
-  // - Tactical targets: show manual entry
-  // - No drill (free practice): show both
-  const showScan = !drill || isPaperTarget;
-  const showManual = !drill || isTacticalTarget;
-  
-  // Legacy compatibility - keep for UI color hints
-  const isPaperDrill = isGroupingDrill || drill?.target_type === 'paper';
-  const isTacticalDrill = isTacticalTarget;
-  
-  const drillLimitReached =
-    !!drill &&
-    !!nextTargetPlan &&
-    (drill.target_type === 'paper'
-      ? nextTargetPlan.remainingTargets <= 0
-      : nextTargetPlan.remainingShots <= 0 || nextTargetPlan.remainingTargets <= 0);
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
@@ -617,7 +649,7 @@ export default function ActiveSessionScreen() {
                 />
               </View>
               <Text style={[styles.drillProgressText, { color: colors.textMuted }]}>
-                {targets.length}/{drillProgress?.requiredTargets ?? 1} rounds
+                {targets.length}/{drillProgress?.requiredTargets ?? 1} entries
               </Text>
             </View>
           </View>
@@ -649,7 +681,7 @@ export default function ActiveSessionScreen() {
               </View>
               <Text style={[styles.statValue, { color: colors.text }]}>{targets.length}</Text>
               <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-                {hasDrill ? 'rounds' : 'targets'}
+                {hasDrill ? 'entries' : 'targets'}
               </Text>
             </View>
             <View style={styles.statItem}>
@@ -666,6 +698,15 @@ export default function ActiveSessionScreen() {
               <Text style={[styles.statValue, { color: '#93C5FD' }]}>{totalHits}</Text>
               <Text style={[styles.statLabel, { color: colors.textMuted }]}>hits</Text>
             </View>
+            {score?.mode === 'points' && (
+              <View style={styles.statItem}>
+                <View style={[styles.statIconBg, { backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}>
+                  <Trophy size={16} color="#F59E0B" />
+                </View>
+                <Text style={[styles.statValue, { color: '#F59E0B' }]}>{Math.round(score.value)}</Text>
+                <Text style={[styles.statLabel, { color: colors.textMuted }]}>points</Text>
+              </View>
+            )}
           </View>
         </View>
       </Animated.View>
@@ -727,17 +768,17 @@ export default function ActiveSessionScreen() {
                 isAchievementDrill && styles.primaryActionBtn,
                 drillLimitReached && { opacity: 0.5 },
               ]}
-              onPress={handleLogTactical}
+              onPress={handleManualRoute}
               disabled={drillLimitReached}
               activeOpacity={0.8}
             >
               <Crosshair size={20} color={isAchievementDrill ? '#fff' : colors.textMuted} />
               <Text style={[styles.tacticalButtonText, { color: isAchievementDrill ? '#fff' : colors.text }]}>
-                {isAchievementDrill
-                  ? (nextTargetPlan?.nextBullets
+                {manualRoute?.kind === 'manual_paper_achievement'
+                  ? 'Manual Entry'
+                  : (nextTargetPlan?.nextBullets
                       ? `Manual (${nextTargetPlan.nextBullets}rds)`
-                      : 'Manual Entry')
-                  : 'Manual'}
+                      : 'Manual')}
               </Text>
             </TouchableOpacity>
           )}
@@ -750,7 +791,7 @@ export default function ActiveSessionScreen() {
                 isGroupingDrill && styles.scanButtonPrimary,
                 drillLimitReached && { opacity: 0.5 },
               ]}
-              onPress={handleScanPaper}
+              onPress={handleScanRoute}
               disabled={drillLimitReached}
               activeOpacity={0.8}
             >

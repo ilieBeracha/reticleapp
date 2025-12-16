@@ -231,3 +231,4 @@ export default HeroSummaryCard;
     backgroundColor: '#22C55E',
   }
 });
+

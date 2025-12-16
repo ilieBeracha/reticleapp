@@ -4,8 +4,8 @@ import { router } from 'expo-router';
 import { ArrowRight, Clock, Target, Users } from 'lucide-react-native';
 import { Text, TouchableOpacity, View } from 'react-native';
 import type { ThemeColors } from '../types';
-import type { UpcomingTraining } from './types';
 import { styles } from './styles';
+import type { UpcomingTraining } from './types';
 
 export function TrainingCard({
   training,
@@ -76,5 +76,7 @@ export function TrainingCard({
     </TouchableOpacity>
   );
 }
+
+
 
 
