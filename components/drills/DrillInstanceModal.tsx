@@ -309,8 +309,8 @@ export function DrillInstanceModal({
       time_limit_seconds: params.timeLimit ?? null,
     };
 
+    // Parent handles closing the modal to avoid race conditions
     onConfirm(config);
-    onClose();
   };
 
   if (!drillType || (!drill && !template)) return null;
