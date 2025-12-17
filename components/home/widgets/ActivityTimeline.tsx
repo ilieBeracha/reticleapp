@@ -154,68 +154,106 @@ export function ActivityTimeline({ sessions, trainings, onSessionPress, limit = 
     return <Users size={size} color="#fff" />;
   };
 
+  // Separate items into upcoming (in_progress + upcoming) and past (completed)
+  const upcomingItems = useMemo(() => 
+    timelineItems.filter(item => item.status === 'in_progress' || item.status === 'upcoming'),
+    [timelineItems]
+  );
+  
+  const pastItems = useMemo(() => 
+    timelineItems.filter(item => item.status === 'completed'),
+    [timelineItems]
+  );
+
   if (timelineItems.length === 0) {
     return null;
   }
 
+  const renderItem = (item: TimelineItem, index: number, isLast: boolean) => {
+    const statusColor = getStatusColor(item.status);
+
+    return (
+      <TouchableOpacity
+        key={item.id}
+        style={styles.item}
+        onPress={() => handlePress(item)}
+        activeOpacity={0.7}
+      >
+        {/* Timeline line */}
+        <View style={styles.lineContainer}>
+          <View style={[styles.dot, { backgroundColor: statusColor }]}>
+            {getIcon(item)}
+          </View>
+          {!isLast && (
+            <View style={[styles.line, { backgroundColor: colors.border }]} />
+          )}
+        </View>
+
+        {/* Content */}
+        <View style={[styles.content, { borderBottomColor: isLast ? 'transparent' : colors.border }]}>
+          <View style={styles.contentHeader}>
+            <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <Text style={[styles.time, { color: colors.textMuted }]}>
+              {formatDate(item.date, item.status)}
+            </Text>
+          </View>
+          <Text style={[styles.subtitle, { color: colors.textMuted }]} numberOfLines={1}>
+            {item.subtitle}
+          </Text>
+
+          {/* Details row */}
+          {item.details.length > 0 && (
+            <View style={styles.detailsRow}>
+              {item.details.map((detail, i) => (
+                <View key={i} style={styles.detailItem}>
+                  {i > 0 && <View style={[styles.detailDot, { backgroundColor: colors.border }]} />}
+                  <Text style={[styles.detailText, { color: colors.textMuted }]}>
+                    {detail}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={[styles.header, { color: colors.textMuted }]}>Recent Activity</Text>
+      <Text style={[styles.header, { color: colors.textMuted }]}>Activity</Text>
       
-      <View style={styles.timeline}>
-        {timelineItems.map((item, index) => {
-          const isLast = index === timelineItems.length - 1;
-          const statusColor = getStatusColor(item.status);
+      {/* Upcoming Section */}
+      {upcomingItems.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={[styles.sectionDot, { backgroundColor: colors.blue }]} />
+            <Text style={[styles.sectionLabel, { color: colors.blue }]}>Upcoming</Text>
+          </View>
+          <View style={styles.timeline}>
+            {upcomingItems.map((item, index) => 
+              renderItem(item, index, index === upcomingItems.length - 1)
+            )}
+          </View>
+        </View>
+      )}
 
-          return (
-            <TouchableOpacity
-              key={item.id}
-              style={styles.item}
-              onPress={() => handlePress(item)}
-              activeOpacity={0.7}
-            >
-              {/* Timeline line */}
-              <View style={styles.lineContainer}>
-                <View style={[styles.dot, { backgroundColor: statusColor }]}>
-                  {getIcon(item)}
-                </View>
-                {!isLast && (
-                  <View style={[styles.line, { backgroundColor: colors.border }]} />
-                )}
-              </View>
-
-              {/* Content */}
-              <View style={[styles.content, { borderBottomColor: isLast ? 'transparent' : colors.border }]}>
-                <View style={styles.contentHeader}>
-                  <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
-                    {item.title}
-                  </Text>
-                  <Text style={[styles.time, { color: colors.textMuted }]}>
-                    {formatDate(item.date, item.status)}
-                  </Text>
-                </View>
-                <Text style={[styles.subtitle, { color: colors.textMuted }]} numberOfLines={1}>
-                  {item.subtitle}
-                </Text>
-
-                {/* Details row */}
-                {item.details.length > 0 && (
-                  <View style={styles.detailsRow}>
-                    {item.details.map((detail, i) => (
-                      <View key={i} style={styles.detailItem}>
-                        {i > 0 && <View style={[styles.detailDot, { backgroundColor: colors.border }]} />}
-                        <Text style={[styles.detailText, { color: colors.textMuted }]}>
-                          {detail}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      {/* Past Section */}
+      {pastItems.length > 0 && (
+        <View style={[styles.section, upcomingItems.length > 0 && styles.sectionSpacing]}>
+          <View style={styles.sectionHeader}>
+            <View style={[styles.sectionDot, { backgroundColor: colors.textMuted }]} />
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Past</Text>
+          </View>
+          <View style={styles.timeline}>
+            {pastItems.map((item, index) => 
+              renderItem(item, index, index === pastItems.length - 1)
+            )}
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -231,6 +269,27 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 16,
+  },
+  section: {},
+  sectionSpacing: {
+    marginTop: 20,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  sectionDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   timeline: {
     gap: 4,
