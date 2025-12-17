@@ -2,30 +2,22 @@
  * Integrations Page
  * 
  * Connect wearables and external services:
- * - Garmin Connect
  * - Apple Watch (coming soon)
  */
-import { GarminSheet } from '@/components/modals/GarminSheet';
-import { type BaseBottomSheetRef } from '@/components/modals/BaseBottomSheet';
 import { useColors } from '@/hooks/ui/useColors';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { Stack } from 'expo-router';
-import { Watch, ChevronRight, CheckCircle2, Plug } from 'lucide-react-native';
-import { useRef, useState } from 'react';
+import { Watch, Plug } from 'lucide-react-native';
 import {
   Platform,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 
 export default function IntegrationsScreen() {
   const colors = useColors();
-  const garminSheetRef = useRef<BaseBottomSheetRef>(null);
-  const [garminConnected, setGarminConnected] = useState(false);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -64,41 +56,6 @@ export default function IntegrationsScreen() {
               WEARABLES
             </Text>
           </View>
-
-          {/* Garmin */}
-          <TouchableOpacity
-            style={[
-              styles.integrationCard,
-              { 
-                backgroundColor: colors.card, 
-                borderColor: garminConnected ? colors.primary : colors.border 
-              },
-            ]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              garminSheetRef.current?.open();
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.integrationLogo, { backgroundColor: '#11314B' }]}>
-              <Text style={styles.garminLogoText}>G</Text>
-            </View>
-            <View style={styles.integrationInfo}>
-              <Text style={[styles.integrationName, { color: colors.text }]}>
-                Garmin
-              </Text>
-              <Text style={[styles.integrationDesc, { color: colors.textMuted }]}>
-                {garminConnected
-                  ? 'Connected • Syncing data'
-                  : 'Heart rate, GPS, stress levels'}
-              </Text>
-            </View>
-            {garminConnected ? (
-              <CheckCircle2 size={22} color={colors.primary} />
-            ) : (
-              <ChevronRight size={20} color={colors.textMuted} />
-            )}
-          </TouchableOpacity>
 
           {/* Apple Watch - Coming Soon */}
           <View
@@ -140,9 +97,6 @@ export default function IntegrationsScreen() {
 
         <View style={{ height: 100 }} />
       </ScrollView>
-
-      {/* Garmin Bottom Sheet */}
-      <GarminSheet ref={garminSheetRef} />
     </View>
   );
 }
@@ -210,11 +164,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  garminLogoText: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#FFFFFF',
   },
   integrationInfo: {
     flex: 1,
