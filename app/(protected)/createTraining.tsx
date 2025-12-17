@@ -679,8 +679,8 @@ const styles = StyleSheet.create({
   input: { height: 48, paddingHorizontal: 14, fontSize: 15 },
 
   // Date Row
-  dateRow: { flexDirection: 'row', gap: 10 },
-  dateBtn: { flex: 1, height: 48, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  dateRow: { flexDirection: 'row', gap: 10, justifyContent: 'center' },
+  dateBtn: { flex: 1, height: 48, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', maxWidth: 160 },
   dateBtnText: { fontSize: 15, fontWeight: '500' },
 
   // Toggle Row
