@@ -168,7 +168,6 @@ export default function CreateTrainingScreen() {
   // Handle selecting a drill from library (opens instance config modal)
   const handleSelectDrill = useCallback((drill: Drill) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Set both states together to avoid intermediate renders
     setSelectedDrill(drill);
     setShowInstanceModal(true);
   }, []);
@@ -481,22 +480,10 @@ export default function CreateTrainingScreen() {
           <Text style={[styles.inputLabel, { color: colors.text }]}>Drills {drills.length > 0 && `(${drills.length})`}</Text>
           <Text style={[styles.required, { color: colors.destructive }]}>*</Text>
         </View>
-        {selectedTeamId && (
-          <TouchableOpacity
-            style={[styles.libraryLink, { backgroundColor: colors.secondary }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push(`/(protected)/drillLibrary?teamId=${selectedTeamId}`);
-            }}
-          >
-            <Ionicons name="library-outline" size={14} color={colors.primary} />
-            <Text style={[styles.libraryLinkText, { color: colors.primary }]}>Drill Library</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
       {drills.length === 0 && teamDrills.length > 0 && (
-        <Text style={[styles.drillsHint, { color: colors.textMuted }]}>Select drills from your library below</Text>
+        <Text style={[styles.drillsHint, { color: colors.textMuted }]}>Tap a drill below to add it</Text>
       )}
 
       {/* Drill List */}
@@ -554,23 +541,14 @@ export default function CreateTrainingScreen() {
         <View style={[styles.emptyDrills, { backgroundColor: colors.secondary }]}>
           <Target size={32} color={colors.textMuted} />
           <Text style={[styles.emptyTitle, { color: colors.text }]}>
-            {!selectedTeamId ? 'Select a team first' : 'No drills in library'}
+            {!selectedTeamId ? 'Select a team first' : 'No drills available'}
           </Text>
           <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
             {!selectedTeamId 
               ? 'Choose a team above to see available drills' 
-              : 'Add drills to your team library first, then select them here'
+              : 'Go to Team → Manage → Drill Library to add drills first'
             }
           </Text>
-          {selectedTeamId && (
-            <TouchableOpacity
-              style={[styles.emptyBtn, { backgroundColor: colors.primary }]}
-              onPress={() => router.push(`/(protected)/drillLibrary?teamId=${selectedTeamId}`)}
-            >
-              <Ionicons name="add" size={16} color="#fff" />
-              <Text style={styles.emptyBtnText}>Go to Drill Library</Text>
-            </TouchableOpacity>
-          )}
         </View>
       )}
 
@@ -747,8 +725,6 @@ const styles = StyleSheet.create({
   // Drills Header
   drillsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   drillsHint: { fontSize: 12, marginBottom: 12 },
-  libraryLink: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
-  libraryLinkText: { fontSize: 12, fontWeight: '600' },
 
   // Drill Library
   drillLibrarySection: { marginBottom: 16 },
@@ -765,8 +741,6 @@ const styles = StyleSheet.create({
   emptyDrills: { alignItems: 'center', padding: 32, borderRadius: 16, gap: 8, marginBottom: 16 },
   emptyTitle: { fontSize: 16, fontWeight: '600' },
   emptyDesc: { fontSize: 13, textAlign: 'center' },
-  emptyBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, marginTop: 8 },
-  emptyBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
 
   // Drills List
   drillsList: { gap: 10, marginBottom: 16 },
