@@ -168,8 +168,15 @@ export default function CreateTrainingScreen() {
   // Handle selecting a drill from library (opens instance config modal)
   const handleSelectDrill = useCallback((drill: Drill) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Set both states together to avoid intermediate renders
     setSelectedDrill(drill);
     setShowInstanceModal(true);
+  }, []);
+
+  // Handle closing the drill instance modal
+  const handleCloseInstanceModal = useCallback(() => {
+    setShowInstanceModal(false);
+    setSelectedDrill(null);
   }, []);
 
   // Handle instance configuration complete (add drill from library to training)
@@ -177,6 +184,8 @@ export default function CreateTrainingScreen() {
     if (!selectedDrill) return;
 
     const trainingDrill = drillToTrainingInput(selectedDrill, instanceConfig);
+    
+    // Add the drill to the list
     setDrills(prev => [
       ...prev,
       {
@@ -184,10 +193,10 @@ export default function CreateTrainingScreen() {
         ...trainingDrill,
       },
     ]);
-    // Close modal first, then clear drill (to avoid race condition)
+    
+    // Close modal and clear selection in one batch
     setShowInstanceModal(false);
-    // Use setTimeout to ensure modal closes before clearing drill
-    setTimeout(() => setSelectedDrill(null), 100);
+    setSelectedDrill(null);
   }, [selectedDrill]);
 
   const handleCreate = useCallback(async () => {
@@ -300,6 +309,14 @@ export default function CreateTrainingScreen() {
           </View>
           <Text style={[styles.title, { color: colors.text }]}>New Training</Text>
         </View>
+
+      {/* ==================== STEP 1: TRAINING DETAILS ==================== */}
+      <View style={[styles.stepHeader, { borderBottomColor: colors.border }]}>
+        <View style={[styles.stepBadge, { backgroundColor: colors.primary + '15' }]}>
+          <Text style={[styles.stepNumber, { color: colors.primary }]}>1</Text>
+        </View>
+        <Text style={[styles.stepTitle, { color: colors.text }]}>Training Details</Text>
+      </View>
 
       {/* Team Selector */}
       <View style={styles.inputSection}>
@@ -449,6 +466,14 @@ export default function CreateTrainingScreen() {
         </View>
       </TouchableOpacity>
 
+      {/* ==================== STEP 2: ATTACH DRILLS ==================== */}
+      <View style={[styles.stepHeader, { borderBottomColor: colors.border, marginTop: 8 }]}>
+        <View style={[styles.stepBadge, { backgroundColor: drills.length > 0 ? colors.primary + '15' : colors.destructive + '15' }]}>
+          <Text style={[styles.stepNumber, { color: drills.length > 0 ? colors.primary : colors.destructive }]}>2</Text>
+        </View>
+        <Text style={[styles.stepTitle, { color: colors.text }]}>Attach Drill</Text>
+      </View>
+
       {/* Drills Section Header */}
       <View style={styles.drillsHeader}>
         <View style={styles.labelRow}>
@@ -593,10 +618,7 @@ export default function CreateTrainingScreen() {
       {/* Drill instance configuration modal */}
       <DrillInstanceModal
         visible={showInstanceModal}
-        onClose={() => {
-          setShowInstanceModal(false);
-          setSelectedDrill(null);
-        }}
+        onClose={handleCloseInstanceModal}
         onConfirm={handleInstanceConfirm}
         drill={selectedDrill}
       />
@@ -672,6 +694,32 @@ const styles = StyleSheet.create({
   headerIcon: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   title: { fontSize: 22, fontWeight: '700', letterSpacing: -0.5 },
   subtitle: { fontSize: 14, marginTop: 4 },
+
+  // Step Header
+  stepHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 10, 
+    paddingBottom: 12,
+    marginBottom: 16,
+    borderBottomWidth: 1,
+  },
+  stepBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepNumber: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  stepTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+  },
 
   // Input Section
   inputSection: { marginBottom: 16 },
