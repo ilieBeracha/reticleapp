@@ -4,41 +4,42 @@
  * Visual, immersive design with 3D effects and bold typography.
  */
 import {
-    useTrainingActions,
-    useTrainingDetail,
+  useTrainingActions,
+  useTrainingDetail,
 } from '@/components/training-detail';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModals } from '@/contexts/ModalContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { usePermissions } from '@/hooks/usePermissions';
+import { getTrainingSessionsWithStats, SessionWithDetails } from '@/services/sessionService';
 import { format, formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
-    ArrowLeft,
-    Calendar,
-    Check,
-    ChevronRight,
-    Clock,
-    Play,
-    Target,
-    Users,
+  ArrowLeft,
+  Calendar,
+  Check,
+  ChevronRight,
+  Clock,
+  Play,
+  Target,
+  Users,
 } from 'lucide-react-native';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import Animated, {
-    FadeIn,
-    FadeInDown,
-    FadeInUp,
+  FadeIn,
+  FadeInDown,
+  FadeInUp,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -165,6 +166,99 @@ export default function TrainingDetailScreen() {
     setTraining,
     onTrainingUpdated: getOnTrainingUpdated() ?? undefined,
   });
+
+  // Team progress (commander view)
+  const [teamSessions, setTeamSessions] = useState<SessionWithDetails[]>([]);
+  const [loadingTeamProgress, setLoadingTeamProgress] = useState(false);
+
+  // Determine if team progress section should be shown (commander + ongoing training)
+  const showTeamProgress = !!training?.id && canManageTraining && training?.status === 'ongoing';
+
+  // Load team progress data for commanders
+  const loadTeamProgress = useCallback(async () => {
+    if (!training?.id || !canManageTraining) return;
+
+    setLoadingTeamProgress(true);
+    try {
+      const sessions = await getTrainingSessionsWithStats(training.id);
+      setTeamSessions(sessions);
+    } catch (error) {
+      console.error('[TrainingDetail] Failed to load team progress:', error);
+    } finally {
+      setLoadingTeamProgress(false);
+    }
+  }, [training?.id, canManageTraining]);
+
+  // Auto-load team progress when commander views ongoing training
+  useEffect(() => {
+    if (showTeamProgress) {
+      loadTeamProgress();
+    }
+  }, [showTeamProgress, loadTeamProgress]);
+
+  // Group team sessions by user for commander view
+  const groupedTeamProgress = useMemo(() => {
+    if (!teamSessions.length) return [];
+
+    // Group sessions by user_id
+    const userMap = new Map<string, {
+      userId: string;
+      userName: string;
+      sessions: SessionWithDetails[];
+      totalShots: number;
+      totalHits: number;
+      accuracy: number;
+      isActive: boolean;
+      drillsCompleted: number;
+    }>();
+
+    teamSessions.forEach((s) => {
+      const odId = s.user_id;
+      const userName = s.user_full_name || 'Unknown';
+
+      if (!userMap.has(odId)) {
+        userMap.set(odId, {
+          userId: odId,
+          userName,
+          sessions: [],
+          totalShots: 0,
+          totalHits: 0,
+          accuracy: 0,
+          isActive: false,
+          drillsCompleted: 0,
+        });
+      }
+
+      const entry = userMap.get(odId)!;
+      entry.sessions.push(s);
+
+      // Aggregate stats
+      if (s.stats) {
+        entry.totalShots += s.stats.shots_fired ?? 0;
+        entry.totalHits += s.stats.hits_total ?? 0;
+      }
+
+      // Check if user has an active session
+      if (s.status === 'active') {
+        entry.isActive = true;
+      }
+
+      // Count completed drills
+      if (s.status === 'completed') {
+        entry.drillsCompleted++;
+      }
+    });
+
+    // Calculate accuracy for each user
+    userMap.forEach((entry) => {
+      if (entry.totalShots > 0) {
+        entry.accuracy = Math.round((entry.totalHits / entry.totalShots) * 100);
+      }
+    });
+
+    // Convert to array and sort by name
+    return Array.from(userMap.values()).sort((a, b) => a.userName.localeCompare(b.userName));
+  }, [teamSessions]);
 
   // If we navigated here with a specific drill intent (e.g. from Create Session),
   // auto-start that drill once the training loads.
@@ -337,6 +431,148 @@ export default function TrainingDetailScreen() {
                   🎉 All drills completed!
                 </Text>
               )}
+            </View>
+          </Animated.View>
+        )}
+
+        {/* Team Progress Section (Commander View) */}
+        {showTeamProgress && (
+          <Animated.View entering={FadeInUp.delay(180).springify()}>
+            <View style={[styles.teamProgressCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {/* Header */}
+              <View style={styles.teamProgressHeader}>
+                <View style={styles.teamProgressHeaderLeft}>
+                  <View style={[styles.teamProgressIcon, { backgroundColor: `${colors.primary}15` }]}>
+                    <Users size={16} color={colors.primary} />
+                  </View>
+                  <Text style={[styles.teamProgressTitle, { color: colors.text }]}>
+                    Team Progress
+                  </Text>
+                </View>
+                {groupedTeamProgress.length > 0 && (
+                  <View style={[styles.teamProgressBadge, { backgroundColor: colors.secondary }]}>
+                    <Text style={[styles.teamProgressBadgeText, { color: colors.textMuted }]}>
+                      {groupedTeamProgress.length} member{groupedTeamProgress.length !== 1 ? 's' : ''}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Content */}
+              <View style={styles.teamProgressContent}>
+                {loadingTeamProgress ? (
+                  <View style={styles.teamProgressLoading}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={[styles.teamProgressLoadingText, { color: colors.textMuted }]}>
+                      Loading team data...
+                    </Text>
+                  </View>
+                ) : groupedTeamProgress.length === 0 ? (
+                  <View style={styles.teamProgressEmpty}>
+                    <Users size={24} color={colors.textMuted} />
+                    <Text style={[styles.teamProgressEmptyText, { color: colors.textMuted }]}>
+                      No team members have started yet
+                    </Text>
+                  </View>
+                ) : (
+                  groupedTeamProgress.map((member, index) => {
+                    // Generate initials from name
+                    const initials = member.userName
+                      .split(' ')
+                      .map(n => n[0])
+                      .join('')
+                      .toUpperCase()
+                      .slice(0, 2);
+
+                    // Generate a consistent color based on name
+                    const avatarColors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4'];
+                    const colorIndex = member.userName.length % avatarColors.length;
+                    const avatarColor = avatarColors[colorIndex];
+
+                    return (
+                      <View
+                        key={member.userId}
+                        style={[
+                          styles.teamMemberRow,
+                          index !== groupedTeamProgress.length - 1 && {
+                            borderBottomWidth: 1,
+                            borderBottomColor: colors.border,
+                          },
+                        ]}
+                      >
+                        {/* Avatar with initials */}
+                        <View style={[styles.teamMemberAvatar, { backgroundColor: avatarColor }]}>
+                          <Text style={styles.teamMemberInitials}>{initials}</Text>
+                          {member.isActive && (
+                            <View style={[styles.activeIndicator, { borderColor: colors.card }]} />
+                          )}
+                        </View>
+
+                        <View style={styles.teamMemberInfo}>
+                          <Text style={[styles.teamMemberName, { color: colors.text }]} numberOfLines={1}>
+                            {member.userName}
+                          </Text>
+                          <Text style={[styles.teamMemberSessions, { color: colors.textMuted }]}>
+                            {member.drillsCompleted} drill{member.drillsCompleted !== 1 ? 's' : ''} completed
+                            {member.isActive && ' • Active now'}
+                          </Text>
+                        </View>
+                        <View style={styles.teamMemberStats}>
+                          {member.totalShots === 0 ? (
+                            <Text style={[styles.teamMemberNotStarted, { color: colors.textMuted }]}>
+                              Not started
+                            </Text>
+                          ) : (
+                            <>
+                              <View style={styles.teamMemberStat}>
+                                <Text style={[styles.teamMemberStatValue, { color: colors.text }]}>
+                                  {member.totalShots}
+                                </Text>
+                                <Text style={[styles.teamMemberStatLabel, { color: colors.textMuted }]}>
+                                  shots
+                                </Text>
+                              </View>
+                              <View style={styles.teamMemberStat}>
+                                <Text style={[styles.teamMemberStatValue, { color: colors.primary }]}>
+                                  {member.totalHits}
+                                </Text>
+                                <Text style={[styles.teamMemberStatLabel, { color: colors.textMuted }]}>
+                                  hits
+                                </Text>
+                              </View>
+                              <View style={styles.teamMemberStat}>
+                                <Text style={[styles.teamMemberStatValue, {
+                                  color: member.accuracy >= 70 ? colors.green : member.accuracy >= 50 ? colors.orange : colors.text
+                                }]}>
+                                  {member.accuracy}%
+                                </Text>
+                                <Text style={[styles.teamMemberStatLabel, { color: colors.textMuted }]}>
+                                  acc
+                                </Text>
+                              </View>
+                            </>
+                          )}
+                        </View>
+                      </View>
+                    );
+                  })
+                )}
+              </View>
+
+              {/* Refresh button */}
+              <TouchableOpacity
+                style={[styles.teamProgressRefresh, { borderTopColor: colors.border }]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  loadTeamProgress();
+                }}
+                disabled={loadingTeamProgress}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.teamProgressRefreshText, { color: colors.primary }]}>
+                  {loadingTeamProgress ? 'Refreshing...' : 'Refresh'}
+                </Text>
+              </TouchableOpacity>
             </View>
           </Animated.View>
         )}
@@ -771,5 +1007,140 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     color: '#fff',
+  },
+
+  // Team Progress (Commander View)
+  teamProgressCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    marginBottom: 20,
+    overflow: 'hidden',
+  },
+  teamProgressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+  },
+  teamProgressHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  teamProgressIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  teamProgressTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  teamProgressBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  teamProgressBadgeText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  teamProgressContent: {
+  },
+  teamProgressLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+    gap: 12,
+  },
+  teamProgressLoadingText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  teamProgressEmpty: {
+    paddingVertical: 32,
+    alignItems: 'center',
+    gap: 10,
+  },
+  teamProgressEmptyText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  teamMemberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    gap: 12,
+  },
+  teamMemberAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  teamMemberInitials: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  activeIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#10B981',
+    borderWidth: 2,
+  },
+  teamMemberInfo: {
+    flex: 1,
+  },
+  teamMemberName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  teamMemberSessions: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  teamMemberStats: {
+    flexDirection: 'row',
+    gap: 20,
+  },
+  teamMemberStat: {
+    alignItems: 'center',
+    minWidth: 44,
+  },
+  teamMemberStatValue: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  teamMemberStatLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  teamMemberNotStarted: {
+    fontSize: 13,
+    fontWeight: '500',
+    fontStyle: 'italic',
+  },
+  teamProgressRefresh: {
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderTopWidth: 1,
+  },
+  teamProgressRefreshText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

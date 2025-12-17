@@ -195,7 +195,7 @@ export function InsightsCard({
         <View style={styles.progressContainer}>
           <View style={[styles.progressBg, { backgroundColor: colors.secondary }]}>
             <View
-              style={[styles.progressFill, { backgroundColor: colors.indigo, width: `${completionPercent}%` }]}
+              style={[styles.progressFill, { backgroundColor: colors.indigo, width: `${Math.min(100, Math.max(0, completionPercent))}%` }]}
             />
           </View>
         </View>
@@ -316,6 +316,8 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 });
+
+
 
 
 

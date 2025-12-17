@@ -18,3 +18,5 @@ COMMENT ON COLUMN public.trainings.manual_start IS
 
 
 
+
+

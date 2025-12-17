@@ -481,6 +481,7 @@ CREATE TABLE IF NOT EXISTS "public"."sessions" (
     "training_id" "uuid",
     "drill_id" "uuid",
     "drill_template_id" "uuid",
+    "custom_drill_config" "jsonb",
     CONSTRAINT "sessions_session_mode_check" CHECK (("session_mode" = ANY (ARRAY['solo'::"text", 'group'::"text"]))),
     CONSTRAINT "sessions_status_check" CHECK (("status" = ANY (ARRAY['active'::"text", 'completed'::"text", 'cancelled'::"text"])))
 );
@@ -490,6 +491,10 @@ ALTER TABLE "public"."sessions" OWNER TO "postgres";
 
 
 COMMENT ON COLUMN "public"."sessions"."drill_template_id" IS 'For quick practice sessions started directly from a drill template.';
+
+
+
+COMMENT ON COLUMN "public"."sessions"."custom_drill_config" IS 'Inline drill configuration for quick practice sessions (no template reference)';
 
 
 
@@ -1753,6 +1758,20 @@ CREATE TABLE IF NOT EXISTS "public"."drill_templates" (
     "video_url" "text",
     "safety_notes" "text",
     "drill_goal" "text" DEFAULT 'achievement'::"text" NOT NULL,
+    "configurable_fields" "text"[],
+    "default_values" "jsonb",
+    "icon" "text",
+    "default_distance_m" integer DEFAULT 25,
+    "default_rounds_per_shooter" integer DEFAULT 5,
+    "default_time_limit_seconds" integer,
+    "default_par_time_seconds" integer,
+    "default_strings_count" integer DEFAULT 1,
+    "default_target_count" integer DEFAULT 1,
+    "default_min_accuracy_percent" integer,
+    "default_shots_per_target" integer,
+    "default_target_size" "text",
+    "default_target_exposure_seconds" integer,
+    "default_movement_distance_m" integer,
     CONSTRAINT "drill_templates_category_check" CHECK ((("category" IS NULL) OR ("category" = ANY (ARRAY['fundamentals'::"text", 'speed'::"text", 'accuracy'::"text", 'stress'::"text", 'tactical'::"text", 'competition'::"text", 'qualification'::"text"])))),
     CONSTRAINT "drill_templates_difficulty_check" CHECK ((("difficulty" IS NULL) OR ("difficulty" = ANY (ARRAY['beginner'::"text", 'intermediate'::"text", 'advanced'::"text", 'expert'::"text"])))),
     CONSTRAINT "drill_templates_drill_goal_check" CHECK (("drill_goal" = ANY (ARRAY['grouping'::"text", 'achievement'::"text"]))),
@@ -1768,6 +1787,66 @@ CREATE TABLE IF NOT EXISTS "public"."drill_templates" (
 
 
 ALTER TABLE "public"."drill_templates" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."drill_templates" IS 'Core drill definitions. Contains static properties that define WHAT a drill is. Reusable across trainings.';
+
+
+
+COMMENT ON COLUMN "public"."drill_templates"."distance_m" IS 'DEPRECATED: Use default_distance_m. Kept for backwards compatibility.';
+
+
+
+COMMENT ON COLUMN "public"."drill_templates"."rounds_per_shooter" IS 'DEPRECATED: Use default_rounds_per_shooter. Kept for backwards compatibility.';
+
+
+
+COMMENT ON COLUMN "public"."drill_templates"."time_limit_seconds" IS 'DEPRECATED: Use default_time_limit_seconds. Kept for backwards compatibility.';
+
+
+
+COMMENT ON COLUMN "public"."drill_templates"."par_time_seconds" IS 'DEPRECATED: Use default_par_time_seconds. Kept for backwards compatibility.';
+
+
+
+COMMENT ON COLUMN "public"."drill_templates"."target_count" IS 'DEPRECATED: Use default_target_count. Kept for backwards compatibility.';
+
+
+
+COMMENT ON COLUMN "public"."drill_templates"."strings_count" IS 'DEPRECATED: Use default_strings_count. Kept for backwards compatibility.';
+
+
+
+COMMENT ON COLUMN "public"."drill_templates"."configurable_fields" IS 'Array of field names that can be customized when adding this drill to a training. Non-configurable fields remain static from the template.';
+
+
+
+COMMENT ON COLUMN "public"."drill_templates"."default_values" IS 'Default/suggested values for configurable fields. Shown as placeholders when adding drill to training.';
+
+
+
+COMMENT ON COLUMN "public"."drill_templates"."icon" IS 'Emoji or icon identifier for visual representation (e.g., 🎯, 🔥, ⚡)';
+
+
+
+COMMENT ON COLUMN "public"."drill_templates"."default_distance_m" IS 'Suggested distance in meters. Copied to instance but can be overridden.';
+
+
+
+COMMENT ON COLUMN "public"."drill_templates"."default_rounds_per_shooter" IS 'Suggested shots per entry. Copied to instance but can be overridden.';
+
+
+
+COMMENT ON COLUMN "public"."drill_templates"."default_time_limit_seconds" IS 'Suggested time limit. Copied to instance but can be overridden.';
+
+
+
+COMMENT ON COLUMN "public"."drill_templates"."default_strings_count" IS 'Suggested number of rounds/strings. Copied to instance but can be overridden.';
+
+
+
+COMMENT ON COLUMN "public"."drill_templates"."default_target_count" IS 'Suggested targets per round. Copied to instance but can be overridden.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."notifications" (
@@ -2017,6 +2096,8 @@ CREATE TABLE IF NOT EXISTS "public"."training_drills" (
     "safety_notes" "text",
     "drill_goal" "text" DEFAULT 'achievement'::"text" NOT NULL,
     "drill_template_id" "uuid",
+    "drill_id" "uuid",
+    "instance_notes" "text",
     CONSTRAINT "training_drills_category_check" CHECK ((("category" IS NULL) OR ("category" = ANY (ARRAY['fundamentals'::"text", 'speed'::"text", 'accuracy'::"text", 'stress'::"text", 'tactical'::"text", 'competition'::"text", 'qualification'::"text"])))),
     CONSTRAINT "training_drills_difficulty_check" CHECK ((("difficulty" IS NULL) OR ("difficulty" = ANY (ARRAY['beginner'::"text", 'intermediate'::"text", 'advanced'::"text", 'expert'::"text"])))),
     CONSTRAINT "training_drills_drill_goal_check" CHECK (("drill_goal" = ANY (ARRAY['grouping'::"text", 'achievement'::"text"]))),
@@ -2034,7 +2115,19 @@ CREATE TABLE IF NOT EXISTS "public"."training_drills" (
 ALTER TABLE "public"."training_drills" OWNER TO "postgres";
 
 
+COMMENT ON TABLE "public"."training_drills" IS 'Drill instances within a training. Contains HOW a drill is configured for a specific training session.';
+
+
+
 COMMENT ON COLUMN "public"."training_drills"."drill_template_id" IS 'Reference to source drill template. If set, template values are used as defaults.';
+
+
+
+COMMENT ON COLUMN "public"."training_drills"."drill_id" IS 'Reference to the source drill definition. NULL for legacy inline drills.';
+
+
+
+COMMENT ON COLUMN "public"."training_drills"."instance_notes" IS 'Training-specific notes for this drill instance. Different from the drill''s core description.';
 
 
 
@@ -2252,6 +2345,10 @@ CREATE INDEX "idx_session_targets_type" ON "public"."session_targets" USING "btr
 
 
 
+CREATE INDEX "idx_sessions_custom_drill_goal" ON "public"."sessions" USING "btree" ((("custom_drill_config" ->> 'drill_goal'::"text")));
+
+
+
 CREATE INDEX "idx_sessions_drill" ON "public"."sessions" USING "btree" ("drill_id");
 
 
@@ -2289,6 +2386,10 @@ CREATE INDEX "idx_team_members_team" ON "public"."team_members" USING "btree" ("
 
 
 CREATE INDEX "idx_team_members_user" ON "public"."team_members" USING "btree" ("user_id");
+
+
+
+CREATE INDEX "idx_training_drills_drill_id" ON "public"."training_drills" USING "btree" ("drill_id");
 
 
 
@@ -2489,6 +2590,11 @@ ALTER TABLE ONLY "public"."teams"
 
 
 ALTER TABLE ONLY "public"."training_drills"
+    ADD CONSTRAINT "training_drills_drill_id_fkey" FOREIGN KEY ("drill_id") REFERENCES "public"."drill_templates"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."training_drills"
     ADD CONSTRAINT "training_drills_drill_template_id_fkey" FOREIGN KEY ("drill_template_id") REFERENCES "public"."drill_templates"("id") ON DELETE SET NULL;
 
 
@@ -2550,6 +2656,14 @@ CREATE POLICY "Anyone can view pending invitations" ON "public"."team_invitation
 CREATE POLICY "Commanders can manage drill templates" ON "public"."drill_templates" USING ((EXISTS ( SELECT 1
    FROM "public"."team_members"
   WHERE (("team_members"."team_id" = "drill_templates"."team_id") AND ("team_members"."user_id" = "auth"."uid"()) AND ("team_members"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text"]))))));
+
+
+
+CREATE POLICY "Commanders can view targets from team trainings" ON "public"."session_targets" FOR SELECT USING ((EXISTS ( SELECT 1
+   FROM (("public"."sessions" "s"
+     JOIN "public"."trainings" "t" ON (("t"."id" = "s"."training_id")))
+     JOIN "public"."team_members" "tm" ON (("tm"."team_id" = "t"."team_id")))
+  WHERE (("s"."id" = "session_targets"."session_id") AND ("tm"."user_id" = "auth"."uid"()) AND ("tm"."role" = ANY (ARRAY['commander'::"text", 'admin'::"text"]))))));
 
 
 

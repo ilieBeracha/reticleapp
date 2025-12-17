@@ -6,11 +6,10 @@ import { Platform } from 'react-native';
 /**
  * Main Tab Layout
  * 
- * 5 tabs in order:
- * - Training: Training list, drills, exercises
+ * 4 tabs:
+ * - Team: Teams, calendar, trainings (with internal tabs)
  * - Insight: Shooting stats and analytics
  * - Home: Dashboard (center)
- * - Team: Team management, members, invites
  * - Profile: Personal settings
  */
 
@@ -39,8 +38,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="trainings"
         options={{
-          title: 'Training',
-          tabBarIcon: ({ focused }) => getTabIcon('target', focused ? 'fitness' : 'fitness-outline'),
+          title: 'Team',
+          tabBarIcon: ({ focused }) => getTabIcon('person.2', focused ? 'people' : 'people-outline'),
         }}
       />
 
@@ -57,14 +56,6 @@ export default function TabsLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ focused }) => getTabIcon('house', focused ? 'home' : 'home-outline'),
-        }}
-      />
-
-      <Tabs.Screen
-        name="teams"
-        options={{
-          title: 'Team',
-          tabBarIcon: ({ focused }) => getTabIcon('person.2', focused ? 'people' : 'people-outline'),
         }}
       />
 

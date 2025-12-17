@@ -3,17 +3,17 @@
  * Drill-first training creation flow
  * 
  * ARCHITECTURE:
- * - Drills: Core definitions (static properties) - selected from team's drill library
- * - Instances: Variable configuration per training (distance, shots, time)
+ * - Drills must come from the team's drill library (no custom creation here)
+ * - Each drill can have instance-specific configuration (distance, shots, time)
+ * - Users must go to Drill Library to create/import new drills
  */
-import { DrillEditorModal } from '@/components/drills/DrillEditorModal';
 import { DrillInstanceModal } from '@/components/drills/DrillInstanceModal';
 import { useColors } from '@/hooks/ui/useColors';
-import { createDrill, drillToTrainingInput, getTeamDrills } from '@/services/drillService';
+import { drillToTrainingInput, getTeamDrills } from '@/services/drillService';
 import { createTraining } from '@/services/trainingService';
 import { useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
-import type { CreateDrillInput, CreateTrainingDrillInput, Drill, DrillInstanceConfig } from '@/types/workspace';
+import type { CreateTrainingDrillInput, Drill, DrillInstanceConfig } from '@/types/workspace';
 import { formatMaxShots } from '@/utils/drillShots';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -22,17 +22,17 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Plus, Target, Trash2 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Keyboard,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Keyboard,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import Animated, { FadeInRight, Layout } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -98,41 +98,6 @@ function DrillItem({
 }
 
 // ============================================================================
-// DRILL CHIP (from team library)
-// ============================================================================
-function DrillChip({
-  drill,
-  colors,
-  onAdd,
-}: {
-  drill: Drill;
-  colors: ReturnType<typeof useColors>;
-  onAdd: () => void;
-}) {
-  const isGrouping = drill.drill_goal === 'grouping';
-  const goalColor = isGrouping ? '#10B981' : '#93C5FD';
-
-  return (
-    <TouchableOpacity
-      style={[styles.drillChip, { backgroundColor: colors.card, borderColor: colors.border }]}
-      onPress={onAdd}
-      activeOpacity={0.7}
-    >
-      {drill.icon && <Text style={styles.drillChipIcon}>{drill.icon}</Text>}
-      <Text style={[styles.drillChipName, { color: colors.text }]} numberOfLines={1}>
-        {drill.name}
-      </Text>
-      <View style={[styles.drillChipBadge, { backgroundColor: `${goalColor}15` }]}>
-        <Text style={[styles.drillChipBadgeText, { color: goalColor }]}>
-          {isGrouping ? 'GRP' : 'ACH'}
-        </Text>
-      </View>
-      <Plus size={14} color={colors.primary} />
-    </TouchableOpacity>
-  );
-}
-
-// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 export default function CreateTrainingScreen() {
@@ -158,7 +123,6 @@ export default function CreateTrainingScreen() {
   const [drills, setDrills] = useState<DrillFormData[]>([]);
 
   // UI state
-  const [showCreateDrill, setShowCreateDrill] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -167,7 +131,6 @@ export default function CreateTrainingScreen() {
   const [teamDrills, setTeamDrills] = useState<Drill[]>([]);
   const [selectedDrill, setSelectedDrill] = useState<Drill | null>(null);
   const [showInstanceModal, setShowInstanceModal] = useState(false);
-  const [pendingNewDrill, setPendingNewDrill] = useState<Drill | null>(null);
 
   // Sync selectedTeamId with URL param when it loads
   useEffect(() => {
@@ -197,24 +160,6 @@ export default function CreateTrainingScreen() {
     }
   }, [selectedTeamId]);
 
-  // Handle creating a new drill (saves to library, then opens instance config)
-  const handleCreateDrill = useCallback(async (input: CreateDrillInput) => {
-    if (!selectedTeamId) return;
-    
-    try {
-      const newDrill = await createDrill(selectedTeamId, input);
-      // Add to local list
-      setTeamDrills(prev => [newDrill, ...prev]);
-      // Store and open instance modal to configure for this training
-      setPendingNewDrill(newDrill);
-      setSelectedDrill(newDrill);
-      setShowInstanceModal(true);
-    } catch (error) {
-      console.error('Failed to create drill:', error);
-      Alert.alert('Error', 'Failed to create drill');
-    }
-  }, [selectedTeamId]);
-
   const handleRemoveDrill = useCallback((drillId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setDrills(prev => prev.filter(d => d.id !== drillId));
@@ -227,10 +172,10 @@ export default function CreateTrainingScreen() {
     setShowInstanceModal(true);
   }, []);
 
-  // Handle instance configuration complete (add to training)
+  // Handle instance configuration complete (add drill from library to training)
   const handleInstanceConfirm = useCallback((instanceConfig: DrillInstanceConfig) => {
     if (!selectedDrill) return;
-    
+
     const trainingDrill = drillToTrainingInput(selectedDrill, instanceConfig);
     setDrills(prev => [
       ...prev,
@@ -240,7 +185,6 @@ export default function CreateTrainingScreen() {
       },
     ]);
     setSelectedDrill(null);
-    setPendingNewDrill(null);
   }, [selectedDrill]);
 
   const handleCreate = useCallback(async () => {
@@ -509,20 +453,22 @@ export default function CreateTrainingScreen() {
           <Text style={[styles.inputLabel, { color: colors.text }]}>Drills {drills.length > 0 && `(${drills.length})`}</Text>
           <Text style={[styles.required, { color: colors.destructive }]}>*</Text>
         </View>
-        <TouchableOpacity
-          style={[styles.addBtn, { backgroundColor: colors.primary }]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            setShowCreateDrill(true);
-          }}
-        >
-          <Plus size={16} color="#fff" />
-          <Text style={styles.addBtnText}>Add</Text>
-        </TouchableOpacity>
+        {selectedTeamId && (
+          <TouchableOpacity
+            style={[styles.libraryLink, { backgroundColor: colors.secondary }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push(`/(protected)/drillLibrary?teamId=${selectedTeamId}`);
+            }}
+          >
+            <Ionicons name="library-outline" size={14} color={colors.primary} />
+            <Text style={[styles.libraryLinkText, { color: colors.primary }]}>Drill Library</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      {drills.length === 0 && (
-        <Text style={[styles.drillsHint, { color: colors.destructive }]}>At least one drill required</Text>
+      {drills.length === 0 && teamDrills.length > 0 && (
+        <Text style={[styles.drillsHint, { color: colors.textMuted }]}>Select drills from your library below</Text>
       )}
 
       {/* Drill List */}
@@ -585,9 +531,18 @@ export default function CreateTrainingScreen() {
           <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
             {!selectedTeamId 
               ? 'Choose a team above to see available drills' 
-              : 'Create drills in your team library to reuse them across trainings'
+              : 'Add drills to your team library first, then select them here'
             }
           </Text>
+          {selectedTeamId && (
+            <TouchableOpacity
+              style={[styles.emptyBtn, { backgroundColor: colors.primary }]}
+              onPress={() => router.push(`/(protected)/drillLibrary?teamId=${selectedTeamId}`)}
+            >
+              <Ionicons name="add" size={16} color="#fff" />
+              <Text style={styles.emptyBtnText}>Go to Drill Library</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -632,22 +587,12 @@ export default function CreateTrainingScreen() {
         )}
       </TouchableOpacity>
 
-      {/* Modals */}
-      {/* Create new drill (saves to library) */}
-      <DrillEditorModal
-        visible={showCreateDrill}
-        onClose={() => setShowCreateDrill(false)}
-        onSave={handleCreateDrill}
-        mode="create"
-      />
-
-      {/* Drill instance configuration (new architecture) */}
+      {/* Drill instance configuration modal */}
       <DrillInstanceModal
         visible={showInstanceModal}
         onClose={() => {
           setShowInstanceModal(false);
           setSelectedDrill(null);
-          setPendingNewDrill(null);
         }}
         onConfirm={handleInstanceConfirm}
         drill={selectedDrill}
@@ -751,8 +696,8 @@ const styles = StyleSheet.create({
   // Drills Header
   drillsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   drillsHint: { fontSize: 12, marginBottom: 12 },
-  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
-  addBtnText: { fontSize: 13, fontWeight: '600', color: '#fff' },
+  libraryLink: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  libraryLinkText: { fontSize: 12, fontWeight: '600' },
 
   // Drill Library
   drillLibrarySection: { marginBottom: 16 },
@@ -763,27 +708,14 @@ const styles = StyleSheet.create({
   quickChipBadge: { width: 18, height: 18, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
   quickChipBadgeText: { fontSize: 10, fontWeight: '700' },
 
-  // Drill Chip Component
-  drillChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginRight: 10,
-  },
-  drillChipIcon: { fontSize: 14 },
-  drillChipName: { fontSize: 14, fontWeight: '500', maxWidth: 100 },
-  drillChipBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  drillChipBadgeText: { fontSize: 9, fontWeight: '700' },
   quickChipIcon: { fontSize: 14 },
 
   // Empty Drills
   emptyDrills: { alignItems: 'center', padding: 32, borderRadius: 16, gap: 8, marginBottom: 16 },
   emptyTitle: { fontSize: 16, fontWeight: '600' },
   emptyDesc: { fontSize: 13, textAlign: 'center' },
+  emptyBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, marginTop: 8 },
+  emptyBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
 
   // Drills List
   drillsList: { gap: 10, marginBottom: 16 },

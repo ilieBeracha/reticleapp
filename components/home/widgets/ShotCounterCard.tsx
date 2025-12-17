@@ -65,7 +65,7 @@ export function ShotCounterCard({ sessions, monthlyGoal = 1000 }: ShotCounterCar
               styles.progressFill,
               {
                 backgroundColor: progress >= 100 ? colors.green : colors.purple,
-                width: `${progress}%`,
+                width: `${Math.min(100, Math.max(0, progress))}%`,
               },
             ]}
           />
@@ -158,6 +158,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+
 
 
 

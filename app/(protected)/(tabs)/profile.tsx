@@ -21,6 +21,7 @@ import {
   BellRing,
   ChevronRight,
   LogOut,
+  Plug,
 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
@@ -182,6 +183,27 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.settingContent}>
               <Text style={[styles.settingLabel, { color: colors.text }]}>Appearance</Text>
+            </View>
+            <ChevronRight size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+
+          {/* Integrations */}
+          <TouchableOpacity
+            style={[styles.settingItem, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push('/(protected)/integrations' as any);
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.settingIcon, { backgroundColor: colors.primary + '20' }]}>
+              <Plug size={18} color={colors.primary} />
+            </View>
+            <View style={styles.settingContent}>
+              <Text style={[styles.settingLabel, { color: colors.text }]}>Integrations</Text>
+              <Text style={[styles.settingHint, { color: colors.textMuted }]}>
+                Garmin, Apple Watch
+              </Text>
             </View>
             <ChevronRight size={18} color={colors.textMuted} />
           </TouchableOpacity>

@@ -67,7 +67,7 @@ export function DistanceBreakdownCard({ sessions }: DistanceBreakdownCardProps) 
                   style={[
                     styles.barFill,
                     {
-                      width: `${stat.accuracy}%`,
+                      width: `${Math.min(100, Math.max(0, stat.accuracy))}%`,
                       backgroundColor: stat.accuracy >= 80 ? colors.green : stat.accuracy >= 60 ? colors.orange : colors.red,
                     },
                   ]}
@@ -127,6 +127,8 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
 });
+
+
 
 
 

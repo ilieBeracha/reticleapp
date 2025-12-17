@@ -64,7 +64,7 @@ export function ShotGoalCard({ sessions, monthlyGoal = 1000 }: ShotGoalCardProps
           style={[
             styles.progressFill,
             {
-              width: `${progress}%`,
+              width: `${Math.min(100, Math.max(0, progress))}%`,
               backgroundColor: isComplete ? colors.green : colors.purple,
             },
           ]}
@@ -137,6 +137,8 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
 });
+
+
 
 
 

@@ -650,6 +650,184 @@ export async function getTrainingSessions(trainingId: string): Promise<SessionWi
 }
 
 /**
+ * Get all sessions for a training with aggregated stats
+ * Used by commanders to view team progress during a training
+ */
+export async function getTrainingSessionsWithStats(trainingId: string): Promise<SessionWithDetails[]> {
+  return withQueryTiming('sessions.getTrainingSessionsWithStats', async () => {
+    const { data, error } = await supabase
+      .from('sessions')
+      .select(
+        `
+        id,
+        user_id,
+        team_id,
+        training_id,
+        drill_id,
+        drill_template_id,
+        custom_drill_config,
+        session_mode,
+        status,
+        started_at,
+        ended_at,
+        created_at,
+        updated_at,
+        profiles:user_id(full_name),
+        teams:team_id(name),
+        trainings:training_id(title),
+        training_drills:drill_id(name),
+        drill_templates:drill_template_id(name)
+      `
+      )
+      .eq('training_id', trainingId)
+      .order('started_at', { ascending: false });
+
+    if (error) throw error;
+
+    const sessions = (data ?? []).map(mapSession);
+
+    if (sessions.length === 0) return sessions;
+
+    // Fetch aggregated stats for all sessions in one query
+    const sessionIds = sessions.map((s) => s.id);
+
+    const { data: statsData, error: statsError } = await supabase
+      .from('session_targets')
+      .select(
+        `
+        session_id,
+        distance_m,
+        paper_target_results(
+          bullets_fired,
+          hits_total,
+          dispersion_cm,
+          scanned_image_url
+        ),
+        tactical_target_results(
+          bullets_fired,
+          hits
+        )
+      `
+      )
+      .in('session_id', sessionIds);
+
+    if (statsError) {
+      console.error('Failed to fetch training session stats:', statsError);
+      return sessions;
+    }
+
+    // Aggregate stats per session
+    const statsMap = new Map<
+      string,
+      SessionAggregatedStats & {
+        manual_shots: number;
+        manual_hits: number;
+      }
+    >();
+
+    (statsData ?? []).forEach((target: any) => {
+      const sessionId = target.session_id;
+      if (!statsMap.has(sessionId)) {
+        statsMap.set(sessionId, {
+          shots_fired: 0,
+          hits_total: 0,
+          accuracy_pct: 0,
+          target_count: 0,
+          best_dispersion_cm: null,
+          avg_distance_m: null,
+          manual_shots: 0,
+          manual_hits: 0,
+        });
+      }
+
+      const stats = statsMap.get(sessionId)!;
+      stats.target_count++;
+
+      // Handle paper_target_results (could be array or object from Supabase)
+      const paperResults = Array.isArray(target.paper_target_results)
+        ? target.paper_target_results
+        : target.paper_target_results
+          ? [target.paper_target_results]
+          : [];
+
+      for (const paperResult of paperResults) {
+        const bullets = paperResult.bullets_fired ?? 0;
+        stats.shots_fired += bullets;
+
+        const isScanned = !!paperResult.scanned_image_url;
+        const hits = paperResult.hits_total ?? 0;
+        stats.hits_total += hits;
+
+        if (paperResult.dispersion_cm != null) {
+          if (stats.best_dispersion_cm === null || paperResult.dispersion_cm < stats.best_dispersion_cm) {
+            stats.best_dispersion_cm = paperResult.dispersion_cm;
+          }
+        }
+
+        if (!isScanned) {
+          stats.manual_shots += bullets;
+          stats.manual_hits += hits;
+        }
+      }
+
+      // Handle tactical_target_results (could be array or object from Supabase)
+      const tacticalResults = Array.isArray(target.tactical_target_results)
+        ? target.tactical_target_results
+        : target.tactical_target_results
+          ? [target.tactical_target_results]
+          : [];
+
+      for (const tacticalResult of tacticalResults) {
+        const bullets = tacticalResult.bullets_fired ?? 0;
+        const hits = tacticalResult.hits ?? 0;
+        stats.shots_fired += bullets;
+        stats.hits_total += hits;
+        stats.manual_shots += bullets;
+        stats.manual_hits += hits;
+      }
+
+      if (target.distance_m) {
+        const currentAvg = stats.avg_distance_m ?? 0;
+        const count = stats.target_count;
+        stats.avg_distance_m = (currentAvg * (count - 1) + target.distance_m) / count;
+      }
+    });
+
+    // Calculate accuracy percentages
+    statsMap.forEach((stats) => {
+      if (stats.manual_shots > 0) {
+        stats.accuracy_pct = Math.round((stats.manual_hits / stats.manual_shots) * 100);
+      }
+    });
+
+    // Attach stats to sessions
+    return sessions.map((session) => {
+      const rawStats = statsMap.get(session.id);
+      return {
+        ...session,
+        stats: rawStats
+          ? {
+              shots_fired: rawStats.shots_fired,
+              hits_total: rawStats.hits_total,
+              accuracy_pct: rawStats.accuracy_pct,
+              target_count: rawStats.target_count,
+              best_dispersion_cm: rawStats.best_dispersion_cm,
+              avg_distance_m: rawStats.avg_distance_m,
+            }
+          : {
+              shots_fired: 0,
+              hits_total: 0,
+              accuracy_pct: 0,
+              target_count: 0,
+              best_dispersion_cm: null,
+              avg_distance_m: null,
+            },
+      };
+    });
+  });
+}
+
+/**
  * @deprecated Use getTeamSessions instead
  */
 export async function getWorkspaceSessions(teamId: string | null): Promise<SessionWithDetails[]> {

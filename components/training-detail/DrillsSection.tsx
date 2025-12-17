@@ -48,7 +48,7 @@ export function DrillsSection({
             style={[
               styles.progressFill,
               {
-                width: `${(completedCount / drills.length) * 100}%`,
+                width: `${Math.min(100, Math.max(0, (completedCount / drills.length) * 100))}%`,
                 backgroundColor: allCompleted ? '#93C5FD' : colors.textMuted,
               },
             ]}
