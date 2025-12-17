@@ -184,7 +184,10 @@ export default function CreateTrainingScreen() {
         ...trainingDrill,
       },
     ]);
-    setSelectedDrill(null);
+    // Close modal first, then clear drill (to avoid race condition)
+    setShowInstanceModal(false);
+    // Use setTimeout to ensure modal closes before clearing drill
+    setTimeout(() => setSelectedDrill(null), 100);
   }, [selectedDrill]);
 
   const handleCreate = useCallback(async () => {
@@ -679,8 +682,8 @@ const styles = StyleSheet.create({
   input: { height: 48, paddingHorizontal: 14, fontSize: 15 },
 
   // Date Row
-  dateRow: { flexDirection: 'row', gap: 10, justifyContent: 'center' },
-  dateBtn: { flex: 1, height: 48, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', maxWidth: 160 },
+  dateRow: { flexDirection: 'row', gap: 10 },
+  dateBtn: { flex: 1, height: 48, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   dateBtnText: { fontSize: 15, fontWeight: '500' },
 
   // Toggle Row
@@ -861,5 +864,5 @@ const styles = StyleSheet.create({
   pickerTitle: { fontSize: 17, fontWeight: '600' },
   pickerCancel: { fontSize: 16 },
   pickerDone: { fontSize: 16, fontWeight: '600' },
-  picker: { height: 200 },
+  picker: { height: 200, alignSelf: 'center', width: '100%' },
 });
