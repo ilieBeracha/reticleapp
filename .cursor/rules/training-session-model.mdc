@@ -1,52 +1,61 @@
 ---
-description: Documentation for training session model structure, states, validation and drill tracking components
+description: Rules for implementing training session data models, states, and validation workflows
 ---
 
 
 # training-session-model
 
-The training session model implements specialized tracking of shooting drills and progression states:
+## Core Session Model Components
 
-## Core Session States
-1. Training Session Management (Importance: 90)
-- States: planned, ongoing, completed, cancelled
-- Supports dual-mode drills: grouping and achievement targets
-- Tracks drill completion criteria including rounds fired, accuracy thresholds
-- Validates time limits and required shooting positions
+1. Session State Management
+- Priority-based session states: active > scheduled > unresolved > default
+- Complex state transitions between personal and team sessions
+- Session origin tracking (solo vs team) with metadata
+- Unified timeline generation from multiple session types
+Importance Score: 90
 
-2. Drill Progression System (Importance: 85)
-- Maps sequential drill requirements and dependencies 
-- Enforces drill prerequisites and unlocking conditions
-- Tracks performance metrics per drill type
-- Manages drill template configurations and parameters
+2. Session Mapping Logic
+- Training event to scheduled session mapping
+- Business rules for session state classification
+- Origin tracking and metadata management
+- Complex session batching for stats aggregation
+Importance Score: 85
 
-3. Session Validation Workflows (Importance: 80)
-- Enforces completion requirements per drill type:
-  - Grouping: Shot dispersion metrics
-  - Achievement: Accuracy percentages and hit counts
-- Validates time constraints and position requirements
-- Processes drill-specific scoring rules
+3. Session Analytics
+- Multi-dimensional progress tracking:
+  - Accuracy metrics
+  - Shot patterns and grouping
+  - Target engagement timing
+  - Performance trends across sessions
+- Streak preservation rules with timezone handling
+Importance Score: 80
 
-## Session Statistics
-- Real-time progress calculations against requirements
-- Aggregated completion rates across drill sequences
-- Distance-based performance categorization
-- Achievement vs grouping success ratios
+4. Session Validation Workflows
+- Training scheduling validation enforcing business rules
+- Custom drill instance parameter validation
+- State transition rules (planned → ongoing → finished/cancelled)
+- Parameter locking system for active sessions
+Importance Score: 75
 
-## Data Models
-1. TrainingSession
-- status: SessionStatus
-- drillProgression: DrillProgress[]
-- completionMetrics: CompletionStats
-- validationRules: ValidationConfig
+## Key Business Rules
 
-2. DrillProgress
-- drillType: 'grouping' | 'achievement'
-- requirements: DrillRequirements
-- completionState: CompletionState
-- validationResults: ValidationResult[]
+1. Session Type Classification
+- Live Fire Qualification
+- CQB Tactics Training
+- Range Training
+- Tactical Drills
 
-The model emphasizes strict progression tracking and validation workflows specific to firearms training scenarios, with particular focus on different drill types and their completion criteria.
+2. Progress Tracking Requirements
+- Completion status monitoring
+- Duration tracking
+- Drill progression validation
+- Team vs individual performance metrics
+
+3. Session State Transitions
+- Strict scheduling validation
+- Parameter locking during active state
+- Completion criteria verification
+- Team synchronization requirements
 
 $END$
 

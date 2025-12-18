@@ -13,7 +13,7 @@ import { INFINITE_SHOTS_SENTINEL } from '@/utils/drillShots';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { Camera, Crosshair, Minus, Play, Plus } from 'lucide-react-native';
+import { Camera, Check, Crosshair, Minus, Play, Plus, Repeat } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -43,7 +43,7 @@ const DISTANCE_PRESETS = [10, 15, 25, 50, 100];
 const TIME_PRESETS = [30, 60, 90, 120];
 const BULLET_PRESETS = [3, 5, 10, 15];
 const MAX_MANUAL_BULLETS = 15;
-const UNLIMITED_ENTRIES = 999; // Practical "unlimited" for solo practice
+const MAX_SOLO_ROUNDS = 2; // Max rounds for solo practice
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
@@ -67,6 +67,7 @@ export default function CreateSessionScreen() {
   const [drillGoal, setDrillGoal] = useState<DrillGoal>('grouping');
   const [inputMethod, setInputMethod] = useState<InputMethod>('scan');
   const [bullets, setBullets] = useState(5);
+  const [rounds, setRounds] = useState(1);
   const [distance, setDistance] = useState(25);
   const [timeLimit, setTimeLimit] = useState<number | null>(null);
 
@@ -147,7 +148,7 @@ export default function CreateSessionScreen() {
           distance_m: distance,
           rounds_per_shooter: roundsPerShooter,
           time_limit_seconds: timeLimit,
-          strings_count: UNLIMITED_ENTRIES, // Allow unlimited entries for solo practice
+          strings_count: rounds,
         },
       });
 
@@ -164,7 +165,7 @@ export default function CreateSessionScreen() {
     } finally {
       setIsStarting(false);
     }
-  }, [name, drillGoal, inputMethod, bullets, distance, timeLimit, teams, loadSessions]);
+  }, [name, drillGoal, inputMethod, bullets, rounds, distance, timeLimit, teams, loadSessions]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // RENDER - Loading
@@ -333,6 +334,64 @@ export default function CreateSessionScreen() {
           </View>
         </View>
       )}
+
+      {/* Rounds Count */}
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.cardRow}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={[styles.roundsIcon, { backgroundColor: `${colors.primary}15` }]}>
+              <Repeat size={14} color={colors.primary} />
+            </View>
+            <Text style={[styles.cardLabel, { color: colors.textMuted, marginBottom: 0 }]}>Rounds</Text>
+          </View>
+        </View>
+        <View style={styles.roundsRow}>
+          <TouchableOpacity
+            style={[
+              styles.roundsOption,
+              { 
+                backgroundColor: rounds === 1 ? `${colors.primary}10` : colors.background, 
+                borderColor: rounds === 1 ? colors.primary : colors.border,
+              },
+            ]}
+            onPress={() => {
+              Haptics.selectionAsync();
+              setRounds(1);
+            }}
+            activeOpacity={0.7}
+          >
+            {rounds === 1 && (
+              <View style={[styles.roundsCheck, { backgroundColor: colors.primary }]}>
+                <Check size={12} color="#fff" strokeWidth={3} />
+              </View>
+            )}
+            <Text style={[styles.roundsNumber, { color: rounds === 1 ? colors.primary : colors.text }]}>1</Text>
+            <Text style={[styles.roundsLabel, { color: rounds === 1 ? colors.primary : colors.textMuted }]}>Round</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.roundsOption,
+              { 
+                backgroundColor: rounds === 2 ? `${colors.primary}10` : colors.background, 
+                borderColor: rounds === 2 ? colors.primary : colors.border,
+              },
+            ]}
+            onPress={() => {
+              Haptics.selectionAsync();
+              setRounds(2);
+            }}
+            activeOpacity={0.7}
+          >
+            {rounds === 2 && (
+              <View style={[styles.roundsCheck, { backgroundColor: colors.primary }]}>
+                <Check size={12} color="#fff" strokeWidth={3} />
+              </View>
+            )}
+            <Text style={[styles.roundsNumber, { color: rounds === 2 ? colors.primary : colors.text }]}>2</Text>
+            <Text style={[styles.roundsLabel, { color: rounds === 2 ? colors.primary : colors.textMuted }]}>Rounds</Text>
+          </TouchableOpacity>
+        </View>
+      </View> 
 
       {/* Distance */}
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -574,6 +633,50 @@ const styles = StyleSheet.create({
   chipText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+
+  // Rounds Selector
+  roundsIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roundsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 14,
+  },
+  roundsOption: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    borderRadius: 14,
+    borderWidth: 2,
+    position: 'relative',
+  },
+  roundsCheck: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roundsNumber: {
+    fontSize: 32,
+    fontWeight: '700',
+  },
+  roundsLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 
   // Start Button

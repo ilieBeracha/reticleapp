@@ -1,56 +1,60 @@
 ---
-description: Specifications for bullet hole detection algorithms, coordinate mapping, and confidence scoring systems
+description: Defines bullet hole detection algorithms, coordinate mapping systems, and scoring calculations for target analysis.
 ---
 
 
 # target-detection-algorithms
 
-Core Target Detection Components:
+Target Detection Core Components:
 
-1. Detection Analysis System
-- Bullet hole detection with confidence scoring
-- Coordinate mapping between image and real-world space
-- Legacy and document analysis detection modes
-- Manual override capabilities for low-confidence detections
-Importance Score: 90/100
+1. Bullet Hole Detection Engine
+Path: components/addTarget/DetectionEditor.tsx
+- Implements specialized coordinate mapping between image and canvas space
+- Processes detected bullet holes using AI-based image analysis
+- Calculates group sizes and shot dispersions
+- Supports manual override for AI detections
+- Manages detection confidence scoring
+Importance Score: 90
 
-2. Shot Pattern Analysis
-- Group size calculations based on detected holes
-- Shot dispersion metrics computation
-- Pattern quality assessment algorithms
-- Distance-based scaling adjustments
-Importance Score: 85/100
+2. Shot Group Analysis
+Path: components/addTarget/ResultCard.tsx
+- Calculates group size measurements using extrema points
+- Determines shot pattern characteristics
+- Processes accuracy metrics based on target zones
+- Handles different scoring zones for tactical vs paper targets
+- Implements MOA calculations for different distances
+Importance Score: 85
 
-3. Target Type Processing
-- Achievement vs grouping target differentiation
-- Specialized scoring zones handling 
-- Distance category validation
-- Accuracy threshold calculations
-Importance Score: 80/100
+3. Target Classification System
+Path: components/addTarget/TargetForm.tsx
+- Differentiates between grouping and achievement targets
+- Processes different scoring rules per target type
+- Handles target orientation detection
+- Manages target distance compensation
+- Implements target-specific metadata validation
+Importance Score: 80
 
-Key Domain-Specific Components:
+4. Detection Confidence Scoring
+- Assigns confidence levels to detected shots
+- Implements threshold-based filtering
+- Processes detection quality indicators
+- Handles edge case detection scenarios
+- Maintains detection audit trail
+Importance Score: 75
 
-1. Target Coordinate System
-- Maps pixel coordinates to physical measurements
-- Handles perspective correction
-- Maintains shot pattern geometry
-- Supports multiple scoring zone layouts
-Importance Score: 85/100
+Key Workflows:
+1. Shot Detection Pipeline
+- Image preprocessing and normalization
+- Bullet hole identification
+- Coordinate transformation
+- Confidence scoring
+- Manual verification interface
 
-2. Confidence Scoring
-- Multi-factor detection confidence calculation
-- Edge case handling for overlapping shots
-- Manual verification thresholds
-- Historical detection improvement tracking
-Importance Score: 80/100
-
-Detection Workflow:
-1. Initial image processing for bullet hole candidates
-2. Confidence score calculation per detection
-3. Coordinate mapping to physical space
-4. Pattern analysis and grouping calculations
-5. Score zone mapping and accuracy computation
-6. Manual verification for low-confidence detections
+2. Group Analysis Process
+- Shot pattern recognition
+- Group size calculation
+- Statistical outlier detection
+- Performance metric generation
 
 $END$
 
