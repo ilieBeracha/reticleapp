@@ -100,6 +100,7 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
         distance_m: params.custom_drill_config!.distance_m,
         rounds_per_shooter: params.custom_drill_config!.rounds_per_shooter,
         time_limit_seconds: params.custom_drill_config!.time_limit_seconds ?? null,
+        strings_count: params.custom_drill_config!.strings_count ?? null,
       }
     : null;
 

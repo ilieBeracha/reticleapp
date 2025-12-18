@@ -12,6 +12,7 @@ export interface CreateSessionParams {
     distance_m: number;
     rounds_per_shooter: number;
     time_limit_seconds?: number | null;
+    strings_count?: number | null; // Number of entries allowed (null = unlimited)
   };
 }
 

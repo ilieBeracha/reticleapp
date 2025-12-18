@@ -31,3 +31,4 @@ export function WeeklyStatsBar({ colors, weeklyStats }: { colors: ThemeColors; w
 
 
 
+

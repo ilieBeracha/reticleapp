@@ -18,3 +18,4 @@ export const SQUAD_TEMPLATES: SquadTemplate[] = [
 
 
 
+

@@ -1,65 +1,67 @@
 ---
-description: Defines military-style hierarchical role management and permissions for training management system.
+description: Technical specification for military hierarchy-based role and permission system implementation
 ---
 
 
 # role-based-access-control
 
-Military-style hierarchical permission system with strictly defined roles and access levels:
+Military Hierarchy Implementation:
+- Owner/Commander (highest authority)
+- Team Commander
+- Squad Commander 
+- Soldier (base level)
 
-## Role Hierarchy
-1. Owner (Top Level)
-   - Full system access
-   - Can modify all roles below
-   - Organization management capabilities
-   - Importance Score: 95/100
+Permission Inheritance Structure:
+1. Core Team Roles:
+```typescript
+const ROLE_CONFIG = {
+  owner: { color: '#A78BFA', label: 'Owner', icon: Crown },
+  commander: { color: '#F87171', label: 'Commander', icon: Crown },
+  team_commander: { color: '#F87171', label: 'Commander', icon: Crown },
+  squad_commander: { color: '#FBBF24', label: 'Squad Lead', icon: Shield },
+  soldier: { color: '#34D399', label: 'Soldier', icon: Target }
+};
+```
 
-2. Commander
-   - Team-wide training management
-   - Can modify squad commander and soldier roles
-   - Access to all team analytics
-   - Importance Score: 85/100
+Role-Based Capabilities:
+1. Owner/Commander
+- Full team management access
+- Can create/modify training sessions
+- Assigns squad commanders
+- Training analytics access
+Importance Score: 95
+
+2. Team Commander
+- Limited team management 
+- Training session creation
+- Squad performance monitoring
+- Member role assignments
+Importance Score: 85
 
 3. Squad Commander
-   - Squad-level training coordination
-   - Member management within assigned squad
-   - Training session oversight
-   - Importance Score: 80/100
+- Squad-level management
+- Training participation tracking
+- Limited analytics access
+Importance Score: 75
 
-4. Soldier (Base Level)
-   - Personal training participation
-   - Individual performance tracking
-   - Limited team view access
-   - Importance Score: 70/100
+4. Soldier
+- Basic training participation
+- Personal performance tracking
+- No management capabilities
+Importance Score: 60
 
-## Permission Implementation 
-Key paths: components/organization/TeamsSection.tsx, services/roleService.ts
+Team Context Management:
+- Auto-selection for single team membership
+- Multi-team switching with role preservation
+- Squad-based organizational boundaries
+- Real-time permission validation
 
-Core permission rules:
-- Higher ranks can modify/manage lower ranks only
-- Squad-based organization with strict hierarchy
-- Role-specific training capabilities
-- Team-specific calendar and resource access
-- Session management restrictions by role level
-
-Color-coding system for visual role identification:
-- Owner: Deep Blue (#003366)
-- Commander: Dark Red (#660000)
-- Squad Commander: Forest Green (#006600)
-- Soldier: Standard Gray (#444444)
-
-Team Management Controls:
-- Role assignment validation
-- Squad membership constraints
-- Training schedule access levels
-- Performance metrics visibility
-
-## Critical Business Rules
-1. Single-root organization structure
-2. Hierarchical command chain for approvals
-3. Squad-based member organization
-4. Role-specific training coordination rights
-5. Specialized notification routing by rank
+Key Implementation Rules:
+1. Strict hierarchical command structure
+2. Role-based interface customization
+3. Squad-level access control
+4. Training management permissions
+5. Analytics access limitations
 
 $END$
 

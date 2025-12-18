@@ -74,7 +74,7 @@ export function mapSession(row: any): SessionWithDetails {
       position: null,
       start_position: null,
       weapon_category: null,
-      strings_count: null,
+      strings_count: customConfig.strings_count ?? null,
       reload_required: null,
       movement_type: null,
       movement_distance_m: null,

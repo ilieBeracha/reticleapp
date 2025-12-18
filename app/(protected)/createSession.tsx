@@ -13,7 +13,7 @@ import { INFINITE_SHOTS_SENTINEL } from '@/utils/drillShots';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { Camera, Crosshair, Minus, Play, Plus } from 'lucide-react-native';
+import { Camera, Check, Crosshair, Minus, Play, Plus, Repeat } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -33,6 +33,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type DrillGoal = 'grouping' | 'achievement';
 type TargetType = 'paper' | 'tactical';
+type InputMethod = 'scan' | 'manual';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -40,6 +41,9 @@ type TargetType = 'paper' | 'tactical';
 
 const DISTANCE_PRESETS = [10, 15, 25, 50, 100];
 const TIME_PRESETS = [30, 60, 90, 120];
+const BULLET_PRESETS = [3, 5, 10, 15];
+const MAX_MANUAL_BULLETS = 15;
+const MAX_SOLO_ROUNDS = 2; // Max rounds for solo practice
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
@@ -61,7 +65,9 @@ export default function CreateSessionScreen() {
   
   const [name, setName] = useState('');
   const [drillGoal, setDrillGoal] = useState<DrillGoal>('grouping');
-  const [targetType, setTargetType] = useState<TargetType>('paper');
+  const [inputMethod, setInputMethod] = useState<InputMethod>('scan');
+  const [bullets, setBullets] = useState(5);
+  const [rounds, setRounds] = useState(1);
   const [distance, setDistance] = useState(25);
   const [timeLimit, setTimeLimit] = useState<number | null>(null);
 
@@ -128,6 +134,10 @@ export default function CreateSessionScreen() {
     try {
       const primaryTeam = teams[0];
 
+      // Determine target type and rounds based on input method
+      const targetType: TargetType = inputMethod === 'scan' ? 'paper' : 'tactical';
+      const roundsPerShooter = inputMethod === 'scan' ? INFINITE_SHOTS_SENTINEL : bullets;
+
       const session = await createSession({
         team_id: primaryTeam?.id ?? undefined,
         session_mode: 'solo',
@@ -136,8 +146,9 @@ export default function CreateSessionScreen() {
           drill_goal: drillGoal,
           target_type: targetType,
           distance_m: distance,
-          rounds_per_shooter: INFINITE_SHOTS_SENTINEL,
+          rounds_per_shooter: roundsPerShooter,
           time_limit_seconds: timeLimit,
+          strings_count: rounds,
         },
       });
 
@@ -154,7 +165,7 @@ export default function CreateSessionScreen() {
     } finally {
       setIsStarting(false);
     }
-  }, [name, drillGoal, targetType, distance, timeLimit, teams, loadSessions]);
+  }, [name, drillGoal, inputMethod, bullets, rounds, distance, timeLimit, teams, loadSessions]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // RENDER - Loading
@@ -215,7 +226,6 @@ export default function CreateSessionScreen() {
             onPress={() => {
               Haptics.selectionAsync();
               setDrillGoal('grouping');
-              setTargetType('paper');
             }}
           >
             <Text style={[styles.segmentedText, { color: drillGoal === 'grouping' ? '#fff' : colors.text }]}>
@@ -239,44 +249,149 @@ export default function CreateSessionScreen() {
         </View>
       </View>
 
-      {/* Target Type - Only for Achievement */}
-      {drillGoal === 'achievement' && (
+      {/* Input Method Selection - Always shown */}
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.cardLabel, { color: colors.textMuted }]}>Input Method</Text>
+        <View style={[styles.segmented, { backgroundColor: colors.background }]}>
+          <TouchableOpacity
+            style={[
+              styles.segmentedOption,
+              inputMethod === 'scan' && { backgroundColor: colors.primary },
+            ]}
+            onPress={() => {
+              Haptics.selectionAsync();
+              setInputMethod('scan');
+            }}
+          >
+            <Camera size={16} color={inputMethod === 'scan' ? '#fff' : colors.textMuted} />
+            <Text style={[styles.segmentedText, { color: inputMethod === 'scan' ? '#fff' : colors.text }]}>
+              Scan Target
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.segmentedOption,
+              inputMethod === 'manual' && { backgroundColor: colors.primary },
+            ]}
+            onPress={() => {
+              Haptics.selectionAsync();
+              setInputMethod('manual');
+            }}
+          >
+            <Crosshair size={16} color={inputMethod === 'manual' ? '#fff' : colors.textMuted} />
+            <Text style={[styles.segmentedText, { color: inputMethod === 'manual' ? '#fff' : colors.text }]}>
+              Manual Entry
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Bullet Count - Only for Manual Input */}
+      {inputMethod === 'manual' && (
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.cardLabel, { color: colors.textMuted }]}>Input Method</Text>
-          <View style={[styles.segmented, { backgroundColor: colors.background }]}>
-            <TouchableOpacity
-              style={[
-                styles.segmentedOption,
-                targetType === 'paper' && { backgroundColor: colors.primary },
-              ]}
-              onPress={() => {
-                Haptics.selectionAsync();
-                setTargetType('paper');
-              }}
-            >
-              <Camera size={16} color={targetType === 'paper' ? '#fff' : colors.textMuted} />
-              <Text style={[styles.segmentedText, { color: targetType === 'paper' ? '#fff' : colors.text }]}>
-                Scan
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.segmentedOption,
-                targetType === 'tactical' && { backgroundColor: colors.primary },
-              ]}
-              onPress={() => {
-                Haptics.selectionAsync();
-                setTargetType('tactical');
-              }}
-            >
-              <Crosshair size={16} color={targetType === 'tactical' ? '#fff' : colors.textMuted} />
-              <Text style={[styles.segmentedText, { color: targetType === 'tactical' ? '#fff' : colors.text }]}>
-                Manual
-              </Text>
-            </TouchableOpacity>
+          <View style={styles.cardRow}>
+            <Text style={[styles.cardLabel, { color: colors.textMuted, marginBottom: 0 }]}>Bullets per Entry</Text>
+            <View style={[styles.stepper, { backgroundColor: colors.background }]}>
+              <TouchableOpacity
+                style={styles.stepperBtn}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setBullets((prev) => Math.max(1, prev - 1));
+                }}
+              >
+                <Minus size={18} color={colors.text} />
+              </TouchableOpacity>
+              <Text style={[styles.stepperValue, { color: colors.text }]}>{bullets}</Text>
+              <TouchableOpacity
+                style={styles.stepperBtn}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setBullets((prev) => Math.min(MAX_MANUAL_BULLETS, prev + 1));
+                }}
+              >
+                <Plus size={18} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+          </View>
+          <View style={styles.chipRow}>
+            {BULLET_PRESETS.map((val) => (
+              <TouchableOpacity
+                key={val}
+                style={[
+                  styles.chip,
+                  { backgroundColor: bullets === val ? colors.primary : colors.background },
+                ]}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setBullets(val);
+                }}
+              >
+                <Text style={[styles.chipText, { color: bullets === val ? '#fff' : colors.text }]}>
+                  {val}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
       )}
+
+      {/* Rounds Count */}
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.cardRow}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={[styles.roundsIcon, { backgroundColor: `${colors.primary}15` }]}>
+              <Repeat size={14} color={colors.primary} />
+            </View>
+            <Text style={[styles.cardLabel, { color: colors.textMuted, marginBottom: 0 }]}>Rounds</Text>
+          </View>
+        </View>
+        <View style={styles.roundsRow}>
+          <TouchableOpacity
+            style={[
+              styles.roundsOption,
+              { 
+                backgroundColor: rounds === 1 ? `${colors.primary}10` : colors.background, 
+                borderColor: rounds === 1 ? colors.primary : colors.border,
+              },
+            ]}
+            onPress={() => {
+              Haptics.selectionAsync();
+              setRounds(1);
+            }}
+            activeOpacity={0.7}
+          >
+            {rounds === 1 && (
+              <View style={[styles.roundsCheck, { backgroundColor: colors.primary }]}>
+                <Check size={12} color="#fff" strokeWidth={3} />
+              </View>
+            )}
+            <Text style={[styles.roundsNumber, { color: rounds === 1 ? colors.primary : colors.text }]}>1</Text>
+            <Text style={[styles.roundsLabel, { color: rounds === 1 ? colors.primary : colors.textMuted }]}>Round</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.roundsOption,
+              { 
+                backgroundColor: rounds === 2 ? `${colors.primary}10` : colors.background, 
+                borderColor: rounds === 2 ? colors.primary : colors.border,
+              },
+            ]}
+            onPress={() => {
+              Haptics.selectionAsync();
+              setRounds(2);
+            }}
+            activeOpacity={0.7}
+          >
+            {rounds === 2 && (
+              <View style={[styles.roundsCheck, { backgroundColor: colors.primary }]}>
+                <Check size={12} color="#fff" strokeWidth={3} />
+              </View>
+            )}
+            <Text style={[styles.roundsNumber, { color: rounds === 2 ? colors.primary : colors.text }]}>2</Text>
+            <Text style={[styles.roundsLabel, { color: rounds === 2 ? colors.primary : colors.textMuted }]}>Rounds</Text>
+          </TouchableOpacity>
+        </View>
+      </View> 
 
       {/* Distance */}
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -518,6 +633,50 @@ const styles = StyleSheet.create({
   chipText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+
+  // Rounds Selector
+  roundsIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roundsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 14,
+  },
+  roundsOption: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    borderRadius: 14,
+    borderWidth: 2,
+    position: 'relative',
+  },
+  roundsCheck: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roundsNumber: {
+    fontSize: 32,
+    fontWeight: '700',
+  },
+  roundsLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 
   // Start Button
