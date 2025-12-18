@@ -1,3 +1,17 @@
+/**
+ * Unified Home Page
+ * 
+ * SESSION-CENTRIC. Home is a launch surface, not a dashboard.
+ * 
+ * Home answers three questions:
+ * 1. What just happened? (last session)
+ * 2. What is coming up? (next session)
+ * 3. What is unresolved? (session needs attention)
+ * 
+ * "Training" is NEVER surfaced as a concept here.
+ * Team sessions appear as "Team Session", not "Training".
+ */
+
 import { useAuth } from '@/contexts/AuthContext';
 import { useModals } from '@/contexts/ModalContext';
 import { useColors } from '@/hooks/ui/useColors';
@@ -21,6 +35,8 @@ import {
 import { BaseAvatar } from '../BaseAvatar';
 import { SectionHeader } from './_shared/SectionHeader';
 import HeroSummaryCard from './cards/HeroSummaryCard';
+import { mapSessionToHomeSession, mapTrainingToScheduledSession, type HomeSession } from './types';
+import { useHomeState } from './useHomeState';
 import { AggregatedStatsCard } from './unified/sections/AggregatedStatsCard';
 import { EmptyState } from './unified/sections/EmptyState';
 import { WeeklyHighlightsCard } from './unified/sections/WeeklyHighlightsCard';
@@ -54,18 +70,6 @@ function TitleHeader({
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// HERO SUMMARY CARD - Unified personal overview
-// ═══════════════════════════════════════════════════════════════════════════
-
-
-
-// Page sections/cards were extracted into `components/home/unified/*`.
-
-// ═══════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
-// ═══════════════════════════════════════════════════════════════════════════
-
 export function UnifiedHomePage() {
   const colors = useColors();
   const { profileFullName, profileAvatarUrl, user } = useAuth();
@@ -84,7 +88,7 @@ export function UnifiedHomePage() {
   const avatarUrl = profileAvatarUrl ?? user?.user_metadata?.avatar_url;
   const fallbackInitial = profileFullName?.charAt(0)?.toUpperCase() ?? email?.charAt(0)?.toUpperCase() ?? '?';
 
-  // Stores
+  // Stores - we still load training data internally, but never expose "training" to UI
   const { sessions, loading: sessionsLoading, initialized } = useSessionStore();
   const { teams, loadTeams } = useTeamStore();
   const { myUpcomingTrainings, myStats, loadMyUpcomingTrainings, loadMyStats } = useTrainingStore();
@@ -96,11 +100,9 @@ export function UnifiedHomePage() {
   const [loadingAllSessions, setLoadingAllSessions] = useState(true);
   const initialLoadDone = useRef(false);
 
-  // Load recent sessions (personal + team) for unified view - OPTIMIZED with SQL limits
+  // Load recent sessions
   const loadAllSessions = useCallback(async () => {
     try {
-      // Fetch only last 7 days of sessions with a reasonable limit
-      // Active sessions are always included regardless of date
       const sessions = await getRecentSessionsWithStats({ days: 7, limit: 20 });
       setAllSessions(sessions);
     } catch (error) {
@@ -110,13 +112,10 @@ export function UnifiedHomePage() {
     }
   }, []);
 
-  // Use useFocusEffect to refresh data when screen regains focus
-  // This ensures data is fresh when navigating back from completing a session
+  // Load data on focus
   useFocusEffect(
     useCallback(() => {
-      // Only do background refresh if already loaded once (avoid double-loading on initial mount)
       if (initialLoadDone.current) {
-        // Background refresh - don't reset loadingAllSessions to avoid flashing
         loadAllSessions();
         loadMyUpcomingTrainings();
         loadMyStats();
@@ -142,20 +141,47 @@ export function UnifiedHomePage() {
 
   // Derived data
   const hasTeams = teams.length > 0;
-  const activeSession = useMemo(
-    () => allSessions.find((s) => s.status === 'active') || null,
-    [allSessions]
-  );
+  
+  // Filter upcoming trainings for scheduled sessions
   const upcomingTrainings = useMemo(() => {
     return myUpcomingTrainings.filter((t) => t.status === 'planned' || t.status === 'ongoing').slice(0, 5);
   }, [myUpcomingTrainings]);
-  const hasActivity = allSessions.length > 0 || upcomingTrainings.length > 0;
 
-  // Sessions are already filtered to last 7 days at SQL level by getRecentSessionsWithStats()
-  // No client-side filtering needed - just filter completed for weekly stats display
+  // Use session-centric home state
+  const homeState = useHomeState({
+    sessions: allSessions,
+    upcomingTrainings,
+    hasTeams,
+  });
+
+  // Build unified timeline from sessions + scheduled sessions
+  const timelineSessions = useMemo(() => {
+    const homeSessions: HomeSession[] = [];
+    
+    // Add real sessions
+    allSessions.forEach(session => {
+      homeSessions.push(mapSessionToHomeSession(session));
+    });
+    
+    // Add scheduled sessions from upcoming trainings
+    upcomingTrainings.forEach(training => {
+      // Only add if not already represented by an active session
+      const hasActiveSession = allSessions.some(
+        s => s.training_id === training.id && s.status === 'active'
+      );
+      if (!hasActiveSession) {
+        homeSessions.push(mapTrainingToScheduledSession(training));
+      }
+    });
+    
+    return homeSessions;
+  }, [allSessions, upcomingTrainings]);
+
   const completedSessions = useMemo(() => {
     return allSessions.filter((s) => s.status === 'completed');
   }, [allSessions]);
+
+  const hasActivity = allSessions.length > 0 || upcomingTrainings.length > 0;
 
   // Handlers
   const onRefresh = useCallback(async () => {
@@ -165,29 +191,43 @@ export function UnifiedHomePage() {
     setRefreshing(false);
   }, [loadAllSessions, loadMyUpcomingTrainings, loadMyStats, loadTeams]);
 
-  const handleOpenActiveSession = useCallback(() => {
-    if (!activeSession) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push(`/(protected)/activeSession?sessionId=${activeSession.id}` );
-  }, [activeSession]);
-
   const handleHeroPress = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (activeSession) {
-      router.push(`/(protected)/activeSession?sessionId=${activeSession.id}`);
-    } else if (hasTeams) {
-      router.push('/(protected)/(tabs)/trainings');
-    } else {
-      handleStartSoloSession();
+    
+    const { activeSession, nextSession, unresolvedSignal, lastSession } = homeState;
+    
+    // Priority navigation based on homeState
+    if (activeSession?.sourceSession) {
+      router.push(`/(protected)/activeSession?sessionId=${activeSession.sourceSession.id}`);
+      return;
     }
-  }, [activeSession, hasTeams]);
+    
+    if (nextSession?.state === 'active' && nextSession.sourceTraining) {
+      // Live team session
+      router.push(`/(protected)/trainingLive?trainingId=${nextSession.sourceTraining.id}`);
+      return;
+    }
+    
+    if (nextSession?.state === 'scheduled' && nextSession.sourceTraining) {
+      // Upcoming team session - go to prepare
+      router.push(`/(protected)/trainingDetail?id=${nextSession.sourceTraining.id}`);
+      return;
+    }
+    
+    if (unresolvedSignal?.type === 'no_review' && unresolvedSignal.sessionId) {
+      router.push(`/(protected)/sessionDetail?sessionId=${unresolvedSignal.sessionId}`);
+      return;
+    }
+    
+    // Default: start new session
+    handleStartSession();
+  }, [homeState]);
 
-  const handleStartSoloSession = useCallback(async () => {
+  const handleStartSession = useCallback(async () => {
     if (starting) return;
     setStarting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      // Check for existing active session first
       const existing = await getMyActivePersonalSession();
       if (existing) {
         setStarting(false);
@@ -220,7 +260,6 @@ export function UnifiedHomePage() {
         );
         return;
       }
-      // Drill-first: route to drill selection screen
       router.push('/(protected)/createSession');
     } catch (error) {
       console.error('Failed to start session:', error);
@@ -229,11 +268,19 @@ export function UnifiedHomePage() {
     }
   }, [starting, loadAllSessions]);
 
-  const handleOpenSessionDetail = useCallback((session: SessionWithDetails) => {
-    router.push(`/(protected)/sessionDetail?sessionId=${session.id}`);
+  const handleSessionPress = useCallback((session: HomeSession) => {
+    if (session.sourceSession) {
+      if (session.state === 'active') {
+        router.push(`/(protected)/activeSession?sessionId=${session.sourceSession.id}`);
+      } else {
+        router.push(`/(protected)/sessionDetail?sessionId=${session.sourceSession.id}`);
+      }
+    } else if (session.sourceTraining) {
+      router.push(`/(protected)/trainingDetail?id=${session.sourceTraining.id}`);
+    }
   }, []);
 
-  // Show loading spinner when data is loading AND we have no sessions to display
+  // Loading state
   const shouldShowLoading = (loadingAllSessions && allSessions.length === 0) || 
                             (!initialized && sessionsLoading);
   
@@ -276,40 +323,33 @@ export function UnifiedHomePage() {
           </View>
         </View>
 
-        {/* Hero Summary */}
+        {/* Hero Summary - session-centric, action-forward */}
         <View style={styles.section}>
           <HeroSummaryCard
-            colors={colors}
-            upcomingCount={upcomingTrainings.length}
-            allSessions={allSessions}
-            activeSession={activeSession}
-            hasTeams={hasTeams}
-            teamCount={teams.length}
+            homeState={homeState}
             onPress={handleHeroPress}
           />
         </View>
 
         {/* Show empty state or activity */}
-        {!hasActivity && !activeSession ? (
-          <EmptyState colors={colors} onStartPractice={handleStartSoloSession} starting={starting} />
+        {!hasActivity && !homeState.activeSession ? (
+          <EmptyState colors={colors} onStartPractice={handleStartSession} starting={starting} />
         ) : (
           <>
-            {/* Side-by-side cards */}
+            {/* Weekly Overview - sessions only */}
             <View style={styles.section}>
-              <TitleHeader title="Weekly Overview" colors={colors} />
+              <TitleHeader title="This Week" colors={colors} />
               <View style={styles.cardsRow}>
                 <AggregatedStatsCard colors={colors} allSessions={completedSessions} trainingStats={myStats} />
                 <WeeklyHighlightsCard colors={colors} sessions={completedSessions} />
               </View>
             </View>
 
-
-            {/* Activity Timeline */}
+            {/* Activity Timeline - sessions only, no "training" concept */}
             <View style={{ marginTop: 8 }}>
               <ActivityTimeline
-                sessions={allSessions}
-                trainings={upcomingTrainings}
-                onSessionPress={handleOpenSessionDetail}
+                sessions={timelineSessions}
+                onSessionPress={handleSessionPress}
               />
             </View>
           </>
@@ -320,6 +360,5 @@ export function UnifiedHomePage() {
     </View>
   );
 }
-
 
 export default UnifiedHomePage;

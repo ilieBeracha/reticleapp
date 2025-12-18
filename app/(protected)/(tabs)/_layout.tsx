@@ -38,6 +38,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="trainings"
         options={{
+          role: 'search',
           title: 'Team',
           tabBarIcon: ({ focused }) => getTabIcon('person.2', focused ? 'people' : 'people-outline'),
         }}

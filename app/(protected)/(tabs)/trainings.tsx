@@ -1,10 +1,42 @@
 /**
  * Team Tab - with internal Calendar/Manage tabs
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════
+ * OWNERSHIP CONTRACT (DO NOT VIOLATE)
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
+ * This screen is CALENDAR + MANAGEMENT only.
+ * 
+ * MAY SHOW:
+ * - Calendar with scheduled sessions
+ * - Team switcher (for multi-team users)
+ * - Live session indicators (informational)
+ * - Management actions (create team, schedule session)
+ * 
+ * MUST NOT:
+ * - Provide primary "Join" / "Start" session CTAs
+ * - Route directly to trainingLive (session execution)
+ * - Be the entry point for session execution
+ * 
+ * Home owns session entry. This tab shows what exists and when.
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════
+ * TEAM CONTEXT MODEL
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
+ * 0 teams → Show NoTeamsEmptyState (full screen)
+ * 1 team  → Auto-selected, show Calendar/Manage directly (no chips row)
+ * N teams → Show TeamSwitcherPill in header, Calendar/Manage for activeTeam
+ * 
+ * All queries use activeTeamId from store.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
+import { NoTeamsEmptyState } from '@/components/team/NoTeamsEmptyState';
+import { TeamSwitcherPill, TeamSwitcherSheet } from '@/components/team/TeamSwitcherSheet';
 import { useColors } from '@/hooks/ui/useColors';
-import { useTeamStore } from '@/store/teamStore';
+import { useTeamContext, useTeamPermissions, useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
-import type { TeamWithRole, TrainingWithDetails } from '@/types/workspace';
+import type { TrainingWithDetails } from '@/types/workspace';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   addDays,
@@ -25,7 +57,6 @@ import {
   Settings,
   Shield,
   Target,
-  UserPlus,
   Users,
 } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
@@ -168,36 +199,6 @@ function WeekCalendar({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TEAM CHIP (compact)
-// ─────────────────────────────────────────────────────────────────────────────
-
-function TeamChipCompact({
-  team,
-  colors,
-  onPress,
-}: {
-  team: TeamWithRole;
-  colors: ReturnType<typeof useColors>;
-  onPress: () => void;
-}) {
-  const roleConfig = getRoleConfig(team.my_role);
-
-  return (
-    <TouchableOpacity
-      style={[styles.teamChipCompact, { backgroundColor: colors.card, borderColor: colors.border }]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <Users size={14} color={colors.primary} />
-      <Text style={[styles.teamChipCompactName, { color: colors.text }]} numberOfLines={1}>
-        {team.name}
-      </Text>
-      <View style={[styles.roleDot, { backgroundColor: roleConfig.color }]} />
-    </TouchableOpacity>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // EVENT CARD
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -218,18 +219,18 @@ function EventCard({
       style={[
         styles.eventCard,
         { backgroundColor: colors.card, borderColor: colors.border },
-        isLive && { borderLeftColor: '#10B981', borderLeftWidth: 3 },
+        isLive && { borderLeftColor: '#F59E0B', borderLeftWidth: 3 },
       ]}
       onPress={onPress}
       activeOpacity={0.7}
     >
       <View style={styles.eventTime}>
-        <Text style={[styles.eventTimeText, { color: isLive ? '#10B981' : colors.textMuted }]}>
+        <Text style={[styles.eventTimeText, { color: isLive ? '#F59E0B' : colors.textMuted }]}>
           {time}
         </Text>
         {isLive && (
           <View style={styles.liveIndicator}>
-            <View style={styles.livePulse} />
+            <View style={[styles.livePulse, { backgroundColor: '#F59E0B' }]} />
           </View>
         )}
       </View>
@@ -238,7 +239,7 @@ function EventCard({
           {training.title}
         </Text>
         <Text style={[styles.eventMeta, { color: colors.textMuted }]}>
-          {training.team?.name} {training.drill_count ? `· ${training.drill_count} drills` : ''}
+          {training.drill_count ? `${training.drill_count} drills` : 'No drills'}
         </Text>
       </View>
       <ChevronRight size={16} color={colors.textMuted} />
@@ -253,77 +254,94 @@ function EventCard({
 export default function TeamScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { teams, loadTeams, loading: teamsLoading } = useTeamStore();
-  const { myUpcomingTrainings, myTrainingsInitialized, loadMyUpcomingTrainings } = useTrainingStore();
+  
+  // Team context - single source of truth
+  const { teamState, teams, activeTeamId, activeTeam, loading: teamsLoading, initialized } = useTeamContext();
+  const { canSchedule, canManage } = useTeamPermissions();
+  const { loadTeams } = useTeamStore();
+  const { teamTrainings, loadTeamTrainings } = useTrainingStore();
 
+  // Local state
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<InternalTab>('calendar');
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [switcherOpen, setSwitcherOpen] = useState(false);
 
-  const hasTeams = teams.length > 0;
-  const isCommander = teams.some(t => t.my_role === 'owner' || t.my_role === 'commander');
+  // ─────────────────────────────────────────────────────────────────────────────
+  // DATA LOADING
+  // ─────────────────────────────────────────────────────────────────────────────
 
-  // Load data on focus
   useFocusEffect(
     useCallback(() => {
       loadTeams();
-      if (hasTeams) {
-        loadMyUpcomingTrainings();
+    }, [loadTeams])
+  );
+
+  // Load trainings for active team
+  useFocusEffect(
+    useCallback(() => {
+      if (activeTeamId) {
+        loadTeamTrainings(activeTeamId);
       }
-    }, [hasTeams, loadTeams, loadMyUpcomingTrainings])
+    }, [activeTeamId, loadTeamTrainings])
   );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await Promise.all([loadTeams(), loadMyUpcomingTrainings()]);
+    await loadTeams();
+    if (activeTeamId) {
+      await loadTeamTrainings(activeTeamId);
+    }
     setRefreshing(false);
-  }, [loadTeams, loadMyUpcomingTrainings]);
+  }, [loadTeams, loadTeamTrainings, activeTeamId]);
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // COMPUTED DATA (for active team only)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  // Filter trainings for active team
+  const activeTeamTrainings = useMemo(() => {
+    if (!activeTeamId) return [];
+    return teamTrainings.filter(t => t.team_id === activeTeamId);
+  }, [teamTrainings, activeTeamId]);
 
   // Trainings for selected date
   const selectedDateTrainings = useMemo(() => {
-    return myUpcomingTrainings
+    return activeTeamTrainings
       .filter(t => isSameDay(new Date(t.scheduled_at), selectedDate))
       .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
-  }, [myUpcomingTrainings, selectedDate]);
+  }, [activeTeamTrainings, selectedDate]);
 
-  // All trainings sorted
+  // All trainings sorted (for Manage tab)
   const allTrainingsSorted = useMemo(() => {
-    return [...myUpcomingTrainings].sort((a, b) => {
+    return [...activeTeamTrainings].sort((a, b) => {
       if (a.status === 'ongoing' && b.status !== 'ongoing') return -1;
       if (b.status === 'ongoing' && a.status !== 'ongoing') return 1;
       return new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime();
     });
-  }, [myUpcomingTrainings]);
+  }, [activeTeamTrainings]);
 
-  // Handlers
-  const handleTeamPress = (team: TeamWithRole) => {
+  // ─────────────────────────────────────────────────────────────────────────────
+  // HANDLERS
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  const handleTeamPress = () => {
+    if (!activeTeamId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push(`/(protected)/teamWorkspace?id=${team.id}` as any);
+    router.push(`/(protected)/teamWorkspace?id=${activeTeamId}` as any);
   };
 
+  // Navigate to session details (context view), NOT session execution
   const handleTrainingPress = (training: TrainingWithDetails) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (training.status === 'ongoing') {
-      router.push(`/(protected)/trainingLive?trainingId=${training.id}` as any);
-    } else {
-      router.push(`/(protected)/trainingDetail?id=${training.id}` as any);
-    }
-  };
-
-  const handleCreateTeam = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push('/(protected)/createTeam' as any);
-  };
-
-  const handleJoinTeam = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push('/(protected)/acceptInvite' as any);
+    router.push(`/(protected)/trainingDetail?id=${training.id}` as any);
   };
 
   const handleCreateTraining = () => {
+    if (!activeTeamId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push('/(protected)/createTraining' as any);
+    router.push(`/(protected)/createTraining?teamId=${activeTeamId}` as any);
   };
 
   const handleOpenLibrary = () => {
@@ -336,13 +354,80 @@ export default function TeamScreen() {
     setActiveTab(tab);
   };
 
-  const isLoading = teamsLoading && !hasTeams;
+  // ─────────────────────────────────────────────────────────────────────────────
+  // RENDER: LOADING
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  if (!initialized || (teamsLoading && teams.length === 0)) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </View>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // RENDER: 0 TEAMS - Empty State
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  if (teamState === 'no_teams') {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <NoTeamsEmptyState />
+      </View>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // RENDER: 1 OR N TEAMS - Calendar/Manage with active team context
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  const showSwitcher = teamState === 'multiple_teams';
+  const roleConfig = activeTeam ? getRoleConfig(activeTeam.my_role) : null;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header with Title + Internal Tabs */}
+      {/* Header */}
       <View style={[styles.headerContainer, { borderBottomColor: colors.border }]}>
-        <Text style={[styles.title, { color: colors.text }]}>Team</Text>
+        <View style={styles.headerTop}>
+          <Text style={[styles.title, { color: colors.text }]}>Team</Text>
+          
+          {/* Team Switcher or Team Name + Add button */}
+          <View style={styles.headerRight}>
+            {showSwitcher ? (
+              <TeamSwitcherPill onPress={() => setSwitcherOpen(true)} />
+            ) : activeTeam && (
+              <TouchableOpacity 
+                style={[styles.singleTeamPill, { backgroundColor: colors.secondary }]}
+                onPress={handleTeamPress}
+                activeOpacity={0.7}
+              >
+                <Users size={14} color={colors.primary} />
+                <Text style={[styles.singleTeamName, { color: colors.text }]} numberOfLines={1}>
+                  {activeTeam.name}
+                </Text>
+                {roleConfig && (
+                  <View style={[styles.roleBadge, { backgroundColor: roleConfig.color + '20' }]}>
+                    <Text style={[styles.roleText, { color: roleConfig.color }]}>
+                      {roleConfig.label}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            )}
+            
+            {/* Add Team button - opens switcher sheet with Create/Join options */}
+            <TouchableOpacity
+              style={[styles.addTeamBtn, { backgroundColor: colors.secondary }]}
+              onPress={() => setSwitcherOpen(true)}
+              activeOpacity={0.7}
+            >
+              <Plus size={18} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
+        </View>
         
         {/* Internal Tab Bar */}
         <View style={[styles.tabBar, { backgroundColor: colors.secondary }]}>
@@ -359,7 +444,7 @@ export default function TeamScreen() {
             </Text>
           </TouchableOpacity>
           
-          {isCommander && (
+          {canManage && (
             <TouchableOpacity
               style={[
                 styles.tabItem,
@@ -382,65 +467,16 @@ export default function TeamScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />}
       >
-        {/* Loading */}
-        {isLoading && (
-          <View style={styles.loading}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        )}
-
         {/* ═══════════════════════════════════════════════════════════════════
             CALENDAR TAB
         ═══════════════════════════════════════════════════════════════════ */}
-        {activeTab === 'calendar' && !isLoading && (
+        {activeTab === 'calendar' && (
           <>
-            {/* Teams Row (horizontal) */}
-            {hasTeams && (
-              <View style={styles.teamsRow}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.teamsRowContent}>
-                  {teams.map(team => (
-                    <TeamChipCompact
-                      key={team.id}
-                      team={team}
-                      colors={colors}
-                      onPress={() => handleTeamPress(team)}
-                    />
-                  ))}
-                  <TouchableOpacity
-                    style={[styles.addTeamBtn, { backgroundColor: colors.secondary }]}
-                    onPress={handleCreateTeam}
-                  >
-                    <Plus size={16} color={colors.primary} />
-                  </TouchableOpacity>
-                </ScrollView>
-              </View>
-            )}
-
-            {/* No Teams */}
-            {!hasTeams && (
-              <View style={styles.noTeamsRow}>
-                <TouchableOpacity
-                  style={[styles.actionBtnSmall, { backgroundColor: colors.primary }]}
-                  onPress={handleCreateTeam}
-                >
-                  <Plus size={14} color="#fff" />
-                  <Text style={styles.actionBtnSmallText}>Create Team</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionBtnSmall, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}
-                  onPress={handleJoinTeam}
-                >
-                  <UserPlus size={14} color={colors.text} />
-                  <Text style={[styles.actionBtnSmallText, { color: colors.text }]}>Join Team</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
             {/* Week Calendar */}
             <WeekCalendar
               selectedDate={selectedDate}
               onSelectDate={setSelectedDate}
-              trainings={myUpcomingTrainings}
+              trainings={activeTeamTrainings}
               colors={colors}
             />
 
@@ -449,7 +485,7 @@ export default function TeamScreen() {
               <Text style={[styles.selectedDateText, { color: colors.text }]}>
                 {isToday(selectedDate) ? 'Today' : format(selectedDate, 'EEEE, MMM d')}
               </Text>
-              {isCommander && (
+              {canSchedule && (
                 <TouchableOpacity
                   style={[styles.addEventBtn, { backgroundColor: colors.primary }]}
                   onPress={handleCreateTraining}
@@ -465,20 +501,20 @@ export default function TeamScreen() {
               <View style={styles.eventsList}>
                 {selectedDateTrainings.map(training => (
                   <EventCard
-                  key={training.id}
-                  training={training}
-                  colors={colors}
-                  onPress={() => handleTrainingPress(training)}
-                />
-              ))}
-            </View>
+                    key={training.id}
+                    training={training}
+                    colors={colors}
+                    onPress={() => handleTrainingPress(training)}
+                  />
+                ))}
+              </View>
             ) : (
               <View style={[styles.noEvents, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Calendar size={24} color={colors.textMuted} />
                 <Text style={[styles.noEventsText, { color: colors.textMuted }]}>
-                  No trainings scheduled
+                  No sessions scheduled
                 </Text>
-          </View>
+              </View>
             )}
           </>
         )}
@@ -486,7 +522,7 @@ export default function TeamScreen() {
         {/* ═══════════════════════════════════════════════════════════════════
             MANAGE TAB (Commanders only)
         ═══════════════════════════════════════════════════════════════════ */}
-        {activeTab === 'manage' && isCommander && !isLoading && (
+        {activeTab === 'manage' && canManage && (
           <>
             {/* Quick Actions */}
             <View style={styles.section}>
@@ -500,8 +536,8 @@ export default function TeamScreen() {
                   <View style={[styles.manageIcon, { backgroundColor: '#10B98115' }]}>
                     <Plus size={22} color="#10B981" />
                   </View>
-                  <Text style={[styles.manageTitle, { color: colors.text }]}>New Training</Text>
-                  <Text style={[styles.manageDesc, { color: colors.textMuted }]}>Schedule session</Text>
+                  <Text style={[styles.manageTitle, { color: colors.text }]}>New Session</Text>
+                  <Text style={[styles.manageDesc, { color: colors.textMuted }]}>Schedule</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -518,53 +554,56 @@ export default function TeamScreen() {
               </View>
             </View>
 
-            {/* Teams to Manage */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>YOUR TEAMS</Text>
-              <View style={styles.teamsList}>
-                {teams
-                  .filter(t => t.my_role === 'owner' || t.my_role === 'commander')
-                  .map(team => (
-                    <TouchableOpacity
-                      key={team.id}
-                      style={[styles.teamRow, { backgroundColor: colors.card, borderColor: colors.border }]}
-                      onPress={() => handleTeamPress(team)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[styles.teamRowIcon, { backgroundColor: colors.primary + '15' }]}>
-                        <Users size={18} color={colors.primary} />
-                      </View>
-                      <View style={styles.teamRowContent}>
-                        <Text style={[styles.teamRowName, { color: colors.text }]}>{team.name}</Text>
-                        <Text style={[styles.teamRowRole, { color: getRoleConfig(team.my_role).color }]}>
-                          {getRoleConfig(team.my_role).label}
-                        </Text>
-                      </View>
-                      <ChevronRight size={18} color={colors.textMuted} />
-                    </TouchableOpacity>
-                  ))}
+            {/* Active Team Card */}
+            {activeTeam && (
+              <View style={styles.section}>
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>ACTIVE TEAM</Text>
+                <TouchableOpacity
+                  style={[styles.teamRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  onPress={handleTeamPress}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.teamRowIcon, { backgroundColor: colors.primary + '15' }]}>
+                    <Users size={18} color={colors.primary} />
+                  </View>
+                  <View style={styles.teamRowContent}>
+                    <Text style={[styles.teamRowName, { color: colors.text }]}>{activeTeam.name}</Text>
+                    {roleConfig && (
+                      <Text style={[styles.teamRowRole, { color: roleConfig.color }]}>
+                        {roleConfig.label}
+                      </Text>
+                    )}
+                  </View>
+                  <ChevronRight size={18} color={colors.textMuted} />
+                </TouchableOpacity>
               </View>
-            </View>
+            )}
 
-        {/* Upcoming Trainings */}
+            {/* Upcoming Sessions */}
             {allTrainingsSorted.length > 0 && (
-          <View style={styles.section}>
-                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>UPCOMING TRAININGS</Text>
+              <View style={styles.section}>
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>UPCOMING SESSIONS</Text>
                 <View style={styles.eventsList}>
                   {allTrainingsSorted.slice(0, 5).map(training => (
                     <EventCard
-                  key={training.id}
-                  training={training}
-                  colors={colors}
-                  onPress={() => handleTrainingPress(training)}
-                />
-              ))}
-            </View>
-          </View>
-        )}
+                      key={training.id}
+                      training={training}
+                      colors={colors}
+                      onPress={() => handleTrainingPress(training)}
+                    />
+                  ))}
+                </View>
+              </View>
+            )}
           </>
         )}
       </ScrollView>
+
+      {/* Team Switcher Sheet */}
+      <TeamSwitcherSheet 
+        visible={switcherOpen} 
+        onClose={() => setSwitcherOpen(false)} 
+      />
     </View>
   );
 }
@@ -576,7 +615,7 @@ export default function TeamScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { flex: 1 },
-  content: { paddingHorizontal: 16 },
+  content: { paddingHorizontal: 16, paddingTop: 16 },
 
   // Header
   headerContainer: {
@@ -585,11 +624,51 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
   title: {
     fontSize: 28,
     fontWeight: '700',
     letterSpacing: -0.5,
-    marginBottom: 16,
+  },
+  singleTeamPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    maxWidth: 200,
+  },
+  singleTeamName: {
+    fontSize: 14,
+    fontWeight: '600',
+    maxWidth: 100,
+  },
+  roleBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  roleText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  addTeamBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Tab Bar
@@ -612,71 +691,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Teams Row
-  teamsRow: {
-    marginTop: 16,
-    marginBottom: 8,
-    marginHorizontal: -16,
-  },
-  teamsRowContent: {
-    paddingHorizontal: 16,
-    gap: 8,
-    flexDirection: 'row',
-  },
-  teamChipCompact: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    gap: 6,
-  },
-  teamChipCompactName: {
-    fontSize: 13,
-    fontWeight: '600',
-    maxWidth: 100,
-  },
-  roleDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  addTeamBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // No Teams Row
-  noTeamsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  actionBtnSmall: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  actionBtnSmallText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#fff',
-  },
-
   // Week Calendar
   weekCalendar: {
     borderRadius: 16,
     borderWidth: 1,
     padding: 12,
-    marginTop: 12,
   },
   weekHeader: {
     flexDirection: 'row',
@@ -775,7 +794,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#10B981',
   },
   eventContent: {
     flex: 1,
@@ -842,10 +860,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 
-  // Teams List
-  teamsList: {
-    gap: 10,
-  },
+  // Team Row
   teamRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -875,7 +890,8 @@ const styles = StyleSheet.create({
 
   // Loading
   loading: {
-    paddingVertical: 40,
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
   },
 });

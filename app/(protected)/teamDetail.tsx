@@ -1,7 +1,28 @@
 /**
  * Team Detail Screen
  * 
- * Professional, clean design for viewing and managing a team.
+ * ═══════════════════════════════════════════════════════════════════════════
+ * OWNERSHIP CONTRACT (DO NOT VIOLATE)
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
+ * This screen is STATUS + CONTEXT only.
+ * 
+ * MAY SHOW:
+ * - Team information (name, description, stats)
+ * - Member roster
+ * - Squad structure
+ * - Scheduled sessions (as calendar/list entries)
+ * - Live session status (informational only)
+ * - Management actions (invite, schedule) for commanders
+ * 
+ * MUST NOT:
+ * - Provide primary "Join" / "Start" / "Continue" CTAs
+ * - Be the entry point for session execution
+ * - Use action colors (green) + action icons (Play) for session entry
+ * - Route directly to trainingLive (session execution)
+ * 
+ * Home owns session entry. Team pages explain what exists.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 import { BaseAvatar } from '@/components/BaseAvatar';
 import { useColors } from '@/hooks/ui/useColors';
@@ -10,7 +31,7 @@ import { useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
 import type { TeamMemberWithProfile, TeamWithMembers, TrainingWithDetails } from '@/types/workspace';
 import { useFocusEffect } from '@react-navigation/native';
-import { format, formatDistanceToNow } from 'date-fns';
+import { differenceInMinutes, format, formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -18,9 +39,10 @@ import {
   ArrowLeft,
   Calendar,
   ChevronRight,
+  Clock,
   Crown,
+  Eye,
   Layers,
-  Play,
   Plus,
   Shield,
   Target,
@@ -61,33 +83,53 @@ function getRoleConfig(role: string | null | undefined) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// LIVE TRAINING BANNER
+// LIVE SESSION STATUS CARD (STATUS ONLY - NOT AN ACTION CTA)
 // ═══════════════════════════════════════════════════════════════════════════
 
-function LiveBanner({ training, colors }: { training: TrainingWithDetails; colors: any }) {
+function LiveSessionStatus({ training, colors }: { training: TrainingWithDetails; colors: any }) {
+  // Calculate duration
+  const startedAt = training.started_at ? new Date(training.started_at) : new Date();
+  const durationMins = differenceInMinutes(new Date(), startedAt);
+  const durationStr = durationMins >= 60 
+    ? `${Math.floor(durationMins / 60)}h ${durationMins % 60}m`
+    : `${durationMins}m`;
+
+  // Navigate to session details (read-only context), not session execution
   const handlePress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Navigate to trainingDetail for session context/status, NOT trainingLive
     router.push(`/(protected)/trainingDetail?id=${training.id}` as any);
   };
 
   return (
     <Animated.View entering={FadeInDown.duration(400)}>
       <TouchableOpacity
-        style={[styles.liveBanner, { backgroundColor: colors.green }]}
+        style={[styles.liveStatusCard, { backgroundColor: colors.card, borderColor: colors.border }]}
         onPress={handlePress}
-        activeOpacity={0.9}
+        activeOpacity={0.7}
       >
-        <View style={styles.liveBannerLeft}>
-          <View style={styles.liveDotContainer}>
-            <View style={styles.liveDot} />
+        {/* Status indicator */}
+        <View style={styles.liveStatusLeft}>
+          <View style={[styles.liveStatusDot, { backgroundColor: colors.orange }]}>
+            <View style={styles.liveStatusDotInner} />
           </View>
-          <View style={styles.liveBannerText}>
-            <Text style={styles.liveBannerLabel}>LIVE NOW</Text>
-            <Text style={styles.liveBannerTitle} numberOfLines={1}>{training.title}</Text>
+          <View style={styles.liveStatusContent}>
+            <Text style={[styles.liveStatusLabel, { color: colors.textMuted }]}>SESSION IN PROGRESS</Text>
+            <Text style={[styles.liveStatusTitle, { color: colors.text }]} numberOfLines={1}>
+              {training.title}
+            </Text>
+            <View style={styles.liveStatusMeta}>
+              <Clock size={12} color={colors.textMuted} />
+              <Text style={[styles.liveStatusMetaText, { color: colors.textMuted }]}>
+                {durationStr} · {training.drill_count || 0} drill{(training.drill_count || 0) !== 1 ? 's' : ''}
+              </Text>
+            </View>
           </View>
         </View>
-        <View style={styles.liveBannerBtn}>
-          <Play size={14} color={colors.green} fill={colors.green} />
+        
+        {/* Secondary action - view details, not join */}
+        <View style={[styles.liveStatusAction, { backgroundColor: colors.secondary }]}>
+          <Eye size={14} color={colors.textMuted} />
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -108,7 +150,6 @@ function MemberRow({ member, colors, isLast }: {
 
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Set active team in store first so memberPreview can find the member
     router.push(`/(protected)/memberPreview?id=${member.user_id}` as any);
   };
 
@@ -137,10 +178,10 @@ function MemberRow({ member, colors, isLast }: {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TRAINING ROW
+// SCHEDULED SESSION ROW (navigates to details, not execution)
 // ═══════════════════════════════════════════════════════════════════════════
 
-function TrainingRow({ training, colors, index }: { 
+function ScheduledSessionRow({ training, colors, index }: { 
   training: TrainingWithDetails; 
   colors: any;
   index: number;
@@ -155,6 +196,7 @@ function TrainingRow({ training, colors, index }: {
         style={[styles.trainingRow, { backgroundColor: colors.card, borderColor: colors.border }]}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          // Navigate to schedule details, not session execution
           router.push(`/(protected)/trainingDetail?id=${training.id}` as any);
         }}
         activeOpacity={0.7}
@@ -200,7 +242,6 @@ export default function TeamDetailScreen() {
   const loadData = useCallback(async () => {
     if (!id) return;
     try {
-      // Set active team in store so memberPreview can find members
       setActiveTeam(id);
       
       const [teamData, membersData] = await Promise.all([
@@ -230,11 +271,11 @@ export default function TeamDetailScreen() {
     setRefreshing(false);
   }, [loadData]);
 
-  const liveTraining = useMemo(() => {
+  const liveSession = useMemo(() => {
     return teamTrainings.find((t) => t.team_id === id && t.status === 'ongoing');
   }, [teamTrainings, id]);
 
-  const upcomingTrainings = useMemo(() => {
+  const upcomingScheduled = useMemo(() => {
     return teamTrainings
       .filter((t) => t.team_id === id && t.status === 'planned')
       .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
@@ -251,11 +292,11 @@ export default function TeamDetailScreen() {
   };
 
   const handleInviteMember = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);console.log('inviteMember');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push(`/(protected)/inviteTeamMember?teamId=${id}` as any);
   };
 
-  const handleCreateTraining = () => {
+  const handleScheduleSession = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push(`/(protected)/createTraining?teamId=${id}` as any);
   };
@@ -294,11 +335,6 @@ export default function TeamDetailScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={handleBack} activeOpacity={0.7}>
           <ArrowLeft size={22} color={colors.text} />
         </TouchableOpacity>
-
-        {/* <View style={[styles.headerBadge, { backgroundColor: roleConfig.bg }]}>
-          <roleConfig.icon size={12} color={roleConfig.color} />
-          <Text style={[styles.headerBadgeText, { color: roleConfig.color }]}>{roleConfig.label}</Text>
-        </View> */}
 
         {canManage && (
           <TouchableOpacity
@@ -346,7 +382,7 @@ export default function TeamDetailScreen() {
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>Squads</Text>
           </View>
           <View style={[styles.statItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.statValue, { color: colors.text }]}>{upcomingTrainings.length}</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>{upcomingScheduled.length}</Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>Scheduled</Text>
           </View>
           <View style={[styles.statItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -355,19 +391,19 @@ export default function TeamDetailScreen() {
           </View>
         </Animated.View>
 
-        {/* Live Training */}
-        {liveTraining && (
+        {/* Live Session Status (informational only, not action CTA) */}
+        {liveSession && (
           <View style={styles.section}>
-            <LiveBanner training={liveTraining} colors={colors} />
+            <LiveSessionStatus training={liveSession} colors={colors} />
           </View>
         )}
 
-        {/* Quick Action */}
+        {/* Schedule New Session (management action - allowed) */}
         {canManage && (
           <Animated.View entering={FadeIn.delay(100).duration(300)} style={styles.section}>
             <TouchableOpacity
               style={styles.primaryAction}
-              onPress={handleCreateTraining}
+              onPress={handleScheduleSession}
               activeOpacity={0.9}
             >
               <LinearGradient
@@ -377,7 +413,7 @@ export default function TeamDetailScreen() {
                 style={styles.primaryActionInner}
               >
                 <Plus size={18} color="#fff" />
-                <Text style={styles.primaryActionText}>Schedule Training</Text>
+                <Text style={styles.primaryActionText}>Schedule Session</Text>
               </LinearGradient>
             </TouchableOpacity>
           </Animated.View>
@@ -404,7 +440,11 @@ export default function TeamDetailScreen() {
                 />
               ))}
               {members.length > 5 && (
-                <TouchableOpacity style={styles.cardFooter} activeOpacity={0.7}>
+                <TouchableOpacity 
+                  style={styles.cardFooter} 
+                  activeOpacity={0.7}
+                  onPress={() => router.push(`/(protected)/teamMembers?teamId=${id}` as any)}
+                >
                   <Text style={[styles.cardFooterText, { color: colors.primary }]}>
                     View all {members.length} members
                   </Text>
@@ -456,37 +496,37 @@ export default function TeamDetailScreen() {
           </View>
         )}
 
-        {/* Trainings Section */}
+        {/* Scheduled Sessions Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionHeaderLeft}>
               <Calendar size={14} color={colors.textMuted} />
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Upcoming</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Scheduled</Text>
             </View>
-            {upcomingTrainings.length > 0 && (
+            {upcomingScheduled.length > 0 && (
               <TouchableOpacity onPress={() => router.push('/(protected)/(tabs)/trainings' as any)}>
                 <Text style={[styles.sectionLink, { color: colors.primary }]}>See all</Text>
               </TouchableOpacity>
             )}
           </View>
 
-          {upcomingTrainings.length > 0 ? (
+          {upcomingScheduled.length > 0 ? (
             <View style={styles.trainingsList}>
-              {upcomingTrainings.map((training, index) => (
-                <TrainingRow key={training.id} training={training} colors={colors} index={index} />
+              {upcomingScheduled.map((training, index) => (
+                <ScheduledSessionRow key={training.id} training={training} colors={colors} index={index} />
               ))}
             </View>
           ) : (
             <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Calendar size={28} color={colors.textMuted} />
-              <Text style={[styles.emptyText, { color: colors.textMuted }]}>No trainings scheduled</Text>
+              <Text style={[styles.emptyText, { color: colors.textMuted }]}>No sessions scheduled</Text>
               {canManage && (
                 <TouchableOpacity
                   style={[styles.emptyBtn, { borderColor: colors.border }]}
-                  onPress={handleCreateTraining}
+                  onPress={handleScheduleSession}
                 >
                   <Plus size={14} color={colors.text} />
-                  <Text style={[styles.emptyBtnText, { color: colors.text }]}>Schedule Training</Text>
+                  <Text style={[styles.emptyBtnText, { color: colors.text }]}>Schedule Session</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -556,18 +596,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginLeft: -8,
   },
-  headerBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  headerBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
   headerAction: {
     width: 40,
     height: 40,
@@ -628,54 +656,61 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Live Banner
-  liveBanner: {
+  // Live Session Status (informational, not action)
+  liveStatusCard: {
     borderRadius: BORDER_RADIUS,
     padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    borderWidth: 1,
   },
-  liveBannerLeft: {
+  liveStatusLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     flex: 1,
   },
-  liveDotContainer: {
+  liveStatusDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: 'rgba(255,255,255,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  liveStatusDotInner: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: '#fff',
   },
-  liveBannerText: {
+  liveStatusContent: {
     flex: 1,
   },
-  liveBannerLabel: {
+  liveStatusLabel: {
     fontSize: 10,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.8)',
-    letterSpacing: 0.8,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginBottom: 2,
   },
-  liveBannerTitle: {
+  liveStatusTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#fff',
-    marginTop: 2,
   },
-  liveBannerBtn: {
-    width: 36,
-    height: 36,
+  liveStatusMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  liveStatusMetaText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  liveStatusAction: {
+    width: 32,
+    height: 32,
     borderRadius: 8,
-    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -708,7 +743,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Primary Action
+  // Primary Action (management - allowed)
   primaryAction: {
     borderRadius: BORDER_RADIUS,
     overflow: 'hidden',
