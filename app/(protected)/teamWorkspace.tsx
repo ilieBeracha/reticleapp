@@ -1,13 +1,27 @@
 /**
  * Team Command Center
  *
- * A team-focused workspace showing:
- * - Live activity (who's training now)
+ * ═══════════════════════════════════════════════════════════════════════════
+ * OWNERSHIP CONTRACT (DO NOT VIOLATE)
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
+ * This screen is STATUS + CONTEXT only.
+ * 
+ * MAY SHOW:
+ * - Live session status (informational)
  * - Team performance stats
  * - Squad breakdown
  * - Member status
- * - Upcoming trainings
- * - Drill library access
+ * - Scheduled sessions
+ * - Drill library
+ * 
+ * MUST NOT:
+ * - Provide primary "Join" / "Start" CTAs for session entry
+ * - Route directly to trainingLive (session execution)
+ * - Be the entry point for session execution
+ * 
+ * Home owns session entry. Team pages explain what exists.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 import { DrillDetailModal } from '@/components/drills/DrillDetailModal';
 import { DrillEditorModal } from '@/components/drills/DrillEditorModal';
@@ -40,9 +54,7 @@ import {
   Clock,
   Crown,
   Layers,
-  Play,
   Plus,
-  Radio,
   Search,
   Settings,
   Shield,
@@ -114,9 +126,12 @@ function getMemberStatus(_member: TeamMemberWithProfile): 'training' | 'online' 
 export default function TeamWorkspaceScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const { teams, setActiveTeam } = useTeamStore();
+  const { id: paramId } = useLocalSearchParams<{ id: string }>();
+  const { teams, activeTeamId, setActiveTeam } = useTeamStore();
   const { teamTrainings, loadTeamTrainings } = useTrainingStore();
+
+  // Use param id if provided, otherwise fall back to activeTeamId from store
+  const id = paramId || activeTeamId;
 
   const team = useMemo(() => teams.find((t) => t.id === id), [teams, id]);
   const roleConfig = getRoleConfig(team?.my_role);
@@ -251,13 +266,13 @@ export default function TeamWorkspaceScreen() {
   const handleMembers = () => router.push(`/(protected)/teamMembers?teamId=${id}` as any);
   const handleCreateTraining = () => router.push(`/(protected)/createTraining?teamId=${id}` as any);
 
+  // Navigate to session details (context view), NOT session execution
+  // Home owns session entry - this screen only shows status/context
   const handleTraining = (t: TrainingWithDetails) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push(
-      t.status === 'ongoing'
-        ? (`/(protected)/trainingLive?trainingId=${t.id}` as any)
-        : (`/(protected)/trainingDetail?id=${t.id}` as any)
-    );
+    // Always navigate to trainingDetail for context/status
+    // Never route directly to trainingLive (session execution) from Team screens
+    router.push(`/(protected)/trainingDetail?id=${t.id}` as any);
   };
 
   // Drill handlers
@@ -328,31 +343,30 @@ export default function TeamWorkspaceScreen() {
 
   const renderCommandView = () => (
     <View style={styles.page}>
-      {/* Live Training Banner */}
+      {/* Live Session Status (informational only - NOT action CTA) */}
       {liveTraining && (
         <Animated.View entering={FadeIn.duration(400)}>
           <TouchableOpacity
-            style={[styles.liveBanner, { backgroundColor: '#10B98115', borderColor: '#10B98140' }]}
+            style={[styles.liveStatusCard, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={() => handleTraining(liveTraining)}
           >
-            <View style={styles.liveBannerLeft}>
-              <View style={styles.liveIndicator}>
-                <Radio size={16} color="#10B981" />
-                <View style={styles.livePulse} />
+            <View style={styles.liveStatusLeft}>
+              <View style={[styles.liveStatusDot, { backgroundColor: '#F59E0B' }]}>
+                <View style={styles.liveStatusDotInner} />
               </View>
-              <View style={styles.liveBannerText}>
-                <Text style={[styles.liveBannerTitle, { color: '#10B981' }]}>LIVE NOW</Text>
-                <Text style={[styles.liveBannerName, { color: colors.text }]} numberOfLines={1}>
+              <View style={styles.liveStatusContent}>
+                <Text style={[styles.liveStatusLabel, { color: colors.textMuted }]}>SESSION IN PROGRESS</Text>
+                <Text style={[styles.liveStatusTitle, { color: colors.text }]} numberOfLines={1}>
                   {liveTraining.title}
                 </Text>
-                <Text style={[styles.liveBannerMeta, { color: colors.textMuted }]}>
-                  {memberStats.training} member{memberStats.training !== 1 ? 's' : ''} training
+                <Text style={[styles.liveStatusMeta, { color: colors.textMuted }]}>
+                  {memberStats.training} member{memberStats.training !== 1 ? 's' : ''} active
                 </Text>
               </View>
             </View>
-            <View style={[styles.joinButton, { backgroundColor: '#10B981' }]}>
-              <Play size={16} color="#fff" fill="#fff" />
-              <Text style={styles.joinButtonText}>Join</Text>
+            {/* Secondary action - view details, not join */}
+            <View style={[styles.liveStatusAction, { backgroundColor: colors.secondary }]}>
+              <ChevronRight size={16} color={colors.textMuted} />
             </View>
           </TouchableOpacity>
         </Animated.View>
@@ -840,33 +854,41 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: '700' },
   sectionLink: { fontSize: 14, fontWeight: '600' },
 
-  // Live Banner
-  liveBanner: {
+  // Live Session Status (informational, not action CTA)
+  liveStatusCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    borderRadius: 16,
+    padding: 14,
+    borderRadius: 14,
     borderWidth: 1,
     marginBottom: 20,
   },
-  liveBannerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  liveIndicator: { position: 'relative' },
-  livePulse: {
-    position: 'absolute',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#10B98130',
-    top: -4,
-    left: -4,
+  liveStatusLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  liveStatusDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  liveBannerText: { flex: 1 },
-  liveBannerTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
-  liveBannerName: { fontSize: 16, fontWeight: '600', marginTop: 2 },
-  liveBannerMeta: { fontSize: 13, marginTop: 2 },
-  joinButton: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 },
-  joinButtonText: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  liveStatusDotInner: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#fff',
+  },
+  liveStatusContent: { flex: 1 },
+  liveStatusLabel: { fontSize: 10, fontWeight: '600', letterSpacing: 0.5, marginBottom: 2 },
+  liveStatusTitle: { fontSize: 15, fontWeight: '600' },
+  liveStatusMeta: { fontSize: 12, marginTop: 2 },
+  liveStatusAction: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   // Stats Card
   statsCard: { borderRadius: 16, borderWidth: 1, padding: 16 },

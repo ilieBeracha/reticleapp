@@ -172,11 +172,19 @@ export default function CreateTrainingScreen() {
     setShowInstanceModal(true);
   }, []);
 
+  // Handle closing the drill instance modal
+  const handleCloseInstanceModal = useCallback(() => {
+    setShowInstanceModal(false);
+    setSelectedDrill(null);
+  }, []);
+
   // Handle instance configuration complete (add drill from library to training)
   const handleInstanceConfirm = useCallback((instanceConfig: DrillInstanceConfig) => {
     if (!selectedDrill) return;
 
     const trainingDrill = drillToTrainingInput(selectedDrill, instanceConfig);
+    
+    // Add the drill to the list
     setDrills(prev => [
       ...prev,
       {
@@ -184,10 +192,10 @@ export default function CreateTrainingScreen() {
         ...trainingDrill,
       },
     ]);
-    // Close modal first, then clear drill (to avoid race condition)
+    
+    // Close modal and clear selection in one batch
     setShowInstanceModal(false);
-    // Use setTimeout to ensure modal closes before clearing drill
-    setTimeout(() => setSelectedDrill(null), 100);
+    setSelectedDrill(null);
   }, [selectedDrill]);
 
   const handleCreate = useCallback(async () => {
@@ -300,6 +308,14 @@ export default function CreateTrainingScreen() {
           </View>
           <Text style={[styles.title, { color: colors.text }]}>New Training</Text>
         </View>
+
+      {/* ==================== STEP 1: TRAINING DETAILS ==================== */}
+      <View style={[styles.stepHeader, { borderBottomColor: colors.border }]}>
+        <View style={[styles.stepBadge, { backgroundColor: colors.primary + '15' }]}>
+          <Text style={[styles.stepNumber, { color: colors.primary }]}>1</Text>
+        </View>
+        <Text style={[styles.stepTitle, { color: colors.text }]}>Training Details</Text>
+      </View>
 
       {/* Team Selector */}
       <View style={styles.inputSection}>
@@ -449,6 +465,14 @@ export default function CreateTrainingScreen() {
         </View>
       </TouchableOpacity>
 
+      {/* ==================== STEP 2: ATTACH DRILLS ==================== */}
+      <View style={[styles.stepHeader, { borderBottomColor: colors.border, marginTop: 8 }]}>
+        <View style={[styles.stepBadge, { backgroundColor: drills.length > 0 ? colors.primary + '15' : colors.destructive + '15' }]}>
+          <Text style={[styles.stepNumber, { color: drills.length > 0 ? colors.primary : colors.destructive }]}>2</Text>
+        </View>
+        <Text style={[styles.stepTitle, { color: colors.text }]}>Attach Drill</Text>
+      </View>
+
       {/* Drills Section Header */}
       <View style={styles.drillsHeader}>
         <View style={styles.labelRow}>
@@ -456,22 +480,10 @@ export default function CreateTrainingScreen() {
           <Text style={[styles.inputLabel, { color: colors.text }]}>Drills {drills.length > 0 && `(${drills.length})`}</Text>
           <Text style={[styles.required, { color: colors.destructive }]}>*</Text>
         </View>
-        {selectedTeamId && (
-          <TouchableOpacity
-            style={[styles.libraryLink, { backgroundColor: colors.secondary }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push(`/(protected)/drillLibrary?teamId=${selectedTeamId}`);
-            }}
-          >
-            <Ionicons name="library-outline" size={14} color={colors.primary} />
-            <Text style={[styles.libraryLinkText, { color: colors.primary }]}>Drill Library</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
       {drills.length === 0 && teamDrills.length > 0 && (
-        <Text style={[styles.drillsHint, { color: colors.textMuted }]}>Select drills from your library below</Text>
+        <Text style={[styles.drillsHint, { color: colors.textMuted }]}>Tap a drill below to add it</Text>
       )}
 
       {/* Drill List */}
@@ -529,23 +541,14 @@ export default function CreateTrainingScreen() {
         <View style={[styles.emptyDrills, { backgroundColor: colors.secondary }]}>
           <Target size={32} color={colors.textMuted} />
           <Text style={[styles.emptyTitle, { color: colors.text }]}>
-            {!selectedTeamId ? 'Select a team first' : 'No drills in library'}
+            {!selectedTeamId ? 'Select a team first' : 'No drills available'}
           </Text>
           <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
             {!selectedTeamId 
               ? 'Choose a team above to see available drills' 
-              : 'Add drills to your team library first, then select them here'
+              : 'Go to Team → Manage → Drill Library to add drills first'
             }
           </Text>
-          {selectedTeamId && (
-            <TouchableOpacity
-              style={[styles.emptyBtn, { backgroundColor: colors.primary }]}
-              onPress={() => router.push(`/(protected)/drillLibrary?teamId=${selectedTeamId}`)}
-            >
-              <Ionicons name="add" size={16} color="#fff" />
-              <Text style={styles.emptyBtnText}>Go to Drill Library</Text>
-            </TouchableOpacity>
-          )}
         </View>
       )}
 
@@ -593,10 +596,7 @@ export default function CreateTrainingScreen() {
       {/* Drill instance configuration modal */}
       <DrillInstanceModal
         visible={showInstanceModal}
-        onClose={() => {
-          setShowInstanceModal(false);
-          setSelectedDrill(null);
-        }}
+        onClose={handleCloseInstanceModal}
         onConfirm={handleInstanceConfirm}
         drill={selectedDrill}
       />
@@ -673,6 +673,32 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '700', letterSpacing: -0.5 },
   subtitle: { fontSize: 14, marginTop: 4 },
 
+  // Step Header
+  stepHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 10, 
+    paddingBottom: 12,
+    marginBottom: 16,
+    borderBottomWidth: 1,
+  },
+  stepBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepNumber: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  stepTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+  },
+
   // Input Section
   inputSection: { marginBottom: 16 },
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
@@ -699,8 +725,6 @@ const styles = StyleSheet.create({
   // Drills Header
   drillsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   drillsHint: { fontSize: 12, marginBottom: 12 },
-  libraryLink: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
-  libraryLinkText: { fontSize: 12, fontWeight: '600' },
 
   // Drill Library
   drillLibrarySection: { marginBottom: 16 },
@@ -717,8 +741,6 @@ const styles = StyleSheet.create({
   emptyDrills: { alignItems: 'center', padding: 32, borderRadius: 16, gap: 8, marginBottom: 16 },
   emptyTitle: { fontSize: 16, fontWeight: '600' },
   emptyDesc: { fontSize: 13, textAlign: 'center' },
-  emptyBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, marginTop: 8 },
-  emptyBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
 
   // Drills List
   drillsList: { gap: 10, marginBottom: 16 },

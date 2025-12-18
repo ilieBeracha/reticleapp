@@ -7,10 +7,16 @@ import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { styles } from '../styles';
 
 export function TeamsRow({ colors }: { colors: ReturnType<typeof useColors> }) {
-  const { teams } = useTeamStore();
+  const { teams, setActiveTeam } = useTeamStore();
   const { myUpcomingTrainings } = useTrainingStore();
 
   if (teams.length === 0) return null;
+
+  // Navigate to team workspace (sets active team first)
+  const handleTeamPress = (teamId: string) => {
+    setActiveTeam(teamId);
+    router.push(`/(protected)/teamWorkspace?id=${teamId}` as any);
+  };
 
   // Single team - show expanded card
   if (teams.length === 1) {
@@ -23,7 +29,7 @@ export function TeamsRow({ colors }: { colors: ReturnType<typeof useColors> }) {
       <View style={[styles.teamsSection, { paddingHorizontal: 16 }]}>
         <TouchableOpacity
           style={[styles.singleTeamCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={() => router.push(`/(protected)/teamDetail?id=${team.id}`)}
+          onPress={() => handleTeamPress(team.id)}
           activeOpacity={0.7}
         >
           <View style={styles.singleTeamHeader}>
@@ -81,7 +87,7 @@ export function TeamsRow({ colors }: { colors: ReturnType<typeof useColors> }) {
             <TouchableOpacity
               key={team.id}
               style={[styles.teamCard, { backgroundColor: colors.card, borderColor: hasLive ? colors.green : colors.border }]}
-              onPress={() => router.push(`/(protected)/teamDetail?id=${team.id}`)}
+              onPress={() => handleTeamPress(team.id)}
               activeOpacity={0.7}
             >
               <View style={[styles.teamCardIcon, { backgroundColor: `${colors.indigo}18` }]}>

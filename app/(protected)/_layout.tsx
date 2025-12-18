@@ -351,6 +351,17 @@ export default function ProtectedLayout() {
           }}
         />
 
+        {/* Drill Library - Card navigation from Team > Manage */}
+        <Stack.Screen
+          name="drillLibrary"
+          options={{
+            headerShown: false,
+            presentation: "card",
+            gestureEnabled: true,
+            contentStyle: { backgroundColor: colors.background },
+          }}
+        />
+
       </Stack>
     </ThemeProvider>
   );

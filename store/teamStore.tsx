@@ -1,25 +1,26 @@
 import {
-    addTeamMember as addTeamMemberService,
-    createTeam as createTeamService,
-    deleteTeam as deleteTeamService,
-    getMyTeams,
-    getTeamMembers,
-    getTeamWithMembers,
-    removeTeamMember as removeTeamMemberService,
-    updateTeamMemberRole as updateMemberRoleService,
-    updateTeam as updateTeamService,
-    type AddTeamMemberInput,
-    type CreateTeamInput,
-    type UpdateTeamInput,
+  addTeamMember as addTeamMemberService,
+  createTeam as createTeamService,
+  deleteTeam as deleteTeamService,
+  getMyTeams,
+  getTeamMembers,
+  getTeamWithMembers,
+  removeTeamMember as removeTeamMemberService,
+  updateTeamMemberRole as updateMemberRoleService,
+  updateTeam as updateTeamService,
+  type AddTeamMemberInput,
+  type CreateTeamInput,
+  type UpdateTeamInput,
 } from '@/services/teamService';
 import { shouldShowInitialLoading } from '@/store/_shared/asyncState';
 import type {
-    TeamMemberWithProfile,
-    TeamRole,
-    TeamWithMembers,
-    TeamWithRole
+  TeamMemberWithProfile,
+  TeamRole,
+  TeamWithMembers,
+  TeamWithRole
 } from '@/types/workspace';
 import { create } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
 
 interface TeamStore {
   // State
@@ -87,15 +88,31 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
       const teams = await getMyTeams();
       const { activeTeamId: currentActiveTeamId } = get();
 
-      // Respect personal mode - never auto-select teams
+      // ═══════════════════════════════════════════════════════════════════
+      // TEAM CONTEXT AUTO-SELECTION RULES
+      // ═══════════════════════════════════════════════════════════════════
+      // 0 teams → activeTeamId = null (solo mode)
+      // 1 team  → activeTeamId = that team (auto-select)
+      // N teams → preserve current if valid, else first team
+      // ═══════════════════════════════════════════════════════════════════
       let newActiveTeamId: string | null = null;
       
-      if (currentActiveTeamId !== null) {
-        // User had a team selected - verify it still exists
-        const teamStillExists = teams.some(t => t.id === currentActiveTeamId);
-        newActiveTeamId = teamStillExists ? currentActiveTeamId : null;
+      if (teams.length === 0) {
+        // 0 teams: pure solo mode
+        newActiveTeamId = null;
+      } else if (teams.length === 1) {
+        // 1 team: auto-select (no ambiguity)
+        newActiveTeamId = teams[0].id;
+      } else {
+        // N teams: preserve valid selection, otherwise pick first
+        if (currentActiveTeamId !== null) {
+          const teamStillExists = teams.some(t => t.id === currentActiveTeamId);
+          newActiveTeamId = teamStillExists ? currentActiveTeamId : teams[0].id;
+        } else {
+          // No previous selection - default to first team
+          newActiveTeamId = teams[0].id;
+        }
       }
-      // If currentActiveTeamId is null, stay in personal mode
 
       set({
         teams,
@@ -343,6 +360,71 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
 // =====================================================
 
 /**
+ * Team state enum for UI branching
+ */
+export type TeamState = 'no_teams' | 'single_team' | 'multiple_teams';
+
+/**
+ * Get current team state (0/1/N teams)
+ * Use this to conditionally render UI based on team count
+ */
+export function useTeamState(): TeamState {
+  return useTeamStore(state => {
+    if (state.teams.length === 0) return 'no_teams';
+    if (state.teams.length === 1) return 'single_team';
+    return 'multiple_teams';
+  });
+}
+
+/**
+ * Get full team context for UI rendering
+ * Uses useShallow to prevent infinite re-renders
+ */
+export function useTeamContext() {
+  return useTeamStore(
+    useShallow(state => {
+      const activeTeam = state.teams.find(t => t.id === state.activeTeamId) || null;
+      const teamState: TeamState = 
+        state.teams.length === 0 ? 'no_teams' :
+        state.teams.length === 1 ? 'single_team' : 'multiple_teams';
+      
+      return {
+        teamState,
+        teams: state.teams,
+        teamCount: state.teams.length,
+        activeTeamId: state.activeTeamId,
+        activeTeam,
+        loading: state.loading,
+        initialized: state.initialized,
+      };
+    })
+  );
+}
+
+/**
+ * Permission check for a specific team
+ * Uses useShallow to prevent infinite re-renders
+ */
+export function useTeamPermissions(teamId?: string | null) {
+  return useTeamStore(
+    useShallow(state => {
+      const targetId = teamId ?? state.activeTeamId;
+      const team = state.teams.find(t => t.id === targetId);
+      const role = team?.my_role || null;
+      
+      return {
+        role,
+        canSchedule: role === 'owner' || role === 'commander',
+        canManage: role === 'owner' || role === 'commander',
+        canView: role !== null, // Any role can view
+        isOwner: role === 'owner',
+        isCommander: role === 'commander',
+      };
+    })
+  );
+}
+
+/**
  * Get current user's role in active team
  */
 export function useMyTeamRole(): TeamRole | null {
@@ -371,18 +453,21 @@ export function useHasTeams(): boolean {
 
 /**
  * Get active team info
+ * Uses useShallow to prevent infinite re-renders
  */
 export function useActiveTeam() {
-  return useTeamStore(state => {
-    const team = state.teams.find(t => t.id === state.activeTeamId);
-    return {
-      teamId: state.activeTeamId,
-      team: team || null,
-      teamName: team?.name || null,
-      members: state.members,
-      memberCount: state.members.length || team?.member_count || 0,
-    };
-  });
+  return useTeamStore(
+    useShallow(state => {
+      const team = state.teams.find(t => t.id === state.activeTeamId);
+      return {
+        teamId: state.activeTeamId,
+        team: team || null,
+        teamName: team?.name || null,
+        members: state.members,
+        memberCount: state.members.length || team?.member_count || 0,
+      };
+    })
+  );
 }
 
 /**

@@ -11,7 +11,7 @@ import { DRILL_TYPES } from '@/types/drillTypes';
 import { isParamLocked, mergeWithDefaults } from '@/utils/drillValidation';
 import * as Haptics from 'expo-haptics';
 import { Award, Check, Clock, Crosshair, Lock, Plus, Target, X } from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -231,14 +231,33 @@ export function DrillInstanceModal({
 
   // Config state - store all params
   const [params, setParams] = useState<Record<string, any>>({});
+  
+  // Track which drill was last initialized to prevent re-initialization loops
+  const initializedDrillIdRef = useRef<string | null>(null);
 
   // Get display name
   const displayName = template?.name ?? drill?.name ?? 'Configure Drill';
   const displayGoal = template?.goal ?? drill?.description ?? '';
+  
+  // Get current drill/template ID for comparison
+  const currentId = template?.id ?? drill?.id ?? null;
 
-  // Initialize params from template/drill defaults
+  // Initialize params from template/drill defaults - only when drill changes or modal opens
   useEffect(() => {
-    if (!visible) return;
+    // Skip if not visible
+    if (!visible) {
+      // Reset the initialized ID when modal closes so next open will re-initialize
+      initializedDrillIdRef.current = null;
+      return;
+    }
+    
+    // Skip if already initialized for this drill (prevents re-render loop)
+    if (currentId && initializedDrillIdRef.current === currentId) {
+      return;
+    }
+
+    // Mark as initialized
+    initializedDrillIdRef.current = currentId;
 
     if (template && drillType) {
       // Use template defaults merged with type defaults
@@ -259,7 +278,7 @@ export function DrillInstanceModal({
     } else if (drillType) {
       setParams({ ...drillType.paramDefaults });
     }
-  }, [visible, drill, template, drillType]);
+  }, [visible, currentId, template, drill, drillType]);
 
   // Update single param
   const updateParam = (key: string, value: any) => {

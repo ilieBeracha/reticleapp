@@ -1,188 +1,187 @@
+/**
+ * Activity Timeline
+ * 
+ * Shows a session-centric timeline. No "training" concept.
+ * 
+ * Displays:
+ * - Active session (in progress)
+ * - Upcoming scheduled sessions (from trainings, but shown as "Team Session")
+ * - Past sessions
+ */
 import { useColors } from '@/hooks/ui/useColors';
-import type { SessionWithDetails } from '@/services/sessionService';
-import type { TrainingWithDetails } from '@/types/workspace';
 import { differenceInMinutes, format, formatDistanceToNow, isFuture, isToday, isYesterday } from 'date-fns';
 import { router } from 'expo-router';
-import { Calendar, Clock, Crosshair, Users } from 'lucide-react-native';
+import { Clock, Crosshair, Users } from 'lucide-react-native';
 import { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import type { HomeSession } from '../types';
 
 interface ActivityTimelineProps {
-  sessions: SessionWithDetails[];
-  trainings: TrainingWithDetails[];
-  onSessionPress?: (session: SessionWithDetails) => void;
+  sessions: HomeSession[];
+  onSessionPress?: (session: HomeSession) => void;
   limit?: number;
 }
 
-type TimelineItem = {
-  id: string;
-  type: 'session' | 'training';
-  date: Date;
-  title: string;
-  subtitle: string;
-  details: string[];
-  status: 'completed' | 'upcoming' | 'in_progress';
-  data: SessionWithDetails | TrainingWithDetails;
-};
-
-export function ActivityTimeline({ sessions, trainings, onSessionPress, limit = 10 }: ActivityTimelineProps) {
+export function ActivityTimeline({ sessions, onSessionPress, limit = 10 }: ActivityTimelineProps) {
   const colors = useColors();
 
-  const timelineItems = useMemo(() => {
-    const items: TimelineItem[] = [];
-
-    // Add sessions
-    sessions.forEach((session) => {
-      const date = new Date(session.started_at);
-      const shots = session.stats?.shots_fired ?? 0;
-      const hits = session.stats?.hits_total ?? 0;
-      const accuracy = session.stats?.accuracy_pct ?? 0;
-      const targets = session.stats?.target_count ?? 0;
+  // Sort and limit sessions
+  const sortedSessions = useMemo(() => {
+    const sorted = [...sessions].sort((a, b) => {
+      // Active first
+      if (a.state === 'active') return -1;
+      if (b.state === 'active') return 1;
       
-      // Calculate duration
-      let duration = '';
-      if (session.ended_at) {
-        const mins = differenceInMinutes(new Date(session.ended_at), date);
-        if (mins >= 60) {
-          duration = `${Math.floor(mins / 60)}h ${mins % 60}m`;
-        } else {
-          duration = `${mins}m`;
-        }
+      // Scheduled next (by scheduled time ascending)
+      if (a.state === 'scheduled' && b.state === 'scheduled') {
+        const aTime = a.scheduledAt?.getTime() ?? 0;
+        const bTime = b.scheduledAt?.getTime() ?? 0;
+        return aTime - bTime;
       }
-
-      // Build details array
-      const details: string[] = [];
-      if (session.status === 'ongoing') {
-        details.push('In progress');
-      } else {
-        if (shots > 0) details.push(`${shots} shots`);
-        if (hits > 0) details.push(`${hits} hits`);
-        if (accuracy > 0) details.push(`${accuracy.toFixed(0)}%`);
-        if (targets > 0) details.push(`${targets} target${targets !== 1 ? 's' : ''}`);
-        if (duration) details.push(duration);
-      }
-
-      items.push({
-        id: `session-${session.id}`,
-        type: 'session',
-        date,
-        title: session.status === 'ongoing' ? 'Session in Progress' : 'Practice Session',
-        subtitle: session.team?.name || 'Solo Practice',
-        details,
-        status: session.status === 'ongoing' ? 'in_progress' : 'completed',
-        data: session,
-      });
-    });
-
-    // Add upcoming trainings
-    trainings.forEach((training) => {
-      if (!training.scheduled_at) return;
-      const date = new Date(training.scheduled_at);
-      if (!isFuture(date)) return;
-
-      const details: string[] = [];
-      details.push(format(date, 'h:mm a'));
-      if (training.team?.name) details.push(training.team.name);
-
-      items.push({
-        id: `training-${training.id}`,
-        type: 'training',
-        date,
-        title: training.name || 'Team Training',
-        subtitle: format(date, 'EEEE'),
-        details,
-        status: 'upcoming',
-        data: training,
-      });
-    });
-
-    // Sort by date
-    items.sort((a, b) => {
-      if (a.status === 'in_progress') return -1;
-      if (b.status === 'in_progress') return 1;
+      if (a.state === 'scheduled') return -1;
+      if (b.state === 'scheduled') return 1;
       
-      if (a.status === 'upcoming' && b.status === 'upcoming') {
-        return a.date.getTime() - b.date.getTime();
-      }
-      if (a.status === 'upcoming') return -1;
-      if (b.status === 'upcoming') return 1;
-      
-      return b.date.getTime() - a.date.getTime();
+      // Completed last (by ended time descending)
+      const aTime = a.endedAt?.getTime() ?? a.startedAt?.getTime() ?? 0;
+      const bTime = b.endedAt?.getTime() ?? b.startedAt?.getTime() ?? 0;
+      return bTime - aTime;
     });
+    
+    return sorted.slice(0, limit);
+  }, [sessions, limit]);
 
-    return items.slice(0, limit);
-  }, [sessions, trainings, limit]);
+  // Separate into upcoming and past
+  const upcomingSessions = useMemo(() => 
+    sortedSessions.filter(s => s.state === 'active' || s.state === 'scheduled'),
+    [sortedSessions]
+  );
+  
+  const pastSessions = useMemo(() => 
+    sortedSessions.filter(s => s.state === 'completed' || s.state === 'unreviewed'),
+    [sortedSessions]
+  );
 
-  const formatDate = (date: Date, status: TimelineItem['status']) => {
-    if (status === 'in_progress') return 'Now';
-    if (isToday(date)) return format(date, 'h:mm a');
-    if (isYesterday(date)) return 'Yesterday';
-    if (isFuture(date)) return formatDistanceToNow(date, { addSuffix: true });
-    return format(date, 'MMM d');
-  };
-
-  const handlePress = (item: TimelineItem) => {
-    if (item.type === 'session') {
-      if (onSessionPress) {
-        onSessionPress(item.data as SessionWithDetails);
-      }
-    } else {
-      router.push(`/(protected)/trainingDetail?id=${(item.data as TrainingWithDetails).id}`);
+  const handlePress = (session: HomeSession) => {
+    if (onSessionPress) {
+      onSessionPress(session);
+      return;
+    }
+    
+    // Default navigation
+    if (session.sourceSession) {
+      router.push(`/(protected)/sessionDetail?sessionId=${session.sourceSession.id}`);
+    } else if (session.sourceTraining) {
+      // Navigate to training detail (will become live session when started)
+      router.push(`/(protected)/trainingDetail?id=${session.sourceTraining.id}`);
     }
   };
 
-  const getStatusColor = (status: TimelineItem['status']) => {
-    switch (status) {
-      case 'in_progress': return colors.orange;
-      case 'upcoming': return colors.blue;
+  const formatTime = (session: HomeSession) => {
+    if (session.state === 'active') return 'Now';
+    
+    if (session.state === 'scheduled' && session.scheduledAt) {
+      if (isToday(session.scheduledAt)) return format(session.scheduledAt, 'h:mm a');
+      if (isFuture(session.scheduledAt)) return formatDistanceToNow(session.scheduledAt, { addSuffix: true });
+    }
+    
+    const date = session.endedAt ?? session.startedAt;
+    if (!date) return '';
+    if (isToday(date)) return format(date, 'h:mm a');
+    if (isYesterday(date)) return 'Yesterday';
+    return format(date, 'MMM d');
+  };
+
+  const getStatusColor = (state: HomeSession['state']) => {
+    switch (state) {
+      case 'active': return colors.orange;
+      case 'scheduled': return colors.blue;
+      case 'unreviewed': return colors.yellow;
       case 'completed': return colors.green;
     }
   };
 
-  const getIcon = (item: TimelineItem) => {
+  const getIcon = (session: HomeSession) => {
     const size = 18;
-
-    if (item.status === 'in_progress') {
+    if (session.state === 'active') {
       return <Clock size={size} color="#fff" />;
     }
-    if (item.status === 'upcoming') {
-      return <Calendar size={size} color="#fff" />;
+    if (session.origin === 'team') {
+      return <Users size={size} color="#fff" />;
     }
-    if (item.type === 'session') {
-      return <Crosshair size={size} color="#fff" />;
-    }
-    return <Users size={size} color="#fff" />;
+    return <Crosshair size={size} color="#fff" />;
   };
 
-  // Separate items into upcoming (in_progress + upcoming) and past (completed)
-  const upcomingItems = useMemo(() => 
-    timelineItems.filter(item => item.status === 'in_progress' || item.status === 'upcoming'),
-    [timelineItems]
-  );
-  
-  const pastItems = useMemo(() => 
-    timelineItems.filter(item => item.status === 'completed'),
-    [timelineItems]
-  );
+  const getTitle = (session: HomeSession) => {
+    if (session.state === 'active') {
+      return session.origin === 'team' ? 'Team Session' : 'Session in Progress';
+    }
+    if (session.state === 'scheduled') {
+      return session.origin === 'team' ? 'Team Session' : 'Scheduled Session';
+    }
+    // Completed/unreviewed
+    return session.origin === 'team' ? 'Team Session' : 'Practice Session';
+  };
 
-  if (timelineItems.length === 0) {
+  const getSubtitle = (session: HomeSession) => {
+    if (session.drillName) return session.drillName;
+    if (session.teamName) return session.teamName;
+    return session.origin === 'team' ? 'Team' : 'Solo Practice';
+  };
+
+  const getDetails = (session: HomeSession): string[] => {
+    const details: string[] = [];
+    
+    if (session.state === 'active') {
+      details.push('In progress');
+      return details;
+    }
+    
+    if (session.state === 'scheduled' && session.scheduledAt) {
+      details.push(format(session.scheduledAt, 'h:mm a'));
+      if (session.teamName) details.push(session.teamName);
+      return details;
+    }
+    
+    // Completed session stats
+    if (session.stats) {
+      if (session.stats.shots > 0) details.push(`${session.stats.shots} shots`);
+      if (session.stats.hits > 0) details.push(`${session.stats.hits} hits`);
+      if (session.stats.accuracy > 0) details.push(`${session.stats.accuracy}%`);
+      if (session.stats.targets > 0) details.push(`${session.stats.targets} target${session.stats.targets !== 1 ? 's' : ''}`);
+    }
+    
+    // Duration for completed
+    if (session.startedAt && session.endedAt) {
+      const mins = differenceInMinutes(session.endedAt, session.startedAt);
+      if (mins >= 60) {
+        details.push(`${Math.floor(mins / 60)}h ${mins % 60}m`);
+      } else if (mins > 0) {
+        details.push(`${mins}m`);
+      }
+    }
+    
+    return details;
+  };
+
+  if (sortedSessions.length === 0) {
     return null;
   }
 
-  const renderItem = (item: TimelineItem, index: number, isLast: boolean) => {
-    const statusColor = getStatusColor(item.status);
+  const renderItem = (session: HomeSession, index: number, isLast: boolean) => {
+    const statusColor = getStatusColor(session.state);
+    const details = getDetails(session);
 
     return (
       <TouchableOpacity
-        key={item.id}
+        key={session.id}
         style={styles.item}
-        onPress={() => handlePress(item)}
+        onPress={() => handlePress(session)}
         activeOpacity={0.7}
       >
         {/* Timeline line */}
         <View style={styles.lineContainer}>
           <View style={[styles.dot, { backgroundColor: statusColor }]}>
-            {getIcon(item)}
+            {getIcon(session)}
           </View>
           {!isLast && (
             <View style={[styles.line, { backgroundColor: colors.border }]} />
@@ -193,20 +192,20 @@ export function ActivityTimeline({ sessions, trainings, onSessionPress, limit = 
         <View style={[styles.content, { borderBottomColor: isLast ? 'transparent' : colors.border }]}>
           <View style={styles.contentHeader}>
             <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
-              {item.title}
+              {getTitle(session)}
             </Text>
             <Text style={[styles.time, { color: colors.textMuted }]}>
-              {formatDate(item.date, item.status)}
+              {formatTime(session)}
             </Text>
           </View>
           <Text style={[styles.subtitle, { color: colors.textMuted }]} numberOfLines={1}>
-            {item.subtitle}
+            {getSubtitle(session)}
           </Text>
 
           {/* Details row */}
-          {item.details.length > 0 && (
+          {details.length > 0 && (
             <View style={styles.detailsRow}>
-              {item.details.map((detail, i) => (
+              {details.map((detail, i) => (
                 <View key={i} style={styles.detailItem}>
                   {i > 0 && <View style={[styles.detailDot, { backgroundColor: colors.border }]} />}
                   <Text style={[styles.detailText, { color: colors.textMuted }]}>
@@ -226,30 +225,30 @@ export function ActivityTimeline({ sessions, trainings, onSessionPress, limit = 
       <Text style={[styles.header, { color: colors.textMuted }]}>Activity</Text>
       
       {/* Upcoming Section */}
-      {upcomingItems.length > 0 && (
+      {upcomingSessions.length > 0 && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={[styles.sectionDot, { backgroundColor: colors.blue }]} />
             <Text style={[styles.sectionLabel, { color: colors.blue }]}>Upcoming</Text>
           </View>
           <View style={styles.timeline}>
-            {upcomingItems.map((item, index) => 
-              renderItem(item, index, index === upcomingItems.length - 1)
+            {upcomingSessions.map((session, index) => 
+              renderItem(session, index, index === upcomingSessions.length - 1)
             )}
           </View>
         </View>
       )}
 
       {/* Past Section */}
-      {pastItems.length > 0 && (
-        <View style={[styles.section, upcomingItems.length > 0 && styles.sectionSpacing]}>
+      {pastSessions.length > 0 && (
+        <View style={[styles.section, upcomingSessions.length > 0 && styles.sectionSpacing]}>
           <View style={styles.sectionHeader}>
             <View style={[styles.sectionDot, { backgroundColor: colors.textMuted }]} />
             <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Past</Text>
           </View>
           <View style={styles.timeline}>
-            {pastItems.map((item, index) => 
-              renderItem(item, index, index === pastItems.length - 1)
+            {pastSessions.map((session, index) => 
+              renderItem(session, index, index === pastSessions.length - 1)
             )}
           </View>
         </View>
@@ -363,9 +362,4 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
-
-
-
-
-
 

@@ -1,111 +1,136 @@
 /**
  * Hero Summary Card
  * 
- * Main hero card at top of home page showing dynamic status
- * based on user's current state (active session, teams, solo).
+ * Action-forward hero card. Points to:
+ * - Active session (if any)
+ * - Next scheduled session (if any)
+ * - Or prompts to start practice
+ * 
+ * Never mentions "training". Shows sessions with context.
  */
 import { useColors } from '@/hooks/ui/useColors';
-import type { SessionWithDetails } from '@/services/sessionService';
 import { BUTTON_GRADIENT } from '@/theme/colors';
-import { format } from 'date-fns';
+import { differenceInHours, differenceInMinutes, format, formatDistanceToNow, isToday, isTomorrow } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Calendar, ChevronRight } from 'lucide-react-native';
+import { Calendar, ChevronRight, Clock, Users } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import type { HomeSession, HomeState } from '../types';
 
 interface HeroSummaryCardProps {
-  allSessions: SessionWithDetails[];
-  activeSession: SessionWithDetails | null;
-  upcomingCount: number;
-  hasTeams: boolean;
-  teamCount: number;
+  homeState: HomeState;
   onPress: () => void;
 }
 
-function HeroSummaryCard({
-  colors,
-  upcomingCount,
-  allSessions,
-  activeSession,
-  hasTeams,
-  teamCount,
-  onPress,
-}: {
-  colors: ReturnType<typeof useColors>;
-  upcomingCount: number;
-  allSessions: SessionWithDetails[];
-  activeSession: SessionWithDetails | null;
-  hasTeams: boolean;
-  teamCount: number;
-  onPress: () => void;
-}) {
-  const totalSessions = allSessions.length;
+function HeroSummaryCard({ homeState, onPress }: HeroSummaryCardProps) {
+  const colors = useColors();
+  const { activeSession, nextSession, lastSession, unresolvedSignal, hasTeams } = homeState;
+  
   const today = new Date();
   const dateStr = format(today, 'd MMMM');
 
-  // Dynamic message based on user's activity
-  const getMessage = () => {
-    if (activeSession) {
+  // Determine what to show - priority order:
+  // 1. Active session
+  // 2. Live team session (ongoing training)
+  // 3. Upcoming scheduled session
+  // 4. Unresolved last session
+  // 5. Start practice prompt
+  
+  const getContent = () => {
+    // 1. Active personal session
+    if (activeSession && activeSession.origin === 'solo') {
       return {
+        badge: { text: 'Active', color: '#22C55E', showDot: true },
         label: 'Session in Progress',
         title: (
           <Text style={styles.heroTitle}>
-            Continue your <Text style={styles.heroHighlight}>active session</Text>
+            Continue your <Text style={styles.heroHighlight}>session</Text>
           </Text>
         ),
+        subtitle: activeSession.drillName,
+        action: 'Continue Session',
       };
     }
-
-    if (hasTeams && upcomingCount > 0) {
+    
+    // 2. Live team session (ongoing)
+    if (nextSession?.state === 'active' && nextSession.origin === 'team') {
       return {
-        label: 'Training Schedule',
+        badge: { text: 'Live', color: '#EF4444', showDot: true },
+        label: 'Team Session',
         title: (
           <Text style={styles.heroTitle}>
-            <Text style={styles.heroHighlight}>{upcomingCount}</Text> training{upcomingCount !== 1 ? 's' : ''}{' '}
-            across <Text style={styles.heroHighlight}>{teamCount}</Text> team{teamCount !== 1 ? 's' : ''}
+            <Text style={styles.heroHighlight}>Live</Text> team session
           </Text>
         ),
+        subtitle: nextSession.teamName,
+        action: 'Join Session',
       };
     }
-
-    if (hasTeams) {
+    
+    // 3. Upcoming scheduled session
+    if (nextSession?.state === 'scheduled' && nextSession.scheduledAt) {
+      const timeLabel = getScheduledTimeLabel(nextSession.scheduledAt);
       return {
-        label: 'Your Teams',
+        badge: timeLabel.isUrgent 
+          ? { text: timeLabel.shortLabel, color: '#F59E0B', showDot: false }
+          : undefined,
+        label: nextSession.teamName ? 'Team Session' : 'Scheduled',
         title: (
           <Text style={styles.heroTitle}>
-            Member of <Text style={styles.heroHighlight}>{teamCount} team{teamCount !== 1 ? 's' : ''}</Text>
+            Session <Text style={styles.heroHighlight}>{timeLabel.label}</Text>
           </Text>
         ),
+        subtitle: nextSession.drillName,
+        action: 'Prepare',
       };
     }
-
-    if (totalSessions > 0) {
+    
+    // 4. Unresolved signal about last session
+    if (unresolvedSignal?.type === 'no_review' && lastSession) {
       return {
-        label: 'Solo Training',
+        badge: { text: 'Review', color: '#F59E0B', showDot: false },
+        label: 'Last Session',
         title: (
           <Text style={styles.heroTitle}>
-            <Text style={styles.heroHighlight}>{totalSessions}</Text> session{totalSessions !== 1 ? 's' : ''} logged
+            Session <Text style={styles.heroHighlight}>needs review</Text>
           </Text>
         ),
+        subtitle: lastSession.drillName,
+        action: 'Review',
       };
     }
-
+    
+    // 5. Default: start practice
+    if (lastSession) {
+      const sessionCount = homeState.weeklyStats.sessions;
+      return {
+        badge: undefined,
+        label: 'Ready',
+        title: (
+          <Text style={styles.heroTitle}>
+            <Text style={styles.heroHighlight}>{sessionCount}</Text> session{sessionCount !== 1 ? 's' : ''} this week
+          </Text>
+        ),
+        subtitle: undefined,
+        action: 'Start Practice',
+      };
+    }
+    
+    // 6. Empty state
     return {
+      badge: undefined,
       label: 'Welcome',
       title: (
         <Text style={styles.heroTitle}>
-          Ready to <Text style={styles.heroHighlight}>start training</Text>?
+          Ready to <Text style={styles.heroHighlight}>start</Text>?
         </Text>
       ),
+      subtitle: undefined,
+      action: 'Start Practice',
     };
   };
 
-  const { label, title } = getMessage();
-  const actionText = activeSession
-    ? 'Resume Session'
-    : hasTeams
-      ? 'View Schedule'
-      : 'Start Practice';
+  const { badge, label, title, subtitle, action } = getContent();
 
   return (
     <Animated.View entering={FadeInDown.duration(400)}>
@@ -121,22 +146,25 @@ function HeroSummaryCard({
               <Calendar size={14} color="rgba(255,255,255,0.7)" />
               <Text style={styles.heroDate}>{dateStr}</Text>
             </View>
-            {activeSession ? (
-              <View style={styles.heroBadge}>
-                <View style={styles.liveDot} />
-                <Text style={styles.heroBadgeText}>Active</Text>
+            {badge && (
+              <View style={[styles.heroBadge, { backgroundColor: `${badge.color}25` }]}>
+                {badge.showDot && <View style={[styles.liveDot, { backgroundColor: badge.color }]} />}
+                <Text style={[styles.heroBadgeText, { color: badge.color }]}>{badge.text}</Text>
               </View>
-            ) : null}
+            )}
           </View>
 
           <View style={styles.heroContent}>
             <Text style={styles.heroLabel}>{label}</Text>
             {title}
+            {subtitle && (
+              <Text style={styles.heroSubtitle} numberOfLines={1}>{subtitle}</Text>
+            )}
           </View>
 
           <View style={styles.heroFooter}>
             <View style={styles.heroAction}>
-              <Text style={styles.heroActionText}>{actionText}</Text>
+              <Text style={styles.heroActionText}>{action}</Text>
               <ChevronRight size={16} color="rgba(255,255,255,0.9)" />
             </View>
           </View>
@@ -144,18 +172,40 @@ function HeroSummaryCard({
       </TouchableOpacity>
     </Animated.View>
   );
-} 
+}
+
+/** Get human-readable time label for scheduled session */
+function getScheduledTimeLabel(date: Date): { label: string; shortLabel: string; isUrgent: boolean } {
+  const now = new Date();
+  const minutesAway = differenceInMinutes(date, now);
+  const hoursAway = differenceInHours(date, now);
+  
+  if (minutesAway <= 0) {
+    return { label: 'now', shortLabel: 'Now', isUrgent: true };
+  }
+  
+  if (minutesAway <= 60) {
+    return { label: `in ${minutesAway}m`, shortLabel: `${minutesAway}m`, isUrgent: true };
+  }
+  
+  if (hoursAway < 24 && isToday(date)) {
+    return { label: `at ${format(date, 'h:mm a')}`, shortLabel: format(date, 'h:mm a'), isUrgent: false };
+  }
+  
+  if (isTomorrow(date)) {
+    return { label: 'tomorrow', shortLabel: 'Tomorrow', isUrgent: false };
+  }
+  
+  return { 
+    label: formatDistanceToNow(date, { addSuffix: true }), 
+    shortLabel: format(date, 'EEE'), 
+    isUrgent: false 
+  };
+}
 
 export default HeroSummaryCard;
 
-// ═══════════════════════════════════════════════════════════════════════════
-// STYLES
-// ═══════════════════════════════════════════════════════════════════════════
- // Section
- const styles = StyleSheet.create({
-
-
-  // Hero Card
+const styles = StyleSheet.create({
   heroCard: {
     borderRadius: 16,
     padding: 16,
@@ -181,7 +231,6 @@ export default HeroSummaryCard;
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(34, 197, 94, 0.25)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 20,
@@ -189,7 +238,6 @@ export default HeroSummaryCard;
   heroBadgeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#22C55E',
     letterSpacing: 0.5,
   },
   heroContent: {
@@ -211,6 +259,12 @@ export default HeroSummaryCard;
   heroHighlight: {
     color: '#7DD3FC',
   },
+  heroSubtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 4,
+  },
   heroFooter: {
     marginTop: 12,
   },
@@ -228,9 +282,6 @@ export default HeroSummaryCard;
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#22C55E',
   }
 });
-
-
 

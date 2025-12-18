@@ -2,9 +2,12 @@
  * DRILL LIBRARY SCREEN
  *
  * Browse and manage drill templates organized by type.
- * - Library: Prebuilt read-only templates
- * - Team: Templates created by team commanders
- * - Personal: User's own templates
+ * 
+ * FLOW:
+ * - Library Tab: Browse prebuilt templates → Duplicate to team
+ * - Team Tab: View team's drills (duplicated from library)
+ * 
+ * To add drills to training, go to Create Training and select from team drills.
  */
 
 import { DrillDetailModal } from '@/components/drills/DrillDetailModal';
@@ -18,7 +21,7 @@ import { getAllDrillTypes } from '@/types/drillTypes';
 import type { Drill, TeamWithRole } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { router, Stack } from 'expo-router';
-import { BookOpen, ChevronLeft, ChevronRight, Plus, Search, Users, X } from 'lucide-react-native';
+import { BookOpen, ChevronLeft, ChevronRight, Search, Users, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -40,7 +43,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // TAB TYPES
 // ============================================================================
 
-type LibraryTab = 'library' | 'team' | 'personal';
+type LibraryTab = 'library' | 'team';
 
 // ============================================================================
 // TEAM SELECTOR MODAL
@@ -323,13 +326,6 @@ export default function DrillLibraryScreen() {
     }
   };
 
-  const handleUseTemplate = (template: DrillTemplate) => {
-    Haptics.selectionAsync();
-    router.push({
-      pathname: '/createTraining',
-      params: { templateId: template.id },
-    });
-  };
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -339,10 +335,6 @@ export default function DrillLibraryScreen() {
     setRefreshing(false);
   }, [activeTab]);
 
-  const handleCreateTemplate = () => {
-    Haptics.selectionAsync();
-    Alert.alert('Coming Soon', 'Custom template creation will be available soon.');
-  };
 
   // Render tab button
   const TabButton = ({
@@ -510,11 +502,6 @@ export default function DrillLibraryScreen() {
               <ChevronLeft size={24} color={colors.text} />
             </TouchableOpacity>
           ),
-          headerRight: () => (
-            <TouchableOpacity onPress={handleCreateTemplate} style={styles.headerBtn}>
-              <Plus size={22} color={colors.primary} />
-            </TouchableOpacity>
-          ),
         }}
       />
 
@@ -535,9 +522,8 @@ export default function DrillLibraryScreen() {
 
         {/* Tabs */}
         <Animated.View entering={FadeInDown.delay(100)} style={styles.tabsRow}>
-          <TabButton tab="library" icon={BookOpen} label="Library" />
-          <TabButton tab="team" icon={Users} label="Team" count={totalTeamDrills} />
-          <TabButton tab="personal" icon={BookOpen} label="My Drills" />
+          <TabButton tab="library" icon={BookOpen} label="Templates" />
+          <TabButton tab="team" icon={Users} label="Team Drills" count={totalTeamDrills} />
         </Animated.View>
 
         {/* Content */}
@@ -562,7 +548,6 @@ export default function DrillLibraryScreen() {
                     defaultExpanded={true}
                     onViewTemplate={handleViewTemplate}
                     onDuplicateTemplate={handleDuplicateTemplate}
-                    onUseTemplate={handleUseTemplate}
                   />
                 );
               })}
@@ -570,25 +555,6 @@ export default function DrillLibraryScreen() {
           )}
 
           {activeTab === 'team' && renderTeamDrills()}
-
-          {activeTab === 'personal' && (
-            <View style={styles.emptyState}>
-              <View style={[styles.emptyIcon, { backgroundColor: colors.card }]}>
-                <BookOpen size={32} color={colors.textMuted} />
-              </View>
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>No Personal Drills</Text>
-              <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-                Create custom drills or duplicate from Library
-              </Text>
-              <TouchableOpacity
-                style={[styles.emptyBtn, { backgroundColor: colors.primary }]}
-                onPress={handleCreateTemplate}
-              >
-                <Plus size={18} color="#fff" />
-                <Text style={styles.emptyBtnText}>Create Drill</Text>
-              </TouchableOpacity>
-            </View>
-          )}
         </ScrollView>
       </View>
 
