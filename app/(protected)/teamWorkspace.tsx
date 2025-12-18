@@ -2,6 +2,26 @@
  * Team Command Center
  *
  * ═══════════════════════════════════════════════════════════════════════════
+ * ⚠️  DEPRECATED - DO NOT USE FOR PRIMARY NAVIGATION
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
+ * This screen has been superseded by the unified Team Tab (`trainings.tsx`).
+ * 
+ * As of the Team Tab Unified Workspace update:
+ * - The Team tab IS the team workspace when an activeTeam is selected
+ * - There should be NO additional "team page" click required to see team content
+ * - Team switching happens ONLY through the pill/sheet
+ * 
+ * This screen is kept for:
+ * - Deep links (e.g., notifications that link directly to team)
+ * - Backward compatibility during transition
+ * - Rare/advanced team views that don't fit in the main tab
+ * 
+ * PRIMARY USER FLOW should use:
+ * - Team Tab → Calendar (scheduled sessions for activeTeamId)
+ * - Team Tab → Manage (members, settings, library for activeTeamId)
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════
  * OWNERSHIP CONTRACT (DO NOT VIOLATE)
  * ═══════════════════════════════════════════════════════════════════════════
  * 
