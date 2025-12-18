@@ -42,9 +42,10 @@
 import { NoTeamsEmptyState } from '@/components/team/NoTeamsEmptyState';
 import { TeamSwitcherPill, TeamSwitcherSheet } from '@/components/team/TeamSwitcherSheet';
 import { useColors } from '@/hooks/ui/useColors';
+import { getTeamMembers } from '@/services/teamService';
 import { useTeamContext, useTeamPermissions, useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
-import type { TrainingWithDetails } from '@/types/workspace';
+import type { TeamMemberWithProfile, TrainingWithDetails } from '@/types/workspace';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   addDays,
@@ -56,6 +57,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import {
+  Activity,
   BookOpen,
   Calendar,
   ChevronLeft,
@@ -67,6 +69,7 @@ import {
   Target,
   UserPlus,
   Users,
+  Zap,
 } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -275,6 +278,7 @@ export default function TeamScreen() {
   const [activeTab, setActiveTab] = useState<InternalTab>('calendar');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [members, setMembers] = useState<TeamMemberWithProfile[]>([]);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // DATA LOADING
@@ -295,15 +299,34 @@ export default function TeamScreen() {
     }, [activeTeamId, loadTeamTrainings])
   );
 
+  // Load team members for stats (only on Manage tab)
+  useFocusEffect(
+    useCallback(() => {
+      if (activeTeamId && activeTab === 'manage') {
+        getTeamMembers(activeTeamId)
+          .then(setMembers)
+          .catch(console.error);
+      }
+    }, [activeTeamId, activeTab])
+  );
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await loadTeams();
     if (activeTeamId) {
       await loadTeamTrainings(activeTeamId);
+      if (activeTab === 'manage') {
+        try {
+          const membersData = await getTeamMembers(activeTeamId);
+          setMembers(membersData);
+        } catch (e) {
+          console.error(e);
+        }
+      }
     }
     setRefreshing(false);
-  }, [loadTeams, loadTeamTrainings, activeTeamId]);
+  }, [loadTeams, loadTeamTrainings, activeTeamId, activeTab]);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // COMPUTED DATA (for active team only)
@@ -321,6 +344,43 @@ export default function TeamScreen() {
       .filter(t => isSameDay(new Date(t.scheduled_at), selectedDate))
       .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
   }, [activeTeamTrainings, selectedDate]);
+
+  // Live training detection
+  const liveTraining = useMemo(() => {
+    return activeTeamTrainings.find(t => t.status === 'ongoing');
+  }, [activeTeamTrainings]);
+
+  // Member stats (simulated activity status for now)
+  const memberStats = useMemo(() => {
+    const stats = { total: members.length, training: 0, online: 0, idle: 0, offline: 0 };
+    members.forEach((_, i) => {
+      // Simulate status distribution (in production, this comes from presence service)
+      const rand = Math.random();
+      if (rand < 0.1) stats.training++;
+      else if (rand < 0.3) stats.online++;
+      else if (rand < 0.6) stats.idle++;
+      else stats.offline++;
+    });
+    return stats;
+  }, [members]);
+
+  // Team stats (this week) - simulated for now
+  const teamStats = useMemo(() => {
+    // In production, this would come from an analytics service
+    const sessionsThisWeek = activeTeamTrainings.filter(t => {
+      const trainingDate = new Date(t.scheduled_at);
+      const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+      const weekEnd = addDays(weekStart, 7);
+      return trainingDate >= weekStart && trainingDate < weekEnd;
+    }).length;
+
+    return {
+      sessionsThisWeek,
+      totalShots: Math.floor(Math.random() * 3000) + 500, // Simulated
+      avgAccuracy: Math.floor(Math.random() * 30) + 60,   // Simulated
+      weeklyGoal: 5000,
+    };
+  }, [activeTeamTrainings]);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // HANDLERS
@@ -533,14 +593,153 @@ export default function TeamScreen() {
             MANAGE TAB (Commanders only)
             
             This is the unified team workspace. No separate "team page" needed.
+            - Live status, team stats, member status
             - Schedule sessions
             - Access drill library
             - Manage members, invite, settings
-            
-            NOTE: "Upcoming Sessions" removed - Calendar is the single source of truth
         ═══════════════════════════════════════════════════════════════════ */}
         {activeTab === 'manage' && canManage && (
           <>
+            {/* Live Session Status (if any) */}
+            {liveTraining && (
+              <TouchableOpacity
+                style={[styles.liveStatusCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => handleTrainingPress(liveTraining)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.liveStatusLeft}>
+                  <View style={[styles.liveStatusDot, { backgroundColor: '#F59E0B' }]}>
+                    <View style={styles.liveStatusDotInner} />
+                  </View>
+                  <View style={styles.liveStatusContent}>
+                    <Text style={[styles.liveStatusLabel, { color: colors.textMuted }]}>SESSION IN PROGRESS</Text>
+                    <Text style={[styles.liveStatusTitle, { color: colors.text }]} numberOfLines={1}>
+                      {liveTraining.title}
+                    </Text>
+                    <Text style={[styles.liveStatusMeta, { color: colors.textMuted }]}>
+                      {memberStats.training} member{memberStats.training !== 1 ? 's' : ''} active
+                    </Text>
+                  </View>
+                </View>
+                <View style={[styles.liveStatusAction, { backgroundColor: colors.secondary }]}>
+                  <ChevronRight size={16} color={colors.textMuted} />
+                </View>
+              </TouchableOpacity>
+            )}
+
+            {/* Team Stats - This Week */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>THIS WEEK</Text>
+              <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={styles.statsGrid}>
+                  <View style={styles.statItem}>
+                    <View style={[styles.statIcon, { backgroundColor: '#3B82F620' }]}>
+                      <Activity size={18} color="#3B82F6" />
+                    </View>
+                    <Text style={[styles.statValue, { color: colors.text }]}>{teamStats.sessionsThisWeek}</Text>
+                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>Sessions</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <View style={[styles.statIcon, { backgroundColor: '#F59E0B20' }]}>
+                      <Zap size={18} color="#F59E0B" />
+                    </View>
+                    <Text style={[styles.statValue, { color: colors.text }]}>{teamStats.totalShots.toLocaleString()}</Text>
+                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>Shots</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <View style={[styles.statIcon, { backgroundColor: '#10B98120' }]}>
+                      <Target size={18} color="#10B981" />
+                    </View>
+                    <Text style={[styles.statValue, { color: colors.text }]}>{teamStats.avgAccuracy}%</Text>
+                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>Accuracy</Text>
+                  </View>
+                </View>
+
+                {/* Progress bar */}
+                <View style={styles.progressSection}>
+                  <View style={styles.progressHeader}>
+                    <Text style={[styles.progressLabel, { color: colors.textMuted }]}>Weekly Goal</Text>
+                    <Text style={[styles.progressValue, { color: colors.text }]}>
+                      {teamStats.totalShots.toLocaleString()} / {teamStats.weeklyGoal.toLocaleString()}
+                    </Text>
+                  </View>
+                  <View style={[styles.progressBg, { backgroundColor: colors.secondary }]}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        {
+                          width: `${Math.min(100, (teamStats.totalShots / teamStats.weeklyGoal) * 100)}%`,
+                          backgroundColor: colors.primary,
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Member Status */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>TEAM STATUS</Text>
+                <TouchableOpacity onPress={handleViewMembers}>
+                  <Text style={[styles.sectionLink, { color: colors.primary }]}>View All</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                style={[styles.memberStatusCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={handleViewMembers}
+                activeOpacity={0.7}
+              >
+                <View style={styles.statusRow}>
+                  <View style={styles.statusItem}>
+                    <View style={[styles.statusDot, { backgroundColor: '#10B981' }]} />
+                    <Text style={[styles.statusCount, { color: colors.text }]}>{memberStats.training}</Text>
+                    <Text style={[styles.statusLabel, { color: colors.textMuted }]}>Training</Text>
+                  </View>
+                  <View style={styles.statusItem}>
+                    <View style={[styles.statusDot, { backgroundColor: '#3B82F6' }]} />
+                    <Text style={[styles.statusCount, { color: colors.text }]}>{memberStats.online}</Text>
+                    <Text style={[styles.statusLabel, { color: colors.textMuted }]}>Online</Text>
+                  </View>
+                  <View style={styles.statusItem}>
+                    <View style={[styles.statusDot, { backgroundColor: '#F59E0B' }]} />
+                    <Text style={[styles.statusCount, { color: colors.text }]}>{memberStats.idle}</Text>
+                    <Text style={[styles.statusLabel, { color: colors.textMuted }]}>Idle</Text>
+                  </View>
+                  <View style={styles.statusItem}>
+                    <View style={[styles.statusDot, { backgroundColor: colors.textMuted }]} />
+                    <Text style={[styles.statusCount, { color: colors.text }]}>{memberStats.offline}</Text>
+                    <Text style={[styles.statusLabel, { color: colors.textMuted }]}>Offline</Text>
+                  </View>
+                </View>
+
+                <View style={[styles.memberRow, { borderTopColor: colors.border }]}>
+                  <View style={styles.memberAvatars}>
+                    {members.slice(0, 5).map((m, i) => (
+                      <View
+                        key={m.user_id}
+                        style={[
+                          styles.memberAvatar,
+                          { backgroundColor: colors.primary, marginLeft: i > 0 ? -8 : 0, zIndex: 5 - i },
+                        ]}
+                      >
+                        <Text style={styles.memberAvatarText}>
+                          {m.profile.full_name?.charAt(0) || m.profile.email.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                    ))}
+                    {members.length > 5 && (
+                      <View style={[styles.memberAvatar, { backgroundColor: colors.secondary, marginLeft: -8 }]}>
+                        <Text style={[styles.memberAvatarText, { color: colors.textMuted }]}>+{members.length - 5}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <ChevronRight size={18} color={colors.textMuted} />
+                </View>
+              </TouchableOpacity>
+            </View>
+
             {/* Quick Actions */}
             <View style={styles.section}>
               <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>ACTIONS</Text>
@@ -885,6 +1084,176 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 12,
     paddingHorizontal: 4,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  sectionLink: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  // Live Session Status
+  liveStatusCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  liveStatusLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  liveStatusDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  liveStatusDotInner: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#fff',
+  },
+  liveStatusContent: {
+    flex: 1,
+  },
+  liveStatusLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  liveStatusTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  liveStatusMeta: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  liveStatusAction: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Stats Card
+  statsCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 16,
+  },
+  statItem: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  statIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statValue: {
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  statLabel: {
+    fontSize: 12,
+  },
+  progressSection: {
+    gap: 8,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  progressLabel: {
+    fontSize: 13,
+  },
+  progressValue: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  progressBg: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+
+  // Member Status Card
+  memberStatusCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    padding: 16,
+  },
+  statusItem: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusCount: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  statusLabel: {
+    fontSize: 11,
+  },
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+    borderTopWidth: 1,
+  },
+  memberAvatars: {
+    flexDirection: 'row',
+  },
+  memberAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#000',
+  },
+  memberAvatarText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
   },
 
   // Manage Grid
