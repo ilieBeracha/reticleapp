@@ -118,11 +118,8 @@ export const useTrainingStore = create<TrainingStore>((set, get) => ({
       return;
     }
 
-    // Always show loading on first load
-    const { teamTrainingsInitialized } = get();
-    if (shouldShowInitialLoading(teamTrainingsInitialized)) {
-      set({ loadingTeamTrainings: true, error: null });
-    }
+    // Always show loading when switching teams or on first load
+    set({ loadingTeamTrainings: true, error: null });
     
     try {
       const trainings = await getTeamTrainings(activeTeamId);

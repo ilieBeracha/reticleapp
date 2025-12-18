@@ -271,7 +271,7 @@ export default function TeamScreen() {
   const { teamState, teams, activeTeamId, activeTeam, loading: teamsLoading, initialized } = useTeamContext();
   const { canSchedule, canManage } = useTeamPermissions();
   const { loadTeams } = useTeamStore();
-  const { teamTrainings, loadTeamTrainings } = useTrainingStore();
+  const { teamTrainings, loadTeamTrainings, loadingTeamTrainings } = useTrainingStore();
 
   // Local state
   const [refreshing, setRefreshing] = useState(false);
@@ -533,10 +533,24 @@ export default function TeamScreen() {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: insets.bottom + 100 },
+          loadingTeamTrainings && styles.contentCentered,
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />}
       >
+        {/* Team Switching Loader */}
+        {loadingTeamTrainings ? (
+          <View style={styles.switchingLoader}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.switchingText, { color: colors.textMuted }]}>
+              Loading team data...
+            </Text>
+          </View>
+        ) : (
+        <>
         {/* ═══════════════════════════════════════════════════════════════════
             CALENDAR TAB
         ═══════════════════════════════════════════════════════════════════ */}
@@ -628,7 +642,7 @@ export default function TeamScreen() {
             )}
 
             {/* Team Stats - This Week */}
-            <View style={styles.section}>
+            <View style={[styles.section, !liveTraining && { marginTop: 0 }]}>
               <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>THIS WEEK</Text>
               <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={styles.statsGrid}>
@@ -852,6 +866,8 @@ export default function TeamScreen() {
             )}
           </>
         )}
+        </>
+        )}
       </ScrollView>
 
       {/* Team Switcher Sheet */}
@@ -871,6 +887,18 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { flex: 1 },
   content: { paddingHorizontal: 16, paddingTop: 16 },
+  contentCentered: { flexGrow: 1, justifyContent: 'center' },
+  
+  // Team Switching Loader
+  switchingLoader: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  switchingText: {
+    marginTop: 12,
+    fontSize: 14,
+  },
 
   // Header
   headerContainer: {

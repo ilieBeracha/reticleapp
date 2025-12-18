@@ -1,5 +1,5 @@
 import { useColors } from "@/hooks/ui/useColors";
-import { garminService } from "@/services/garminService";
+// import { garminService } from "@/services/garminService";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { CheckCircle2, RefreshCw, Watch, Wifi, WifiOff } from "lucide-react-native";
@@ -19,7 +19,7 @@ export const GarminSheet = forwardRef<BaseBottomSheetRef>((_, ref) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsLoading(true);
     try {
-      await garminService.connect();
+      // await garminService.connect();
       setIsInitialized(true);
       // Fetch devices after init
       const deviceList = await getDevicesList();
