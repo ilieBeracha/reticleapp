@@ -97,9 +97,27 @@ flowchart TD
 
 ### Active team + members (RPC + fallback select)
 
+> **Note:** As of the Unified Team Tab update, `teamWorkspace.tsx` is deprecated.
+> The Team Tab (`trainings.tsx`) IS the team workspace when an activeTeam is selected.
+> Team switching happens only through the pill/sheet - no separate "team page" navigation.
+
 ```mermaid
 flowchart TD
-  TeamWorkspace[app_protected_teamWorkspace] --> teamStoreActive[store_teamStore_loadActiveTeam]
+  TeamTab[app_protected_tabs_trainings] --> teamStoreLoad[store_teamStore_loadTeams]
+  teamStoreLoad --> rpcGetMyTeams[services_teamService_getMyTeams]
+  rpcGetMyTeams --> rpc[(rpc_get_my_teams)]
+  
+  TeamTab --> teamMembers[app_protected_teamMembers]
+  teamMembers --> getTeamMembers[services_teamService_getTeamMembers]
+  getTeamMembers --> teamMembersTable[(team_members)]
+  teamMembersTable --> profiles[(profiles)]
+```
+
+### Legacy: Team Workspace (deprecated)
+
+```mermaid
+flowchart TD
+  TeamWorkspace[app_protected_teamWorkspace_DEPRECATED] --> teamStoreActive[store_teamStore_loadActiveTeam]
   teamStoreActive --> rpcTeamWithMembers[services_teamService_getTeamWithMembers]
   rpcTeamWithMembers --> rpc[(rpc_get_team_with_members)]
   rpcTeamWithMembers -->|fallback_when_profiles_incomplete| teamMembers[(team_members)]

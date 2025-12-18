@@ -12,10 +12,11 @@ export function TeamsRow({ colors }: { colors: ReturnType<typeof useColors> }) {
 
   if (teams.length === 0) return null;
 
-  // Navigate to team workspace (sets active team first)
+  // Navigate to Team tab (unified workspace) - sets active team first
+  // Note: teamWorkspace is deprecated; Team tab IS the team workspace
   const handleTeamPress = (teamId: string) => {
     setActiveTeam(teamId);
-    router.push(`/(protected)/teamWorkspace?id=${teamId}` as any);
+    router.push('/(protected)/(tabs)/trainings' as any);
   };
 
   // Single team - show expanded card

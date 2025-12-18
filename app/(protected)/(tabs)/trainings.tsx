@@ -1,22 +1,30 @@
 /**
- * Team Tab - with internal Calendar/Manage tabs
+ * Team Tab - Unified Team Workspace
  * 
  * ═══════════════════════════════════════════════════════════════════════════
- * OWNERSHIP CONTRACT (DO NOT VIOLATE)
+ * UNIFIED TEAM WORKSPACE (v2)
  * ═══════════════════════════════════════════════════════════════════════════
  * 
- * This screen is CALENDAR + MANAGEMENT only.
+ * If an activeTeam is selected, the Team tab IS the team workspace.
+ * There is NO additional "team page" required to see team content.
+ * 
+ * OWNERSHIP CONTRACT:
+ * - This screen is CALENDAR + MANAGEMENT + TEAM WORKSPACE
+ * - Team switching happens ONLY through the pill/sheet
+ * - No "enter team page" click required
  * 
  * MAY SHOW:
- * - Calendar with scheduled sessions
+ * - Calendar with scheduled sessions for active team
  * - Team switcher (for multi-team users)
  * - Live session indicators (informational)
- * - Management actions (create team, schedule session)
+ * - Management actions (create session, drill library, members, settings)
+ * - Team member management
  * 
  * MUST NOT:
  * - Provide primary "Join" / "Start" session CTAs
  * - Route directly to trainingLive (session execution)
  * - Be the entry point for session execution
+ * - Navigate to a separate "team workspace" page
  * 
  * Home owns session entry. This tab shows what exists and when.
  * 
@@ -57,6 +65,7 @@ import {
   Settings,
   Shield,
   Target,
+  UserPlus,
   Users,
 } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
@@ -313,24 +322,9 @@ export default function TeamScreen() {
       .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
   }, [activeTeamTrainings, selectedDate]);
 
-  // All trainings sorted (for Manage tab)
-  const allTrainingsSorted = useMemo(() => {
-    return [...activeTeamTrainings].sort((a, b) => {
-      if (a.status === 'ongoing' && b.status !== 'ongoing') return -1;
-      if (b.status === 'ongoing' && a.status !== 'ongoing') return 1;
-      return new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime();
-    });
-  }, [activeTeamTrainings]);
-
   // ─────────────────────────────────────────────────────────────────────────────
   // HANDLERS
   // ─────────────────────────────────────────────────────────────────────────────
-
-  const handleTeamPress = () => {
-    if (!activeTeamId) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push(`/(protected)/teamWorkspace?id=${activeTeamId}` as any);
-  };
 
   // Navigate to session details (context view), NOT session execution
   const handleTrainingPress = (training: TrainingWithDetails) => {
@@ -347,6 +341,25 @@ export default function TeamScreen() {
   const handleOpenLibrary = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push('/(protected)/drillLibrary' as any);
+  };
+
+  // Team management handlers - integrated directly into Team tab
+  const handleViewMembers = () => {
+    if (!activeTeamId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push(`/(protected)/teamMembers?teamId=${activeTeamId}` as any);
+  };
+
+  const handleInviteMember = () => {
+    if (!activeTeamId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push(`/(protected)/inviteTeamMember?teamId=${activeTeamId}` as any);
+  };
+
+  const handleTeamSettings = () => {
+    if (!activeTeamId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push(`/(protected)/teamSettings?teamId=${activeTeamId}` as any);
   };
 
   const handleTabChange = (tab: InternalTab) => {
@@ -395,15 +408,12 @@ export default function TeamScreen() {
           <Text style={[styles.title, { color: colors.text }]}>Team</Text>
           
           {/* Team Switcher or Team Name + Add button */}
+          {/* Note: Team switching happens ONLY through the pill/sheet, no separate "team page" */}
           <View style={styles.headerRight}>
             {showSwitcher ? (
               <TeamSwitcherPill onPress={() => setSwitcherOpen(true)} />
             ) : activeTeam && (
-              <TouchableOpacity 
-                style={[styles.singleTeamPill, { backgroundColor: colors.secondary }]}
-                onPress={handleTeamPress}
-                activeOpacity={0.7}
-              >
+              <View style={[styles.singleTeamPill, { backgroundColor: colors.secondary }]}>
                 <Users size={14} color={colors.primary} />
                 <Text style={[styles.singleTeamName, { color: colors.text }]} numberOfLines={1}>
                   {activeTeam.name}
@@ -415,7 +425,7 @@ export default function TeamScreen() {
                     </Text>
                   </View>
                 )}
-              </TouchableOpacity>
+              </View>
             )}
             
             {/* Add Team button - opens switcher sheet with Create/Join options */}
@@ -521,6 +531,13 @@ export default function TeamScreen() {
 
         {/* ═══════════════════════════════════════════════════════════════════
             MANAGE TAB (Commanders only)
+            
+            This is the unified team workspace. No separate "team page" needed.
+            - Schedule sessions
+            - Access drill library
+            - Manage members, invite, settings
+            
+            NOTE: "Upcoming Sessions" removed - Calendar is the single source of truth
         ═══════════════════════════════════════════════════════════════════ */}
         {activeTab === 'manage' && canManage && (
           <>
@@ -554,15 +571,70 @@ export default function TeamScreen() {
               </View>
             </View>
 
-            {/* Active Team Card */}
+            {/* Team Management - Integrated directly, no separate "team page" */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>TEAM</Text>
+              
+              {/* Members Row */}
+              <TouchableOpacity
+                style={[styles.manageRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={handleViewMembers}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.manageRowIcon, { backgroundColor: colors.primary + '15' }]}>
+                  <Users size={18} color={colors.primary} />
+                </View>
+                <View style={styles.manageRowContent}>
+                  <Text style={[styles.manageRowTitle, { color: colors.text }]}>Members</Text>
+                  <Text style={[styles.manageRowDesc, { color: colors.textMuted }]}>
+                    View and manage team roster
+                  </Text>
+                </View>
+                <ChevronRight size={18} color={colors.textMuted} />
+              </TouchableOpacity>
+
+              {/* Invite Row */}
+              <TouchableOpacity
+                style={[styles.manageRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={handleInviteMember}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.manageRowIcon, { backgroundColor: '#A78BFA15' }]}>
+                  <UserPlus size={18} color="#A78BFA" />
+                </View>
+                <View style={styles.manageRowContent}>
+                  <Text style={[styles.manageRowTitle, { color: colors.text }]}>Invite Members</Text>
+                  <Text style={[styles.manageRowDesc, { color: colors.textMuted }]}>
+                    Add new members to the team
+                  </Text>
+                </View>
+                <ChevronRight size={18} color={colors.textMuted} />
+              </TouchableOpacity>
+
+              {/* Settings Row */}
+              <TouchableOpacity
+                style={[styles.manageRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={handleTeamSettings}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.manageRowIcon, { backgroundColor: colors.secondary }]}>
+                  <Settings size={18} color={colors.textMuted} />
+                </View>
+                <View style={styles.manageRowContent}>
+                  <Text style={[styles.manageRowTitle, { color: colors.text }]}>Team Settings</Text>
+                  <Text style={[styles.manageRowDesc, { color: colors.textMuted }]}>
+                    Configuration and preferences
+                  </Text>
+                </View>
+                <ChevronRight size={18} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Team Info Card - Informational only, not a navigation entry point */}
             {activeTeam && (
               <View style={styles.section}>
-                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>ACTIVE TEAM</Text>
-                <TouchableOpacity
-                  style={[styles.teamRow, { backgroundColor: colors.card, borderColor: colors.border }]}
-                  onPress={handleTeamPress}
-                  activeOpacity={0.7}
-                >
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>CURRENT TEAM</Text>
+                <View style={[styles.teamInfoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <View style={[styles.teamRowIcon, { backgroundColor: colors.primary + '15' }]}>
                     <Users size={18} color={colors.primary} />
                   </View>
@@ -574,24 +646,8 @@ export default function TeamScreen() {
                       </Text>
                     )}
                   </View>
-                  <ChevronRight size={18} color={colors.textMuted} />
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Upcoming Sessions */}
-            {allTrainingsSorted.length > 0 && (
-              <View style={styles.section}>
-                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>UPCOMING SESSIONS</Text>
-                <View style={styles.eventsList}>
-                  {allTrainingsSorted.slice(0, 5).map(training => (
-                    <EventCard
-                      key={training.id}
-                      training={training}
-                      colors={colors}
-                      onPress={() => handleTrainingPress(training)}
-                    />
-                  ))}
+                  {/* No navigation chevron - this is informational only */}
+                  {/* Team switching happens through the header pill */}
                 </View>
               </View>
             )}
@@ -860,8 +916,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 
-  // Team Row
-  teamRow: {
+  // Team Info Card (informational only, not navigational)
+  teamInfoCard: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 14,
@@ -884,6 +940,35 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   teamRowRole: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+
+  // Manage Row (for Members, Invite, Settings)
+  manageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 12,
+    marginBottom: 10,
+  },
+  manageRowIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  manageRowContent: {
+    flex: 1,
+  },
+  manageRowTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  manageRowDesc: {
     fontSize: 12,
     marginTop: 2,
   },
