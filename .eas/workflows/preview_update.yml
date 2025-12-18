@@ -1,12 +1,10 @@
-name: Publish preview update
-
-on:
-  push:
-    branches: ['main','devenv','orgenized-structure']
-
 jobs:
-  publish_preview_update:
-    name: Publish preview update
+  publish_update:
     type: update
+    environment: preview
+    env: # optional list of environment variables
+      APP_VARIANT: preview
     params:
-      branch: ${{ github.ref_name || 'test' }}
+      message: "Preview update" # optional
+      platform: "ios" # optional - android | ios | all, defaults to all
+      channel: "preview"
