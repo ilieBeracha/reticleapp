@@ -6,11 +6,11 @@
  * - Apple Watch (coming soon)
  */
 import { useColors } from '@/hooks/ui/useColors';
+import { useGarminStore, useGarminConnectionStatus } from '@/store/garminStore';
 import { Ionicons } from '@expo/vector-icons';
-import * as ExpoGarmin from 'expo-garmin';
 import { Stack } from 'expo-router';
 import { Plug, Watch } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import {
     Alert,
     Platform,
@@ -23,56 +23,41 @@ import {
 
 export default function IntegrationsScreen() {
   const colors = useColors();
-  const [garminDevices, setGarminDevices] = useState<ExpoGarmin.GarminDevice[]>([]);
-  const [isConnecting, setIsConnecting] = useState(false);
+  
+  // Use zustand store for persistent Garmin state
+  const { 
+    devices, 
+    isConnecting, 
+    startDeviceSelection, 
+    refreshDevices,
+    _initialize 
+  } = useGarminStore();
+  
+  const connectionStatus = useGarminConnectionStatus();
 
   useEffect(() => {
-    // Load connected devices on mount
-    loadGarminDevices();
-    
-    // Listen for device updates
-    const subscription = ExpoGarmin.addDevicesUpdatedListener((event) => {
-      setGarminDevices(event.devices);
-      setIsConnecting(false);
-    });
-
-    return () => subscription.remove();
-  }, []);
-
-  const loadGarminDevices = async () => {
-    try {
-      const devices = await ExpoGarmin.getConnectedDevices();
-      setGarminDevices(devices);
-    } catch (error) {
-      console.log('Failed to load Garmin devices:', error);
-    }
-  };
+    // Initialize Garmin listeners once
+    const cleanup = _initialize();
+    return cleanup;
+  }, [_initialize]);
 
   const connectGarmin = () => {
     if (Platform.OS !== 'ios') {
       Alert.alert('Not Available', 'Garmin integration is only available on iOS');
       return;
     }
-    setIsConnecting(true);
-    ExpoGarmin.showDeviceSelection();
+    startDeviceSelection();
   };
 
   const disconnectGarmin = () => {
     Alert.alert(
       'Disconnect Garmin',
-      'Are you sure you want to disconnect your Garmin device?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Disconnect', 
-          style: 'destructive',
-          onPress: () => setGarminDevices([])
-        },
-      ]
+      'To disconnect, open Garmin Connect Mobile and remove this app from your shared devices.',
+      [{ text: 'OK' }]
     );
   };
 
-  const isGarminConnected = garminDevices.length > 0;
+  const isGarminConnected = devices.length > 0;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -115,13 +100,14 @@ export default function IntegrationsScreen() {
           {/* Garmin Watch */}
           <Pressable
             onPress={isGarminConnected ? disconnectGarmin : connectGarmin}
+            disabled={isConnecting}
             style={({ pressed }) => [
               styles.integrationCard,
               { 
                 backgroundColor: colors.card, 
                 borderColor: isGarminConnected ? colors.primary : colors.border,
                 borderWidth: isGarminConnected ? 2 : 1,
-                opacity: pressed ? 0.7 : 1,
+                opacity: pressed || isConnecting ? 0.7 : 1,
               },
             ]}
           >
@@ -134,9 +120,9 @@ export default function IntegrationsScreen() {
               </Text>
               <Text style={[styles.integrationDesc, { color: colors.textMuted }]}>
                 {isConnecting 
-                  ? 'Connecting...' 
+                  ? 'Opening Garmin Connect...' 
                   : isGarminConnected 
-                    ? garminDevices[0]?.friendlyName || 'Connected'
+                    ? devices[0]?.friendlyName || 'Connected'
                     : 'Connect your Garmin watch'
                 }
               </Text>
@@ -149,7 +135,7 @@ export default function IntegrationsScreen() {
                 </Text>
               </View>
             ) : (
-              <View style={[styles.connectButton, { backgroundColor: colors.primary }]}>
+              <View style={[styles.connectButton, { backgroundColor: isConnecting ? colors.textMuted : colors.primary }]}>
                 <Text style={styles.connectButtonText}>
                   {isConnecting ? '...' : 'Connect'}
                 </Text>
@@ -190,10 +176,15 @@ export default function IntegrationsScreen() {
         {/* Connected Device Info */}
         {isGarminConnected && (
           <View style={[styles.deviceInfoBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.deviceInfoTitle, { color: colors.text }]}>
-              Connected Device
-            </Text>
-            {garminDevices.map((device) => (
+            <View style={styles.deviceInfoHeader}>
+              <Text style={[styles.deviceInfoTitle, { color: colors.text }]}>
+                Connected Device{devices.length > 1 ? 's' : ''}
+              </Text>
+              <Pressable onPress={refreshDevices} hitSlop={8}>
+                <Ionicons name="refresh" size={18} color={colors.textMuted} />
+              </Pressable>
+            </View>
+            {devices.map((device) => (
               <View key={device.uuid} style={styles.deviceInfoRow}>
                 <Text style={[styles.deviceInfoLabel, { color: colors.textMuted }]}>
                   {device.modelName || 'Garmin Watch'}
@@ -210,7 +201,10 @@ export default function IntegrationsScreen() {
         <View style={[styles.infoBox, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
           <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
           <Text style={[styles.infoText, { color: colors.text }]}>
-            Connected devices will automatically sync heart rate and GPS data during active training sessions.
+            {Platform.OS === 'ios' 
+              ? 'Tap Connect to open Garmin Connect Mobile and select devices to share with this app.'
+              : 'Garmin integration is only available on iOS devices.'
+            }
           </Text>
         </View>
 
@@ -336,10 +330,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 16,
   },
+  deviceInfoHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   deviceInfoTitle: {
     fontSize: 14,
     fontWeight: '600',
-    marginBottom: 12,
   },
   deviceInfoRow: {
     flexDirection: 'row',

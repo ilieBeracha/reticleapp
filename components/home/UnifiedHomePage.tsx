@@ -20,7 +20,6 @@ import { useSessionStore } from '@/store/sessionStore';
 import { useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
 import { useFocusEffect } from '@react-navigation/native';
-import { addDevicesUpdatedListener, showDeviceSelection } from 'expo-garmin';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -55,16 +54,6 @@ function TitleHeader({
   actionText?: string;
   colors: ReturnType<typeof useColors>;
 }) {
-  
-  // Start device selection (opens Garmin Connect Mobile)
-  showDeviceSelection();
-
-  // Listen for devices returned from Garmin Connect
-  const sub = addDevicesUpdatedListener((event) => {
-    console.log('Devices:', event.devices);
-  });
-
-
   return (
     <View style={{ marginBottom: 12, marginTop: 4 }}>
       <SectionHeader
