@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 
 /**
  * Main Tab Layout
- * 
+ *
  * 4 tabs:
  * - Team: Teams, calendar, trainings (with internal tabs)
  * - Insight: Shooting stats and analytics
@@ -13,10 +13,7 @@ import { Platform } from 'react-native';
  * - Profile: Personal settings
  */
 
-const getTabIcon = (
-  sfSymbol: string,
-  ionicon: keyof typeof Ionicons.glyphMap,
-): any => {
+const getTabIcon = (sfSymbol: string, ionicon: keyof typeof Ionicons.glyphMap): any => {
   if (Platform.OS === 'ios') {
     return { sfSymbol };
   }
@@ -36,11 +33,10 @@ export default function TabsLayout() {
       tabBarInactiveTintColor={colors.textMuted}
     >
       <Tabs.Screen
-        name="trainings"
+        name="index"
         options={{
-          role: 'search',
-          title: 'Team',
-          tabBarIcon: ({ focused }) => getTabIcon('person.2', focused ? 'people' : 'people-outline'),
+          title: 'Home',
+          tabBarIcon: ({ focused }) => getTabIcon('house', focused ? 'home' : 'home-outline'),
         }}
       />
 
@@ -53,18 +49,11 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen
-        name="index"
+        name="trainings"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ focused }) => getTabIcon('house', focused ? 'home' : 'home-outline'),
-        }}
-      />
-
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ focused }) => getTabIcon('person.circle', focused ? 'person-circle' : 'person-circle-outline'),
+          role: 'search',
+          title: 'Team',
+          tabBarIcon: ({ focused }) => getTabIcon('person.2', focused ? 'people' : 'people-outline'),
         }}
       />
     </Tabs>

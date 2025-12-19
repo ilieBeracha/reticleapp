@@ -20,27 +20,28 @@ import { useSessionStore } from '@/store/sessionStore';
 import { useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
 import { useFocusEffect } from '@react-navigation/native';
+import { addDevicesUpdatedListener, showDeviceSelection } from 'expo-garmin';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    RefreshControl,
-    ScrollView,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { BaseAvatar } from '../BaseAvatar';
 import { SectionHeader } from './_shared/SectionHeader';
 import HeroSummaryCard from './cards/HeroSummaryCard';
 import { mapSessionToHomeSession, mapTrainingToScheduledSession, type HomeSession } from './types';
-import { useHomeState } from './useHomeState';
 import { AggregatedStatsCard } from './unified/sections/AggregatedStatsCard';
 import { EmptyState } from './unified/sections/EmptyState';
 import { WeeklyHighlightsCard } from './unified/sections/WeeklyHighlightsCard';
 import { styles } from './unified/styles';
+import { useHomeState } from './useHomeState';
 import { ActivityTimeline } from './widgets';
 
 function TitleHeader({
@@ -54,6 +55,16 @@ function TitleHeader({
   actionText?: string;
   colors: ReturnType<typeof useColors>;
 }) {
+  
+  // Start device selection (opens Garmin Connect Mobile)
+  showDeviceSelection();
+
+  // Listen for devices returned from Garmin Connect
+  const sub = addDevicesUpdatedListener((event) => {
+    console.log('Devices:', event.devices);
+  });
+
+
   return (
     <View style={{ marginBottom: 12, marginTop: 4 }}>
       <SectionHeader

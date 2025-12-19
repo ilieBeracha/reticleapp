@@ -1,46 +1,20 @@
-/**
- * Dynamic Expo Configuration
- * 
- * Supports multiple app variants that can be installed simultaneously:
- * - development: Local dev server, includes expo-dev-client
- * - preview: Internal testing, receives OTA updates from preview branch
- * - production: App Store / Play Store release
- * 
- * Usage:
- *   eas build --profile development --platform ios
- *   eas build --profile preview --platform ios
- *   eas build --profile production --platform ios
- */
-
 const IS_DEV = process.env.APP_VARIANT === 'development';
 const IS_PREVIEW = process.env.APP_VARIANT === 'preview';
-
-// Determine app name suffix and bundle identifier suffix
 const getAppName = () => {
   if (IS_DEV) return 'Retic (Dev)';
   if (IS_PREVIEW) return 'Retic';
   return 'Retic';
 };
-
 const getBundleIdentifier = () => {
   if (IS_DEV) return 'com.retic.app.development';
   if (IS_PREVIEW) return 'com.retic.app';
   return 'com.reticled.app';
 };
-
 const getAndroidPackage = () => {
   if (IS_DEV) return 'com.retic.app.development';
   if (IS_PREVIEW) return 'com.retic.app';
   return 'com.reticled.app';
 };
-
-const getScheme = () => {
-  if (IS_DEV) return 'retic-dev';
-  if (IS_PREVIEW) return 'retic';
-  // Must be lowercase and match: ^[a-z][a-z0-9+.-]*$
-  return 'reticled';
-};
-
 export default ({ config }) => {
   return {
     ...config,
@@ -49,7 +23,7 @@ export default ({ config }) => {
     version: '1.0.0',
     orientation: 'portrait',
     icon: './assets/images/icon.jpg',
-    scheme: getScheme(),
+    scheme: 'retic',
     userInterfaceStyle: 'automatic',
     splash: {
       image: './assets/images/icon.jpg',
@@ -74,8 +48,6 @@ export default ({ config }) => {
         backgroundImage: './assets/images/icon.jpg',
         monochromeImage: './assets/images/icon.jpg',
       },
-      edgeToEdgeEnabled: true,
-      predictiveBackGestureEnabled: false,
       package: getAndroidPackage(),
       permissions: [
         'android.permission.CAMERA',
@@ -84,14 +56,11 @@ export default ({ config }) => {
         'android.permission.USE_FINGERPRINT',
       ],
     },
-    web: {
-      output: 'single',
-      favicon: './assets/images/icon.jpg',
-    },
     plugins: [
-      "expo-build-properties",
-      "expo-secure-store",
-      "expo-web-browser",
+      './plugins/withGarminConnectIQ', // ← ADD THIS FIRST!
+      'expo-build-properties',
+      'expo-secure-store',
+      'expo-web-browser',
       [
         'expo-local-authentication',
         {
@@ -112,9 +81,6 @@ export default ({ config }) => {
           imageWidth: 200,
           resizeMode: 'cover',
           backgroundColor: '#221f20',
-          dark: {
-            backgroundColor: '#221f20',
-          },
         },
       ],
       ['react-native-bottom-tabs'],
@@ -150,11 +116,8 @@ export default ({ config }) => {
     extra: {
       owner: 'ilieberacha',
       eas: {
-        router: {},
         projectId: 'a6389fa6-2be9-4cf2-803c-58ceab564997',
       },
-      router: {},
-      // Expose variant to app code if needed
       appVariant: process.env.APP_VARIANT || 'production',
     },
     owner: 'ilieberacha',

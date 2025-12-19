@@ -1,19 +1,18 @@
+import { BaseAvatar } from '@/components/BaseAvatar';
+import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
-import { deleteSession, getMyActivePersonalSession } from '@/services/sessionService';
-import { Button, ContextMenu, Host } from '@expo/ui/swift-ui';
+import { useAppContext } from '@/hooks/useAppContext';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
-import { Bell, Plus } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
+import { Bell } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
 import {
-  Alert,
-  Image,
-  Platform,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Image,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
 interface HeaderProps {
@@ -25,11 +24,13 @@ interface HeaderProps {
  * 
  * Brand header with:
  * - App icon + "Reticle" brand name
- * - Add button (native context menu with Session/Training options)
  * - Notification bell with badge
+ * - Profile avatar (opens profile sheet)
  */
 export function Header({ onNotificationPress }: HeaderProps) {
   const colors = useColors();
+  const { fullName, avatarUrl } = useAppContext();
+  const { profileAvatarUrl } = useAuth();
   const [notificationCount, setNotificationCount] = useState(0);
 
   // Fetch pending notification count
@@ -48,98 +49,18 @@ export function Header({ onNotificationPress }: HeaderProps) {
     return () => clearInterval(interval);
   }, []);
 
-  const handleStartSession = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try {
-      // Check for existing active session first
-      const existing = await getMyActivePersonalSession();
-      if (existing) {
-        Alert.alert(
-          'Active Session',
-          `You have an active session${existing.drill_name ? ` for "${existing.drill_name}"` : ''}. What would you like to do?`,
-          [
-            {
-              text: 'Continue',
-              onPress: () => {
-                router.push(`/(protected)/activeSession?sessionId=${existing.id}` as any);
-              },
-            },
-            {
-              text: 'Delete & Start New',
-              style: 'destructive',
-              onPress: async () => {
-                try {
-                  await deleteSession(existing.id);
-                  router.push('/(protected)/createSession' as any);
-                } catch (err) {
-                  console.error('Failed to delete session:', err);
-                  Alert.alert('Error', 'Failed to delete session');
-                }
-              },
-            },
-            { text: 'Cancel', style: 'cancel' },
-          ]
-        );
-        return;
-      }
-      // Drill-first: route to drill selection screen
-      router.push('/(protected)/createSession' as any);
-    } catch (error) {
-      console.error('Failed to start session:', error);
-    }
-  }, []);
-
-  const handleCreateTraining = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/(protected)/createTraining' as any);
-  }, []);
-
   const handleNotificationPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onNotificationPress?.();
   };
 
-  // Native add button with context menu (iOS only)
-  const AddButtonWithMenu = () => {
-    if (Platform.OS === 'ios') {
-      return (
-        <Host style={styles.addButtonHost}>
-          <ContextMenu>
-            <ContextMenu.Items>
-              <Button 
-                systemImage="target" 
-                onPress={handleStartSession}
-              >
-                Start Session
-              </Button>
-              <Button 
-                systemImage="calendar.badge.plus" 
-                onPress={handleCreateTraining}
-              >
-                New Training
-              </Button>
-            </ContextMenu.Items>
-            <ContextMenu.Trigger>
-              <View style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Plus size={18} color={colors.text} strokeWidth={2} />
-              </View>
-            </ContextMenu.Trigger>
-          </ContextMenu>
-        </Host>
-      );
-    }
-
-    // Android fallback - simple button that opens training
-    return (
-      <TouchableOpacity
-        style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-        onPress={handleCreateTraining}
-        activeOpacity={0.7}
-      >
-        <Plus size={18} color={colors.text} strokeWidth={2} />
-      </TouchableOpacity>
-    );
+  const handleProfilePress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/(protected)/profileSheet' as any);
   };
+
+  // Use avatarUrl from context or auth
+  const avatarSource = avatarUrl || profileAvatarUrl;
 
   return (
     <View style={styles.container}>
@@ -154,8 +75,6 @@ export function Header({ onNotificationPress }: HeaderProps) {
 
       {/* Right - Action Buttons */}
       <View style={styles.actions}>
-        <AddButtonWithMenu />
-
         <TouchableOpacity
           style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
           onPress={handleNotificationPress}
@@ -169,6 +88,19 @@ export function Header({ onNotificationPress }: HeaderProps) {
               </Text>
             </View>
           )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={handleProfilePress}
+          activeOpacity={0.7}
+        >
+          <BaseAvatar
+            source={avatarSource ? { uri: avatarSource } : undefined}
+            fallbackText={fullName?.charAt(0) || 'U'}
+            size="sm"
+            borderWidth={1}
+            borderColor={colors.border}
+          />
         </TouchableOpacity>
       </View>
     </View>
@@ -207,10 +139,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  addButtonHost: {
-    width: 38,
-    height: 38,
   },
   iconBtn: {
     width: 38,

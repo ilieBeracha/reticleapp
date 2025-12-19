@@ -37,3 +37,5 @@ export function removeSquad(existingSquads: string[], squadName: string): string
 
 
 
+
+

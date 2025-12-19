@@ -56,6 +56,21 @@ export default function ProtectedLayout() {
           }}
         />
         
+        {/* Profile Sheet - Quick profile access from header */}
+        <Stack.Screen
+          name="profileSheet"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.75, 0.92],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+          }}
+        />
+
         {/* User Menu */}
         <Stack.Screen
           name="userMenu"

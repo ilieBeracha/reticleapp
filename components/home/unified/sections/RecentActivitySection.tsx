@@ -75,8 +75,3 @@ export function RecentActivitySection({
 }
 
 
-
-
-
-
-

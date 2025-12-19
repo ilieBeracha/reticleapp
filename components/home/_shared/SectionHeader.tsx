@@ -38,8 +38,3 @@ const styles = StyleSheet.create({
 });
 
 
-
-
-
-
-
