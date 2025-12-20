@@ -1,18 +1,18 @@
 /**
- * Drill Instance Modal - TYPE-AWARE
+ * Drill Instance Modal - Compact Config
  *
  * Configure instance-specific values when adding a drill to a training.
- * Shows only relevant params for the drill type and respects template constraints.
  */
 import { useColors } from '@/hooks/ui/useColors';
-import type { Drill, DrillInstanceConfig } from '@/types/workspace';
 import type { DrillTemplate, DrillTypeId, ParamConstraint } from '@/types/drillTypes';
 import { DRILL_TYPES } from '@/types/drillTypes';
+import type { Drill, DrillInstanceConfig } from '@/types/workspace';
 import { isParamLocked, mergeWithDefaults } from '@/utils/drillValidation';
 import * as Haptics from 'expo-haptics';
-import { Award, Check, Clock, Crosshair, Lock, Plus, Target, X } from 'lucide-react-native';
+import { Check, Lock, X } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ScrollView as HorizontalScroll,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -23,7 +23,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ============================================================================
@@ -40,60 +39,48 @@ interface DrillInstanceModalProps {
 }
 
 // ============================================================================
-// ICON MAP
-// ============================================================================
-
-const TYPE_ICONS: Record<DrillTypeId, any> = {
-  zeroing: Crosshair,
-  grouping: Target,
-  timed: Clock,
-  qualification: Award,
-};
-
-// ============================================================================
-// PILL SELECTOR COMPONENT
+// PILL SELECTOR COMPONENT (Compact)
 // ============================================================================
 
 function PillSelector({
   label,
-  unit,
+  hint,
   options,
   value,
   onChange,
   colors,
-  accentColor,
   locked = false,
   formatLabel,
 }: {
   label: string;
-  unit?: string;
+  hint?: string | null;
   options: (number | string | null)[];
   value: number | string | null;
   onChange: (val: number | string | null) => void;
   colors: ReturnType<typeof useColors>;
-  accentColor: string;
   locked?: boolean;
   formatLabel?: (val: number | string | null) => string;
 }) {
   return (
-    <View style={[styles.fieldContainer, locked && styles.fieldLocked]}>
-      <View style={styles.fieldHeader}>
-        <Text style={[styles.fieldLabel, { color: colors.text }]}>{label}</Text>
-        {unit && <Text style={[styles.fieldUnit, { color: colors.textMuted }]}>{unit}</Text>}
-        {locked && (
-          <View style={[styles.lockedBadge, { backgroundColor: colors.secondary }]}>
-            <Lock size={10} color={colors.textMuted} />
-            <Text style={[styles.lockedText, { color: colors.textMuted }]}>Fixed</Text>
-          </View>
-        )}
+    <View style={[styles.fieldRow, locked && styles.fieldLocked]}>
+      <View style={styles.fieldLabelWrap}>
+        <View style={styles.fieldLabelRow}>
+          <Text style={[styles.fieldLabel, { color: colors.text }]}>{label}</Text>
+          {locked && <Lock size={10} color={colors.textMuted} />}
+        </View>
+        {hint && <Text style={[styles.fieldHint, { color: colors.textMuted }]}>{hint}</Text>}
       </View>
-      <View style={styles.pillRow}>
+      <HorizontalScroll 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.pillRow}
+      >
         {options.map((opt) => {
           const isSelected = value === opt;
           const displayLabel = formatLabel
             ? formatLabel(opt)
             : opt === null
-              ? 'None'
+              ? '—'
               : String(opt);
           return (
             <TouchableOpacity
@@ -101,9 +88,8 @@ function PillSelector({
               style={[
                 styles.pill,
                 {
-                  backgroundColor: isSelected ? accentColor : colors.card,
-                  borderColor: isSelected ? accentColor : colors.border,
-                  opacity: locked && !isSelected ? 0.4 : 1,
+                  backgroundColor: isSelected ? colors.text : colors.secondary,
+                  opacity: locked && !isSelected ? 0.3 : 1,
                 },
               ]}
               onPress={() => {
@@ -114,40 +100,40 @@ function PillSelector({
               activeOpacity={locked ? 1 : 0.7}
               disabled={locked}
             >
-              <Text style={[styles.pillText, { color: isSelected ? '#fff' : colors.text }]}>
+              <Text style={[styles.pillText, { color: isSelected ? colors.background : colors.textMuted }]}>
                 {displayLabel}
               </Text>
             </TouchableOpacity>
           );
         })}
-      </View>
+      </HorizontalScroll>
     </View>
   );
 }
 
 // ============================================================================
-// NUMBER INPUT COMPONENT
+// NUMBER INPUT COMPONENT (Compact)
 // ============================================================================
 
 function NumberInput({
   label,
+  hint,
   unit,
   value,
   onChange,
   min,
   max,
   colors,
-  accentColor,
   locked = false,
 }: {
   label: string;
+  hint?: string | null;
   unit?: string;
   value: number | null;
   onChange: (val: number | null) => void;
   min?: number;
   max?: number;
   colors: ReturnType<typeof useColors>;
-  accentColor: string;
   locked?: boolean;
 }) {
   const [text, setText] = useState(value?.toString() ?? '');
@@ -168,18 +154,15 @@ function NumberInput({
   };
 
   return (
-    <View style={[styles.fieldContainer, locked && styles.fieldLocked]}>
-      <View style={styles.fieldHeader}>
-        <Text style={[styles.fieldLabel, { color: colors.text }]}>{label}</Text>
-        {unit && <Text style={[styles.fieldUnit, { color: colors.textMuted }]}>{unit}</Text>}
-        {locked && (
-          <View style={[styles.lockedBadge, { backgroundColor: colors.secondary }]}>
-            <Lock size={10} color={colors.textMuted} />
-            <Text style={[styles.lockedText, { color: colors.textMuted }]}>Fixed</Text>
-          </View>
-        )}
+    <View style={[styles.fieldRow, locked && styles.fieldLocked]}>
+      <View style={styles.fieldLabelWrap}>
+        <View style={styles.fieldLabelRow}>
+          <Text style={[styles.fieldLabel, { color: colors.text }]}>{label}</Text>
+          {locked && <Lock size={10} color={colors.textMuted} />}
+        </View>
+        {hint && <Text style={[styles.fieldHint, { color: colors.textMuted }]}>{hint}</Text>}
       </View>
-      <View style={[styles.numberInputRow, { borderColor: locked ? colors.border : accentColor }]}>
+      <View style={[styles.numberInputWrap, { backgroundColor: colors.secondary }]}>
         <TextInput
           style={[styles.numberInput, { color: colors.text }]}
           value={text}
@@ -191,11 +174,6 @@ function NumberInput({
         />
         {unit && <Text style={[styles.numberUnit, { color: colors.textMuted }]}>{unit}</Text>}
       </View>
-      {min !== undefined && max !== undefined && (
-        <Text style={[styles.rangeHint, { color: colors.textMuted }]}>
-          Range: {min} - {max}
-        </Text>
-      )}
     </View>
   );
 }
@@ -218,29 +196,22 @@ export function DrillInstanceModal({
   const drillTypeId: DrillTypeId | null = useMemo(() => {
     if (template) return template.drillType;
     if (drill) {
-      // Map legacy drill_goal to drill type
       if (drill.drill_goal === 'grouping') return 'grouping';
-      return 'qualification'; // Default achievement to qualification
+      return 'qualification';
     }
     return null;
   }, [drill, template]);
 
   const drillType = drillTypeId ? DRILL_TYPES[drillTypeId] : null;
-  const accentColor = drillType?.color ?? '#3B82F6';
-  const Icon = drillTypeId ? TYPE_ICONS[drillTypeId] : Target;
 
-  // Config state - store all params
+  // Config state
   const [params, setParams] = useState<Record<string, any>>({});
-  
-  // Track which drill was last initialized to prevent re-initialization loops
   const initializedDrillIdRef = useRef<string | null>(null);
 
   // Get display name
   const displayName = template?.name ?? drill?.name ?? 'Configure Drill';
-  const displayGoal = template?.goal ?? drill?.description ?? '';
-  
-  // Get current drill/template ID for comparison
   const currentId = template?.id ?? drill?.id ?? null;
+  const isGrouping = drill?.drill_goal === 'grouping' || drillTypeId === 'grouping' || drillTypeId === 'zeroing';
 
   // Initialize params from template/drill defaults - only when drill changes or modal opens
   useEffect(() => {
@@ -334,71 +305,67 @@ export function DrillInstanceModal({
 
   if (!drillType || (!drill && !template)) return null;
 
-  // Render params based on drill type
+  // Render params - flat list, no sections
   const renderParamControls = () => {
-    const sections = drillType.configSections;
+    const allParams: string[] = [];
+    drillType.configSections.forEach((section) => {
+      section.params.forEach((param) => allParams.push(param));
+    });
 
-    return sections.map((section, sectionIndex) => (
-      <Animated.View
-        key={section.id}
-        entering={FadeInDown.delay(100 + sectionIndex * 50)}
-        style={[styles.configSection, { backgroundColor: colors.card, borderColor: colors.border }]}
-      >
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>{section.title}</Text>
+    return allParams.map((param) => {
+      const constraint = getConstraint(param);
+      if (!constraint) return null;
 
-        {section.params.map((param) => {
-          const constraint = getConstraint(param);
-          if (!constraint) return null;
+      const locked = isLocked(param);
+      const value = params[param];
 
-          const locked = isLocked(param);
-          const value = params[param];
+      if (constraint.type === 'options') {
+        const options = getOptions(param);
+        if (options.length === 0) return null;
 
-          if (constraint.type === 'options') {
-            const options = getOptions(param);
-            if (options.length === 0) return null;
+        return (
+          <PillSelector
+            key={param}
+            label={formatParamLabel(param)}
+            hint={getParamHint(param)}
+            options={options}
+            value={value}
+            onChange={(v) => updateParam(param, v)}
+            colors={colors}
+            locked={locked}
+            formatLabel={
+              param === 'timeLimit' || param === 'parTime'
+                ? (v) => (v === null ? '—' : `${v}s`)
+                : param === 'distance'
+                  ? (v) => `${v}m`
+                  : undefined
+            }
+          />
+        );
+      }
 
-            return (
-              <PillSelector
-                key={param}
-                label={formatParamLabel(param)}
-                unit={constraint.unit}
-                options={options}
-                value={value}
-                onChange={(v) => updateParam(param, v)}
-                colors={colors}
-                accentColor={accentColor}
-                locked={locked}
-                formatLabel={
-                  param === 'timeLimit' || param === 'parTime'
-                    ? (v) => (v === null ? 'None' : `${v}s`)
-                    : undefined
-                }
-              />
-            );
-          }
+      if (constraint.type === 'range') {
+        return (
+          <NumberInput
+            key={param}
+            label={formatParamLabel(param)}
+            hint={getParamHint(param)}
+            unit={constraint.unit}
+            value={value}
+            onChange={(v) => updateParam(param, v)}
+            min={constraint.min}
+            max={constraint.max}
+            colors={colors}
+            locked={locked}
+          />
+        );
+      }
 
-          if (constraint.type === 'range') {
-            return (
-              <NumberInput
-                key={param}
-                label={formatParamLabel(param)}
-                unit={constraint.unit}
-                value={value}
-                onChange={(v) => updateParam(param, v)}
-                min={constraint.min}
-                max={constraint.max}
-                colors={colors}
-                accentColor={accentColor}
-                locked={locked}
-              />
-            );
-          }
-
-          return null;
-        })}
-      </Animated.View>
-    ));
+      return null;
+    });
   };
+
+  const badgeColor = isGrouping ? '#10B981' : '#3B82F6';
 
   return (
     <Modal
@@ -411,76 +378,47 @@ export function DrillInstanceModal({
         style={[styles.container, { backgroundColor: colors.background }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* Header */}
+        {/* Compact Header */}
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          <TouchableOpacity style={styles.headerBtn} onPress={onClose} hitSlop={8}>
-            <X size={22} color={colors.textMuted} />
+          <TouchableOpacity style={styles.closeBtn} onPress={onClose} hitSlop={12}>
+            <X size={20} color={colors.textMuted} />
           </TouchableOpacity>
-          <View style={styles.headerCenter}>
-            <Plus size={18} color={accentColor} />
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Add to Training</Text>
-          </View>
-          <View style={styles.headerSpacer} />
-        </View>
-
-        {/* Drill Info Card */}
-        <Animated.View
-          entering={FadeInDown.delay(50)}
-          style={[styles.drillCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-        >
-          <View style={[styles.drillIcon, { backgroundColor: accentColor + '15' }]}>
-            <Icon size={24} color={accentColor} />
-          </View>
-          <View style={styles.drillInfo}>
-            <Text style={[styles.drillName, { color: colors.text }]} numberOfLines={1}>
+          <View style={styles.headerInfo}>
+            <Text style={[styles.headerName, { color: colors.text }]} numberOfLines={1}>
               {displayName}
             </Text>
-            <View style={styles.drillMeta}>
-              <View style={[styles.drillBadge, { backgroundColor: accentColor + '20' }]}>
-                <Text style={[styles.drillBadgeText, { color: accentColor }]}>
-                  {drillType.name}
-                </Text>
-              </View>
-              {template?.source === 'library' && (
-                <Text style={[styles.sourceText, { color: colors.textMuted }]}>Library</Text>
-              )}
+            <View style={[styles.headerBadge, { backgroundColor: badgeColor + '20' }]}>
+              <Text style={[styles.headerBadgeText, { color: badgeColor }]}>
+                {isGrouping ? 'Grouping' : 'Achievement'}
+              </Text>
             </View>
           </View>
-        </Animated.View>
+        </View>
 
-        {/* Goal */}
-        {displayGoal && (
-          <Animated.View entering={FadeInDown.delay(75)} style={styles.goalContainer}>
-            <Text style={[styles.goalLabel, { color: colors.textMuted }]}>Goal</Text>
-            <Text style={[styles.goalText, { color: colors.text }]}>{displayGoal}</Text>
-          </Animated.View>
-        )}
-
+        {/* Config */}
         <ScrollView
           style={styles.body}
-          contentContainerStyle={[styles.bodyContent, { paddingBottom: insets.bottom + 100 }]}
+          contentContainerStyle={[styles.bodyContent, { paddingBottom: insets.bottom + 80 }]}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
+          {/* Intro */}
+          <Text style={[styles.introText, { color: colors.textMuted }]}>
+            Configure how this drill will run in the training session.
+          </Text>
+          
           {renderParamControls()}
         </ScrollView>
 
         {/* Footer */}
-        <View
-          style={[styles.footer, { paddingBottom: insets.bottom + 16, borderTopColor: colors.border }]}
-        >
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
           <TouchableOpacity
-            style={[styles.cancelBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={onClose}
-          >
-            <Text style={[styles.cancelBtnText, { color: colors.text }]}>Cancel</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.confirmBtn, { backgroundColor: accentColor }]}
+            style={[styles.addBtn, { backgroundColor: colors.primary }]}
             onPress={handleConfirm}
+            activeOpacity={0.8}
           >
-            <Text style={styles.confirmBtnText}>Add Drill</Text>
             <Check size={18} color="#fff" />
+            <Text style={styles.addBtnText}>Add to Training</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -495,7 +433,7 @@ export function DrillInstanceModal({
 function formatParamLabel(param: string): string {
   const labels: Record<string, string> = {
     distance: 'Distance',
-    shots: 'Shots',
+    shots: 'Shots per round',
     strings: 'Rounds',
     position: 'Position',
     targetSize: 'Target Size',
@@ -507,100 +445,62 @@ function formatParamLabel(param: string): string {
   return labels[param] ?? param.charAt(0).toUpperCase() + param.slice(1);
 }
 
+function getParamHint(param: string): string | null {
+  const hints: Record<string, string> = {
+    distance: 'How far from target',
+    shots: 'Bullets fired each round',
+    strings: 'How many times to repeat',
+    timeLimit: 'Max time allowed',
+    parTime: 'Target completion time',
+    targetCount: 'Number of targets',
+    minScore: 'Required to pass',
+  };
+  return hints[param] ?? null;
+}
+
 // ============================================================================
-// STYLES
+// STYLES (Compact)
 // ============================================================================
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 12,
   },
-  headerBtn: {
-    width: 40,
-    height: 40,
+  closeBtn: {
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerCenter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  headerSpacer: {
-    width: 40,
-  },
-
-  // Drill Card
-  drillCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 14,
-  },
-  drillIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  drillInfo: {
+  headerInfo: {
     flex: 1,
-    gap: 8,
-  },
-  drillName: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  drillMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
-  drillBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  drillBadgeText: {
-    fontSize: 12,
+  headerName: {
+    fontSize: 16,
     fontWeight: '600',
+    flex: 1,
   },
-  sourceText: {
-    fontSize: 12,
+  headerBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
-
-  // Goal
-  goalContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-  },
-  goalLabel: {
-    fontSize: 12,
+  headerBadgeText: {
+    fontSize: 11,
     fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  goalText: {
-    fontSize: 14,
-    lineHeight: 20,
   },
 
   // Body
@@ -608,129 +508,103 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   bodyContent: {
-    padding: 16,
-    gap: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+  },
+  introText: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 8,
   },
 
-  // Config Section
-  configSection: {
-    padding: 20,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 16,
-  },
-
-  // Field
-  fieldContainer: {
-    marginBottom: 20,
+  // Field Row
+  fieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(128,128,128,0.15)',
   },
   fieldLocked: {
-    opacity: 0.7,
+    opacity: 0.5,
   },
-  fieldHeader: {
+  fieldLabelWrap: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 2,
+    width: 100,
+    flexShrink: 0,
+    marginRight: 12,
+  },
+  fieldLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
+    gap: 6,
   },
   fieldLabel: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '500',
   },
-  fieldUnit: {
+  fieldHint: {
     fontSize: 12,
-  },
-  lockedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    marginLeft: 'auto',
-  },
-  lockedText: {
-    fontSize: 10,
-    fontWeight: '600',
   },
 
   // Pills
   pillRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
+    paddingRight: 4,
   },
   pill: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    minWidth: 52,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    minWidth: 40,
     alignItems: 'center',
+    flexShrink: 0,
   },
   pillText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
+    flexShrink: 0,
   },
 
   // Number Input
-  numberInputRow: {
+  numberInputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderRadius: 12,
-    paddingHorizontal: 16,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    minWidth: 80,
   },
   numberInput: {
-    flex: 1,
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '600',
-    paddingVertical: 14,
+    paddingVertical: 6,
+    minWidth: 40,
+    textAlign: 'center',
   },
   numberUnit: {
-    fontSize: 14,
-    marginLeft: 8,
-  },
-  rangeHint: {
-    fontSize: 11,
-    marginTop: 6,
+    fontSize: 13,
+    marginLeft: 4,
   },
 
   // Footer
   footer: {
-    flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  cancelBtn: {
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 14,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelBtnText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  confirmBtn: {
-    flex: 1,
+  addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 16,
-    borderRadius: 14,
+    height: 48,
+    borderRadius: 12,
   },
-  confirmBtnText: {
-    fontSize: 16,
+  addBtnText: {
+    fontSize: 15,
     fontWeight: '600',
     color: '#fff',
   },

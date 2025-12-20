@@ -115,10 +115,9 @@ export default function CreateTrainingScreen() {
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(teamIdParam ?? null);
   const [title, setTitle] = useState('');
   const [scheduledDate, setScheduledDate] = useState(() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(9, 0, 0, 0);
-    return tomorrow;
+    const date = new Date();
+    date.setHours(date.getHours() + 2, 0, 0, 0);
+    return date;
   });
   const [manualStart, setManualStart] = useState(true);
   const [drills, setDrills] = useState<DrillFormData[]>([]);
