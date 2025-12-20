@@ -488,14 +488,7 @@ export default function TeamScreen() {
               </View>
             )}
             
-            {/* Add Team button - opens switcher sheet with Create/Join options */}
-            <TouchableOpacity
-              style={[styles.addTeamBtn, { backgroundColor: colors.secondary }]}
-              onPress={() => setSwitcherOpen(true)}
-              activeOpacity={0.7}
-            >
-              <Plus size={18} color={colors.primary} />
-            </TouchableOpacity>
+           
           </View>
         </View>
         

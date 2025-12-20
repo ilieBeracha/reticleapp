@@ -134,9 +134,13 @@ export default function CreateSessionScreen() {
     try {
       const primaryTeam = teams[0];
 
-      // Determine target type and rounds based on input method
-      const targetType: TargetType = inputMethod === 'scan' ? 'paper' : 'tactical';
-      const roundsPerShooter = inputMethod === 'scan' ? INFINITE_SHOTS_SENTINEL : bullets;
+      // Consistency rule:
+      // - grouping => paper + scan (infinite shots sentinel)
+      // - achievement => scan => paper (infinite), manual => tactical (fixed bullets)
+      const targetType: TargetType =
+        drillGoal === 'grouping' ? 'paper' : inputMethod === 'scan' ? 'paper' : 'tactical';
+      const roundsPerShooter =
+        drillGoal === 'grouping' ? INFINITE_SHOTS_SENTINEL : inputMethod === 'scan' ? INFINITE_SHOTS_SENTINEL : bullets;
 
       const session = await createSession({
         team_id: primaryTeam?.id ?? undefined,
@@ -226,6 +230,7 @@ export default function CreateSessionScreen() {
             onPress={() => {
               Haptics.selectionAsync();
               setDrillGoal('grouping');
+              setInputMethod('scan');
             }}
           >
             <Text style={[styles.segmentedText, { color: drillGoal === 'grouping' ? '#fff' : colors.text }]}>
@@ -272,11 +277,14 @@ export default function CreateSessionScreen() {
             style={[
               styles.segmentedOption,
               inputMethod === 'manual' && { backgroundColor: colors.primary },
+              drillGoal === 'grouping' && { opacity: 0.5 },
             ]}
             onPress={() => {
+              if (drillGoal === 'grouping') return;
               Haptics.selectionAsync();
               setInputMethod('manual');
             }}
+            disabled={drillGoal === 'grouping'}
           >
             <Crosshair size={16} color={inputMethod === 'manual' ? '#fff' : colors.textMuted} />
             <Text style={[styles.segmentedText, { color: inputMethod === 'manual' ? '#fff' : colors.text }]}>

@@ -3,13 +3,14 @@
  * Drill-first training creation flow
  * 
  * ARCHITECTURE:
- * - Drills must come from the team's drill library (no custom creation here)
+ * - Drills must come from the team's drill library
  * - Each drill can have instance-specific configuration (distance, shots, time)
- * - Users must go to Drill Library to create/import new drills
+ * - Quick Drill allows commanders to create a minimal drill inline (saved to library)
  */
 import { DrillInstanceModal } from '@/components/drills/DrillInstanceModal';
+import { QuickDrillModal, type QuickDrillPayload } from '@/components/drills/QuickDrillModal';
 import { useColors } from '@/hooks/ui/useColors';
-import { drillToTrainingInput, getTeamDrills } from '@/services/drillService';
+import { createDrill, drillToTrainingInput, getTeamDrills } from '@/services/drillService';
 import { createTraining } from '@/services/trainingService';
 import { useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
@@ -127,10 +128,15 @@ export default function CreateTrainingScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   
+  // Wizard step (1 = Details, 2 = Drills)
+  const [currentStep, setCurrentStep] = useState<1 | 2>(1);
+  
   // Drill library and instance configuration
   const [teamDrills, setTeamDrills] = useState<Drill[]>([]);
   const [selectedDrill, setSelectedDrill] = useState<Drill | null>(null);
   const [showInstanceModal, setShowInstanceModal] = useState(false);
+  const [quickDrillModalVisible, setQuickDrillModalVisible] = useState(false);
+  const [creatingQuickDrill, setCreatingQuickDrill] = useState(false);
 
   // Sync selectedTeamId with URL param when it loads
   useEffect(() => {
@@ -147,6 +153,7 @@ export default function CreateTrainingScreen() {
   }, [teams, selectedTeamId, teamIdParam]);
 
   const selectedTeam = teams.find(t => t.id === selectedTeamId);
+  const canCreateDrills = selectedTeam?.my_role === 'owner' || selectedTeam?.my_role === 'commander';
   
   // Show team selection prompt when no team selected and multiple teams exist
   const needsTeamSelection = !selectedTeamId && teams.length > 1 && !isTeamLocked;
@@ -172,6 +179,56 @@ export default function CreateTrainingScreen() {
     setShowInstanceModal(true);
   }, []);
 
+  const handleOpenQuickDrill = useCallback(() => {
+    if (!selectedTeamId) {
+      Alert.alert('Team Required', 'Please select a team first');
+      return;
+    }
+    if (!canCreateDrills) {
+      Alert.alert('Not Allowed', 'Only team owners and commanders can create drills.');
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setQuickDrillModalVisible(true);
+  }, [selectedTeamId, canCreateDrills]);
+
+  const handleQuickDrillSaved = useCallback(async (payload: QuickDrillPayload) => {
+    if (!selectedTeamId) return;
+    if (!canCreateDrills) return;
+    if (creatingQuickDrill) return;
+
+    setCreatingQuickDrill(true);
+    try {
+      const created = await createDrill(selectedTeamId, {
+        name: payload.draft.name,
+        drill_goal: payload.draft.drill_goal,
+        target_type: payload.draft.drill_goal === 'grouping' ? 'paper' : payload.draft.target_type,
+        distance_m: payload.instance.distance_m,
+        rounds_per_shooter: payload.instance.rounds_per_shooter,
+        time_limit_seconds: payload.instance.time_limit_seconds ?? undefined,
+        strings_count: payload.instance.strings_count ?? undefined,
+      });
+
+      setTeamDrills((prev) => [created, ...prev]);
+
+      const trainingDrill = drillToTrainingInput(created, payload.instance);
+      setDrills((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          ...trainingDrill,
+        },
+      ]);
+
+      setQuickDrillModalVisible(false);
+    } catch (error: any) {
+      console.error('Failed to create quick drill:', error);
+      Alert.alert('Error', error?.message || 'Failed to create drill');
+    } finally {
+      setCreatingQuickDrill(false);
+    }
+  }, [selectedTeamId, canCreateDrills, creatingQuickDrill]);
+
   // Handle closing the drill instance modal
   const handleCloseInstanceModal = useCallback(() => {
     setShowInstanceModal(false);
@@ -179,7 +236,7 @@ export default function CreateTrainingScreen() {
   }, []);
 
   // Handle instance configuration complete (add drill from library to training)
-  const handleInstanceConfirm = useCallback((instanceConfig: DrillInstanceConfig) => {
+  const handleInstanceConfirm = useCallback(async (instanceConfig: DrillInstanceConfig) => {
     if (!selectedDrill) return;
 
     const trainingDrill = drillToTrainingInput(selectedDrill, instanceConfig);
@@ -265,6 +322,28 @@ export default function CreateTrainingScreen() {
   const isFormValid = selectedTeamId && title.trim() && drills.length > 0;
   const canCreate = isFormValid && !submitting;
 
+  // Wizard navigation
+  const step1Complete = !!selectedTeamId && !!title.trim();
+  const step2Complete = drills.length > 0;
+
+  const handleNextStep = useCallback(() => {
+    if (!step1Complete) {
+      if (!selectedTeamId) {
+        Alert.alert('Team Required', 'Please select a team first');
+      } else if (!title.trim()) {
+        Alert.alert('Name Required', 'Please enter a training name');
+      }
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setCurrentStep(2);
+  }, [step1Complete, selectedTeamId, title]);
+
+  const handleBackStep = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setCurrentStep(1);
+  }, []);
+
   // No teams available
   if (teams.length === 0) {
     return (
@@ -309,13 +388,61 @@ export default function CreateTrainingScreen() {
           <Text style={[styles.title, { color: colors.text }]}>New Training</Text>
         </View>
 
-      {/* ==================== STEP 1: TRAINING DETAILS ==================== */}
-      <View style={[styles.stepHeader, { borderBottomColor: colors.border }]}>
-        <View style={[styles.stepBadge, { backgroundColor: colors.primary + '15' }]}>
-          <Text style={[styles.stepNumber, { color: colors.primary }]}>1</Text>
+      {/* Stepper indicator */}
+      <View style={styles.stepperWrap}>
+        <View style={styles.stepperRow}>
+          <TouchableOpacity 
+            style={styles.stepperItem} 
+            onPress={() => currentStep === 2 && handleBackStep()}
+            activeOpacity={currentStep === 2 ? 0.7 : 1}
+          >
+            <View
+              style={[
+                styles.stepperCircle,
+                {
+                  backgroundColor: step1Complete ? colors.primary : currentStep === 1 ? colors.primary + '20' : colors.secondary,
+                  borderColor: step1Complete || currentStep === 1 ? colors.primary : colors.border,
+                },
+              ]}
+            >
+              {step1Complete ? (
+                <Ionicons name="checkmark" size={14} color="#fff" />
+              ) : (
+                <Text style={[styles.stepperCircleText, { color: currentStep === 1 ? colors.primary : colors.textMuted }]}>1</Text>
+              )}
+            </View>
+            <Text style={[styles.stepperLabel, { color: currentStep === 1 ? colors.text : colors.textMuted }]}>Details</Text>
+          </TouchableOpacity>
+
+          <View style={[styles.stepperLine, { backgroundColor: step1Complete ? colors.primary : colors.border }]} />
+
+          <View style={styles.stepperItem}>
+            <View
+              style={[
+                styles.stepperCircle,
+                {
+                  backgroundColor: step2Complete ? colors.primary : currentStep === 2 ? colors.primary + '20' : colors.secondary,
+                  borderColor: step2Complete || currentStep === 2 ? colors.primary : colors.border,
+                },
+              ]}
+            >
+              {step2Complete ? (
+                <Ionicons name="checkmark" size={14} color="#fff" />
+              ) : (
+                <Text style={[styles.stepperCircleText, { color: currentStep === 2 ? colors.primary : colors.textMuted }]}>2</Text>
+              )}
+            </View>
+            <Text style={[styles.stepperLabel, { color: currentStep === 2 ? colors.text : colors.textMuted }]}>Drills</Text>
+          </View>
         </View>
-        <Text style={[styles.stepTitle, { color: colors.text }]}>Training Details</Text>
       </View>
+
+      {/* ==================== STEP 1: TRAINING DETAILS ==================== */}
+      {currentStep === 1 && (
+        <>
+        <View style={[styles.stepHeader, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.stepTitle, { color: colors.text }]}>Training Details</Text>
+        </View>
 
       {/* Team Selector */}
       <View style={styles.inputSection}>
@@ -465,133 +592,162 @@ export default function CreateTrainingScreen() {
         </View>
       </TouchableOpacity>
 
-      {/* ==================== STEP 2: ATTACH DRILLS ==================== */}
-      <View style={[styles.stepHeader, { borderBottomColor: colors.border, marginTop: 8 }]}>
-        <View style={[styles.stepBadge, { backgroundColor: drills.length > 0 ? colors.primary + '15' : colors.destructive + '15' }]}>
-          <Text style={[styles.stepNumber, { color: drills.length > 0 ? colors.primary : colors.destructive }]}>2</Text>
-        </View>
-        <Text style={[styles.stepTitle, { color: colors.text }]}>Attach Drill</Text>
-      </View>
-
-      {/* Drills Section Header */}
-      <View style={styles.drillsHeader}>
-        <View style={styles.labelRow}>
-          <Ionicons name="list" size={16} color={drills.length === 0 ? colors.destructive : colors.primary} />
-          <Text style={[styles.inputLabel, { color: colors.text }]}>Drills {drills.length > 0 && `(${drills.length})`}</Text>
-          <Text style={[styles.required, { color: colors.destructive }]}>*</Text>
-        </View>
-      </View>
-
-      {drills.length === 0 && teamDrills.length > 0 && (
-        <Text style={[styles.drillsHint, { color: colors.textMuted }]}>Tap a drill below to add it</Text>
-      )}
-
-      {/* Drill List */}
-      {drills.length > 0 && (
-        <View style={styles.drillsList}>
-          {drills.map((drill, index) => (
-            <DrillItem
-              key={drill.id}
-              drill={drill}
-              index={index}
-              colors={colors}
-              onRemove={() => handleRemoveDrill(drill.id)}
-            />
-          ))}
-        </View>
-      )}
-
-      {/* Drill Library - Select from team's saved drills */}
-      {teamDrills.length > 0 && (
-        <View style={styles.drillLibrarySection}>
-          <Text style={[styles.drillLibraryLabel, { color: colors.textMuted }]}>
-            {drills.length === 0 ? 'Select from drill library:' : 'Add more drills:'}
-          </Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.drillChipsScroll}
-          >
-            {teamDrills.map(drill => {
-              const isGrouping = drill.drill_goal === 'grouping';
-              const goalColor = isGrouping ? '#10B981' : '#93C5FD';
-              return (
-                <TouchableOpacity
-                  key={drill.id}
-                  style={[styles.quickChip, { backgroundColor: colors.secondary }]}
-                  onPress={() => handleSelectDrill(drill)}
-                >
-                  {drill.icon && <Text style={styles.quickChipIcon}>{drill.icon}</Text>}
-                  <Text style={[styles.quickChipText, { color: colors.text }]}>{drill.name}</Text>
-                  <View style={[styles.quickChipBadge, { backgroundColor: `${goalColor}20` }]}>
-                    <Text style={[styles.quickChipBadgeText, { color: goalColor }]}>
-                      {isGrouping ? 'G' : 'A'}
-                    </Text>
-                  </View>
-                  <Plus size={12} color={colors.primary} />
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-      )}
-
-      {/* Empty State */}
-      {drills.length === 0 && teamDrills.length === 0 && (
-        <View style={[styles.emptyDrills, { backgroundColor: colors.secondary }]}>
-          <Target size={32} color={colors.textMuted} />
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>
-            {!selectedTeamId ? 'Select a team first' : 'No drills available'}
-          </Text>
-          <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
-            {!selectedTeamId 
-              ? 'Choose a team above to see available drills' 
-              : 'Go to Team → Manage → Drill Library to add drills first'
-            }
-          </Text>
-        </View>
-      )}
-
-      {/* Info */}
-      <View style={[styles.infoCard, { backgroundColor: colors.secondary }]}>
-        <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
-        <Text style={[styles.infoText, { color: colors.textMuted }]}>
-          Team members will be notified and can track their drill completions.
-        </Text>
-      </View>
-
-      {/* Create Button */}
+      {/* Next Button */}
       <TouchableOpacity
         style={[
-          styles.createButton, 
-          { 
-            backgroundColor: isFormValid ? colors.primary : colors.muted,
-            opacity: submitting ? 0.85 : 1,
-          }
+          styles.nextButton,
+          {
+            backgroundColor: step1Complete ? colors.primary : colors.muted,
+          },
         ]}
-        onPress={handleCreate}
-        disabled={!canCreate}
+        onPress={handleNextStep}
         activeOpacity={0.8}
       >
-        {submitting ? (
-          <>
-            <ActivityIndicator color="#fff" size="small" />
-            <Text style={styles.createButtonText}>Creating...</Text>
-          </>
-        ) : (
-          <>
-            <Ionicons name="add-circle" size={20} color="#fff" />
-            <Text style={styles.createButtonText}>
-              {!selectedTeamId 
-                ? 'Select Team First'
-                : drills.length === 0 
-                  ? 'Add Drills First' 
-                  : 'Create Training'
-              }
-            </Text>
-          </>
-        )}
+        <Text style={styles.nextButtonText}>Next: Add Drills</Text>
+        <Ionicons name="arrow-forward" size={18} color="#fff" />
       </TouchableOpacity>
+        </>
+      )}
+
+      {/* ==================== STEP 2: ATTACH DRILLS ==================== */}
+      {currentStep === 2 && (
+        <>
+        {/* Compact back link */}
+        <TouchableOpacity
+          style={styles.backLink}
+          onPress={handleBackStep}
+          activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="chevron-back" size={18} color={colors.primary} />
+          <Text style={[styles.backLinkText, { color: colors.primary }]}>Details</Text>
+        </TouchableOpacity>
+
+        {/* Added Drills */}
+        {drills.length > 0 && (
+          <View style={styles.addedDrillsSection}>
+            <View style={styles.addedDrillsHeader}>
+              <Text style={[styles.addedDrillsTitle, { color: colors.text }]}>
+                {drills.length} {drills.length === 1 ? 'drill' : 'drills'} added
+              </Text>
+            </View>
+            <View style={styles.drillsList}>
+              {drills.map((drill, index) => (
+                <DrillItem
+                  key={drill.id}
+                  drill={drill}
+                  index={index}
+                  colors={colors}
+                  onRemove={() => handleRemoveDrill(drill.id)}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Drill Library */}
+        <View style={[styles.librarySection, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.libraryHeader}>
+            <Text style={[styles.libraryTitle, { color: colors.text }]}>
+              {drills.length === 0 ? 'Choose drills' : 'Add more'}
+            </Text>
+            {canCreateDrills && (
+              <TouchableOpacity
+                style={[styles.newDrillBtn, { backgroundColor: colors.primary + '15' }]}
+                onPress={handleOpenQuickDrill}
+                activeOpacity={0.7}
+              >
+                <Plus size={14} color={colors.primary} />
+                <Text style={[styles.newDrillBtnText, { color: colors.primary }]}>New</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {teamDrills.length > 0 ? (
+            <View style={styles.libraryGrid}>
+              {teamDrills.map(drill => {
+                const isGrouping = drill.drill_goal === 'grouping';
+                const goalColor = isGrouping ? '#10B981' : '#93C5FD';
+                return (
+                  <TouchableOpacity
+                    key={drill.id}
+                    style={[styles.libraryDrill, { backgroundColor: colors.secondary }]}
+                    onPress={() => handleSelectDrill(drill)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.libraryDrillRow}>
+                      {drill.icon && <Text style={styles.libraryDrillIcon}>{drill.icon}</Text>}
+                      <Text style={[styles.libraryDrillName, { color: colors.text }]} numberOfLines={1}>
+                        {drill.name}
+                      </Text>
+                      <View style={[styles.libraryDrillBadge, { backgroundColor: `${goalColor}20` }]}>
+                        <Text style={[styles.libraryDrillBadgeText, { color: goalColor }]}>
+                          {isGrouping ? 'G' : 'A'}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={[styles.libraryDrillAdd, { backgroundColor: colors.primary + '15' }]}>
+                      <Plus size={14} color={colors.primary} />
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={styles.libraryEmpty}>
+              <Text style={[styles.libraryEmptyText, { color: colors.textMuted }]}>
+                {!selectedTeamId 
+                  ? 'Select a team first' 
+                  : 'No drills in library yet'
+                }
+              </Text>
+              {selectedTeamId && canCreateDrills && (
+                <TouchableOpacity
+                  style={[styles.libraryEmptyBtn, { borderColor: colors.primary }]}
+                  onPress={handleOpenQuickDrill}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.libraryEmptyBtnText, { color: colors.primary }]}>Create first drill</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* Create Button */}
+        <TouchableOpacity
+          style={[
+            styles.createButton, 
+            { 
+              backgroundColor: step2Complete ? colors.primary : colors.muted,
+              opacity: submitting ? 0.85 : 1,
+            }
+          ]}
+          onPress={step2Complete ? handleCreate : undefined}
+          disabled={!canCreate}
+          activeOpacity={0.8}
+        >
+          {submitting ? (
+            <>
+              <ActivityIndicator color="#fff" size="small" />
+              <Text style={styles.createButtonText}>Creating...</Text>
+            </>
+          ) : (
+            <>
+              <Ionicons name={step2Complete ? "checkmark-circle" : "add-circle-outline"} size={20} color="#fff" />
+              <Text style={styles.createButtonText}>Create Training</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        {/* Subtle info */}
+        {drills.length > 0 && (
+          <Text style={[styles.footerHint, { color: colors.textMuted }]}>
+            Team will be notified when training is created
+          </Text>
+        )}
+        </>
+      )}
 
       {/* Drill instance configuration modal */}
       <DrillInstanceModal
@@ -599,6 +755,14 @@ export default function CreateTrainingScreen() {
         onClose={handleCloseInstanceModal}
         onConfirm={handleInstanceConfirm}
         drill={selectedDrill}
+      />
+
+      {/* Quick drill modal */}
+      <QuickDrillModal
+        visible={quickDrillModalVisible}
+        onClose={() => setQuickDrillModalVisible(false)}
+        onSave={handleQuickDrillSaved}
+        saving={creatingQuickDrill}
       />
 
       {showDatePicker && (
@@ -673,6 +837,15 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '700', letterSpacing: -0.5 },
   subtitle: { fontSize: 14, marginTop: 4 },
 
+  // Main stepper (2 steps)
+  stepperWrap: { marginBottom: 18 },
+  stepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  stepperItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  stepperCircle: { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  stepperCircleText: { fontSize: 13, fontWeight: '800' },
+  stepperLabel: { fontSize: 13, fontWeight: '700' },
+  stepperLine: { width: 36, height: 2, borderRadius: 2 },
+
   // Step Header
   stepHeader: { 
     flexDirection: 'row', 
@@ -699,6 +872,26 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
 
+  // Next/Back buttons
+  nextButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 52,
+    borderRadius: 14,
+    gap: 10,
+    marginBottom: 24,
+  },
+  nextButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+  backLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    alignSelf: 'flex-start',
+    marginBottom: 16,
+  },
+  backLinkText: { fontSize: 15, fontWeight: '600' },
+
   // Input Section
   inputSection: { marginBottom: 16 },
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
@@ -722,28 +915,73 @@ const styles = StyleSheet.create({
   switchThumb: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff' },
   switchThumbActive: { alignSelf: 'flex-end' },
 
-  // Drills Header
-  drillsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  drillsHint: { fontSize: 12, marginBottom: 12 },
+  // Added Drills Section
+  addedDrillsSection: { marginBottom: 16 },
+  addedDrillsHeader: { marginBottom: 10 },
+  addedDrillsTitle: { fontSize: 13, fontWeight: '600', opacity: 0.7 },
 
-  // Drill Library
-  drillLibrarySection: { marginBottom: 16 },
-  drillLibraryLabel: { fontSize: 12, fontWeight: '500', marginBottom: 8 },
-  drillChipsScroll: { gap: 8, paddingRight: 20 },
-  quickChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10 },
-  quickChipText: { fontSize: 13, fontWeight: '500' },
-  quickChipBadge: { width: 18, height: 18, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
-  quickChipBadgeText: { fontSize: 10, fontWeight: '700' },
-
-  quickChipIcon: { fontSize: 14 },
-
-  // Empty Drills
-  emptyDrills: { alignItems: 'center', padding: 32, borderRadius: 16, gap: 8, marginBottom: 16 },
-  emptyTitle: { fontSize: 16, fontWeight: '600' },
-  emptyDesc: { fontSize: 13, textAlign: 'center' },
+  // Library Section
+  librarySection: { 
+    padding: 14, 
+    borderRadius: 14, 
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  libraryHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  libraryTitle: { fontSize: 15, fontWeight: '600' },
+  newDrillBtn: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 4,
+    paddingHorizontal: 10, 
+    paddingVertical: 6, 
+    borderRadius: 8,
+  },
+  newDrillBtnText: { fontSize: 13, fontWeight: '600' },
+  libraryGrid: { gap: 8 },
+  libraryDrill: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between',
+    padding: 12, 
+    borderRadius: 10,
+  },
+  libraryDrillRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  libraryDrillIcon: { fontSize: 14 },
+  libraryDrillName: { fontSize: 14, fontWeight: '500', flex: 1 },
+  libraryDrillBadge: { 
+    width: 20, 
+    height: 20, 
+    borderRadius: 5, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+  },
+  libraryDrillBadgeText: { fontSize: 11, fontWeight: '700' },
+  libraryDrillAdd: { 
+    width: 28, 
+    height: 28, 
+    borderRadius: 8, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    marginLeft: 10,
+  },
+  libraryEmpty: { alignItems: 'center', paddingVertical: 20, gap: 10 },
+  libraryEmptyText: { fontSize: 14, textAlign: 'center' },
+  libraryEmptyBtn: { 
+    paddingHorizontal: 14, 
+    paddingVertical: 8, 
+    borderRadius: 8, 
+    borderWidth: 1.5,
+  },
+  libraryEmptyBtnText: { fontSize: 13, fontWeight: '600' },
 
   // Drills List
-  drillsList: { gap: 10, marginBottom: 16 },
+  drillsList: { gap: 8 },
   drillItem: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1 },
   drillItemIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   drillItemContent: { flex: 1, gap: 4 },
@@ -754,13 +992,10 @@ const styles = StyleSheet.create({
   drillItemMeta: { fontSize: 13 },
   drillItemRemove: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
 
-  // Info Card
-  infoCard: { flexDirection: 'row', alignItems: 'flex-start', padding: 14, borderRadius: 12, gap: 10, marginBottom: 20 },
-  infoText: { flex: 1, fontSize: 13, lineHeight: 18 },
-
   // Create Button
-  createButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 52, borderRadius: 14, gap: 8, marginBottom: 20 },
+  createButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 52, borderRadius: 14, gap: 8, marginBottom: 12 },
   createButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+  footerHint: { fontSize: 12, textAlign: 'center', marginBottom: 20 },
 
   // Team Selector
   teamSelector: { marginHorizontal: -4 },
