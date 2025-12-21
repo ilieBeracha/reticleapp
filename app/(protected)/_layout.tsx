@@ -3,6 +3,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useGarminStore } from '@/store/garminStore';
+import { useInitializeMessages } from '@/store/messagesService';
 import { router, Stack } from 'expo-router';
 import { useEffect } from 'react';
 
@@ -24,15 +25,21 @@ import { useEffect } from 'react';
 export default function ProtectedLayout() {
   const colors = useColors();
   const garminInitialize = useGarminStore((s) => s._initialize);
+  const initializeMessages = useInitializeMessages();
   
   // Register push notifications on authenticated user
   usePushNotifications();
 
-  // Initialize Garmin SDK at app level so it persists across navigation
+  // Initialize Garmin SDK and message listener at app level
   useEffect(() => {
-    const cleanup = garminInitialize();
-    return cleanup;
-  }, [garminInitialize]);
+    const garminCleanup = garminInitialize();
+    const messageCleanup = initializeMessages();
+    
+    return () => {
+      garminCleanup();
+      messageCleanup();
+    };
+  }, [garminInitialize, initializeMessages]);
 
   return (
     <ThemeProvider>

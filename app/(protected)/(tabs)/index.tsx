@@ -4,7 +4,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { useColors } from '@/hooks/ui/useColors';
 import * as Sentry from '@sentry/react-native';
 import { Stack } from 'expo-router';
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, memo, type ErrorInfo, type ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
 
 /**
@@ -108,7 +108,7 @@ function HomeScreenContent() {
 }
 
 // Memoize the component to prevent unnecessary re-renders
-const MemoizedHomeScreenContent = React.memo(HomeScreenContent);
+const MemoizedHomeScreenContent = memo(HomeScreenContent);
 
 /**
  * Default Export - Home Screen with Error Boundary

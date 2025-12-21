@@ -42,6 +42,7 @@ import { WeeklyHighlightsCard } from './unified/sections/WeeklyHighlightsCard';
 import { styles } from './unified/styles';
 import { useHomeState } from './useHomeState';
 import { ActivityTimeline } from './widgets';
+import { useMessagesStore } from '@/store/messagesService';
 
 function TitleHeader({
   title,
@@ -110,6 +111,13 @@ export function UnifiedHomePage() {
     } finally {
       setLoadingAllSessions(false);
     }
+  }, []);
+
+
+  useEffect(() => {
+    useMessagesStore.subscribe((state) => {
+      console.log('Messages:', state.messages);
+    });
   }, []);
 
   // Load data on focus

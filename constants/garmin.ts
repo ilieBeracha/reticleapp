@@ -1,0 +1,1 @@
+export const GARMIN_APP_ID = 'cc520bad-1365-422b-8589-63d60c71cea0';

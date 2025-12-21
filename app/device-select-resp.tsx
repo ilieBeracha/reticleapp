@@ -4,13 +4,12 @@
  * This route handles the callback from Garmin Connect Mobile.
  * It quickly processes the response and redirects to integrations.
  */
-import { useGarminStore } from '@/store/garminStore';
-import { router } from 'expo-router';
+import { GarminDeviceStatus, useGarminStore } from '@/store/garminStore';
+import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet } from 'react-native';
 
-export default function DeviceSelectResponseScreen() {
-  const { refreshDevices } = useGarminStore();
+function DeviceSelectResponseScreen() {
+  const { refreshDevices, connectToDevice, devices } = useGarminStore();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -22,32 +21,17 @@ export default function DeviceSelectResponseScreen() {
       
       // Refresh devices list
       await refreshDevices();
-      
-      const { devices } = useGarminStore.getState();
-      
-      console.log('[Garmin] Devices after refresh:', devices.length);
-      
-      // Ready to redirect
-      setReady(true);
-    };
-
+        
+      const connectedDevice = devices.find(d => d.status === GarminDeviceStatus.CONNECTED);
+      if (connectedDevice) {
+        connectToDevice(devices[0].id, devices[0].model, devices[0].name);
+        console.log('[Garmin] Connected to device:', devices[0].name);
+      }
+    }
     process();
-  }, []);
+  }, [connectToDevice, devices, refreshDevices]);
 
-  // Once ready, redirect to integrations
-  if (ready) {
-    router.replace('/(protected)');    
-  }
-  return null;
-
+  return <Redirect href="/(protected)/(tabs)" />;
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#000',
-  },
-});
-
+export default DeviceSelectResponseScreen;

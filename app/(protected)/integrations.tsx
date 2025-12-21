@@ -67,7 +67,11 @@ export default function IntegrationsScreen() {
           { text: 'Re-pair', onPress: startDeviceSelection },
           { 
             text: 'Connect', 
-            onPress: () => connectToDevice(devices[0])
+            onPress: () => {
+              if (devices.length > 0) {
+                connectToDevice(devices[0].id, devices[0].model, devices[0].name);
+              }
+            }
           }
         ]
       );

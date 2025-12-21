@@ -7,8 +7,7 @@ import {
     destroy,
     getDevicesList,
     initialize,
-    sendMessage,
-    showDevicesList,
+    showDevicesList
 } from 'react-native-garmin-connect';
 import { create } from 'zustand';
 
@@ -26,8 +25,7 @@ interface GarminState {
   
   // Actions
   startDeviceSelection: () => void;
-  connectToDevice: (device: GarminDevice) => void;
-  sendMessage: (message: string) => void;
+  connectToDevice: (id: string, model: string, name: string) => void;
   refreshDevices: () => Promise<void>;
   clearError: () => void;
   _initialize: () => () => void;
@@ -42,14 +40,6 @@ export const useGarminStore = create<GarminState>((set, get) => ({
   isInitialized: false,
   isSdkReady: false,
   lastError: null,
-  sendMessage: (message: string) => {
-    try {
-      sendMessage(message);
-    } catch (error) {
-      console.error('[Garmin] Error sending message:', error);
-      set({ lastError: 'Failed to send message' });
-    }
-  },
   startDeviceSelection: () => {
     if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
       set({ lastError: 'Garmin is only available on iOS and Android' });
@@ -79,14 +69,14 @@ export const useGarminStore = create<GarminState>((set, get) => ({
     }, 30000); // 30 second timeout
   },
 
-  connectToDevice: (device: GarminDevice) => {
+  connectToDevice: (id: string, model: string, name: string) => {
     if (!get().isSdkReady) {
       console.log('[Garmin] SDK not ready yet');
       return;
     }
     
-    console.log('[Garmin] Connecting to device:', device.name);
-    connectDevice(device.id, device.model, device.name);
+    console.log('[Garmin] Connecting to device:', name);
+    connectDevice(id, model, name);
   },
 
   refreshDevices: async () => {
@@ -195,4 +185,5 @@ export const useGarminConnectionStatus = () => {
   if (devices.length > 0) return 'paired';
   return 'disconnected';
 };
+
 
