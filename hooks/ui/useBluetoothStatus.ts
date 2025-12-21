@@ -1,44 +1,36 @@
-import { useEffect, useState } from "react";
+import { useGarminStore, GarminDeviceStatus } from "@/store/garminStore";
 
-interface GarminDevice {
+interface BluetoothDevice {
   name: string;
   model: string;
-  battery: number;
-  isCharging: boolean;
+  battery?: number;
+  isCharging?: boolean;
 }
 
+/**
+ * Hook to get Bluetooth/Garmin connection status.
+ * Uses the Garmin store to get real device data.
+ */
 export function useBluetoothStatus() {
-  const [isConnected, setIsConnected] = useState(true); // Mock as connected
-  const [device, setDevice] = useState<GarminDevice | null>(null);
+  const { devices } = useGarminStore();
+  
+  // Find the first connected device
+  const connectedDevice = devices.find(
+    (d) => d.status === GarminDeviceStatus.CONNECTED
+  );
+  
+  const device: BluetoothDevice | null = connectedDevice
+    ? {
+        name: connectedDevice.name,
+        model: connectedDevice.model,
+        // Battery info not available from Garmin Connect SDK
+        battery: undefined,
+        isCharging: undefined,
+      }
+    : null;
 
-  useEffect(() => {
-    // Mock Garmin device - replace with actual Bluetooth/Garmin SDK
-    // You can use Garmin Connect IQ SDK or react-native-ble-manager
-
-    // Simulated Garmin device
-    const mockGarminDevice: GarminDevice = {
-      name: "Garmin Forerunner 965",
-      model: "FR965",
-      battery: 87,
-      isCharging: false,
-    };
-
-    setIsConnected(true);
-    setDevice(mockGarminDevice);
-
-    // Simulate battery drain every 30 seconds
-    const interval = setInterval(() => {
-      setDevice((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          battery: Math.max(0, prev.battery - 1),
-        };
-      });
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  return { isConnected, device };
+  return {
+    isConnected: !!connectedDevice,
+    device,
+  };
 }

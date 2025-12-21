@@ -2,7 +2,9 @@ import { Header } from '@/components/Header';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useGarminStore } from '@/store/garminStore';
 import { router, Stack } from 'expo-router';
+import { useEffect } from 'react';
 
 /**
  * Protected Layout - Unified Architecture
@@ -21,9 +23,16 @@ import { router, Stack } from 'expo-router';
  */
 export default function ProtectedLayout() {
   const colors = useColors();
+  const garminInitialize = useGarminStore((s) => s._initialize);
   
   // Register push notifications on authenticated user
   usePushNotifications();
+
+  // Initialize Garmin SDK at app level so it persists across navigation
+  useEffect(() => {
+    const cleanup = garminInitialize();
+    return cleanup;
+  }, [garminInitialize]);
 
   return (
     <ThemeProvider>

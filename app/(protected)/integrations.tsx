@@ -1,11 +1,13 @@
 /**
  * Integrations Page - Simple & Clean
+ * 
+ * Note: Garmin SDK is initialized at app level in ProtectedLayout
+ * so it persists across navigation.
  */
 import { useColors } from '@/hooks/ui/useColors';
-import { useGarminStore } from '@/store/garminStore';
+import { GarminDeviceStatus, useGarminStore } from '@/store/garminStore';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
-import { useEffect } from 'react';
 import {
   Alert,
   Platform,
@@ -18,31 +20,64 @@ import {
 
 export default function IntegrationsScreen() {
   const colors = useColors();
-  const { devices, isConnecting, startDeviceSelection, _initialize } = useGarminStore();
-
-  useEffect(() => {
-    const cleanup = _initialize();
-    return cleanup;
-  }, [_initialize]);
+  const { devices, isConnecting, lastError, startDeviceSelection, connectToDevice, clearError } = useGarminStore();
 
   const handleGarminPress = () => {
-    if (Platform.OS !== 'ios') {
-      Alert.alert('Not Available', 'Garmin is only available on iOS');
+    if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
+      Alert.alert('Not Available', 'Garmin is only available on iOS and Android');
       return;
     }
     
-    if (devices.length > 0) {
+    // If there was a "device not found" error, prompt to re-pair
+    if (lastError?.includes('not found') || lastError?.includes('re-select')) {
+      Alert.alert(
+        'Re-pair Required',
+        'Your device needs to be re-paired. Open Garmin Connect to select your device.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Open Garmin Connect', 
+            onPress: () => {
+              clearError();
+              startDeviceSelection();
+            }
+          }
+        ]
+      );
+      return;
+    }
+    
+    const connectedDevice = devices.find(d => d.status === GarminDeviceStatus.CONNECTED);
+    if (connectedDevice) {
       Alert.alert(
         'Garmin Connected',
-        `Connected to ${devices[0]?.friendlyName || 'your device'}.\n\nTo disconnect, use the Garmin Connect app.`,
-        [{ text: 'OK' }]
+        `Connected to ${connectedDevice.name || 'your device'}.\n\nTo disconnect, use the Garmin Connect app.`,
+        [
+          { text: 'OK' },
+          { text: 'Re-pair', onPress: startDeviceSelection }
+        ]
+      );
+    } else if (devices.length > 0) {
+      // Devices are paired but not connected - offer to connect or re-pair
+      Alert.alert(
+        'Garmin Device',
+        `${devices[0].name}\nStatus: ${devices[0].status || 'OFFLINE'}`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Re-pair', onPress: startDeviceSelection },
+          { 
+            text: 'Connect', 
+            onPress: () => connectToDevice(devices[0])
+          }
+        ]
       );
     } else {
       startDeviceSelection();
     }
   };
 
-  const isConnected = devices.length > 0;
+  const connectedDevice = devices.find(d => d.status === GarminDeviceStatus.CONNECTED);
+  const isConnected = !!connectedDevice;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -85,8 +120,10 @@ export default function IntegrationsScreen() {
               {isConnecting 
                 ? 'Connecting...' 
                 : isConnected 
-                  ? devices[0]?.friendlyName 
-                  : 'Heart rate & GPS sync'}
+                  ? connectedDevice?.name 
+                  : devices.length > 0 
+                    ? `${devices.length} device(s) paired`
+                    : 'Heart rate & GPS sync'}
             </Text>
           </View>
 

@@ -42,9 +42,6 @@ typedef NS_ENUM(NSInteger, IQDeviceStatus){
 ///         Garmin Connect Mobile.
 @property (nonatomic, readonly) NSString *friendlyName;
 
-/// @brief The part number of the device per the Garmin catalog of devices.
-@property (nonatomic, readonly) NSString *partNumber;
-
 /// @brief  Creates a new device instance.
 ///
 /// @param  uuid         The UUID of the device to create.
@@ -53,17 +50,6 @@ typedef NS_ENUM(NSInteger, IQDeviceStatus){
 ///
 /// @return A new IQDevice instance with the appropriate values set.
 + (IQDevice *)deviceWithId:(NSUUID *)uuid modelName:(NSString *)modelName friendlyName:(NSString *)friendlyName;
-
-/// @brief  Creates a new device instance with part number included.
-///
-/// @param  uuid         The UUID of the device to create.
-/// @param  modelName    The model name of the device to create.
-/// @param  friendlyName The friendly name of the device to create.
-/// @param  partNumber The part number of the device to create.
-///
-/// @return A new IQDevice instance with the appropriate values set.
-+ (IQDevice *)deviceWithId:(NSUUID *)uuid modelName:(NSString *)modelName friendlyName:(NSString *)friendlyName
-                partNumber:(NSString *)partNumber;
 
 /// @brief  Creates a new device instance by copying another device's values.
 ///

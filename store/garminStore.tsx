@@ -1,36 +1,64 @@
-import type { GarminDevice } from 'expo-garmin';
+import { DeviceEventEmitter, NativeEventEmitter, Platform } from 'react-native';
 import {
-    addDeviceStatusChangedListener,
-    addDevicesUpdatedListener,
-    getConnectedDevices,
-    showDeviceSelection
-} from 'expo-garmin';
-import { Platform } from 'react-native';
+    type Device,
+    GarminConnect,
+    Status,
+    connectDevice,
+    destroy,
+    getDevicesList,
+    initialize,
+    sendMessage,
+    showDevicesList,
+} from 'react-native-garmin-connect';
 import { create } from 'zustand';
+
+// Re-export types for consumers
+export type GarminDevice = Device;
+export { Status as GarminDeviceStatus };
 
 interface GarminState {
   // State
   devices: GarminDevice[];
   isConnecting: boolean;
   isInitialized: boolean;
+  isSdkReady: boolean;
   lastError: string | null;
   
   // Actions
   startDeviceSelection: () => void;
+  connectToDevice: (device: GarminDevice) => void;
+  sendMessage: (message: string) => void;
   refreshDevices: () => Promise<void>;
   clearError: () => void;
   _initialize: () => () => void;
 }
 
+// URL scheme from app.config.js
+const URL_SCHEME = 'retic';
+
 export const useGarminStore = create<GarminState>((set, get) => ({
   devices: [],
   isConnecting: false,
   isInitialized: false,
+  isSdkReady: false,
   lastError: null,
-
+  sendMessage: (message: string) => {
+    try {
+      sendMessage(message);
+    } catch (error) {
+      console.error('[Garmin] Error sending message:', error);
+      set({ lastError: 'Failed to send message' });
+    }
+  },
   startDeviceSelection: () => {
-    if (Platform.OS !== 'ios') {
-      set({ lastError: 'Garmin is only available on iOS' });
+    if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
+      set({ lastError: 'Garmin is only available on iOS and Android' });
+      return;
+    }
+    
+    if (!get().isSdkReady) {
+      console.log('[Garmin] SDK not ready yet');
+      set({ lastError: 'Garmin SDK not ready' });
       return;
     }
     
@@ -43,8 +71,7 @@ export const useGarminStore = create<GarminState>((set, get) => ({
     set({ isConnecting: true, lastError: null });
     
     // This opens Garmin Connect Mobile - the app will go to background
-    // When user returns, the URL callback will trigger device update
-    showDeviceSelection();
+    showDevicesList();
     
     // Reset connecting state after a timeout (in case user cancels in GCM)
     setTimeout(() => {
@@ -52,11 +79,23 @@ export const useGarminStore = create<GarminState>((set, get) => ({
     }, 30000); // 30 second timeout
   },
 
+  connectToDevice: (device: GarminDevice) => {
+    if (!get().isSdkReady) {
+      console.log('[Garmin] SDK not ready yet');
+      return;
+    }
+    
+    console.log('[Garmin] Connecting to device:', device.name);
+    connectDevice(device.id, device.model, device.name);
+  },
+
   refreshDevices: async () => {
-    if (Platform.OS !== 'ios') return;
+    if (Platform.OS !== 'ios' && Platform.OS !== 'android') return;
+    if (!get().isSdkReady) return;
     
     try {
-      const devices = await getConnectedDevices();
+      const devices = await getDevicesList();
+      console.log('[Garmin] Fetched devices:', devices);
       set({ devices, isConnecting: false });
     } catch (error) {
       console.error('[Garmin] Error fetching devices:', error);
@@ -67,7 +106,7 @@ export const useGarminStore = create<GarminState>((set, get) => ({
   clearError: () => set({ lastError: null }),
 
   _initialize: () => {
-    if (Platform.OS !== 'ios') {
+    if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
       return () => {};
     }
     
@@ -75,31 +114,72 @@ export const useGarminStore = create<GarminState>((set, get) => ({
       return () => {};
     }
     
-    console.log('[Garmin] Initializing store listeners...');
+    console.log('[Garmin] Initializing SDK...');
     set({ isInitialized: true });
 
-    // Listen for device updates from the native module
-    const devicesSub = addDevicesUpdatedListener((event) => {
-      console.log('[Garmin] Devices updated:', event.devices);
-      set({ devices: event.devices, isConnecting: false });
-    });
+    // Create the appropriate event emitter based on platform
+    // IMPORTANT: Register listeners BEFORE calling initialize() to avoid race condition
+    const emitter = Platform.OS === 'ios' 
+      ? new NativeEventEmitter(GarminConnect as any)
+      : DeviceEventEmitter;
 
-    // Listen for device status changes
-    const statusSub = addDeviceStatusChangedListener((event) => {
-      console.log('[Garmin] Device status changed:', event);
-      // Refresh devices when status changes
+    // Listen for SDK ready
+    const sdkReadySub = emitter.addListener('onSdkReady', () => {
+      console.log('[Garmin] SDK is ready');
+      set({ isSdkReady: true });
+      // Fetch initial devices list
       get().refreshDevices();
     });
 
-    // Initial fetch of connected devices
-    get().refreshDevices();
+    // Initialize the Garmin SDK with URL scheme AFTER listeners are set up
+    initialize(URL_SCHEME);
+
+    // Listen for device status changes (CONNECTED, DISCONNECTED, etc.)
+    const deviceStatusSub = emitter.addListener('onDeviceStatusChanged', (event: { name: string; status: string; error?: string }) => {
+      console.log('[Garmin] Device status changed:', event);
+      
+      // If there's an error (e.g., device not found), set it
+      if (event.error) {
+        set({ lastError: event.error, isConnecting: false });
+      } else {
+        // Clear any previous errors on successful status update
+        set({ lastError: null });
+      }
+      
+      // Refresh device list to get updated status
+      get().refreshDevices();
+    });
+
+    // Listen for messages from Garmin device
+    const messageSub = emitter.addListener('onMessage', (message: any) => {
+      console.log('[Garmin] Received message:', message);
+      // Handle incoming messages from Garmin device if needed
+    });
+
+    // Listen for errors
+    const errorSub = emitter.addListener('onError', (error: any) => {
+      console.error('[Garmin] Error:', error);
+      set({ lastError: error?.message || 'Garmin error occurred' });
+    });
+
+    // Listen for info (e.g., Garmin Connect app not installed)
+    const infoSub = emitter.addListener('onInfo', (info: any) => {
+      console.log('[Garmin] Info:', info);
+      if (info?.message?.includes('not installed')) {
+        set({ lastError: 'Garmin Connect app is not installed' });
+      }
+    });
 
     // Return cleanup function
     return () => {
-      console.log('[Garmin] Cleaning up store listeners...');
-      devicesSub.remove();
-      statusSub.remove();
-      set({ isInitialized: false });
+      console.log('[Garmin] Cleaning up SDK...');
+      sdkReadySub.remove();
+      deviceStatusSub.remove();
+      messageSub.remove();
+      errorSub.remove();
+      infoSub.remove();
+      destroy();
+      set({ isInitialized: false, isSdkReady: false });
     };
   },
 }));
@@ -109,7 +189,10 @@ export const useGarminConnectionStatus = () => {
   const { devices, isConnecting } = useGarminStore();
   
   if (isConnecting) return 'connecting';
-  if (devices.length > 0) return 'connected';
+  // Check if any device is connected (not just in the list)
+  const connectedDevice = devices.find(d => d.status === Status.CONNECTED);
+  if (connectedDevice) return 'connected';
+  if (devices.length > 0) return 'paired';
   return 'disconnected';
 };
 

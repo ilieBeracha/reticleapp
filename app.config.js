@@ -57,7 +57,7 @@ export default ({ config }) => {
       ],
     },
     plugins: [
-      './plugins/withGarminConnectIQ', // ← ADD THIS FIRST!
+      './plugins/withGarminUrlHandler',
       'expo-build-properties',
       'expo-secure-store',
       'expo-web-browser',

@@ -1,6 +1,7 @@
 import { useColors } from '@/hooks/ui/useColors';
 import { Ionicons } from '@expo/vector-icons';
-import { Link, Stack } from 'expo-router';
+import { Link, Stack, usePathname } from 'expo-router';
+import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 /**
@@ -10,7 +11,11 @@ import { StyleSheet, Text, View } from 'react-native';
  */
 export default function NotFoundScreen() {
   const colors = useColors();
-  
+
+  const pathname = usePathname();
+  useEffect(() => {
+    console.log(pathname || '');
+  }, [pathname]);
   return (
     <>
       <Stack.Screen options={{ title: 'Oops!' }} />

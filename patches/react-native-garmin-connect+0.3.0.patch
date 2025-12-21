@@ -1,0 +1,328 @@
+diff --git a/node_modules/react-native-garmin-connect/.DS_Store b/node_modules/react-native-garmin-connect/.DS_Store
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-garmin-connect/ios/AppConstants.swift b/node_modules/react-native-garmin-connect/ios/AppConstants.swift
+index 2e67eb2..aae19c5 100644
+--- a/node_modules/react-native-garmin-connect/ios/AppConstants.swift
++++ b/node_modules/react-native-garmin-connect/ios/AppConstants.swift
+@@ -8,7 +8,11 @@ struct AppConstants {
+     static let MESSAGE_TYPE_CURRENT_ANGLE = "MESSAGE_TYPE_CURRENT_ANGLE"
+     static let MESSAGE_TYPE_MAX_ANGLE = "MESSAGE_TYPE_MAX_ANGLE"
+ 
+-    static let APP_ID = "467f4bb7-cd3c-45c4-a39b-9bb78260c9ed"
++    // This can be set at runtime via GarminDeviceStorage.appId
++    // Default is empty - set your ConnectIQ watch app UUID
++    static var APP_ID: String {
++        return GarminDeviceStorage.appId.isEmpty ? "cc520bad-1365-422b-8589-63d60c71cea0" : GarminDeviceStorage.appId
++    }
+ 
+     static let STATUS_ONLINE = "ONLINE"
+     static let STATUS_OFFLINE = "OFFLINE"
+diff --git a/node_modules/react-native-garmin-connect/ios/GarminConnect-Bridging-Header.h b/node_modules/react-native-garmin-connect/ios/GarminConnect-Bridging-Header.h
+index bc10698..5fae954 100644
+--- a/node_modules/react-native-garmin-connect/ios/GarminConnect-Bridging-Header.h
++++ b/node_modules/react-native-garmin-connect/ios/GarminConnect-Bridging-Header.h
+@@ -1,3 +1,15 @@
+-#import "React/RCTBridgeModule.h"
+-#import "React/RCTEventEmitter.h"
++#ifndef GarminConnect_Bridging_Header_h
++#define GarminConnect_Bridging_Header_h
+ 
++// React Native
++#import <React/RCTBridgeModule.h>
++#import <React/RCTEventEmitter.h>
++
++// Garmin ConnectIQ SDK (Objective-C framework - required for Swift interop)
++#import <ConnectIQ/ConnectIQ.h>
++#import <ConnectIQ/IQApp.h>
++#import <ConnectIQ/IQAppStatus.h>
++#import <ConnectIQ/IQConstants.h>
++#import <ConnectIQ/IQDevice.h>
++
++#endif /* GarminConnect_Bridging_Header_h */
+diff --git a/node_modules/react-native-garmin-connect/ios/GarminConnect.h b/node_modules/react-native-garmin-connect/ios/GarminConnect.h
+index 9d6604f..40aa11d 100644
+--- a/node_modules/react-native-garmin-connect/ios/GarminConnect.h
++++ b/node_modules/react-native-garmin-connect/ios/GarminConnect.h
+@@ -1,7 +1,12 @@
+ #import <React/RCTEventEmitter.h>
+-#import "GarminConnectModule.h"
+ #import <Foundation/Foundation.h>
+ 
++#if __has_include(<React/RCTBridgeModule.h>)
++#import <React/RCTBridgeModule.h>
++#endif
++
++@class GarminConnectModule;
++
+ #ifdef RCT_NEW_ARCH_ENABLED
+ 
+ #import "NativeGarminConnect.h"
+diff --git a/node_modules/react-native-garmin-connect/ios/GarminConnect.mm b/node_modules/react-native-garmin-connect/ios/GarminConnect.mm
+index 83dae3d..741203a 100644
+--- a/node_modules/react-native-garmin-connect/ios/GarminConnect.mm
++++ b/node_modules/react-native-garmin-connect/ios/GarminConnect.mm
+@@ -1,7 +1,16 @@
+ #import "GarminConnect.h"
+-#import "GarminConnectModule.h"
+ #import <React/RCTBridgeModule.h>
+-//#import <react_native_garmin_connect-Swift.h>
++
++// Import ConnectIQ framework BEFORE Swift header - the Swift-generated header
++// references ConnectIQ types (IQAppMessageDelegate, IQDeviceStatus, etc.)
++#import <ConnectIQ/ConnectIQ.h>
++
++// Use Swift-generated header to access GarminConnectModule implementation
++#if __has_include(<react_native_garmin_connect-Swift.h>)
++#import <react_native_garmin_connect-Swift.h>
++#elif __has_include("react_native_garmin_connect-Swift.h")
++#import "react_native_garmin_connect-Swift.h"
++#endif
+ 
+ @implementation GarminConnect
+ 
+diff --git a/node_modules/react-native-garmin-connect/ios/GarminConnectModule.h b/node_modules/react-native-garmin-connect/ios/GarminConnectModule.h
+index 07c2959..99bec8e 100644
+--- a/node_modules/react-native-garmin-connect/ios/GarminConnectModule.h
++++ b/node_modules/react-native-garmin-connect/ios/GarminConnectModule.h
+@@ -1,4 +1,4 @@
+-#import "ConnectIQ.h"
++#import <ConnectIQ/ConnectIQ.h>
+ #import "React/RCTEventEmitter.h"
+ 
+ @interface GarminConnectModule : NSObject <IQAppMessageDelegate, IQDeviceEventDelegate>
+diff --git a/node_modules/react-native-garmin-connect/ios/GarminConnectModule.swift b/node_modules/react-native-garmin-connect/ios/GarminConnectModule.swift
+index 46e8be4..e1935e0 100644
+--- a/node_modules/react-native-garmin-connect/ios/GarminConnectModule.swift
++++ b/node_modules/react-native-garmin-connect/ios/GarminConnectModule.swift
+@@ -21,7 +21,7 @@ public class GarminConnectModule: NSObject, IQDeviceEventDelegate, IQAppMessageD
+         self.onSdkReady()
+     }
+     
+-    @objc func destroy(){
++    @objc public func destroy(){
+         ConnectIQ.sharedInstance().unregister(forAllDeviceEvents: self)
+         ConnectIQ.sharedInstance().unregister(forAllAppMessages: self)
+     }
+@@ -39,8 +39,33 @@ public class GarminConnectModule: NSObject, IQDeviceEventDelegate, IQAppMessageD
+ 
+     @objc(connectDevice:model:name:)
+     public func connectDevice(id: String, model: String, name: String) {
+-        let device = IQDevice.init(id: UUID(uuidString: id), modelName: model, friendlyName: name)
++        // Try to get the original IQDevice from storage (preserves SDK internal state)
++        guard let device = GarminDeviceStorage.getDevice(byId: id) else {
++            print("[Garmin] Device not found in storage, cannot connect: \(id)")
++            // Emit error status
++            let errorDevice: NSMutableDictionary = [:]
++            errorDevice["name"] = name
++            errorDevice["status"] = "OFFLINE"
++            errorDevice["error"] = "Device not found. Please re-select device from Garmin Connect."
++            self.emitter.sendEvent(withName: "onDeviceStatusChanged", body: errorDevice)
++            return
++        }
++        
++        print("[Garmin] Connecting to stored device: \(device.friendlyName ?? name)")
++        
+         ConnectIQ.sharedInstance().register(forDeviceEvents: device, delegate: self)
++        
++        // Query and emit the current device status immediately
++        let currentStatus = ConnectIQ.sharedInstance().getDeviceStatus(device)
++        print("[Garmin] Device \(name) current status: \(getStatus(status: currentStatus))")
++        self.onDeviceStatusChanged(device, status: getStatus(status: currentStatus))
++        
++        // If already connected, register for app messages
++        if currentStatus == .connected {
++            connectedApp = IQApp(uuid: watchAppUuid, store: nil, device: device)
++            ConnectIQ.sharedInstance().register(forAppMessages: connectedApp, delegate: self)
++            print("[Garmin] Registered for app messages with app UUID: \(AppConstants.APP_ID)")
++        }
+     }
+ 
+     @objc public func sendMessage(_ message: String) {
+diff --git a/node_modules/react-native-garmin-connect/ios/GarminDeviceStorage.swift b/node_modules/react-native-garmin-connect/ios/GarminDeviceStorage.swift
+index a7c6f2d..03a92fc 100644
+--- a/node_modules/react-native-garmin-connect/ios/GarminDeviceStorage.swift
++++ b/node_modules/react-native-garmin-connect/ios/GarminDeviceStorage.swift
+@@ -1,30 +1,98 @@
+ 
+ import Foundation
++import ConnectIQ
+ 
+ @objc(GarminDeviceStorage)
+ public class GarminDeviceStorage: NSObject {
+     static var urlScheme = ""
++    static var appId = ""  // Set your ConnectIQ watch app UUID here
+     static var devicesListKey = "devicesListKey"
++    static var devicesDataKey = "devicesDataKey"
++    
++    // Keep original IQDevice objects in memory for quick access
++    private static var cachedDevices: [String: IQDevice] = [:]
+     
+     @objc
+     public static func onDevicesReceived(open url: URL){
++        print("[Garmin] URL received: \(url.absoluteString)")
++        print("[Garmin] URL scheme: \(url.scheme ?? "nil"), expected: \(urlScheme)")
++        print("[Garmin] URL host: \(url.host ?? "nil")")
++        print("[Garmin] URL path: \(url.path)")
++        print("[Garmin] URL query: \(url.query ?? "nil")")
+         
+-        if (url.scheme == urlScheme){
+-            let devices = ConnectIQ.sharedInstance()?.parseDeviceSelectionResponse(from: url) as? [IQDevice]
+-            var devicesToSet: [Data] = []
++        // Check if this is the device selection response from GCM
++        // Format: retic://device-select-resp?...  OR  retic://?devices=...
++        let isDeviceSelectResp = url.path == "/device-select-resp" || 
++                                  url.host == "device-select-resp" ||
++                                  (url.query?.contains("devices") ?? false)
+         
+-            if let unwrappedDevices = devices {
+-                for device in unwrappedDevices {
+-                    let garminDevice = GarminDevice(id: device.uuid.uuidString, model: device.modelName, name: device.friendlyName)
+-                    let result = try? JSONEncoder().encode(garminDevice)
+-                    if let unwrappedDevice = result {
+-                        devicesToSet.append(unwrappedDevice)
+-                    }
++        guard url.scheme == urlScheme && isDeviceSelectResp else {
++            print("[Garmin] Not a device selection response, ignoring")
++            return
++        }
++        
++        print("[Garmin] Processing device selection response...")
++        
++        let devices = ConnectIQ.sharedInstance()?.parseDeviceSelectionResponse(from: url) as? [IQDevice]
++        print("[Garmin] Parsed devices count: \(devices?.count ?? 0)")
++        
++        var devicesToSet: [Data] = []
++        var deviceDataToSet: [Data] = []
++        
++        // Clear cached devices
++        cachedDevices.removeAll()
++        
++        if let unwrappedDevices = devices {
++            for device in unwrappedDevices {
++                // Store device info for JS (display purposes)
++                let garminDevice = GarminDevice(id: device.uuid.uuidString, model: device.modelName, name: device.friendlyName)
++                if let result = try? JSONEncoder().encode(garminDevice) {
++                    devicesToSet.append(result)
++                }
++                
++                // Store the actual IQDevice object (NSSecureCoding)
++                if let deviceData = try? NSKeyedArchiver.archivedData(withRootObject: device, requiringSecureCoding: true) {
++                    deviceDataToSet.append(deviceData)
+                 }
++                
++                // Cache in memory for immediate use
++                cachedDevices[device.uuid.uuidString] = device
++                
++                print("[Garmin] Stored device: \(device.friendlyName ?? "Unknown") with UUID: \(device.uuid.uuidString)")
+             }
++        }
++
++        UserDefaults.standard.set(devicesToSet, forKey: devicesListKey)
++        UserDefaults.standard.set(deviceDataToSet, forKey: devicesDataKey)
++        print("[Garmin] Stored \(cachedDevices.count) devices")
++    }
+     
+-            UserDefaults.standard.set(devicesToSet, forKey: devicesListKey)
++    // Get the actual IQDevice object by UUID
++    @objc
++    public static func getDevice(byId id: String) -> IQDevice? {
++        // First check memory cache
++        if let device = cachedDevices[id] {
++            print("[Garmin] Found device in memory cache: \(id)")
++            return device
+         }
++        
++        // If not in cache, try to restore from UserDefaults
++        if let deviceDataArray = UserDefaults.standard.object(forKey: devicesDataKey) as? [Data] {
++            for deviceData in deviceDataArray {
++                if let device = try? NSKeyedUnarchiver.unarchivedObject(ofClass: IQDevice.self, from: deviceData) {
++                    // Re-populate cache
++                    cachedDevices[device.uuid.uuidString] = device
++                    
++                    if device.uuid.uuidString == id {
++                        print("[Garmin] Restored device from storage: \(id)")
++                        return device
++                    }
++                }
++            }
++        }
++        
++        print("[Garmin] Device not found: \(id)")
++        return nil
+     }
+     
+     static func getDevicesList(_ resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+diff --git a/node_modules/react-native-garmin-connect/react-native-garmin-connect.podspec b/node_modules/react-native-garmin-connect/react-native-garmin-connect.podspec
+index 16e7390..b49cea3 100644
+--- a/node_modules/react-native-garmin-connect/react-native-garmin-connect.podspec
++++ b/node_modules/react-native-garmin-connect/react-native-garmin-connect.podspec
+@@ -14,7 +14,11 @@ Pod::Spec.new do |s|
+   s.platforms    = { :ios => min_ios_version_supported }
+   s.source       = { :git => "https://github.com/malgorzatamaz/react-native-garmin-connect.git", :tag => "#{s.version}" }
+ 
+-  s.source_files = "ios/**/*.{h,m,mm,swift}"
++  # Only include the module's source files (exclude the vendored ConnectIQ.xcframework headers)
++  s.source_files = "ios/*.{h,m,mm,swift}"
++  # Only the React Native module header should be public; Swift types are exposed via the generated
++  # `react_native_garmin_connect-Swift.h` and we must avoid duplicating Objective-C interfaces.
++  s.public_header_files = "ios/GarminConnect.h"
+   s.vendored_frameworks = 'ios/ConnectIQ.xcframework'
+ 
+   # Use install_modules_dependencies helper to install the dependencies if React Native version >=0.71.0.
+@@ -22,21 +26,28 @@ Pod::Spec.new do |s|
+   if respond_to?(:install_modules_dependencies, true)
+     install_modules_dependencies(s)
+   else
+-  s.dependency "React-Core"
++    s.dependency "React-Core"
+ 
+-  # Don't install the dependencies when we run `pod install` in the old architecture.
+-  if ENV['RCT_NEW_ARCH_ENABLED'] == '1' then
+-    s.compiler_flags = folly_compiler_flags + " -DRCT_NEW_ARCH_ENABLED=1"
+-    s.pod_target_xcconfig    = {
+-        "HEADER_SEARCH_PATHS" => "\"$(PODS_ROOT)/boost\"",
+-        "OTHER_CPLUSPLUSFLAGS" => "-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1",
+-        "CLANG_CXX_LANGUAGE_STANDARD" => "c++17"
+-    }
+-    s.dependency "React-Codegen"
+-    s.dependency "RCT-Folly"
+-    s.dependency "RCTRequired"
+-    s.dependency "RCTTypeSafety"
+-    s.dependency "ReactCommon/turbomodule/core"
+-   end
++    # Don't install the dependencies when we run `pod install` in the old architecture.
++    if ENV['RCT_NEW_ARCH_ENABLED'] == '1' then
++      s.compiler_flags = folly_compiler_flags + " -DRCT_NEW_ARCH_ENABLED=1"
++      s.dependency "React-Codegen"
++      s.dependency "RCT-Folly"
++      s.dependency "RCTRequired"
++      s.dependency "RCTTypeSafety"
++      s.dependency "ReactCommon/turbomodule/core"
++    end
+   end    
++  
++  # Configure build settings for ConnectIQ SDK integration
++  # - FRAMEWORK_SEARCH_PATHS: Ensure Xcode can find the vendored ConnectIQ.xcframework
++  # - SWIFT_INCLUDE_PATHS: Allow Swift to find the ConnectIQ module
++  s.pod_target_xcconfig = {
++    'FRAMEWORK_SEARCH_PATHS' => '$(inherited) $(PODS_TARGET_SRCROOT)/ios',
++    'HEADER_SEARCH_PATHS' => '$(inherited) $(PODS_TARGET_SRCROOT)/ios/ConnectIQ.xcframework/ios-arm64/ConnectIQ.framework/Headers',
++    'OTHER_LDFLAGS' => '$(inherited) -framework ConnectIQ'
++  }
++  s.user_target_xcconfig = {
++    'FRAMEWORK_SEARCH_PATHS' => '$(inherited) $(PODS_ROOT)/../../node_modules/react-native-garmin-connect/ios'
++  }    
+ end
+diff --git a/node_modules/react-native-garmin-connect/src/index.tsx b/node_modules/react-native-garmin-connect/src/index.tsx
+index d72b4a2..99887f2 100644
+--- a/node_modules/react-native-garmin-connect/src/index.tsx
++++ b/node_modules/react-native-garmin-connect/src/index.tsx
+@@ -29,7 +29,6 @@ const LINKING_ERROR =
+   '- You rebuilt the app after installing the package\n' +
+   '- You are not using Expo Go\n';
+ 
+-// @ts-expect-error
+ const isTurboModuleEnabled = global.__turboModuleProxy != null;
+ 
+ const GarminConnectModule = isTurboModuleEnabled
