@@ -16,7 +16,7 @@ export default function DeviceSelectResp() {
     run();
   }, []);
 
-  if (done) return <Redirect href="/(protected)/integrations" />;
+  if (done) return <Redirect href="/(protected)/(tabs)" />;
   
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>

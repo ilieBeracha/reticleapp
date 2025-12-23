@@ -153,11 +153,11 @@ const SessionCard = memo(({ session }: SessionCardProps) => {
           </View>
         )}
         
-        {session.workspace_name && session.workspace_name !== 'Personal' && (
+        {session.team_name && session.team_name !== 'Personal' && (
           <View style={styles.metaItem}>
             <Ionicons name="business-outline" size={14} color={colors.textMuted} />
             <Text style={[styles.metaText, { color: colors.textMuted }]}>
-              {session.workspace_name}
+              {session.team_name}
             </Text>
           </View>
         )}

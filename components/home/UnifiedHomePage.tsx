@@ -16,9 +16,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useModals } from '@/contexts/ModalContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { deleteSession, getMyActivePersonalSession, getRecentSessionsWithStats, type SessionWithDetails } from '@/services/sessionService';
+import { useGarminStore } from '@/store/garminStore';
+import { useMessagesStore } from '@/store/messagesService';
 import { useSessionStore } from '@/store/sessionStore';
 import { useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -42,7 +45,6 @@ import { WeeklyHighlightsCard } from './unified/sections/WeeklyHighlightsCard';
 import { styles } from './unified/styles';
 import { useHomeState } from './useHomeState';
 import { ActivityTimeline } from './widgets';
-import { useMessagesStore } from '@/store/messagesService';
 
 function TitleHeader({
   title,
@@ -75,6 +77,8 @@ export function UnifiedHomePage() {
   const colors = useColors();
   const { profileFullName, profileAvatarUrl, user } = useAuth();
   const { setOnSessionCreated, setOnTeamCreated } = useModals();
+  const garminStatus = useGarminStore((s) => s.status);
+  const isGarminConnected = garminStatus === 'CONNECTED';
 
   // Greeting
   const getGreeting = () => {
@@ -327,7 +331,12 @@ export function UnifiedHomePage() {
           </View>
           <View>
             <Text style={[styles.greetingText, { color: colors.textMuted }]}>{getGreeting()},</Text>
-            <Text style={[styles.greetingName, { color: colors.text }]}>{firstName}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={[styles.greetingName, { color: colors.text }]}>{firstName}</Text>
+              {isGarminConnected && (
+                <Ionicons name="watch" size={16} color="#10B981" />
+              )}
+            </View>
           </View>
         </View>
 

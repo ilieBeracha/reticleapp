@@ -18,6 +18,7 @@ import {
   SessionTargetWithResults,
   SessionWithDetails
 } from '@/services/sessionService';
+import { useGarminStore } from '@/store/garminStore';
 import { useSessionStore } from '@/store/sessionStore';
 import { formatMaxShots, isInfiniteShots } from '@/utils/drillShots';
 import { Ionicons } from '@expo/vector-icons';
@@ -48,6 +49,7 @@ export default function ActiveSessionScreen() {
   const colors = useColors();
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
   const { loadPersonalSessions, loadTeamSessions } = useSessionStore();
+  const { status: garminStatus, send: sendToGarmin } = useGarminStore();
 
   // State
   const [session, setSession] = useState<SessionWithDetails | null>(null);
@@ -94,6 +96,30 @@ export default function ActiveSessionScreen() {
       loadData();
     }, [loadData])
   );
+
+  // ============================================================================
+  // GARMIN INTEGRATION - Notify watch when session starts
+  // ============================================================================
+  const garminNotifiedRef = useRef(false);
+  
+  useEffect(() => {
+    // Only send once per session, and only when we have session data and Garmin is connected
+    if (!session || garminNotifiedRef.current || garminStatus !== 'CONNECTED') return;
+    
+    garminNotifiedRef.current = true;
+    
+    const drillConfig = session.drill_config;
+    sendToGarmin('SESSION_START', {
+      sessionId: session.id,
+      drillName: drillConfig?.name || 'Training Session',
+      drillGoal: drillConfig?.drill_goal || 'practice',
+      distance: drillConfig?.distance_m || 0,
+      rounds: drillConfig?.strings_count || 1,
+      timeLimit: drillConfig?.time_limit_seconds || 0,
+    });
+    
+    console.log('[Garmin] 📤 Sent SESSION_START to watch');
+  }, [session, garminStatus, sendToGarmin]);
 
   // Live timer
   useEffect(() => {
@@ -375,6 +401,18 @@ export default function ActiveSessionScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             try {
               await endSession(sessionId!);
+              
+              // Notify Garmin watch that session ended
+              if (garminStatus === 'CONNECTED') {
+                sendToGarmin('SESSION_END', {
+                  sessionId: sessionId,
+                  duration: elapsedTime,
+                  targetsCount: targets.length,
+                  accuracy: accuracy,
+                });
+                console.log('[Garmin] 📤 Sent SESSION_END to watch');
+              }
+              
               // Reload sessions and navigate back to home
               if (session?.team_id) {
                 await loadTeamSessions();
