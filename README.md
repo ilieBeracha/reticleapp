@@ -146,3 +146,4 @@ Supabase
       ↓
 Database
 ```
+# reticIQ
