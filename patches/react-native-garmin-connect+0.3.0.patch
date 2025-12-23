@@ -6,7 +6,7 @@ index 2e67eb2..3ba78f5 100644
      static let MESSAGE_TYPE_CURRENT_ANGLE = "MESSAGE_TYPE_CURRENT_ANGLE"
      static let MESSAGE_TYPE_MAX_ANGLE = "MESSAGE_TYPE_MAX_ANGLE"
  
--    static let APP_ID = "467f4bb7-cd3c-45c4-a39b-9bb78260c9ed"
+-    static let APP_ID = "bd8df375-4ed5-4ff3-bcf4-b752426e1628"
 +    // This can be set at runtime via GarminDeviceStorage.appId
 +    // Default is empty - set your ConnectIQ watch app UUID
 +    static var APP_ID: String = "bd8df3754ed54ff3bcf4b752426e1628"

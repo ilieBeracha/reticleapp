@@ -7,13 +7,13 @@
 
 import { supabase } from '@/lib/supabase';
 import type {
-    CreateTrainingDrillInput,
-    CreateTrainingInput,
-    Training,
-    TrainingDrill,
-    TrainingStatus,
-    TrainingWithDetails,
-    UpdateTrainingInput,
+  CreateTrainingDrillInput,
+  CreateTrainingInput,
+  Training,
+  TrainingDrill,
+  TrainingStatus,
+  TrainingWithDetails,
+  UpdateTrainingInput,
 } from '@/types/workspace';
 import { scheduleTrainingReminder } from './notifications';
 import { notifyTeamNewTraining, notifyTeamTrainingStarted } from './pushService';

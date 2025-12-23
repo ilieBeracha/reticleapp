@@ -7,15 +7,15 @@
 
 import { DeviceEventEmitter, NativeEventEmitter, Platform } from 'react-native';
 import {
-    type Device,
-    GarminConnect,
-    Status,
-    connectDevice,
-    destroy,
-    getDevicesList,
-    initialize,
-    sendMessage,
-    showDevicesList,
+  type Device,
+  GarminConnect,
+  Status,
+  connectDevice,
+  destroy,
+  getDevicesList,
+  initialize,
+  sendMessage,
+  showDevicesList,
 } from 'react-native-garmin-connect';
 import { create } from 'zustand';
 
@@ -26,7 +26,7 @@ import { create } from 'zustand';
 export type GarminDevice = Device;
 export { Status as GarminDeviceStatus };
 
-export type GarminStatus = 'UNKNOWN' | 'CONNECTED' | 'ONLINE' | 'OFFLINE';
+export type GarminStatus = 'UNKNOWN' | 'CONNECTED' | 'ONLINE' | 'OFFLINE' | 'ACK' | 'PONG';
 
 export interface GarminMessage {
   type: string;
