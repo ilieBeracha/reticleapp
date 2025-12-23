@@ -1,17 +1,15 @@
 diff --git a/node_modules/react-native-garmin-connect/ios/AppConstants.swift b/node_modules/react-native-garmin-connect/ios/AppConstants.swift
-index 2e67eb2..2ecd2fb 100644
+index 2e67eb2..3ba78f5 100644
 --- a/node_modules/react-native-garmin-connect/ios/AppConstants.swift
 +++ b/node_modules/react-native-garmin-connect/ios/AppConstants.swift
-@@ -8,7 +8,11 @@ struct AppConstants {
+@@ -8,7 +8,9 @@ struct AppConstants {
      static let MESSAGE_TYPE_CURRENT_ANGLE = "MESSAGE_TYPE_CURRENT_ANGLE"
      static let MESSAGE_TYPE_MAX_ANGLE = "MESSAGE_TYPE_MAX_ANGLE"
  
 -    static let APP_ID = "467f4bb7-cd3c-45c4-a39b-9bb78260c9ed"
 +    // This can be set at runtime via GarminDeviceStorage.appId
 +    // Default is empty - set your ConnectIQ watch app UUID
-+    static var APP_ID: String {
-+        return GarminDeviceStorage.appId.isEmpty ? "c0068c7f-b169-4acf-8c02-74fe99d504c5" : GarminDeviceStorage.appId
-+    }
++    static var APP_ID: String = "bd8df3754ed54ff3bcf4b752426e1628"
  
      static let STATUS_ONLINE = "ONLINE"
      static let STATUS_OFFLINE = "OFFLINE"
@@ -51,7 +49,7 @@ index 07c2959..99bec8e 100644
  
  @interface GarminConnectModule : NSObject <IQAppMessageDelegate, IQDeviceEventDelegate>
 diff --git a/node_modules/react-native-garmin-connect/ios/GarminConnectModule.swift b/node_modules/react-native-garmin-connect/ios/GarminConnectModule.swift
-index 46e8be4..22d4352 100644
+index 46e8be4..b829fed 100644
 --- a/node_modules/react-native-garmin-connect/ios/GarminConnectModule.swift
 +++ b/node_modules/react-native-garmin-connect/ios/GarminConnectModule.swift
 @@ -21,7 +21,7 @@ public class GarminConnectModule: NSObject, IQDeviceEventDelegate, IQAppMessageD
@@ -63,24 +61,25 @@ index 46e8be4..22d4352 100644
          ConnectIQ.sharedInstance().unregister(forAllDeviceEvents: self)
          ConnectIQ.sharedInstance().unregister(forAllAppMessages: self)
      }
-@@ -39,8 +39,33 @@ public class GarminConnectModule: NSObject, IQDeviceEventDelegate, IQAppMessageD
+@@ -39,15 +39,58 @@ public class GarminConnectModule: NSObject, IQDeviceEventDelegate, IQAppMessageD
  
      @objc(connectDevice:model:name:)
      public func connectDevice(id: String, model: String, name: String) {
 -        let device = IQDevice.init(id: UUID(uuidString: id), modelName: model, friendlyName: name)
-+        // Try to get the original IQDevice from storage (preserves SDK internal state)
++        // Get LIVE IQDevice from current session - archived devices don't work!
 +        guard let device = GarminDeviceStorage.getDevice(byId: id) else {
-+            print("[Garmin] Device not found in storage, cannot connect: \(id)")
-+            // Emit error status
++            print("[Garmin] ❌ Device \(id) not in current session - needs re-pairing via GCM")
++            // Emit status indicating re-pairing is needed
 +            let errorDevice: NSMutableDictionary = [:]
 +            errorDevice["name"] = name
 +            errorDevice["status"] = "OFFLINE"
-+            errorDevice["error"] = "Device not found. Please re-select device from Garmin Connect."
++            errorDevice["needsRepairing"] = true
++            errorDevice["error"] = "Session expired. Tap to re-pair via Garmin Connect."
 +            self.emitter.sendEvent(withName: "onDeviceStatusChanged", body: errorDevice)
 +            return
 +        }
 +
-+        print("[Garmin] Connecting to stored device: \(device.friendlyName ?? name)")
++        print("[Garmin] ✅ Connecting to live session device: \(device.friendlyName ?? name)")
 +
          ConnectIQ.sharedInstance().register(forDeviceEvents: device, delegate: self)
 +
@@ -97,43 +96,86 @@ index 46e8be4..22d4352 100644
 +        }
      }
  
-     @objc public func sendMessage(_ message: String) {
+-    @objc public func sendMessage(_ message: String) {
+-        if let currentApp = connectedApp {
+-            ConnectIQ.sharedInstance().sendMessage(message, to: currentApp, progress: nil, completion: nil)
++   @objc public func sendMessage(_ message: String) {
++    print("[Garmin] sendMessage called with: \(message)")
++    
++    if let currentApp = connectedApp {
++        print("[Garmin] Have connected app, sending...")        // Parse JSON string to Dictionary
++        if let data = message.data(using: .utf8),
++           let dict = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
++            ConnectIQ.sharedInstance().sendMessage(dict, to: currentApp, progress: nil, completion: nil)
++        } else {
++            // Fallback: send as plain string wrapped in expected format
++            let wrappedMessage: [String: Any] = [
++                "type": "DATA",
++                "payload": ["text": message]
++            ]
++            ConnectIQ.sharedInstance().sendMessage(wrappedMessage, to: currentApp, progress: nil, completion: nil)
+         }
+     }
++    else {
++        print("[Garmin] ❌ connectedApp is nil - is watch app open?")
++        self.emitter.sendEvent(withName: "onError", body: "Watch app not connected. Open the app on your watch.")
++    }
++} 
+ 
+     public func needsToInstallConnectMobile(){
+         self.emitter.sendEvent(withName: "onInfo", body: "Garmin Connect app is required.")
+@@ -56,10 +99,22 @@ public class GarminConnectModule: NSObject, IQDeviceEventDelegate, IQAppMessageD
+     func getStatus(status: IQDeviceStatus) -> String {
+         switch status {
+             case .connected:
++                print("[Garmin] Status: .connected")
+                 return "CONNECTED"
+             case .notConnected:
++                print("[Garmin] Status: .notConnected (device reachable but app not running)")
+                 return "ONLINE"
+-        case .bluetoothNotReady, .invalidDevice, .notFound:
++            case .bluetoothNotReady:
++                print("[Garmin] Status: .bluetoothNotReady - Bluetooth may be off or unavailable")
++                return "OFFLINE"
++            case .invalidDevice:
++                print("[Garmin] Status: .invalidDevice - Device object is invalid/stale")
++                return "OFFLINE"
++            case .notFound:
++                print("[Garmin] Status: .notFound - Device not found via GCM")
++                return "OFFLINE"
++            @unknown default:
++                print("[Garmin] Status: unknown")
+                 return "OFFLINE"
+         }
+     }
 diff --git a/node_modules/react-native-garmin-connect/ios/GarminDeviceStorage.swift b/node_modules/react-native-garmin-connect/ios/GarminDeviceStorage.swift
-index a7c6f2d..d68b55f 100644
+index a7c6f2d..f39ed5e 100644
 --- a/node_modules/react-native-garmin-connect/ios/GarminDeviceStorage.swift
 +++ b/node_modules/react-native-garmin-connect/ios/GarminDeviceStorage.swift
-@@ -1,30 +1,98 @@
- 
+@@ -1,30 +1,82 @@
+-
  import Foundation
 +import ConnectIQ
  
  @objc(GarminDeviceStorage)
  public class GarminDeviceStorage: NSObject {
-     static var urlScheme = ""
-+    static var appId = ""  // Set your ConnectIQ watch app UUID here
+-    static var urlScheme = ""
++    static var urlScheme = "retic"
++    static var appId = "bd8df375-4ed5-4ff3-bcf4-b752426e1628"
      static var devicesListKey = "devicesListKey"
-+    static var devicesDataKey = "devicesDataKey"
+ 
++    // IMPORTANT: IQDevice objects are SESSION-BASED and cannot be persisted!
++    // Only devices from the CURRENT session's parseDeviceSelectionResponse are valid.
++    // This cache holds live IQDevice objects from the current app session only.
++    private static var sessionDevices: [String: IQDevice] = [:]
 +
-+    // Keep original IQDevice objects in memory for quick access
-+    private static var cachedDevices: [String: IQDevice] = [:]
- 
      @objc
-     public static func onDevicesReceived(open url: URL){
-+        print("[Garmin] URL received: \(url.absoluteString)")
-+        print("[Garmin] URL scheme: \(url.scheme ?? "nil"), expected: \(urlScheme)")
-+        print("[Garmin] URL host: \(url.host ?? "nil")")
-+        print("[Garmin] URL path: \(url.path)")
-+        print("[Garmin] URL query: \(url.query ?? "nil")")
- 
+-    public static func onDevicesReceived(open url: URL){
+-
 -        if (url.scheme == urlScheme){
 -            let devices = ConnectIQ.sharedInstance()?.parseDeviceSelectionResponse(from: url) as? [IQDevice]
 -            var devicesToSet: [Data] = []
-+        // Check if this is the device selection response from GCM
-+        // Format: retic://device-select-resp?...  OR  retic://?devices=...
-+        let isDeviceSelectResp = url.path == "/device-select-resp" ||
-+                                  url.host == "device-select-resp" ||
-+                                  (url.query?.contains("devices") ?? false)
- 
+-            
 -            if let unwrappedDevices = devices {
 -                for device in unwrappedDevices {
 -                    let garminDevice = GarminDevice(id: device.uuid.uuidString, model: device.modelName, name: device.friendlyName)
@@ -141,6 +183,18 @@ index a7c6f2d..d68b55f 100644
 -                    if let unwrappedDevice = result {
 -                        devicesToSet.append(unwrappedDevice)
 -                    }
++    public static func onDevicesReceived(open url: URL) {
++        print("[Garmin] URL received: \(url.absoluteString)")
++        print("[Garmin] URL scheme: \(url.scheme ?? "nil"), expected: \(urlScheme)")
++        print("[Garmin] URL host: \(url.host ?? "nil")")
++        print("[Garmin] URL path: \(url.path)")
++        print("[Garmin] URL query: \(url.query ?? "nil")")
++
++        // Check if this is the device selection response from GCM
++        let isDeviceSelectResp = url.path == "/device-select-resp" ||
++                                  url.host == "device-select-resp" ||
++                                  (url.query?.contains("devices") ?? false)
++
 +        guard url.scheme == urlScheme && isDeviceSelectResp else {
 +            print("[Garmin] Not a device selection response, ignoring")
 +            return
@@ -148,70 +202,75 @@ index a7c6f2d..d68b55f 100644
 +
 +        print("[Garmin] Processing device selection response...")
 +
++        // Parse fresh IQDevice objects from GCM - these are the ONLY valid device references
 +        let devices = ConnectIQ.sharedInstance()?.parseDeviceSelectionResponse(from: url) as? [IQDevice]
-+        print("[Garmin] Parsed devices count: \(devices?.count ?? 0)")
++        print("[Garmin] Parsed \(devices?.count ?? 0) fresh devices from GCM")
 +
-+        var devicesToSet: [Data] = []
-+        var deviceDataToSet: [Data] = []
-+
-+        // Clear cached devices
-+        cachedDevices.removeAll()
++        var devicesToStore: [Data] = []
++        
++        // Clear previous session devices
++        sessionDevices.removeAll()
 +
 +        if let unwrappedDevices = devices {
 +            for device in unwrappedDevices {
-+                // Store device info for JS (display purposes)
++                // Store device INFO for display (UUID, name, model) - NOT the IQDevice object
 +                let garminDevice = GarminDevice(id: device.uuid.uuidString, model: device.modelName, name: device.friendlyName)
 +                if let result = try? JSONEncoder().encode(garminDevice) {
-+                    devicesToSet.append(result)
-+                }
-+
-+                // Store the actual IQDevice object (NSSecureCoding)
-+                if let deviceData = try? NSKeyedArchiver.archivedData(withRootObject: device, requiringSecureCoding: true) {
-+                    deviceDataToSet.append(deviceData)
++                    devicesToStore.append(result)
                  }
 +
-+                // Cache in memory for immediate use
-+                cachedDevices[device.uuid.uuidString] = device
-+
-+                print("[Garmin] Stored device: \(device.friendlyName ?? "Unknown") with UUID: \(device.uuid.uuidString)")
++                // Cache the LIVE IQDevice object for this session only
++                sessionDevices[device.uuid.uuidString] = device
++                print("[Garmin] ✅ Fresh device cached: \(device.friendlyName ?? "Unknown") - \(device.uuid.uuidString)")
              }
 +        }
 +
-+        UserDefaults.standard.set(devicesToSet, forKey: devicesListKey)
-+        UserDefaults.standard.set(deviceDataToSet, forKey: devicesDataKey)
-+        print("[Garmin] Stored \(cachedDevices.count) devices")
++        // Persist only the display info (not IQDevice objects - they can't be restored)
++        UserDefaults.standard.set(devicesToStore, forKey: devicesListKey)
++        print("[Garmin] Stored \(sessionDevices.count) session devices")
 +    }
  
 -            UserDefaults.standard.set(devicesToSet, forKey: devicesListKey)
-+    // Get the actual IQDevice object by UUID
++    // Get a LIVE IQDevice object - only works for current session devices
 +    @objc
 +    public static func getDevice(byId id: String) -> IQDevice? {
-+        // First check memory cache
-+        if let device = cachedDevices[id] {
-+            print("[Garmin] Found device in memory cache: \(id)")
++        if let device = sessionDevices[id] {
++            print("[Garmin] ✅ Found live session device: \(id)")
 +            return device
          }
-+
-+        // If not in cache, try to restore from UserDefaults
-+        if let deviceDataArray = UserDefaults.standard.object(forKey: devicesDataKey) as? [Data] {
-+            for deviceData in deviceDataArray {
-+                if let device = try? NSKeyedUnarchiver.unarchivedObject(ofClass: IQDevice.self, from: deviceData) {
-+                    // Re-populate cache
-+                    cachedDevices[device.uuid.uuidString] = device
-+
-+                    if device.uuid.uuidString == id {
-+                        print("[Garmin] Restored device from storage: \(id)")
-+                        return device
-+                    }
-+                }
-+            }
-+        }
-+
-+        print("[Garmin] Device not found: \(id)")
++        
++        // Device not in current session - user needs to re-pair via GCM
++        print("[Garmin] ❌ Device \(id) not in current session - re-pairing required")
 +        return nil
++    }
++    
++    // Check if we have live session devices
++    @objc
++    public static func hasSessionDevices() -> Bool {
++        return !sessionDevices.isEmpty
      }
  
      static func getDevicesList(_ resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+@@ -39,12 +91,17 @@ public class GarminDeviceStorage: NSObject {
+                     deviceObject["id"] = unwrappedDevice.id
+                     deviceObject["name"] = unwrappedDevice.name
+                     deviceObject["model"] = unwrappedDevice.model
+-                    deviceObject["status"] = "ONLINE"
++                    
++                    // Check if this device has a live session reference
++                    let hasLiveSession = sessionDevices[unwrappedDevice.id] != nil
++                    deviceObject["status"] = hasLiveSession ? "ONLINE" : "OFFLINE"
++                    deviceObject["needsRepairing"] = !hasLiveSession
++                    
+                     devicesList.add(deviceObject)
+                 }
+             }
+         }
+ 
+-        resolve(devicesList);
++        resolve(devicesList)
+     }
+ }
 diff --git a/node_modules/react-native-garmin-connect/react-native-garmin-connect.podspec b/node_modules/react-native-garmin-connect/react-native-garmin-connect.podspec
 index 16e7390..602c195 100644
 --- a/node_modules/react-native-garmin-connect/react-native-garmin-connect.podspec
@@ -226,3 +285,15 @@ index 16e7390..602c195 100644
    s.vendored_frameworks = 'ios/ConnectIQ.xcframework'
  
    # Use install_modules_dependencies helper to install the dependencies if React Native version >=0.71.0.
+diff --git a/node_modules/react-native-garmin-connect/src/index.tsx b/node_modules/react-native-garmin-connect/src/index.tsx
+index d72b4a2..99887f2 100644
+--- a/node_modules/react-native-garmin-connect/src/index.tsx
++++ b/node_modules/react-native-garmin-connect/src/index.tsx
+@@ -29,7 +29,6 @@ const LINKING_ERROR =
+   '- You rebuilt the app after installing the package\n' +
+   '- You are not using Expo Go\n';
+ 
+-// @ts-expect-error
+ const isTurboModuleEnabled = global.__turboModuleProxy != null;
+ 
+ const GarminConnectModule = isTurboModuleEnabled

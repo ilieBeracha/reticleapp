@@ -1,37 +1,26 @@
-/**
- * Garmin Device Selection Response Handler
- * 
- * This route handles the callback from Garmin Connect Mobile.
- * It quickly processes the response and redirects to integrations.
- */
-import { GarminDeviceStatus, useGarminStore } from '@/store/garminStore';
+import { useGarminStore } from '@/store/garminStore';
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 
-function DeviceSelectResponseScreen() {
-  const { refreshDevices, connectToDevice, devices } = useGarminStore();
-  const [ready, setReady] = useState(false);
+export default function DeviceSelectResp() {
+  const { refreshDevices } = useGarminStore();
+  const [done, setDone] = useState(false);
 
   useEffect(() => {
-    const process = async () => {
-      console.log('[Garmin] Device selection callback - processing...');
-      
-      // Wait a moment for native side to finish parsing
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      // Refresh devices list
+    const run = async () => {
+      await new Promise(r => setTimeout(r, 500));
       await refreshDevices();
-        
-      const connectedDevice = devices.find(d => d.status === GarminDeviceStatus.CONNECTED);
-      if (connectedDevice) {
-        connectToDevice(devices[0].id, devices[0].model, devices[0].name);
-        console.log('[Garmin] Connected to device:', devices[0].name);
-      }
-    }
-    process();
-  }, [connectToDevice, devices, refreshDevices]);
+      setDone(true);
+    };
+    run();
+  }, []);
 
-  return <Redirect href="/(protected)/(tabs)" />;
+  if (done) return <Redirect href="/(protected)/integrations" />;
+  
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+      <ActivityIndicator size="large" color="#007CC3" />
+    </View>
+  );
 }
-
-export default DeviceSelectResponseScreen;
