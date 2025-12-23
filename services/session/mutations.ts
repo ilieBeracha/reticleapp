@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase';
-import { notifySessionStarted } from '../notifications';
 import { getDrillRequirements } from './drillContract';
 import { mapSession } from './mappers';
 import {
@@ -227,9 +226,6 @@ export async function createTrainingSession(params: {
  * Send notifications when a training session is started
  */
 async function sendTrainingSessionNotifications(trainingId: string, trainingTitle: string, memberName: string) {
-  // Notify the user who started (local)
-  await notifySessionStarted(trainingId);
-
   // Log for commanders/owners - actual push needs server-side
   console.log(`[Notification] ${memberName} started session in ${trainingTitle}`);
 

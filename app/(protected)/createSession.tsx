@@ -3,9 +3,9 @@
  */
 import { useColors } from '@/hooks/ui/useColors';
 import {
-  createSession,
-  deleteSession,
-  getMyActiveSession
+    createSession,
+    deleteSession,
+    getMyActiveSession
 } from '@/services/sessionService';
 import { useSessionStore } from '@/store/sessionStore';
 import { useTeamStore } from '@/store/teamStore';
@@ -16,14 +16,14 @@ import { router } from 'expo-router';
 import { Camera, Check, Crosshair, Minus, Play, Plus, Repeat } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 

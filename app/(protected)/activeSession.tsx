@@ -114,7 +114,7 @@ export default function ActiveSessionScreen() {
       drillName: drillConfig?.name || 'Training Session',
       drillGoal: drillConfig?.drill_goal || 'practice',
       distance: drillConfig?.distance_m || 0,
-      rounds: drillConfig?.strings_count || 1,
+      rounds: drillConfig?.rounds_per_shooter || 1,
       timeLimit: drillConfig?.time_limit_seconds || 0,
     });
     
