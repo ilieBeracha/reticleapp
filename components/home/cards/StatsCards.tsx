@@ -316,12 +316,3 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 });
-
-
-
-
-
-
-
-
-

@@ -12,12 +12,3 @@ export const SQUAD_TEMPLATES: SquadTemplate[] = [
   { label: '1st, 2nd, 3rd', squads: ['1st Squad', '2nd Squad', '3rd Squad'] },
   { label: 'Red, Blue, Green', squads: ['Red', 'Blue', 'Green'] },
 ];
-
-
-
-
-
-
-
-
-

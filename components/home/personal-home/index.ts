@@ -1,4 +1,5 @@
 // Components
+export { TrainingsSection } from '../TrainingsSection';
 export { ActivityHub } from './ActivityHub';
 export { GreetingHeader } from './GreetingHeader';
 export { RecentSessionsSection } from './RecentSessionsSection';
