@@ -167,7 +167,7 @@ import { useEffect } from 'react';
 export function useGarminInitialize() {
   useEffect(() => {
     // Initialize the native SDK
-    const cleanup = initialize();
+    const cleanup = initialize('retic', '467f4bb7-cd3c-45c4-a39b-9bb78260c9ed');
 
     // Subscribe to service events and update store
     const unsubscribe = subscribe((event) => {
