@@ -116,6 +116,9 @@ store/
 
 ### Technical Docs (`docs/`)
 - **`docs/garmin-integration.md`** ← Garmin Connect IQ integration (patch-based, critical!)
+- **`docs/garmin-architecture.md`** ← System architecture for Garmin flow
+- **`docs/garmin-drill-sync-spec.md`** ← Drill sync protocol (phone ↔ watch)
+- **`docs/WATCH-APP-INSTRUCTIONS.md`** ← Instructions for watch app developer
 - `docs/data-flow-map.md` - UI → Store → Service → DB flows
 - `docs/query-map.md` - All Supabase queries documented
 - `docs/drill-training-architecture-v2.md` - Training/drill system design

@@ -7,7 +7,9 @@
 
 import { GarminConnectionBanner } from '@/components/garmin/GarminConnectionBanner';
 import { TargetCard } from '@/components/session/TargetCard';
+// Watch session results now use route-based sheet: /(protected)/watchSessionResult
 import { useColors } from '@/hooks/ui/useColors';
+import type { GarminSessionData } from '@/services/garminService';
 import { getDrillInputRoutes } from '@/services/session/drillInputRecipe';
 import { computeSessionScore } from '@/services/session/scoring';
 import {
@@ -15,6 +17,7 @@ import {
   endSession,
   getSessionById,
   getSessionTargetsWithResults,
+  saveWatchSessionData,
   SessionStats,
   SessionTargetWithResults,
   SessionWithDetails
@@ -50,7 +53,7 @@ export default function ActiveSessionScreen() {
   const colors = useColors();
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
   const { loadPersonalSessions, loadTeamSessions } = useSessionStore();
-  const { status: garminStatus, send: sendToGarmin } = useGarminStore();
+  const { status: garminStatus, send: sendToGarmin, lastSessionData, setSessionDataCallback, clearLastSessionData } = useGarminStore();
 
   // State
   const [session, setSession] = useState<SessionWithDetails | null>(null);
@@ -63,6 +66,9 @@ export default function ActiveSessionScreen() {
   // Drill completion modal
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const completionShownRef = useRef(false);
+
+  // Watch data processing (navigates to sheet instead of modal)
+  const watchDataProcessedRef = useRef<Set<string>>(new Set());
 
   // Live timer
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -121,6 +127,64 @@ export default function ActiveSessionScreen() {
     
     console.log('[Garmin] 📤 Sent SESSION_START to watch');
   }, [session, garminStatus, sendToGarmin]);
+
+  // ============================================================================
+  // GARMIN INTEGRATION - Listen for watch session data (SESSION_RESULT)
+  // ============================================================================
+  
+  // Clear any stale lastSessionData when entering this session
+  useEffect(() => {
+    // On mount, clear any old session data that might be from a previous session
+    if (lastSessionData && lastSessionData.sessionId && lastSessionData.sessionId !== sessionId) {
+      console.log('[Garmin] Clearing stale session data from previous session');
+      clearLastSessionData();
+    }
+  }, [sessionId]); // Only run when sessionId changes
+  
+  useEffect(() => {
+    // Register callback for session data from watch
+    const handleWatchSessionData = (data: GarminSessionData) => {
+      console.log('[Garmin] 📩 Received session data from watch:', data);
+      console.log('[Garmin] 📩 Duration from watch:', data.durationMs, 'ms =', (data.durationMs || 0) / 1000, 'seconds');
+      
+      // Only process if it's for this session (or no sessionId = assume it's this session)
+      if (data.sessionId && data.sessionId !== sessionId) {
+        console.log('[Garmin] 📩 Session ID mismatch, ignoring. Expected:', sessionId, 'Got:', data.sessionId);
+        return;
+      }
+      
+      // Prevent duplicate processing
+      const dataKey = `${data.sessionId}-${data.shotsRecorded}-${data.durationMs}`;
+      if (watchDataProcessedRef.current.has(dataKey)) {
+        console.log('[Garmin] 📩 Already processed this data, ignoring');
+        return;
+      }
+      watchDataProcessedRef.current.add(dataKey);
+      
+      // Clear the store data since we're processing it
+      clearLastSessionData();
+      
+      // Navigate to watch result sheet
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.push({
+        pathname: '/(protected)/watchSessionResult',
+        params: {
+          sessionId: sessionId!,
+          shots: String(data.shotsRecorded),
+          duration: String(Math.round((data.durationMs || 0) / 1000)),
+          distance: String(data.distance || 0),
+          completed: data.completed ? '1' : '0',
+          teamId: session?.team_id || '',
+        },
+      });
+    };
+    
+    setSessionDataCallback(handleWatchSessionData);
+    
+    return () => {
+      setSessionDataCallback(null);
+    };
+  }, [sessionId, session?.team_id, setSessionDataCallback, clearLastSessionData]);
 
   // Live timer
   useEffect(() => {
@@ -447,15 +511,85 @@ export default function ActiveSessionScreen() {
 
   const handleClose = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert(
-      'Leave Session?',
-      'Your session stays active. You can return later.',
-      [
-        { text: 'Stay', style: 'cancel' },
-        { text: 'Leave', onPress: () => router.back() },
-      ]
-    );
-  }, []);
+    
+    const hasData = targets.length > 0;
+    const sessionName = drill?.name || 'Session';
+    
+    // Different options based on whether session has data
+    if (hasData) {
+      // Session has targets - require explicit action
+      Alert.alert(
+        'What would you like to do?',
+        `"${sessionName}" has ${targets.length} target${targets.length !== 1 ? 's' : ''} recorded.\n\nSession timer: ${formatTime(elapsedTime)}`,
+        [
+          { text: 'Stay', style: 'cancel' },
+          {
+            text: 'End & Save',
+            style: 'destructive',
+            onPress: async () => {
+              setEnding(true);
+              try {
+                await endSession(sessionId!);
+                if (session?.team_id) {
+                  await loadTeamSessions();
+                } else {
+                  await loadPersonalSessions();
+                }
+                router.replace('/(protected)/(tabs)');
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              } catch (error: any) {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                Alert.alert('Error', error.message || 'Failed to end session');
+                setEnding(false);
+              }
+            },
+          },
+          {
+            text: 'Leave Active',
+            onPress: () => {
+              // Warn user about session timeout
+              Alert.alert(
+                'Session Will Stay Active',
+                'Remember to return and end your session. Sessions left active for more than 2 hours will be prompted for resolution.',
+                [{ text: 'OK', onPress: () => router.back() }]
+              );
+            },
+          },
+        ]
+      );
+    } else {
+      // No data - offer to cancel or keep active
+      Alert.alert(
+        'No targets recorded yet',
+        'Would you like to cancel this session or keep it active?',
+        [
+          { text: 'Stay', style: 'cancel' },
+          {
+            text: 'Cancel Session',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                const { deleteSession } = await import('@/services/sessionService');
+                await deleteSession(sessionId!);
+                if (session?.team_id) {
+                  await loadTeamSessions();
+                } else {
+                  await loadPersonalSessions();
+                }
+                router.replace('/(protected)/(tabs)');
+              } catch (error: any) {
+                Alert.alert('Error', error.message || 'Failed to cancel session');
+              }
+            },
+          },
+          {
+            text: 'Leave Active',
+            onPress: () => router.back(),
+          },
+        ]
+      );
+    }
+  }, [sessionId, session?.team_id, targets.length, drill?.name, elapsedTime, loadPersonalSessions, loadTeamSessions]);
 
   // ============================================================================
   // DRILL-DRIVEN INPUT (A) + SCORING (B)

@@ -1,3 +1,4 @@
+import { getSafeSessionDuration } from '@/utils/sessionDuration';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
@@ -43,11 +44,9 @@ function calculateParticipantStats(sessions: SessionWithDetails[]): ParticipantS
     const isCompleted = session.status === 'completed';
     const isActive = session.status === 'active';
 
-    // Calculate session duration
-    let durationMin = 0;
-    if (session.started_at && session.ended_at) {
-      durationMin = (new Date(session.ended_at).getTime() - new Date(session.started_at).getTime()) / 60000;
-    }
+    // Calculate session duration with safety cap
+    const durationSeconds = getSafeSessionDuration(session);
+    const durationMin = durationSeconds / 60;
 
     if (existing) {
       existing.sessionCount++;

@@ -37,6 +37,7 @@ import {
 } from 'react-native';
 import { BaseAvatar } from '../BaseAvatar';
 import { SectionHeader } from './_shared/SectionHeader';
+import { ActiveSessionBanner } from './ActiveSessionBanner';
 import HeroSummaryCard from './cards/HeroSummaryCard';
 import { mapSessionToHomeSession, mapTrainingToScheduledSession, type HomeSession } from './types';
 import { AggregatedStatsCard } from './unified/sections/AggregatedStatsCard';
@@ -340,6 +341,14 @@ export function UnifiedHomePage() {
           </View>
         </View>
 
+        {/* Active Session Banner - prominent reminder if session is active */}
+        {homeState.activeSession?.sourceSession && (
+          <ActiveSessionBanner 
+            session={homeState.activeSession.sourceSession}
+            onSessionEnded={loadAllSessions}
+          />
+        )}
+
         {/* Hero Summary - session-centric, action-forward */}
         <View style={styles.section}>
           <HeroSummaryCard
@@ -371,7 +380,6 @@ export function UnifiedHomePage() {
             </View>
           </>
         )}
-
         <View style={{ height: 100 }} />
       </ScrollView>
     </View>

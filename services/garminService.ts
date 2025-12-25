@@ -255,17 +255,29 @@ const msgSub = emitter.addListener('onMessage', (raw: any) => {
   if (message.type === 'SESSION_DATA' || message.type === 'SESSION_ENDED' || message.type === 'SESSION_RESULT') {
     console.log('[GarminService] 📩 Session data message detected, type:', message.type);
     
+    // Debug: Log raw values from watch BEFORE any conversion
+    console.log('[GarminService] 📩 RAW from watch:');
+    console.log('  - elapsedTime (seconds):', parsedPayload?.elapsedTime);
+    console.log('  - shotsFired:', parsedPayload?.shotsFired);
+    console.log('  - sessionId:', parsedPayload?.sessionId);
+    console.log('  - distance:', parsedPayload?.distance);
+    
     // Map SESSION_RESULT fields to our GarminSessionData format
+    const rawElapsedTime = parsedPayload?.elapsedTime ?? 0;
+    const convertedDurationMs = rawElapsedTime * 1000;
+    
+    console.log('[GarminService] 📩 Converting: elapsedTime', rawElapsedTime, 'sec → durationMs', convertedDurationMs, 'ms');
+    
     const sessionData: GarminSessionData = {
       sessionId: parsedPayload?.sessionId,
       shotsRecorded: parsedPayload?.shotsFired ?? 0,
-      durationMs: (parsedPayload?.elapsedTime ?? 0) * 1000, // Convert seconds to ms
+      durationMs: convertedDurationMs,
       // Additional fields from watch if available
       ...(parsedPayload?.distance && { distance: parsedPayload.distance }),
       ...(parsedPayload?.completed !== undefined && { completed: parsedPayload.completed }),
     };
     
-    console.log('[GarminService] 📩 Emitting session_data:', sessionData);
+    console.log('[GarminService] 📩 Final sessionData:', JSON.stringify(sessionData));
     emit({ event: 'session_data', data: sessionData });
   }
 });
@@ -362,14 +374,44 @@ return true;
 // ============================================================================
 
 /**
-* Tell the watch to start tracking a session.
-*/
-export function startWatchSession(sessionId: string, drillName?: string): boolean {
-return sendMessage('START_SESSION', {
-  sessionId,
-  drillName,
-  startedAt: Date.now(),
-});
+ * Configuration for starting a watch session.
+ * Import WatchSessionConfig from @/utils/garminHelpers for building this.
+ */
+export interface StartWatchSessionPayload {
+  sessionId: string;
+  drillName: string;
+  drillType: string;
+  inputMethod: string;
+  watchMode: 'primary' | 'supplementary';
+  distance: number;
+  rounds: number;
+  timeLimit: number | null;
+  parTime: number | null;
+  strings: number;
+  startedAt: number;
+}
+
+/**
+ * Tell the watch to start tracking a session.
+ *
+ * For full drill-aware sessions, use the payload version.
+ * For simple sessions, use the string version (legacy).
+ */
+export function startWatchSession(
+  sessionIdOrPayload: string | StartWatchSessionPayload,
+  drillName?: string
+): boolean {
+  // If payload object, send full config
+  if (typeof sessionIdOrPayload === 'object') {
+    return sendMessage('START_SESSION', sessionIdOrPayload);
+  }
+
+  // Legacy: simple session start
+  return sendMessage('START_SESSION', {
+    sessionId: sessionIdOrPayload,
+    drillName,
+    startedAt: Date.now(),
+  });
 }
 
 /**

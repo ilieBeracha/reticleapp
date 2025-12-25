@@ -159,6 +159,105 @@ export async function getMyActivePersonalSession(): Promise<SessionWithDetails |
 }
 
 /**
+ * Get ALL active sessions for the current user (not just the most recent).
+ * Used for orphan detection and single-session enforcement.
+ */
+export async function getMyActiveSessionsAll(): Promise<SessionWithDetails[]> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('sessions')
+    .select(
+      `
+      id,
+      user_id,
+      team_id,
+      training_id,
+      drill_id,
+      drill_template_id,
+      custom_drill_config,
+      session_mode,
+      status,
+      started_at,
+      ended_at,
+      created_at,
+      updated_at,
+      profiles:user_id(full_name),
+      teams:team_id(name),
+      trainings:training_id(title),
+      training_drills:drill_id(name),
+      drill_templates:drill_template_id(name)
+    `
+    )
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .order('started_at', { ascending: false });
+
+  if (error || !data) {
+    console.error('[getMyActiveSessionsAll] Error:', error);
+    return [];
+  }
+
+  return data.map(mapSession);
+}
+
+// ============================================================================
+// STALE SESSION DETECTION
+// ============================================================================
+
+/** Threshold in hours after which a session is considered stale */
+export const STALE_SESSION_THRESHOLD_HOURS = 2;
+
+/** Threshold in hours after which a session should be auto-cancelled */
+export const AUTO_CANCEL_THRESHOLD_HOURS = 24;
+
+/**
+ * Check if a session is stale (no activity for > threshold hours).
+ * Uses started_at as the activity timestamp since we don't have last_activity_at yet.
+ */
+export function isSessionStale(session: SessionWithDetails): boolean {
+  const lastActivity = session.started_at;
+  if (!lastActivity) return false;
+  
+  const hoursElapsed = (Date.now() - new Date(lastActivity).getTime()) / (1000 * 60 * 60);
+  return hoursElapsed > STALE_SESSION_THRESHOLD_HOURS;
+}
+
+/**
+ * Check if a session is extremely old and should be auto-cancelled.
+ */
+export function shouldAutoCancelSession(session: SessionWithDetails): boolean {
+  const startedAt = session.started_at;
+  if (!startedAt) return false;
+  
+  const hoursElapsed = (Date.now() - new Date(startedAt).getTime()) / (1000 * 60 * 60);
+  return hoursElapsed > AUTO_CANCEL_THRESHOLD_HOURS;
+}
+
+/**
+ * Get the age of a session in a human-readable format.
+ */
+export function getSessionAge(session: SessionWithDetails): string {
+  const startedAt = session.started_at;
+  if (!startedAt) return 'unknown';
+  
+  const ms = Date.now() - new Date(startedAt).getTime();
+  const minutes = Math.floor(ms / (1000 * 60));
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  
+  if (days > 0) return `${days}d ${hours % 24}h`;
+  if (hours > 0) return `${hours}h ${minutes % 60}m`;
+  return `${minutes}m`;
+}
+
+/**
  * Get sessions - fetches all sessions accessible to the user
  * Includes both personal sessions and team sessions
  */

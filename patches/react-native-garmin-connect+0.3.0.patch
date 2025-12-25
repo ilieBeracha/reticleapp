@@ -9,7 +9,7 @@ index 2e67eb2..3ba78f5 100644
 -    static let APP_ID = "467f4bb7-cd3c-45c4-a39b-9bb78260c9ed"
 +    // This can be set at runtime via GarminDeviceStorage.appId
 +    // Default is empty - set your ConnectIQ watch app UUID
-+    static var APP_ID: String = "bd8df375-4ed5-4ff3-bcf4-b752426e1628"
++    static var APP_ID: String = "467f4bb7-cd3c-45c4-a39b-9bb78260c9ed"
  
      static let STATUS_ONLINE = "ONLINE"
      static let STATUS_OFFLINE = "OFFLINE"
@@ -347,7 +347,7 @@ index a7c6f2d..5c36a37 100644
  public class GarminDeviceStorage: NSObject {
 -    static var urlScheme = ""
 +    static var urlScheme = "retic"
-+    static var appId = "bd8df375-4ed5-4ff3-bcf4-b752426e1628"
++    static var appId = "467f4bb7-cd3c-45c4-a39b-9bb78260c9ed"
      static var devicesListKey = "devicesListKey"
      
 +    // IMPORTANT: IQDevice objects are SESSION-BASED and cannot be persisted!

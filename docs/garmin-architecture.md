@@ -166,12 +166,15 @@ Phone                                              Native
 
 ### Connection States
 
-| Status | Meaning | Action Required |
-|--------|---------|-----------------|
-| `UNKNOWN` | SDK not initialized | Wait for init |
-| `OFFLINE` | Watch not reachable | Open Garmin Connect Mobile |
-| `ONLINE` | Watch reachable, app not open | Open watch app |
-| `CONNECTED` | Watch app is open | Ready to send/receive |
+| Status | Meaning | Action Required | UI Behavior |
+|--------|---------|-----------------|-------------|
+| `UNKNOWN` | SDK not initialized | Wait for init | Show loading |
+| `OFFLINE` | Watch not reachable | Open Garmin Connect Mobile | Show "Retry" button |
+| `ONLINE` | Watch reachable, app not open | **User must open watch app** | Instruction only, NO repair button |
+| `CONNECTED` | Watch app is open | Ready to send/receive | Show success |
+
+> **Important:** When status is `ONLINE`, do NOT show a "Repair" or "Reconnect" button.
+> Repair/reconnect won't work because the watch IS reachable - the user just needs to open the ReticleIQ app on their watch.
 
 ---
 

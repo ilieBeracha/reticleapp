@@ -1,8 +1,9 @@
 import { useColors } from '@/hooks/ui/useColors';
 import type { SessionWithDetails } from '@/services/sessionService';
+import { getSafeSessionDuration } from '@/utils/sessionDuration';
+import { Crosshair, Target } from 'lucide-react-native';
 import { useMemo } from 'react';
 import { Text, View } from 'react-native';
-import { Crosshair, Target } from 'lucide-react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { styles } from '../styles';
 
@@ -21,10 +22,10 @@ export function WeeklyHighlightsCard({
     let distCount = 0;
 
     sessions.forEach((s) => {
-      // Time
-      if (s.started_at && s.ended_at) {
-        const diff = new Date(s.ended_at).getTime() - new Date(s.started_at).getTime();
-        if (diff > 0 && diff < 86400000) totalTimeMs += diff;
+      // Time - use safe duration to cap absurdly long sessions
+      const durationSeconds = getSafeSessionDuration(s);
+      if (durationSeconds > 0) {
+        totalTimeMs += durationSeconds * 1000;
       }
 
       // Dispersion

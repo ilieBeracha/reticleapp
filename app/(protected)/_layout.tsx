@@ -1,6 +1,7 @@
 import { Header } from '@/components/Header';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { useColors } from '@/hooks/ui/useColors';
+import { useOrphanedSessionCheck } from '@/hooks/useOrphanedSessionCheck';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useGarminInitialize } from '@/store/garminStore';
 import { router, Stack } from 'expo-router';
@@ -25,6 +26,8 @@ export default function ProtectedLayout() {
   useGarminInitialize();
   // Register push notifications on authenticated user
   usePushNotifications();
+  // Check for orphaned sessions on app start
+  useOrphanedSessionCheck();
 
 
   return (
@@ -352,6 +355,21 @@ export default function ProtectedLayout() {
             sheetGrabberVisible: true,
             contentStyle: { backgroundColor: colors.card },
             sheetAllowedDetents: [0.85, 0.95],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+          }}
+        />
+
+        {/* Watch Session Result - Garmin data confirmation */}
+        <Stack.Screen
+          name="watchSessionResult"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.55],
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
           }}

@@ -1,3 +1,4 @@
+import { getSafeSessionDuration } from '@/utils/sessionDuration';
 import { format, isToday, isYesterday } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -104,10 +105,8 @@ function SessionItem({ session, colors, isLast }: { session: SessionWithDetails;
 }
 
 function getDuration(session: SessionWithDetails): number {
-  if (!session.ended_at) return 0;
-  return Math.round(
-    (new Date(session.ended_at).getTime() - new Date(session.started_at).getTime()) / 60000
-  );
+  const durationSeconds = getSafeSessionDuration(session);
+  return Math.round(durationSeconds / 60); // Convert to minutes
 }
 
 function getDateLabel(dateStr: string): string {

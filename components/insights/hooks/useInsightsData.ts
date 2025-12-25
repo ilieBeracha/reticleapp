@@ -2,6 +2,7 @@ import { useSessionStats } from '@/hooks/useSessionStats';
 import { useSessionStore } from '@/store/sessionStore';
 import { useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
+import { getSafeSessionDuration, MAX_REASONABLE_DURATION_SECONDS } from '@/utils/sessionDuration';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SessionStats, TotalTime } from '../types';
@@ -73,16 +74,12 @@ export function useInsightsData(): UseInsightsDataReturn {
   }, [activeTeamId, loadPersonalSessions, loadTeamSessions, loadMyStats]);
 
   const totalTime = useMemo((): TotalTime => {
-    const totalMinutes = sessions.reduce((acc, session) => {
-      if (session.started_at && session.ended_at) {
-        return (
-          acc +
-          (new Date(session.ended_at).getTime() - new Date(session.started_at).getTime()) /
-            (1000 * 60)
-        );
-      }
-      return acc;
+    const totalSeconds = sessions.reduce((acc, session) => {
+      // Use safe duration to cap absurdly long sessions
+      const durationSeconds = getSafeSessionDuration(session);
+      return acc + durationSeconds;
     }, 0);
+    const totalMinutes = totalSeconds / 60;
     const hours = Math.floor(totalMinutes / 60);
     const mins = Math.round(totalMinutes % 60);
     return { hours, mins, display: hours > 0 ? `${hours}h ${mins}m` : `${mins}m` };

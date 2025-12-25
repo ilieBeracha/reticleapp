@@ -12,9 +12,9 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import { useGarminStore, useIsGarminConnected } from '@/store/garminStore';
+import { GarminDevice, useGarminStore, useIsGarminConnected, useWatchEnabled } from '@/store/garminStore';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -33,7 +33,7 @@ export interface GarminConnectionBannerProps {
   onStatusChange?: (connected: boolean) => void;
 }
 
-type BannerState = 'connected' | 'needs_pairing' | 'offline' | 'connecting';
+type BannerState = 'connected' | 'online' | 'needs_pairing' | 'offline' | 'connecting';
 
 export function GarminConnectionBanner({
   alwaysShow = false,
@@ -41,23 +41,32 @@ export function GarminConnectionBanner({
   onStatusChange,
 }: GarminConnectionBannerProps) {
   const colors = useColors();
+  const watchEnabled = useWatchEnabled();
   const isConnected = useIsGarminConnected();
   const { status, statusReason, devices, openDeviceSelection, refreshDevices, isReady } = useGarminStore();
   
   const [isRetrying, setIsRetrying] = useState(false);
   const fadeAnim = useState(() => new Animated.Value(1))[0];
   
+  // If watch is disabled by user, don't render anything
+  if (!watchEnabled) {
+    return null;
+  }
+  
   // Determine banner state
   const device = devices[0];
   const needsPairing = device?.needsRepairing || (!device && isReady);
+  const isOnline = status === 'ONLINE'; // Watch reachable but app not open
   
   const bannerState: BannerState = isRetrying 
     ? 'connecting'
     : isConnected 
-      ? 'connected' 
-      : needsPairing 
-        ? 'needs_pairing' 
-        : 'offline';
+      ? 'connected'
+      : isOnline
+        ? 'online' // Watch is reachable - user just needs to open app
+        : needsPairing 
+          ? 'needs_pairing' 
+          : 'offline';
   
   // Notify parent of status changes
   useEffect(() => {
@@ -88,7 +97,7 @@ export function GarminConnectionBanner({
     
     try {
       // Try to reconnect to existing device first
-      const refreshedDevices = await refreshDevices();
+      const refreshedDevices = await refreshDevices() as unknown as GarminDevice[];
       
       // If no devices or needs re-pairing, open GCM
       if (refreshedDevices.length === 0 || refreshedDevices[0]?.needsRepairing) {
@@ -119,6 +128,16 @@ export function GarminConnectionBanner({
       text: device?.name || 'Watch Connected',
       subtext: null,
       actionText: null,
+    },
+    online: {
+      // Watch is reachable but app not open - NO repair will help here
+      icon: 'watch-outline' as const,
+      iconColor: '#3B82F6', // Blue - informational
+      bgColor: '#3B82F615',
+      borderColor: '#3B82F6',
+      text: device?.name || 'Watch Ready',
+      subtext: 'Open ReticleIQ app on your watch',
+      actionText: null, // No action - user must open watch app manually
     },
     needs_pairing: {
       icon: 'watch-outline' as const,
@@ -159,8 +178,20 @@ export function GarminConnectionBanner({
   return (
     <Animated.View style={{ opacity: fadeAnim }}>
       <TouchableOpacity
-        onPress={bannerState !== 'connected' && bannerState !== 'connecting' ? handleReconnect : undefined}
-        activeOpacity={bannerState === 'connected' || bannerState === 'connecting' ? 1 : 0.7}
+        onPress={
+          bannerState !== 'connected' && 
+          bannerState !== 'connecting' && 
+          bannerState !== 'online' // ONLINE = user needs to open watch app, repair won't help
+            ? handleReconnect 
+            : undefined
+        }
+        activeOpacity={
+          bannerState === 'connected' || 
+          bannerState === 'connecting' || 
+          bannerState === 'online' 
+            ? 1 
+            : 0.7
+        }
         style={[
           styles.banner,
           compact && styles.bannerCompact,

@@ -1,3 +1,4 @@
+import { getSafeSessionDuration } from '@/utils/sessionDuration';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -33,11 +34,8 @@ interface SessionRowProps {
 }
 
 function SessionRow({ session, colors, delay = 0 }: SessionRowProps) {
-  const duration = session.ended_at
-    ? Math.round(
-        (new Date(session.ended_at).getTime() - new Date(session.started_at).getTime()) / 60000
-      )
-    : null;
+  const durationSeconds = getSafeSessionDuration(session);
+  const duration = durationSeconds > 0 ? Math.round(durationSeconds / 60) : null;
 
   const isCompleted = session.status === 'completed';
   const isActive = session.status === 'active';

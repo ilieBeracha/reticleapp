@@ -3,7 +3,9 @@ import { getDrillRequirements } from './drillContract';
 import { mapSession } from './mappers';
 import {
   getMyActiveSessionForTraining,
+  getMyActiveSessionsAll,
   getSessionById,
+  shouldAutoCancelSession,
 } from './queries';
 import { calculateSessionStats } from './stats';
 import {
@@ -29,6 +31,11 @@ import type {
  * - custom_drill_config: For quick/custom drill (inline config)
  *
  * The session's configuration is determined by the drill parameters.
+ * 
+ * SINGLE SESSION ENFORCEMENT:
+ * - Before creating a new session, any existing active sessions are auto-ended
+ * - Sessions older than 24h are auto-cancelled (no data saved)
+ * - This prevents orphaned sessions from accumulating
  */
 export async function createSession(params: CreateSessionParams): Promise<SessionWithDetails> {
   const {
@@ -37,6 +44,43 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
 
   if (!user) {
     throw new Error('Not authenticated');
+  }
+
+  // =========================================================================
+  // SINGLE ACTIVE SESSION ENFORCEMENT
+  // =========================================================================
+  // Before creating a new session, handle any existing active sessions.
+  // This prevents orphaned sessions from accumulating.
+  const existingActiveSessions = await getMyActiveSessionsAll();
+  
+  if (existingActiveSessions.length > 0) {
+    console.log(`[createSession] Found ${existingActiveSessions.length} existing active session(s), cleaning up...`);
+    
+    for (const existingSession of existingActiveSessions) {
+      // Sessions older than 24h are stale - cancel them (don't count as completed)
+      if (shouldAutoCancelSession(existingSession)) {
+        console.log(`[createSession] Auto-cancelling stale session ${existingSession.id} (>24h old)`);
+        await supabase
+          .from('sessions')
+          .update({ 
+            status: 'cancelled', 
+            ended_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingSession.id);
+      } else {
+        // Recent sessions - end them properly (mark as completed)
+        console.log(`[createSession] Auto-ending active session ${existingSession.id}`);
+        await supabase
+          .from('sessions')
+          .update({ 
+            status: 'completed', 
+            ended_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingSession.id);
+      }
+    }
   }
 
   // DRILL-FIRST: Every session must have a drill source
@@ -560,6 +604,81 @@ export async function addTargetWithTacticalResult(params: {
     paper_result: null,
     tactical_result: tacticalResult,
   };
+}
+
+// ============================================================================
+// WATCH DATA INTEGRATION
+// ============================================================================
+
+export interface WatchSessionData {
+  sessionId: string;
+  shotsRecorded: number;
+  durationMs?: number;
+  distance?: number;
+  completed?: boolean;
+}
+
+/**
+ * Save watch data to session and optionally end it.
+ * Creates a tactical target entry with the watch data as the result.
+ * 
+ * @param data - Watch session data from Garmin
+ * @param endSession - Whether to end the session after saving
+ * @returns The updated session
+ */
+export async function saveWatchSessionData(
+  data: WatchSessionData,
+  shouldEnd: boolean = true
+): Promise<SessionWithDetails> {
+  const session = await getSessionById(data.sessionId);
+  
+  if (!session) {
+    throw new Error('Session not found');
+  }
+  
+  console.log('[SessionService] Saving watch data:', data);
+  
+  // Get drill config for distance if not provided by watch
+  const drill = session.drill_config;
+  const distance = data.distance ?? drill?.distance_m ?? 0;
+  
+  // Create a tactical target entry with watch data
+  // This allows the data to be picked up by normal stats calculation
+  const target = await addSessionTarget({
+    session_id: data.sessionId,
+    target_type: 'tactical',
+    distance_m: distance,
+    notes: 'Recorded via Garmin watch',
+    target_data: {
+      source: 'garmin_watch',
+      raw_data: data,
+    },
+  });
+  
+  // Calculate time in seconds from milliseconds
+  const timeSeconds = data.durationMs ? data.durationMs / 1000 : null;
+  
+  // Save the tactical result
+  // For watch data, we assume all shots are hits unless we have more info
+  await saveTacticalTargetResult({
+    session_target_id: target.id,
+    bullets_fired: data.shotsRecorded,
+    hits: data.shotsRecorded, // Assume all shots are hits from watch
+    is_stage_cleared: data.completed ?? false,
+    time_seconds: timeSeconds,
+    notes: 'Watch session data',
+  });
+  
+  console.log('[SessionService] Watch data saved as tactical target:', target.id);
+  
+  // End the session if requested
+  if (shouldEnd) {
+    const { endSession: endSessionFn } = await import('./mutations');
+    return await endSessionFn(data.sessionId);
+  }
+  
+  // Otherwise just return the current session
+  return session;
 }
 
 
