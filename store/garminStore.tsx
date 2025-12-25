@@ -10,23 +10,28 @@
  * - View: Calls initialize() hook on mount
  */
 
+import { useEffect, useRef } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
+import { create } from 'zustand';
+
 import {
   type GarminConnectionStatus,
   type GarminDevice,
   type GarminInboundMessage,
+  type GarminOutboundMessageType,
   type GarminSessionData,
   endWatchSession,
   getCurrentStatus,
   getIsReady,
   getPairedDevices,
+  initialize,
   openDeviceSelection as serviceOpenDeviceSelection,
   refreshDevices as serviceRefreshDevices,
   sendMessage as serviceSendMessage,
   startWatchSession,
   subscribe,
-  syncDrillToWatch
+  syncDrillToWatch,
 } from '@/services/garminService';
-import { create } from 'zustand';
 
 // Re-export types for convenience
 export type { GarminConnectionStatus, GarminDevice, GarminSessionData };
@@ -56,7 +61,7 @@ interface GarminState {
   // Actions (delegating to service)
   openDeviceSelection: () => void;
   refreshDevices: () => Promise<void>;
-  send: (type: 'START_SESSION' | 'END_SESSION' | 'SYNC_DRILL' | 'PING', payload?: unknown) => boolean;
+  send: (type: GarminOutboundMessageType, payload?: unknown) => boolean;
   clearMessages: () => void;
 
   // Session helpers
@@ -161,13 +166,12 @@ export const useGarminStore = create<GarminState>((set, get) => ({
  * }
  * ```
  */
-import { initialize } from '@/services/garminService';
-import { useEffect } from 'react';
-
 export function useGarminInitialize() {
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  
   useEffect(() => {
-    // Initialize the native SDK
-    const cleanup = initialize('retic', '467f4bb7-cd3c-45c4-a39b-9bb78260c9ed');
+    // Initialize the native SDK (uses GARMIN_DEFAULT_CONFIG)
+    const cleanup = initialize();
 
     // Subscribe to service events and update store
     const unsubscribe = subscribe((event) => {
@@ -190,9 +194,13 @@ export function useGarminInitialize() {
           break;
 
         case 'message_received':
-          useGarminStore.setState((state) => ({
-            messages: [...state.messages, event.message].slice(-MAX_MESSAGES),
-          }));
+          console.log('[GarminStore] 📩 MESSAGE_RECEIVED event');
+          console.log('[GarminStore] 📩 Message:', JSON.stringify(event.message, null, 2));
+          useGarminStore.setState((state) => {
+            const newMessages = [...state.messages, event.message].slice(-MAX_MESSAGES);
+            console.log('[GarminStore] 📩 Total messages now:', newMessages.length);
+            return { messages: newMessages };
+          });
           break;
 
         case 'session_data':
@@ -212,10 +220,34 @@ export function useGarminInitialize() {
 
     // Sync initial state
     useGarminStore.getState()._syncFromService();
+    
+    // =========================================================================
+    // AUTO-RECONNECT ON APP RESUME
+    // When app comes back to foreground, try to refresh devices & reconnect
+    // =========================================================================
+    const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
+      const wasBackground = appStateRef.current.match(/inactive|background/);
+      const isNowActive = nextAppState === 'active';
+      
+      if (wasBackground && isNowActive) {
+        console.log('[GarminStore] App resumed - attempting auto-reconnect');
+        const { isReady, status } = useGarminStore.getState();
+        
+        // Only try to reconnect if SDK ready and not already connected
+        if (isReady && status !== 'CONNECTED') {
+          serviceRefreshDevices().catch((err) => {
+            console.log('[GarminStore] Auto-reconnect failed:', err);
+          });
+        }
+      }
+      
+      appStateRef.current = nextAppState;
+    });
 
     return () => {
       unsubscribe();
       cleanup();
+      appStateSubscription.remove();
       useGarminStore.setState({
         isReady: false,
         status: 'UNKNOWN',

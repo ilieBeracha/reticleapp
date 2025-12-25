@@ -5,6 +5,7 @@
  * Clear separation between Paper (scan) and Tactical (manual) target flows.
  */
 
+import { GarminConnectionBanner } from '@/components/garmin/GarminConnectionBanner';
 import { TargetCard } from '@/components/session/TargetCard';
 import { useColors } from '@/hooks/ui/useColors';
 import { getDrillInputRoutes } from '@/services/session/drillInputRecipe';
@@ -608,6 +609,9 @@ export default function ActiveSessionScreen() {
           </Text>
         </View>
       </Animated.View>
+
+      {/* Garmin Connection Banner - inline reconnect, non-blocking */}
+      <GarminConnectionBanner compact />
 
       {/* Drill Requirements Banner */}
       {hasDrill && drill && (

@@ -108,10 +108,17 @@ store/
 
 ## Documentation
 
+### Architecture Guides
 - **`SINGLE_SOURCE_OF_TRUTH.md`** ← Complete guide (READ THIS!)
 - `HOW_IT_WORKS.md` - System architecture
 - `DATA_ACCESS_GUIDE.md` - Examples
 - `SIMPLE_GUIDE.md` - Quick reference
+
+### Technical Docs (`docs/`)
+- **`docs/garmin-integration.md`** ← Garmin Connect IQ integration (patch-based, critical!)
+- `docs/data-flow-map.md` - UI → Store → Service → DB flows
+- `docs/query-map.md` - All Supabase queries documented
+- `docs/drill-training-architecture-v2.md` - Training/drill system design
 
 ---
 

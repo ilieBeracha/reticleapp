@@ -56,6 +56,7 @@ export type GarminOutboundMessageType =
 /** Message types received FROM the watch */
 export type GarminInboundMessageType =
 | 'SESSION_DATA'
+| 'SESSION_RESULT'  // Watch sends this when session ends (auto or manual)
 | 'SHOT_RECORDED'
 | 'SESSION_ENDED'
 | 'HEARTBEAT'
@@ -64,14 +65,18 @@ export type GarminInboundMessageType =
 export interface GarminSessionData {
 /** Session ID (matches our DB session) */
 sessionId?: string;
-/** Total shots recorded by the watch */
+/** Total shots recorded by the watch (watch sends as shotsFired) */
 shotsRecorded: number;
 /** Shot timestamps (ms since session start) */
 shotTimestamps?: number[];
 /** Average time between shots (ms) */
 avgSplitMs?: number;
-/** Session duration (ms) */
+/** Session duration (ms) - watch sends elapsedTime in seconds */
 durationMs?: number;
+/** Distance in meters (from watch) */
+distance?: number;
+/** Whether session was completed (max bullets reached) */
+completed?: boolean;
 /** Heart rate data if available */
 heartRate?: {
   avg: number;
@@ -85,11 +90,6 @@ type: GarminInboundMessageType | string;
 payload?: unknown;
 sessionData?: GarminSessionData;
 timestamp?: number;
-}
-
-export interface GarminOutboundMessage {
-type: GarminOutboundMessageType;
-payload?: unknown;
 }
 
 // Event types emitted by this service
@@ -113,6 +113,16 @@ urlScheme: string;
 /** Your ConnectIQ watch app UUID */
 appId: string;
 }
+
+// ============================================================================
+// DEFAULT CONFIG (centralized - change here only)
+// ============================================================================
+
+/** Default Garmin configuration for this app */
+export const GARMIN_DEFAULT_CONFIG: GarminConfig = {
+  urlScheme: 'retic',
+  appId: '467f4bb7-cd3c-45c4-a39b-9bb78260c9ed',
+} as const;
 
 // ============================================================================
 // SERVICE STATE (module-level singleton)
@@ -164,21 +174,17 @@ return () => listeners.delete(listener);
 * Call once at app root (e.g., in _layout.tsx useEffect).
 * Returns a cleanup function.
 *
-* @param urlScheme - Your app's URL scheme (must match Info.plist)
-* @param appId - Your ConnectIQ watch app UUID
+* @param customConfig - Optional custom config (defaults to GARMIN_DEFAULT_CONFIG)
 */
-export function initialize(urlScheme: string, appId: string): () => void {
+export function initialize(customConfig?: Partial<GarminConfig>): () => void {
 if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
   console.log('[GarminService] Not a mobile platform, skipping init');
   return () => {};
 }
-urlScheme = 'retic';
-appId = '467f4bb7-cd3c-45c4-a39b-9bb78260c9ed';
 
-if (!urlScheme || !appId) {
-  console.error('[GarminService] Missing urlScheme or appId');
-  return () => {};
-}
+// Merge with defaults
+const urlScheme = customConfig?.urlScheme ?? GARMIN_DEFAULT_CONFIG.urlScheme;
+const appId = customConfig?.appId ?? GARMIN_DEFAULT_CONFIG.appId;
 
 if (isInitialized) {
   console.log('[GarminService] Already initialized');
@@ -216,22 +222,51 @@ const statusSub = emitter.addListener('onDeviceStatusChanged', (event: any) => {
 
 // Incoming Messages from Watch
 const msgSub = emitter.addListener('onMessage', (raw: any) => {
-  console.log('[GarminService] 📩 Raw message:', raw);
+  console.log('[GarminService] 📩 ========================================');
+  console.log('[GarminService] 📩 MESSAGE RECEIVED FROM NATIVE');
+  console.log('[GarminService] 📩 Raw:', JSON.stringify(raw, null, 2));
+  console.log('[GarminService] 📩 ========================================');
+
+  // Parse payload if it's a JSON string
+  let parsedPayload = raw?.payload;
+  if (typeof parsedPayload === 'string') {
+    try {
+      parsedPayload = JSON.parse(parsedPayload);
+      console.log('[GarminService] 📩 Parsed payload:', parsedPayload);
+    } catch {
+      // Keep as string if not valid JSON
+      console.log('[GarminService] 📩 Payload is plain string');
+    }
+  }
 
   const message: GarminInboundMessage = {
     type: raw?.type || 'unknown',
-    payload: raw?.payload,
-    sessionData: raw?.sessionData,
+    payload: parsedPayload,
+    // Extract sessionData from parsed payload if present
+    sessionData: parsedPayload?.sessionData || parsedPayload,
     timestamp: Date.now(),
   };
 
+  console.log('[GarminService] 📩 Emitting message_received:', message.type);
   emit({ event: 'message_received', message });
 
   // Special handling for session data
-  if (message.type === 'SESSION_DATA' || message.type === 'SESSION_ENDED') {
-    if (message.sessionData) {
-      emit({ event: 'session_data', data: message.sessionData });
-    }
+  // Watch sends: SESSION_RESULT with { sessionId, shotsFired, elapsedTime, distance, completed }
+  if (message.type === 'SESSION_DATA' || message.type === 'SESSION_ENDED' || message.type === 'SESSION_RESULT') {
+    console.log('[GarminService] 📩 Session data message detected, type:', message.type);
+    
+    // Map SESSION_RESULT fields to our GarminSessionData format
+    const sessionData: GarminSessionData = {
+      sessionId: parsedPayload?.sessionId,
+      shotsRecorded: parsedPayload?.shotsFired ?? 0,
+      durationMs: (parsedPayload?.elapsedTime ?? 0) * 1000, // Convert seconds to ms
+      // Additional fields from watch if available
+      ...(parsedPayload?.distance && { distance: parsedPayload.distance }),
+      ...(parsedPayload?.completed !== undefined && { completed: parsedPayload.completed }),
+    };
+    
+    console.log('[GarminService] 📩 Emitting session_data:', sessionData);
+    emit({ event: 'session_data', data: sessionData });
   }
 });
 
