@@ -6,9 +6,11 @@
  */
 
 import { GarminConnectionBanner } from '@/components/garmin/GarminConnectionBanner';
+import { WatchChoiceModal } from '@/components/garmin/WatchChoiceModal';
 import { TargetCard } from '@/components/session/TargetCard';
 // Watch session results now use route-based sheet: /(protected)/watchSessionResult
 import { useColors } from '@/hooks/ui/useColors';
+import { useWatchSessionChoice } from '@/hooks/useWatchSessionChoice';
 import type { GarminSessionData } from '@/services/garminService';
 import { getDrillInputRoutes } from '@/services/session/drillInputRecipe';
 import { computeSessionScore } from '@/services/session/scoring';
@@ -54,6 +56,14 @@ export default function ActiveSessionScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
   const { loadPersonalSessions, loadTeamSessions } = useSessionStore();
   const { status: garminStatus, send: sendToGarmin, lastSessionData, setSessionDataCallback, clearLastSessionData } = useGarminStore();
+
+  // Watch session choice - ask user if they want to use watch or phone only
+  const {
+    useWatch,
+    showChoiceModal,
+    onChooseWatch,
+    onChoosePhone,
+  } = useWatchSessionChoice();
 
   // State
   const [session, setSession] = useState<SessionWithDetails | null>(null);
@@ -110,8 +120,8 @@ export default function ActiveSessionScreen() {
   const garminNotifiedRef = useRef(false);
   
   useEffect(() => {
-    // Only send once per session, and only when we have session data and Garmin is connected
-    if (!session || garminNotifiedRef.current || garminStatus !== 'CONNECTED') return;
+    // Only send once per session, when user chose to use watch, and Garmin is connected
+    if (!session || garminNotifiedRef.current || !useWatch || garminStatus !== 'CONNECTED') return;
     
     garminNotifiedRef.current = true;
     
@@ -126,7 +136,7 @@ export default function ActiveSessionScreen() {
     });
     
     console.log('[Garmin] 📤 Sent SESSION_START to watch');
-  }, [session, garminStatus, sendToGarmin]);
+  }, [session, garminStatus, sendToGarmin, useWatch]);
 
   // ============================================================================
   // GARMIN INTEGRATION - Listen for watch session data (SESSION_RESULT)
@@ -142,6 +152,9 @@ export default function ActiveSessionScreen() {
   }, [sessionId]); // Only run when sessionId changes
   
   useEffect(() => {
+    // Only listen if user chose to use watch
+    if (!useWatch) return;
+    
     // Register callback for session data from watch
     const handleWatchSessionData = (data: GarminSessionData) => {
       console.log('[Garmin] 📩 Received session data from watch:', data);
@@ -184,7 +197,7 @@ export default function ActiveSessionScreen() {
     return () => {
       setSessionDataCallback(null);
     };
-  }, [sessionId, session?.team_id, setSessionDataCallback, clearLastSessionData]);
+  }, [sessionId, session?.team_id, setSessionDataCallback, clearLastSessionData, useWatch]);
 
   // Live timer
   useEffect(() => {
@@ -467,8 +480,8 @@ export default function ActiveSessionScreen() {
             try {
               await endSession(sessionId!);
               
-              // Notify Garmin watch that session ended
-              if (garminStatus === 'CONNECTED') {
+              // Notify Garmin watch that session ended (only if user chose to use watch)
+              if (useWatch && garminStatus === 'CONNECTED') {
                 sendToGarmin('SESSION_END', {
                   sessionId: sessionId,
                   duration: elapsedTime,
@@ -507,6 +520,9 @@ export default function ActiveSessionScreen() {
     drillProgress,
     totalShots,
     accuracy,
+    useWatch,
+    garminStatus,
+    sendToGarmin,
   ]);
 
   const handleClose = useCallback(() => {
@@ -744,8 +760,8 @@ export default function ActiveSessionScreen() {
         </View>
       </Animated.View>
 
-      {/* Garmin Connection Banner - inline reconnect, non-blocking */}
-      <GarminConnectionBanner compact />
+      {/* Garmin Connection Banner - only show if user chose to use watch */}
+      {useWatch && <GarminConnectionBanner compact />}
 
       {/* Drill Requirements Banner */}
       {hasDrill && drill && (
@@ -1052,6 +1068,13 @@ export default function ActiveSessionScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Watch Choice Modal - ask user if they want to use watch */}
+      <WatchChoiceModal
+        visible={showChoiceModal}
+        onChooseWatch={onChooseWatch}
+        onChoosePhone={onChoosePhone}
+      />
     </View>
   );
 }
