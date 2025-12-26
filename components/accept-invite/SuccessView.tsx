@@ -24,7 +24,7 @@ export function SuccessView({ result, onOpenTeam, onClose }: SuccessViewProps) {
         <Ionicons name="checkmark-circle" size={66} color={colors.primary} />
       </View>
 
-      <Text style={[styles.successTitle, { color: colors.text }]}>You're in</Text>
+      <Text style={[styles.successTitle, { color: colors.text }]}>You&apos;re in</Text>
       <Text style={[styles.successTeam, { color: colors.text }]} numberOfLines={1}>
         {result.team_name}
       </Text>
