@@ -177,6 +177,11 @@ export function drillToTrainingInput(
   drill: Drill,
   instanceConfig?: Partial<DrillInstanceConfig>
 ): import('@/types/workspace').CreateTrainingDrillInput {
+  // Determine input_method: from config, or derive from drill goal
+  // Grouping drills are always scan, achievement defaults to manual unless specified
+  const inputMethod = instanceConfig?.input_method 
+    ?? (drill.drill_goal === 'grouping' ? 'scan' : 'manual');
+
   return {
     // Reference to source drill
     drill_id: drill.id,
@@ -186,6 +191,9 @@ export function drillToTrainingInput(
     drill_goal: drill.drill_goal,
     target_type: drill.target_type,
     description: drill.description || undefined,
+
+    // Entry method (commander's choice)
+    input_method: inputMethod,
 
     // Instance configuration (use overrides or drill defaults)
     distance_m: instanceConfig?.distance_m ?? drill.distance_m,

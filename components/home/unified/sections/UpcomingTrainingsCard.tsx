@@ -59,6 +59,7 @@ function TrainingRow({ training, drillsCompleted, isLast, colors }: TrainingRowP
   const drillCount = training.drill_count ?? 0;
   const scheduledAt = training.scheduled_at ? new Date(training.scheduled_at) : null;
   const expiresAt = (training as any).expires_at ? new Date((training as any).expires_at) : null;
+  const isLive = training.status === 'ongoing';
   
   // Determine time display
   const getTimeDisplay = () => {
@@ -99,15 +100,27 @@ function TrainingRow({ training, drillsCompleted, isLast, colors }: TrainingRowP
   
   return (
     <TouchableOpacity 
-      style={[styles.row, !isLast && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
+      style={[
+        styles.row, 
+        !isLast && { borderBottomWidth: 1, borderBottomColor: colors.border },
+        isLive && { backgroundColor: `${colors.primary}08` }
+      ]}
       onPress={handlePress}
       activeOpacity={0.7}
     >
       <View style={styles.rowContent}>
-        {/* Training title */}
-        <Text style={[styles.trainingTitle, { color: colors.text }]} numberOfLines={1}>
-          {training.title}
-        </Text>
+        {/* Training title with Live badge */}
+        <View style={styles.titleRow}>
+          <Text style={[styles.trainingTitle, { color: colors.text }]} numberOfLines={1}>
+            {training.title}
+          </Text>
+          {isLive && (
+            <View style={styles.liveBadge}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>Live</Text>
+            </View>
+          )}
+        </View>
         
         {/* Team + drill info */}
         <View style={styles.metaRow}>
@@ -195,10 +208,37 @@ const styles = StyleSheet.create({
   rowContent: {
     flex: 1,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
   trainingTitle: {
     fontSize: 15,
     fontWeight: '600',
-    marginBottom: 4,
+    flex: 1,
+  },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#EF4444',
+  },
+  liveText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#EF4444',
+    letterSpacing: 0.3,
   },
   metaRow: {
     flexDirection: 'row',

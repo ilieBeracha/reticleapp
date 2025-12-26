@@ -27,6 +27,7 @@ export type QuickDrillDraft = {
   name: string;
   drill_goal: DrillGoal;
   target_type: TargetType;
+  input_method: 'scan' | 'manual';
 };
 
 export type QuickDrillPayload = {
@@ -60,6 +61,7 @@ export function QuickDrillModal({
   const [name, setName] = useState('');
   const [goal, setGoal] = useState<DrillGoal>('achievement');
   const [targetType, setTargetType] = useState<TargetType>('tactical');
+  const [inputMethod, setInputMethod] = useState<'scan' | 'manual'>('manual');
   const [distance, setDistance] = useState<number>(25);
   const [shots, setShots] = useState<number>(5);
   const [strings, setStrings] = useState<number>(1);
@@ -70,6 +72,7 @@ export function QuickDrillModal({
     setName(initial?.name ?? '');
     setGoal(initial?.drill_goal ?? 'achievement');
     setTargetType(initial?.target_type ?? 'tactical');
+    setInputMethod('manual'); // Default to manual, commander can change
     setDistance(25);
     setShots(5);
     setStrings(1);
@@ -80,6 +83,7 @@ export function QuickDrillModal({
   useEffect(() => {
     if (goal === 'grouping') {
       setTargetType('paper');
+      setInputMethod('scan'); // Grouping always uses scan
     }
   }, [goal]);
 
@@ -91,17 +95,21 @@ export function QuickDrillModal({
   const handleSave = () => {
     if (!canSave || saving) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    // For grouping drills, always use scan
+    const finalInputMethod = goal === 'grouping' ? 'scan' : inputMethod;
     onSave({
       draft: {
         name: name.trim(),
         drill_goal: goal,
         target_type: goal === 'grouping' ? 'paper' : targetType,
+        input_method: finalInputMethod,
       },
       instance: {
         distance_m: distance,
         rounds_per_shooter: shots,
         strings_count: strings,
         time_limit_seconds: timeLimit,
+        input_method: finalInputMethod,
       },
     });
   };
@@ -235,6 +243,51 @@ export function QuickDrillModal({
             <Text style={[styles.helperText, { color: colors.textMuted }]}>
               Grouping drills use paper targets (scan).
             </Text>
+          )}
+
+          {/* Entry Method - Only for achievement drills */}
+          {goal === 'achievement' && (
+            <>
+              <Text style={[styles.label, { color: colors.textMuted, marginTop: 16 }]}>ENTRY METHOD</Text>
+              <View style={[styles.segmented, { backgroundColor: colors.secondary }]}>
+                <TouchableOpacity
+                  style={[
+                    styles.segmentedOption,
+                    inputMethod === 'scan' && { backgroundColor: colors.primary },
+                  ]}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setInputMethod('scan');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.segmentedText, { color: inputMethod === 'scan' ? '#fff' : colors.text }]}>
+                    📷 Scan
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.segmentedOption,
+                    inputMethod === 'manual' && { backgroundColor: colors.primary },
+                  ]}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setInputMethod('manual');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.segmentedText, { color: inputMethod === 'manual' ? '#fff' : colors.text }]}>
+                    ✋ Manual
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={[styles.helperText, { color: colors.textMuted }]}>
+                {inputMethod === 'scan' 
+                  ? 'Soldiers will scan targets with camera to record shots.'
+                  : 'Soldiers will manually enter hit/miss counts on watch or phone.'
+                }
+              </Text>
+            </>
           )}
 
           {/* Instance Config */}

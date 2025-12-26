@@ -140,6 +140,7 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
         name: params.custom_drill_config!.name || 'Quick Practice',
         drill_goal: params.custom_drill_config!.drill_goal,
         target_type: params.custom_drill_config!.target_type || 'paper',
+        input_method: params.custom_drill_config!.input_method ?? null, // User's choice
         distance_m: params.custom_drill_config!.distance_m,
         rounds_per_shooter: params.custom_drill_config!.rounds_per_shooter,
         time_limit_seconds: params.custom_drill_config!.time_limit_seconds ?? null,

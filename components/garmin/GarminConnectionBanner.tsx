@@ -122,9 +122,9 @@ export function GarminConnectionBanner({
   const stateConfig = {
     connected: {
       icon: 'checkmark-circle' as const,
-      iconColor: '#10B981',
-      bgColor: '#10B98115',
-      borderColor: '#10B981',
+      iconColor: colors.primary,
+      bgColor: `${colors.primary}15`,
+      borderColor: colors.primary,
       text: device?.name || 'Watch Connected',
       subtext: null,
       actionText: null,
@@ -132,18 +132,18 @@ export function GarminConnectionBanner({
     online: {
       // Watch is reachable but app not open - NO repair will help here
       icon: 'watch-outline' as const,
-      iconColor: '#3B82F6', // Blue - informational
-      bgColor: '#3B82F615',
-      borderColor: '#3B82F6',
+      iconColor: colors.primary, // Blue - informational
+      bgColor: `${colors.primary}15`,
+      borderColor: colors.primary,
       text: device?.name || 'Watch Ready',
       subtext: 'Open ReticleIQ app on your watch',
       actionText: null, // No action - user must open watch app manually
     },
     needs_pairing: {
       icon: 'watch-outline' as const,
-      iconColor: '#F59E0B',
-      bgColor: '#F59E0B15',
-      borderColor: '#F59E0B',
+      iconColor: colors.accent,
+      bgColor: `${colors.accent}15`,
+      borderColor: colors.accent,
       text: 'Watch needs pairing',
       subtext: 'Tap to connect via Garmin Connect',
       actionText: 'Connect',
@@ -151,7 +151,7 @@ export function GarminConnectionBanner({
     offline: {
       icon: 'bluetooth-outline' as const,
       iconColor: colors.textMuted,
-      bgColor: colors.card,
+      bgColor: `${colors.textMuted}15`,
       borderColor: colors.border,
       text: device?.name || 'Watch Offline',
       subtext: statusReason || 'Open Garmin Connect app',
@@ -246,7 +246,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 14,
-    borderRadius: 12,
     borderWidth: 1,
     marginHorizontal: 16,
     marginVertical: 8,

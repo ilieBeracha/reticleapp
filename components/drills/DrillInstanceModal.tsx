@@ -236,6 +236,8 @@ export function DrillInstanceModal({
       setParams(merged);
     } else if (drill && drillType) {
       // Legacy drill - convert to params
+      // Default input_method: grouping always scan, achievement defaults to manual
+      const defaultInputMethod = drill.drill_goal === 'grouping' ? 'scan' : 'manual';
       setParams({
         distance: drill.distance_m ?? drillType.paramDefaults.distance,
         shots: drill.rounds_per_shooter ?? drillType.paramDefaults.shots,
@@ -245,6 +247,7 @@ export function DrillInstanceModal({
         parTime: null,
         targetCount: 1,
         minScore: 80,
+        input_method: defaultInputMethod,
       });
     } else if (drillType) {
       setParams({ ...drillType.paramDefaults });
@@ -297,6 +300,7 @@ export function DrillInstanceModal({
       rounds_per_shooter: params.shots ?? 5,
       strings_count: params.strings ?? 1,
       time_limit_seconds: params.timeLimit ?? null,
+      input_method: params.input_method ?? (isGrouping ? 'scan' : 'manual'),
     };
 
     // Parent handles closing the modal to avoid race conditions
@@ -406,6 +410,48 @@ export function DrillInstanceModal({
           <Text style={[styles.introText, { color: colors.textMuted }]}>
             Configure how this drill will run in the training session.
           </Text>
+
+          {/* Entry Method - Only for non-grouping drills */}
+          {!isGrouping && (
+            <View style={styles.entryMethodSection}>
+              <Text style={[styles.entryMethodLabel, { color: colors.text }]}>Entry Method</Text>
+              <Text style={[styles.entryMethodHint, { color: colors.textMuted }]}>
+                How soldiers will record their results
+              </Text>
+              <View style={[styles.entryMethodRow, { backgroundColor: colors.secondary }]}>
+                <TouchableOpacity
+                  style={[
+                    styles.entryMethodBtn,
+                    params.input_method === 'scan' && { backgroundColor: colors.primary },
+                  ]}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    updateParam('input_method', 'scan');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.entryMethodBtnText, { color: params.input_method === 'scan' ? '#fff' : colors.text }]}>
+                    📷 Scan
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.entryMethodBtn,
+                    params.input_method === 'manual' && { backgroundColor: colors.primary },
+                  ]}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    updateParam('input_method', 'manual');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.entryMethodBtnText, { color: params.input_method === 'manual' ? '#fff' : colors.text }]}>
+                    ✋ Manual
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
           
           {renderParamControls()}
         </ScrollView>
@@ -515,6 +561,40 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 8,
+  },
+
+  // Entry Method Section
+  entryMethodSection: {
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(128,128,128,0.15)',
+  },
+  entryMethodLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  entryMethodHint: {
+    fontSize: 12,
+    marginBottom: 12,
+  },
+  entryMethodRow: {
+    flexDirection: 'row',
+    borderRadius: 10,
+    padding: 4,
+    gap: 4,
+  },
+  entryMethodBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  entryMethodBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 
   // Field Row

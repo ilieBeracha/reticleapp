@@ -75,6 +75,10 @@ export async function createTraining(input: CreateTrainingInput): Promise<Traini
       // === PRIMARY CLASSIFICATION ===
       drill_goal: drill.drill_goal,
 
+      // === ENTRY METHOD (commander's choice) ===
+      // Only include if set (column may not exist in older schemas)
+      ...(drill.input_method ? { input_method: drill.input_method } : {}),
+
       // === BASIC CONFIG ===
       target_type: drill.target_type,
       distance_m: drill.distance_m,
@@ -130,7 +134,8 @@ export async function createTraining(input: CreateTrainingInput): Promise<Traini
 
     if (drillsError) {
       console.error('Failed to create drills:', drillsError);
-      // Don't throw - training was created, just log the error
+      // IMPORTANT: Drills are essential - throw if they fail
+      throw new Error(`Training created but drills failed: ${drillsError.message}`);
     }
 
     const result = {
@@ -718,6 +723,10 @@ export async function addDrill(
 
       // === PRIMARY CLASSIFICATION ===
       drill_goal: drill.drill_goal,
+
+      // === ENTRY METHOD (commander's choice) ===
+      // Only include if set (column may not exist in older schemas)
+      ...(drill.input_method ? { input_method: drill.input_method } : {}),
 
       // === BASIC CONFIG ===
       target_type: drill.target_type,

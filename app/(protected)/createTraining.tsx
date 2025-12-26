@@ -80,10 +80,15 @@ function DrillItem({
         </View>
         <Text style={[styles.drillItemMeta, { color: colors.textMuted }]}>
           {drill.distance_m}m •{' '}
-          {drill.target_type === 'paper'
-            ? `Scan (max ${formatMaxShots(drill.rounds_per_shooter)})`
-            : `${drill.rounds_per_shooter} shots`}
-          {drill.time_limit_seconds ? ` • ${drill.time_limit_seconds}s` : ''}
+          {drill.input_method === 'scan' || (drill.drill_goal === 'grouping')
+            ? `📷 Scan`
+            : `✋ Manual`}
+          {' • '}
+          {drill.rounds_per_shooter} shots
+          {(drill.strings_count && drill.strings_count > 1) 
+            ? ` × ${drill.strings_count} rounds = ${drill.rounds_per_shooter * drill.strings_count} total`
+            : ''}
+          {drill.time_limit_seconds ? ` • ${drill.time_limit_seconds}s limit` : ''}
         </Text>
       </View>
 
@@ -711,6 +716,13 @@ export default function CreateTrainingScreen() {
               )}
             </View>
           )}
+          
+          {/* Info hint */}
+          {teamDrills.length > 0 && (
+            <Text style={[styles.libraryHint, { color: colors.textMuted }]}>
+              💡 Manage drill templates in your team's Drill Library
+            </Text>
+          )}
         </View>
 
         {/* Create Button */}
@@ -978,6 +990,12 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   libraryEmptyBtnText: { fontSize: 13, fontWeight: '600' },
+  libraryHint: { 
+    fontSize: 12, 
+    marginTop: 12, 
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
 
   // Drills List
   drillsList: { gap: 8 },

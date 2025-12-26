@@ -9,6 +9,7 @@ export interface CreateSessionParams {
     name: string;
     drill_goal: 'grouping' | 'achievement';
     target_type: 'paper' | 'tactical';
+    input_method?: 'scan' | 'manual' | null; // User's explicit choice
     distance_m: number;
     rounds_per_shooter: number;
     time_limit_seconds?: number | null;
@@ -22,6 +23,7 @@ export interface SessionDrillConfig {
   name: string;
   drill_goal: 'grouping' | 'achievement'; // Primary: what the drill measures
   target_type: 'paper' | 'tactical'; // Secondary: input method hint
+  input_method?: 'scan' | 'manual' | null; // Commander's explicit choice (overrides target_type inference)
   distance_m: number;
   rounds_per_shooter: number;
   time_limit_seconds?: number | null;

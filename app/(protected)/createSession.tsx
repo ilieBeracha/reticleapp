@@ -3,9 +3,9 @@
  */
 import { useColors } from '@/hooks/ui/useColors';
 import {
-    createSession,
-    deleteSession,
-    getMyActiveSession
+  createSession,
+  deleteSession,
+  getMyActiveSession
 } from '@/services/sessionService';
 import { useSessionStore } from '@/store/sessionStore';
 import { useTeamStore } from '@/store/teamStore';
@@ -16,14 +16,14 @@ import { router } from 'expo-router';
 import { Camera, Check, Crosshair, Minus, Play, Plus, Repeat } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -149,6 +149,7 @@ export default function CreateSessionScreen() {
           name: name || 'Solo Practice',
           drill_goal: drillGoal,
           target_type: targetType,
+          input_method: drillGoal === 'grouping' ? 'scan' : inputMethod, // User's choice (grouping always scan)
           distance_m: distance,
           rounds_per_shooter: roundsPerShooter,
           time_limit_seconds: timeLimit,
@@ -231,6 +232,7 @@ export default function CreateSessionScreen() {
               Haptics.selectionAsync();
               setDrillGoal('grouping');
               setInputMethod('scan');
+              setRounds(1); // Grouping is always 1 round
             }}
           >
             <Text style={[styles.segmentedText, { color: drillGoal === 'grouping' ? '#fff' : colors.text }]}>
@@ -343,63 +345,65 @@ export default function CreateSessionScreen() {
         </View>
       )}
 
-      {/* Rounds Count */}
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={styles.cardRow}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <View style={[styles.roundsIcon, { backgroundColor: `${colors.primary}15` }]}>
-              <Repeat size={14} color={colors.primary} />
+      {/* Rounds Count - Only for Achievement drills */}
+      {drillGoal === 'achievement' && (
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.cardRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={[styles.roundsIcon, { backgroundColor: `${colors.primary}15` }]}>
+                <Repeat size={14} color={colors.primary} />
+              </View>
+              <Text style={[styles.cardLabel, { color: colors.textMuted, marginBottom: 0 }]}>Rounds</Text>
             </View>
-            <Text style={[styles.cardLabel, { color: colors.textMuted, marginBottom: 0 }]}>Rounds</Text>
+          </View>
+          <View style={styles.roundsRow}>
+            <TouchableOpacity
+              style={[
+                styles.roundsOption,
+                { 
+                  backgroundColor: rounds === 1 ? `${colors.primary}10` : colors.background, 
+                  borderColor: rounds === 1 ? colors.primary : colors.border,
+                },
+              ]}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setRounds(1);
+              }}
+              activeOpacity={0.7}
+            >
+              {rounds === 1 && (
+                <View style={[styles.roundsCheck, { backgroundColor: colors.primary }]}>
+                  <Check size={12} color="#fff" strokeWidth={3} />
+                </View>
+              )}
+              <Text style={[styles.roundsNumber, { color: rounds === 1 ? colors.primary : colors.text }]}>1</Text>
+              <Text style={[styles.roundsLabel, { color: rounds === 1 ? colors.primary : colors.textMuted }]}>Round</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.roundsOption,
+                { 
+                  backgroundColor: rounds === 2 ? `${colors.primary}10` : colors.background, 
+                  borderColor: rounds === 2 ? colors.primary : colors.border,
+                },
+              ]}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setRounds(2);
+              }}
+              activeOpacity={0.7}
+            >
+              {rounds === 2 && (
+                <View style={[styles.roundsCheck, { backgroundColor: colors.primary }]}>
+                  <Check size={12} color="#fff" strokeWidth={3} />
+                </View>
+              )}
+              <Text style={[styles.roundsNumber, { color: rounds === 2 ? colors.primary : colors.text }]}>2</Text>
+              <Text style={[styles.roundsLabel, { color: rounds === 2 ? colors.primary : colors.textMuted }]}>Rounds</Text>
+            </TouchableOpacity>
           </View>
         </View>
-        <View style={styles.roundsRow}>
-          <TouchableOpacity
-            style={[
-              styles.roundsOption,
-              { 
-                backgroundColor: rounds === 1 ? `${colors.primary}10` : colors.background, 
-                borderColor: rounds === 1 ? colors.primary : colors.border,
-              },
-            ]}
-            onPress={() => {
-              Haptics.selectionAsync();
-              setRounds(1);
-            }}
-            activeOpacity={0.7}
-          >
-            {rounds === 1 && (
-              <View style={[styles.roundsCheck, { backgroundColor: colors.primary }]}>
-                <Check size={12} color="#fff" strokeWidth={3} />
-              </View>
-            )}
-            <Text style={[styles.roundsNumber, { color: rounds === 1 ? colors.primary : colors.text }]}>1</Text>
-            <Text style={[styles.roundsLabel, { color: rounds === 1 ? colors.primary : colors.textMuted }]}>Round</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.roundsOption,
-              { 
-                backgroundColor: rounds === 2 ? `${colors.primary}10` : colors.background, 
-                borderColor: rounds === 2 ? colors.primary : colors.border,
-              },
-            ]}
-            onPress={() => {
-              Haptics.selectionAsync();
-              setRounds(2);
-            }}
-            activeOpacity={0.7}
-          >
-            {rounds === 2 && (
-              <View style={[styles.roundsCheck, { backgroundColor: colors.primary }]}>
-                <Check size={12} color="#fff" strokeWidth={3} />
-              </View>
-            )}
-            <Text style={[styles.roundsNumber, { color: rounds === 2 ? colors.primary : colors.text }]}>2</Text>
-            <Text style={[styles.roundsLabel, { color: rounds === 2 ? colors.primary : colors.textMuted }]}>Rounds</Text>
-          </TouchableOpacity>
-        </View>
-      </View> 
+      )}
 
       {/* Distance */}
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>

@@ -24,6 +24,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
+import { Plus } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -36,7 +37,6 @@ import {
 } from 'react-native';
 import { BaseAvatar } from '../BaseAvatar';
 import { SectionHeader } from './_shared/SectionHeader';
-import { ActiveSessionBanner } from './ActiveSessionBanner';
 import HeroSummaryCard from './cards/HeroSummaryCard';
 import { mapSessionToHomeSession, mapTrainingToScheduledSession, type HomeSession } from './types';
 import { AggregatedStatsCard } from './unified/sections/AggregatedStatsCard';
@@ -155,10 +155,14 @@ export function UnifiedHomePage() {
   // Derived data
   const hasTeams = teams.length > 0;
   
-  // Filter upcoming trainings for scheduled sessions
+  // Filter upcoming trainings - exclude trainings where user already has an active session
   const upcomingTrainings = useMemo(() => {
-    return myUpcomingTrainings.filter((t) => t.status === 'planned' || t.status === 'ongoing').slice(0, 5);
-  }, [myUpcomingTrainings]);
+    return myUpcomingTrainings
+      .filter((t) => t.status === 'planned' || t.status === 'ongoing')
+      // Don't show training in "upcoming" if user already has an active session for it
+      .filter((t) => !allSessions.some(s => s.training_id === t.id && s.status === 'active'))
+      .slice(0, 5);
+  }, [myUpcomingTrainings, allSessions]);
 
   // Use session-centric home state
   const homeState = useHomeState({
@@ -204,38 +208,6 @@ export function UnifiedHomePage() {
     setRefreshing(false);
   }, [loadAllSessions, loadMyUpcomingTrainings, loadMyStats, loadTeams]);
 
-  const handleHeroPress = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
-    const { activeSession, nextSession, unresolvedSignal, lastSession } = homeState;
-    
-    // Priority navigation based on homeState
-    if (activeSession?.sourceSession) {
-      router.push(`/(protected)/activeSession?sessionId=${activeSession.sourceSession.id}`);
-      return;
-    }
-    
-    if (nextSession?.state === 'active' && nextSession.sourceTraining) {
-      // Live team session
-      router.push(`/(protected)/trainingLive?trainingId=${nextSession.sourceTraining.id}`);
-      return;
-    }
-    
-    if (nextSession?.state === 'scheduled' && nextSession.sourceTraining) {
-      // Upcoming team session - go to prepare
-      router.push(`/(protected)/trainingDetail?id=${nextSession.sourceTraining.id}`);
-      return;
-    }
-    
-    if (unresolvedSignal?.type === 'no_review' && unresolvedSignal.sessionId) {
-      router.push(`/(protected)/sessionDetail?sessionId=${unresolvedSignal.sessionId}`);
-      return;
-    }
-    
-    // Default: start new session
-    handleStartSession();
-  }, [homeState]);
-
   const handleStartSession = useCallback(async () => {
     if (starting) return;
     setStarting(true);
@@ -280,6 +252,22 @@ export function UnifiedHomePage() {
       setStarting(false);
     }
   }, [starting, loadAllSessions]);
+
+  const handleHeroPress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    const { activeSession } = homeState;
+    
+    // Hero card is now PERSONAL only
+    // If active solo session, continue it
+    if (activeSession?.sourceSession && activeSession.origin === 'solo') {
+      router.push(`/(protected)/activeSession?sessionId=${activeSession.sourceSession.id}`);
+      return;
+    }
+    
+    // Otherwise, start new solo session
+    handleStartSession();
+  }, [homeState, handleStartSession]);
 
   const handleSessionPress = useCallback((session: HomeSession) => {
     if (session.sourceSession) {
@@ -341,13 +329,7 @@ export function UnifiedHomePage() {
           </View>
         </View>
 
-        {/* Active Session Banner - prominent reminder if session is active */}
-        {homeState.activeSession?.sourceSession && (
-          <ActiveSessionBanner 
-            session={homeState.activeSession.sourceSession}
-            onSessionEnded={loadAllSessions}
-          />
-        )}
+
 
         {/* Hero Summary - session-centric, action-forward */}
         <View style={styles.section}>
@@ -389,6 +371,37 @@ export function UnifiedHomePage() {
         )}
         <View style={{ height: 100 }} />
       </ScrollView>
+      
+      {/* Floating Action Button - Always visible to start solo session */}
+      {!homeState.activeSession && (
+        <TouchableOpacity
+          style={{
+            position: 'absolute',
+            bottom: 90,
+            right: 16,
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            backgroundColor: '#10B981',
+            justifyContent: 'center',
+            alignItems: 'center',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            elevation: 8,
+          }}
+          onPress={handleStartSession}
+          activeOpacity={0.8}
+          disabled={starting}
+        >
+          {starting ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Plus size={24} color="#fff" strokeWidth={2.5} />
+          )}
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
