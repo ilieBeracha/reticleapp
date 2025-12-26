@@ -140,6 +140,14 @@ FOLLOW THESE RULES STRICTLY AND EXACTLY.
 - Always provide a complete PLAN with REASONING based on evidence from code and logs before making changes.
 - Explain your OBSERVATIONS clearly, then provide REASONING to identify the exact issue. Add console logs when needed to gather more information.
 
+## Code Quality & Consistency
+
+- Remove all AI-generated comments (e.g., "// This function does X", "// Added by AI").
+- Avoid mega-files: split files larger than 300–400 lines into logical components or utilities.
+- Never hardcode colors (e.g., `#2196F3`, `'red'`, `'white'`) — always use values from the theme.
+- No hardcoded strings; use constants from the global constants folder.
+- If a component has a lot of logic, extract it into a utility or custom hook.
+
 
 ## Core Business Domain
 Military/law enforcement training management platform focused on shooting drills, team organization, and performance tracking.
