@@ -1,5 +1,5 @@
 diff --git a/node_modules/react-native-garmin-connect/ios/AppConstants.swift b/node_modules/react-native-garmin-connect/ios/AppConstants.swift
-index 2e67eb2..3ba78f5 100644
+index 2e67eb2..de23617 100644
 --- a/node_modules/react-native-garmin-connect/ios/AppConstants.swift
 +++ b/node_modules/react-native-garmin-connect/ios/AppConstants.swift
 @@ -8,7 +8,9 @@ struct AppConstants {
@@ -49,7 +49,7 @@ index 07c2959..99bec8e 100644
  
  @interface GarminConnectModule : NSObject <IQAppMessageDelegate, IQDeviceEventDelegate>
 diff --git a/node_modules/react-native-garmin-connect/ios/GarminConnectModule.swift b/node_modules/react-native-garmin-connect/ios/GarminConnectModule.swift
-index 46e8be4..763f041 100644
+index 46e8be4..81f65a0 100644
 --- a/node_modules/react-native-garmin-connect/ios/GarminConnectModule.swift
 +++ b/node_modules/react-native-garmin-connect/ios/GarminConnectModule.swift
 @@ -6,7 +6,10 @@ import Foundation
@@ -220,7 +220,7 @@ index 46e8be4..763f041 100644
 +            return
          }
 -     }
-         
+     
 -    func onSdkReady() {
 -        self.emitter.sendEvent(withName: "onSdkReady", body: true)
 +        if let messagesArray = messages as? [[String: Any]] {
@@ -247,7 +247,7 @@ index 46e8be4..763f041 100644
 +            self.emitSafeMessage(type: "RAW", payload: String(describing: messages!))
 +        }
      }
-     
+ 
 -    func onMessage(body: NSMutableDictionary) {
 -        let message: NSMutableDictionary = [:]
 -        message["type"] = body[AppConstants.KEY_MESSAGE_TYPE]
@@ -286,7 +286,7 @@ index 46e8be4..763f041 100644
 +                payloadString = String(describing: payload)
 +            }
          }
-     
+         
 -        self.emitter.sendEvent(withName: "onMessage", body: message)
 +        print("[Garmin] 📨 DEBUG: payloadString = \(payloadString)")
 +        self.emitSafeMessage(type: messageType, payload: payloadString)
@@ -335,7 +335,7 @@ index 46e8be4..763f041 100644
      }
  }
 diff --git a/node_modules/react-native-garmin-connect/ios/GarminDeviceStorage.swift b/node_modules/react-native-garmin-connect/ios/GarminDeviceStorage.swift
-index a7c6f2d..5c36a37 100644
+index a7c6f2d..69841a4 100644
 --- a/node_modules/react-native-garmin-connect/ios/GarminDeviceStorage.swift
 +++ b/node_modules/react-native-garmin-connect/ios/GarminDeviceStorage.swift
 @@ -1,30 +1,82 @@
@@ -458,19 +458,30 @@ index a7c6f2d..5c36a37 100644
      }
  }
 diff --git a/node_modules/react-native-garmin-connect/react-native-garmin-connect.podspec b/node_modules/react-native-garmin-connect/react-native-garmin-connect.podspec
-index 16e7390..602c195 100644
+index 16e7390..fe89ac9 100644
 --- a/node_modules/react-native-garmin-connect/react-native-garmin-connect.podspec
 +++ b/node_modules/react-native-garmin-connect/react-native-garmin-connect.podspec
-@@ -14,7 +14,8 @@ Pod::Spec.new do |s|
+@@ -14,9 +14,19 @@ Pod::Spec.new do |s|
    s.platforms    = { :ios => min_ios_version_supported }
    s.source       = { :git => "https://github.com/malgorzatamaz/react-native-garmin-connect.git", :tag => "#{s.version}" }
  
 -  s.source_files = "ios/**/*.{h,m,mm,swift}"
++  # Exclude GarminDeviceStorage.h - Swift auto-generates the ObjC header from @objc class
 +  s.source_files = "ios/*.{h,m,mm,swift}"
++  s.exclude_files = "ios/GarminDeviceStorage.h"
 +  s.public_header_files = "ios/GarminConnect.h"
    s.vendored_frameworks = 'ios/ConnectIQ.xcframework'
- 
+   
++  # Configure framework search paths for ConnectIQ
++  # Note: PODS_ROOT is inside ios/, so ../../ goes to project root
++  s.xcconfig = {
++    'FRAMEWORK_SEARCH_PATHS' => '"${PODS_ROOT}/../../node_modules/react-native-garmin-connect/ios"',
++    'HEADER_SEARCH_PATHS' => '"${PODS_ROOT}/../../node_modules/react-native-garmin-connect/ios/ConnectIQ.xcframework/ios-arm64/ConnectIQ.framework/Headers" "${PODS_ROOT}/../../node_modules/react-native-garmin-connect/ios/ConnectIQ.xcframework/ios-arm64_x86_64-simulator/ConnectIQ.framework/Headers"'
++  }
++
    # Use install_modules_dependencies helper to install the dependencies if React Native version >=0.71.0.
+   # See https://github.com/facebook/react-native/blob/febf6b7f33fdb4904669f99d795eba4c0f95d7bf/scripts/cocoapods/new_architecture.rb#L79.
+   if respond_to?(:install_modules_dependencies, true)
 diff --git a/node_modules/react-native-garmin-connect/src/index.tsx b/node_modules/react-native-garmin-connect/src/index.tsx
 index d72b4a2..99887f2 100644
 --- a/node_modules/react-native-garmin-connect/src/index.tsx

@@ -1,18 +1,18 @@
 /**
  * Hero Summary Card
  * 
- * Action-forward hero card. Points to:
+ * TRAINING-FIRST hero card. Shows:
  * - Active session (if any)
- * - Next scheduled session (if any)
+ * - Next TRAINING with drill count and progress
  * - Or prompts to start practice
  * 
- * Never mentions "training". Shows sessions with context.
+ * Trainings and drills are shown EXPLICITLY.
  */
 import { useColors } from '@/hooks/ui/useColors';
 import { BUTTON_GRADIENT } from '@/theme/colors';
 import { differenceInHours, differenceInMinutes, format, formatDistanceToNow, isToday, isTomorrow } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Calendar, ChevronRight, Clock, Users } from 'lucide-react-native';
+import { Calendar, ChevronRight, Clock, Target, Users } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { HomeSession, HomeState } from '../types';
@@ -41,47 +41,61 @@ function HeroSummaryCard({ homeState, onPress }: HeroSummaryCardProps) {
     if (activeSession && activeSession.origin === 'solo') {
       return {
         badge: { text: 'Active', color: '#22C55E', showDot: true },
-        label: 'Session in Progress',
+        label: activeSession.trainingTitle ? 'Training Session' : 'Practice Session',
         title: (
           <Text style={styles.heroTitle}>
-            Continue your <Text style={styles.heroHighlight}>session</Text>
+            Continue <Text style={styles.heroHighlight}>{activeSession.drillName || 'session'}</Text>
           </Text>
         ),
-        subtitle: activeSession.drillName,
-        action: 'Continue Session',
+        subtitle: activeSession.trainingTitle,
+        action: 'Continue',
+        drillInfo: undefined,
       };
     }
     
-    // 2. Live team session (ongoing)
+    // 2. Live team training (ongoing)
     if (nextSession?.state === 'active' && nextSession.origin === 'team') {
+      const drillProgress = nextSession.drillCount 
+        ? `${nextSession.drillsCompleted || 0}/${nextSession.drillCount} drills`
+        : undefined;
       return {
         badge: { text: 'Live', color: '#EF4444', showDot: true },
-        label: 'Team Session',
+        label: nextSession.teamName || 'Team Training',
         title: (
           <Text style={styles.heroTitle}>
-            <Text style={styles.heroHighlight}>Live</Text> team session
+            <Text style={styles.heroHighlight}>{nextSession.trainingTitle || 'Training'}</Text>
           </Text>
         ),
-        subtitle: nextSession.teamName,
-        action: 'Join Session',
+        subtitle: drillProgress,
+        action: 'Join Training',
+        drillInfo: drillProgress,
       };
     }
     
-    // 3. Upcoming scheduled session
+    // 3. Upcoming scheduled TRAINING (show training name + drill count)
     if (nextSession?.state === 'scheduled' && nextSession.scheduledAt) {
       const timeLabel = getScheduledTimeLabel(nextSession.scheduledAt);
+      const drillCount = nextSession.drillCount || 0;
+      const drillsLeft = drillCount - (nextSession.drillsCompleted || 0);
+      
+      // Build subtitle: "Alpha Squad • 3 drills"
+      const subtitleParts: string[] = [];
+      if (nextSession.teamName) subtitleParts.push(nextSession.teamName);
+      if (drillCount > 0) subtitleParts.push(`${drillCount} drill${drillCount !== 1 ? 's' : ''}`);
+      
       return {
         badge: timeLabel.isUrgent 
           ? { text: timeLabel.shortLabel, color: '#F59E0B', showDot: false }
           : undefined,
-        label: nextSession.teamName ? 'Team Session' : 'Scheduled',
+        label: `Training ${timeLabel.label}`,
         title: (
           <Text style={styles.heroTitle}>
-            Session <Text style={styles.heroHighlight}>{timeLabel.label}</Text>
+            <Text style={styles.heroHighlight}>{nextSession.trainingTitle || 'Training'}</Text>
           </Text>
         ),
-        subtitle: nextSession.drillName,
+        subtitle: subtitleParts.join(' • ') || undefined,
         action: 'Prepare',
+        drillInfo: drillCount > 0 ? `${drillsLeft} drill${drillsLeft !== 1 ? 's' : ''} to go` : undefined,
       };
     }
     
@@ -89,14 +103,15 @@ function HeroSummaryCard({ homeState, onPress }: HeroSummaryCardProps) {
     if (unresolvedSignal?.type === 'no_review' && lastSession) {
       return {
         badge: { text: 'Review', color: '#F59E0B', showDot: false },
-        label: 'Last Session',
+        label: lastSession.trainingTitle || 'Last Session',
         title: (
           <Text style={styles.heroTitle}>
-            Session <Text style={styles.heroHighlight}>needs review</Text>
+            <Text style={styles.heroHighlight}>{lastSession.drillName || 'Session'}</Text> needs review
           </Text>
         ),
-        subtitle: lastSession.drillName,
+        subtitle: undefined,
         action: 'Review',
+        drillInfo: undefined,
       };
     }
     
@@ -105,7 +120,7 @@ function HeroSummaryCard({ homeState, onPress }: HeroSummaryCardProps) {
       const sessionCount = homeState.weeklyStats.sessions;
       return {
         badge: undefined,
-        label: 'Ready',
+        label: 'Ready to train',
         title: (
           <Text style={styles.heroTitle}>
             <Text style={styles.heroHighlight}>{sessionCount}</Text> session{sessionCount !== 1 ? 's' : ''} this week
@@ -113,6 +128,7 @@ function HeroSummaryCard({ homeState, onPress }: HeroSummaryCardProps) {
         ),
         subtitle: undefined,
         action: 'Start Practice',
+        drillInfo: undefined,
       };
     }
     
@@ -122,15 +138,16 @@ function HeroSummaryCard({ homeState, onPress }: HeroSummaryCardProps) {
       label: 'Welcome',
       title: (
         <Text style={styles.heroTitle}>
-          Ready to <Text style={styles.heroHighlight}>start</Text>?
+          Ready to <Text style={styles.heroHighlight}>train</Text>?
         </Text>
       ),
       subtitle: undefined,
       action: 'Start Practice',
+      drillInfo: undefined,
     };
   };
 
-  const { badge, label, title, subtitle, action } = getContent();
+  const { badge, label, title, subtitle, action, drillInfo } = getContent();
 
   return (
     <Animated.View entering={FadeInDown.duration(400)}>
@@ -159,6 +176,12 @@ function HeroSummaryCard({ homeState, onPress }: HeroSummaryCardProps) {
             {title}
             {subtitle && (
               <Text style={styles.heroSubtitle} numberOfLines={1}>{subtitle}</Text>
+            )}
+            {drillInfo && (
+              <View style={styles.drillInfoRow}>
+                <Target size={12} color="rgba(255,255,255,0.7)" />
+                <Text style={styles.drillInfoText}>{drillInfo}</Text>
+              </View>
             )}
           </View>
 
@@ -264,6 +287,17 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: 'rgba(255,255,255,0.7)',
     marginTop: 4,
+  },
+  drillInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+  },
+  drillInfoText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.7)',
   },
   heroFooter: {
     marginTop: 12,

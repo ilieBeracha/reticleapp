@@ -5,6 +5,7 @@ import {
     finishTraining,
     startTrainingWithConfig
 } from '@/services/trainingService';
+import { useTrainingStore } from '@/store/trainingStore';
 import type { TrainingDrill, TrainingWithDetails } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -68,6 +69,9 @@ export function useTrainingActions({
   const [actionLoading, setActionLoading] = useState(false);
   const [startingDrillId, setStartingDrillId] = useState<string | null>(null);
   const [showStartModal, setShowStartModal] = useState(false);
+  
+  // Get store refresh function
+  const loadMyUpcomingTrainings = useTrainingStore((s) => s.loadMyUpcomingTrainings);
 
   // Open the start modal (for commanders to configure drill instances)
   const handleOpenStartModal = useCallback(() => {
@@ -113,21 +117,39 @@ export function useTrainingActions({
   }, [training, setTraining, onTrainingUpdated]);
 
   const handleFinishTraining = useCallback(() => {
-    if (!training) return;
+    if (!training) {
+      console.log('[TrainingActions] No training to finish');
+      return;
+    }
 
+    console.log('[TrainingActions] Showing finish confirmation for:', training.id);
+    
     Alert.alert('Finish Training', 'Mark this training as completed?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Finish',
         onPress: async () => {
+          console.log('[TrainingActions] User confirmed finish for:', training.id);
           setActionLoading(true);
           try {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            await finishTraining(training.id);
+            console.log('[TrainingActions] Calling finishTraining...');
+            const result = await finishTraining(training.id);
+            console.log('[TrainingActions] finishTraining result:', result);
+            
+            if (!result) {
+              console.log('[TrainingActions] Training not found or already finished');
+              Alert.alert('Info', 'Training was already finished or not found');
+            }
+            
             setTraining((prev) => (prev ? { ...prev, status: 'finished' } : null));
             onTrainingUpdated?.();
+            // Refresh store so home page updates
+            loadMyUpcomingTrainings().catch(() => {});
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            console.log('[TrainingActions] Finish complete');
           } catch (error: any) {
+            console.error('[TrainingActions] Finish failed:', error);
             Alert.alert('Error', error.message || 'Failed to finish training');
           } finally {
             setActionLoading(false);
@@ -135,7 +157,7 @@ export function useTrainingActions({
         },
       },
     ]);
-  }, [training, setTraining, onTrainingUpdated]);
+  }, [training, setTraining, onTrainingUpdated, loadMyUpcomingTrainings]);
 
   const handleCancelTraining = useCallback(() => {
     if (!training) return;
@@ -155,6 +177,8 @@ export function useTrainingActions({
               await cancelTraining(training.id);
               setTraining((prev) => (prev ? { ...prev, status: 'cancelled' } : null));
               onTrainingUpdated?.();
+              // Refresh store so home page updates
+              loadMyUpcomingTrainings().catch(() => {});
               router.back();
             } catch (error: any) {
               Alert.alert('Error', error.message || 'Failed to cancel training');
@@ -165,7 +189,7 @@ export function useTrainingActions({
         },
       ]
     );
-  }, [training, setTraining, onTrainingUpdated]);
+  }, [training, setTraining, onTrainingUpdated, loadMyUpcomingTrainings]);
 
   const handleStartDrill = useCallback(
     async (drill: TrainingDrill) => {

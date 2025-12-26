@@ -1,15 +1,14 @@
 /**
  * Unified Home Page
  * 
- * SESSION-CENTRIC. Home is a launch surface, not a dashboard.
+ * TRAINING-FIRST. Home shows trainings and drills explicitly.
  * 
  * Home answers three questions:
- * 1. What just happened? (last session)
- * 2. What is coming up? (next session)
- * 3. What is unresolved? (session needs attention)
+ * 1. What's my next training? (training name, drills, deadline)
+ * 2. What drills do I need to do? (drill progress)
+ * 3. What's my recent activity? (completed sessions)
  * 
- * "Training" is NEVER surfaced as a concept here.
- * Team sessions appear as "Team Session", not "Training".
+ * Trainings are shown EXPLICITLY with drill counts and progress.
  */
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -42,6 +41,7 @@ import HeroSummaryCard from './cards/HeroSummaryCard';
 import { mapSessionToHomeSession, mapTrainingToScheduledSession, type HomeSession } from './types';
 import { AggregatedStatsCard } from './unified/sections/AggregatedStatsCard';
 import { EmptyState } from './unified/sections/EmptyState';
+import { UpcomingTrainingsCard } from './unified/sections/UpcomingTrainingsCard';
 import { WeeklyHighlightsCard } from './unified/sections/WeeklyHighlightsCard';
 import { styles } from './unified/styles';
 import { useHomeState } from './useHomeState';
@@ -362,7 +362,14 @@ export function UnifiedHomePage() {
           <EmptyState colors={colors} onStartPractice={handleStartSession} starting={starting} />
         ) : (
           <>
-            {/* Weekly Overview - sessions only */}
+            {/* Upcoming Trainings - EXPLICIT training display */}
+            {upcomingTrainings.length > 0 && (
+              <View style={styles.section}>
+                <UpcomingTrainingsCard trainings={upcomingTrainings} />
+              </View>
+            )}
+
+            {/* Weekly Overview */}
             <View style={styles.section}>
               <TitleHeader title="This Week" colors={colors} />
               <View style={styles.cardsRow}>
@@ -371,7 +378,7 @@ export function UnifiedHomePage() {
               </View>
             </View>
 
-            {/* Activity Timeline - sessions only, no "training" concept */}
+            {/* Activity Timeline - recent sessions */}
             <View style={{ marginTop: 8 }}>
               <ActivityTimeline
                 sessions={timelineSessions}

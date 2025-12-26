@@ -1,13 +1,12 @@
 /**
  * Home View Model Types
  * 
- * Home is SESSION-CENTRIC. Training is an internal coordination concept
- * that never surfaces directly on Home.
+ * Home is TRAINING-FIRST. Users see their trainings, drills, and progress.
  * 
  * Home answers three questions:
- * 1. What just happened? (last session)
- * 2. What is coming up? (next session - could be from a training)
- * 3. What is unresolved? (session needs review)
+ * 1. What's my next training? (upcoming trainings with drill count)
+ * 2. What drills do I need to do? (drill progress within training)
+ * 3. What's my recent activity? (completed sessions)
  */
 
 import type { SessionWithDetails } from '@/services/session/types';
@@ -24,11 +23,11 @@ export type HomeSessionState =
   | 'unreviewed';   // Completed but needs attention
 
 /**
- * Unified Home Session - the only entity Home cares about
+ * Unified Home Session - represents activity on Home
  * 
  * This can represent:
  * - An actual session (active, completed)
- * - A "scheduled session" derived from an upcoming training
+ * - A "scheduled training" with drills to complete
  */
 export interface HomeSession {
   id: string;
@@ -39,9 +38,15 @@ export interface HomeSession {
   scheduledAt: Date | null;  // When it's scheduled (for upcoming)
   startedAt: Date | null;    // When it started (for active/completed)
   endedAt: Date | null;      // When it ended (for completed)
+  expiresAt: Date | null;    // When training expires/deadline
   
   // Context (optional - only if team-based)
   teamName?: string;
+  
+  // TRAINING INFO (explicit - not hidden)
+  trainingTitle?: string;    // "Squad Alpha Range Day"
+  drillCount?: number;       // 5 drills
+  drillsCompleted?: number;  // 2/5 done
   
   // Drill info (if available)
   drillName?: string;
@@ -121,7 +126,12 @@ export function mapSessionToHomeSession(session: SessionWithDetails): HomeSessio
     scheduledAt: null,
     startedAt: session.started_at ? new Date(session.started_at) : null,
     endedAt: session.ended_at ? new Date(session.ended_at) : null,
+    expiresAt: null,
     teamName: session.team_name ?? undefined,
+    
+    // Training context if session is part of training
+    trainingTitle: session.training_title ?? undefined,
+    
     drillName: session.drill_name ?? session.drill_config?.name ?? undefined,
     drillGoal: session.drill_config?.drill_goal,
     stats: session.stats ? {
@@ -137,20 +147,29 @@ export function mapSessionToHomeSession(session: SessionWithDetails): HomeSessio
 }
 
 /**
- * Map an upcoming training to a "scheduled session" for Home
+ * Map a training to HomeSession for display
  * 
- * Training is NOT surfaced as "training" - it becomes a scheduled session.
+ * Training IS surfaced explicitly - users see training name, drill count, progress
  */
-export function mapTrainingToScheduledSession(training: TrainingWithDetails): HomeSession {
+export function mapTrainingToScheduledSession(training: TrainingWithDetails, drillsCompleted?: number): HomeSession {
+  const drillCount = training.drill_count ?? training.drills?.length ?? 0;
+  
   return {
-    id: `scheduled-${training.id}`,
+    id: `training-${training.id}`,
     state: training.status === 'ongoing' ? 'active' : 'scheduled',
     origin: 'team',
     scheduledAt: training.scheduled_at ? new Date(training.scheduled_at) : null,
     startedAt: training.started_at ? new Date(training.started_at) : null,
     endedAt: null,
+    expiresAt: (training as any).expires_at ? new Date((training as any).expires_at) : null,
     teamName: training.team?.name ?? undefined,
-    drillName: training.drills?.[0]?.name ?? undefined,
+    
+    // EXPLICIT TRAINING INFO
+    trainingTitle: training.title,
+    drillCount,
+    drillsCompleted: drillsCompleted ?? 0,
+    
+    drillName: drillCount === 1 ? training.drills?.[0]?.name : undefined,
     sourceTraining: training,
   };
 }

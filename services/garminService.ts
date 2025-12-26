@@ -434,6 +434,46 @@ return sendMessage('SYNC_DRILL', drill);
 }
 
 // ============================================================================
+// MOCK (for testing without a real watch)
+// ============================================================================
+
+/**
+ * Simulate receiving session data from a watch.
+ * Useful for testing the flow without a real Garmin device.
+ * 
+ * Usage: mockWatchSessionResult('session-id-here', 5, 45);
+ */
+export function mockWatchSessionResult(
+  sessionId: string,
+  shotsFired: number = 5,
+  elapsedTimeSeconds: number = 30,
+  distance: number = 25,
+  completed: boolean = true
+): void {
+  console.log('[GarminService] 🧪 MOCK: Simulating watch session result');
+  
+  const mockPayload = {
+    sessionId,
+    shotsFired,
+    elapsedTime: elapsedTimeSeconds,
+    distance,
+    completed,
+  };
+  
+  // Simulate the same flow as a real watch message
+  const sessionData: GarminSessionData = {
+    sessionId: mockPayload.sessionId,
+    shotsRecorded: mockPayload.shotsFired,
+    durationMs: mockPayload.elapsedTime * 1000,
+    distance: mockPayload.distance,
+    completed: mockPayload.completed,
+  };
+  
+  console.log('[GarminService] 🧪 MOCK: Emitting session_data:', sessionData);
+  emit({ event: 'session_data', data: sessionData });
+}
+
+// ============================================================================
 // GETTERS (for reading current state without subscribing)
 // ============================================================================
 

@@ -398,6 +398,24 @@ export async function endSession(sessionId: string) {
         durationSeconds,
       });
     }
+
+    // =========================================================================
+    // AUTO-CLOSE TRAINING IF ALL MEMBERS COMPLETED ALL DRILLS (OR EXPIRED)
+    // =========================================================================
+    try {
+      const { data: newStatus, error: rpcError } = await supabase.rpc('auto_close_training_if_complete', {
+        p_training_id: session.training_id,
+      });
+
+      if (rpcError) {
+        console.error('[SessionService] Failed to check training auto-close:', rpcError);
+      } else if (newStatus === 'finished') {
+        console.log('[SessionService] Training auto-closed - all members completed all drills');
+      }
+    } catch (err) {
+      // Non-blocking - don't fail session end if auto-close check fails
+      console.error('[SessionService] Error checking training auto-close:', err);
+    }
   }
 
   return updatedSession;

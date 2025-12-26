@@ -274,6 +274,45 @@ COMMENT ON FUNCTION "public"."add_team_member"("p_team_id" "uuid", "p_user_id" "
 
 
 
+CREATE OR REPLACE FUNCTION "public"."auto_close_training_if_complete"("p_training_id" "uuid") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+  v_current_status text;
+  v_should_close boolean;
+BEGIN
+  -- Get current status
+  SELECT status INTO v_current_status
+  FROM trainings
+  WHERE id = p_training_id;
+  
+  -- Only check active trainings (planned or ongoing)
+  IF v_current_status NOT IN ('planned', 'ongoing', 'in_progress') THEN
+    RETURN v_current_status;
+  END IF;
+  
+  -- Check if should close
+  v_should_close := check_training_completion(p_training_id);
+  
+  IF v_should_close THEN
+    UPDATE trainings
+    SET 
+      status = 'finished',
+      ended_at = NOW(),
+      updated_at = NOW()
+    WHERE id = p_training_id;
+    
+    RETURN 'finished';
+  END IF;
+  
+  RETURN v_current_status;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."auto_close_training_if_complete"("p_training_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."auto_start_trainings"() RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -424,6 +463,78 @@ $$;
 
 
 ALTER FUNCTION "public"."check_invitation_commander_constraints"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."check_training_completion"("p_training_id" "uuid") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+  v_team_id uuid;
+  v_expires_at timestamptz;
+  v_has_drills boolean;
+  v_has_participants boolean;
+  v_missing_count integer;
+BEGIN
+  -- Get training info
+  SELECT t.team_id, t.expires_at
+  INTO v_team_id, v_expires_at
+  FROM trainings t
+  WHERE t.id = p_training_id;
+  
+  -- Training not found
+  IF v_team_id IS NULL THEN
+    RETURN FALSE;
+  END IF;
+  
+  -- Check if deadline passed (if expires_at is set)
+  IF v_expires_at IS NOT NULL AND v_expires_at < NOW() THEN
+    RETURN TRUE;
+  END IF;
+  
+  -- Check if training has drills
+  SELECT EXISTS (
+    SELECT 1 FROM training_drills WHERE training_id = p_training_id
+  ) INTO v_has_drills;
+  
+  -- No drills = nothing to complete
+  IF NOT v_has_drills THEN
+    RETURN FALSE;
+  END IF;
+  
+  -- Check if team has participants
+  SELECT EXISTS (
+    SELECT 1 FROM team_members WHERE team_id = v_team_id
+  ) INTO v_has_participants;
+  
+  -- No participants = nothing to complete
+  IF NOT v_has_participants THEN
+    RETURN FALSE;
+  END IF;
+  
+  -- Count missing completions (participants × drills that are NOT in user_drill_completions)
+  SELECT COUNT(*)
+  INTO v_missing_count
+  FROM (
+    -- Required: every participant × every drill
+    SELECT tm.user_id, td.id as drill_id
+    FROM team_members tm
+    CROSS JOIN training_drills td
+    WHERE tm.team_id = v_team_id
+      AND td.training_id = p_training_id
+  ) required
+  LEFT JOIN user_drill_completions udc
+    ON udc.user_id = required.user_id 
+    AND udc.drill_id = required.drill_id
+    AND udc.training_id = p_training_id
+  WHERE udc.id IS NULL;
+  
+  -- All done if no missing completions
+  RETURN v_missing_count = 0;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."check_training_completion"("p_training_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."create_org_workspace"("p_name" "text", "p_description" "text" DEFAULT NULL::"text") RETURNS TABLE("id" "uuid", "name" "text", "description" "text", "workspace_slug" "text", "created_by" "uuid", "created_at" timestamp with time zone)
@@ -1084,6 +1195,69 @@ $$;
 
 
 ALTER FUNCTION "public"."get_team_with_members"("p_team_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."get_training_completion_status"("p_training_id" "uuid") RETURNS TABLE("total_participants" integer, "participants_complete" integer, "total_drills" integer, "total_required_completions" integer, "total_actual_completions" integer, "completion_pct" numeric, "expires_at" timestamp with time zone, "is_expired" boolean, "should_auto_close" boolean)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+  v_team_id uuid;
+  v_expires_at timestamptz;
+BEGIN
+  -- Get training info
+  SELECT t.team_id, t.expires_at
+  INTO v_team_id, v_expires_at
+  FROM trainings t
+  WHERE t.id = p_training_id;
+  
+  RETURN QUERY
+  WITH participants AS (
+    SELECT tm.user_id
+    FROM team_members tm
+    WHERE tm.team_id = v_team_id
+  ),
+  drills AS (
+    SELECT td.id as drill_id
+    FROM training_drills td
+    WHERE td.training_id = p_training_id
+  ),
+  required AS (
+    SELECT p.user_id, d.drill_id
+    FROM participants p
+    CROSS JOIN drills d
+  ),
+  completions AS (
+    SELECT udc.user_id, udc.drill_id
+    FROM user_drill_completions udc
+    WHERE udc.training_id = p_training_id
+  ),
+  participant_stats AS (
+    SELECT 
+      p.user_id,
+      COUNT(c.drill_id) as drills_done,
+      (SELECT COUNT(*) FROM drills) as total_drills
+    FROM participants p
+    LEFT JOIN completions c ON c.user_id = p.user_id
+    GROUP BY p.user_id
+  )
+  SELECT
+    (SELECT COUNT(*)::integer FROM participants),
+    (SELECT COUNT(*)::integer FROM participant_stats WHERE drills_done = total_drills),
+    (SELECT COUNT(*)::integer FROM drills),
+    (SELECT COUNT(*)::integer FROM required),
+    (SELECT COUNT(*)::integer FROM completions),
+    CASE 
+      WHEN (SELECT COUNT(*) FROM required) = 0 THEN 0
+      ELSE ROUND((SELECT COUNT(*) FROM completions)::numeric / (SELECT COUNT(*) FROM required) * 100, 1)
+    END,
+    v_expires_at,
+    v_expires_at IS NOT NULL AND v_expires_at < NOW(),
+    check_training_completion(p_training_id);
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_training_completion_status"("p_training_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."get_workspace_sessions"("p_workspace_id" "uuid", "p_limit" integer DEFAULT 50, "p_offset" integer DEFAULT 0) RETURNS TABLE("id" "uuid", "workspace_type" "text", "user_id" "uuid", "user_full_name" "text", "team_id" "uuid", "team_name" "text", "session_mode" "text", "status" "text", "started_at" timestamp with time zone, "ended_at" timestamp with time zone, "session_data" "jsonb", "created_at" timestamp with time zone)
@@ -2144,6 +2318,7 @@ CREATE TABLE IF NOT EXISTS "public"."trainings" (
     "manual_start" boolean DEFAULT false,
     "started_at" timestamp with time zone,
     "ended_at" timestamp with time zone,
+    "expires_at" timestamp with time zone,
     CONSTRAINT "trainings_status_check" CHECK (("status" = ANY (ARRAY['planned'::"text", 'ongoing'::"text", 'finished'::"text", 'cancelled'::"text"])))
 );
 
@@ -3024,6 +3199,12 @@ GRANT ALL ON FUNCTION "public"."add_team_member"("p_team_id" "uuid", "p_user_id"
 
 
 
+GRANT ALL ON FUNCTION "public"."auto_close_training_if_complete"("p_training_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."auto_close_training_if_complete"("p_training_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."auto_close_training_if_complete"("p_training_id" "uuid") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."auto_start_trainings"() TO "anon";
 GRANT ALL ON FUNCTION "public"."auto_start_trainings"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."auto_start_trainings"() TO "service_role";
@@ -3039,6 +3220,12 @@ GRANT ALL ON FUNCTION "public"."check_commander_constraints"() TO "service_role"
 GRANT ALL ON FUNCTION "public"."check_invitation_commander_constraints"() TO "anon";
 GRANT ALL ON FUNCTION "public"."check_invitation_commander_constraints"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."check_invitation_commander_constraints"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."check_training_completion"("p_training_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."check_training_completion"("p_training_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."check_training_completion"("p_training_id" "uuid") TO "service_role";
 
 
 
@@ -3141,6 +3328,12 @@ GRANT ALL ON FUNCTION "public"."get_team_members"("p_team_id" "uuid") TO "servic
 GRANT ALL ON FUNCTION "public"."get_team_with_members"("p_team_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_team_with_members"("p_team_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_team_with_members"("p_team_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."get_training_completion_status"("p_training_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_training_completion_status"("p_training_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_training_completion_status"("p_training_id" "uuid") TO "service_role";
 
 
 
