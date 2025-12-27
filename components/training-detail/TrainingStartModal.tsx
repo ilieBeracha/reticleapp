@@ -473,7 +473,7 @@ export function TrainingStartModal({
     >
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Header */}
-        <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border }]}>
+        <View style={[styles.header, { paddingTop: insets.top + 20, borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={onClose} disabled={starting}>
             <Text style={[styles.cancelText, { color: colors.textMuted }]}>Cancel</Text>
           </TouchableOpacity>

@@ -34,6 +34,7 @@ export function LoadingScreen({ overlay = false }: LoadingScreenProps = {}) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingTop: 100,
     justifyContent: 'center',
     alignItems: 'center',
   },

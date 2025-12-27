@@ -26,7 +26,7 @@ const bottomSheetBackdropStyle = tva({
 });
 
 const bottomSheetContentStyle = tva({
-  base: "mt-2",
+  base: "mt-5 pt-5",
 });
 const bottomSheetTriggerStyle = tva({
   base: "",

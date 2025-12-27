@@ -245,7 +245,8 @@ export function useTrainingActions({
       setStartingDrillId(drill.id);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      // Build BaseSessionConfig for training drill
+      // NEW FLOW: Create session as pending, let user choose watch in session screen
+      // This allows them to see watch connection status in real-time
       const config: BaseSessionConfig = {
         team_id: training.team_id,
         training_id: training.id,
@@ -253,21 +254,14 @@ export function useTrainingActions({
         drill_template_id: null,
         drill_config: null, // Drill config comes from the training_drills table
         session_mode: 'solo',
-        watch_controlled: false, // Will be set by prompt if needed
+        watch_controlled: false, // Will be set when user activates session
+        start_as_pending: true,  // Create as pending, user starts inside session screen
       };
 
-      // If watch is connected, show prompt before starting
-      if (isWatchConnected) {
-        setPendingSessionConfig(config);
-        setPendingDrillName(drill.name);
-        setShowWatchPrompt(true);
-        return;
-      }
-
-      // No watch connected, start immediately
+      // Go directly to session - no more prompt here
       doCreateDrillSession(config);
     },
-    [training, isWatchConnected, doCreateDrillSession]
+    [training, doCreateDrillSession]
   );
 
   return {

@@ -46,6 +46,10 @@ export interface BaseSessionConfig {
   
   // Optional metadata
   notes?: string;
+  
+  // Start as pending (for watch selection flow)
+  // When true, session is created as 'pending' and user must call activateSession()
+  start_as_pending?: boolean;
 }
 
 /**
@@ -116,7 +120,7 @@ export interface SessionWithDetails {
   drill_name?: string | null;
   drill_config?: SessionDrillConfig | null; // Full drill configuration
   session_mode: 'solo' | 'group';
-  status: 'active' | 'completed' | 'cancelled';
+  status: 'pending' | 'active' | 'completed' | 'cancelled';
   watch_controlled: boolean; // Whether watch controls this session
   started_at: string;
   ended_at: string | null;

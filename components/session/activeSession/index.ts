@@ -14,6 +14,9 @@ export * from './activeSession.helpers';
 // Styles
 export { styles } from './activeSession.styles';
 
-// Hook (will be added)
+// Hook
 export { useActiveSession } from './useActiveSession';
+
+// Components
+export { SessionPrepView } from './SessionPrepView';
 

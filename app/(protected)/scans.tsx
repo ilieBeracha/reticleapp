@@ -697,7 +697,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     alignSelf: "center",
     marginTop: 12,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   sheetTitle: {
     fontSize: 20,
@@ -834,7 +834,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingTop: Platform.OS === "ios" ? 16 : 12,
+    paddingTop: Platform.OS === "ios" ? 20 : 20,
     paddingBottom: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,

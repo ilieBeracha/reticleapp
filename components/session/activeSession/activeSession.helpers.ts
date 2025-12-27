@@ -204,15 +204,15 @@ interface SessionForPayload {
   drill_name?: string | null;
   watch_controlled?: boolean;
   drill_config?: {
-    name?: string;
-    drill_goal?: string;
-    target_type?: string;
-    input_method?: string;
-    distance_m?: number;
-    rounds_per_shooter?: number;
-    time_limit_seconds?: number;
-    par_time_seconds?: number;
-    strings_count?: number;
+    name?: string | null;
+    drill_goal?: string | null;
+    target_type?: string | null;
+    input_method?: string | null;
+    distance_m?: number | null;
+    rounds_per_shooter?: number | null;
+    time_limit_seconds?: number | null;
+    par_time_seconds?: number | null;
+    strings_count?: number | null;
   } | null;
 }
 

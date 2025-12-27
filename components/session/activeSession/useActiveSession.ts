@@ -281,6 +281,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
           distance: String(data.distance || 0),
           completed: data.completed ? '1' : '0',
           teamId: session?.team_id || '',
+          trainingId: session?.training_id || '',
         },
       });
     };
@@ -290,7 +291,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     return () => {
       setSessionDataCallback(null);
     };
-  }, [sessionId, session?.team_id, setSessionDataCallback, clearLastSessionData]);
+  }, [sessionId, session?.team_id, session?.training_id, setSessionDataCallback, clearLastSessionData]);
 
   // ============================================================================
   // AUTO-COMPLETION DETECTION
@@ -452,7 +453,16 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
             } else {
               await loadPersonalSessions();
             }
-            router.replace('/(protected)/(tabs)');
+
+            // Redirect back to training if session was part of one, otherwise home
+            if (session?.training_id) {
+              router.replace({
+                pathname: '/(protected)/trainingDetail',
+                params: { id: session.training_id },
+              });
+            } else {
+              router.replace('/(protected)/(tabs)');
+            }
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           } catch (error: any) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -467,6 +477,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     targets.length,
     elapsedTime,
     session?.team_id,
+    session?.training_id,
     loadPersonalSessions,
     loadTeamSessions,
     hasDrill,
@@ -502,7 +513,15 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
                 } else {
                   await loadPersonalSessions();
                 }
-                router.replace('/(protected)/(tabs)');
+                // Redirect back to training if session was part of one
+                if (session?.training_id) {
+                  router.replace({
+                    pathname: '/(protected)/trainingDetail',
+                    params: { id: session.training_id },
+                  });
+                } else {
+                  router.replace('/(protected)/(tabs)');
+                }
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               } catch (error: any) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -541,7 +560,15 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
                 } else {
                   await loadPersonalSessions();
                 }
-                router.replace('/(protected)/(tabs)');
+                // Redirect back to training if session was part of one
+                if (session?.training_id) {
+                  router.replace({
+                    pathname: '/(protected)/trainingDetail',
+                    params: { id: session.training_id },
+                  });
+                } else {
+                  router.replace('/(protected)/(tabs)');
+                }
               } catch (error: any) {
                 Alert.alert('Error', error.message || 'Failed to cancel session');
               }
@@ -554,7 +581,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
         ]
       );
     }
-  }, [sessionId, session?.team_id, targets.length, drill?.name, elapsedTime, loadPersonalSessions, loadTeamSessions]);
+  }, [sessionId, session?.team_id, session?.training_id, targets.length, drill?.name, elapsedTime, loadPersonalSessions, loadTeamSessions]);
 
   const handleContinueWithoutWatch = useCallback(async () => {
     try {

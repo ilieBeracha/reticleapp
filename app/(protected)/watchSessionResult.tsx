@@ -30,13 +30,14 @@ export default function WatchSessionResultSheet() {
   const insets = useSafeAreaInsets();
   const { loadPersonalSessions, loadTeamSessions } = useSessionStore();
   
-  const { sessionId, shots, duration, distance, completed, teamId } = useLocalSearchParams<{
+  const { sessionId, shots, duration, distance, completed, teamId, trainingId } = useLocalSearchParams<{
     sessionId: string;
     shots?: string;
     duration?: string;
     distance?: string;
     completed?: string;
     teamId?: string;
+    trainingId?: string;
   }>();
 
   const [saving, setSaving] = useState(false);
@@ -81,7 +82,16 @@ export default function WatchSessionResultSheet() {
           await loadPersonalSessions();
         }
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.replace('/(protected)/(tabs)');
+        
+        // Redirect back to training if session was part of one
+        if (trainingId) {
+          router.replace({
+            pathname: '/(protected)/trainingDetail',
+            params: { id: trainingId },
+          });
+        } else {
+          router.replace('/(protected)/(tabs)');
+        }
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         router.back();
@@ -92,7 +102,7 @@ export default function WatchSessionResultSheet() {
       Alert.alert('Error', error.message || 'Failed to save watch data');
       setSaving(false);
     }
-  }, [sessionId, shotsCount, durationSec, distanceM, teamId, loadPersonalSessions, loadTeamSessions]);
+  }, [sessionId, shotsCount, durationSec, distanceM, teamId, trainingId, loadPersonalSessions, loadTeamSessions]);
 
   if (!sessionId) {
     return (

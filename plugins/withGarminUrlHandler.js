@@ -73,9 +73,14 @@ const withGarminUrlHandler = (config) => {
       'gcm-ciq'
     ];
     
-    // Required for Bluetooth
+    // Required for Bluetooth (iOS 12 legacy)
     config.modResults.NSBluetoothPeripheralUsageDescription = 
       config.modResults.NSBluetoothPeripheralUsageDescription ||
+      'This app needs Bluetooth to communicate with your Garmin device';
+    
+    // Required for Bluetooth (iOS 13+) - THIS IS CRITICAL!
+    config.modResults.NSBluetoothAlwaysUsageDescription = 
+      config.modResults.NSBluetoothAlwaysUsageDescription ||
       'This app needs Bluetooth to communicate with your Garmin device';
     
     return config;

@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: '#ccc',
-    marginBottom: 12,
+    marginBottom: 100,
   },
   title: {
     fontWeight: '600',

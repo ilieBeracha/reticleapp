@@ -177,7 +177,7 @@ export function useSessionForm(options: UseSessionFormOptions = {}): UseSessionF
     };
   }, [state, targetType]);
   
-  const buildSessionConfig = useCallback((watchControlled: boolean): BaseSessionConfig => {
+  const buildSessionConfig = useCallback((watchControlled: boolean, startAsPending = false): BaseSessionConfig => {
     return {
       team_id: context.teamId,
       training_id: context.trainingId ?? null,
@@ -186,6 +186,7 @@ export function useSessionForm(options: UseSessionFormOptions = {}): UseSessionF
       drill_config: context.drillTemplateId ? null : buildDrillConfig(),
       session_mode: 'solo',
       watch_controlled: watchControlled,
+      start_as_pending: startAsPending,
     };
   }, [context, buildDrillConfig]);
   
@@ -212,18 +213,12 @@ export function useSessionForm(options: UseSessionFormOptions = {}): UseSessionF
   }, [pendingConfig, doSubmit]);
   
   const submit = useCallback(() => {
-    const config = buildSessionConfig(false);
-    
-    // Only show watch prompt if: connected AND using manual input (not scan)
-    if (isWatchConnected && canUseWatch) {
-      setPendingConfig(config);
-      setShowWatchPrompt(true);
-      return;
-    }
-    
-    // Scan mode or no watch = submit immediately with watch_controlled: false
+    // NEW FLOW: Always create session as pending
+    // User will choose watch vs phone inside the session screen
+    // This allows them to see watch connection status in real-time
+    const config = buildSessionConfig(false, true); // start_as_pending = true
     doSubmit(config);
-  }, [buildSessionConfig, isWatchConnected, canUseWatch, doSubmit]);
+  }, [buildSessionConfig, doSubmit]);
   
   return {
     state,

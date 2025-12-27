@@ -9,7 +9,6 @@ import { NoTeamsEmptyState } from '@/components/team/NoTeamsEmptyState';
 import { TeamSwitcherPill, TeamSwitcherSheet } from '@/components/team/TeamSwitcherSheet';
 import {
   COLORS,
-  calculateQuickStats,
   getStatusConfig,
   groupTrainingsByTimeframe,
   PULSE_ANIMATION,
@@ -37,6 +36,7 @@ import {
   Animated,
   RefreshControl,
   ScrollView,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -79,6 +79,129 @@ function PulseDot({ color }: { color: string }) {
 }
 
 // ============================================================================
+// TRAINING ROW - Compact training item (status badge is colorful)
+// ============================================================================
+function TrainingRow({
+  training,
+  showDate,
+  colors,
+  onPress,
+}: {
+  training: TrainingWithDetails;
+  showDate?: boolean;
+  colors: ReturnType<typeof useColors>;
+  onPress: () => void;
+}) {
+  const statusConfig = getStatusConfig(training.status);
+  const date = new Date(training.scheduled_at);
+  const isLive = training.status === 'ongoing';
+
+  return (
+    <TouchableOpacity
+      style={[localStyles.row, { backgroundColor: colors.card }]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      {/* Status badge - only colorful element */}
+      <View style={[localStyles.statusBadge, { backgroundColor: statusConfig.bg }]}>
+        {isLive && <PulseDot color={statusConfig.color} />}
+        <Text style={[localStyles.statusText, { color: statusConfig.color }]}>
+          {statusConfig.label}
+        </Text>
+      </View>
+
+      {/* Content */}
+      <View style={localStyles.rowContent}>
+        <Text style={[localStyles.rowTitle, { color: colors.text }]} numberOfLines={1}>
+          {training.title}
+        </Text>
+        <Text style={[localStyles.rowMeta, { color: colors.textMuted }]}>
+          {showDate ? format(date, 'EEE, MMM d') + ' • ' : ''}
+          {format(date, 'HH:mm')}
+          {(training.drill_count ?? 0) > 0 && ` • ${training.drill_count} drills`}
+        </Text>
+      </View>
+
+      <ChevronRight size={16} color={colors.border} />
+    </TouchableOpacity>
+  );
+}
+
+// Compact inline styles for training row
+const localStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 6,
+    gap: 10,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    minWidth: 70,
+    justifyContent: 'center',
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  rowContent: {
+    flex: 1,
+  },
+  rowTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  rowMeta: {
+    fontSize: 12,
+  },
+  newBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  empty: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  emptyText: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  emptyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  emptyBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+});
+
+// ============================================================================
 // SCHEDULE VIEW - Agenda style with status
 // ============================================================================
 function ScheduleView({
@@ -95,127 +218,68 @@ function ScheduleView({
   canSchedule: boolean;
 }) {
   const grouped = useMemo(() => groupTrainingsByTimeframe(trainings), [trainings]);
-  const stats = useMemo(() => calculateQuickStats(grouped), [grouped]);
   const hasAny = trainings.length > 0;
 
   const renderGroup = useCallback(
     (title: string, items: TrainingWithDetails[], showDate = false, isLive = false) => {
       if (items.length === 0) return null;
 
-  return (
+      return (
         <View style={styles.scheduleGroup}>
           <View style={styles.scheduleGroupHeader}>
             {isLive && <PulseDot color={COLORS.live} />}
             <Text style={[styles.scheduleGroupTitle, { color: isLive ? COLORS.live : colors.textMuted }]}>
-              {title}
-        </Text>
-      </View>
-          {items.map(training => {
-            const statusConfig = getStatusConfig(training.status);
-            const date = new Date(training.scheduled_at);
-            const isLiveItem = training.status === 'ongoing';
-
-          return (
-            <TouchableOpacity
-                key={training.id}
-              style={[
-                  styles.scheduleItem,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                  isLiveItem && styles.scheduleItemLive,
-                ]}
-                onPress={() => onPress(training)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.scheduleStatus, { backgroundColor: statusConfig.bg }]}>
-                  {isLiveItem && <PulseDot color={statusConfig.color} />}
-                  <Text style={[styles.scheduleStatusText, { color: statusConfig.color }]}>
-                    {statusConfig.label}
-              </Text>
-                </View>
-                <View style={styles.scheduleContent}>
-                  <Text style={[styles.scheduleTitle, { color: colors.text }]} numberOfLines={1}>
-                    {training.title}
-              </Text>
-                  <View style={styles.scheduleMeta}>
-                    <Text style={[styles.scheduleTime, { color: colors.textMuted }]}>
-                      {showDate ? format(date, 'EEE, MMM d') + ' · ' : ''}
-                      {format(date, 'HH:mm')}
-                    </Text>
-                    {training.drill_count ? (
-                      <>
-                        <View style={[styles.scheduleMetaDot, { backgroundColor: colors.border }]} />
-                        <Text style={[styles.scheduleDrills, { color: colors.textMuted }]}>
-                          {training.drill_count} drill{training.drill_count !== 1 ? 's' : ''}
-                        </Text>
-                      </>
-                    ) : null}
-                </View>
-                </View>
-                <ChevronRight size={18} color={colors.textMuted} />
-            </TouchableOpacity>
-          );
-        })}
-    </View>
-  );
+              {title.toUpperCase()}
+            </Text>
+            <Text style={[styles.scheduleGroupCount, { color: colors.border }]}>
+              {items.length}
+            </Text>
+          </View>
+          {items.map(training => (
+            <TrainingRow
+              key={training.id}
+              training={training}
+              showDate={showDate}
+              colors={colors}
+              onPress={() => onPress(training)}
+            />
+          ))}
+        </View>
+      );
     },
     [colors, onPress]
   );
 
   return (
     <View style={styles.scheduleContainer}>
-      {/* Header with Quick Stats */}
+      {/* Header - simple */}
       <View style={styles.scheduleHeader}>
-        <View>
-          <Text style={[styles.scheduleHeaderTitle, { color: colors.text }]}>Schedule</Text>
-          {hasAny && (
-            <View style={styles.quickStats}>
-              {stats.live > 0 && (
-                <View style={styles.quickStatItem}>
-                  <PulseDot color={COLORS.live} />
-                  <Text style={[styles.quickStatText, { color: COLORS.live }]}>{stats.live} Live</Text>
-                </View>
-              )}
-              {stats.today > 0 && (
-                <View style={styles.quickStatItem}>
-                  <View style={[styles.quickStatDot, { backgroundColor: colors.primary }]} />
-                  <Text style={[styles.quickStatText, { color: colors.textMuted }]}>{stats.today} Today</Text>
-                </View>
-              )}
-              {stats.thisWeek > 0 && (
-                <View style={styles.quickStatItem}>
-                  <View style={[styles.quickStatDot, { backgroundColor: colors.border }]} />
-                  <Text style={[styles.quickStatText, { color: colors.textMuted }]}>{stats.thisWeek} This Week</Text>
-                </View>
-              )}
-            </View>
-          )}
-        </View>
+        <Text style={[styles.scheduleHeaderTitle, { color: colors.text }]}>Schedule</Text>
         {canSchedule && (
-    <TouchableOpacity
-            style={[styles.scheduleNewBtn, { backgroundColor: colors.primary }]}
+          <TouchableOpacity
+            style={[localStyles.newBtn, { backgroundColor: colors.text }]}
             onPress={onCreateNew}
           >
-            <Plus size={16} color="#fff" />
-            <Text style={styles.scheduleNewBtnText}>New</Text>
+            <Plus size={14} color={colors.background} />
           </TouchableOpacity>
         )}
       </View>
 
       {!hasAny ? (
-        <View style={[styles.scheduleEmpty, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Calendar size={32} color={colors.textMuted} />
-          <Text style={[styles.scheduleEmptyTitle, { color: colors.text }]}>No Trainings</Text>
-          <Text style={[styles.scheduleEmptyText, { color: colors.textMuted }]}>
-            {canSchedule ? 'Schedule your first training session' : 'No sessions scheduled yet'}
-        </Text>
+        <View style={[localStyles.empty, { backgroundColor: colors.card }]}>
+          <Calendar size={24} color={colors.textMuted} style={{ marginBottom: 12 }} />
+          <Text style={[localStyles.emptyTitle, { color: colors.text }]}>No Trainings</Text>
+          <Text style={[localStyles.emptyText, { color: colors.textMuted }]}>
+            {canSchedule ? 'Schedule a training for your team' : 'No trainings scheduled yet'}
+          </Text>
           {canSchedule && (
             <TouchableOpacity
-              style={[styles.scheduleEmptyBtn, { backgroundColor: colors.primary }]}
+              style={[localStyles.emptyBtn, { backgroundColor: colors.text }]}
               onPress={onCreateNew}
             >
-              <Plus size={16} color="#fff" />
-              <Text style={styles.scheduleEmptyBtnText}>Create Training</Text>
-    </TouchableOpacity>
+              <Plus size={16} color={colors.background} />
+              <Text style={[localStyles.emptyBtnText, { color: colors.background }]}>Create Training</Text>
+            </TouchableOpacity>
           )}
         </View>
       ) : (

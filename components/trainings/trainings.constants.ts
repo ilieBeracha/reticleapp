@@ -18,12 +18,16 @@ export const ROLE_CONFIG: Record<string, RoleConfig> = {
 
 // ============================================================================
 // TRAINING STATUS CONFIGURATION
+// Keys must match database status values: planned, ongoing, finished, cancelled
 // ============================================================================
 export const STATUS_CONFIG: Record<string, StatusConfig> = {
+  planned: { color: '#3B82F6', label: 'Scheduled', bg: '#3B82F620' },
   ongoing: { color: '#F59E0B', label: 'Live', bg: '#F59E0B20' },
+  finished: { color: '#10B981', label: 'Completed', bg: '#10B98120' },
+  cancelled: { color: '#EF4444', label: 'Cancelled', bg: '#EF444420' },
+  // Legacy aliases (for backwards compatibility with UI code)
   scheduled: { color: '#3B82F6', label: 'Scheduled', bg: '#3B82F620' },
   completed: { color: '#10B981', label: 'Completed', bg: '#10B98120' },
-  cancelled: { color: '#EF4444', label: 'Cancelled', bg: '#EF444420' },
 };
 
 // ============================================================================

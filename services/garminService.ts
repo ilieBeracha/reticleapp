@@ -93,7 +93,6 @@ payload?: unknown;
 sessionData?: GarminSessionData;
 timestamp?: number;
 }
-
 // Event types emitted by this service
 export type GarminServiceEvent =
 | { event: 'sdk_ready' }

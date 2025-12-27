@@ -80,8 +80,8 @@ function LayoutWithLoadingOverlay({ colorScheme }: { colorScheme: 'light' | 'dar
   
   return (
     <SafeAreaProvider>
-      <BottomSheetModalProvider>
-        <GestureHandlerRootView>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <BottomSheetModalProvider>
           <Slot />
           <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
           
@@ -89,8 +89,8 @@ function LayoutWithLoadingOverlay({ colorScheme }: { colorScheme: 'light' | 'dar
           {transitioning && (
             <LoadingScreen overlay />
           )}
-        </GestureHandlerRootView>
-      </BottomSheetModalProvider>
+        </BottomSheetModalProvider>
+      </GestureHandlerRootView>
     </SafeAreaProvider>
   );
 }

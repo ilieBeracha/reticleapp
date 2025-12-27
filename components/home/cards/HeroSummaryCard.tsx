@@ -1,10 +1,10 @@
 /**
  * Hero Summary Card
- * 
+ *
  * PERSONAL FOCUS. Shows YOUR practice status:
  * - Active solo session → Continue
  * - No session → Weekly stats + Start Practice
- * 
+ *
  * Team trainings are handled separately by UpcomingTrainingsCard.
  */
 import { BUTTON_GRADIENT } from '@/theme/colors';
@@ -22,15 +22,12 @@ interface HeroSummaryCardProps {
 function HeroSummaryCard({ homeState, onPress }: HeroSummaryCardProps) {
   const { activeSession, weeklyStats } = homeState;
 
-  // Simple logic: Active session OR start practice
   const hasActiveSession = activeSession && activeSession.origin === 'solo';
-  
-  const sessionName = hasActiveSession 
-    ? (activeSession.drillName || 'Practice Session')
-    : undefined;
+
+  const sessionName = hasActiveSession ? activeSession.drillName || 'Practice Session' : undefined;
 
   return (
-    <Animated.View entering={FadeInDown.duration(400)}>
+    <Animated.View entering={FadeInDown.duration(350)}>
       <TouchableOpacity activeOpacity={0.9} onPress={onPress}>
         <LinearGradient
           colors={[...BUTTON_GRADIENT]}
@@ -38,11 +35,9 @@ function HeroSummaryCard({ homeState, onPress }: HeroSummaryCardProps) {
           end={{ x: 1, y: 1 }}
           style={styles.heroCard}
         >
-          {/* Main Content Row */}
           <View style={styles.heroMain}>
             <View style={styles.heroContent}>
               {hasActiveSession ? (
-                // Active session state
                 <>
                   <View style={styles.heroActiveRow}>
                     <View style={styles.liveDot} />
@@ -53,7 +48,6 @@ function HeroSummaryCard({ homeState, onPress }: HeroSummaryCardProps) {
                   </Text>
                 </>
               ) : (
-                // Ready to train state
                 <>
                   <Text style={styles.heroLabel}>This week</Text>
                   <Text style={styles.heroTitle}>
@@ -64,11 +58,8 @@ function HeroSummaryCard({ homeState, onPress }: HeroSummaryCardProps) {
               )}
             </View>
 
-            {/* Action Button */}
             <View style={styles.heroActionBtn}>
-              <Text style={styles.heroActionText}>
-                {hasActiveSession ? 'Continue' : 'Start'}
-              </Text>
+              <Text style={styles.heroActionText}>{hasActiveSession ? 'Continue' : 'Start'}</Text>
               <ChevronRight size={14} color="#fff" />
             </View>
           </View>
@@ -82,9 +73,9 @@ export default HeroSummaryCard;
 
 const styles = StyleSheet.create({
   heroCard: {
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
   heroMain: {
     flexDirection: 'row',
@@ -97,8 +88,8 @@ const styles = StyleSheet.create({
   heroActiveRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 2,
+    gap: 5,
+    marginBottom: 1,
   },
   liveDot: {
     width: 6,
@@ -107,18 +98,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#22C55E',
   },
   heroLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.6)',
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   heroTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: '#fff',
     letterSpacing: -0.3,
-    marginTop: 2,
+    marginTop: 1,
   },
   heroHighlight: {
     color: '#7DD3FC',
@@ -126,14 +117,14 @@ const styles = StyleSheet.create({
   heroActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 18,
   },
   heroActionText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: '#fff',
   },

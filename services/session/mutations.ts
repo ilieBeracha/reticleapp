@@ -178,6 +178,11 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
       }
     : null;
 
+  // Check if we should start as pending (for watch selection flow)
+  const startAsPending = (config as any).start_as_pending === true;
+  const status = startAsPending ? 'pending' : 'active';
+  const startedAt = startAsPending ? null : new Date().toISOString();
+
   // Direct insert for all sessions (RLS handles permissions)
   const { data, error } = await supabase
     .from('sessions')
@@ -190,8 +195,8 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
       custom_drill_config: customDrillConfig,
       session_mode: config.session_mode,
       watch_controlled: config.watch_controlled,
-      status: 'active',
-      started_at: new Date().toISOString(),
+      status,
+      started_at: startedAt,
     })
     .select(
       `
@@ -319,8 +324,9 @@ async function sendTrainingSessionNotifications(trainingId: string, trainingTitl
 export async function updateSession(
   sessionId: string,
   updates: {
-    status?: 'active' | 'completed' | 'cancelled';
+    status?: 'pending' | 'active' | 'completed' | 'cancelled';
     ended_at?: string;
+    started_at?: string;
     watch_controlled?: boolean;
   }
 ) {
@@ -336,7 +342,11 @@ export async function updateSession(
     updatePayload.ended_at = updates.ended_at;
   }
 
-  if (typeof updates.watch_controlled !== 'undefined') {
+  if (typeof updates.started_at !== 'undefined') {
+    updatePayload.started_at = updates.started_at;
+  }
+
+   if (typeof updates.watch_controlled !== 'undefined') {
     updatePayload.watch_controlled = updates.watch_controlled;
   }
 
@@ -382,6 +392,38 @@ export async function deleteSession(sessionId: string): Promise<boolean> {
 
   if (error) throw error;
   return true;
+}
+
+/**
+ * Activate a pending session
+ * 
+ * Changes status from 'pending' to 'active' and sets:
+ * - started_at to now
+ * - watch_controlled based on user choice
+ * 
+ * @param sessionId - The pending session to activate
+ * @param watchControlled - Whether the watch should control this session
+ * @returns The activated session
+ */
+export async function activateSession(
+  sessionId: string,
+  watchControlled: boolean
+): Promise<SessionWithDetails> {
+  const session = await getSessionById(sessionId);
+  
+  if (!session) {
+    throw new Error('Session not found');
+  }
+  
+  if (session.status !== 'pending') {
+    throw new Error(`Cannot activate session with status '${session.status}'. Expected 'pending'.`);
+  }
+  
+  return updateSession(sessionId, {
+    status: 'active',
+    started_at: new Date().toISOString(),
+    watch_controlled: watchControlled,
+  });
 }
 
 /**
@@ -763,7 +805,7 @@ export async function saveWatchSessionData(
       
       const meetsShotCount = !drill.rounds_per_shooter || stats.totalShotsFired >= drill.rounds_per_shooter;
       const targetRequirement = (drill.strings_count ?? 1) * (drill.target_count ?? 1);
-      const meetsTargetCount = stats.targetsCount >= targetRequirement;
+      const meetsTargetCount = stats.targetCount >= targetRequirement;
       const meetsAccuracy = !drill.min_accuracy_percent || stats.accuracyPct >= drill.min_accuracy_percent;
       
       const endedAt = new Date(calculatedEndedAt).getTime();
@@ -772,7 +814,12 @@ export async function saveWatchSessionData(
       const meetsTime = !drill.time_limit_seconds || durationSeconds <= drill.time_limit_seconds;
       
       if (meetsShotCount && meetsTargetCount && meetsAccuracy && meetsTime) {
-        await markTrainingDrillCompleted(session.training_id, session.drill_id, session.user_id);
+        await recordDrillCompletion({
+          sessionId: data.sessionId,
+          trainingId: session.training_id,
+          drillId: session.drill_id,
+          stats,
+        });
         console.log('[SessionService] Watch session: Drill marked completed');
       }
     }

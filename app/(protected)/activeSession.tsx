@@ -1,29 +1,30 @@
 /**
  * Active Session Screen
  * 
- * Shows the current active shooting session with targets, stats, and actions.
- * Clear separation between Paper (scan) and Tactical (manual) target flows.
+ * Clean, refined design matching the training detail screen.
+ * Inline action buttons instead of FAB.
  */
 
 import { TargetCard } from '@/components/session/TargetCard';
 import {
   COLORS,
   formatTime,
+  SessionPrepView,
   styles,
   useActiveSession,
 } from '@/components/session/activeSession';
 import { useColors } from '@/hooks/ui/useColors';
-import type { SessionTargetWithResults } from '@/services/sessionService';
 import { formatMaxShots } from '@/utils/drillShots';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   Camera,
-  CheckCircle,
+  Check,
   Clock,
   Crosshair,
   Focus,
   MapPin,
+  Square,
   Target,
   Trophy,
   Watch,
@@ -34,14 +35,106 @@ import { useCallback } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Modal,
+  Image,
   RefreshControl,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// ============================================================================
+// HERO TARGET - Large display of most recent target
+// ============================================================================
+function HeroTarget({
+  target,
+  onPress,
+  colors,
+}: {
+  target: any;
+  onPress: () => void;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const hasImage = !!target.image_url;
+  const accuracy = target.shots_fired > 0 ? Math.round((target.hits / target.shots_fired) * 100) : 0;
+
+  return (
+    <TouchableOpacity
+      style={[localStyles.heroTarget, { backgroundColor: colors.card }]}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      {hasImage ? (
+        <Image source={{ uri: target.image_url }} style={localStyles.heroImage} resizeMode="cover" />
+      ) : (
+        <View style={[localStyles.heroPlaceholder, { backgroundColor: colors.secondary }]}>
+          <Target size={32} color={colors.textMuted} />
+        </View>
+      )}
+      <View style={localStyles.heroOverlay}>
+        <View style={localStyles.heroStats}>
+          <View style={localStyles.heroStatItem}>
+            <Text style={localStyles.heroStatValue}>{target.shots_fired}</Text>
+            <Text style={localStyles.heroStatLabel}>shots</Text>
+          </View>
+          <View style={[localStyles.heroStatDivider, { backgroundColor: 'rgba(255,255,255,0.3)' }]} />
+          <View style={localStyles.heroStatItem}>
+            <Text style={localStyles.heroStatValue}>{target.hits}</Text>
+            <Text style={localStyles.heroStatLabel}>hits</Text>
+          </View>
+          <View style={[localStyles.heroStatDivider, { backgroundColor: 'rgba(255,255,255,0.3)' }]} />
+          <View style={localStyles.heroStatItem}>
+            <Text style={localStyles.heroStatValue}>{accuracy}%</Text>
+            <Text style={localStyles.heroStatLabel}>acc</Text>
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ============================================================================
+// COMPACT STATS
+// ============================================================================
+function CompactStats({
+  accuracy,
+  totalShots,
+  totalHits,
+  totalTargets,
+  colors,
+}: {
+  accuracy: number;
+  totalShots: number;
+  totalHits: number;
+  totalTargets: number;
+  colors: ReturnType<typeof useColors>;
+}) {
+  return (
+    <View style={[localStyles.compactStats, { backgroundColor: colors.card }]}>
+      <View style={localStyles.compactStatItem}>
+        <Text style={[localStyles.compactStatValue, { color: colors.text }]}>{accuracy}%</Text>
+        <Text style={[localStyles.compactStatLabel, { color: colors.textMuted }]}>accuracy</Text>
+      </View>
+      <View style={[localStyles.compactStatDivider, { backgroundColor: colors.border }]} />
+      <View style={localStyles.compactStatItem}>
+        <Text style={[localStyles.compactStatValue, { color: colors.text }]}>{totalShots}</Text>
+        <Text style={[localStyles.compactStatLabel, { color: colors.textMuted }]}>shots</Text>
+      </View>
+      <View style={[localStyles.compactStatDivider, { backgroundColor: colors.border }]} />
+      <View style={localStyles.compactStatItem}>
+        <Text style={[localStyles.compactStatValue, { color: colors.text }]}>{totalHits}</Text>
+        <Text style={[localStyles.compactStatLabel, { color: colors.textMuted }]}>hits</Text>
+      </View>
+      <View style={[localStyles.compactStatDivider, { backgroundColor: colors.border }]} />
+      <View style={localStyles.compactStatItem}>
+        <Text style={[localStyles.compactStatValue, { color: colors.text }]}>{totalTargets}</Text>
+        <Text style={[localStyles.compactStatLabel, { color: colors.textMuted }]}>targets</Text>
+      </View>
+    </View>
+  );
+}
 
 // ============================================================================
 // MAIN COMPONENT
@@ -51,11 +144,9 @@ export default function ActiveSessionScreen() {
   const colors = useColors();
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
 
-  // Use the extracted hook for all logic
   const {
     session,
     targets,
-    stats,
     loading,
     refreshing,
     ending,
@@ -66,94 +157,65 @@ export default function ActiveSessionScreen() {
     totalHits,
     accuracy,
     drillProgress,
-    nextTargetPlan,
     drillLimitReached,
     score,
     isGroupingDrill,
     isAchievementDrill,
     isTacticalDrill,
     watchState,
-    showCompletionModal,
     handleRefresh,
     handleManualRoute,
     handleScanRoute,
     handleTargetPress,
     handleEndSession,
     handleClose,
-    handleCompleteDrill,
-    handleFixResults,
     handleContinueWithoutWatch,
     handleRetryWatchConnection,
     showManual,
     showScan,
   } = useActiveSession({ sessionId });
 
-  // ============================================================================
-  // RENDER HELPERS
-  // ============================================================================
-  const renderTarget = useCallback(
-    ({ item, index }: { item: SessionTargetWithResults; index: number }) => (
-        <Animated.View entering={FadeInDown.delay(index * 50).duration(300)}>
-          <TargetCard
-            target={item}
-            index={targets.length - index}
-            onPress={() => handleTargetPress(item)}
-          />
-        </Animated.View>
-    ),
-    [targets.length, handleTargetPress]
-  );
-
   const renderEmpty = useCallback(
     () => (
-    <View style={styles.emptyContainer}>
-        <View style={[styles.emptyIcon, { backgroundColor: `${COLORS.success}15` }]}>
-          <Target size={32} color={COLORS.success} />
+      <View style={styles.emptyContainer}>
+        <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
+          <Target size={28} color={colors.textMuted} />
+        </View>
+        <Text style={[styles.emptyTitle, { color: colors.text }]}>Ready to shoot</Text>
+        <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
+          Add your first target to get started
+        </Text>
       </View>
-      <Text style={[styles.emptyTitle, { color: colors.text }]}>Ready to shoot</Text>
-      <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
-        Use the buttons below to scan a{'\n'}paper target or log results manually
-      </Text>
-    </View>
     ),
     [colors]
   );
 
-  // ============================================================================
-  // LOADING STATE
-  // ============================================================================
+  // Loading
   if (loading) {
     return (
       <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={colors.text} />
       </View>
     );
   }
 
-  // ============================================================================
-  // ERROR / COMPLETED STATE
-  // ============================================================================
-  if (!session || session.status !== 'active') {
+  // Error / Completed / Cancelled
+  if (!session || (session.status !== 'active' && session.status !== 'pending')) {
     const isCompleted = session?.status === 'completed';
     return (
       <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
-        <View
-          style={[
-            styles.statusIcon,
-            { backgroundColor: isCompleted ? `${COLORS.success}20` : `${COLORS.error}20` },
-          ]}
-        >
+        <View style={[styles.statusIcon, { backgroundColor: colors.secondary }]}>
           <Ionicons
             name={isCompleted ? 'checkmark-circle' : 'alert-circle'}
             size={48}
-            color={isCompleted ? COLORS.success : COLORS.error}
+            color={isCompleted ? colors.green : colors.destructive}
           />
         </View>
         <Text style={[styles.statusTitle, { color: colors.text }]}>
           {isCompleted ? 'Session Completed' : 'Session not found'}
         </Text>
-        <TouchableOpacity 
-          style={[styles.statusButton, { backgroundColor: colors.secondary }]} 
+        <TouchableOpacity
+          style={[styles.statusButton, { backgroundColor: colors.secondary }]}
           onPress={() => router.back()}
         >
           <Text style={[styles.statusButtonText, { color: colors.text }]}>Go Back</Text>
@@ -162,13 +224,25 @@ export default function ActiveSessionScreen() {
     );
   }
 
-  // ============================================================================
-  // WATCH CONTROLLED - FULL PAGE WAITING STATE
-  // ============================================================================
+  // Pending session - show prep view to select watch or phone
+  if (session.status === 'pending') {
+    return (
+      <SessionPrepView
+        session={session}
+        insets={insets}
+        onSessionActivated={(activated) => {
+          // Session is now active, the hook will reload data
+          handleRefresh();
+        }}
+        onClose={handleClose}
+      />
+    );
+  }
+
+  // Watch controlled states
   if (watchState.isWatchControlled) {
     const drillName = session.drill_name || session.training_title || 'Practice Session';
 
-    // Show failure state if watch start failed
     if (watchState.watchStartFailed) {
       return (
         <WatchFailedView
@@ -184,16 +258,8 @@ export default function ActiveSessionScreen() {
       );
     }
 
-    // Show "starting" state while sending to watch
     if (watchState.watchStarting) {
-      return (
-        <WatchStartingView
-          colors={colors}
-          insets={insets}
-          drillName={drillName}
-          onClose={handleClose}
-        />
-      );
+      return <WatchStartingView colors={colors} insets={insets} drillName={drillName} onClose={handleClose} />;
     }
 
     return (
@@ -211,40 +277,30 @@ export default function ActiveSessionScreen() {
     );
   }
 
-  // ============================================================================
-  // MAIN RENDER (Phone-controlled session)
-  // ============================================================================
+  // Main render
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <Animated.View 
-        entering={FadeIn.duration(300)}
-        style={[styles.header, { paddingTop: insets.top + 12 }]}
-      >
-        <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.secondary }]}
-          onPress={handleClose}
-        >
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.secondary }]} onPress={handleClose}>
           <X size={18} color={colors.textMuted} />
         </TouchableOpacity>
-        
+
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-            {session.drill_name || session.training_title || 'Practice Session'}
+            {session.drill_name || session.training_title || 'Practice'}
           </Text>
         </View>
-        
+
         <View style={styles.timerContainer}>
           <View style={[styles.liveDot, drillProgress?.overTime && { backgroundColor: COLORS.error }]} />
-          <Text
-            style={[styles.timerText, { color: drillProgress?.overTime ? COLORS.error : colors.text }]}
-          >
+          <Text style={[styles.timerText, { color: drillProgress?.overTime ? COLORS.error : colors.text }]}>
             {formatTime(elapsedTime)}
           </Text>
         </View>
-      </Animated.View>
+      </View>
 
-      {/* Drill Requirements Banner */}
+      {/* Drill Requirements */}
       {hasDrill && drill && (
         <DrillBanner
           colors={colors}
@@ -256,96 +312,100 @@ export default function ActiveSessionScreen() {
         />
       )}
 
-      {/* Stats Card */}
-      <StatsCard
-        colors={colors}
-        accuracy={accuracy}
-        drill={drill}
-        drillProgress={drillProgress}
-        hasDrill={hasDrill}
-        targets={targets}
-        totalShots={totalShots}
-        totalHits={totalHits}
-        score={score}
-      />
+      {/* Hero Target */}
+      {targets.length > 0 && (
+        <Animated.View entering={FadeIn.duration(300)} style={localStyles.heroContainer}>
+          <HeroTarget target={targets[0]} onPress={() => handleTargetPress(targets[0])} colors={colors} />
+        </Animated.View>
+      )}
 
-      {/* Targets List */}
+      {/* Stats Bar */}
+      <Animated.View entering={FadeInDown.delay(50).duration(300)} style={localStyles.statsContainer}>
+        <CompactStats
+          accuracy={accuracy}
+          totalShots={totalShots}
+          totalHits={totalHits}
+          totalTargets={targets.length}
+          colors={colors}
+        />
+      </Animated.View>
+
+      {/* Add Target Button */}
+      {(showScan || showManual) && !drillLimitReached && (
+        <Animated.View entering={FadeInDown.delay(100).duration(300)} style={localStyles.actionsContainer}>
+          <TouchableOpacity
+            style={[localStyles.addBtn, { backgroundColor: colors.text }]}
+            onPress={showScan ? handleScanRoute : handleManualRoute}
+          >
+            {showScan ? <Camera size={18} color={colors.background} /> : <Crosshair size={18} color={colors.background} />}
+            <Text style={[localStyles.addBtnText, { color: colors.background }]}>
+              {showScan ? 'Scan Target' : 'Add Entry'}
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
+      {/* Previous Targets */}
       <View style={styles.listContainer}>
-        {targets.length > 0 && (
-          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-            TARGETS ({targets.length})
-          </Text>
+        {targets.length > 1 && (
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>PREVIOUS ({targets.length - 1})</Text>
         )}
         <FlatList
-          data={targets}
-          renderItem={renderTarget}
+          data={targets.length > 1 ? targets.slice(1) : []}
+          renderItem={({ item, index }) => (
+            <TargetCard target={item} index={targets.length - 1 - index} onPress={() => handleTargetPress(item)} />
+          )}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={[
-            styles.listContent,
-            { paddingBottom: insets.bottom + 180 },
-            targets.length === 0 && styles.listContentEmpty,
-          ]}
-          ListEmptyComponent={renderEmpty}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor={colors.primary}
-            />
-          }
+          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 100 }]}
+          ListEmptyComponent={targets.length === 0 ? renderEmpty : null}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.text} />}
           showsVerticalScrollIndicator={false}
         />
       </View>
 
-      {/* Bottom Actions */}
-      <BottomActions
-        colors={colors}
-        insets={insets}
-        ending={ending}
-        drillLimitReached={drillLimitReached}
-        isAchievementDrill={isAchievementDrill}
-        isGroupingDrill={isGroupingDrill}
-        hasDrill={hasDrill}
-        drill={drill}
-        nextTargetPlan={nextTargetPlan}
-        showManual={showManual}
-        showScan={showScan}
-        onEndSession={handleEndSession}
-        onManualRoute={handleManualRoute}
-        onScanRoute={handleScanRoute}
-      />
-
-      {/* Drill Completion Modal */}
-      <CompletionModal
-        visible={showCompletionModal}
-        colors={colors}
-        targets={targets}
-        totalShots={totalShots}
-        accuracy={accuracy}
-        stats={stats}
-        elapsedTime={elapsedTime}
-        ending={ending}
-        onFixResults={handleFixResults}
-        onComplete={handleCompleteDrill}
-      />
+      {/* End Session Button */}
+      <View style={[localStyles.bottomBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
+        <TouchableOpacity
+          style={[
+            localStyles.endBtn,
+            drillProgress?.isComplete && drillProgress?.meetsAccuracy
+              ? { backgroundColor: colors.text }
+              : { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+          ]}
+          onPress={handleEndSession}
+          disabled={ending}
+        >
+          {ending ? (
+            <ActivityIndicator size="small" color={drillProgress?.isComplete ? colors.background : colors.text} />
+          ) : (
+            <>
+              {drillProgress?.isComplete && drillProgress?.meetsAccuracy ? (
+                <Check size={18} color={colors.background} />
+              ) : (
+                <Square size={16} color={colors.text} />
+              )}
+              <Text
+                style={[
+                  localStyles.endBtnText,
+                  {
+                    color:
+                      drillProgress?.isComplete && drillProgress?.meetsAccuracy ? colors.background : colors.text,
+                  },
+                ]}
+              >
+                {drillProgress?.isComplete && drillProgress?.meetsAccuracy ? 'Complete Drill' : 'End Session'}
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 // ============================================================================
-// SUB-COMPONENTS (could be extracted to separate files if needed)
+// SUB-COMPONENTS
 // ============================================================================
-
-interface WatchFailedViewProps {
-  colors: any;
-  insets: any;
-  drillName: string;
-  elapsedTime: number;
-  watchStarting: boolean;
-  onClose: () => void;
-  onRetry: () => void;
-  onContinueWithoutWatch: () => void;
-}
 
 function WatchFailedView({
   colors,
@@ -356,23 +416,18 @@ function WatchFailedView({
   onClose,
   onRetry,
   onContinueWithoutWatch,
-}: WatchFailedViewProps) {
+}: any) {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.secondary }]}
-          onPress={onClose}
-        >
+        <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.secondary }]} onPress={onClose}>
           <X size={18} color={colors.textMuted} />
         </TouchableOpacity>
-
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
             {drillName}
           </Text>
         </View>
-
         <View style={styles.timerContainer}>
           <View style={[styles.liveDot, { backgroundColor: COLORS.error }]} />
           <Text style={[styles.timerText, { color: colors.text }]}>{formatTime(elapsedTime)}</Text>
@@ -380,113 +435,69 @@ function WatchFailedView({
       </View>
 
       <View style={styles.watchWaitingContainer}>
-        <Animated.View entering={FadeIn.duration(500)} style={styles.watchWaitingIconContainer}>
-          <View style={[styles.watchWaitingIconBg, { backgroundColor: COLORS.errorBg }]}>
-            <Watch size={48} color={COLORS.error} />
-          </View>
-        </Animated.View>
+        <View style={[styles.watchWaitingIconBg, { backgroundColor: colors.secondary }]}>
+          <Watch size={48} color={colors.textMuted} />
+        </View>
+        <Text style={[styles.watchWaitingTitle, { color: colors.text, marginTop: 24 }]}>Watch Not Responding</Text>
+        <Text style={[styles.watchWaitingDesc, { color: colors.textMuted }]}>
+          Could not start session on watch.
+        </Text>
 
-        <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.watchWaitingText}>
-          <Text style={[styles.watchWaitingTitle, { color: colors.text }]}>Watch Not Responding</Text>
-          <Text style={[styles.watchWaitingDesc, { color: colors.textMuted }]}>
-            Could not start session on watch after 3 attempts.{'\n'}
-            The watch may not be in range or the app may not be open.
-          </Text>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.watchFailedActions}>
+        <View style={styles.watchFailedActions}>
           <TouchableOpacity
-            style={[styles.watchFailedButton, styles.watchFailedRetryButton]}
+            style={[localStyles.actionBtn, { backgroundColor: colors.text, borderWidth: 0 }]}
             onPress={onRetry}
             disabled={watchStarting}
           >
             {watchStarting ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={colors.background} />
             ) : (
               <>
-                <Ionicons name="refresh" size={18} color="#fff" />
-                <Text style={styles.watchFailedRetryText}>Retry Connection</Text>
+                <Ionicons name="refresh" size={18} color={colors.background} />
+                <Text style={[localStyles.actionBtnText, { color: colors.background }]}>Retry</Text>
               </>
             )}
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[
-              styles.watchFailedButton,
-              { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 },
-            ]}
+            style={[localStyles.actionBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={onContinueWithoutWatch}
           >
             <Ionicons name="phone-portrait-outline" size={18} color={colors.text} />
-            <Text style={[styles.watchFailedButtonText, { color: colors.text }]}>
-              Continue Without Watch
-            </Text>
+            <Text style={[localStyles.actionBtnText, { color: colors.text }]}>Continue Without Watch</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.watchFailedButton, { backgroundColor: 'transparent' }]}
-            onPress={() => router.back()}
-          >
-            <Text style={[styles.watchFailedCancelText, { color: colors.textMuted }]}>
-              Cancel Session
-            </Text>
+          <TouchableOpacity style={{ paddingVertical: 12 }} onPress={() => router.back()}>
+            <Text style={[localStyles.actionBtnText, { color: colors.textMuted }]}>Cancel</Text>
           </TouchableOpacity>
-        </Animated.View>
+        </View>
       </View>
     </View>
   );
 }
 
-interface WatchStartingViewProps {
-  colors: any;
-  insets: any;
-  drillName: string;
-  onClose: () => void;
-}
-
-function WatchStartingView({ colors, insets, drillName, onClose }: WatchStartingViewProps) {
+function WatchStartingView({ colors, insets, drillName, onClose }: any) {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.secondary }]}
-          onPress={onClose}
-        >
+        <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.secondary }]} onPress={onClose}>
           <X size={18} color={colors.textMuted} />
         </TouchableOpacity>
-
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
             {drillName}
           </Text>
         </View>
-
         <View style={{ width: 36 }} />
       </View>
 
       <View style={styles.watchWaitingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.watchWaitingTitle, { color: colors.text, marginTop: 24 }]}>
-          Starting Watch Session...
-        </Text>
-        <Text style={[styles.watchWaitingDesc, { color: colors.textMuted }]}>
-          Sending session data to your watch
-        </Text>
+        <ActivityIndicator size="large" color={colors.text} />
+        <Text style={[styles.watchWaitingTitle, { color: colors.text, marginTop: 24 }]}>Starting Watch...</Text>
+        <Text style={[styles.watchWaitingDesc, { color: colors.textMuted }]}>Sending session to your watch</Text>
       </View>
     </View>
   );
-}
-
-interface WatchWaitingViewProps {
-  colors: any;
-  insets: any;
-  drillName: string;
-  elapsedTime: number;
-  drill: any;
-  isWatchConnected: boolean;
-  ending: boolean;
-  onClose: () => void;
-  onEndSession: () => void;
 }
 
 function WatchWaitingView({
@@ -499,116 +510,59 @@ function WatchWaitingView({
   ending,
   onClose,
   onEndSession,
-}: WatchWaitingViewProps) {
+}: any) {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.secondary }]}
-          onPress={onClose}
-        >
+        <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.secondary }]} onPress={onClose}>
           <X size={18} color={colors.textMuted} />
         </TouchableOpacity>
-
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
             {drillName}
           </Text>
         </View>
-
         <View style={styles.timerContainer}>
-          <View style={[styles.liveDot, { backgroundColor: COLORS.success }]} />
+          <View style={[styles.liveDot, { backgroundColor: isWatchConnected ? '#10B981' : COLORS.warning }]} />
           <Text style={[styles.timerText, { color: colors.text }]}>{formatTime(elapsedTime)}</Text>
         </View>
       </View>
 
       <View style={styles.watchWaitingContainer}>
-        <Animated.View entering={FadeIn.duration(500)} style={styles.watchWaitingIconContainer}>
-          <View
-            style={[
-              styles.watchWaitingPulseOuter,
-              { borderColor: isWatchConnected ? COLORS.success : COLORS.warning },
-            ]}
-          />
-          <View
-            style={[
-              styles.watchWaitingIconBg,
-              { backgroundColor: isWatchConnected ? COLORS.successBg : COLORS.warningBg },
-            ]}
-          >
-            <Watch size={48} color={isWatchConnected ? COLORS.success : COLORS.warning} />
-          </View>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.watchWaitingText}>
-          <Text style={[styles.watchWaitingTitle, { color: colors.text }]}>
-            {isWatchConnected ? 'Watch in Control' : 'Watch Disconnected'}
-          </Text>
-          <Text style={[styles.watchWaitingDesc, { color: colors.textMuted }]}>
-            {isWatchConnected
-              ? 'Your Garmin watch is tracking this session.\nEnd the session on your watch when finished.'
-              : 'Reconnect your watch to continue tracking,\nor end the session manually below.'}
-          </Text>
-        </Animated.View>
+        <View style={[styles.watchWaitingIconBg, { backgroundColor: colors.secondary }]}>
+          <Watch size={48} color={isWatchConnected ? '#10B981' : colors.textMuted} />
+        </View>
+        <Text style={[styles.watchWaitingTitle, { color: colors.text, marginTop: 24 }]}>
+          {isWatchConnected ? 'Watch in Control' : 'Watch Disconnected'}
+        </Text>
+        <Text style={[styles.watchWaitingDesc, { color: colors.textMuted }]}>
+          {isWatchConnected
+            ? 'End the session on your watch when finished.'
+            : 'Reconnect your watch or end manually.'}
+        </Text>
 
         {drill && (
-          <Animated.View
-            entering={FadeInDown.delay(200).duration(400)}
-            style={[styles.watchWaitingDrillCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-          >
-            <View style={styles.watchWaitingDrillRow}>
-              <MapPin size={14} color={colors.textMuted} />
-              <Text style={[styles.watchWaitingDrillText, { color: colors.text }]}>{drill.distance_m}m</Text>
-            </View>
-            {drill.rounds_per_shooter && (
-              <View style={styles.watchWaitingDrillRow}>
-                <Zap size={14} color={colors.textMuted} />
-                <Text style={[styles.watchWaitingDrillText, { color: colors.text }]}>
-                  {drill.rounds_per_shooter} shots
-                </Text>
-              </View>
-            )}
-            {drill.time_limit_seconds && (
-              <View style={styles.watchWaitingDrillRow}>
-                <Clock size={14} color={colors.textMuted} />
-                <Text style={[styles.watchWaitingDrillText, { color: colors.text }]}>
-                  {formatTime(drill.time_limit_seconds)} limit
-                </Text>
-              </View>
-            )}
-          </Animated.View>
+          <View style={[localStyles.drillMeta, { backgroundColor: colors.card, marginTop: 20 }]}>
+            <Text style={[localStyles.drillMetaText, { color: colors.text }]}>
+              {drill.distance_m}m • {drill.rounds_per_shooter} shots
+              {drill.time_limit_seconds ? ` • ${formatTime(drill.time_limit_seconds)}` : ''}
+            </Text>
+          </View>
         )}
-
-        <Animated.View
-          entering={FadeInDown.delay(300).duration(400)}
-          style={[
-            styles.watchWaitingStatusBadge,
-            { backgroundColor: isWatchConnected ? `${COLORS.success}15` : `${COLORS.warning}15` },
-          ]}
-        >
-          <View
-            style={[styles.watchWaitingStatusDot, { backgroundColor: isWatchConnected ? COLORS.success : COLORS.warning }]}
-          />
-          <Text
-            style={[styles.watchWaitingStatusText, { color: isWatchConnected ? COLORS.success : COLORS.warning }]}
-          >
-            {isWatchConnected ? 'Watch Connected' : 'Watch Not Connected'}
-          </Text>
-        </Animated.View>
       </View>
 
-      <View style={[styles.watchWaitingBottom, { paddingBottom: insets.bottom + 16 }]}>
+      <View style={[localStyles.bottomBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
         <TouchableOpacity
-          style={[styles.watchWaitingEndButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+          style={[localStyles.endBtn, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}
           onPress={onEndSession}
           disabled={ending}
         >
           {ending ? (
-            <ActivityIndicator size="small" color={COLORS.error} />
+            <ActivityIndicator size="small" color={colors.text} />
           ) : (
             <>
-              <Ionicons name="stop-circle" size={20} color={COLORS.error} />
-              <Text style={[styles.watchWaitingEndText, { color: colors.text }]}>End Session Manually</Text>
+              <Square size={16} color={colors.text} />
+              <Text style={[localStyles.endBtnText, { color: colors.text }]}>End Session Manually</Text>
             </>
           )}
         </TouchableOpacity>
@@ -617,345 +571,150 @@ function WatchWaitingView({
   );
 }
 
-interface DrillBannerProps {
-  colors: any;
-  drill: any;
-  drillProgress: any;
-  targets: any[];
-  isGroupingDrill: boolean;
-  isTacticalDrill: boolean;
-}
-
-function DrillBanner({ colors, drill, drillProgress, targets, isGroupingDrill, isTacticalDrill }: DrillBannerProps) {
+function DrillBanner({ colors, drill, drillProgress, targets, isGroupingDrill, isTacticalDrill }: any) {
   return (
-        <Animated.View entering={FadeInDown.delay(50).duration(300)} style={styles.drillBanner}>
-          <View style={[styles.drillBannerInner, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.drillInfoRow}>
-          <View
-            style={[
-              styles.drillTypeIcon,
-              { backgroundColor: isGroupingDrill ? COLORS.successBg : COLORS.accentBg },
-            ]}
-          >
-            {isGroupingDrill ? <Focus size={16} color={COLORS.success} /> : <Trophy size={16} color={COLORS.accent} />}
+    <View style={styles.drillBanner}>
+      <View style={[styles.drillBannerInner, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.drillInfoRow}>
+          <View style={[styles.drillTypeIcon, { backgroundColor: colors.secondary }]}>
+            {isGroupingDrill ? <Focus size={16} color={colors.text} /> : <Trophy size={16} color={colors.text} />}
+          </View>
+          <View style={styles.drillInfoText}>
+            <View style={styles.drillRequirements}>
+              <View style={styles.drillReqItem}>
+                <MapPin size={12} color={colors.textMuted} />
+                <Text style={[styles.drillReqText, { color: colors.text }]}>{drill.distance_m}m</Text>
               </View>
-              <View style={styles.drillInfoText}>
-                <View style={styles.drillRequirements}>
-                  <View style={styles.drillReqItem}>
-                    <MapPin size={12} color={colors.textMuted} />
-                    <Text style={[styles.drillReqText, { color: colors.text }]}>{drill.distance_m}m</Text>
-                  </View>
-                  <View style={styles.drillReqItem}>
-                    {isTacticalDrill ? (
-                      <>
-                        <Zap size={12} color={colors.textMuted} />
-                        <Text style={[styles.drillReqText, { color: colors.text }]}>
-                          {drillProgress?.bulletsPerRound ?? drill.rounds_per_shooter} shots/round
-                        </Text>
-                      </>
-                    ) : (
-                      <>
-                        <Camera size={12} color={colors.textMuted} />
-                        <Text style={[styles.drillReqText, { color: colors.text }]}>
-                          Scan (max {formatMaxShots(drill.rounds_per_shooter)})
-                        </Text>
-                      </>
-                    )}
-                  </View>
-                  {drillProgress?.rounds && drillProgress.rounds > 1 && (
-                    <View style={styles.drillReqItem}>
-                      <Ionicons name="repeat" size={12} color={colors.textMuted} />
-                  <Text style={[styles.drillReqText, { color: colors.text }]}>{drillProgress.rounds} rounds</Text>
-                    </View>
-                  )}
-                  {drill.time_limit_seconds && (
-                    <View style={styles.drillReqItem}>
+              <View style={styles.drillReqItem}>
+                {isTacticalDrill ? (
+                  <>
+                    <Zap size={12} color={colors.textMuted} />
+                    <Text style={[styles.drillReqText, { color: colors.text }]}>
+                      {drillProgress?.bulletsPerRound ?? drill.rounds_per_shooter} shots/round
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Camera size={12} color={colors.textMuted} />
+                    <Text style={[styles.drillReqText, { color: colors.text }]}>
+                      Scan (max {formatMaxShots(drill.rounds_per_shooter)})
+                    </Text>
+                  </>
+                )}
+              </View>
+              {drill.time_limit_seconds && (
+                <View style={styles.drillReqItem}>
                   <Clock size={12} color={drillProgress?.overTime ? COLORS.error : colors.textMuted} />
                   <Text
                     style={[styles.drillReqText, { color: drillProgress?.overTime ? COLORS.error : colors.text }]}
                   >
-                        {formatTime(drill.time_limit_seconds)}
-                      </Text>
-                    </View>
-                  )}
-                  {drill.min_accuracy_percent && (
-                    <View style={styles.drillReqItem}>
-                      <Target size={12} color={colors.textMuted} />
-                      <Text style={[styles.drillReqText, { color: colors.text }]}>{drill.min_accuracy_percent}%</Text>
-                    </View>
-                  )}
+                    {formatTime(drill.time_limit_seconds)}
+                  </Text>
                 </View>
-              </View>
-              {drillProgress?.isComplete && (
-            <View style={[styles.drillCompleteBadge, { backgroundColor: COLORS.accentBg }]}>
-              <CheckCircle size={14} color={COLORS.accent} />
+              )}
+              {drill.min_accuracy_percent && (
+                <View style={styles.drillReqItem}>
+                  <Target size={12} color={colors.textMuted} />
+                  <Text style={[styles.drillReqText, { color: colors.text }]}>{drill.min_accuracy_percent}%</Text>
                 </View>
               )}
             </View>
-
-            <View style={styles.drillProgressContainer}>
-              <View style={[styles.drillProgressBg, { backgroundColor: colors.secondary }]}>
-                <View 
-                  style={[
-                    styles.drillProgressFill, 
-                    { 
-                      width: `${drillProgress?.targetsProgress || 0}%`,
-                  backgroundColor: drillProgress?.isComplete ? COLORS.accent : colors.text,
-                },
-                  ]} 
-                />
-              </View>
-              <Text style={[styles.drillProgressText, { color: colors.textMuted }]}>
-                {targets.length}/{drillProgress?.requiredTargets ?? 1} entries
-              </Text>
-            </View>
           </View>
-        </Animated.View>
-  );
-}
-
-interface StatsCardProps {
-  colors: any;
-  accuracy: number;
-  drill: any;
-  drillProgress: any;
-  hasDrill: boolean;
-  targets: any[];
-  totalShots: number;
-  totalHits: number;
-  score: any;
-}
-
-function StatsCard({ colors, accuracy, drill, drillProgress, hasDrill, targets, totalShots, totalHits, score }: StatsCardProps) {
-  const getAccuracyColor = () => {
-    if (drill?.min_accuracy_percent) {
-      if (accuracy >= drill.min_accuracy_percent) return COLORS.accent;
-      if (accuracy >= drill.min_accuracy_percent * 0.8) return COLORS.warning;
-      return COLORS.error;
-    }
-    if (accuracy >= 70) return COLORS.accent;
-    if (accuracy >= 50) return COLORS.warning;
-    return colors.text;
-  };
-
-  return (
-      <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.statsSection}>
-        <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.accuracyCenter}>
-          <Text style={[styles.accuracyValue, { color: getAccuracyColor() }]}>{accuracy}%</Text>
-            <Text style={[styles.accuracyLabel, { color: colors.textMuted }]}>
-              {drill?.min_accuracy_percent ? `goal: ${drill.min_accuracy_percent}%` : 'accuracy'}
-            </Text>
-          </View>
-          
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-            <View style={[styles.statIconBg, { backgroundColor: COLORS.accentBg }]}>
-              <Target size={16} color={COLORS.accent} />
-              </View>
-              <Text style={[styles.statValue, { color: colors.text }]}>{targets.length}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-                {hasDrill ? 'entries' : 'targets'}
-              </Text>
+          {drillProgress?.isComplete && (
+            <View style={[styles.drillCompleteBadge, { backgroundColor: colors.secondary }]}>
+              <Check size={14} color={colors.text} />
             </View>
-            <View style={styles.statItem}>
-              <View style={[styles.statIconBg, { backgroundColor: colors.secondary }]}>
-                <Crosshair size={16} color={colors.textMuted} />
-              </View>
-              <Text style={[styles.statValue, { color: colors.text }]}>{totalShots}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>shots</Text>
-            </View>
-            <View style={styles.statItem}>
-            <View style={[styles.statIconBg, { backgroundColor: COLORS.accentBg }]}>
-              <Ionicons name="checkmark" size={16} color={COLORS.accent} />
-              </View>
-            <Text style={[styles.statValue, { color: COLORS.accent }]}>{totalHits}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>hits</Text>
-            </View>
-            {score?.mode === 'points' && (
-              <View style={styles.statItem}>
-              <View style={[styles.statIconBg, { backgroundColor: `${COLORS.warning}12` }]}>
-                <Trophy size={16} color={COLORS.warning} />
-                </View>
-              <Text style={[styles.statValue, { color: COLORS.warning }]}>{Math.round(score.value)}</Text>
-                <Text style={[styles.statLabel, { color: colors.textMuted }]}>points</Text>
-              </View>
-            )}
-          </View>
+          )}
         </View>
-      </Animated.View>
-  );
-}
 
-interface BottomActionsProps {
-  colors: any;
-  insets: any;
-  ending: boolean;
-  drillLimitReached: boolean;
-  isAchievementDrill: boolean;
-  isGroupingDrill: boolean;
-  hasDrill: boolean;
-  drill: any;
-  nextTargetPlan: any;
-  showManual: boolean;
-  showScan: boolean;
-  onEndSession: () => void;
-  onManualRoute: () => void;
-  onScanRoute: () => void;
-}
-
-function BottomActions({
-  colors,
-  insets,
-  ending,
-  drillLimitReached,
-  isAchievementDrill,
-  isGroupingDrill,
-  hasDrill,
-  drill,
-  nextTargetPlan,
-  showManual,
-  showScan,
-  onEndSession,
-  onManualRoute,
-  onScanRoute,
-}: BottomActionsProps) {
-  return (
-      <View style={[styles.bottomActions, { paddingBottom: insets.bottom + 12 }]}>
-        <View style={[styles.bottomActionsInner, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <TouchableOpacity style={styles.endButton} onPress={onEndSession} disabled={ending} activeOpacity={0.7}>
-            {ending ? (
-            <ActivityIndicator size="small" color={COLORS.error} />
-            ) : (
-            <Ionicons name="stop-circle" size={24} color={COLORS.error} />
-            )}
-          </TouchableOpacity>
-
-          <View style={[styles.actionDivider, { backgroundColor: colors.border }]} />
-
-          {showManual && (
-            <TouchableOpacity
+        <View style={styles.drillProgressContainer}>
+          <View style={[styles.drillProgressBg, { backgroundColor: colors.secondary }]}>
+            <View
               style={[
-                styles.tacticalButton,
-                isAchievementDrill && styles.primaryActionBtn,
-                drillLimitReached && { opacity: 0.5 },
+                styles.drillProgressFill,
+                {
+                  width: `${drillProgress?.targetsProgress || 0}%`,
+                  backgroundColor: drillProgress?.isComplete ? colors.green : colors.text,
+                },
               ]}
-            onPress={onManualRoute}
-              disabled={drillLimitReached}
-              activeOpacity={0.8}
-            >
-              <Crosshair size={20} color={isAchievementDrill ? '#fff' : colors.textMuted} />
-              <Text style={[styles.tacticalButtonText, { color: isAchievementDrill ? '#fff' : colors.text }]}>
-              {nextTargetPlan?.nextBullets ? `Manual (${nextTargetPlan.nextBullets}rds)` : 'Manual'}
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {showScan && (
-            <TouchableOpacity
-              style={[
-                styles.scanButton,
-                isGroupingDrill && styles.scanButtonPrimary,
-                drillLimitReached && { opacity: 0.5 },
-              ]}
-            onPress={onScanRoute}
-              disabled={drillLimitReached}
-              activeOpacity={0.8}
-            >
-              <Camera size={20} color="#fff" />
-              <Text style={styles.scanButtonText}>
-                {hasDrill && drill?.target_type === 'paper'
-                  ? `Scan (max ${formatMaxShots(drill.rounds_per_shooter)})`
-                  : isGroupingDrill
-                    ? 'Scan Grouping'
-                    : 'Scan'}
-              </Text>
-            </TouchableOpacity>
-          )}
+            />
+          </View>
+          <Text style={[styles.drillProgressText, { color: colors.textMuted }]}>
+            {targets.length}/{drillProgress?.requiredTargets ?? 1} entries
+          </Text>
         </View>
       </View>
+    </View>
   );
 }
 
-interface CompletionModalProps {
-  visible: boolean;
-  colors: any;
-  targets: any[];
-  totalShots: number;
-  accuracy: number;
-  stats: any;
-  elapsedTime: number;
-  ending: boolean;
-  onFixResults: () => void;
-  onComplete: () => void;
-}
+// ============================================================================
+// LOCAL STYLES
+// ============================================================================
+const localStyles = StyleSheet.create({
+  // Hero
+  heroContainer: { paddingHorizontal: 16, marginBottom: 12 },
+  heroTarget: { borderRadius: 12, overflow: 'hidden', height: 160 },
+  heroImage: { width: '100%', height: '100%' },
+  heroPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  heroOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 12,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  heroStats: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20 },
+  heroStatItem: { alignItems: 'center' },
+  heroStatValue: { fontSize: 18, fontWeight: '700', color: '#fff' },
+  heroStatLabel: { fontSize: 11, color: 'rgba(255,255,255,0.7)' },
+  heroStatDivider: { width: 1, height: 24 },
 
-function CompletionModal({
-  visible,
-  colors,
-  targets,
-  totalShots,
-  accuracy,
-  stats,
-  elapsedTime,
-  ending,
-  onFixResults,
-  onComplete,
-}: CompletionModalProps) {
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onFixResults}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-            <View style={styles.modalIconContainer}>
-            <CheckCircle size={56} color={COLORS.success} />
-            </View>
-            
-          <Text style={[styles.modalTitle, { color: colors.text }]}>Drill Complete!</Text>
-            
-            <View style={styles.modalStats}>
-              <View style={styles.modalStatRow}>
-                <Text style={[styles.modalStatLabel, { color: colors.textMuted }]}>Targets</Text>
-                <Text style={[styles.modalStatValue, { color: colors.text }]}>{targets.length}</Text>
-              </View>
-              <View style={styles.modalStatRow}>
-                <Text style={[styles.modalStatLabel, { color: colors.textMuted }]}>Shots</Text>
-                <Text style={[styles.modalStatValue, { color: colors.text }]}>{totalShots}</Text>
-              </View>
-              <View style={styles.modalStatRow}>
-                <Text style={[styles.modalStatLabel, { color: colors.textMuted }]}>Accuracy</Text>
-                <Text style={[styles.modalStatValue, { color: colors.text }]}>{accuracy}%</Text>
-              </View>
-              {stats?.bestDispersionCm && (
-                <View style={styles.modalStatRow}>
-                  <Text style={[styles.modalStatLabel, { color: colors.textMuted }]}>Best Group</Text>
-                <Text style={[styles.modalStatValue, { color: colors.text }]}>
-                  {stats.bestDispersionCm.toFixed(1)}cm
-                </Text>
-                </View>
-              )}
-              <View style={styles.modalStatRow}>
-                <Text style={[styles.modalStatLabel, { color: colors.textMuted }]}>Time</Text>
-                <Text style={[styles.modalStatValue, { color: colors.text }]}>{formatTime(elapsedTime)}</Text>
-              </View>
-            </View>
-            
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalSecondaryButton, { borderColor: colors.border }]}
-              onPress={onFixResults}
-              >
-                <Text style={[styles.modalSecondaryButtonText, { color: colors.text }]}>Fix Results</Text>
-              </TouchableOpacity>
-            <TouchableOpacity style={styles.modalPrimaryButton} onPress={onComplete} disabled={ending}>
-                {ending ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.modalPrimaryButtonText}>Done</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-  );
-}
+  // Stats
+  statsContainer: { paddingHorizontal: 16, marginBottom: 12 },
+  compactStats: { flexDirection: 'row', borderRadius: 10, padding: 12 },
+  compactStatItem: { flex: 1, alignItems: 'center' },
+  compactStatValue: { fontSize: 16, fontWeight: '700' },
+  compactStatLabel: { fontSize: 11, marginTop: 2 },
+  compactStatDivider: { width: 1, height: 28 },
+
+  // Actions
+  actionsContainer: { paddingHorizontal: 16, marginBottom: 16 },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    height: 48,
+    borderRadius: 12,
+  },
+  addBtnText: { fontSize: 15, fontWeight: '600' },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  actionBtnText: { fontSize: 14, fontWeight: '600' },
+
+  // Bottom
+  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingTop: 12 },
+  endBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    height: 50,
+    borderRadius: 12,
+  },
+  endBtnText: { fontSize: 16, fontWeight: '600' },
+
+  // Drill meta
+  drillMeta: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 },
+  drillMetaText: { fontSize: 14, fontWeight: '500', textAlign: 'center' },
+});

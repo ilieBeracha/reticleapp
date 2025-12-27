@@ -4,7 +4,6 @@ import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { PieChart } from 'react-native-gifted-charts';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { styles } from '../styles';
 
 export function AggregatedStatsCard({
   colors,
@@ -12,7 +11,7 @@ export function AggregatedStatsCard({
 }: {
   colors: ReturnType<typeof useColors>;
   allSessions: SessionWithDetails[];
-  trainingStats?: any; // Kept for compatibility but unused
+  trainingStats?: any;
 }) {
   const { shots, hits, solo, team, accuracy } = useMemo(() => {
     let shots = 0;
@@ -21,7 +20,6 @@ export function AggregatedStatsCard({
     let team = 0;
 
     allSessions.forEach((s) => {
-      // Only count completed sessions for stats to avoid skewing with empty active ones
       if (s.status === 'completed') {
         if (s.stats) {
           shots += s.stats.shots_fired || 0;
@@ -42,101 +40,44 @@ export function AggregatedStatsCard({
     { value: team, color: colors.green, text: 'Team' },
   ].filter((d) => d.value > 0);
 
-  // Default data for empty state
-  const chartData = pieData.length > 0 ? pieData : [{ value: 1, color: `${colors.text}10` }];
+  const chartData = pieData.length > 0 ? pieData : [{ value: 1, color: `${colors.text}15` }];
 
   return (
-    <Animated.View entering={FadeIn.delay(100).duration(400)} style={styles.halfCard}>
-      <View
-        style={[
-          styles.card,
-          {
-            backgroundColor: colors.card,
-            borderColor: colors.border,
-            padding: 0,
-            overflow: 'hidden',
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.05,
-            shadowRadius: 8,
-            elevation: 2,
-            flex: 1, // Add flex: 1 here
-          },
-        ]}
-      >
-        {/* Header / Chart Section */}
-        <View style={{ padding: 12, paddingBottom: 0, alignItems: 'center', flexDirection: 'row', gap: 12 }}>
-          {/* Chart */}
-          <View>
-            <PieChart data={chartData} donut radius={32} innerRadius={24} showText={false} backgroundColor={colors.card} />
-            <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
-              <Text style={{ fontSize: 10, fontWeight: '800', color: colors.textMuted }}>{allSessions.length}</Text>
+    <Animated.View entering={FadeIn.delay(100).duration(300)} style={styles.container}>
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {/* Top: Chart + Accuracy */}
+        <View style={styles.topRow}>
+          <View style={styles.chartWrap}>
+            <PieChart
+              data={chartData}
+              donut
+              radius={26}
+              innerRadius={19}
+              showText={false}
+              backgroundColor={colors.card}
+            />
+            <View style={[StyleSheet.absoluteFill, styles.chartCenter]}>
+              <Text style={[styles.chartLabel, { color: colors.textMuted }]}>
+                {allSessions.length}
+              </Text>
             </View>
           </View>
 
-          {/* Legend / Primary Stat */}
-          <View style={{ flex: 1, justifyContent: 'center' }}>
-            <Text
-              style={{
-                fontSize: 11,
-                color: colors.textMuted,
-                fontWeight: '600',
-                letterSpacing: 0.5,
-                textTransform: 'uppercase',
-                marginBottom: 2,
-              }}
-            >
-              Accuracy
-            </Text>
-            <Text style={{ fontSize: 26, fontWeight: '800', color: colors.text, letterSpacing: -1 }}>{accuracy}%</Text>
+          <View style={styles.accuracyWrap}>
+            <Text style={[styles.accuracyLabel, { color: colors.textMuted }]}>Accuracy</Text>
+            <Text style={[styles.accuracyValue, { color: colors.indigo }]}>{accuracy}%</Text>
           </View>
         </View>
 
-        {/* Stats Grid */}
-        <View style={{ flexDirection: 'row', padding: 12, gap: 8 }}>
-          <View
-            style={{
-              flex: 1,
-              padding: 8,
-              borderRadius: 8,
-              backgroundColor: `${colors.text}05`,
-              alignItems: 'center',
-            }}
-          >
-            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>{shots.toLocaleString()}</Text>
-            <Text
-              style={{
-                fontSize: 9,
-                color: colors.textMuted,
-                fontWeight: '700',
-                marginTop: 2,
-                textTransform: 'uppercase',
-              }}
-            >
-              Shots
-            </Text>
+        {/* Bottom: Shot stats */}
+        <View style={styles.statsRow}>
+          <View style={[styles.statBox, { backgroundColor: `${colors.text}06` }]}>
+            <Text style={[styles.statValue, { color: colors.text }]}>{shots.toLocaleString()}</Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Shots</Text>
           </View>
-          <View
-            style={{
-              flex: 1,
-              padding: 8,
-              borderRadius: 8,
-              backgroundColor: `${colors.text}05`,
-              alignItems: 'center',
-            }}
-          >
-            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>{hits.toLocaleString()}</Text>
-            <Text
-              style={{
-                fontSize: 9,
-                color: colors.textMuted,
-                fontWeight: '700',
-                marginTop: 2,
-                textTransform: 'uppercase',
-              }}
-            >
-              Hits
-            </Text>
+          <View style={[styles.statBox, { backgroundColor: `${colors.text}06` }]}>
+            <Text style={[styles.statValue, { color: colors.text }]}>{hits.toLocaleString()}</Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Hits</Text>
           </View>
         </View>
       </View>
@@ -144,12 +85,65 @@ export function AggregatedStatsCard({
   );
 }
 
-
-
-
-
-
-
-
-
-
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  card: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    gap: 10,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  chartWrap: {
+    position: 'relative',
+  },
+  chartCenter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chartLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  accuracyWrap: {
+    flex: 1,
+  },
+  accuracyLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  accuracyValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -1,
+    marginTop: -2,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  statBox: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  statValue: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  statLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    marginTop: 1,
+  },
+});

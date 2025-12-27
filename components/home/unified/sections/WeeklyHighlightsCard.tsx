@@ -3,9 +3,8 @@ import type { SessionWithDetails } from '@/services/sessionService';
 import { getSafeSessionDuration } from '@/utils/sessionDuration';
 import { Crosshair, Target } from 'lucide-react-native';
 import { useMemo } from 'react';
-import { Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { styles } from '../styles';
 
 export function WeeklyHighlightsCard({
   colors,
@@ -22,19 +21,16 @@ export function WeeklyHighlightsCard({
     let distCount = 0;
 
     sessions.forEach((s) => {
-      // Time - use safe duration to cap absurdly long sessions
       const durationSeconds = getSafeSessionDuration(s);
       if (durationSeconds > 0) {
         totalTimeMs += durationSeconds * 1000;
       }
 
-      // Dispersion
       if (s.stats?.best_dispersion_cm && s.stats.best_dispersion_cm > 0) {
         hasDispersion = true;
         minDispersion = Math.min(minDispersion, s.stats.best_dispersion_cm);
       }
 
-      // Distance
       if (s.stats?.avg_distance_m) {
         totalDist += s.stats.avg_distance_m;
         distCount++;
@@ -52,70 +48,27 @@ export function WeeklyHighlightsCard({
   }, [sessions]);
 
   return (
-    <Animated.View entering={FadeIn.delay(150).duration(400)} style={styles.halfCard}>
-      <View
-        style={[
-          styles.card,
-          {
-            backgroundColor: colors.card,
-            borderColor: colors.border,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.05,
-            shadowRadius: 8,
-            elevation: 2,
-            justifyContent: 'center',
-            paddingVertical: 16,
-            paddingHorizontal: 16,
-            flex: 1, // Add flex: 1 here
-          },
-        ]}
-      >
-        <View style={{ gap: 16 }}>
-          {/* Row 2: Best Group */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <View
-              style={[styles.statIcon, { backgroundColor: `${colors.indigo}15`, width: 36, height: 36, borderRadius: 10 }]}
-            >
-              <Crosshair size={18} color={colors.indigo} />
-            </View>
-            <View>
-              <Text
-                style={{
-                  fontSize: 10,
-                  color: colors.textMuted,
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  marginBottom: 2,
-                }}
-              >
-                Best Group
-              </Text>
-              <Text style={{ fontSize: 17, fontWeight: '800', color: colors.text, letterSpacing: -0.5 }}>{stats.bestGroup}</Text>
-            </View>
+    <Animated.View entering={FadeIn.delay(150).duration(300)} style={styles.container}>
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {/* Best Group */}
+        <View style={styles.statRow}>
+          <View style={[styles.iconWrap, { backgroundColor: `${colors.indigo}15` }]}>
+            <Crosshair size={16} color={colors.indigo} />
           </View>
+          <View style={styles.statContent}>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Best Group</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>{stats.bestGroup}</Text>
+          </View>
+        </View>
 
-          {/* Row 3: Avg Distance */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <View
-              style={[styles.statIcon, { backgroundColor: `${colors.green}15`, width: 36, height: 36, borderRadius: 10 }]}
-            >
-              <Target size={18} color={colors.green} />
-            </View>
-            <View>
-              <Text
-                style={{
-                  fontSize: 10,
-                  color: colors.textMuted,
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  marginBottom: 2,
-                }}
-              >
-                Avg Distance
-              </Text>
-              <Text style={{ fontSize: 17, fontWeight: '800', color: colors.text, letterSpacing: -0.5 }}>{stats.avgDist}</Text>
-            </View>
+        {/* Avg Distance */}
+        <View style={styles.statRow}>
+          <View style={[styles.iconWrap, { backgroundColor: `${colors.green}15` }]}>
+            <Target size={16} color={colors.green} />
+          </View>
+          <View style={styles.statContent}>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Avg Distance</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>{stats.avgDist}</Text>
           </View>
         </View>
       </View>
@@ -123,7 +76,42 @@ export function WeeklyHighlightsCard({
   );
 }
 
-
-
-
-
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  card: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    justifyContent: 'center',
+    gap: 12,
+  },
+  statRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  iconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statContent: {
+    flex: 1,
+  },
+  statLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    marginTop: -1,
+  },
+});

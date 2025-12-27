@@ -237,7 +237,7 @@ export default function MemberPreviewSheet() {
   // Loading state
   if (loading) {
     return (
-      <View style={[styles.centerContainer, { backgroundColor: colors.card }]}>
+      <View style={[styles.centerContainer, { backgroundColor: colors.card, paddingTop: 100 }]}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={[styles.loadingText, { color: colors.textMuted }]}>Processing...</Text>
       </View>
@@ -247,7 +247,7 @@ export default function MemberPreviewSheet() {
   // No member state
   if (!member) {
     return (
-      <View style={[styles.centerContainer, { backgroundColor: colors.card }]}>
+      <View style={[styles.centerContainer, { backgroundColor: colors.card, paddingTop: 100 }]}>
         <Ionicons name="person-outline" size={48} color={colors.textMuted} />
         <Text style={[styles.emptyText, { color: colors.textMuted }]}>Member not found</Text>
       </View>
@@ -508,7 +508,7 @@ export default function MemberPreviewSheet() {
 
 const styles = StyleSheet.create({
   scrollView: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 16 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 20 },
 
   centerContainer: {
     flex: 1,
@@ -644,7 +644,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingTop: 20,
+    paddingBottom: 14,
     borderBottomWidth: 1,
   },
   modalCancel: { fontSize: 16 },

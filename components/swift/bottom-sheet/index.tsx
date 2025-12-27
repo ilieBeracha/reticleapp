@@ -104,5 +104,6 @@ export default function SwiftBottomSheet(props: SwiftBottomSheetProps) {
 const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
+    paddingTop: 40,
   },
 });

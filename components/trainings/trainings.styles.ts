@@ -163,22 +163,107 @@ export const styles = StyleSheet.create({
 
   // Schedule groups
   scheduleGroup: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   scheduleGroupHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 10,
-    paddingHorizontal: 2,
+    gap: 8,
+    marginBottom: 12,
+    paddingHorizontal: 4,
   },
   scheduleGroupTitle: {
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  scheduleGroupCount: {
+    fontSize: 11,
     fontWeight: '600',
-    letterSpacing: 0.3,
   },
 
-  // Schedule item
+  // Training Card - New design
+  trainingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
+  trainingCardLive: {
+    borderWidth: 1.5,
+  },
+  trainingAccent: {
+    width: 4,
+    height: '100%',
+    minHeight: 80,
+  },
+  trainingContent: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+  },
+  trainingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  trainingStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  trainingStatusText: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  trainingDrillBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  trainingDrillCount: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  trainingTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    marginBottom: 6,
+  },
+  trainingMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  trainingTime: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  trainingAction: {
+    paddingRight: 14,
+    paddingLeft: 4,
+  },
+  trainingPlayBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Legacy Schedule item (kept for backwards compatibility)
   scheduleItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -238,32 +323,43 @@ export const styles = StyleSheet.create({
   // Empty state
   scheduleEmpty: {
     alignItems: 'center',
-    padding: 32,
-    borderRadius: 14,
+    paddingVertical: 48,
+    paddingHorizontal: 32,
+    borderRadius: 20,
     borderWidth: 1,
-    gap: 10,
+    borderStyle: 'dashed',
+  },
+  scheduleEmptyIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
   },
   scheduleEmptyTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 4,
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    marginBottom: 8,
   },
   scheduleEmptyText: {
-    fontSize: 13,
+    fontSize: 14,
     textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
   },
   scheduleEmptyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-    marginTop: 8,
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
   },
   scheduleEmptyBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: '#fff',
   },
 

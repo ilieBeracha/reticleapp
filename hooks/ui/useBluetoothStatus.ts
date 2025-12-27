@@ -1,4 +1,5 @@
-import { useGarminStore, GarminDeviceStatus } from "@/store/garminStore";
+import { GarminDeviceStatus } from "@/services/garminService";
+import { useGarminStore, } from "@/store/garminStore";
 
 interface BluetoothDevice {
   name: string;

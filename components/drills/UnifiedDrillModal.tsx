@@ -2,32 +2,47 @@
  * Unified Drill Modal
  *
  * Single modal for all drill-related forms:
- * - mode: 'template' → Create/edit drill templates (saves to DB)
- * - mode: 'configure' → Configure drill instance for training
- * - mode: 'quick' → Quick inline drill (not saved, for training)
+ * - mode: 'template' → Create/edit drill templates (saves to DB) - Full screen modal
+ * - mode: 'configure' → Configure drill instance for training - Full screen modal
+ * - mode: 'quick' → Quick inline drill (not saved, for training) - Bottom sheet
+ *
+ * Uses shared DrillFormComponents for consistent UI with SessionFormSheet.
  */
+import {
+  ConfigCard,
+  ConfigRow,
+  DISTANCE_PRESETS,
+  HintBox,
+  OptionCard,
+  ROUNDS_PRESETS,
+  SectionLabel,
+  SHOTS_PRESETS,
+  TIME_PRESETS,
+  TimeRow,
+} from '@/components/session/form/DrillFormComponents';
 import { useColors } from '@/hooks/ui/useColors';
 import type { DrillGoal, DrillInstanceConfig, TargetType } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import {
-    Camera,
-    Check,
-    Crosshair,
-    Hand,
-    Trophy,
-    X
+  Camera,
+  Check,
+  Crosshair,
+  Hand,
+  Trophy,
+  X
 } from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -61,223 +76,6 @@ export interface UnifiedDrillModalProps {
 }
 
 // ============================================================================
-// PRESETS (shared with SessionFormSheet pattern)
-// ============================================================================
-const DISTANCE_PRESETS = [7, 15, 25, 50, 100, 200];
-const SHOTS_PRESETS = [3, 5, 10, 15, 20];
-const ROUNDS_PRESETS = [1, 2, 3, 5];
-const TIME_PRESETS = [30, 60, 90, 120];
-
-const GOAL_COLORS = {
-  grouping: '#10B981',
-  achievement: '#3B82F6',
-};
-
-// ============================================================================
-// TOGGLE BUTTON (same as SessionFormSheet)
-// ============================================================================
-function ToggleButton({
-  icon,
-  label,
-  active,
-  color,
-  onPress,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  active: boolean;
-  color: string;
-  onPress: () => void;
-}) {
-  const colors = useColors();
-  return (
-    <TouchableOpacity
-      style={[
-        styles.toggleBtn,
-        {
-          backgroundColor: active ? `${color}15` : colors.card,
-          borderColor: active ? color : colors.border,
-        },
-      ]}
-      onPress={() => {
-        Haptics.selectionAsync();
-        onPress();
-      }}
-      activeOpacity={0.7}
-    >
-      {icon}
-      <Text style={[styles.toggleLabel, { color: active ? color : colors.text }]}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
-// ============================================================================
-// CONFIG ROW (inline input + presets - same as SessionFormSheet)
-// ============================================================================
-function ConfigRow({
-  label,
-  unit,
-  value,
-  onChange,
-  presets,
-  accentColor,
-}: {
-  label: string;
-  unit: string;
-  value: number;
-  onChange: (v: number) => void;
-  presets: number[];
-  accentColor: string;
-}) {
-  const colors = useColors();
-  const [text, setText] = useState(String(value));
-
-  useEffect(() => {
-    setText(String(value));
-  }, [value]);
-
-  const handleBlur = () => {
-    const n = parseInt(text, 10);
-    if (isNaN(n) || n < 1) {
-      onChange(1);
-      setText('1');
-    } else {
-      onChange(n);
-    }
-  };
-
-  return (
-    <View style={[styles.configRow, { borderBottomColor: colors.border }]}>
-      <View style={styles.configLeft}>
-        <Text style={[styles.configLabel, { color: colors.text }]}>{label}</Text>
-        <Text style={[styles.configUnit, { color: colors.textMuted }]}>{unit}</Text>
-      </View>
-      <View style={styles.configRight}>
-        <View style={[styles.inputBox, { borderColor: accentColor }]}>
-          <TextInput
-            style={[styles.inputText, { color: colors.text }]}
-            value={text}
-            onChangeText={setText}
-            onBlur={handleBlur}
-            keyboardType="number-pad"
-            selectTextOnFocus
-          />
-        </View>
-        {presets.slice(0, 4).map((p) => (
-          <TouchableOpacity
-            key={p}
-            style={[
-              styles.presetPill,
-              { backgroundColor: value === p ? accentColor : colors.secondary },
-            ]}
-            onPress={() => {
-              Haptics.selectionAsync();
-              onChange(p);
-            }}
-          >
-            <Text style={[styles.presetText, { color: value === p ? '#fff' : colors.textMuted }]}>
-              {p}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-// ============================================================================
-// TIME ROW (with input + None toggle - same as SessionFormSheet)
-// ============================================================================
-function TimeRow({
-  value,
-  onChange,
-  presets,
-  accentColor,
-}: {
-  value: number | null;
-  onChange: (v: number | null) => void;
-  presets: number[];
-  accentColor: string;
-}) {
-  const colors = useColors();
-  const [text, setText] = useState(value ? String(value) : '');
-  const hasValue = value !== null;
-
-  useEffect(() => {
-    setText(value ? String(value) : '');
-  }, [value]);
-
-  const handleTextChange = (t: string) => {
-    setText(t);
-    if (t === '') {
-      onChange(null);
-    } else {
-      const n = parseInt(t, 10);
-      if (!isNaN(n) && n > 0) onChange(n);
-    }
-  };
-
-  const handleBlur = () => {
-    if (text === '' || text === '0') {
-      onChange(null);
-      setText('');
-    }
-  };
-
-  return (
-    <View style={styles.configRow}>
-      <View style={styles.configLeft}>
-        <Text style={[styles.configLabel, { color: colors.text }]}>Time</Text>
-        <Text style={[styles.configUnit, { color: colors.textMuted }]}>seconds</Text>
-      </View>
-      <View style={styles.configRight}>
-        <TouchableOpacity
-          style={[styles.presetPill, { backgroundColor: !hasValue ? accentColor : colors.secondary }]}
-          onPress={() => {
-            Haptics.selectionAsync();
-            onChange(null);
-            setText('');
-          }}
-        >
-          <Text style={[styles.presetText, { color: !hasValue ? '#fff' : colors.textMuted }]}>
-            None
-          </Text>
-        </TouchableOpacity>
-        <View style={[styles.inputBox, { borderColor: hasValue ? accentColor : colors.border }]}>
-          <TextInput
-            style={[styles.inputText, { color: colors.text }]}
-            value={text}
-            onChangeText={handleTextChange}
-            onBlur={handleBlur}
-            keyboardType="number-pad"
-            placeholder="—"
-            placeholderTextColor={colors.textMuted}
-            selectTextOnFocus
-          />
-        </View>
-        {presets.slice(0, 3).map((p) => (
-          <TouchableOpacity
-            key={p}
-            style={[
-              styles.presetPill,
-              { backgroundColor: value === p ? accentColor : colors.secondary },
-            ]}
-            onPress={() => {
-              Haptics.selectionAsync();
-              onChange(p);
-            }}
-          >
-            <Text style={[styles.presetText, { color: value === p ? '#fff' : colors.textMuted }]}>
-              {p}s
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 export function UnifiedDrillModal({
@@ -291,6 +89,300 @@ export function UnifiedDrillModal({
   drillName,
   saving = false,
 }: UnifiedDrillModalProps) {
+  // Use bottom sheet for quick mode, modal for template/configure
+  if (mode === 'quick') {
+    return (
+      <QuickDrillSheet
+        visible={visible}
+        onClose={onClose}
+        onSave={onSaveQuick}
+        initialData={initialData}
+        saving={saving}
+      />
+    );
+  }
+
+  return (
+    <FullScreenDrillModal
+      visible={visible}
+      onClose={onClose}
+      mode={mode}
+      onSaveTemplate={onSaveTemplate}
+      onConfirmConfig={onConfirmConfig}
+      initialData={initialData}
+      drillName={drillName}
+      saving={saving}
+    />
+  );
+}
+
+// ============================================================================
+// QUICK DRILL SHEET (Modal styled as bottom sheet - simpler, more reliable)
+// ============================================================================
+interface QuickDrillSheetProps {
+  visible: boolean;
+  onClose: () => void;
+  onSave?: (data: { draft: DrillFormData; instance: DrillInstanceConfig }) => void;
+  initialData?: Partial<DrillFormData>;
+  saving?: boolean;
+}
+
+function QuickDrillSheet({
+  visible,
+  onClose,
+  onSave,
+  initialData,
+  saving = false,
+}: QuickDrillSheetProps) {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+
+  // Form state
+  const [name, setName] = useState('');
+  const [drillGoal, setDrillGoal] = useState<DrillGoal>('achievement');
+  const [inputMethod, setInputMethod] = useState<'scan' | 'manual'>('manual');
+  const [distance, setDistance] = useState(25);
+  const [shots, setShots] = useState(5);
+  const [rounds, setRounds] = useState(1);
+  const [timeLimit, setTimeLimit] = useState<number | null>(null);
+
+  const isGrouping = drillGoal === 'grouping';
+
+  // Reset form on open
+  useEffect(() => {
+    if (!visible) return;
+
+    if (initialData) {
+      setName(initialData.name || '');
+      setDrillGoal(initialData.drill_goal || 'achievement');
+      setInputMethod(initialData.input_method || 'manual');
+      setDistance(initialData.distance_m || 25);
+      setShots(initialData.rounds_per_shooter || 5);
+      setRounds(initialData.strings_count || 1);
+      setTimeLimit(initialData.time_limit_seconds || null);
+    } else {
+      setName('');
+      setDrillGoal('achievement');
+      setInputMethod('manual');
+      setDistance(25);
+      setShots(5);
+      setRounds(1);
+      setTimeLimit(null);
+    }
+  }, [visible, initialData]);
+
+  // Grouping forces scan
+  useEffect(() => {
+    if (drillGoal === 'grouping') {
+      setInputMethod('scan');
+    }
+  }, [drillGoal]);
+
+  const canSave = name.trim().length > 0 && distance > 0 && shots > 0 && rounds > 0;
+
+  const handleSave = useCallback(() => {
+    if (!canSave || saving) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Keyboard.dismiss();
+
+    const formData: DrillFormData = {
+      name: name.trim(),
+      drill_goal: drillGoal,
+      target_type: isGrouping ? 'paper' : 'tactical',
+      input_method: isGrouping ? 'scan' : inputMethod,
+      distance_m: distance,
+      rounds_per_shooter: shots,
+      strings_count: rounds,
+      time_limit_seconds: timeLimit,
+    };
+
+    const instanceConfig: DrillInstanceConfig = {
+      distance_m: distance,
+      rounds_per_shooter: shots,
+      strings_count: rounds,
+      time_limit_seconds: timeLimit,
+      input_method: isGrouping ? 'scan' : inputMethod,
+    };
+
+    onSave?.({ draft: formData, instance: instanceConfig });
+    onClose();
+  }, [canSave, saving, name, drillGoal, isGrouping, inputMethod, distance, shots, rounds, timeLimit, onSave, onClose]);
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        {/* Header */}
+        <View style={[styles.header, { paddingTop: 20, borderBottomColor: colors.border }]}>
+          <TouchableOpacity style={styles.headerBtn} onPress={onClose} hitSlop={12}>
+            <X size={22} color={colors.textMuted} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Quick Drill</Text>
+          <TouchableOpacity
+            style={[styles.headerSaveBtn, { opacity: canSave && !saving ? 1 : 0.4 }]}
+            onPress={handleSave}
+            disabled={!canSave || saving}
+            hitSlop={12}
+          >
+            <Text style={[styles.headerSaveText, { color: colors.primary }]}>
+              {saving ? 'Saving...' : 'Save'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          style={styles.body}
+          contentContainerStyle={[styles.bodyContent, { paddingBottom: insets.bottom + 100 }]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Name */}
+          <View style={styles.section}>
+            <SectionLabel>DRILL NAME</SectionLabel>
+            <TextInput
+              style={[
+                styles.textInput,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: name.trim() ? colors.primary : colors.border,
+                  color: colors.text,
+                },
+              ]}
+              placeholder="e.g., Bill Drill, Cold Bore..."
+              placeholderTextColor={colors.textMuted}
+              value={name}
+              onChangeText={setName}
+              autoFocus
+            />
+          </View>
+
+          {/* Objective */}
+          <View style={styles.section}>
+            <SectionLabel>OBJECTIVE</SectionLabel>
+            <View style={styles.optionGroup}>
+              <OptionCard
+                icon={<Crosshair size={18} color={colors.text} strokeWidth={1.5} />}
+                label="Grouping"
+                description="Measure shot dispersion"
+                active={drillGoal === 'grouping'}
+                onPress={() => setDrillGoal('grouping')}
+              />
+              <OptionCard
+                icon={<Trophy size={18} color={colors.text} strokeWidth={1.5} />}
+                label="Achievement"
+                description="Zone-based scoring"
+                active={drillGoal === 'achievement'}
+                onPress={() => setDrillGoal('achievement')}
+              />
+            </View>
+          </View>
+
+          {/* Input Method */}
+          {!isGrouping && (
+            <View style={styles.section}>
+              <SectionLabel>INPUT METHOD</SectionLabel>
+              <View style={styles.optionGroup}>
+                <OptionCard
+                  icon={<Camera size={18} color={colors.text} strokeWidth={1.5} />}
+                  label="Scan"
+                  description="AI target detection"
+                  active={inputMethod === 'scan'}
+                  onPress={() => setInputMethod('scan')}
+                />
+                <OptionCard
+                  icon={<Hand size={18} color={colors.text} strokeWidth={1.5} />}
+                  label="Manual"
+                  description="Mark shots yourself"
+                  active={inputMethod === 'manual'}
+                  onPress={() => setInputMethod('manual')}
+                />
+              </View>
+            </View>
+          )}
+
+          {/* Grouping hint */}
+          {isGrouping && (
+            <HintBox>Grouping drills use camera scanning to measure shot dispersion</HintBox>
+          )}
+
+          {/* Parameters */}
+          <View style={styles.section}>
+            <SectionLabel>PARAMETERS</SectionLabel>
+            <ConfigCard>
+              <ConfigRow
+                label="Distance"
+                unit="meters"
+                value={distance}
+                onChange={setDistance}
+                presets={DISTANCE_PRESETS}
+              />
+              <ConfigRow
+                label="Shots"
+                unit="per round"
+                value={shots}
+                onChange={setShots}
+                presets={SHOTS_PRESETS}
+              />
+              <ConfigRow
+                label="Rounds"
+                unit="repetitions"
+                value={rounds}
+                onChange={setRounds}
+                presets={ROUNDS_PRESETS}
+              />
+              <TimeRow value={timeLimit} onChange={setTimeLimit} presets={TIME_PRESETS} isLast />
+            </ConfigCard>
+          </View>
+        </ScrollView>
+
+        {/* Footer */}
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
+          <TouchableOpacity
+            style={[
+              styles.footerBtn,
+              { backgroundColor: canSave && !saving ? colors.primary : colors.secondary },
+            ]}
+            onPress={handleSave}
+            disabled={!canSave || saving}
+            activeOpacity={0.8}
+          >
+            <Check size={20} color={canSave && !saving ? '#fff' : colors.textMuted} />
+            <Text style={[styles.footerBtnText, { color: canSave && !saving ? '#fff' : colors.textMuted }]}>
+              Add Drill
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+// ============================================================================
+// FULL SCREEN MODAL (Template / Configure modes)
+// ============================================================================
+interface FullScreenDrillModalProps {
+  visible: boolean;
+  onClose: () => void;
+  mode: 'template' | 'configure';
+  onSaveTemplate?: (data: DrillFormData) => void;
+  onConfirmConfig?: (config: DrillInstanceConfig) => void;
+  initialData?: Partial<DrillFormData>;
+  drillName?: string;
+  saving?: boolean;
+}
+
+function FullScreenDrillModal({
+  visible,
+  onClose,
+  mode,
+  onSaveTemplate,
+  onConfirmConfig,
+  initialData,
+  drillName,
+  saving = false,
+}: FullScreenDrillModalProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
 
@@ -300,12 +392,11 @@ export function UnifiedDrillModal({
   const [drillGoal, setDrillGoal] = useState<DrillGoal>('achievement');
   const [targetType, setTargetType] = useState<TargetType>('tactical');
   const [inputMethod, setInputMethod] = useState<'scan' | 'manual'>('manual');
-  const [distance, setDistance] = useState<number>(25);
-  const [shots, setShots] = useState<number>(5);
-  const [strings, setStrings] = useState<number>(1);
+  const [distance, setDistance] = useState(25);
+  const [shots, setShots] = useState(5);
+  const [strings, setStrings] = useState(1);
   const [timeLimit, setTimeLimit] = useState<number | null>(null);
 
-  const accentColor = GOAL_COLORS[drillGoal];
   const isGrouping = drillGoal === 'grouping';
 
   const title = useMemo(() => {
@@ -314,13 +405,11 @@ export function UnifiedDrillModal({
         return initialData?.name ? 'Edit Drill' : 'New Drill';
       case 'configure':
         return drillName || 'Configure Drill';
-      case 'quick':
-        return 'Quick Drill';
     }
   }, [mode, initialData, drillName]);
 
-  const showNameField = mode === 'template' || mode === 'quick';
-  const showGoalSelection = mode === 'template' || mode === 'quick';
+  const showNameField = mode === 'template';
+  const showGoalSelection = mode === 'template';
 
   // Reset on open
   useEffect(() => {
@@ -394,9 +483,6 @@ export function UnifiedDrillModal({
       case 'configure':
         onConfirmConfig?.(instanceConfig);
         break;
-      case 'quick':
-        onSaveQuick?.({ draft: formData, instance: instanceConfig });
-        break;
     }
 
     onClose();
@@ -408,18 +494,11 @@ export function UnifiedDrillModal({
         return initialData?.name ? 'Save Changes' : 'Create Drill';
       case 'configure':
         return 'Add to Training';
-      case 'quick':
-        return 'Add Drill';
     }
   }, [mode, initialData]);
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="fullScreen"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: colors.background }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -436,7 +515,7 @@ export function UnifiedDrillModal({
             disabled={!canSave || saving}
             hitSlop={12}
           >
-            <Text style={[styles.headerSaveText, { color: accentColor }]}>
+            <Text style={[styles.headerSaveText, { color: colors.primary }]}>
               {saving ? 'Saving...' : 'Save'}
             </Text>
           </TouchableOpacity>
@@ -451,13 +530,13 @@ export function UnifiedDrillModal({
           {/* NAME & DESCRIPTION */}
           {showNameField && (
             <View style={styles.section}>
-              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>DRILL NAME</Text>
+              <SectionLabel>DRILL NAME</SectionLabel>
               <TextInput
                 style={[
                   styles.textInput,
                   {
                     backgroundColor: colors.card,
-                    borderColor: name.trim() ? accentColor : colors.border,
+                    borderColor: name.trim() ? colors.primary : colors.border,
                     color: colors.text,
                   },
                 ]}
@@ -465,16 +544,14 @@ export function UnifiedDrillModal({
                 placeholderTextColor={colors.textMuted}
                 value={name}
                 onChangeText={setName}
-                autoFocus={mode === 'template' || mode === 'quick'}
+                autoFocus={mode === 'template'}
               />
             </View>
           )}
 
           {mode === 'template' && (
             <View style={styles.section}>
-              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-                DESCRIPTION (optional)
-              </Text>
+              <SectionLabel>DESCRIPTION (OPTIONAL)</SectionLabel>
               <TextInput
                 style={[
                   styles.textInputMulti,
@@ -493,43 +570,43 @@ export function UnifiedDrillModal({
           {/* OBJECTIVE */}
           {showGoalSelection && (
             <View style={styles.section}>
-              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>OBJECTIVE</Text>
-              <View style={styles.toggleRow}>
-                <ToggleButton
-                  icon={<Crosshair size={18} color={drillGoal === 'grouping' ? GOAL_COLORS.grouping : colors.textMuted} />}
+              <SectionLabel>OBJECTIVE</SectionLabel>
+              <View style={styles.optionGroup}>
+                <OptionCard
+                  icon={<Crosshair size={18} color={colors.text} strokeWidth={1.5} />}
                   label="Grouping"
+                  description="Measure shot dispersion"
                   active={drillGoal === 'grouping'}
-                  color={GOAL_COLORS.grouping}
                   onPress={() => setDrillGoal('grouping')}
                 />
-                <ToggleButton
-                  icon={<Trophy size={18} color={drillGoal === 'achievement' ? GOAL_COLORS.achievement : colors.textMuted} />}
+                <OptionCard
+                  icon={<Trophy size={18} color={colors.text} strokeWidth={1.5} />}
                   label="Achievement"
+                  description="Zone-based scoring"
                   active={drillGoal === 'achievement'}
-                  color={GOAL_COLORS.achievement}
                   onPress={() => setDrillGoal('achievement')}
                 />
               </View>
             </View>
           )}
 
-          {/* ENTRY METHOD */}
+          {/* INPUT METHOD */}
           {!isGrouping && (
             <View style={styles.section}>
-              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>INPUT METHOD</Text>
-              <View style={styles.toggleRow}>
-                <ToggleButton
-                  icon={<Camera size={18} color={inputMethod === 'scan' ? accentColor : colors.textMuted} />}
+              <SectionLabel>INPUT METHOD</SectionLabel>
+              <View style={styles.optionGroup}>
+                <OptionCard
+                  icon={<Camera size={18} color={colors.text} strokeWidth={1.5} />}
                   label="Scan"
+                  description="AI target detection"
                   active={inputMethod === 'scan'}
-                  color={accentColor}
                   onPress={() => setInputMethod('scan')}
                 />
-                <ToggleButton
-                  icon={<Hand size={18} color={inputMethod === 'manual' ? accentColor : colors.textMuted} />}
+                <OptionCard
+                  icon={<Hand size={18} color={colors.text} strokeWidth={1.5} />}
                   label="Manual"
+                  description="Mark shots yourself"
                   active={inputMethod === 'manual'}
-                  color={accentColor}
                   onPress={() => setInputMethod('manual')}
                 />
               </View>
@@ -538,49 +615,36 @@ export function UnifiedDrillModal({
 
           {/* Grouping hint */}
           {isGrouping && showGoalSelection && (
-            <View style={[styles.hintBox, { backgroundColor: `${GOAL_COLORS.grouping}10` }]}>
-              <Camera size={14} color={GOAL_COLORS.grouping} />
-              <Text style={[styles.hintText, { color: GOAL_COLORS.grouping }]}>
-                Grouping drills use camera scanning to measure shot dispersion
-              </Text>
-            </View>
+            <HintBox>Grouping drills use camera scanning to measure shot dispersion</HintBox>
           )}
 
           {/* CONFIGURATION */}
-          <View style={[styles.configSection, { borderTopColor: colors.border }]}>
-            <ConfigRow
-              label="Distance"
-              unit="meters"
-              value={distance}
-              onChange={setDistance}
-              presets={DISTANCE_PRESETS}
-              accentColor={accentColor}
-            />
-
-            <ConfigRow
-              label="Shots"
-              unit="per round"
-              value={shots}
-              onChange={setShots}
-              presets={SHOTS_PRESETS}
-              accentColor={accentColor}
-            />
-
-            <ConfigRow
-              label="Rounds"
-              unit="repetitions"
-              value={strings}
-              onChange={setStrings}
-              presets={ROUNDS_PRESETS}
-              accentColor={accentColor}
-            />
-
-            <TimeRow
-              value={timeLimit}
-              onChange={setTimeLimit}
-              presets={TIME_PRESETS}
-              accentColor={accentColor}
-            />
+          <View style={styles.section}>
+            <SectionLabel>PARAMETERS</SectionLabel>
+            <ConfigCard>
+              <ConfigRow
+                label="Distance"
+                unit="meters"
+                value={distance}
+                onChange={setDistance}
+                presets={DISTANCE_PRESETS}
+              />
+              <ConfigRow
+                label="Shots"
+                unit="per round"
+                value={shots}
+                onChange={setShots}
+                presets={SHOTS_PRESETS}
+              />
+              <ConfigRow
+                label="Rounds"
+                unit="repetitions"
+                value={strings}
+                onChange={setStrings}
+                presets={ROUNDS_PRESETS}
+              />
+              <TimeRow value={timeLimit} onChange={setTimeLimit} presets={TIME_PRESETS} isLast />
+            </ConfigCard>
           </View>
         </ScrollView>
 
@@ -589,7 +653,7 @@ export function UnifiedDrillModal({
           <TouchableOpacity
             style={[
               styles.footerBtn,
-              { backgroundColor: canSave && !saving ? accentColor : colors.secondary },
+              { backgroundColor: canSave && !saving ? colors.primary : colors.secondary },
             ]}
             onPress={handleSave}
             disabled={!canSave || saving}
@@ -614,7 +678,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Header
+  // Shared header styles
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -626,6 +690,18 @@ const styles = StyleSheet.create({
   headerBtn: {
     width: 36,
     height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  headerIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -655,31 +731,8 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 20,
   },
-  sectionLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    marginBottom: 10,
-  },
-
-  // Toggle buttons
-  toggleRow: {
-    flexDirection: 'row',
+  optionGroup: {
     gap: 10,
-  },
-  toggleBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
-  },
-  toggleLabel: {
-    fontSize: 14,
-    fontWeight: '600',
   },
 
   // Text inputs
@@ -698,73 +751,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     minHeight: 70,
     textAlignVertical: 'top',
-  },
-
-  // Hint
-  hintBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  hintText: {
-    fontSize: 12,
-    fontWeight: '500',
-    flex: 1,
-  },
-
-  // Config section
-  configSection: {
-    borderTopWidth: 1,
-    paddingTop: 4,
-  },
-  configRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  configLeft: {
-    flexDirection: 'column',
-    gap: 2,
-  },
-  configLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  configUnit: {
-    fontSize: 11,
-  },
-  configRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  inputBox: {
-    width: 48,
-    height: 34,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    justifyContent: 'center',
-  },
-  inputText: {
-    fontSize: 14,
-    fontWeight: '700',
-    textAlign: 'center',
-    padding: 0,
-  },
-  presetPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  presetText: {
-    fontSize: 12,
-    fontWeight: '600',
   },
 
   // Footer

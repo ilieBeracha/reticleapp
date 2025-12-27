@@ -29,7 +29,7 @@ export function getRoleConfig(role: string | null | undefined): RoleConfig {
  * Gets status configuration for display
  */
 export function getStatusConfig(status: string | null | undefined): StatusConfig {
-  return STATUS_CONFIG[status || 'scheduled'] || STATUS_CONFIG.scheduled;
+  return STATUS_CONFIG[status || 'planned'] || STATUS_CONFIG.planned;
 }
 
 // ============================================================================
@@ -38,6 +38,11 @@ export function getStatusConfig(status: string | null | undefined): StatusConfig
 
 /**
  * Groups trainings by timeframe (live, today, tomorrow, this week, upcoming, past)
+ * 
+ * Status handling:
+ * - 'ongoing' → live (regardless of scheduled date)
+ * - 'finished' or 'cancelled' → past (regardless of scheduled date)
+ * - 'planned' → grouped by scheduled date
  */
 export function groupTrainingsByTimeframe(trainings: TrainingWithDetails[]): GroupedTrainings {
   const now = new Date();
@@ -55,9 +60,20 @@ export function groupTrainingsByTimeframe(trainings: TrainingWithDetails[]): Gro
   trainings.forEach(t => {
     const date = new Date(t.scheduled_at);
 
+    // Live trainings (ongoing status)
     if (t.status === 'ongoing') {
       live.push(t);
-    } else if (date < todayStart) {
+      return;
+    }
+    
+    // Finished or cancelled trainings always go to past
+    if (t.status === 'finished' || t.status === 'cancelled' || t.status === 'completed') {
+      past.push(t);
+      return;
+    }
+
+    // For planned/scheduled trainings, group by date
+    if (date < todayStart) {
       past.push(t);
     } else if (isSameDay(date, todayStart)) {
       today.push(t);

@@ -111,7 +111,7 @@ export default function CreateSessionScreen() {
 
   if (checkingSession) {
     return (
-      <View className="flex-1 justify-center items-center gap-4">
+      <View className="flex-1 justify-center items-center gap-4" style={{ paddingTop: 60 }}>
         <ActivityIndicator color={colors.text} size="large" />
         <Text style={{ color: colors.textMuted }} className="text-sm">
           Checking sessions...
