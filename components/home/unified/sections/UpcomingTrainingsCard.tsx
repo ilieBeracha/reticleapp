@@ -29,18 +29,25 @@ export function UpcomingTrainingsCard({ trainings, drillProgress }: UpcomingTrai
   return (
     <View style={[styles.container, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Upcoming Trainings</Text>
-        <TouchableOpacity onPress={() => router.push('/(protected)/(tabs)/trainings')}>
-          <Text style={[styles.seeAll, { color: colors.primary }]}>See All</Text>
+        <View style={styles.headerLeft}>
+          <Clock size={14} color={colors.primary} />
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Next Up</Text>
+        </View>
+        <TouchableOpacity 
+          style={[styles.scheduleBtn, { backgroundColor: colors.secondary }]}
+          onPress={() => router.push('/(protected)/(tabs)/trainings')}
+        >
+          <Text style={[styles.scheduleBtnText, { color: colors.primary }]}>Full Schedule</Text>
+          <ChevronRight size={14} color={colors.primary} />
         </TouchableOpacity>
       </View>
       
-      {trainings.slice(0, 3).map((training, idx) => (
+      {trainings.slice(0, 2).map((training, idx) => (
         <TrainingRow 
           key={training.id} 
           training={training} 
           drillsCompleted={drillProgress?.get(training.id) ?? 0}
-          isLast={idx === Math.min(trainings.length, 3) - 1}
+          isLast={idx === Math.min(trainings.length, 2) - 1}
           colors={colors}
         />
       ))}
@@ -189,15 +196,28 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   headerTitle: {
     fontSize: 14,
     fontWeight: '600',
   },
-  seeAll: {
+  scheduleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  scheduleBtnText: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   row: {
     flexDirection: 'row',

@@ -44,6 +44,9 @@ export interface UseGarminSessionOptions {
   /** The session ID to associate with watch data */
   sessionId: string;
 
+  /** Whether watch controls this session (user's choice from WatchControlPrompt) */
+  watchControlled: boolean;
+
   /** Drill config to sync to watch */
   drill?: {
     name: string;
@@ -55,7 +58,7 @@ export interface UseGarminSessionOptions {
   /** Callback when session data is received from watch */
   onSessionData?: (data: GarminSessionData) => void;
 
-  /** Auto-sync drill to watch on mount (default: true) */
+  /** Auto-sync drill to watch on mount (default: true, but only if watchControlled) */
   autoSync?: boolean;
 }
 
@@ -80,7 +83,7 @@ export interface UseGarminSessionResult {
 }
 
 export function useGarminSession(options: UseGarminSessionOptions): UseGarminSessionResult {
-  const { sessionId, drill, onSessionData, autoSync = true } = options;
+  const { sessionId, watchControlled, drill, onSessionData, autoSync = true } = options;
 
   const isWatchConnected = useIsGarminConnected();
   const { startSession, endSession, syncDrill: storeSyncDrill, setSessionDataCallback, lastSessionData } =
@@ -94,8 +97,15 @@ export function useGarminSession(options: UseGarminSessionOptions): UseGarminSes
   const callbackRef = useRef(onSessionData);
   callbackRef.current = onSessionData;
 
-  // Register callback for session data
+  // Effective connection: only true if watch connected AND user chose watch control
+  const effectiveWatchActive = isWatchConnected && watchControlled;
+
+  // Register callback for session data (only if watch controlled)
   useEffect(() => {
+    if (!watchControlled) {
+      return; // Don't register callback if watch not controlling
+    }
+
     const handleSessionData = (data: GarminSessionData) => {
       // Only process if it's for our session
       if (data.sessionId && data.sessionId !== sessionId) {
@@ -115,33 +125,39 @@ export function useGarminSession(options: UseGarminSessionOptions): UseGarminSes
     return () => {
       setSessionDataCallback(null);
     };
-  }, [sessionId, setSessionDataCallback]);
+  }, [sessionId, watchControlled, setSessionDataCallback]);
 
-  // Auto-sync drill to watch on mount
+  // Auto-sync drill to watch on mount (only if watchControlled)
   useEffect(() => {
-    if (autoSync && isWatchConnected && drill && !hasSyncedRef.current) {
+    if (autoSync && effectiveWatchActive && drill && !hasSyncedRef.current) {
       hasSyncedRef.current = true;
       storeSyncDrill(drill);
       startSession(sessionId, drill.name);
     }
-  }, [autoSync, isWatchConnected, drill, sessionId, storeSyncDrill, startSession]);
+  }, [autoSync, effectiveWatchActive, drill, sessionId, storeSyncDrill, startSession]);
 
   // Manual sync drill
   const syncDrill = useCallback(() => {
-    if (isWatchConnected && drill) {
+    if (effectiveWatchActive && drill) {
       storeSyncDrill(drill);
     }
-  }, [isWatchConnected, drill, storeSyncDrill]);
+  }, [effectiveWatchActive, drill, storeSyncDrill]);
 
   // Start watch tracking
   const startWatchTracking = useCallback(() => {
-    if (isWatchConnected) {
+    if (effectiveWatchActive) {
       startSession(sessionId, drill?.name);
     }
-  }, [isWatchConnected, sessionId, drill, startSession]);
+  }, [effectiveWatchActive, sessionId, drill, startSession]);
 
   // Request data from watch (ends watch session)
+  // Only does something if watchControlled is true
   const requestWatchData = useCallback(() => {
+    if (!watchControlled) {
+      // If watch not controlling, immediately return - don't wait
+      return;
+    }
+    
     if (isWatchConnected) {
       setIsWaitingForData(true);
       endSession(sessionId);
@@ -151,7 +167,7 @@ export function useGarminSession(options: UseGarminSessionOptions): UseGarminSes
         setIsWaitingForData(false);
       }, 5000);
     }
-  }, [isWatchConnected, sessionId, endSession]);
+  }, [watchControlled, isWatchConnected, sessionId, endSession]);
 
   return {
     isWatchConnected,

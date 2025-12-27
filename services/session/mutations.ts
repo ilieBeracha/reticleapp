@@ -14,6 +14,7 @@ import {
   saveTacticalTargetResult,
 } from './targets';
 import type {
+  BaseSessionConfig,
   CreateSessionParams,
   PaperType,
   SessionStats,
@@ -23,21 +24,50 @@ import type {
 } from './types';
 
 /**
- * Create a new session - DRILL-FIRST architecture
+ * Convert legacy CreateSessionParams to BaseSessionConfig
+ */
+function normalizeToBaseConfig(params: CreateSessionParams | BaseSessionConfig): BaseSessionConfig {
+  // If it's already a BaseSessionConfig (has watch_controlled as required boolean)
+  if ('watch_controlled' in params && typeof params.watch_controlled === 'boolean' && 'drill_config' in params) {
+    return params as BaseSessionConfig;
+  }
+  
+  // Convert from CreateSessionParams
+  const legacy = params as CreateSessionParams;
+  return {
+    team_id: legacy.team_id ?? null,
+    training_id: legacy.training_id ?? null,
+    drill_id: legacy.drill_id ?? null,
+    drill_template_id: legacy.drill_template_id ?? null,
+    drill_config: legacy.custom_drill_config ?? null,
+    session_mode: legacy.session_mode ?? 'solo',
+    watch_controlled: legacy.watch_controlled ?? false,
+  };
+}
+
+/**
+ * Create a new session - UNIFIED ARCHITECTURE
+ *
+ * All session creation flows use BaseSessionConfig:
+ * - Solo quick practice (team_id: null)
+ * - Team training (team_id: X, training_id: Y)
+ * - Drill library pick (drill_template_id: Z)
+ * - Custom drill (drill_config: {...})
  *
  * Every session MUST have a drill configuration:
  * - drill_id: For training drills (from a scheduled training)
  * - drill_template_id: For quick practice (from drill library)
- * - custom_drill_config: For quick/custom drill (inline config)
+ * - drill_config: For quick/custom drill (inline config)
  *
- * The session's configuration is determined by the drill parameters.
- * 
  * SINGLE SESSION ENFORCEMENT:
  * - Before creating a new session, any existing active sessions are auto-ended
  * - Sessions older than 24h are auto-cancelled (no data saved)
  * - This prevents orphaned sessions from accumulating
  */
-export async function createSession(params: CreateSessionParams): Promise<SessionWithDetails> {
+export async function createSession(params: CreateSessionParams | BaseSessionConfig): Promise<SessionWithDetails> {
+  // Normalize to BaseSessionConfig
+  const config = normalizeToBaseConfig(params);
+  
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -85,21 +115,21 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
 
   // DRILL-FIRST: Every session must have a drill source
   const hasCustomConfig =
-    params.custom_drill_config && params.custom_drill_config.distance_m > 0 && params.custom_drill_config.rounds_per_shooter > 0;
+    config.drill_config && config.drill_config.distance_m > 0 && config.drill_config.rounds_per_shooter > 0;
 
-  if (!params.drill_id && !params.drill_template_id && !hasCustomConfig) {
+  if (!config.drill_id && !config.drill_template_id && !hasCustomConfig) {
     throw new Error('A drill configuration is required. Use custom drill, training drill, or drill template.');
   }
 
   // If joining a training, enforce drill-driven sessions and avoid drill mismatches
-  if (params.training_id) {
-    const existingSession = await getMyActiveSessionForTraining(params.training_id);
+  if (config.training_id) {
+    const existingSession = await getMyActiveSessionForTraining(config.training_id);
 
     // If there's already an active session for this training, only allow:
     // - continuing it (no drill specified), or
     // - continuing it if the requested drill matches
     if (existingSession) {
-      if (!params.drill_id || existingSession.drill_id === params.drill_id) {
+      if (!config.drill_id || existingSession.drill_id === config.drill_id) {
         return existingSession;
       }
 
@@ -108,11 +138,11 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
     }
 
     // No active session yet: if this training has drills, require selecting a drill
-    if (!params.drill_id) {
+    if (!config.drill_id) {
       const { count, error: drillsCountError } = await supabase
         .from('training_drills')
         .select('*', { count: 'exact', head: true })
-        .eq('training_id', params.training_id);
+        .eq('training_id', config.training_id);
 
       // If we can't determine drill count, fail safe by allowing session creation.
       // (UI should still route users through drill selection.)
@@ -124,11 +154,11 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
       const { data: drillRow, error: drillError } = await supabase
         .from('training_drills')
         .select('training_id')
-        .eq('id', params.drill_id)
+        .eq('id', config.drill_id)
         .single();
 
       if (drillError) throw drillError;
-      if (drillRow?.training_id !== params.training_id) {
+      if (drillRow?.training_id !== config.training_id) {
         throw new Error('Selected drill does not belong to this training.');
       }
     }
@@ -137,14 +167,14 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
   // Build custom drill config for inline storage
   const customDrillConfig = hasCustomConfig
     ? {
-        name: params.custom_drill_config!.name || 'Quick Practice',
-        drill_goal: params.custom_drill_config!.drill_goal,
-        target_type: params.custom_drill_config!.target_type || 'paper',
-        input_method: params.custom_drill_config!.input_method ?? null, // User's choice
-        distance_m: params.custom_drill_config!.distance_m,
-        rounds_per_shooter: params.custom_drill_config!.rounds_per_shooter,
-        time_limit_seconds: params.custom_drill_config!.time_limit_seconds ?? null,
-        strings_count: params.custom_drill_config!.strings_count ?? null,
+        name: config.drill_config!.name || 'Quick Practice',
+        drill_goal: config.drill_config!.drill_goal,
+        target_type: config.drill_config!.target_type || 'paper',
+        input_method: config.drill_config!.input_method ?? null, // User's choice
+        distance_m: config.drill_config!.distance_m,
+        rounds_per_shooter: config.drill_config!.rounds_per_shooter,
+        time_limit_seconds: config.drill_config!.time_limit_seconds ?? null,
+        strings_count: config.drill_config!.strings_count ?? null,
       }
     : null;
 
@@ -153,12 +183,13 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
     .from('sessions')
     .insert({
       user_id: user.id,
-      team_id: params.team_id ?? null,
-      training_id: params.training_id ?? null,
-      drill_id: params.drill_id ?? null,
-      drill_template_id: params.drill_template_id ?? null,
+      team_id: config.team_id,
+      training_id: config.training_id,
+      drill_id: config.drill_id,
+      drill_template_id: config.drill_template_id,
       custom_drill_config: customDrillConfig,
-      session_mode: params.session_mode ?? 'solo',
+      session_mode: config.session_mode,
+      watch_controlled: config.watch_controlled,
       status: 'active',
       started_at: new Date().toISOString(),
     })
@@ -172,6 +203,7 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
       drill_template_id,
       custom_drill_config,
       session_mode,
+      watch_controlled,
       status,
       started_at,
       ended_at,
@@ -318,6 +350,7 @@ export async function updateSession(
       drill_template_id,
       custom_drill_config,
       session_mode,
+      watch_controlled,
       status,
       started_at,
       ended_at,

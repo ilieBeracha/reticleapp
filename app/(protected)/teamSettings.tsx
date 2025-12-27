@@ -3,18 +3,24 @@
  * 
  * Manage team configuration and preferences - native form sheet
  */
+import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
+import { deleteTeam, removeTeamMember, updateTeam } from '@/services/teamService';
 import { useTeamStore } from '@/store/teamStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -131,15 +137,143 @@ export default function TeamSettingsSheet() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { teamId } = useLocalSearchParams<{ teamId: string }>();
-  const { teams } = useTeamStore();
+  const { teams, loadTeams, setActiveTeam } = useTeamStore();
+  const { user } = useAuth();
 
   const team = teams.find(t => t.id === teamId);
   const isOwner = team?.my_role === 'owner';
   const canManage = isOwner || team?.my_role === 'commander';
 
+  // Edit Team Modal State
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editName, setEditName] = useState(team?.name || '');
+  const [editDescription, setEditDescription] = useState(team?.description || '');
+  const [saving, setSaving] = useState(false);
+
   const showComingSoon = (feature: string) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     Alert.alert('Coming Soon', `${feature} will be available in a future update.`, [{ text: 'OK' }]);
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // LEAVE TEAM
+  // ─────────────────────────────────────────────────────────────────────────
+  const handleLeaveTeam = async () => {
+    if (!teamId || !user) return;
+    
+    if (isOwner) {
+      Alert.alert(
+        'Cannot Leave',
+        'As the owner, you must transfer ownership or delete the team instead.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Leave Team',
+      `Are you sure you want to leave ${team?.name}? You'll need a new invite to rejoin.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              await removeTeamMember(teamId, user.id);
+              await loadTeams();
+              
+              // Switch to another team or clear active
+              const remainingTeams = teams.filter(t => t.id !== teamId);
+              if (remainingTeams.length > 0) {
+                setActiveTeam(remainingTeams[0].id);
+              } else {
+                setActiveTeam(null);
+              }
+              
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              router.back();
+              Alert.alert('Left Team', `You have left ${team?.name}.`);
+            } catch (error) {
+              console.error('Failed to leave team:', error);
+              Alert.alert('Error', 'Failed to leave team. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // DELETE TEAM
+  // ─────────────────────────────────────────────────────────────────────────
+  const handleDeleteTeam = async () => {
+    if (!teamId || !isOwner) return;
+
+    Alert.alert(
+      'Delete Team',
+      `Are you sure you want to permanently delete "${team?.name}"?\n\nThis will remove all members, trainings, and data. This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Forever',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              await deleteTeam(teamId);
+              await loadTeams();
+              
+              // Switch to another team or clear active
+              const remainingTeams = teams.filter(t => t.id !== teamId);
+              if (remainingTeams.length > 0) {
+                setActiveTeam(remainingTeams[0].id);
+              } else {
+                setActiveTeam(null);
+              }
+              
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              router.back();
+              Alert.alert('Team Deleted', `${team?.name} has been permanently deleted.`);
+            } catch (error) {
+              console.error('Failed to delete team:', error);
+              Alert.alert('Error', 'Failed to delete team. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // EDIT TEAM INFO
+  // ─────────────────────────────────────────────────────────────────────────
+  const handleEditTeam = () => {
+    setEditName(team?.name || '');
+    setEditDescription(team?.description || '');
+    setEditModalVisible(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!teamId || !editName.trim()) return;
+    
+    setSaving(true);
+    try {
+      await updateTeam({
+        team_id: teamId,
+        name: editName.trim(),
+        description: editDescription.trim() || undefined,
+      });
+      await loadTeams();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setEditModalVisible(false);
+    } catch (error) {
+      console.error('Failed to update team:', error);
+      Alert.alert('Error', 'Failed to update team. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSettingPress = (item: SettingItem) => {
@@ -150,7 +284,7 @@ export default function TeamSettingsSheet() {
         router.push(`/(protected)/teamMembers?teamId=${teamId}` as any);
         break;
       case 'edit_team':
-        showComingSoon('Edit Team Info');
+        handleEditTeam();
         break;
       case 'notifications':
         showComingSoon('Notification Settings');
@@ -159,7 +293,7 @@ export default function TeamSettingsSheet() {
         showComingSoon('Roles & Permissions');
         break;
       case 'squads':
-        showComingSoon('Squad Management');
+        router.push(`/(protected)/teamSquads?teamId=${teamId}` as any);
         break;
       case 'drill_defaults':
         showComingSoon('Drill Defaults');
@@ -177,36 +311,14 @@ export default function TeamSettingsSheet() {
         showComingSoon('Archive Team');
         break;
       case 'leave':
-        Alert.alert(
-          'Leave Team',
-          `Are you sure you want to leave ${team?.name}?`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { 
-              text: 'Leave', 
-              style: 'destructive', 
-              onPress: () => showComingSoon('Leave Team') 
-            },
-          ]
-        );
+        handleLeaveTeam();
         break;
       case 'delete':
         if (!isOwner) {
           Alert.alert('Permission Denied', 'Only the team owner can delete the team.');
           return;
         }
-        Alert.alert(
-          'Delete Team',
-          `Are you sure you want to permanently delete ${team?.name}? This action cannot be undone.`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { 
-              text: 'Delete', 
-              style: 'destructive', 
-              onPress: () => showComingSoon('Delete Team') 
-            },
-          ]
-        );
+        handleDeleteTeam();
         break;
       default:
         showComingSoon(item.label);
@@ -276,6 +388,71 @@ export default function TeamSettingsSheet() {
           Team ID: {teamId?.slice(0, 8)}...
         </Text>
       </View>
+
+      {/* Edit Team Modal */}
+      <Modal
+        visible={editModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          {/* Modal Header */}
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={() => setEditModalVisible(false)} disabled={saving}>
+              <Text style={[styles.modalCancel, { color: colors.textMuted }]}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Team</Text>
+            <TouchableOpacity onPress={handleSaveEdit} disabled={saving || !editName.trim()}>
+              {saving ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Text style={[
+                  styles.modalSave, 
+                  { color: editName.trim() ? colors.primary : colors.textMuted }
+                ]}>
+                  Save
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Modal Content */}
+          <View style={styles.modalContent}>
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>TEAM NAME</Text>
+              <TextInput
+                style={[styles.textInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+                value={editName}
+                onChangeText={setEditName}
+                placeholder="Enter team name"
+                placeholderTextColor={colors.textMuted}
+                autoFocus
+                editable={!saving}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>DESCRIPTION</Text>
+              <TextInput
+                style={[
+                  styles.textInput, 
+                  styles.textArea,
+                  { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }
+                ]}
+                value={editDescription}
+                onChangeText={setEditDescription}
+                placeholder="Optional team description"
+                placeholderTextColor={colors.textMuted}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+                editable={!saving}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -336,5 +513,32 @@ const styles = StyleSheet.create({
   // Footer
   footer: { alignItems: 'center', paddingVertical: 32 },
   footerText: { fontSize: 11 },
+
+  // Modal
+  modalContainer: { flex: 1 },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+  },
+  modalCancel: { fontSize: 16 },
+  modalTitle: { fontSize: 17, fontWeight: '600' },
+  modalSave: { fontSize: 16, fontWeight: '600' },
+  modalContent: { padding: 20, gap: 20 },
+  inputGroup: { gap: 8 },
+  inputLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5, marginLeft: 4 },
+  textInput: {
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    fontSize: 16,
+  },
+  textArea: {
+    minHeight: 100,
+    paddingTop: 14,
+  },
 });
 

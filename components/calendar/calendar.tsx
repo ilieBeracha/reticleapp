@@ -9,7 +9,8 @@ import { SessionWithDetails } from '@/services/sessionService';
 import { useSessionStore } from '@/store/sessionStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import * as React from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type EventFilter = 'all' | 'training' | 'session' | 'assessment' | 'briefing' | 'qualification';

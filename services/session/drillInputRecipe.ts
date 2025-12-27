@@ -86,8 +86,8 @@ export function getDrillInputRoutes(args: {
   // Commander can explicitly choose input_method during training creation.
   // If set, respect it. Otherwise, fall back to target_type-based inference.
   
-  const maxShots = !isInfiniteShots(drill.rounds_per_shooter) ? String(drill.rounds_per_shooter) : undefined;
-  
+    const maxShots = !isInfiniteShots(drill.rounds_per_shooter) ? String(drill.rounds_per_shooter) : undefined;
+
   // Determine effective input method:
   // 1. Explicit input_method from commander takes priority
   // 2. Grouping drills always use scan (regardless of input_method)
@@ -106,21 +106,21 @@ export function getDrillInputRoutes(args: {
   }
 
   // Grouping: scan only (no manual option)
-  if (drill.drill_goal === 'grouping') {
-    return {
-      primary: {
-        kind: 'scan_paper',
-        pathname: '/(protected)/scanTarget',
-        params: {
-          sessionId,
-          distance: String(defaultDistance),
-          ...(maxShots ? { maxShots } : {}),
-          drillGoal: 'grouping',
-          locked: '1',  // Lock to drill values
+    if (drill.drill_goal === 'grouping') {
+      return {
+        primary: {
+          kind: 'scan_paper',
+          pathname: '/(protected)/scanTarget',
+          params: {
+            sessionId,
+            distance: String(defaultDistance),
+            ...(maxShots ? { maxShots } : {}),
+            drillGoal: 'grouping',
+            locked: '1',  // Lock to drill values
+          },
         },
-      },
-    };
-  }
+      };
+    }
 
   // Achievement drills - respect commander's input_method choice
   // When commander explicitly chose input_method, only show that option (no secondary)
@@ -143,16 +143,16 @@ export function getDrillInputRoutes(args: {
       },
       // Only offer manual as secondary if commander didn't explicitly choose scan
       ...(!hasExplicitInputMethod && drill.target_type === 'paper' ? {
-        secondary: {
+      secondary: {
           kind: 'manual_paper_achievement' as const,
           pathname: '/(protected)/addTarget' as const,
-          params: {
-            sessionId,
+        params: {
+          sessionId,
             defaultTargetType: 'achievement' as const,
-            defaultDistance: String(defaultDistance),
+          defaultDistance: String(defaultDistance),
             defaultInputMethod: 'manual' as const,
             startInManual: '1' as const,
-            ...(maxShots ? { maxShots } : {}),
+          ...(maxShots ? { maxShots } : {}),
             locked: '1' as const,
           },
         },
@@ -163,15 +163,15 @@ export function getDrillInputRoutes(args: {
   // Manual mode: direct hit/miss entry
   if (drill.target_type === 'tactical') {
     // Tactical manual: go directly to tactical input
-    const shotsAreFlexible = isInfiniteShots(drill.rounds_per_shooter);
-    return {
-      primary: {
-        kind: 'manual_tactical',
-        pathname: '/(protected)/tacticalTarget',
-        params: {
-          sessionId,
-          distance: String(defaultDistance),
-          ...(shotsAreFlexible ? {} : nextBullets ? { bullets: String(nextBullets) } : {}),
+  const shotsAreFlexible = isInfiniteShots(drill.rounds_per_shooter);
+  return {
+    primary: {
+      kind: 'manual_tactical',
+      pathname: '/(protected)/tacticalTarget',
+      params: {
+        sessionId,
+        distance: String(defaultDistance),
+        ...(shotsAreFlexible ? {} : nextBullets ? { bullets: String(nextBullets) } : {}),
           locked: '1',
         },
       },

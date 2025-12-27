@@ -51,8 +51,7 @@ import {
   addDays,
   format,
   isSameDay,
-  isToday,
-  startOfWeek,
+  startOfWeek
 } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -60,7 +59,6 @@ import {
   Activity,
   BookOpen,
   Calendar,
-  ChevronLeft,
   ChevronRight,
   Crown,
   Plus,
@@ -71,9 +69,10 @@ import {
   Users,
   Zap,
 } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -108,154 +107,283 @@ function getRoleConfig(role: string | null | undefined) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WEEK CALENDAR
+// TRAINING STATUS CONFIG
 // ─────────────────────────────────────────────────────────────────────────────
 
-function WeekCalendar({
-  selectedDate,
-  onSelectDate,
-  trainings,
-  colors,
-}: {
-  selectedDate: Date;
-  onSelectDate: (date: Date) => void;
-  trainings: TrainingWithDetails[];
-  colors: ReturnType<typeof useColors>;
-}) {
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
+const STATUS_CONFIG: Record<string, { color: string; label: string; bg: string }> = {
+  ongoing: { color: '#F59E0B', label: 'Live', bg: '#F59E0B20' },
+  scheduled: { color: '#3B82F6', label: 'Scheduled', bg: '#3B82F620' },
+  completed: { color: '#10B981', label: 'Completed', bg: '#10B98120' },
+  cancelled: { color: '#EF4444', label: 'Cancelled', bg: '#EF444420' },
+};
 
-  const weekDays = useMemo(() => {
-    return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  }, [weekStart]);
+function getStatusConfig(status: string | null | undefined) {
+  return STATUS_CONFIG[status || 'scheduled'] || STATUS_CONFIG.scheduled;
+}
 
-  const getTrainingsForDate = (date: Date) => {
-    return trainings.filter(t => isSameDay(new Date(t.scheduled_at), date));
-  };
+// ─────────────────────────────────────────────────────────────────────────────
+// PULSE DOT - Animated live indicator
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const goToPrevWeek = () => {
-    Haptics.selectionAsync();
-    setWeekStart(prev => addDays(prev, -7));
-  };
+function PulseDot({ color }: { color: string }) {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  const goToNextWeek = () => {
-    Haptics.selectionAsync();
-    setWeekStart(prev => addDays(prev, 7));
-  };
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 0.4,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [pulseAnim]);
 
   return (
-    <View style={[styles.weekCalendar, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      {/* Month Header */}
-      <View style={styles.weekHeader}>
-        <TouchableOpacity onPress={goToPrevWeek} style={styles.weekNavBtn}>
-          <ChevronLeft size={20} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.weekMonth, { color: colors.text }]}>
-          {format(weekStart, 'MMMM yyyy')}
-        </Text>
-        <TouchableOpacity onPress={goToNextWeek} style={styles.weekNavBtn}>
-          <ChevronRight size={20} color={colors.text} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Days Row */}
-      <View style={styles.weekDays}>
-        {weekDays.map((day) => {
-          const dayTrainings = getTrainingsForDate(day);
-          const hasTrainings = dayTrainings.length > 0;
-          const hasLive = dayTrainings.some(t => t.status === 'ongoing');
-          const isSelected = isSameDay(day, selectedDate);
-          const isTodayDate = isToday(day);
-
-          return (
-            <TouchableOpacity
-              key={day.toISOString()}
-              style={[
-                styles.dayCell,
-                isSelected && { backgroundColor: colors.primary },
-                isTodayDate && !isSelected && { backgroundColor: colors.primary + '20' },
-              ]}
-              onPress={() => {
-                Haptics.selectionAsync();
-                onSelectDate(day);
-              }}
-            >
-              <Text style={[
-                styles.dayName,
-                { color: isSelected ? '#fff' : colors.textMuted },
-              ]}>
-                {format(day, 'EEE')}
-              </Text>
-              <Text style={[
-                styles.dayNumber,
-                { color: isSelected ? '#fff' : colors.text },
-                isTodayDate && !isSelected && { color: colors.primary },
-              ]}>
-                {format(day, 'd')}
-              </Text>
-              {/* Event Dots */}
-              {hasTrainings && (
-                <View style={styles.dotRow}>
-                  {hasLive ? (
-                    <View style={[styles.dot, { backgroundColor: '#10B981' }]} />
-                  ) : (
-                    <View style={[styles.dot, { backgroundColor: isSelected ? '#fff' : colors.primary }]} />
-                  )}
-                </View>
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+    <View style={styles.pulseDotContainer}>
+      <Animated.View
+        style={[
+          styles.pulseDotOuter,
+          { backgroundColor: color, opacity: pulseAnim },
+        ]}
+      />
+      <View style={[styles.pulseDotInner, { backgroundColor: color }]} />
     </View>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// EVENT CARD
+// SCHEDULE VIEW - Agenda style with status
 // ─────────────────────────────────────────────────────────────────────────────
 
-function EventCard({
-  training,
+function ScheduleView({
+  trainings,
   colors,
   onPress,
+  onCreateNew,
+  canSchedule,
 }: {
-  training: TrainingWithDetails;
+  trainings: TrainingWithDetails[];
   colors: ReturnType<typeof useColors>;
-  onPress: () => void;
+  onPress: (training: TrainingWithDetails) => void;
+  onCreateNew: () => void;
+  canSchedule: boolean;
 }) {
-  const isLive = training.status === 'ongoing';
-  const time = format(new Date(training.scheduled_at), 'HH:mm');
+  // Group trainings by timeframe
+  const grouped = useMemo(() => {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrowStart = addDays(todayStart, 1);
+    const weekEnd = addDays(todayStart, 7);
+
+    const live: TrainingWithDetails[] = [];
+    const today: TrainingWithDetails[] = [];
+    const tomorrow: TrainingWithDetails[] = [];
+    const thisWeek: TrainingWithDetails[] = [];
+    const upcoming: TrainingWithDetails[] = [];
+    const past: TrainingWithDetails[] = [];
+
+    trainings.forEach(t => {
+      const date = new Date(t.scheduled_at);
+      
+      if (t.status === 'ongoing') {
+        live.push(t);
+      } else if (date < todayStart) {
+        past.push(t);
+      } else if (isSameDay(date, todayStart)) {
+        today.push(t);
+      } else if (isSameDay(date, tomorrowStart)) {
+        tomorrow.push(t);
+      } else if (date < weekEnd) {
+        thisWeek.push(t);
+      } else {
+        upcoming.push(t);
+      }
+    });
+
+    // Sort each group by time
+    const sortByTime = (a: TrainingWithDetails, b: TrainingWithDetails) => 
+      new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime();
+
+    return {
+      live: live.sort(sortByTime),
+      today: today.sort(sortByTime),
+      tomorrow: tomorrow.sort(sortByTime),
+      thisWeek: thisWeek.sort(sortByTime),
+      upcoming: upcoming.sort(sortByTime),
+      past: past.sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime()),
+    };
+  }, [trainings]);
+
+  const hasAny = trainings.length > 0;
+
+  // Quick stats
+  const stats = useMemo(() => ({
+    live: grouped.live.length,
+    today: grouped.today.length,
+    thisWeek: grouped.today.length + grouped.tomorrow.length + grouped.thisWeek.length,
+  }), [grouped]);
+
+  const renderGroup = (title: string, items: TrainingWithDetails[], showDate = false, isLive = false) => {
+    if (items.length === 0) return null;
+    
+    return (
+      <View style={styles.scheduleGroup}>
+        <View style={styles.scheduleGroupHeader}>
+          {isLive && <PulseDot color="#F59E0B" />}
+          <Text style={[
+            styles.scheduleGroupTitle, 
+            { color: isLive ? '#F59E0B' : colors.textMuted }
+          ]}>
+            {title}
+          </Text>
+        </View>
+        {items.map(training => {
+          const statusConfig = getStatusConfig(training.status);
+          const date = new Date(training.scheduled_at);
+          const isLiveItem = training.status === 'ongoing';
+          
+          return (
+            <TouchableOpacity
+              key={training.id}
+              style={[
+                styles.scheduleItem, 
+                { backgroundColor: colors.card, borderColor: colors.border },
+                isLiveItem && styles.scheduleItemLive,
+              ]}
+              onPress={() => onPress(training)}
+              activeOpacity={0.7}
+            >
+              {/* Status indicator */}
+              <View style={[styles.scheduleStatus, { backgroundColor: statusConfig.bg }]}>
+                {isLiveItem && <PulseDot color={statusConfig.color} />}
+                <Text style={[styles.scheduleStatusText, { color: statusConfig.color }]}>
+                  {statusConfig.label}
+                </Text>
+              </View>
+
+              {/* Content */}
+              <View style={styles.scheduleContent}>
+                <Text style={[styles.scheduleTitle, { color: colors.text }]} numberOfLines={1}>
+                  {training.title}
+                </Text>
+                <View style={styles.scheduleMeta}>
+                  <Text style={[styles.scheduleTime, { color: colors.textMuted }]}>
+                    {showDate ? format(date, 'EEE, MMM d') + ' · ' : ''}{format(date, 'HH:mm')}
+                  </Text>
+                  {training.drill_count ? (
+                    <>
+                      <View style={[styles.scheduleMetaDot, { backgroundColor: colors.border }]} />
+                      <Text style={[styles.scheduleDrills, { color: colors.textMuted }]}>
+                        {training.drill_count} drill{training.drill_count !== 1 ? 's' : ''}
+                      </Text>
+                    </>
+                  ) : null}
+                </View>
+              </View>
+
+              {/* Arrow */}
+              <ChevronRight size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    );
+  };
 
   return (
-    <TouchableOpacity
-      style={[
-        styles.eventCard,
-        { backgroundColor: colors.card, borderColor: colors.border },
-        isLive && { borderLeftColor: '#F59E0B', borderLeftWidth: 3 },
-      ]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <View style={styles.eventTime}>
-        <Text style={[styles.eventTimeText, { color: isLive ? '#F59E0B' : colors.textMuted }]}>
-          {time}
-        </Text>
-        {isLive && (
-          <View style={styles.liveIndicator}>
-            <View style={[styles.livePulse, { backgroundColor: '#F59E0B' }]} />
-          </View>
+    <View style={styles.scheduleContainer}>
+      {/* Header with Quick Stats */}
+      <View style={styles.scheduleHeader}>
+        <View>
+          <Text style={[styles.scheduleHeaderTitle, { color: colors.text }]}>Schedule</Text>
+          {hasAny && (
+            <View style={styles.quickStats}>
+              {stats.live > 0 && (
+                <View style={styles.quickStatItem}>
+                  <PulseDot color="#F59E0B" />
+                  <Text style={[styles.quickStatText, { color: '#F59E0B' }]}>
+                    {stats.live} Live
+                  </Text>
+                </View>
+              )}
+              {stats.today > 0 && (
+                <View style={styles.quickStatItem}>
+                  <View style={[styles.quickStatDot, { backgroundColor: colors.primary }]} />
+                  <Text style={[styles.quickStatText, { color: colors.textMuted }]}>
+                    {stats.today} Today
+                  </Text>
+                </View>
+              )}
+              {stats.thisWeek > 0 && (
+                <View style={styles.quickStatItem}>
+                  <View style={[styles.quickStatDot, { backgroundColor: colors.border }]} />
+                  <Text style={[styles.quickStatText, { color: colors.textMuted }]}>
+                    {stats.thisWeek} This Week
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
+        {canSchedule && (
+          <TouchableOpacity
+            style={[styles.scheduleNewBtn, { backgroundColor: colors.primary }]}
+            onPress={onCreateNew}
+          >
+            <Plus size={16} color="#fff" />
+            <Text style={styles.scheduleNewBtnText}>New</Text>
+          </TouchableOpacity>
         )}
       </View>
-      <View style={styles.eventContent}>
-        <Text style={[styles.eventTitle, { color: colors.text }]} numberOfLines={1}>
-          {training.title}
-        </Text>
-        <Text style={[styles.eventMeta, { color: colors.textMuted }]}>
-          {training.drill_count ? `${training.drill_count} drills` : 'No drills'}
-        </Text>
-      </View>
-      <ChevronRight size={16} color={colors.textMuted} />
-    </TouchableOpacity>
+
+      {!hasAny ? (
+        <View style={[styles.scheduleEmpty, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Calendar size={32} color={colors.textMuted} />
+          <Text style={[styles.scheduleEmptyTitle, { color: colors.text }]}>No Trainings</Text>
+          <Text style={[styles.scheduleEmptyText, { color: colors.textMuted }]}>
+            {canSchedule ? 'Schedule your first training session' : 'No sessions scheduled yet'}
+          </Text>
+          {canSchedule && (
+            <TouchableOpacity
+              style={[styles.scheduleEmptyBtn, { backgroundColor: colors.primary }]}
+              onPress={onCreateNew}
+            >
+              <Plus size={16} color="#fff" />
+              <Text style={styles.scheduleEmptyBtnText}>Create Training</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      ) : (
+        <>
+          {/* Live first - with pulse animation */}
+          {grouped.live.length > 0 && renderGroup('Live Now', grouped.live, false, true)}
+          
+          {/* Today */}
+          {renderGroup('Today', grouped.today)}
+          
+          {/* Tomorrow */}
+          {renderGroup('Tomorrow', grouped.tomorrow)}
+          
+          {/* This Week */}
+          {renderGroup('This Week', grouped.thisWeek, true)}
+          
+          {/* Upcoming */}
+          {renderGroup('Upcoming', grouped.upcoming, true)}
+          
+          {/* Past (collapsed or limited) */}
+          {grouped.past.length > 0 && renderGroup('Past', grouped.past.slice(0, 3), true)}
+        </>
+      )}
+    </View>
   );
 }
 
@@ -276,7 +404,6 @@ export default function TeamScreen() {
   // Local state
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<InternalTab>('calendar');
-  const [selectedDate, setSelectedDate] = useState(new Date());
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [members, setMembers] = useState<TeamMemberWithProfile[]>([]);
 
@@ -337,13 +464,6 @@ export default function TeamScreen() {
     if (!activeTeamId) return [];
     return teamTrainings.filter(t => t.team_id === activeTeamId);
   }, [teamTrainings, activeTeamId]);
-
-  // Trainings for selected date
-  const selectedDateTrainings = useMemo(() => {
-    return activeTeamTrainings
-      .filter(t => isSameDay(new Date(t.scheduled_at), selectedDate))
-      .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
-  }, [activeTeamTrainings, selectedDate]);
 
   // Live training detection
   const liveTraining = useMemo(() => {
@@ -545,55 +665,16 @@ export default function TeamScreen() {
         ) : (
         <>
         {/* ═══════════════════════════════════════════════════════════════════
-            CALENDAR TAB
+            CALENDAR TAB - Now uses Schedule View
         ═══════════════════════════════════════════════════════════════════ */}
         {activeTab === 'calendar' && (
-          <>
-            {/* Week Calendar */}
-            <WeekCalendar
-              selectedDate={selectedDate}
-              onSelectDate={setSelectedDate}
-              trainings={activeTeamTrainings}
-              colors={colors}
-            />
-
-            {/* Selected Date Label */}
-            <View style={styles.selectedDateHeader}>
-              <Text style={[styles.selectedDateText, { color: colors.text }]}>
-                {isToday(selectedDate) ? 'Today' : format(selectedDate, 'EEEE, MMM d')}
-              </Text>
-              {canSchedule && (
-                <TouchableOpacity
-                  style={[styles.addEventBtn, { backgroundColor: colors.primary }]}
-                  onPress={handleCreateTraining}
-                >
-                  <Plus size={14} color="#fff" />
-                  <Text style={styles.addEventBtnText}>Add</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* Events for Selected Date */}
-            {selectedDateTrainings.length > 0 ? (
-              <View style={styles.eventsList}>
-                {selectedDateTrainings.map(training => (
-                  <EventCard
-                    key={training.id}
-                    training={training}
-                    colors={colors}
-                    onPress={() => handleTrainingPress(training)}
-                  />
-                ))}
-              </View>
-            ) : (
-              <View style={[styles.noEvents, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Calendar size={24} color={colors.textMuted} />
-                <Text style={[styles.noEventsText, { color: colors.textMuted }]}>
-                  No sessions scheduled
-                </Text>
-              </View>
-            )}
-          </>
+          <ScheduleView
+            trainings={activeTeamTrainings}
+            colors={colors}
+            onPress={handleTrainingPress}
+            onCreateNew={handleCreateTraining}
+            canSchedule={canSchedule}
+          />
         )}
 
         {/* ═══════════════════════════════════════════════════════════════════
@@ -967,132 +1048,176 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Week Calendar
-  weekCalendar: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 12,
-  },
-  weekHeader: {
-    flexDirection: 'row',
+  // Pulse Dot
+  pulseDotContainer: {
+    width: 10,
+    height: 10,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
+    justifyContent: 'center',
   },
-  weekNavBtn: {
-    padding: 4,
+  pulseDotOuter: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
-  weekMonth: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  weekDays: {
-    flexDirection: 'row',
-  },
-  dayCell: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  dayName: {
-    fontSize: 11,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  dayNumber: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  dotRow: {
-    flexDirection: 'row',
-    gap: 3,
-    marginTop: 4,
+  pulseDotInner: {
+    width: 6,
     height: 6,
-  },
-  dot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
+    borderRadius: 3,
   },
 
-  // Selected Date Header
-  selectedDateHeader: {
+  // Schedule View
+  scheduleContainer: {},
+  scheduleHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  scheduleHeaderTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  quickStats: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 20,
-    marginBottom: 12,
-    paddingHorizontal: 4,
+    gap: 12,
+    marginTop: 6,
   },
-  selectedDateText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  addEventBtn: {
+  quickStatItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
   },
-  addEventBtnText: {
+  quickStatDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  quickStatText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  scheduleNewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  scheduleNewBtnText: {
     fontSize: 13,
     fontWeight: '600',
     color: '#fff',
   },
 
-  // Events List
-  eventsList: {
-    gap: 10,
+  // Schedule groups
+  scheduleGroup: {
+    marginBottom: 20,
   },
-  eventCard: {
+  scheduleGroupHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 14,
+    gap: 6,
+    marginBottom: 10,
+    paddingHorizontal: 2,
+  },
+  scheduleGroupTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+
+  // Schedule item
+  scheduleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
     borderWidth: 1,
+    marginBottom: 8,
     gap: 12,
   },
-  eventTime: {
-    alignItems: 'center',
-    minWidth: 44,
+  scheduleItemLive: {
+    borderColor: '#F59E0B40',
+    borderWidth: 1.5,
   },
-  eventTimeText: {
-    fontSize: 14,
+  scheduleStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    minWidth: 70,
+  },
+  scheduleLiveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  scheduleStatusText: {
+    fontSize: 10,
     fontWeight: '700',
   },
-  liveIndicator: {
-    marginTop: 4,
-  },
-  livePulse: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  eventContent: {
+  scheduleContent: {
     flex: 1,
+    gap: 2,
   },
-  eventTitle: {
+  scheduleTitle: {
     fontSize: 15,
     fontWeight: '600',
   },
-  eventMeta: {
+  scheduleMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  scheduleTime: {
     fontSize: 12,
-    marginTop: 2,
+  },
+  scheduleMetaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+  },
+  scheduleDrills: {
+    fontSize: 12,
   },
 
-  // No Events
-  noEvents: {
+  // Empty state
+  scheduleEmpty: {
     alignItems: 'center',
-    padding: 24,
+    padding: 32,
     borderRadius: 14,
     borderWidth: 1,
-    gap: 8,
+    gap: 10,
   },
-  noEventsText: {
+  scheduleEmptyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  scheduleEmptyText: {
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  scheduleEmptyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  scheduleEmptyBtnText: {
     fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
   },
 
   // Section

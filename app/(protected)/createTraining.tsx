@@ -7,20 +7,18 @@
  * - Each drill can have instance-specific configuration (distance, shots, time)
  * - Quick Drill allows commanders to create a minimal drill inline (saved to library)
  */
-import { DrillInstanceModal } from '@/components/drills/DrillInstanceModal';
-import { QuickDrillModal, type QuickDrillPayload } from '@/components/drills/QuickDrillModal';
+import { UnifiedDrillModal, type DrillFormData as UnifiedDrillFormData } from '@/components/drills/UnifiedDrillModal';
 import { useColors } from '@/hooks/ui/useColors';
 import { createDrill, drillToTrainingInput, getTeamDrills } from '@/services/drillService';
 import { createTraining } from '@/services/trainingService';
 import { useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
 import type { CreateTrainingDrillInput, Drill, DrillInstanceConfig } from '@/types/workspace';
-import { formatMaxShots } from '@/utils/drillShots';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Plus, Target, Trash2 } from 'lucide-react-native';
+import { Target, Trash2 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -38,68 +36,288 @@ import {
 import Animated, { FadeInRight, Layout } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-interface DrillFormData extends CreateTrainingDrillInput {
+/** Drill item in the training form (extends the training input with local ID) */
+interface TrainingDrillItem extends CreateTrainingDrillInput {
   id: string;
 }
 
 // ============================================================================
-// DRILL ITEM (in list)
+// DRILL LIBRARY PICKER - Tab-based professional design
 // ============================================================================
-function DrillItem({
-  drill,
-  index,
+function DrillLibraryPicker({
+  drills,
   colors,
-  onRemove,
+  onSelect,
+  onCreateNew,
+  hasTeam,
 }: {
-  drill: DrillFormData;
-  index: number;
+  drills: Drill[];
   colors: ReturnType<typeof useColors>;
-  onRemove: () => void;
+  onSelect: (drill: Drill) => void;
+  onCreateNew?: () => void;
+  hasTeam: boolean;
 }) {
-  const isGrouping = drill.drill_goal === 'grouping';
-  const goalColor = isGrouping ? '#10B981' : '#93C5FD';
+  const [activeTab, setActiveTab] = useState<'all' | 'achievement' | 'grouping'>('all');
 
-  return (
-    <Animated.View
-      entering={FadeInRight.delay(index * 50).springify()}
-      layout={Layout.springify()}
-      style={[styles.drillItem, { backgroundColor: colors.card, borderColor: colors.border }]}
-    >
-      <View style={[styles.drillItemIcon, { backgroundColor: `${goalColor}10` }]}>
-        <Target size={18} color={goalColor} />
-      </View>
+  const filteredDrills = drills.filter(d => {
+    if (activeTab === 'all') return true;
+    return d.drill_goal === activeTab;
+  });
 
-      <View style={styles.drillItemContent}>
-        <View style={styles.drillItemHeader}>
-          <Text style={[styles.drillItemName, { color: colors.text }]}>{drill.name}</Text>
-          <View style={[styles.drillItemBadge, { backgroundColor: `${goalColor}15` }]}>
-            <Text style={[styles.drillItemBadgeText, { color: goalColor }]}>
-              {isGrouping ? 'Grouping' : 'Achievement'}
-            </Text>
-          </View>
-        </View>
-        <Text style={[styles.drillItemMeta, { color: colors.textMuted }]}>
-          {drill.distance_m}m •{' '}
-          {drill.input_method === 'scan' || (drill.drill_goal === 'grouping')
-            ? `📷 Scan`
-            : `✋ Manual`}
-          {' • '}
-          {drill.rounds_per_shooter} shots
-          {(drill.strings_count && drill.strings_count > 1) 
-            ? ` × ${drill.strings_count} rounds = ${drill.rounds_per_shooter * drill.strings_count} total`
-            : ''}
-          {drill.time_limit_seconds ? ` • ${drill.time_limit_seconds}s limit` : ''}
+  const achievementCount = drills.filter(d => d.drill_goal === 'achievement').length;
+  const groupingCount = drills.filter(d => d.drill_goal === 'grouping').length;
+
+  if (!hasTeam) {
+    return (
+      <View style={[styles.libSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.libEmptyText, { color: colors.textMuted }]}>
+          Select a team to view drills
         </Text>
       </View>
+    );
+  }
 
-      <TouchableOpacity
-        style={[styles.drillItemRemove, { backgroundColor: colors.secondary }]}
-        onPress={onRemove}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <Trash2 size={16} color={colors.destructive} />
-      </TouchableOpacity>
-    </Animated.View>
+  return (
+    <View style={[styles.libSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      {/* Header */}
+      <View style={styles.libHeader}>
+        <Text style={[styles.libTitle, { color: colors.text }]}>Drill Library</Text>
+        {onCreateNew && (
+          <TouchableOpacity onPress={onCreateNew} hitSlop={8}>
+            <Text style={[styles.libNewLink, { color: colors.primary }]}>+ New</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Tabs */}
+      <View style={[styles.libTabs, { backgroundColor: colors.secondary }]}>
+        <TouchableOpacity
+          style={[styles.libTab, activeTab === 'all' && { backgroundColor: colors.card }]}
+          onPress={() => setActiveTab('all')}
+        >
+          <Text style={[styles.libTabText, { color: activeTab === 'all' ? colors.text : colors.textMuted }]}>
+            All ({drills.length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.libTab, activeTab === 'achievement' && { backgroundColor: colors.card }]}
+          onPress={() => setActiveTab('achievement')}
+        >
+          <Text style={[styles.libTabText, { color: activeTab === 'achievement' ? '#3B82F6' : colors.textMuted }]}>
+            Achievement ({achievementCount})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.libTab, activeTab === 'grouping' && { backgroundColor: colors.card }]}
+          onPress={() => setActiveTab('grouping')}
+        >
+          <Text style={[styles.libTabText, { color: activeTab === 'grouping' ? '#10B981' : colors.textMuted }]}>
+            Grouping ({groupingCount})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* List */}
+      {filteredDrills.length > 0 ? (
+        <View style={styles.libList}>
+          {filteredDrills.map((drill) => {
+            const isGrouping = drill.drill_goal === 'grouping';
+            const goalColor = isGrouping ? '#10B981' : '#3B82F6';
+
+            return (
+              <TouchableOpacity
+                key={drill.id}
+                style={[styles.libItem, { borderBottomColor: colors.border }]}
+                onPress={() => onSelect(drill)}
+                activeOpacity={0.6}
+              >
+                <View style={[styles.libItemIndicator, { backgroundColor: goalColor }]} />
+                <View style={styles.libItemContent}>
+                  <Text style={[styles.libItemName, { color: colors.text }]} numberOfLines={1}>
+                    {drill.icon ? `${drill.icon} ` : ''}{drill.name}
+                  </Text>
+                  <Text style={[styles.libItemMeta, { color: colors.textMuted }]}>
+                    {drill.distance_m}m · {drill.rounds_per_shooter} shots
+                    {drill.time_limit_seconds ? ` · ${drill.time_limit_seconds}s` : ''}
+                  </Text>
+                </View>
+                <Ionicons name="add-circle-outline" size={22} color={goalColor} />
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ) : (
+        <View style={styles.libEmpty}>
+          <Text style={[styles.libEmptyText, { color: colors.textMuted }]}>
+            {drills.length === 0 ? 'No drills yet' : 'No drills in this category'}
+          </Text>
+          {drills.length === 0 && onCreateNew && (
+            <TouchableOpacity
+              style={[styles.libEmptyBtn, { borderColor: colors.primary }]}
+              onPress={onCreateNew}
+            >
+              <Text style={[styles.libEmptyBtnText, { color: colors.primary }]}>Create Drill</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ============================================================================
+// DRILL TIMELINE - Visual progression rail
+// ============================================================================
+function DrillTimeline({
+  drills,
+  colors,
+  onRemove,
+  onMove,
+}: {
+  drills: TrainingDrillItem[];
+  colors: ReturnType<typeof useColors>;
+  onRemove: (id: string) => void;
+  onMove: (index: number, direction: 'up' | 'down') => void;
+}) {
+  const totalShots = drills.reduce((sum, d) => sum + d.rounds_per_shooter * (d.strings_count || 1), 0);
+  const totalTime = drills.reduce((sum, d) => sum + (d.time_limit_seconds || 0), 0);
+
+  return (
+    <View style={styles.timeline}>
+      {/* Summary bar */}
+      <View style={[styles.timelineSummary, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.timelineSummaryStats}>
+          <View style={styles.timelineStat}>
+            <Text style={[styles.timelineStatValue, { color: colors.text }]}>{drills.length}</Text>
+            <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>drills</Text>
+          </View>
+          <View style={[styles.timelineStatDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.timelineStat}>
+            <Text style={[styles.timelineStatValue, { color: colors.text }]}>{totalShots}</Text>
+            <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>shots</Text>
+          </View>
+          {totalTime > 0 && (
+            <>
+              <View style={[styles.timelineStatDivider, { backgroundColor: colors.border }]} />
+              <View style={styles.timelineStat}>
+                <Text style={[styles.timelineStatValue, { color: colors.text }]}>
+                  {totalTime >= 60 ? `${Math.floor(totalTime / 60)}m` : `${totalTime}s`}
+                </Text>
+                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>limit</Text>
+              </View>
+            </>
+          )}
+        </View>
+      </View>
+
+      {/* Timeline rail with nodes */}
+      <View style={styles.timelineRail}>
+        {drills.map((drill, index) => {
+          const isGrouping = drill.drill_goal === 'grouping';
+          const goalColor = isGrouping ? '#10B981' : '#3B82F6';
+          const totalDrillShots = drill.rounds_per_shooter * (drill.strings_count || 1);
+          const isFirst = index === 0;
+          const isLast = index === drills.length - 1;
+
+          return (
+            <Animated.View
+              key={drill.id}
+              entering={FadeInRight.delay(index * 50).springify()}
+              layout={Layout.springify()}
+              style={styles.timelineNode}
+            >
+              {/* Rail line - top segment */}
+              {!isFirst && (
+                <View style={[styles.timelineLineTop, { backgroundColor: colors.border }]} />
+              )}
+
+              {/* Node circle */}
+              <View style={[styles.timelineCircle, { backgroundColor: goalColor, borderColor: goalColor }]}>
+                <Text style={styles.timelineCircleText}>{index + 1}</Text>
+              </View>
+
+              {/* Rail line - bottom segment */}
+              {!isLast && (
+                <View style={[styles.timelineLineBottom, { backgroundColor: colors.border }]} />
+              )}
+
+              {/* Drill content */}
+              <View style={[styles.timelineContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                {/* Header row */}
+                <View style={styles.timelineContentHeader}>
+                  <Text style={[styles.timelineDrillName, { color: colors.text }]} numberOfLines={1}>
+                    {drill.name}
+                  </Text>
+                  <View style={[styles.timelineTypeBadge, { backgroundColor: `${goalColor}20` }]}>
+                    <Text style={[styles.timelineTypeText, { color: goalColor }]}>
+                      {isGrouping ? 'GRP' : 'ACH'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Stats row */}
+                <View style={styles.timelineContentStats}>
+                  <View style={[styles.timelineStatChip, { backgroundColor: colors.secondary }]}>
+                    <Ionicons name="locate-outline" size={11} color={colors.textMuted} />
+                    <Text style={[styles.timelineChipText, { color: colors.textMuted }]}>{drill.distance_m}m</Text>
+                  </View>
+                  <View style={[styles.timelineStatChip, { backgroundColor: colors.secondary }]}>
+                    <Target size={11} color={colors.textMuted} />
+                    <Text style={[styles.timelineChipText, { color: colors.textMuted }]}>{totalDrillShots}</Text>
+                  </View>
+                  {drill.time_limit_seconds && (
+                    <View style={[styles.timelineStatChip, { backgroundColor: colors.secondary }]}>
+                      <Ionicons name="timer-outline" size={11} color={colors.textMuted} />
+                      <Text style={[styles.timelineChipText, { color: colors.textMuted }]}>{drill.time_limit_seconds}s</Text>
+                    </View>
+                  )}
+                  <View style={[styles.timelineStatChip, { backgroundColor: colors.secondary }]}>
+                    <Text style={[styles.timelineChipText, { color: colors.textMuted }]}>
+                      {drill.input_method === 'scan' || isGrouping ? '📷' : '✋'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Actions */}
+                <View style={styles.timelineActions}>
+                  <TouchableOpacity
+                    style={[styles.timelineActionBtn, { opacity: isFirst ? 0.3 : 1 }]}
+                    onPress={() => onMove(index, 'up')}
+                    disabled={isFirst}
+                    hitSlop={6}
+                  >
+                    <Ionicons name="arrow-up" size={14} color={colors.textMuted} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.timelineActionBtn, { opacity: isLast ? 0.3 : 1 }]}
+                    onPress={() => onMove(index, 'down')}
+                    disabled={isLast}
+                    hitSlop={6}
+                  >
+                    <Ionicons name="arrow-down" size={14} color={colors.textMuted} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.timelineActionBtn}
+                    onPress={() => onRemove(drill.id)}
+                    hitSlop={6}
+                  >
+                    <Trash2 size={14} color={colors.destructive} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Animated.View>
+          );
+        })}
+
+        {/* End marker */}
+        <View style={styles.timelineEnd}>
+          <View style={[styles.timelineEndCircle, { backgroundColor: colors.primary }]}>
+            <Ionicons name="flag" size={12} color="#fff" />
+          </View>
+          <Text style={[styles.timelineEndText, { color: colors.textMuted }]}>Training Complete</Text>
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -125,7 +343,7 @@ export default function CreateTrainingScreen() {
     return date;
   });
   const [manualStart, setManualStart] = useState(true);
-  const [drills, setDrills] = useState<DrillFormData[]>([]);
+  const [drills, setDrills] = useState<TrainingDrillItem[]>([]);
 
   // UI state
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -135,12 +353,12 @@ export default function CreateTrainingScreen() {
   // Wizard step (1 = Details, 2 = Drills)
   const [currentStep, setCurrentStep] = useState<1 | 2>(1);
   
-  // Drill library and instance configuration
+  // Drill library and modal state
   const [teamDrills, setTeamDrills] = useState<Drill[]>([]);
   const [selectedDrill, setSelectedDrill] = useState<Drill | null>(null);
-  const [showInstanceModal, setShowInstanceModal] = useState(false);
-  const [quickDrillModalVisible, setQuickDrillModalVisible] = useState(false);
-  const [creatingQuickDrill, setCreatingQuickDrill] = useState(false);
+  const [drillModalVisible, setDrillModalVisible] = useState(false);
+  const [drillModalMode, setDrillModalMode] = useState<'configure' | 'quick'>('configure');
+  const [savingDrill, setSavingDrill] = useState(false);
 
   // Sync selectedTeamId with URL param when it loads
   useEffect(() => {
@@ -176,11 +394,23 @@ export default function CreateTrainingScreen() {
     setDrills(prev => prev.filter(d => d.id !== drillId));
   }, []);
 
-  // Handle selecting a drill from library (opens instance config modal)
+  const handleMoveDrill = useCallback((index: number, direction: 'up' | 'down') => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setDrills(prev => {
+      const newDrills = [...prev];
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= newDrills.length) return prev;
+      [newDrills[index], newDrills[targetIndex]] = [newDrills[targetIndex], newDrills[index]];
+      return newDrills;
+    });
+  }, []);
+
+  // Handle selecting a drill from library (opens configure modal)
   const handleSelectDrill = useCallback((drill: Drill) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedDrill(drill);
-    setShowInstanceModal(true);
+    setDrillModalMode('configure');
+    setDrillModalVisible(true);
   }, []);
 
   const handleOpenQuickDrill = useCallback(() => {
@@ -193,15 +423,42 @@ export default function CreateTrainingScreen() {
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setQuickDrillModalVisible(true);
+    setSelectedDrill(null);
+    setDrillModalMode('quick');
+    setDrillModalVisible(true);
   }, [selectedTeamId, canCreateDrills]);
 
-  const handleQuickDrillSaved = useCallback(async (payload: QuickDrillPayload) => {
+  // Handle closing the drill modal
+  const handleCloseDrillModal = useCallback(() => {
+    setDrillModalVisible(false);
+    setSelectedDrill(null);
+  }, []);
+
+  // Handle configure mode: add existing drill with custom config
+  const handleConfigureConfirm = useCallback((config: DrillInstanceConfig) => {
+    if (!selectedDrill) return;
+
+    const trainingDrill = drillToTrainingInput(selectedDrill, config);
+    
+    setDrills(prev => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        ...trainingDrill,
+      },
+    ]);
+    
+    setDrillModalVisible(false);
+    setSelectedDrill(null);
+  }, [selectedDrill]);
+
+  // Handle quick mode: create new drill and add to training
+  const handleQuickDrillSave = useCallback(async (payload: { draft: UnifiedDrillFormData; instance: DrillInstanceConfig }) => {
     if (!selectedTeamId) return;
     if (!canCreateDrills) return;
-    if (creatingQuickDrill) return;
+    if (savingDrill) return;
 
-    setCreatingQuickDrill(true);
+    setSavingDrill(true);
     try {
       const created = await createDrill(selectedTeamId, {
         name: payload.draft.name,
@@ -224,40 +481,14 @@ export default function CreateTrainingScreen() {
         },
       ]);
 
-      setQuickDrillModalVisible(false);
+      setDrillModalVisible(false);
     } catch (error: any) {
       console.error('Failed to create quick drill:', error);
       Alert.alert('Error', error?.message || 'Failed to create drill');
     } finally {
-      setCreatingQuickDrill(false);
+      setSavingDrill(false);
     }
-  }, [selectedTeamId, canCreateDrills, creatingQuickDrill]);
-
-  // Handle closing the drill instance modal
-  const handleCloseInstanceModal = useCallback(() => {
-    setShowInstanceModal(false);
-    setSelectedDrill(null);
-  }, []);
-
-  // Handle instance configuration complete (add drill from library to training)
-  const handleInstanceConfirm = useCallback(async (instanceConfig: DrillInstanceConfig) => {
-    if (!selectedDrill) return;
-
-    const trainingDrill = drillToTrainingInput(selectedDrill, instanceConfig);
-    
-    // Add the drill to the list
-    setDrills(prev => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        ...trainingDrill,
-      },
-    ]);
-    
-    // Close modal and clear selection in one batch
-    setShowInstanceModal(false);
-    setSelectedDrill(null);
-  }, [selectedDrill]);
+  }, [selectedTeamId, canCreateDrills, savingDrill]);
 
   const handleCreate = useCallback(async () => {
     if (!selectedTeamId) {
@@ -627,103 +858,24 @@ export default function CreateTrainingScreen() {
           <Text style={[styles.backLinkText, { color: colors.primary }]}>Details</Text>
         </TouchableOpacity>
 
-        {/* Added Drills */}
+        {/* Drill Timeline */}
         {drills.length > 0 && (
-          <View style={styles.addedDrillsSection}>
-            <View style={styles.addedDrillsHeader}>
-              <Text style={[styles.addedDrillsTitle, { color: colors.text }]}>
-                {drills.length} {drills.length === 1 ? 'drill' : 'drills'} added
-              </Text>
-            </View>
-            <View style={styles.drillsList}>
-              {drills.map((drill, index) => (
-                <DrillItem
-                  key={drill.id}
-                  drill={drill}
-                  index={index}
-                  colors={colors}
-                  onRemove={() => handleRemoveDrill(drill.id)}
-                />
-              ))}
-            </View>
-          </View>
+          <DrillTimeline
+            drills={drills}
+            colors={colors}
+            onRemove={handleRemoveDrill}
+            onMove={handleMoveDrill}
+          />
         )}
 
-        {/* Drill Library */}
-        <View style={[styles.librarySection, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.libraryHeader}>
-            <Text style={[styles.libraryTitle, { color: colors.text }]}>
-              {drills.length === 0 ? 'Choose drills' : 'Add more'}
-            </Text>
-            {canCreateDrills && (
-              <TouchableOpacity
-                style={[styles.newDrillBtn, { backgroundColor: colors.primary + '15' }]}
-                onPress={handleOpenQuickDrill}
-                activeOpacity={0.7}
-              >
-                <Plus size={14} color={colors.primary} />
-                <Text style={[styles.newDrillBtnText, { color: colors.primary }]}>New</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {teamDrills.length > 0 ? (
-            <View style={styles.libraryGrid}>
-              {teamDrills.map(drill => {
-                const isGrouping = drill.drill_goal === 'grouping';
-                const goalColor = isGrouping ? '#10B981' : '#93C5FD';
-                return (
-                  <TouchableOpacity
-                    key={drill.id}
-                    style={[styles.libraryDrill, { backgroundColor: colors.secondary }]}
-                    onPress={() => handleSelectDrill(drill)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.libraryDrillRow}>
-                      {drill.icon && <Text style={styles.libraryDrillIcon}>{drill.icon}</Text>}
-                      <Text style={[styles.libraryDrillName, { color: colors.text }]} numberOfLines={1}>
-                        {drill.name}
-                      </Text>
-                      <View style={[styles.libraryDrillBadge, { backgroundColor: `${goalColor}20` }]}>
-                        <Text style={[styles.libraryDrillBadgeText, { color: goalColor }]}>
-                          {isGrouping ? 'G' : 'A'}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={[styles.libraryDrillAdd, { backgroundColor: colors.primary + '15' }]}>
-                      <Plus size={14} color={colors.primary} />
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          ) : (
-            <View style={styles.libraryEmpty}>
-              <Text style={[styles.libraryEmptyText, { color: colors.textMuted }]}>
-                {!selectedTeamId 
-                  ? 'Select a team first' 
-                  : 'No drills in library yet'
-                }
-              </Text>
-              {selectedTeamId && canCreateDrills && (
-                <TouchableOpacity
-                  style={[styles.libraryEmptyBtn, { borderColor: colors.primary }]}
-                  onPress={handleOpenQuickDrill}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.libraryEmptyBtnText, { color: colors.primary }]}>Create first drill</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-          
-          {/* Info hint */}
-          {teamDrills.length > 0 && (
-            <Text style={[styles.libraryHint, { color: colors.textMuted }]}>
-              💡 Manage drill templates in your team's Drill Library
-            </Text>
-          )}
-        </View>
+        {/* Drill Library - Tab Based */}
+        <DrillLibraryPicker
+          drills={teamDrills}
+          colors={colors}
+          onSelect={handleSelectDrill}
+          onCreateNew={canCreateDrills ? handleOpenQuickDrill : undefined}
+          hasTeam={!!selectedTeamId}
+        />
 
         {/* Create Button */}
         <TouchableOpacity
@@ -760,34 +912,38 @@ export default function CreateTrainingScreen() {
         </>
       )}
 
-      {/* Drill instance configuration modal */}
-      <DrillInstanceModal
-        visible={showInstanceModal}
-        onClose={handleCloseInstanceModal}
-        onConfirm={handleInstanceConfirm}
-        drill={selectedDrill}
-      />
-
-      {/* Quick drill modal */}
-      <QuickDrillModal
-        visible={quickDrillModalVisible}
-        onClose={() => setQuickDrillModalVisible(false)}
-        onSave={handleQuickDrillSaved}
-        saving={creatingQuickDrill}
+      {/* Unified drill modal for configure and quick modes */}
+      <UnifiedDrillModal
+        visible={drillModalVisible}
+        onClose={handleCloseDrillModal}
+        mode={drillModalMode}
+        drillName={selectedDrill?.name}
+        initialData={selectedDrill ? {
+          drill_goal: selectedDrill.drill_goal,
+          target_type: selectedDrill.target_type,
+          distance_m: selectedDrill.distance_m,
+          rounds_per_shooter: selectedDrill.rounds_per_shooter,
+          strings_count: selectedDrill.strings_count ?? 1,
+          time_limit_seconds: selectedDrill.time_limit_seconds ?? null,
+          input_method: selectedDrill.drill_goal === 'grouping' ? 'scan' : 'manual',
+        } : undefined}
+        onConfirmConfig={handleConfigureConfirm}
+        onSaveQuick={handleQuickDrillSave}
+        saving={savingDrill}
       />
 
       {showDatePicker && (
         <Modal visible transparent animationType="slide" onRequestClose={() => setShowDatePicker(false)}>
-          <Pressable style={styles.pickerOverlay} onPress={() => setShowDatePicker(false)}>
-            <Pressable style={[styles.pickerSheet, { backgroundColor: colors.card }]} onPress={e => e.stopPropagation()}>
-              <View style={[styles.pickerGrabber, { backgroundColor: colors.border }]} />
-              <View style={styles.pickerHeader}>
+          <Pressable style={styles.datePickerOverlay} onPress={() => setShowDatePicker(false)}>
+            <Pressable style={[styles.datePickerSheet, { backgroundColor: colors.card }]} onPress={e => e.stopPropagation()}>
+              <View style={[styles.datePickerGrabber, { backgroundColor: colors.border }]} />
+              <View style={styles.datePickerHeader}>
                 <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text style={[styles.pickerCancel, { color: colors.textMuted }]}>Cancel</Text>
+                  <Text style={[styles.datePickerCancel, { color: colors.textMuted }]}>Cancel</Text>
                 </TouchableOpacity>
-                <Text style={[styles.pickerTitle, { color: colors.text }]}>Select Date</Text>
+                <Text style={[styles.datePickerTitle, { color: colors.text }]}>Select Date</Text>
                 <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text style={[styles.pickerDone, { color: colors.primary }]}>Done</Text>
+                  <Text style={[styles.datePickerDone, { color: colors.primary }]}>Done</Text>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
@@ -796,7 +952,7 @@ export default function CreateTrainingScreen() {
                 display="spinner"
                 onChange={(_, date) => date && setScheduledDate(date)}
                 minimumDate={new Date()}
-                style={styles.picker}
+                style={styles.datePickerWheel}
               />
               <View style={{ height: insets.bottom }} />
             </Pressable>
@@ -806,16 +962,16 @@ export default function CreateTrainingScreen() {
 
       {showTimePicker && (
         <Modal visible transparent animationType="slide" onRequestClose={() => setShowTimePicker(false)}>
-          <Pressable style={styles.pickerOverlay} onPress={() => setShowTimePicker(false)}>
-            <Pressable style={[styles.pickerSheet, { backgroundColor: colors.card }]} onPress={e => e.stopPropagation()}>
-              <View style={[styles.pickerGrabber, { backgroundColor: colors.border }]} />
-              <View style={styles.pickerHeader}>
+          <Pressable style={styles.datePickerOverlay} onPress={() => setShowTimePicker(false)}>
+            <Pressable style={[styles.datePickerSheet, { backgroundColor: colors.card }]} onPress={e => e.stopPropagation()}>
+              <View style={[styles.datePickerGrabber, { backgroundColor: colors.border }]} />
+              <View style={styles.datePickerHeader}>
                 <TouchableOpacity onPress={() => setShowTimePicker(false)}>
-                  <Text style={[styles.pickerCancel, { color: colors.textMuted }]}>Cancel</Text>
+                  <Text style={[styles.datePickerCancel, { color: colors.textMuted }]}>Cancel</Text>
                 </TouchableOpacity>
-                <Text style={[styles.pickerTitle, { color: colors.text }]}>Select Time</Text>
+                <Text style={[styles.datePickerTitle, { color: colors.text }]}>Select Time</Text>
                 <TouchableOpacity onPress={() => setShowTimePicker(false)}>
-                  <Text style={[styles.pickerDone, { color: colors.primary }]}>Done</Text>
+                  <Text style={[styles.datePickerDone, { color: colors.primary }]}>Done</Text>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
@@ -823,7 +979,7 @@ export default function CreateTrainingScreen() {
                 mode="time"
                 display="spinner"
                 onChange={(_, date) => date && setScheduledDate(date)}
-                style={styles.picker}
+                style={styles.datePickerWheel}
               />
               <View style={{ height: insets.bottom }} />
             </Pressable>
@@ -926,88 +1082,207 @@ const styles = StyleSheet.create({
   switchThumb: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff' },
   switchThumbActive: { alignSelf: 'flex-end' },
 
-  // Added Drills Section
-  addedDrillsSection: { marginBottom: 16 },
-  addedDrillsHeader: { marginBottom: 10 },
-  addedDrillsTitle: { fontSize: 13, fontWeight: '600', opacity: 0.7 },
+  // Drill Timeline
+  timeline: { marginBottom: 20 },
+  
+  // Timeline summary bar
+  timelineSummary: { 
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12, 
+    borderRadius: 12, 
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  timelineSummaryStats: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 16,
+  },
+  timelineStat: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  timelineStatValue: { fontSize: 18, fontWeight: '700' },
+  timelineStatLabel: { fontSize: 12 },
+  timelineStatDivider: { width: 1, height: 16 },
 
-  // Library Section
-  librarySection: { 
-    padding: 14, 
-    borderRadius: 14, 
+  // Timeline rail
+  timelineRail: { paddingLeft: 20 },
+  
+  // Timeline node (each drill)
+  timelineNode: { 
+    flexDirection: 'row', 
+    alignItems: 'flex-start',
+    marginBottom: 0,
+  },
+  
+  // Rail lines
+  timelineLineTop: { 
+    position: 'absolute',
+    left: 11,
+    top: 0,
+    width: 2,
+    height: 12,
+  },
+  timelineLineBottom: { 
+    position: 'absolute',
+    left: 11,
+    top: 36,
+    bottom: -12,
+    width: 2,
+  },
+  
+  // Node circle
+  timelineCircle: { 
+    width: 24, 
+    height: 24, 
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    zIndex: 1,
+  },
+  timelineCircleText: { 
+    fontSize: 12, 
+    fontWeight: '800', 
+    color: '#fff',
+  },
+
+  // Content card
+  timelineContent: { 
+    flex: 1,
+    marginLeft: 12,
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  timelineContentHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  timelineDrillName: { fontSize: 15, fontWeight: '600', flex: 1 },
+  timelineTypeBadge: { 
+    paddingHorizontal: 8, 
+    paddingVertical: 3, 
+    borderRadius: 6,
+  },
+  timelineTypeText: { fontSize: 10, fontWeight: '700' },
+
+  // Stats chips
+  timelineContentStats: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  timelineStatChip: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 4, 
+    paddingHorizontal: 8, 
+    paddingVertical: 4, 
+    borderRadius: 6,
+  },
+  timelineChipText: { fontSize: 11, fontWeight: '500' },
+
+  // Actions
+  timelineActions: { 
+    flexDirection: 'row', 
+    justifyContent: 'flex-end',
+    gap: 4,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+  timelineActionBtn: { 
+    width: 32, 
+    height: 28, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    borderRadius: 6,
+  },
+
+  // End marker
+  timelineEnd: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 10,
+    paddingTop: 4,
+  },
+  timelineEndCircle: { 
+    width: 24, 
+    height: 24, 
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timelineEndText: { fontSize: 12, fontWeight: '500', fontStyle: 'italic' },
+
+  // Drill Library - Tab Based
+  libSection: { 
+    borderRadius: 12,
     borderWidth: 1,
     marginBottom: 20,
+    overflow: 'hidden',
   },
-  libraryHeader: { 
+  libHeader: { 
     flexDirection: 'row', 
     alignItems: 'center', 
     justifyContent: 'space-between',
-    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
-  libraryTitle: { fontSize: 15, fontWeight: '600' },
-  newDrillBtn: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 4,
-    paddingHorizontal: 10, 
-    paddingVertical: 6, 
+  libTitle: { fontSize: 15, fontWeight: '600' },
+  libNewLink: { fontSize: 14, fontWeight: '600' },
+
+  // Tabs
+  libTabs: { 
+    flexDirection: 'row',
+    marginHorizontal: 10,
     borderRadius: 8,
+    padding: 3,
+    marginBottom: 8,
   },
-  newDrillBtnText: { fontSize: 13, fontWeight: '600' },
-  libraryGrid: { gap: 8 },
-  libraryDrill: { 
+  libTab: { 
+    flex: 1, 
+    paddingVertical: 8,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  libTabText: { fontSize: 12, fontWeight: '600' },
+
+  // List
+  libList: {},
+  libItem: { 
     flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between',
-    padding: 12, 
-    borderRadius: 10,
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 10,
   },
-  libraryDrillRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
-  libraryDrillIcon: { fontSize: 14 },
-  libraryDrillName: { fontSize: 14, fontWeight: '500', flex: 1 },
-  libraryDrillBadge: { 
-    width: 20, 
-    height: 20, 
-    borderRadius: 5, 
+  libItemIndicator: { width: 3, height: 24, borderRadius: 2 },
+  libItemContent: { flex: 1, gap: 2 },
+  libItemName: { fontSize: 14, fontWeight: '600' },
+  libItemMeta: { fontSize: 12 },
+
+  // Empty
+  libEmpty: { 
     alignItems: 'center', 
-    justifyContent: 'center',
+    paddingVertical: 24, 
+    gap: 10,
   },
-  libraryDrillBadgeText: { fontSize: 11, fontWeight: '700' },
-  libraryDrillAdd: { 
-    width: 28, 
-    height: 28, 
-    borderRadius: 8, 
-    alignItems: 'center', 
-    justifyContent: 'center',
-    marginLeft: 10,
-  },
-  libraryEmpty: { alignItems: 'center', paddingVertical: 20, gap: 10 },
-  libraryEmptyText: { fontSize: 14, textAlign: 'center' },
-  libraryEmptyBtn: { 
+  libEmptyText: { fontSize: 13 },
+  libEmptyBtn: { 
     paddingHorizontal: 14, 
     paddingVertical: 8, 
-    borderRadius: 8, 
+    borderRadius: 8,
     borderWidth: 1.5,
   },
-  libraryEmptyBtnText: { fontSize: 13, fontWeight: '600' },
-  libraryHint: { 
-    fontSize: 12, 
-    marginTop: 12, 
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
+  libEmptyBtnText: { fontSize: 13, fontWeight: '600' },
 
-  // Drills List
-  drillsList: { gap: 8 },
-  drillItem: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1 },
-  drillItemIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  drillItemContent: { flex: 1, gap: 4 },
-  drillItemHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  drillItemName: { fontSize: 15, fontWeight: '600' },
-  drillItemBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  drillItemBadgeText: { fontSize: 10, fontWeight: '600' },
-  drillItemMeta: { fontSize: 13 },
-  drillItemRemove: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
 
   // Create Button
   createButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 52, borderRadius: 14, gap: 8, marginBottom: 12 },
@@ -1110,33 +1385,33 @@ const styles = StyleSheet.create({
   },
   typeBtnText: { fontSize: 15, fontWeight: '600' },
 
-  // Picker
-  pickerOverlay: {
+  // Date/Time Picker Modal
+  datePickerOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',
   },
-  pickerSheet: {
+  datePickerSheet: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 8,
   },
-  pickerGrabber: {
+  datePickerGrabber: {
     width: 36,
     height: 4,
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: 8,
   },
-  pickerHeader: {
+  datePickerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 12,
   },
-  pickerTitle: { fontSize: 17, fontWeight: '600' },
-  pickerCancel: { fontSize: 16 },
-  pickerDone: { fontSize: 16, fontWeight: '600' },
-  picker: { height: 200, alignSelf: 'center', width: '100%' },
+  datePickerTitle: { fontSize: 17, fontWeight: '600' },
+  datePickerCancel: { fontSize: 16 },
+  datePickerDone: { fontSize: 16, fontWeight: '600' },
+  datePickerWheel: { height: 200, alignSelf: 'center', width: '100%' },
 });

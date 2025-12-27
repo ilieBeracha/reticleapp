@@ -17,19 +17,18 @@ import {
   endSession,
   getSessionById,
   getSessionTargetsWithResults,
-  saveWatchSessionData,
   SessionStats,
   SessionTargetWithResults,
   SessionWithDetails
 } from '@/services/sessionService';
-import { useGarminStore } from '@/store/garminStore';
+import { useGarminStore, useIsGarminConnected } from '@/store/garminStore';
 import { useSessionStore } from '@/store/sessionStore';
 import { formatMaxShots, isInfiniteShots } from '@/utils/drillShots';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Camera, CheckCircle, Clock, Crosshair, Focus, MapPin, Target, Trophy, X, Zap } from 'lucide-react-native';
+import { Camera, CheckCircle, Clock, Crosshair, Focus, MapPin, Target, Trophy, Watch, X, Zap } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -54,6 +53,7 @@ export default function ActiveSessionScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
   const { loadPersonalSessions, loadTeamSessions } = useSessionStore();
   const { status: garminStatus, send: sendToGarmin, lastSessionData, setSessionDataCallback, clearLastSessionData } = useGarminStore();
+  const isWatchConnected = useIsGarminConnected();
 
   // State
   const [session, setSession] = useState<SessionWithDetails | null>(null);
@@ -602,6 +602,11 @@ export default function ActiveSessionScreen() {
   // Legacy compatibility - keep for UI color hints
   const isPaperDrill = isGroupingDrill || drill?.target_type === 'paper';
   const isTacticalDrill = drill?.target_type === 'tactical';
+  
+  // Watch control: session is controlled by watch if flag is set AND watch is connected
+  // When watch loses connection during a watch-controlled session, we show the waiting state
+  const isWatchControlled = session?.watch_controlled === true;
+  const watchActivelyControlling = isWatchControlled && isWatchConnected;
 
   const drillLimitReached =
     !!drill &&
@@ -714,7 +719,121 @@ export default function ActiveSessionScreen() {
   }
 
   // ============================================================================
-  // MAIN RENDER
+  // WATCH CONTROLLED - FULL PAGE WAITING STATE
+  // ============================================================================
+  if (isWatchControlled) {
+    const drillName = session.drill_name || session.training_title || 'Practice Session';
+    
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        {/* Minimal Header */}
+        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+          <TouchableOpacity
+            style={[styles.closeButton, { backgroundColor: colors.secondary }]}
+            onPress={handleClose}
+          >
+            <X size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+          
+          <View style={styles.headerCenter}>
+            <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+              {drillName}
+            </Text>
+          </View>
+          
+          <View style={styles.timerContainer}>
+            <View style={[styles.liveDot, { backgroundColor: '#10B981' }]} />
+            <Text style={[styles.timerText, { color: colors.text }]}>
+              {formatTime(elapsedTime)}
+            </Text>
+          </View>
+        </View>
+
+        {/* Watch Waiting Content */}
+        <View style={styles.watchWaitingContainer}>
+          {/* Watch Icon with Pulse */}
+          <Animated.View 
+            entering={FadeIn.duration(500)}
+            style={styles.watchWaitingIconContainer}
+          >
+            <View style={[styles.watchWaitingPulseOuter, { borderColor: isWatchConnected ? '#10B981' : '#F59E0B' }]} />
+            <View style={[styles.watchWaitingIconBg, { backgroundColor: isWatchConnected ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)' }]}>
+              <Watch size={48} color={isWatchConnected ? '#10B981' : '#F59E0B'} />
+            </View>
+          </Animated.View>
+
+          {/* Status Text */}
+          <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.watchWaitingText}>
+            <Text style={[styles.watchWaitingTitle, { color: colors.text }]}>
+              {isWatchConnected ? 'Watch in Control' : 'Watch Disconnected'}
+            </Text>
+            <Text style={[styles.watchWaitingDesc, { color: colors.textMuted }]}>
+              {isWatchConnected
+                ? 'Your Garmin watch is tracking this session.\nEnd the session on your watch when finished.'
+                : 'Reconnect your watch to continue tracking,\nor end the session manually below.'}
+            </Text>
+          </Animated.View>
+
+          {/* Drill Info Card */}
+          {drill && (
+            <Animated.View 
+              entering={FadeInDown.delay(200).duration(400)}
+              style={[styles.watchWaitingDrillCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+            >
+              <View style={styles.watchWaitingDrillRow}>
+                <MapPin size={14} color={colors.textMuted} />
+                <Text style={[styles.watchWaitingDrillText, { color: colors.text }]}>{drill.distance_m}m</Text>
+              </View>
+              {drill.rounds_per_shooter && (
+                <View style={styles.watchWaitingDrillRow}>
+                  <Zap size={14} color={colors.textMuted} />
+                  <Text style={[styles.watchWaitingDrillText, { color: colors.text }]}>{drill.rounds_per_shooter} shots</Text>
+                </View>
+              )}
+              {drill.time_limit_seconds && (
+                <View style={styles.watchWaitingDrillRow}>
+                  <Clock size={14} color={colors.textMuted} />
+                  <Text style={[styles.watchWaitingDrillText, { color: colors.text }]}>{formatTime(drill.time_limit_seconds)} limit</Text>
+                </View>
+              )}
+            </Animated.View>
+          )}
+
+          {/* Connection Status Indicator */}
+          <Animated.View 
+            entering={FadeInDown.delay(300).duration(400)}
+            style={[styles.watchWaitingStatusBadge, { backgroundColor: isWatchConnected ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)' }]}
+          >
+            <View style={[styles.watchWaitingStatusDot, { backgroundColor: isWatchConnected ? '#10B981' : '#F59E0B' }]} />
+            <Text style={[styles.watchWaitingStatusText, { color: isWatchConnected ? '#10B981' : '#F59E0B' }]}>
+              {isWatchConnected ? 'Watch Connected' : 'Watch Not Connected'}
+            </Text>
+          </Animated.View>
+        </View>
+
+        {/* Bottom End Button */}
+        <View style={[styles.watchWaitingBottom, { paddingBottom: insets.bottom + 16 }]}>
+          <TouchableOpacity
+            style={[styles.watchWaitingEndButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={handleEndSession}
+            disabled={ending}
+          >
+            {ending ? (
+              <ActivityIndicator size="small" color="#EF4444" />
+            ) : (
+              <>
+                <Ionicons name="stop-circle" size={20} color="#EF4444" />
+                <Text style={[styles.watchWaitingEndText, { color: colors.text }]}>End Session Manually</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // ============================================================================
+  // MAIN RENDER (Phone-controlled session)
   // ============================================================================
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -915,7 +1034,7 @@ export default function ActiveSessionScreen() {
         />
       </View>
 
-      {/* Bottom Actions - Floating */}
+      {/* Bottom Actions - Floating (only for phone-controlled sessions) */}
       <View style={[styles.bottomActions, { paddingBottom: insets.bottom + 12 }]}>
         <View style={[styles.bottomActionsInner, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {/* End Session */}
@@ -935,7 +1054,6 @@ export default function ActiveSessionScreen() {
           {/* Divider */}
           <View style={[styles.actionDivider, { backgroundColor: colors.border }]} />
 
-          {/* Show appropriate button(s) based on drill_goal */}
           {/* Manual entry - only for achievement drills or free practice */}
           {showManual && (
             <TouchableOpacity
@@ -1362,6 +1480,103 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '700',
+  },
+
+  // Watch Waiting Full Page
+  watchWaitingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  watchWaitingIconContainer: {
+    position: 'relative',
+    marginBottom: 32,
+  },
+  watchWaitingPulseOuter: {
+    position: 'absolute',
+    top: -16,
+    left: -16,
+    right: -16,
+    bottom: -16,
+    borderRadius: 72,
+    borderWidth: 2,
+    opacity: 0.3,
+  },
+  watchWaitingIconBg: {
+    width: 112,
+    height: 112,
+    borderRadius: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  watchWaitingText: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  watchWaitingTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  watchWaitingDesc: {
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  watchWaitingDrillCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  watchWaitingDrillRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  watchWaitingDrillText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  watchWaitingStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  watchWaitingStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  watchWaitingStatusText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  watchWaitingBottom: {
+    paddingHorizontal: 20,
+  },
+  watchWaitingEndButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  watchWaitingEndText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
 
   // Completion Modal

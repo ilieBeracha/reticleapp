@@ -106,19 +106,19 @@ export function ActiveSessionBanner({ session, onSessionEnded }: ActiveSessionBa
               IN PROGRESS
             </Text>
           </View>
-          <Text 
+        <Text 
             style={[styles.title, { color: colors.text }]}
-            numberOfLines={1}
-          >
-            {sessionName}
-          </Text>
+          numberOfLines={1}
+        >
+          {sessionName}
+        </Text>
           <View style={styles.metaRow}>
             <Clock size={11} color={colors.textMuted} />
             <Text style={[styles.meta, { color: colors.textMuted }]}>
               {elapsed}
-            </Text>
-          </View>
+          </Text>
         </View>
+      </View>
 
         <View style={styles.continueHint}>
           <Text style={[styles.continueText, { color: colors.primary }]}>
@@ -126,17 +126,17 @@ export function ActiveSessionBanner({ session, onSessionEnded }: ActiveSessionBa
           </Text>
           <ChevronRight size={16} color={colors.primary} />
         </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
 
       {/* End button */}
-      <TouchableOpacity
-        onPress={handleEnd}
+        <TouchableOpacity
+          onPress={handleEnd}
         style={[styles.endButton, { borderColor: colors.border }]}
-        disabled={ending}
+          disabled={ending}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
+        >
         <X size={16} color={colors.textMuted} />
-      </TouchableOpacity>
+        </TouchableOpacity>
     </Animated.View>
   );
 }

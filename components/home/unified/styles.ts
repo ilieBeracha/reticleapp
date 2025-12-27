@@ -12,7 +12,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     marginBottom: 24,
   },
   greetingAvatar: {
@@ -39,7 +39,7 @@ export const styles = StyleSheet.create({
 
   // Section
   section: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     marginBottom: 20,
   },
   sectionHeader: {

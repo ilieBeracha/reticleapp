@@ -1,10 +1,12 @@
-import { createTrainingSession } from '@/services/sessionService';
+import { createSession } from '@/services/sessionService';
+import type { BaseSessionConfig } from '@/services/session/types';
 import {
     cancelTraining,
     DrillInstanceOverrides,
     finishTraining,
     startTrainingWithConfig
 } from '@/services/trainingService';
+import { useIsGarminConnected } from '@/store/garminStore';
 import { useTrainingStore } from '@/store/trainingStore';
 import type { TrainingDrill, TrainingWithDetails } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
@@ -28,6 +30,10 @@ interface UseTrainingActionsReturn {
   handleFinishTraining: () => void;
   handleCancelTraining: () => void;
   handleStartDrill: (drill: TrainingDrill) => void;
+  // Watch control prompt
+  showWatchPrompt: boolean;
+  pendingDrillName: string | null;
+  handleWatchControlSelect: (watchControlled: boolean) => void;
 }
 
 /**
@@ -69,6 +75,12 @@ export function useTrainingActions({
   const [actionLoading, setActionLoading] = useState(false);
   const [startingDrillId, setStartingDrillId] = useState<string | null>(null);
   const [showStartModal, setShowStartModal] = useState(false);
+  
+  // Watch control prompt state
+  const [showWatchPrompt, setShowWatchPrompt] = useState(false);
+  const [pendingSessionConfig, setPendingSessionConfig] = useState<BaseSessionConfig | null>(null);
+  const [pendingDrillName, setPendingDrillName] = useState<string | null>(null);
+  const isWatchConnected = useIsGarminConnected();
   
   // Get store refresh function
   const loadMyUpcomingTrainings = useTrainingStore((s) => s.loadMyUpcomingTrainings);
@@ -123,7 +135,7 @@ export function useTrainingActions({
     }
 
     console.log('[TrainingActions] Showing finish confirmation for:', training.id);
-    
+
     Alert.alert('Finish Training', 'Mark this training as completed?', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -191,20 +203,11 @@ export function useTrainingActions({
     );
   }, [training, setTraining, onTrainingUpdated, loadMyUpcomingTrainings]);
 
-  const handleStartDrill = useCallback(
-    async (drill: TrainingDrill) => {
-      if (!training) return;
-
-      setStartingDrillId(drill.id);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
+  // Actually create the drill session
+  const doCreateDrillSession = useCallback(
+    async (config: BaseSessionConfig) => {
       try {
-        const session = await createTrainingSession({
-          training_id: training.id,
-          drill_id: drill.id,
-          session_mode: 'solo',
-        });
-
+        const session = await createSession(config);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         router.push(`/(protected)/activeSession?sessionId=${session.id}` as any);
       } catch (error: any) {
@@ -214,7 +217,57 @@ export function useTrainingActions({
         setStartingDrillId(null);
       }
     },
-    [training]
+    []
+  );
+
+  // Handle watch control selection
+  const handleWatchControlSelect = useCallback(
+    (watchControlled: boolean) => {
+      setShowWatchPrompt(false);
+      
+      if (pendingSessionConfig) {
+        const configWithWatch: BaseSessionConfig = {
+          ...pendingSessionConfig,
+          watch_controlled: watchControlled,
+        };
+        doCreateDrillSession(configWithWatch);
+        setPendingSessionConfig(null);
+        setPendingDrillName(null);
+      }
+    },
+    [pendingSessionConfig, doCreateDrillSession]
+  );
+
+  const handleStartDrill = useCallback(
+    async (drill: TrainingDrill) => {
+      if (!training) return;
+
+      setStartingDrillId(drill.id);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      // Build BaseSessionConfig for training drill
+      const config: BaseSessionConfig = {
+        team_id: training.team_id,
+        training_id: training.id,
+        drill_id: drill.id,
+        drill_template_id: null,
+        drill_config: null, // Drill config comes from the training_drills table
+        session_mode: 'solo',
+        watch_controlled: false, // Will be set by prompt if needed
+      };
+
+      // If watch is connected, show prompt before starting
+      if (isWatchConnected) {
+        setPendingSessionConfig(config);
+        setPendingDrillName(drill.name);
+        setShowWatchPrompt(true);
+        return;
+      }
+
+      // No watch connected, start immediately
+      doCreateDrillSession(config);
+    },
+    [training, isWatchConnected, doCreateDrillSession]
   );
 
   return {
@@ -227,5 +280,9 @@ export function useTrainingActions({
     handleFinishTraining,
     handleCancelTraining,
     handleStartDrill,
+    // Watch control prompt
+    showWatchPrompt,
+    pendingDrillName,
+    handleWatchControlSelect,
   };
 }

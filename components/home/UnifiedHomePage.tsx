@@ -31,14 +31,16 @@ import {
   Alert,
   RefreshControl,
   ScrollView,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BaseAvatar } from '../BaseAvatar';
 import { SectionHeader } from './_shared/SectionHeader';
 import HeroSummaryCard from './cards/HeroSummaryCard';
-import { mapSessionToHomeSession, mapTrainingToScheduledSession, type HomeSession } from './types';
+import { mapSessionToHomeSession, type HomeSession } from './types';
 import { AggregatedStatsCard } from './unified/sections/AggregatedStatsCard';
 import { EmptyState } from './unified/sections/EmptyState';
 import { UpcomingTrainingsCard } from './unified/sections/UpcomingTrainingsCard';
@@ -76,6 +78,7 @@ function TitleHeader({
 
 export function UnifiedHomePage() {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const { profileFullName, profileAvatarUrl, user } = useAuth();
   const { setOnSessionCreated, setOnTeamCreated } = useModals();
   const garminStatus = useGarminStore((s) => s.status);
@@ -155,13 +158,12 @@ export function UnifiedHomePage() {
   // Derived data
   const hasTeams = teams.length > 0;
   
-  // Filter upcoming trainings - exclude trainings where user already has an active session
+  // Filter upcoming trainings - just show a quick peek (full schedule in Team tab)
   const upcomingTrainings = useMemo(() => {
     return myUpcomingTrainings
       .filter((t) => t.status === 'planned' || t.status === 'ongoing')
-      // Don't show training in "upcoming" if user already has an active session for it
       .filter((t) => !allSessions.some(s => s.training_id === t.id && s.status === 'active'))
-      .slice(0, 5);
+      .slice(0, 2); // Limit to 2 - full schedule is in Team tab
   }, [myUpcomingTrainings, allSessions]);
 
   // Use session-centric home state
@@ -171,28 +173,10 @@ export function UnifiedHomePage() {
     hasTeams,
   });
 
-  // Build unified timeline from sessions + scheduled sessions
+  // Build timeline from actual sessions only (scheduled trainings now in Team tab)
   const timelineSessions = useMemo(() => {
-    const homeSessions: HomeSession[] = [];
-    
-    // Add real sessions
-    allSessions.forEach(session => {
-      homeSessions.push(mapSessionToHomeSession(session));
-    });
-    
-    // Add scheduled sessions from upcoming trainings
-    upcomingTrainings.forEach(training => {
-      // Only add if not already represented by an active session
-      const hasActiveSession = allSessions.some(
-        s => s.training_id === training.id && s.status === 'active'
-      );
-      if (!hasActiveSession) {
-        homeSessions.push(mapTrainingToScheduledSession(training));
-      }
-    });
-    
-    return homeSessions;
-  }, [allSessions, upcomingTrainings]);
+    return allSessions.map(session => mapSessionToHomeSession(session));
+  }, [allSessions]);
 
   const completedSessions = useMemo(() => {
     return allSessions.filter((s) => s.status === 'completed');
@@ -309,27 +293,31 @@ export function UnifiedHomePage() {
           />
         }
       >
-        {/* Greeting */}
-        <View style={styles.greetingRow}>
-          <View style={[styles.greetingAvatar, { backgroundColor: colors.secondary }]}>
-            {avatarUrl ? (
-              <BaseAvatar source={{ uri: avatarUrl }} fallbackText={fallbackInitial} size="sm" borderWidth={0} />
-            ) : (
-              <Text style={[styles.greetingAvatarText, { color: colors.text }]}>{fallbackInitial}</Text>
-            )}
-          </View>
-          <View>
-            <Text style={[styles.greetingText, { color: colors.textMuted }]}>{getGreeting()},</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={[styles.greetingName, { color: colors.text }]}>{firstName}</Text>
-              {isGarminConnected && (
-                <Ionicons name="watch" size={16} color="#10B981" />
+        {/* Header Row - Greeting + Date */}
+        <View style={localStyles.headerRow}>
+          <View style={localStyles.headerLeft}>
+            <View style={[localStyles.avatar, { backgroundColor: colors.secondary }]}>
+              {avatarUrl ? (
+                <BaseAvatar source={{ uri: avatarUrl }} fallbackText={fallbackInitial} size="sm" borderWidth={0} />
+              ) : (
+                <Text style={[localStyles.avatarText, { color: colors.text }]}>{fallbackInitial}</Text>
               )}
             </View>
+            <View>
+              <Text style={[localStyles.greeting, { color: colors.textMuted }]}>
+                {getGreeting()}, <Text style={{ color: colors.text, fontWeight: '600' }}>{firstName}</Text>
+              </Text>
+              <Text style={[localStyles.dateText, { color: colors.textMuted }]}>
+                {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+              </Text>
+            </View>
           </View>
+          {isGarminConnected && (
+            <View style={[localStyles.watchBadge, { backgroundColor: '#10B98115' }]}>
+              <Ionicons name="watch" size={14} color="#10B981" />
+            </View>
+          )}
         </View>
-
-
 
         {/* Hero Summary - session-centric, action-forward */}
         <View style={styles.section}>
@@ -361,7 +349,7 @@ export function UnifiedHomePage() {
             </View>
 
             {/* Activity Timeline - recent sessions */}
-            <View style={{ marginTop: 8 }}>
+            <View style={styles.section}>
               <ActivityTimeline
                 sessions={timelineSessions}
                 onSessionPress={handleSessionPress}
@@ -372,33 +360,21 @@ export function UnifiedHomePage() {
         <View style={{ height: 100 }} />
       </ScrollView>
       
-      {/* Floating Action Button - Always visible to start solo session */}
+      {/* Floating Action Button - Extended with label */}
       {!homeState.activeSession && (
         <TouchableOpacity
-          style={{
-            position: 'absolute',
-            bottom: 90,
-            right: 16,
-            width: 56,
-            height: 56,
-            borderRadius: 28,
-            backgroundColor: '#10B981',
-            justifyContent: 'center',
-            alignItems: 'center',
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.3,
-            shadowRadius: 8,
-            elevation: 8,
-          }}
+          style={[localStyles.fab, { bottom: insets.bottom + 70 }]}
           onPress={handleStartSession}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
           disabled={starting}
         >
           {starting ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Plus size={24} color="#fff" strokeWidth={2.5} />
+            <>
+              <Plus size={20} color="#fff" strokeWidth={2.5} />
+              <Text style={localStyles.fabLabel}>Practice</Text>
+            </>
           )}
         </TouchableOpacity>
       )}
@@ -407,3 +383,68 @@ export function UnifiedHomePage() {
 }
 
 export default UnifiedHomePage;
+
+// Local styles for layout improvements
+const localStyles = StyleSheet.create({
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    marginBottom: 16,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  greeting: {
+    fontSize: 15,
+    fontWeight: '400',
+  },
+  dateText: {
+    fontSize: 12,
+    marginTop: 1,
+  },
+  watchBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fab: {
+    position: 'absolute',
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 28,
+    backgroundColor: '#10B981',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  fabLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+    letterSpacing: -0.2,
+  },
+});
