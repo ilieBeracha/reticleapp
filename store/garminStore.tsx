@@ -32,6 +32,7 @@ import {
   openDeviceSelection as serviceOpenDeviceSelection,
   refreshDevices as serviceRefreshDevices,
   sendMessage as serviceSendMessage,
+  sendMessageWithRetry as serviceSendMessageWithRetry,
   startWatchSession,
   subscribe,
   syncDrillToWatch,
@@ -45,6 +46,9 @@ export type { GarminConnectionStatus, GarminDevice, GarminSessionData };
 // ============================================================================
 
 const MAX_MESSAGES = 20;
+
+/** Session start status for retry tracking */
+export type SessionStartStatus = 'idle' | 'sending' | 'success' | 'failed';
 
 interface GarminState {
   // ---------------------------------------------------------------------------
@@ -73,6 +77,14 @@ interface GarminState {
   onSessionData: ((data: GarminSessionData) => void) | null;
 
   // ---------------------------------------------------------------------------
+  // Session Start Retry State
+  // ---------------------------------------------------------------------------
+  /** Status of sending SESSION_START to watch */
+  sessionStartStatus: SessionStartStatus;
+  /** Number of retry attempts made */
+  sessionStartAttempts: number;
+
+  // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
   
@@ -85,13 +97,21 @@ interface GarminState {
   openDeviceSelection: () => void;
   refreshDevices: () => Promise<void>;
   send: (type: GarminOutboundMessageType, payload?: unknown) => boolean;
+  /** Send message with retry and ACK confirmation */
+  sendWithRetry: (type: string, payload: Record<string, unknown>, options?: { maxRetries?: number; timeoutMs?: number }) => Promise<boolean>;
   clearMessages: () => void;
   clearLastSessionData: () => void;
 
   // Session helpers
   startSession: (sessionId: string, drillName?: string) => boolean;
+  /** Start session with retry logic - returns true if watch acknowledged */
+  startSessionWithRetry: (payload: Record<string, unknown>) => Promise<boolean>;
   endSession: (sessionId: string) => boolean;
   syncDrill: (drill: { name: string; rounds: number; distance?: number; timeLimit?: number }) => boolean;
+  
+  // Session start status management
+  setSessionStartStatus: (status: SessionStartStatus) => void;
+  resetSessionStartStatus: () => void;
 
   // Callback registration
   setSessionDataCallback: (callback: ((data: GarminSessionData) => void) | null) => void;
@@ -117,6 +137,8 @@ export const useGarminStore = create<GarminState>((set, get) => ({
   messages: [],
   lastSessionData: null,
   onSessionData: null,
+  sessionStartStatus: 'idle',
+  sessionStartAttempts: 0,
 
   // ---------------------------------------------------------------------------
   // Watch Enabled Preference
@@ -164,6 +186,10 @@ export const useGarminStore = create<GarminState>((set, get) => ({
     return serviceSendMessage(type, payload);
   },
 
+  sendWithRetry: async (type, payload, options) => {
+    return serviceSendMessageWithRetry(type, payload, options);
+  },
+
   clearMessages: () => set({ messages: [], lastSessionData: null }),
   
   clearLastSessionData: () => set({ lastSessionData: null }),
@@ -176,12 +202,37 @@ export const useGarminStore = create<GarminState>((set, get) => ({
     return startWatchSession(sessionId, drillName);
   },
 
+  startSessionWithRetry: async (payload) => {
+    set({ sessionStartStatus: 'sending', sessionStartAttempts: 0 });
+    
+    const success = await serviceSendMessageWithRetry('SESSION_START', payload, {
+      maxRetries: 3,
+      timeoutMs: 3000,
+    });
+    
+    if (success) {
+      set({ sessionStartStatus: 'success' });
+    } else {
+      set({ sessionStartStatus: 'failed' });
+    }
+    
+    return success;
+  },
+
   endSession: (sessionId) => {
     return endWatchSession(sessionId);
   },
 
   syncDrill: (drill) => {
     return syncDrillToWatch(drill);
+  },
+
+  setSessionStartStatus: (status) => {
+    set({ sessionStartStatus: status });
+  },
+
+  resetSessionStartStatus: () => {
+    set({ sessionStartStatus: 'idle', sessionStartAttempts: 0 });
   },
 
   // ---------------------------------------------------------------------------
@@ -365,3 +416,6 @@ export const useWatchEnabled = () => useGarminStore((s) => s.watchEnabled);
 
 /** Returns whether watch preference has been loaded from storage */
 export const useWatchEnabledLoaded = () => useGarminStore((s) => s.watchEnabledLoaded);
+
+/** Returns the session start status for retry UI */
+export const useSessionStartStatus = () => useGarminStore((s) => s.sessionStartStatus);

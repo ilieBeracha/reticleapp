@@ -50,6 +50,8 @@ export type GarminConnectionStatus =
 export type GarminOutboundMessageType =
 | 'START_SESSION'
 | 'END_SESSION'
+| 'SESSION_START'  // Alias for START_SESSION (used by watch)
+| 'SESSION_END'    // Alias for END_SESSION (used by watch)
 | 'SYNC_DRILL'
 | 'PING';
 
@@ -134,6 +136,13 @@ let isReady = false;
 let currentStatus: GarminConnectionStatus = 'UNKNOWN';
 let pairedDevices: GarminDevice[] = [];
 const listeners = new Set<GarminServiceListener>();
+
+// Pending ACK tracking for retry logic
+let pendingAck: {
+  type: string;
+  resolve: (success: boolean) => void;
+  timeout: ReturnType<typeof setTimeout>;
+} | null = null;
 
 // ============================================================================
 // INTERNAL HELPERS
@@ -247,6 +256,11 @@ const msgSub = emitter.addListener('onMessage', (raw: any) => {
     timestamp: Date.now(),
   };
 
+  // Handle ACK messages for retry logic
+  if (message.type === 'ACK') {
+    handleAckReceived(parsedPayload);
+  }
+
   console.log('[GarminService] 📩 Emitting message_received:', message.type);
   emit({ event: 'message_received', message });
 
@@ -357,7 +371,7 @@ showDevicesList();
 /**
 * Send a message to the connected watch app.
 */
-export function sendMessage(type: GarminOutboundMessageType, payload?: unknown): boolean {
+export function sendMessage(type: GarminOutboundMessageType | string, payload?: unknown): boolean {
 if (currentStatus !== 'CONNECTED') {
   console.log('[GarminService] Cannot send - status:', currentStatus);
   return false;
@@ -367,6 +381,109 @@ const message = JSON.stringify({ type, payload });
 console.log('[GarminService] 📤 Sending:', message);
 sdkSendMessage(message);
 return true;
+}
+
+// ============================================================================
+// ACK HANDLING & RETRY LOGIC
+// ============================================================================
+
+/**
+ * Handle ACK received from watch. Resolves any pending ACK promise.
+ */
+function handleAckReceived(ackPayload: { status?: string } | null): void {
+  if (!pendingAck) {
+    console.log('[GarminService] ACK received but no pending request');
+    return;
+  }
+
+  clearTimeout(pendingAck.timeout);
+  const wasWaiting = pendingAck;
+  pendingAck = null;
+
+  // Check if ACK indicates success
+  const status = ackPayload?.status;
+  if (status === 'session_started' || status === 'session_ended' || status === 'received' || status === 'weather_updated') {
+    console.log('[GarminService] ✅ ACK received for:', wasWaiting.type, '- status:', status);
+    wasWaiting.resolve(true);
+  } else {
+    console.log('[GarminService] ⚠️ ACK received with unexpected status:', status);
+    wasWaiting.resolve(false);
+  }
+}
+
+/**
+ * Send a message and wait for ACK with timeout.
+ */
+function sendAndWaitForAck(
+  type: string,
+  payload: Record<string, unknown>,
+  timeoutMs: number
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    // Clear any existing pending ACK
+    if (pendingAck) {
+      clearTimeout(pendingAck.timeout);
+      pendingAck.resolve(false);
+    }
+
+    // Set up ACK listener with timeout
+    pendingAck = {
+      type,
+      resolve,
+      timeout: setTimeout(() => {
+        console.warn(`[GarminService] ⏱️ ACK timeout for ${type} after ${timeoutMs}ms`);
+        pendingAck = null;
+        resolve(false);
+      }, timeoutMs),
+    };
+
+    // Send the message
+    const sent = sendMessage(type, payload);
+    if (!sent) {
+      // If send failed immediately (not connected), resolve false
+      if (pendingAck) {
+        clearTimeout(pendingAck.timeout);
+        pendingAck = null;
+      }
+      resolve(false);
+    }
+  });
+}
+
+/**
+ * Send a message with retry and ACK confirmation.
+ * Returns true if message was acknowledged by watch, false otherwise.
+ * 
+ * @param type - Message type (e.g., 'SESSION_START')
+ * @param payload - Message payload
+ * @param options - Retry options (maxRetries, timeoutMs)
+ */
+export async function sendMessageWithRetry(
+  type: string,
+  payload: Record<string, unknown>,
+  options: { maxRetries?: number; timeoutMs?: number } = {}
+): Promise<boolean> {
+  const { maxRetries = 3, timeoutMs = 3000 } = options;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    console.log(`[GarminService] 📤 Sending ${type}, attempt ${attempt}/${maxRetries}`);
+
+    const success = await sendAndWaitForAck(type, payload, timeoutMs);
+    if (success) {
+      console.log(`[GarminService] ✅ ${type} acknowledged on attempt ${attempt}`);
+      return true;
+    }
+
+    // Exponential backoff before retry
+    if (attempt < maxRetries) {
+      const backoffMs = 1000 * attempt;
+      console.log(`[GarminService] ⏳ Waiting ${backoffMs}ms before retry...`);
+      await new Promise((r) => setTimeout(r, backoffMs));
+    }
+  }
+
+  console.warn(`[GarminService] ❌ ${type} failed after ${maxRetries} attempts`);
+  return false;
 }
 
 // ============================================================================

@@ -1,0 +1,236 @@
+---
+alwaysApply: true
+---
+### 2. Hooks (useXxx.ts) - Stateful Logic
+
+All stateful logic, effects, and data fetching go in hooks.
+
+**Pattern:**
+```tsx
+// useUserCard.ts
+export function useUserCard(userId: string) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    fetchUser(userId)
+      .then(setUser)
+      .catch(setError)
+      .finally(() => setLoading(false));
+  }, [userId]);
+
+  const refresh = useCallback(() => {
+    setLoading(true);
+    fetchUser(userId).then(setUser).finally(() => setLoading(false));
+  }, [userId]);
+
+  return { user, loading, error, refresh };
+}
+```
+
+**Hook naming:**
+- `useComponentName` - Primary hook for a component
+- `useFeatureName` - Shared hook for a feature
+- `useActionVerb` - Action-specific hooks (useSubmitForm, useDeleteItem)
+
+---
+
+### 3. Helpers (.helpers.ts) - Pure Functions
+
+Helpers are **pure functions** with no side effects, state, or React dependencies.
+
+**DO:**
+```tsx
+// UserCard.helpers.ts
+export function formatUserName(firstName: string, lastName: string): string {
+  return `${firstName} ${lastName}`.trim();
+}
+
+export function getInitials(name: string): string {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase();
+}
+
+export function isUserActive(lastSeen: Date, thresholdMinutes = 5): boolean {
+  const diff = Date.now() - lastSeen.getTime();
+  return diff < thresholdMinutes * 60 * 1000;
+}
+```
+
+**DON'T put in helpers:**
+- Anything using `useState`, `useEffect`, hooks
+- Async functions that call APIs (those go in services)
+- Functions with side effects
+
+---
+
+### 4. Constants (.constants.ts) - Static Values
+
+All magic numbers, config values, and enums.
+
+```tsx
+// UserCard.constants.ts
+export const USER_CARD_HEIGHT = 72;
+export const AVATAR_SIZE = 48;
+export const ONLINE_THRESHOLD_MINUTES = 5;
+
+export const USER_STATUS = {
+  ONLINE: 'online',
+  AWAY: 'away',
+  OFFLINE: 'offline',
+} as const;
+
+export type UserStatus = typeof USER_STATUS[keyof typeof USER_STATUS];
+
+export const STATUS_COLORS: Record<UserStatus, string> = {
+  online: '#10B981',
+  away: '#F59E0B',
+  offline: '#6B7280',
+};
+```
+
+---
+
+### 5. Types (.types.ts) - TypeScript Definitions
+
+Keep types separate when they're:
+- Used by multiple files
+- Complex (more than 5 properties)
+- Shared between component and hook
+
+```tsx
+// UserCard.types.ts
+export interface User {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  avatarUrl?: string;
+  lastSeen: Date;
+}
+
+export interface UserCardProps {
+  user: User;
+  onPress?: (user: User) => void;
+  variant?: 'compact' | 'expanded';
+  showStatus?: boolean;
+}
+
+export interface UseUserCardReturn {
+  user: User | null;
+  loading: boolean;
+  error: Error | null;
+  refresh: () => void;
+}
+```
+
+---
+
+### 6. Styles (.styles.ts) - StyleSheet
+
+Separate styles when file exceeds 100 lines or styles are complex.
+
+```tsx
+// UserCard.styles.ts
+import { StyleSheet } from 'react-native';
+import { USER_CARD_HEIGHT, AVATAR_SIZE } from './UserCard.constants';
+
+export const styles = StyleSheet.create({
+  container: {
+    height: USER_CARD_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  avatar: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
+  },
+  // ...
+});
+```
+
+---
+
+## Reusability Rules
+
+### When to Extract to Shared Location
+
+Move to `components/shared/` or `components/ui/` when:
+- Used in 3+ places
+- Generic enough (Button, Card, Modal)
+- No domain-specific logic
+
+Move to `hooks/` when:
+- Hook is used in 2+ unrelated components
+- Hook represents a cross-cutting concern (auth, network, storage)
+
+Move to `utils/` when:
+- Helper is used in 3+ places
+- Helper has no component-specific context
+
+---
+
+## Index Barrel Files
+
+Use barrel files for clean imports:
+
+```tsx
+// components/UserCard/index.ts
+export { UserCard } from './UserCard';
+export { useUserCard } from './useUserCard';
+export type { UserCardProps, User } from './UserCard.types';
+```
+
+This allows:
+```tsx
+import { UserCard, useUserCard } from '@/components/UserCard';
+```
+
+---
+
+## Decision Tree
+
+```
+Is it a static value/config?
+  → constants.ts
+
+Is it a TypeScript type/interface?
+  → types.ts (or inline if simple)
+
+Is it a pure function with no React/state?
+  → helpers.ts
+
+Does it use useState/useEffect/hooks?
+  → useXxx.ts (hook)
+
+Does it render JSX?
+  → Component.tsx
+
+Is it used in 3+ places?
+  → Move to shared location
+```
+
+---
+
+## Anti-Patterns to Avoid
+
+1. **God Components** - Components over 300 lines → Split into sub-components + hook
+2. **Logic in JSX** - Complex expressions in render → Extract to helper or hook
+3. **Prop Drilling** - Passing props 3+ levels → Use context or composition
+4. **Duplicate Logic** - Same code in 2+ places → Extract to hook or helper
+5. **Mixed Concerns** - Fetching + transforming + rendering → Separate into layers
+
+---
+
+## Quick Reference
+
+| File Type | Contains | Example |
+|-----------|----------|---------|
+| `Component.tsx` | JSX, UI rendering | `<View><Text>{name}</Text></View>` |
+| `useComponent.ts` | useState, useEffect, callbacks | `const [data, setData] = useState()` |
+| `Component.helpers.ts` | Pure functions | `formatDate(date)` |
+| `Component.constants.ts` | Static values | `const MAX_ITEMS = 10` |
+| `Component.types.ts` | Interfaces, types | `interface Props { ... }` |
+| `Component.styles.ts` | StyleSheet | `StyleSheet.create({ ... })` |

@@ -321,6 +321,7 @@ export async function updateSession(
   updates: {
     status?: 'active' | 'completed' | 'cancelled';
     ended_at?: string;
+    watch_controlled?: boolean;
   }
 ) {
   const updatePayload: Record<string, any> = {
@@ -333,6 +334,10 @@ export async function updateSession(
 
   if (typeof updates.ended_at !== 'undefined') {
     updatePayload.ended_at = updates.ended_at;
+  }
+
+  if (typeof updates.watch_controlled !== 'undefined') {
+    updatePayload.watch_controlled = updates.watch_controlled;
   }
 
   // Return a fully-hydrated session payload so callers don't lose drill context after updates.
@@ -725,8 +730,54 @@ export async function saveWatchSessionData(
   
   // End the session if requested
   if (shouldEnd) {
-    const { endSession: endSessionFn } = await import('./mutations');
-    return await endSessionFn(data.sessionId);
+    // Calculate ended_at based on watch duration (not current phone time)
+    // This ensures the session duration matches what the watch recorded
+    let calculatedEndedAt: string;
+    
+    if (data.durationMs && session.started_at) {
+      // Use watch duration: started_at + durationMs
+      const startedAtMs = new Date(session.started_at).getTime();
+      const endedAtMs = startedAtMs + data.durationMs;
+      calculatedEndedAt = new Date(endedAtMs).toISOString();
+      console.log('[SessionService] Using watch duration for ended_at:', {
+        started_at: session.started_at,
+        durationMs: data.durationMs,
+        calculated_ended_at: calculatedEndedAt,
+      });
+    } else {
+      // Fallback to current time if no duration from watch
+      calculatedEndedAt = new Date().toISOString();
+      console.log('[SessionService] No watch duration, using current time for ended_at');
+    }
+    
+    // Update session with calculated ended_at
+    const updatedSession = await updateSession(data.sessionId, {
+      status: 'completed',
+      ended_at: calculatedEndedAt,
+    });
+    
+    // Check drill completion if applicable
+    if (session.training_id && session.drill_id && session.drill_config) {
+      const drill = session.drill_config;
+      const stats = await calculateSessionStats(data.sessionId);
+      
+      const meetsShotCount = !drill.rounds_per_shooter || stats.totalShotsFired >= drill.rounds_per_shooter;
+      const targetRequirement = (drill.strings_count ?? 1) * (drill.target_count ?? 1);
+      const meetsTargetCount = stats.targetsCount >= targetRequirement;
+      const meetsAccuracy = !drill.min_accuracy_percent || stats.accuracyPct >= drill.min_accuracy_percent;
+      
+      const endedAt = new Date(calculatedEndedAt).getTime();
+      const startedAt = session.started_at ? new Date(session.started_at).getTime() : endedAt;
+      const durationSeconds = Math.max(0, Math.floor((endedAt - startedAt) / 1000));
+      const meetsTime = !drill.time_limit_seconds || durationSeconds <= drill.time_limit_seconds;
+      
+      if (meetsShotCount && meetsTargetCount && meetsAccuracy && meetsTime) {
+        await markTrainingDrillCompleted(session.training_id, session.drill_id, session.user_id);
+        console.log('[SessionService] Watch session: Drill marked completed');
+      }
+    }
+    
+    return updatedSession;
   }
   
   // Otherwise just return the current session
