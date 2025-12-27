@@ -1,12 +1,12 @@
 import { SQUAD_TEMPLATES } from '@/helpers/team/squads';
 import {
-    addSquad,
-    isDuplicateSquadName,
-    isTeamNamePresent,
-    normalizeSquadName,
-    normalizeTeamDescription,
-    normalizeTeamName,
-    removeSquad,
+  addSquad,
+  isDuplicateSquadName,
+  isTeamNamePresent,
+  normalizeSquadName,
+  normalizeTeamDescription,
+  normalizeTeamName,
+  removeSquad,
 } from '@/helpers/team/validation';
 import { useTeamStore } from '@/store/teamStore';
 import * as Haptics from 'expo-haptics';

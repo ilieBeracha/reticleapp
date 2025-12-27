@@ -258,6 +258,9 @@ export interface CreateTrainingDrillInput {
   target_type: TargetType;
   description?: string;
   
+  // === ENTRY METHOD (commander chooses in advance) ===
+  input_method?: 'scan' | 'manual';       // How results are entered: scan (camera) or manual
+  
   // === INSTANCE CONFIGURATION (variable per training) ===
   distance_m: number;
   rounds_per_shooter: number;
@@ -380,6 +383,7 @@ export interface DrillInstanceConfig {
   rounds_per_shooter: number;            // Shots per entry
   time_limit_seconds?: number | null;    // Max time allowed
   strings_count?: number | null;         // Number of rounds (default 1)
+  input_method?: 'scan' | 'manual';      // How results are entered (commander choice)
 
   // Legacy (kept for backwards compatibility)
   /** @deprecated */ par_time_seconds?: number | null;

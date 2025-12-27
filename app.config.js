@@ -3,27 +3,38 @@ const IS_PREVIEW = process.env.APP_VARIANT === 'preview';
 const getAppName = () => {
   if (IS_DEV) return 'Retic (Dev)';
   if (IS_PREVIEW) return 'Retic';
-  return 'Retic';
+  return 'Reticle';
 };
 const getBundleIdentifier = () => {
   if (IS_DEV) return 'com.retic.app.development';
   if (IS_PREVIEW) return 'com.retic.app';
-  return 'com.reticled.app';
+  return 'com.reticle.app';
 };
 const getAndroidPackage = () => {
   if (IS_DEV) return 'com.retic.app.development';
   if (IS_PREVIEW) return 'com.retic.app';
-  return 'com.reticled.app';
+  return 'com.reticle.app';
+};
+
+const getScheme = () => {
+  if (IS_DEV) return 'retic';
+  if (IS_PREVIEW) return 'retic';
+  return 'retic';
+};
+
+const getSlug = () => {
+  // All variants use same slug because they share the same EAS project
+  return 'retic';
 };
 export default ({ config }) => {
   return {
     ...config,
     name: getAppName(),
-    slug: 'retic',
+    slug: getSlug(),
     version: '1.0.0',
     orientation: 'portrait',
     icon: './assets/images/icon.jpg',
-    scheme: 'retic',
+    scheme: getScheme(),
     userInterfaceStyle: 'automatic',
     splash: {
       image: './assets/images/icon.jpg',

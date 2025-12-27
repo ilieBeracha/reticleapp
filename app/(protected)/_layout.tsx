@@ -1,11 +1,10 @@
 import { Header } from '@/components/Header';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { useColors } from '@/hooks/ui/useColors';
+import { useOrphanedSessionCheck } from '@/hooks/useOrphanedSessionCheck';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
-import { useGarminStore } from '@/store/garminStore';
-import { useMessagesStore } from '@/store/messagesService';
+import { useGarminInitialize } from '@/store/garminStore';
 import { router, Stack } from 'expo-router';
-import { useEffect } from 'react';
 
 /**
  * Protected Layout - Unified Architecture
@@ -24,21 +23,12 @@ import { useEffect } from 'react';
  */
 export default function ProtectedLayout() {
   const colors = useColors();
-  const garminInitialize = useGarminStore((s) => s._initialize);
-  const messagesInitialize = useMessagesStore((s) => s.initialize);
+  useGarminInitialize();
   // Register push notifications on authenticated user
   usePushNotifications();
+  // Check for orphaned sessions on app start
+  useOrphanedSessionCheck();
 
-  useEffect(() => {
-    // Initialize Garmin connection
-    garminInitialize();
-
-    messagesInitialize();
-
-    return () => {
-      messagesInitialize();
-    };
-  }, [garminInitialize, messagesInitialize]);
 
   return (
     <ThemeProvider>
@@ -365,6 +355,21 @@ export default function ProtectedLayout() {
             sheetGrabberVisible: true,
             contentStyle: { backgroundColor: colors.card },
             sheetAllowedDetents: [0.85, 0.95],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+          }}
+        />
+
+        {/* Watch Session Result - Garmin data confirmation */}
+        <Stack.Screen
+          name="watchSessionResult"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.55],
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
           }}

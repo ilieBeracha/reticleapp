@@ -7,14 +7,14 @@ import * as Notifications from 'expo-notifications';
 import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import Animated, { FadeIn, FadeInDown, Layout } from "react-native-reanimated";
 
@@ -511,18 +511,4 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

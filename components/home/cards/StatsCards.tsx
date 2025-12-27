@@ -317,11 +317,3 @@ const styles = StyleSheet.create({
   },
 });
 
-
-
-
-
-
-
-
-

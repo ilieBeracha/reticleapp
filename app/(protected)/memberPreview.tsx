@@ -12,6 +12,7 @@ import {
   ActionSheetIOS,
   ActivityIndicator,
   Alert,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -45,6 +46,11 @@ export default function MemberPreviewSheet() {
   const canManage = useCanManageTeam();
   const [loading, setLoading] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [squadPickerVisible, setSquadPickerVisible] = useState(false);
+  const [pendingRole, setPendingRole] = useState<TeamRole | null>(null);
+
+  // Get team squads
+  const teamSquads = activeTeam?.squads || [];
 
   // Get current user ID
   useEffect(() => {
@@ -90,8 +96,29 @@ export default function MemberPreviewSheet() {
     const currentRole = memberRole;
     const availableRoles = teamRoleOptions.filter(r => r !== currentRole);
     
-    const options = [...availableRoles.map(r => r.replace(/_/g, ' ')), 'Cancel'];
+    const options = [...availableRoles.map(r => {
+      if (r === 'squad_commander') return 'Squad Commander';
+      return r.charAt(0).toUpperCase() + r.slice(1);
+    }), 'Cancel'];
     const cancelButtonIndex = options.length - 1;
+    
+    const handleRoleSelect = (role: TeamRole) => {
+      // Squad commander requires a squad
+      if (role === 'squad_commander') {
+        if (teamSquads.length === 0) {
+          Alert.alert(
+            'No Squads',
+            'Create squads first before assigning a Squad Commander.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+        setPendingRole(role);
+        setSquadPickerVisible(true);
+      } else {
+        updateTeamRole(role, null);
+      }
+    };
     
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
@@ -99,38 +126,40 @@ export default function MemberPreviewSheet() {
           options,
           cancelButtonIndex,
           title: 'Change Team Role',
-          message: `Current role: ${currentRole.replace(/_/g, ' ')}`,
+          message: `Current role: ${ROLE_CONFIG[currentRole]?.label || currentRole}`,
         },
         async (buttonIndex) => {
           if (buttonIndex !== cancelButtonIndex) {
             const newRole = availableRoles[buttonIndex];
-            await updateTeamRole(newRole);
+            handleRoleSelect(newRole);
           }
         }
       );
     } else {
       Alert.alert(
         'Change Team Role',
-        `Current role: ${currentRole.replace(/_/g, ' ')}\n\nSelect new role:`,
+        `Current role: ${ROLE_CONFIG[currentRole]?.label || currentRole}\n\nSelect new role:`,
         [
           ...availableRoles.map(role => ({
-            text: role.replace(/_/g, ' '),
-            onPress: () => updateTeamRole(role),
+            text: role === 'squad_commander' ? 'Squad Commander' : role.charAt(0).toUpperCase() + role.slice(1),
+            onPress: () => handleRoleSelect(role),
           })),
           { text: 'Cancel', style: 'cancel' as const },
         ]
       );
     }
-  }, [activeTeamId, member, memberRole]);
+  }, [activeTeamId, member, memberRole, teamSquads]);
 
-  const updateTeamRole = async (newRole: TeamRole) => {
+  const updateTeamRole = async (newRole: TeamRole, squadId: string | null) => {
     if (!activeTeamId || !member) return;
     try {
       setLoading(true);
-      await updateTeamMemberRole(activeTeamId, member.user_id, newRole);
+      const details = squadId ? { squad_id: squadId } : undefined;
+      await updateTeamMemberRole(activeTeamId, member.user_id, newRole, details);
       await loadMembers();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Success', `Role changed to ${newRole.replace(/_/g, ' ')}`);
+      const roleLabel = ROLE_CONFIG[newRole]?.label || newRole;
+      Alert.alert('Success', `Role changed to ${roleLabel}${squadId ? ` (${squadId})` : ''}`);
       router.back();
     } catch (error: any) {
       console.error('Failed to update team role:', error);
@@ -138,6 +167,42 @@ export default function MemberPreviewSheet() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAssignSquad = useCallback(() => {
+    if (teamSquads.length === 0) {
+      Alert.alert('No Squads', 'Create squads first in Team Settings.');
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setPendingRole(null); // null means just assigning squad, not changing role
+    setSquadPickerVisible(true);
+  }, [teamSquads]);
+
+  const handleSquadSelect = async (squadId: string | null) => {
+    setSquadPickerVisible(false);
+    if (!activeTeamId || !member) return;
+
+    if (pendingRole) {
+      // Changing role to squad_commander with squad
+      await updateTeamRole(pendingRole, squadId);
+    } else {
+      // Just assigning to a squad (keeping current role)
+      try {
+        setLoading(true);
+        const currentRole = member.role?.role || 'soldier';
+        await updateTeamMemberRole(activeTeamId, member.user_id, currentRole as TeamRole, { squad_id: squadId });
+        await loadMembers();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert('Success', squadId ? `Assigned to ${squadId}` : 'Removed from squad');
+      } catch (error: any) {
+        console.error('Failed to assign squad:', error);
+        Alert.alert('Error', error.message || 'Failed to assign squad');
+      } finally {
+        setLoading(false);
+      }
+    }
+    setPendingRole(null);
   };
 
   const handleRemoveFromTeam = useCallback(() => {
@@ -281,7 +346,34 @@ export default function MemberPreviewSheet() {
               <View style={[styles.actionIcon, { backgroundColor: '#F59E0B20' }]}>
                 <Ionicons name="shield-checkmark" size={18} color="#F59E0B" />
               </View>
-              <Text style={[styles.actionText, { color: colors.text }]}>Change Role</Text>
+              <View>
+                <Text style={[styles.actionText, { color: colors.text }]}>Change Role</Text>
+                <Text style={[styles.actionSubtext, { color: colors.textMuted }]}>
+                  {ROLE_CONFIG[memberRole]?.label || memberRole}
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
+
+        {/* Assign to Squad - Managers only */}
+        {canManage && teamSquads.length > 0 && (
+          <TouchableOpacity
+            style={[styles.actionRow, { borderBottomColor: colors.border }]}
+            onPress={handleAssignSquad}
+            activeOpacity={0.7}
+          >
+            <View style={styles.actionLeft}>
+              <View style={[styles.actionIcon, { backgroundColor: '#3B82F620' }]}>
+                <Ionicons name="git-branch" size={18} color="#3B82F6" />
+              </View>
+              <View>
+                <Text style={[styles.actionText, { color: colors.text }]}>Assign Squad</Text>
+                <Text style={[styles.actionSubtext, { color: colors.textMuted }]}>
+                  {member?.role?.squad_id || member?.details?.squad_id || 'Not assigned'}
+                </Text>
+              </View>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </TouchableOpacity>
@@ -324,6 +416,92 @@ export default function MemberPreviewSheet() {
       )}
 
       <View style={{ height: 40 }} />
+
+      {/* Squad Picker Modal */}
+      <Modal
+        visible={squadPickerVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => {
+          setSquadPickerVisible(false);
+          setPendingRole(null);
+        }}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={() => {
+              setSquadPickerVisible(false);
+              setPendingRole(null);
+            }}>
+              <Text style={[styles.modalCancel, { color: colors.textMuted }]}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {pendingRole ? 'Select Squad for Commander' : 'Assign to Squad'}
+            </Text>
+            <View style={{ width: 50 }} />
+          </View>
+
+          <ScrollView style={styles.modalContent}>
+            {/* Current squad indicator */}
+            {(member?.role?.squad_id || member?.details?.squad_id) && !pendingRole && (
+              <View style={[styles.currentSquadBadge, { backgroundColor: colors.primary + '15' }]}>
+                <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                <Text style={[styles.currentSquadText, { color: colors.primary }]}>
+                  Currently in: {member?.role?.squad_id || member?.details?.squad_id}
+                </Text>
+              </View>
+            )}
+
+            {/* Squad options */}
+            {teamSquads.map((squad) => {
+              const isCurrentSquad = squad === (member?.role?.squad_id || member?.details?.squad_id);
+              return (
+                <TouchableOpacity
+                  key={squad}
+                  style={[
+                    styles.squadOption,
+                    { backgroundColor: colors.card, borderColor: isCurrentSquad ? colors.primary : colors.border }
+                  ]}
+                  onPress={() => handleSquadSelect(squad)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.squadOptionIcon, { backgroundColor: '#3B82F620' }]}>
+                    <Ionicons name="git-branch" size={18} color="#3B82F6" />
+                  </View>
+                  <Text style={[styles.squadOptionText, { color: colors.text }]}>{squad}</Text>
+                  {isCurrentSquad && (
+                    <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+
+            {/* Remove from squad option */}
+            {!pendingRole && (member?.role?.squad_id || member?.details?.squad_id) && (
+              <TouchableOpacity
+                style={[styles.squadOption, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 16 }]}
+                onPress={() => handleSquadSelect(null)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.squadOptionIcon, { backgroundColor: '#EF444420' }]}>
+                  <Ionicons name="close-circle" size={18} color="#EF4444" />
+                </View>
+                <Text style={[styles.squadOptionText, { color: '#EF4444' }]}>Remove from Squad</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Note for squad commander */}
+            {pendingRole === 'squad_commander' && (
+              <View style={[styles.squadNote, { backgroundColor: colors.secondary }]}>
+                <Ionicons name="information-circle" size={16} color={colors.textMuted} />
+                <Text style={[styles.squadNoteText, { color: colors.textMuted }]}>
+                  Squad Commanders can manage members in their assigned squad.
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -454,6 +632,59 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
   },
+  actionSubtext: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+
+  // Modal
+  modalContainer: { flex: 1 },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+  },
+  modalCancel: { fontSize: 16 },
+  modalTitle: { fontSize: 17, fontWeight: '600' },
+  modalContent: { padding: 20 },
+  currentSquadBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 16,
+  },
+  currentSquadText: { fontSize: 14, fontWeight: '500' },
+  squadOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 12,
+    marginBottom: 10,
+  },
+  squadOptionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  squadOptionText: { flex: 1, fontSize: 16, fontWeight: '500' },
+  squadNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 16,
+  },
+  squadNoteText: { flex: 1, fontSize: 13, lineHeight: 18 },
 
   // Note
   noteCard: {

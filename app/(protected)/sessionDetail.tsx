@@ -6,37 +6,36 @@
  */
 import { useColors } from '@/hooks/ui/useColors';
 import {
-    calculateSessionStats,
-    getSessionById,
-    getSessionTargetsWithResults,
-    type SessionStats,
-    type SessionTargetWithResults,
-    type SessionWithDetails,
+  calculateSessionStats,
+  getSessionById,
+  getSessionTargetsWithResults,
+  type SessionStats,
+  type SessionTargetWithResults,
+  type SessionWithDetails,
 } from '@/services/sessionService';
 import { format, intervalToDuration } from 'date-fns';
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
-    Award,
-    Calendar,
-    ChevronRight,
-    Clock,
-    Crosshair,
-    Target,
-    TrendingUp,
-    Users,
-    Zap,
+  Award,
+  Calendar,
+  ChevronRight,
+  Clock,
+  Crosshair,
+  Target,
+  TrendingUp,
+  Users,
+  Zap,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    Dimensions,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -272,7 +271,6 @@ export default function SessionDetailScreen() {
                   style={[styles.imageCard, { backgroundColor: colors.card, borderColor: colors.border }]}
                   activeOpacity={0.8}
                 >
-                  <Image source={{ uri: img.url }} style={styles.targetImage} contentFit="cover" transition={200} />
                   <View style={styles.imageOverlay}>
                     <Text style={styles.imageLabel}>#{img.sequence || index + 1}</Text>
                     <Text style={styles.imageHits}>

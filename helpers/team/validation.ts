@@ -30,12 +30,3 @@ export function addSquad(existingSquads: string[], squadName: string): string[] 
 export function removeSquad(existingSquads: string[], squadName: string): string[] {
   return existingSquads.filter((s) => s !== squadName);
 }
-
-
-
-
-
-
-
-
-

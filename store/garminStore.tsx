@@ -1,62 +1,124 @@
 /**
  * Garmin Connect IQ Store
- * 
- * Manages connection to Garmin wearables via the ConnectIQ Mobile SDK.
- * Handles device pairing, status tracking, and bidirectional messaging.
+ *
+ * Pure state management layer for Garmin integration.
+ * Subscribes to garminService events and exposes reactive state.
+ *
+ * Architecture:
+ * - Service: Native bridge, event emitters, message sending
+ * - Store: State management only (this file)
+ * - View: Calls initialize() hook on mount
  */
 
-import { DeviceEventEmitter, NativeEventEmitter, Platform } from 'react-native';
-import {
-  type Device,
-  GarminConnect,
-  Status,
-  connectDevice,
-  destroy,
-  getDevicesList,
-  initialize,
-  sendMessage,
-  showDevicesList,
-} from 'react-native-garmin-connect';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useEffect, useRef } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import { create } from 'zustand';
+
+// AsyncStorage key for watch enabled preference
+const WATCH_ENABLED_KEY = '@garmin_watch_enabled';
+
+import {
+  type GarminConnectionStatus,
+  type GarminDevice,
+  type GarminInboundMessage,
+  type GarminOutboundMessageType,
+  type GarminSessionData,
+  endWatchSession,
+  getCurrentStatus,
+  getIsReady,
+  getPairedDevices,
+  initialize,
+  openDeviceSelection as serviceOpenDeviceSelection,
+  refreshDevices as serviceRefreshDevices,
+  sendMessage as serviceSendMessage,
+  sendMessageWithRetry as serviceSendMessageWithRetry,
+  startWatchSession,
+  subscribe,
+  syncDrillToWatch,
+} from '@/services/garminService';
+
+// Re-export types for convenience
+export type { GarminConnectionStatus, GarminDevice, GarminSessionData };
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-export type GarminDevice = Device;
-export { Status as GarminDeviceStatus };
+const MAX_MESSAGES = 20;
 
-export type GarminStatus = 'UNKNOWN' | 'CONNECTED' | 'ONLINE' | 'OFFLINE' | 'ACK' | 'PONG';
-
-export interface GarminMessage {
-  type: string;
-  payload?: unknown;
-}
+/** Session start status for retry tracking */
+export type SessionStartStatus = 'idle' | 'sending' | 'success' | 'failed';
 
 interface GarminState {
-  // State
+  // ---------------------------------------------------------------------------
+  // User Preference
+  // ---------------------------------------------------------------------------
+  /** Whether user has enabled Garmin watch integration */
+  watchEnabled: boolean;
+  /** Whether we've loaded the preference from storage */
+  watchEnabledLoaded: boolean;
+  
+  // ---------------------------------------------------------------------------
+  // Connection state
+  // ---------------------------------------------------------------------------
   devices: GarminDevice[];
-  status: GarminStatus;
+  status: GarminConnectionStatus;
   statusReason: string;
   isReady: boolean;
-  messages: GarminMessage[];
 
+  // Message history (for debugging/display)
+  messages: GarminInboundMessage[];
+
+  // Session data received from watch
+  lastSessionData: GarminSessionData | null;
+
+  // Callbacks for session data (set by active session screen)
+  onSessionData: ((data: GarminSessionData) => void) | null;
+
+  // ---------------------------------------------------------------------------
+  // Session Start Retry State
+  // ---------------------------------------------------------------------------
+  /** Status of sending SESSION_START to watch */
+  sessionStartStatus: SessionStartStatus;
+  /** Number of retry attempts made */
+  sessionStartAttempts: number;
+
+  // ---------------------------------------------------------------------------
   // Actions
+  // ---------------------------------------------------------------------------
+  
+  /** Toggle watch enabled preference (persists to AsyncStorage) */
+  setWatchEnabled: (enabled: boolean) => Promise<void>;
+  /** Load watch enabled preference from storage */
+  loadWatchEnabled: () => Promise<boolean>;
+  
+  // Actions (delegating to service)
   openDeviceSelection: () => void;
   refreshDevices: () => Promise<void>;
-  send: (type: string, payload?: unknown) => void;
+  send: (type: GarminOutboundMessageType, payload?: unknown) => boolean;
+  /** Send message with retry and ACK confirmation */
+  sendWithRetry: (type: string, payload: Record<string, unknown>, options?: { maxRetries?: number; timeoutMs?: number }) => Promise<boolean>;
   clearMessages: () => void;
+  clearLastSessionData: () => void;
 
-  // Lifecycle
-  _initialize: () => () => void;
+  // Session helpers
+  startSession: (sessionId: string, drillName?: string) => boolean;
+  /** Start session with retry logic - returns true if watch acknowledged */
+  startSessionWithRetry: (payload: Record<string, unknown>) => Promise<boolean>;
+  endSession: (sessionId: string) => boolean;
+  syncDrill: (drill: { name: string; rounds: number; distance?: number; timeLimit?: number }) => boolean;
+  
+  // Session start status management
+  setSessionStartStatus: (status: SessionStartStatus) => void;
+  resetSessionStartStatus: () => void;
+
+  // Callback registration
+  setSessionDataCallback: (callback: ((data: GarminSessionData) => void) | null) => void;
+
+  // Internal: called by initialization hook
+  _syncFromService: () => void;
 }
-
-// ============================================================================
-// CONSTANTS
-// ============================================================================
-
-const URL_SCHEME = 'retic';
-const MAX_MESSAGES = 20;
 
 // ============================================================================
 // STORE
@@ -66,131 +128,266 @@ export const useGarminStore = create<GarminState>((set, get) => ({
   // ---------------------------------------------------------------------------
   // Initial State
   // ---------------------------------------------------------------------------
+  watchEnabled: true, // Default to true for existing users
+  watchEnabledLoaded: false,
   devices: [],
   status: 'UNKNOWN',
   statusReason: '',
   isReady: false,
   messages: [],
+  lastSessionData: null,
+  onSessionData: null,
+  sessionStartStatus: 'idle',
+  sessionStartAttempts: 0,
 
   // ---------------------------------------------------------------------------
-  // Actions
+  // Watch Enabled Preference
   // ---------------------------------------------------------------------------
 
-  /** Opens Garmin Connect Mobile for device selection */
-  openDeviceSelection: () => {
-    if (!get().isReady) {
-      console.log('[Garmin] SDK not ready');
-      return;
-    }
-    showDevicesList();
-  },
-
-  /** Fetches paired devices and auto-connects to the first one */
-  refreshDevices: async () => {
-    if (!get().isReady) return;
-
+  setWatchEnabled: async (enabled: boolean) => {
     try {
-      const devices = await getDevicesList();
-      console.log('[Garmin] Devices:', devices);
-      set({ devices });
-
-      // Auto-connect to first device
-      if (devices.length > 0) {
-        const d = devices[0];
-        console.log('[Garmin] Connecting to:', d.name);
-        connectDevice(d.id, d.model, d.name);
-      }
+      await AsyncStorage.setItem(WATCH_ENABLED_KEY, JSON.stringify(enabled));
+      set({ watchEnabled: enabled });
+      console.log(`[GarminStore] Watch enabled set to: ${enabled}`);
     } catch (error) {
-      console.error('[Garmin] Error fetching devices:', error);
+      console.error('[GarminStore] Failed to save watchEnabled:', error);
     }
   },
 
-  /** Sends a message to the connected watch app */
-  send: (type: string, payload?: unknown) => {
-    if (get().status !== 'CONNECTED') {
-      console.log('[Garmin] Cannot send - status:', get().status);
-      return;
+  loadWatchEnabled: async () => {
+    try {
+      const stored = await AsyncStorage.getItem(WATCH_ENABLED_KEY);
+      // Default to true if never set (for existing users with watches)
+      const enabled = stored !== null ? JSON.parse(stored) : true;
+      set({ watchEnabled: enabled, watchEnabledLoaded: true });
+      console.log(`[GarminStore] Watch enabled loaded: ${enabled}`);
+      return enabled;
+    } catch (error) {
+      console.error('[GarminStore] Failed to load watchEnabled:', error);
+      set({ watchEnabled: true, watchEnabledLoaded: true });
+      return true;
     }
-
-    const message = JSON.stringify({ type, payload });
-    console.log('[Garmin] 📤 Sending:', message);
-    sendMessage(message);
   },
 
-  /** Clears the message history */
-  clearMessages: () => set({ messages: [] }),
-
   // ---------------------------------------------------------------------------
-  // Lifecycle
+  // Actions (delegating to service)
   // ---------------------------------------------------------------------------
 
-  /** Initializes the SDK and sets up event listeners. Call once at app root. */
-  _initialize: () => {
-    // Only available on mobile
-    if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
-      return () => {};
+  openDeviceSelection: () => {
+    serviceOpenDeviceSelection();
+  },
+
+  refreshDevices: async () => {
+    const devices = await serviceRefreshDevices();
+    set({ devices });
+  },
+
+  send: (type, payload) => {
+    return serviceSendMessage(type, payload);
+  },
+
+  sendWithRetry: async (type, payload, options) => {
+    return serviceSendMessageWithRetry(type, payload, options);
+  },
+
+  clearMessages: () => set({ messages: [], lastSessionData: null }),
+  
+  clearLastSessionData: () => set({ lastSessionData: null }),
+
+  // ---------------------------------------------------------------------------
+  // Session Helpers
+  // ---------------------------------------------------------------------------
+
+  startSession: (sessionId, drillName) => {
+    return startWatchSession(sessionId, drillName);
+  },
+
+  startSessionWithRetry: async (payload) => {
+    set({ sessionStartStatus: 'sending', sessionStartAttempts: 0 });
+    
+    const success = await serviceSendMessageWithRetry('SESSION_START', payload, {
+      maxRetries: 3,
+      timeoutMs: 3000,
+    });
+    
+    if (success) {
+      set({ sessionStartStatus: 'success' });
+    } else {
+      set({ sessionStartStatus: 'failed' });
     }
+    
+    return success;
+  },
 
-    console.log('[Garmin] Initializing SDK...');
+  endSession: (sessionId) => {
+    return endWatchSession(sessionId);
+  },
 
-    // Create platform-specific event emitter
-    const emitter =
-      Platform.OS === 'ios'
-        ? new NativeEventEmitter(GarminConnect as any)
-        : DeviceEventEmitter;
+  syncDrill: (drill) => {
+    return syncDrillToWatch(drill);
+  },
 
-    // SDK Ready
-    const sdkSub = emitter.addListener('onSdkReady', () => {
-      console.log('[Garmin] ✅ SDK Ready');
-      set({ isReady: true });
-      get().refreshDevices();
+  setSessionStartStatus: (status) => {
+    set({ sessionStartStatus: status });
+  },
+
+  resetSessionStartStatus: () => {
+    set({ sessionStartStatus: 'idle', sessionStartAttempts: 0 });
+  },
+
+  // ---------------------------------------------------------------------------
+  // Callback Registration
+  // ---------------------------------------------------------------------------
+
+  setSessionDataCallback: (callback) => {
+    set({ onSessionData: callback });
+  },
+
+  // ---------------------------------------------------------------------------
+  // Internal: Sync state from service
+  // ---------------------------------------------------------------------------
+
+  _syncFromService: () => {
+    set({
+      isReady: getIsReady(),
+      status: getCurrentStatus(),
+      devices: getPairedDevices(),
     });
-
-    // Device Status Changes
-    const statusSub = emitter.addListener('onDeviceStatusChanged', (event: any) => {
-      const status = event.status as GarminStatus;
-      const reason = event.reason || '';
-      console.log(`[Garmin] 📱 Status: ${status}${reason ? ` (${reason})` : ''}`);
-      set({ status, statusReason: reason });
-    });
-
-    // Incoming Messages from Watch
-    const msgSub = emitter.addListener('onMessage', (raw: any) => {
-      console.log('[Garmin] 📩 Message received:', raw);
-      
-      const message: GarminMessage = {
-        type: raw?.type || 'unknown',
-        payload: raw?.payload,
-      };
-      
-      set((state) => ({
-        messages: [...state.messages, message].slice(-MAX_MESSAGES),
-      }));
-    });
-
-    // Errors
-    const errSub = emitter.addListener('onError', (error: any) => {
-      console.error('[Garmin] ❌ Error:', error);
-    });
-
-    // Initialize the native SDK
-    initialize(URL_SCHEME);
-
-    // Cleanup function
-    return () => {
-      console.log('[Garmin] Cleaning up...');
-      sdkSub.remove();
-      statusSub.remove();
-      msgSub.remove();
-      errSub.remove();
-      destroy();
-      set({ isReady: false, status: 'UNKNOWN', devices: [] });
-    };
   },
 }));
 
 // ============================================================================
-// HOOKS (Convenience selectors)
+// INITIALIZATION HOOK
+// ============================================================================
+
+/**
+ * Hook to initialize the Garmin service and sync state to the store.
+ * Call this once at the app root (e.g., in _layout.tsx).
+ *
+ * @example
+ * ```tsx
+ * import { useGarminInitialize } from '@/store/garminStore';
+ *
+ * export default function RootLayout() {
+ *   useGarminInitialize();
+ *   return <Stack />;
+ * }
+ * ```
+ */
+export function useGarminInitialize() {
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const cleanupRef = useRef<(() => void) | null>(null);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
+  
+  useEffect(() => {
+    let appStateSubscription: ReturnType<typeof AppState.addEventListener> | null = null;
+    
+    // Load preference and conditionally initialize
+    const initAsync = async () => {
+      const { loadWatchEnabled } = useGarminStore.getState();
+      const watchEnabled = await loadWatchEnabled();
+      
+      if (!watchEnabled) {
+        console.log('[GarminStore] Watch disabled by user preference - skipping init');
+        return;
+      }
+      
+      console.log('[GarminStore] Watch enabled - initializing SDK');
+      
+      // Initialize the native SDK (uses GARMIN_DEFAULT_CONFIG)
+      cleanupRef.current = initialize();
+
+      // Subscribe to service events and update store
+      unsubscribeRef.current = subscribe((event) => {
+        const store = useGarminStore.getState();
+
+        switch (event.event) {
+          case 'sdk_ready':
+            useGarminStore.setState({ isReady: true });
+            break;
+
+          case 'status_changed':
+            useGarminStore.setState({
+              status: event.status,
+              statusReason: event.reason || '',
+            });
+            break;
+
+          case 'devices_updated':
+            useGarminStore.setState({ devices: event.devices });
+            break;
+
+          case 'message_received':
+            console.log('[GarminStore] 📩 MESSAGE_RECEIVED event');
+            console.log('[GarminStore] 📩 Message:', JSON.stringify(event.message, null, 2));
+            useGarminStore.setState((state) => {
+              const newMessages = [...state.messages, event.message].slice(-MAX_MESSAGES);
+              console.log('[GarminStore] 📩 Total messages now:', newMessages.length);
+              return { messages: newMessages };
+            });
+            break;
+
+          case 'session_data':
+            useGarminStore.setState({ lastSessionData: event.data });
+
+            // Call registered callback if any
+            if (store.onSessionData) {
+              store.onSessionData(event.data);
+            }
+            break;
+
+          case 'error':
+            console.error('[GarminStore] Service error:', event.error);
+            break;
+        }
+      });
+
+      // Sync initial state
+      useGarminStore.getState()._syncFromService();
+      
+      // =========================================================================
+      // AUTO-RECONNECT ON APP RESUME
+      // When app comes back to foreground, try to refresh devices & reconnect
+      // Only if watchEnabled is true
+      // =========================================================================
+      appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
+        const wasBackground = appStateRef.current.match(/inactive|background/);
+        const isNowActive = nextAppState === 'active';
+        
+        if (wasBackground && isNowActive) {
+          const { isReady, status, watchEnabled } = useGarminStore.getState();
+          
+          // Only try to reconnect if watch enabled, SDK ready, and not already connected
+          if (watchEnabled && isReady && status !== 'CONNECTED') {
+            console.log('[GarminStore] App resumed - attempting silent reconnect');
+            serviceRefreshDevices().catch((err) => {
+              console.log('[GarminStore] Silent reconnect failed:', err);
+            });
+          }
+        }
+        
+        appStateRef.current = nextAppState;
+      });
+    };
+    
+    initAsync();
+
+    return () => {
+      unsubscribeRef.current?.();
+      cleanupRef.current?.();
+      appStateSubscription?.remove();
+      useGarminStore.setState({
+        isReady: false,
+        status: 'UNKNOWN',
+        devices: [],
+        messages: [],
+      });
+    };
+  }, []);
+}
+
+// ============================================================================
+// CONVENIENCE SELECTORS (Hooks)
 // ============================================================================
 
 /** Returns the current connection status */
@@ -208,5 +405,17 @@ export const useGarminDevice = () => useGarminStore((s) => s.devices[0]);
 /** Returns messages received from the watch */
 export const useGarminMessages = () => useGarminStore((s) => s.messages);
 
-/** Returns the send function */
-export const useGarminSend = () => useGarminStore((s) => s.send);
+/** Returns the last session data received from watch */
+export const useGarminSessionData = () => useGarminStore((s) => s.lastSessionData);
+
+/** Returns true if SDK is ready */
+export const useGarminReady = () => useGarminStore((s) => s.isReady);
+
+/** Returns whether watch integration is enabled by user */
+export const useWatchEnabled = () => useGarminStore((s) => s.watchEnabled);
+
+/** Returns whether watch preference has been loaded from storage */
+export const useWatchEnabledLoaded = () => useGarminStore((s) => s.watchEnabledLoaded);
+
+/** Returns the session start status for retry UI */
+export const useSessionStartStatus = () => useGarminStore((s) => s.sessionStartStatus);

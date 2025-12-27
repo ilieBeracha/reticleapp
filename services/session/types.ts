@@ -1,19 +1,65 @@
+// ============================================================================
+// BASE SESSION CONFIG - Unified structure for ALL session creation
+// ============================================================================
+
+/**
+ * Inline drill configuration for custom/ad-hoc drills.
+ * Used when starting a session without a saved template.
+ */
+export interface DrillConfig {
+  name: string;
+  drill_goal: 'grouping' | 'achievement';
+  target_type: 'paper' | 'tactical';
+  input_method?: 'scan' | 'manual' | null; // User's explicit choice
+  distance_m: number;
+  rounds_per_shooter: number;
+  time_limit_seconds?: number | null;
+  strings_count?: number | null; // Number of entries allowed (null = unlimited)
+}
+
+/**
+ * BaseSessionConfig - The unified structure ALL session creation flows must use.
+ * 
+ * Entry points:
+ * - Solo quick practice
+ * - Team training start
+ * - Drill library pick
+ * - Custom drill create
+ * 
+ * All funnel through sessionService.createSession(config: BaseSessionConfig)
+ */
+export interface BaseSessionConfig {
+  // Context
+  team_id: string | null;           // null = personal solo session
+  training_id: string | null;       // null = ad-hoc session
+  drill_id: string | null;          // Link to training drill (if from training)
+  
+  // Drill source (exactly one should be set, or neither for blank session)
+  drill_template_id: string | null; // existing template
+  drill_config: DrillConfig | null; // inline custom drill
+  
+  // Session mode
+  session_mode: 'solo' | 'group';
+  
+  // Watch control
+  watch_controlled: boolean;        // user's choice per session
+  
+  // Optional metadata
+  notes?: string;
+}
+
+/**
+ * @deprecated Use BaseSessionConfig instead. This type is kept for backwards compatibility.
+ */
 export interface CreateSessionParams {
   team_id?: string | null; // NULL for personal, UUID for team
   training_id?: string | null; // Link session to a training
   drill_id?: string | null; // Link session to a specific drill
   drill_template_id?: string | null; // For quick practice from template
   session_mode?: 'solo' | 'group';
+  watch_controlled?: boolean; // Watch control choice
   // Custom drill config for quick practice (inline, no template)
-  custom_drill_config?: {
-    name: string;
-    drill_goal: 'grouping' | 'achievement';
-    target_type: 'paper' | 'tactical';
-    distance_m: number;
-    rounds_per_shooter: number;
-    time_limit_seconds?: number | null;
-    strings_count?: number | null; // Number of entries allowed (null = unlimited)
-  };
+  custom_drill_config?: DrillConfig;
 }
 
 /** Drill configuration embedded in session */
@@ -22,6 +68,7 @@ export interface SessionDrillConfig {
   name: string;
   drill_goal: 'grouping' | 'achievement'; // Primary: what the drill measures
   target_type: 'paper' | 'tactical'; // Secondary: input method hint
+  input_method?: 'scan' | 'manual' | null; // Commander's explicit choice (overrides target_type inference)
   distance_m: number;
   rounds_per_shooter: number;
   time_limit_seconds?: number | null;
@@ -70,6 +117,7 @@ export interface SessionWithDetails {
   drill_config?: SessionDrillConfig | null; // Full drill configuration
   session_mode: 'solo' | 'group';
   status: 'active' | 'completed' | 'cancelled';
+  watch_controlled: boolean; // Whether watch controls this session
   started_at: string;
   ended_at: string | null;
   created_at: string;

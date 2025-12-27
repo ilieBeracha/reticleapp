@@ -56,20 +56,3 @@ const styles = StyleSheet.create({
   },
 });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

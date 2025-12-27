@@ -32,6 +32,34 @@ export async function getTeamDrills(teamId: string): Promise<Drill[]> {
 }
 
 /**
+ * Get personal drills for the current user (team_id is null)
+ * These are drills saved from solo practice sessions.
+ */
+export async function getPersonalDrills(): Promise<Drill[]> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error('Not authenticated');
+  }
+
+  const { data, error } = await supabase
+    .from('drill_templates')
+    .select('*')
+    .is('team_id', null)
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Failed to fetch personal drills:', error);
+    throw new Error(error.message || 'Failed to fetch personal drills');
+  }
+
+  return (data || []) as Drill[];
+}
+
+/**
  * Get a single drill by ID
  */
 export async function getDrill(drillId: string): Promise<Drill | null> {
@@ -93,6 +121,80 @@ export async function createDrill(teamId: string, input: CreateDrillInput): Prom
   }
 
   return data as Drill;
+}
+
+/**
+ * Create a personal drill (team_id = null, user_id = current user)
+ * Used when saving drills from solo practice sessions.
+ */
+export async function createPersonalDrill(input: CreateDrillInput): Promise<Drill> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error('Not authenticated');
+  }
+
+  const { data, error } = await supabase
+    .from('drill_templates')
+    .insert({
+      team_id: null, // Personal drill
+      user_id: user.id, // Owner
+      created_by: user.id,
+
+      // === ESSENTIAL FIELDS ===
+      name: input.name,
+      description: input.description || null,
+      drill_goal: input.drill_goal,
+      target_type: input.target_type,
+      distance_m: input.distance_m,
+      rounds_per_shooter: input.rounds_per_shooter,
+      time_limit_seconds: input.time_limit_seconds || null,
+      strings_count: input.strings_count || 1,
+
+      // Legacy fields (same values for backwards compatibility)
+      default_distance_m: input.distance_m,
+      default_rounds_per_shooter: input.rounds_per_shooter,
+      default_time_limit_seconds: input.time_limit_seconds || null,
+      default_strings_count: input.strings_count || 1,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Failed to create personal drill:', error);
+    throw new Error(error.message || 'Failed to create personal drill');
+  }
+
+  return data as Drill;
+}
+
+/**
+ * Save a session's inline drill_config as a personal template.
+ * Used after a session ends when user chooses to save the custom drill.
+ */
+export async function saveSessionDrillAsTemplate(
+  drillConfig: {
+    name: string;
+    drill_goal: 'grouping' | 'achievement';
+    target_type: 'paper' | 'tactical';
+    distance_m: number;
+    rounds_per_shooter: number;
+    time_limit_seconds?: number | null;
+    strings_count?: number | null;
+  },
+  customName?: string
+): Promise<Drill> {
+  return createPersonalDrill({
+    name: customName || drillConfig.name,
+    drill_goal: drillConfig.drill_goal,
+    target_type: drillConfig.target_type,
+    distance_m: drillConfig.distance_m,
+    rounds_per_shooter: drillConfig.rounds_per_shooter,
+    time_limit_seconds: drillConfig.time_limit_seconds ?? undefined,
+    strings_count: drillConfig.strings_count ?? 1,
+  });
 }
 
 /**
@@ -177,6 +279,11 @@ export function drillToTrainingInput(
   drill: Drill,
   instanceConfig?: Partial<DrillInstanceConfig>
 ): import('@/types/workspace').CreateTrainingDrillInput {
+  // Determine input_method: from config, or derive from drill goal
+  // Grouping drills are always scan, achievement defaults to manual unless specified
+  const inputMethod = instanceConfig?.input_method 
+    ?? (drill.drill_goal === 'grouping' ? 'scan' : 'manual');
+
   return {
     // Reference to source drill
     drill_id: drill.id,
@@ -186,6 +293,9 @@ export function drillToTrainingInput(
     drill_goal: drill.drill_goal,
     target_type: drill.target_type,
     description: drill.description || undefined,
+
+    // Entry method (commander's choice)
+    input_method: inputMethod,
 
     // Instance configuration (use overrides or drill defaults)
     distance_m: instanceConfig?.distance_m ?? drill.distance_m,

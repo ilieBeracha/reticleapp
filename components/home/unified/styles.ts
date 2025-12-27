@@ -4,16 +4,16 @@ import { CARD_RADIUS, SMALL_RADIUS } from './constants';
 export const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollView: { flex: 1 },
-  scrollContent: { paddingBottom: 24, paddingTop: 8 },
+  scrollContent: { paddingBottom: 24, paddingTop: 12, paddingHorizontal: 4 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   // Greeting
   greetingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    marginBottom: 20,
+    gap: 14,
+    paddingHorizontal: 10,
+    marginBottom: 24,
   },
   greetingAvatar: {
     width: 44,
@@ -39,8 +39,8 @@ export const styles = StyleSheet.create({
 
   // Section
   section: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
+    paddingHorizontal: 10,
+    marginBottom: 20,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -504,13 +504,85 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
   },
+
+  // Quick Actions Grid
+  quickActionsGrid: {
+    paddingHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  gridRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  gridItem: {
+    flex: 1,
+    aspectRatio: 1,
+    borderRadius: 16,
+    padding: 16,
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  gridItemWide: {
+    flex: 2,
+    aspectRatio: 2.1,
+    borderRadius: 16,
+    padding: 16,
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  gridItemTall: {
+    flex: 1,
+    aspectRatio: 0.85,
+    borderRadius: 16,
+    padding: 16,
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  gridIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gridItemTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  gridItemSubtitle: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
+    opacity: 0.7,
+  },
+  gridItemValue: {
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -1,
+  },
+  gridItemUnit: {
+    fontSize: 12,
+    fontWeight: '600',
+    opacity: 0.6,
+  },
+  gridGlow: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    opacity: 0.15,
+  },
+
+  // Debug borders (toggle with DEV_MODE)
+  debugBorder: {
+    borderWidth: 1,
+    borderColor: '#FF00FF',
+    borderStyle: 'dashed',
+  },
 });
-
-
-
-
-
-
-
-
-

@@ -28,6 +28,7 @@ export function mapSession(row: any): SessionWithDetails {
       name: drillSource.name,
       drill_goal: drillSource.drill_goal ?? 'achievement',
       target_type: drillSource.target_type,
+      input_method: drillSource.input_method ?? null, // Commander's choice
       distance_m: drillSource.distance_m,
       rounds_per_shooter: drillSource.rounds_per_shooter,
       time_limit_seconds: drillSource.time_limit_seconds ?? null,
@@ -59,6 +60,7 @@ export function mapSession(row: any): SessionWithDetails {
       name: customConfig.name ?? 'Quick Practice',
       drill_goal: customConfig.drill_goal ?? 'grouping',
       target_type: customConfig.target_type ?? 'paper',
+      input_method: customConfig.input_method ?? null, // User's choice
       distance_m: customConfig.distance_m ?? 25,
       rounds_per_shooter: customConfig.rounds_per_shooter ?? 5,
       time_limit_seconds: customConfig.time_limit_seconds ?? null,
@@ -101,6 +103,7 @@ export function mapSession(row: any): SessionWithDetails {
     drill_config: drillConfig,
     session_mode: row.session_mode,
     status: row.status,
+    watch_controlled: row.watch_controlled ?? false,
     started_at: row.started_at,
     ended_at: row.ended_at ?? null,
     created_at: row.created_at,

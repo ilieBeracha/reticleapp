@@ -1,5 +1,5 @@
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 import { ArrowRight, Play } from 'lucide-react-native';
+import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 import type { ThemeColors } from '../types';
 import { styles } from './styles';
 

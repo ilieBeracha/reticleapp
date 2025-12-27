@@ -3,7 +3,9 @@ import { getDrillRequirements } from './drillContract';
 import { mapSession } from './mappers';
 import {
   getMyActiveSessionForTraining,
+  getMyActiveSessionsAll,
   getSessionById,
+  shouldAutoCancelSession,
 } from './queries';
 import { calculateSessionStats } from './stats';
 import {
@@ -12,6 +14,7 @@ import {
   saveTacticalTargetResult,
 } from './targets';
 import type {
+  BaseSessionConfig,
   CreateSessionParams,
   PaperType,
   SessionStats,
@@ -21,16 +24,50 @@ import type {
 } from './types';
 
 /**
- * Create a new session - DRILL-FIRST architecture
+ * Convert legacy CreateSessionParams to BaseSessionConfig
+ */
+function normalizeToBaseConfig(params: CreateSessionParams | BaseSessionConfig): BaseSessionConfig {
+  // If it's already a BaseSessionConfig (has watch_controlled as required boolean)
+  if ('watch_controlled' in params && typeof params.watch_controlled === 'boolean' && 'drill_config' in params) {
+    return params as BaseSessionConfig;
+  }
+  
+  // Convert from CreateSessionParams
+  const legacy = params as CreateSessionParams;
+  return {
+    team_id: legacy.team_id ?? null,
+    training_id: legacy.training_id ?? null,
+    drill_id: legacy.drill_id ?? null,
+    drill_template_id: legacy.drill_template_id ?? null,
+    drill_config: legacy.custom_drill_config ?? null,
+    session_mode: legacy.session_mode ?? 'solo',
+    watch_controlled: legacy.watch_controlled ?? false,
+  };
+}
+
+/**
+ * Create a new session - UNIFIED ARCHITECTURE
+ *
+ * All session creation flows use BaseSessionConfig:
+ * - Solo quick practice (team_id: null)
+ * - Team training (team_id: X, training_id: Y)
+ * - Drill library pick (drill_template_id: Z)
+ * - Custom drill (drill_config: {...})
  *
  * Every session MUST have a drill configuration:
  * - drill_id: For training drills (from a scheduled training)
  * - drill_template_id: For quick practice (from drill library)
- * - custom_drill_config: For quick/custom drill (inline config)
+ * - drill_config: For quick/custom drill (inline config)
  *
- * The session's configuration is determined by the drill parameters.
+ * SINGLE SESSION ENFORCEMENT:
+ * - Before creating a new session, any existing active sessions are auto-ended
+ * - Sessions older than 24h are auto-cancelled (no data saved)
+ * - This prevents orphaned sessions from accumulating
  */
-export async function createSession(params: CreateSessionParams): Promise<SessionWithDetails> {
+export async function createSession(params: CreateSessionParams | BaseSessionConfig): Promise<SessionWithDetails> {
+  // Normalize to BaseSessionConfig
+  const config = normalizeToBaseConfig(params);
+  
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -39,23 +76,60 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
     throw new Error('Not authenticated');
   }
 
+  // =========================================================================
+  // SINGLE ACTIVE SESSION ENFORCEMENT
+  // =========================================================================
+  // Before creating a new session, handle any existing active sessions.
+  // This prevents orphaned sessions from accumulating.
+  const existingActiveSessions = await getMyActiveSessionsAll();
+  
+  if (existingActiveSessions.length > 0) {
+    console.log(`[createSession] Found ${existingActiveSessions.length} existing active session(s), cleaning up...`);
+    
+    for (const existingSession of existingActiveSessions) {
+      // Sessions older than 24h are stale - cancel them (don't count as completed)
+      if (shouldAutoCancelSession(existingSession)) {
+        console.log(`[createSession] Auto-cancelling stale session ${existingSession.id} (>24h old)`);
+        await supabase
+          .from('sessions')
+          .update({ 
+            status: 'cancelled', 
+            ended_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingSession.id);
+      } else {
+        // Recent sessions - end them properly (mark as completed)
+        console.log(`[createSession] Auto-ending active session ${existingSession.id}`);
+        await supabase
+          .from('sessions')
+          .update({ 
+            status: 'completed', 
+            ended_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingSession.id);
+      }
+    }
+  }
+
   // DRILL-FIRST: Every session must have a drill source
   const hasCustomConfig =
-    params.custom_drill_config && params.custom_drill_config.distance_m > 0 && params.custom_drill_config.rounds_per_shooter > 0;
+    config.drill_config && config.drill_config.distance_m > 0 && config.drill_config.rounds_per_shooter > 0;
 
-  if (!params.drill_id && !params.drill_template_id && !hasCustomConfig) {
+  if (!config.drill_id && !config.drill_template_id && !hasCustomConfig) {
     throw new Error('A drill configuration is required. Use custom drill, training drill, or drill template.');
   }
 
   // If joining a training, enforce drill-driven sessions and avoid drill mismatches
-  if (params.training_id) {
-    const existingSession = await getMyActiveSessionForTraining(params.training_id);
+  if (config.training_id) {
+    const existingSession = await getMyActiveSessionForTraining(config.training_id);
 
     // If there's already an active session for this training, only allow:
     // - continuing it (no drill specified), or
     // - continuing it if the requested drill matches
     if (existingSession) {
-      if (!params.drill_id || existingSession.drill_id === params.drill_id) {
+      if (!config.drill_id || existingSession.drill_id === config.drill_id) {
         return existingSession;
       }
 
@@ -64,11 +138,11 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
     }
 
     // No active session yet: if this training has drills, require selecting a drill
-    if (!params.drill_id) {
+    if (!config.drill_id) {
       const { count, error: drillsCountError } = await supabase
         .from('training_drills')
         .select('*', { count: 'exact', head: true })
-        .eq('training_id', params.training_id);
+        .eq('training_id', config.training_id);
 
       // If we can't determine drill count, fail safe by allowing session creation.
       // (UI should still route users through drill selection.)
@@ -80,11 +154,11 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
       const { data: drillRow, error: drillError } = await supabase
         .from('training_drills')
         .select('training_id')
-        .eq('id', params.drill_id)
+        .eq('id', config.drill_id)
         .single();
 
       if (drillError) throw drillError;
-      if (drillRow?.training_id !== params.training_id) {
+      if (drillRow?.training_id !== config.training_id) {
         throw new Error('Selected drill does not belong to this training.');
       }
     }
@@ -93,13 +167,14 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
   // Build custom drill config for inline storage
   const customDrillConfig = hasCustomConfig
     ? {
-        name: params.custom_drill_config!.name || 'Quick Practice',
-        drill_goal: params.custom_drill_config!.drill_goal,
-        target_type: params.custom_drill_config!.target_type || 'paper',
-        distance_m: params.custom_drill_config!.distance_m,
-        rounds_per_shooter: params.custom_drill_config!.rounds_per_shooter,
-        time_limit_seconds: params.custom_drill_config!.time_limit_seconds ?? null,
-        strings_count: params.custom_drill_config!.strings_count ?? null,
+        name: config.drill_config!.name || 'Quick Practice',
+        drill_goal: config.drill_config!.drill_goal,
+        target_type: config.drill_config!.target_type || 'paper',
+        input_method: config.drill_config!.input_method ?? null, // User's choice
+        distance_m: config.drill_config!.distance_m,
+        rounds_per_shooter: config.drill_config!.rounds_per_shooter,
+        time_limit_seconds: config.drill_config!.time_limit_seconds ?? null,
+        strings_count: config.drill_config!.strings_count ?? null,
       }
     : null;
 
@@ -108,12 +183,13 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
     .from('sessions')
     .insert({
       user_id: user.id,
-      team_id: params.team_id ?? null,
-      training_id: params.training_id ?? null,
-      drill_id: params.drill_id ?? null,
-      drill_template_id: params.drill_template_id ?? null,
+      team_id: config.team_id,
+      training_id: config.training_id,
+      drill_id: config.drill_id,
+      drill_template_id: config.drill_template_id,
       custom_drill_config: customDrillConfig,
-      session_mode: params.session_mode ?? 'solo',
+      session_mode: config.session_mode,
+      watch_controlled: config.watch_controlled,
       status: 'active',
       started_at: new Date().toISOString(),
     })
@@ -127,6 +203,7 @@ export async function createSession(params: CreateSessionParams): Promise<Sessio
       drill_template_id,
       custom_drill_config,
       session_mode,
+      watch_controlled,
       status,
       started_at,
       ended_at,
@@ -244,6 +321,7 @@ export async function updateSession(
   updates: {
     status?: 'active' | 'completed' | 'cancelled';
     ended_at?: string;
+    watch_controlled?: boolean;
   }
 ) {
   const updatePayload: Record<string, any> = {
@@ -256,6 +334,10 @@ export async function updateSession(
 
   if (typeof updates.ended_at !== 'undefined') {
     updatePayload.ended_at = updates.ended_at;
+  }
+
+  if (typeof updates.watch_controlled !== 'undefined') {
+    updatePayload.watch_controlled = updates.watch_controlled;
   }
 
   // Return a fully-hydrated session payload so callers don't lose drill context after updates.
@@ -273,6 +355,7 @@ export async function updateSession(
       drill_template_id,
       custom_drill_config,
       session_mode,
+      watch_controlled,
       status,
       started_at,
       ended_at,
@@ -353,6 +436,24 @@ export async function endSession(sessionId: string) {
         accuracyPct: stats.accuracyPct,
         durationSeconds,
       });
+    }
+
+    // =========================================================================
+    // AUTO-CLOSE TRAINING IF ALL MEMBERS COMPLETED ALL DRILLS (OR EXPIRED)
+    // =========================================================================
+    try {
+      const { data: newStatus, error: rpcError } = await supabase.rpc('auto_close_training_if_complete', {
+        p_training_id: session.training_id,
+      });
+
+      if (rpcError) {
+        console.error('[SessionService] Failed to check training auto-close:', rpcError);
+      } else if (newStatus === 'finished') {
+        console.log('[SessionService] Training auto-closed - all members completed all drills');
+      }
+    } catch (err) {
+      // Non-blocking - don't fail session end if auto-close check fails
+      console.error('[SessionService] Error checking training auto-close:', err);
     }
   }
 
@@ -560,6 +661,127 @@ export async function addTargetWithTacticalResult(params: {
     paper_result: null,
     tactical_result: tacticalResult,
   };
+}
+
+// ============================================================================
+// WATCH DATA INTEGRATION
+// ============================================================================
+
+export interface WatchSessionData {
+  sessionId: string;
+  shotsRecorded: number;
+  durationMs?: number;
+  distance?: number;
+  completed?: boolean;
+}
+
+/**
+ * Save watch data to session and optionally end it.
+ * Creates a tactical target entry with the watch data as the result.
+ * 
+ * @param data - Watch session data from Garmin
+ * @param endSession - Whether to end the session after saving
+ * @returns The updated session
+ */
+export async function saveWatchSessionData(
+  data: WatchSessionData,
+  shouldEnd: boolean = true
+): Promise<SessionWithDetails> {
+  const session = await getSessionById(data.sessionId);
+  
+  if (!session) {
+    throw new Error('Session not found');
+  }
+  
+  console.log('[SessionService] Saving watch data:', data);
+  
+  // Get drill config for distance if not provided by watch
+  const drill = session.drill_config;
+  const distance = data.distance ?? drill?.distance_m ?? 0;
+  
+  // Create a tactical target entry with watch data
+  // This allows the data to be picked up by normal stats calculation
+  const target = await addSessionTarget({
+    session_id: data.sessionId,
+    target_type: 'tactical',
+    distance_m: distance,
+    notes: 'Recorded via Garmin watch',
+    target_data: {
+      source: 'garmin_watch',
+      raw_data: data,
+    },
+  });
+  
+  // Calculate time in seconds from milliseconds
+  const timeSeconds = data.durationMs ? data.durationMs / 1000 : null;
+  
+  // Save the tactical result
+  // For watch data, we assume all shots are hits unless we have more info
+  await saveTacticalTargetResult({
+    session_target_id: target.id,
+    bullets_fired: data.shotsRecorded,
+    hits: data.shotsRecorded, // Assume all shots are hits from watch
+    is_stage_cleared: data.completed ?? false,
+    time_seconds: timeSeconds,
+    notes: 'Watch session data',
+  });
+  
+  console.log('[SessionService] Watch data saved as tactical target:', target.id);
+  
+  // End the session if requested
+  if (shouldEnd) {
+    // Calculate ended_at based on watch duration (not current phone time)
+    // This ensures the session duration matches what the watch recorded
+    let calculatedEndedAt: string;
+    
+    if (data.durationMs && session.started_at) {
+      // Use watch duration: started_at + durationMs
+      const startedAtMs = new Date(session.started_at).getTime();
+      const endedAtMs = startedAtMs + data.durationMs;
+      calculatedEndedAt = new Date(endedAtMs).toISOString();
+      console.log('[SessionService] Using watch duration for ended_at:', {
+        started_at: session.started_at,
+        durationMs: data.durationMs,
+        calculated_ended_at: calculatedEndedAt,
+      });
+    } else {
+      // Fallback to current time if no duration from watch
+      calculatedEndedAt = new Date().toISOString();
+      console.log('[SessionService] No watch duration, using current time for ended_at');
+    }
+    
+    // Update session with calculated ended_at
+    const updatedSession = await updateSession(data.sessionId, {
+      status: 'completed',
+      ended_at: calculatedEndedAt,
+    });
+    
+    // Check drill completion if applicable
+    if (session.training_id && session.drill_id && session.drill_config) {
+      const drill = session.drill_config;
+      const stats = await calculateSessionStats(data.sessionId);
+      
+      const meetsShotCount = !drill.rounds_per_shooter || stats.totalShotsFired >= drill.rounds_per_shooter;
+      const targetRequirement = (drill.strings_count ?? 1) * (drill.target_count ?? 1);
+      const meetsTargetCount = stats.targetsCount >= targetRequirement;
+      const meetsAccuracy = !drill.min_accuracy_percent || stats.accuracyPct >= drill.min_accuracy_percent;
+      
+      const endedAt = new Date(calculatedEndedAt).getTime();
+      const startedAt = session.started_at ? new Date(session.started_at).getTime() : endedAt;
+      const durationSeconds = Math.max(0, Math.floor((endedAt - startedAt) / 1000));
+      const meetsTime = !drill.time_limit_seconds || durationSeconds <= drill.time_limit_seconds;
+      
+      if (meetsShotCount && meetsTargetCount && meetsAccuracy && meetsTime) {
+        await markTrainingDrillCompleted(session.training_id, session.drill_id, session.user_id);
+        console.log('[SessionService] Watch session: Drill marked completed');
+      }
+    }
+    
+    return updatedSession;
+  }
+  
+  // Otherwise just return the current session
+  return session;
 }
 
 

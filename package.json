@@ -97,9 +97,9 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@react-native-community/cli": "latest",
     "@types/react": "~19.1.0",
     "eslint": "^9.25.0",
-    "@react-native-community/cli": "latest",
     "eslint-config-expo": "~10.0.0",
     "patch-package": "^8.0.1",
     "prettier-plugin-tailwindcss": "^0.5.14",

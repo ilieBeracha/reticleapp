@@ -80,11 +80,32 @@ export function getDrillInputRoutes(args: {
     };
   }
 
-  // Drill-driven - all routes get locked: '1' to skip setup and enforce drill values
-  if (drill.target_type === 'paper') {
+  // =========================================================================
+  // DRILL-DRIVEN INPUT ROUTING
+  // =========================================================================
+  // Commander can explicitly choose input_method during training creation.
+  // If set, respect it. Otherwise, fall back to target_type-based inference.
+  
     const maxShots = !isInfiniteShots(drill.rounds_per_shooter) ? String(drill.rounds_per_shooter) : undefined;
 
-    // Grouping: scan only
+  // Determine effective input method:
+  // 1. Explicit input_method from commander takes priority
+  // 2. Grouping drills always use scan (regardless of input_method)
+  // 3. Otherwise, infer from target_type
+  let effectiveInputMethod: 'scan' | 'manual' = 'manual';
+  
+  if (drill.drill_goal === 'grouping') {
+    // Grouping drills are always scan (paper targets with camera)
+    effectiveInputMethod = 'scan';
+  } else if (drill.input_method) {
+    // Respect commander's explicit choice
+    effectiveInputMethod = drill.input_method;
+  } else {
+    // Legacy inference: paper → scan, tactical → manual
+    effectiveInputMethod = drill.target_type === 'paper' ? 'scan' : 'manual';
+  }
+
+  // Grouping: scan only (no manual option)
     if (drill.drill_goal === 'grouping') {
       return {
         primary: {
@@ -101,7 +122,13 @@ export function getDrillInputRoutes(args: {
       };
     }
 
-    // Achievement: scan + manual (paper)
+  // Achievement drills - respect commander's input_method choice
+  // When commander explicitly chose input_method, only show that option (no secondary)
+  // When input_method was inferred (null), we can offer both options
+  const hasExplicitInputMethod = !!drill.input_method;
+
+  if (effectiveInputMethod === 'scan') {
+    // Scan mode: camera input only (no manual fallback if explicitly chosen)
     return {
       primary: {
         kind: 'scan_paper',
@@ -111,26 +138,31 @@ export function getDrillInputRoutes(args: {
           distance: String(defaultDistance),
           ...(maxShots ? { maxShots } : {}),
           drillGoal: 'achievement',
-          locked: '1',  // Lock to drill values
+          locked: '1',
         },
       },
+      // Only offer manual as secondary if commander didn't explicitly choose scan
+      ...(!hasExplicitInputMethod && drill.target_type === 'paper' ? {
       secondary: {
-        kind: 'manual_paper_achievement',
-        pathname: '/(protected)/addTarget',
+          kind: 'manual_paper_achievement' as const,
+          pathname: '/(protected)/addTarget' as const,
         params: {
           sessionId,
-          defaultTargetType: 'achievement',
+            defaultTargetType: 'achievement' as const,
           defaultDistance: String(defaultDistance),
-          defaultInputMethod: 'manual',
-          startInManual: '1',
+            defaultInputMethod: 'manual' as const,
+            startInManual: '1' as const,
           ...(maxShots ? { maxShots } : {}),
-          locked: '1',  // Lock to drill values
+            locked: '1' as const,
+          },
         },
-      },
+      } : {}),
     };
   }
 
-  // Tactical drills: manual only - skip setup, go directly to results entry
+  // Manual mode: direct hit/miss entry
+  if (drill.target_type === 'tactical') {
+    // Tactical manual: go directly to tactical input
   const shotsAreFlexible = isInfiniteShots(drill.rounds_per_shooter);
   return {
     primary: {
@@ -139,9 +171,26 @@ export function getDrillInputRoutes(args: {
       params: {
         sessionId,
         distance: String(defaultDistance),
-        // Pass the bullets for this entry (from drill config)
         ...(shotsAreFlexible ? {} : nextBullets ? { bullets: String(nextBullets) } : {}),
-        locked: '1',  // Lock to drill values - skips setup, goes straight to results
+          locked: '1',
+        },
+      },
+    };
+  }
+
+  // Paper manual: achievement entry form
+  return {
+    primary: {
+      kind: 'manual_paper_achievement',
+      pathname: '/(protected)/addTarget',
+      params: {
+        sessionId,
+        defaultTargetType: 'achievement',
+        defaultDistance: String(defaultDistance),
+        defaultInputMethod: 'manual',
+        startInManual: '1',
+        ...(maxShots ? { maxShots } : {}),
+        locked: '1',
       },
     },
   };

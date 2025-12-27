@@ -1,14 +1,14 @@
 /**
- * useHomeState - Session-centric Home state
+ * useHomeState - Training-first Home state
  * 
  * This hook computes what Home needs to display:
  * - Active session (if any)
- * - Next scheduled session (from trainings, but not called "training")
+ * - Next TRAINING (shown explicitly with drill count + progress)
  * - Last session
  * - Unresolved signal
  * - Weekly stats
  * 
- * Training is INTERNAL. Home never exposes "training" as a concept.
+ * Training is EXPLICIT. Users see their trainings and drills clearly.
  */
 
 import { useMemo } from 'react';

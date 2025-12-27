@@ -75,6 +75,10 @@ export async function createTraining(input: CreateTrainingInput): Promise<Traini
       // === PRIMARY CLASSIFICATION ===
       drill_goal: drill.drill_goal,
 
+      // === ENTRY METHOD (commander's choice) ===
+      // Only include if set (column may not exist in older schemas)
+      ...(drill.input_method ? { input_method: drill.input_method } : {}),
+
       // === BASIC CONFIG ===
       target_type: drill.target_type,
       distance_m: drill.distance_m,
@@ -130,7 +134,8 @@ export async function createTraining(input: CreateTrainingInput): Promise<Traini
 
     if (drillsError) {
       console.error('Failed to create drills:', drillsError);
-      // Don't throw - training was created, just log the error
+      // IMPORTANT: Drills are essential - throw if they fail
+      throw new Error(`Training created but drills failed: ${drillsError.message}`);
     }
 
     const result = {
@@ -321,7 +326,19 @@ export async function getTrainingById(trainingId: string): Promise<TrainingWithD
 export async function updateTraining(
   trainingId: string,
   updates: UpdateTrainingInput
-): Promise<Training> {
+): Promise<Training | null> {
+  // First check if training exists
+  const { data: existing } = await supabase
+    .from('trainings')
+    .select('id, status')
+    .eq('id', trainingId)
+    .maybeSingle();
+
+  if (!existing) {
+    console.log('[TrainingService] Training not found for update:', trainingId);
+    return null;
+  }
+
   const updatePayload: Record<string, any> = {
     updated_at: new Date().toISOString(),
   };
@@ -336,7 +353,7 @@ export async function updateTraining(
     .update(updatePayload)
     .eq('id', trainingId)
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error('Failed to update training:', error);
@@ -364,8 +381,30 @@ export async function deleteTraining(trainingId: string): Promise<void> {
 /**
  * Start a training (change status to ongoing, set started_at)
  */
-export async function startTraining(trainingId: string): Promise<Training> {
+export async function startTraining(trainingId: string): Promise<Training | null> {
   const { data: { user } } = await supabase.auth.getUser();
+  
+  // First check if training exists and can be started
+  const { data: existing } = await supabase
+    .from('trainings')
+    .select('id, status')
+    .eq('id', trainingId)
+    .maybeSingle();
+
+  if (!existing) {
+    console.log('[TrainingService] Training not found for start:', trainingId);
+    return null;
+  }
+
+  // Already ongoing or finished
+  if (existing.status === 'ongoing' || existing.status === 'finished') {
+    const { data } = await supabase
+      .from('trainings')
+      .select('*')
+      .eq('id', trainingId)
+      .single();
+    return data as Training;
+  }
   
   // Update with started_at timestamp
   const { data, error } = await supabase
@@ -377,11 +416,16 @@ export async function startTraining(trainingId: string): Promise<Training> {
     })
     .eq('id', trainingId)
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error('Failed to start training:', error);
     throw new Error(error.message || 'Failed to start training');
+  }
+
+  if (!data) {
+    console.log('[TrainingService] Training update returned no data:', trainingId);
+    return null;
   }
 
   const training = data as Training;
@@ -408,8 +452,80 @@ export async function startTraining(trainingId: string): Promise<Training> {
 
 /**
  * Finish a training (change status to finished, set ended_at)
+ * 
+ * Safe to call even if training is already finished or doesn't exist.
  */
-export async function finishTraining(trainingId: string): Promise<Training> {
+export async function finishTraining(trainingId: string): Promise<Training | null> {
+  console.log('[TrainingService] finishTraining called for:', trainingId);
+  
+  // Get current user for debugging
+  const { data: { user } } = await supabase.auth.getUser();
+  console.log('[TrainingService] Current user:', user?.id);
+  
+  if (!user) {
+    console.log('[TrainingService] No authenticated user');
+    return null;
+  }
+
+  // Get user's team memberships to check access
+  const { data: memberships } = await supabase
+    .from('team_members')
+    .select('team_id, role')
+    .eq('user_id', user.id);
+  console.log('[TrainingService] User memberships:', JSON.stringify(memberships));
+  
+  // First check current status - use broader select like the list does
+  const { data: existing, error: fetchError } = await supabase
+    .from('trainings')
+    .select('id, status, team_id, created_by')
+    .eq('id', trainingId)
+    .maybeSingle();
+
+  console.log('[TrainingService] Existing training:', JSON.stringify(existing), 'FetchError:', fetchError);
+
+  // If can't fetch, might be RLS issue - try direct update anyway
+  if (!existing && !fetchError) {
+    console.log('[TrainingService] Training not found via SELECT, trying direct UPDATE...');
+    
+    // Try the update directly - RLS will block if not authorized
+    const { data: updated, error: updateError } = await supabase
+      .from('trainings')
+      .update({
+        status: 'finished',
+        ended_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', trainingId)
+      .select()
+      .maybeSingle();
+    
+    console.log('[TrainingService] Direct update result:', JSON.stringify(updated), 'Error:', updateError);
+    
+    if (updateError) {
+      throw new Error(updateError.message || 'Failed to finish training - no access');
+    }
+    
+    return updated as Training;
+  }
+
+  // If already finished or doesn't exist, return early
+  if (!existing) {
+    console.log('[TrainingService] Training not found:', trainingId);
+    return null;
+  }
+  
+  if (existing.status === 'finished' || existing.status === 'cancelled') {
+    console.log('[TrainingService] Training already finished/cancelled:', trainingId, existing.status);
+    // Return the existing training
+    const { data } = await supabase
+      .from('trainings')
+      .select('*')
+      .eq('id', trainingId)
+      .maybeSingle();
+    return data as Training;
+  }
+
+  console.log('[TrainingService] Updating training to finished...');
   const { data, error } = await supabase
     .from('trainings')
     .update({
@@ -419,7 +535,9 @@ export async function finishTraining(trainingId: string): Promise<Training> {
     })
     .eq('id', trainingId)
     .select()
-    .single();
+    .maybeSingle();
+
+  console.log('[TrainingService] Update result:', JSON.stringify(data), 'Error:', error);
 
   if (error) {
     console.error('Failed to finish training:', error);
@@ -432,7 +550,7 @@ export async function finishTraining(trainingId: string): Promise<Training> {
 /**
  * Cancel a training
  */
-export async function cancelTraining(trainingId: string): Promise<Training> {
+export async function cancelTraining(trainingId: string): Promise<Training | null> {
   return updateTraining(trainingId, { status: 'cancelled' });
 }
 
@@ -605,6 +723,10 @@ export async function addDrill(
 
       // === PRIMARY CLASSIFICATION ===
       drill_goal: drill.drill_goal,
+
+      // === ENTRY METHOD (commander's choice) ===
+      // Only include if set (column may not exist in older schemas)
+      ...(drill.input_method ? { input_method: drill.input_method } : {}),
 
       // === BASIC CONFIG ===
       target_type: drill.target_type,
@@ -804,7 +926,7 @@ export async function updateTrainingDrills(
 export async function startTrainingWithConfig(
   trainingId: string,
   drillOverrides?: Map<string, DrillInstanceOverrides>
-): Promise<Training> {
+): Promise<Training | null> {
   // First, apply any drill overrides
   if (drillOverrides && drillOverrides.size > 0) {
     await updateTrainingDrills(trainingId, drillOverrides);

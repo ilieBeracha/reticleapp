@@ -187,9 +187,55 @@ export async function updateTeam(input: UpdateTeamInput): Promise<Team> {
 }
 
 /**
- * Delete a team
+ * Delete a team and all related data
+ * Order: trainings → drill_templates → team_invitations → team_members → team
  */
 export async function deleteTeam(teamId: string): Promise<void> {
+  // Delete trainings first (they reference team_id)
+  const { error: trainingsError } = await supabase
+    .from('trainings')
+    .delete()
+    .eq('team_id', teamId);
+
+  if (trainingsError) {
+    console.error('Failed to delete team trainings:', trainingsError);
+    throw new Error('Failed to delete team trainings');
+  }
+
+  // Delete drill templates
+  const { error: drillsError } = await supabase
+    .from('drill_templates')
+    .delete()
+    .eq('team_id', teamId);
+
+  if (drillsError) {
+    console.error('Failed to delete team drills:', drillsError);
+    throw new Error('Failed to delete team drills');
+  }
+
+  // Delete invitations
+  const { error: invitesError } = await supabase
+    .from('team_invitations')
+    .delete()
+    .eq('team_id', teamId);
+
+  if (invitesError) {
+    console.error('Failed to delete team invitations:', invitesError);
+    throw new Error('Failed to delete team invitations');
+  }
+
+  // Delete members
+  const { error: membersError } = await supabase
+    .from('team_members')
+    .delete()
+    .eq('team_id', teamId);
+
+  if (membersError) {
+    console.error('Failed to delete team members:', membersError);
+    throw new Error('Failed to delete team members');
+  }
+
+  // Finally delete the team
   const { error } = await supabase
     .from('teams')
     .delete()
