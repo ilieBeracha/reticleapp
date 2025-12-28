@@ -181,7 +181,8 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
   // Check if we should start as pending (for watch selection flow)
   const startAsPending = (config as any).start_as_pending === true;
   const status = startAsPending ? 'pending' : 'active';
-  const startedAt = startAsPending ? null : new Date().toISOString();
+  // Always set started_at - database requires it. Status indicates pending vs active.
+  const startedAt = new Date().toISOString();
 
   // Direct insert for all sessions (RLS handles permissions)
   const { data, error } = await supabase

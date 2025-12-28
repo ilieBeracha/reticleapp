@@ -223,18 +223,12 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
   }, [session, garminStatus, startSessionWithRetry]);
 
   useEffect(() => {
-    if (!session || garminNotifiedRef.current || garminStatus !== 'CONNECTED') return;
+    // Only send to watch if user explicitly chose watch control
+    if (!session || !session.watch_controlled || garminNotifiedRef.current || garminStatus !== 'CONNECTED') return;
 
     garminNotifiedRef.current = true;
-
-    if (session.watch_controlled) {
-      startWatchSessionWithRetry();
-    } else {
-      const payload = buildWatchSessionPayload(session, AUTO_DETECT_ENABLED, SHOT_SENSITIVITY_DEFAULT);
-      sendToGarmin('SESSION_START', payload);
-      console.log('[Garmin] 📤 Sent SESSION_START to watch (no retry)');
-    }
-  }, [session, garminStatus, sendToGarmin, startWatchSessionWithRetry]);
+    startWatchSessionWithRetry();
+  }, [session, garminStatus, startWatchSessionWithRetry]);
 
   // Reset session start status when leaving screen
   useEffect(() => {

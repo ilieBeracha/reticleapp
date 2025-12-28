@@ -213,12 +213,12 @@ export function useSessionForm(options: UseSessionFormOptions = {}): UseSessionF
   }, [pendingConfig, doSubmit]);
   
   const submit = useCallback(() => {
-    // NEW FLOW: Always create session as pending
-    // User will choose watch vs phone inside the session screen
-    // This allows them to see watch connection status in real-time
-    const config = buildSessionConfig(false, true); // start_as_pending = true
+    // If watch connected and can be used, create as pending so user sees SessionPrepView
+    // Otherwise start as active immediately
+    const startAsPending = isWatchConnected && canUseWatch;
+    const config = buildSessionConfig(false, startAsPending);
     doSubmit(config);
-  }, [buildSessionConfig, doSubmit]);
+  }, [buildSessionConfig, doSubmit, isWatchConnected, canUseWatch]);
   
   return {
     state,
