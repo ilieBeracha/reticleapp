@@ -10,6 +10,7 @@
  * - View: Calls service.initialize() on mount
  */
 
+import Constants from 'expo-constants';
 import {
   DeviceEventEmitter,
   NativeEventEmitter,
@@ -119,12 +120,14 @@ appId: string;
 // DEFAULT CONFIG (centralized - change here only)
 // ============================================================================
 
+// Get scheme from app config (set at build time)
+const APP_SCHEME = Constants.expoConfig?.scheme || 'retic';
+
 /** Default Garmin configuration for this app */
 export const GARMIN_DEFAULT_CONFIG: GarminConfig = {
-  urlScheme: 'retic',
+  urlScheme: APP_SCHEME as string,
   appId: '467f4bb7-cd3c-45c4-a39b-9bb78260c9ed',
 } as const;
-
 // ============================================================================
 // SERVICE STATE (module-level singleton)
 // ============================================================================

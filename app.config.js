@@ -17,10 +17,11 @@ const getAndroidPackage = () => {
 };
 
 const getScheme = () => {
-  if (IS_DEV) return 'retic';
-  if (IS_PREVIEW) return 'retic';
+  if (IS_DEV) return 'retic-dev';
+  if (IS_PREVIEW) return 'retic-preview';
   return 'retic';
 };
+
 
 const getSlug = () => {
   // All variants use same slug because they share the same EAS project
