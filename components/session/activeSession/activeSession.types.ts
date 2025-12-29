@@ -39,6 +39,8 @@ export interface WatchState {
   watchActivelyControlling: boolean;
   watchStartFailed: boolean;
   watchStarting: boolean;
+  watchPreviewQueued: boolean;
+  watchAppNotOpen: boolean;
 }
 
 // ============================================================================

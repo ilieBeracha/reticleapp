@@ -8,21 +8,17 @@
  * - Grouping + Scan → only distance + time (AI detects shots)
  * - Grouping + Manual → all fields
  * - Achievement → all fields
- * - Scan mode → watch control disabled
  */
 
-import { WatchControlPrompt } from '@/components/session/WatchControlPrompt';
 import { useColors } from '@/hooks/ui/useColors';
 import * as Haptics from 'expo-haptics';
 import {
   Camera,
-  ChevronRight,
   Crosshair,
   Hand,
   Play,
   Target,
   Trophy,
-  Watch,
 } from 'lucide-react-native';
 import {
   ActivityIndicator,
@@ -204,41 +200,6 @@ export function SessionFormSheet({
         </ConfigCard>
       </View>
 
-      {/* Watch hint */}
-      {form.isWatchConnected && (
-        <View
-          style={[
-            styles.watchHint,
-            {
-              backgroundColor: colors.card,
-              borderColor: form.canUseWatch ? colors.accent : colors.border,
-            },
-          ]}
-        >
-          <Watch
-            size={16}
-            color={form.canUseWatch ? colors.accent : colors.textMuted}
-            strokeWidth={1.5}
-          />
-          <View style={styles.watchHintContent}>
-            <Text
-              style={[
-                styles.watchHintTitle,
-                { color: form.canUseWatch ? colors.text : colors.textMuted },
-              ]}
-            >
-              {form.canUseWatch ? 'Watch Connected' : 'Watch Unavailable'}
-            </Text>
-            <Text style={[styles.watchHintSub, { color: colors.textMuted }]}>
-              {form.canUseWatch
-                ? 'Control option available after submit'
-                : 'Scan mode requires phone control'}
-            </Text>
-          </View>
-          {form.canUseWatch && <ChevronRight size={16} color={colors.textMuted} />}
-        </View>
-      )}
-
       {/* Submit */}
       <TouchableOpacity
         style={[
@@ -265,11 +226,6 @@ export function SessionFormSheet({
         )}
       </TouchableOpacity>
 
-      <WatchControlPrompt
-        visible={form.showWatchPrompt}
-        onSelect={form.handleWatchControlSelect}
-        drillName={form.state.name || 'Quick Practice'}
-      />
     </ScrollView>
   );
 }
@@ -320,21 +276,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
   },
-
-  // Watch hint
-  watchHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 20,
-  },
-  watchHintContent: { flex: 1 },
-  watchHintTitle: { fontSize: 13, fontWeight: '600', marginBottom: 2 },
-  watchHintSub: { fontSize: 11 },
 
   // Submit
   submitBtn: {

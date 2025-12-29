@@ -713,6 +713,7 @@ export async function addTargetWithTacticalResult(params: {
 export interface WatchSessionData {
   sessionId: string;
   shotsRecorded: number;
+  hitsRecorded?: number; // User-entered hits count
   durationMs?: number;
   distance?: number;
   completed?: boolean;
@@ -759,11 +760,12 @@ export async function saveWatchSessionData(
   const timeSeconds = data.durationMs ? data.durationMs / 1000 : null;
   
   // Save the tactical result
-  // For watch data, we assume all shots are hits unless we have more info
+  // Use user-provided hits if available, otherwise assume all shots are hits
+  const hits = data.hitsRecorded ?? data.shotsRecorded;
   await saveTacticalTargetResult({
     session_target_id: target.id,
     bullets_fired: data.shotsRecorded,
-    hits: data.shotsRecorded, // Assume all shots are hits from watch
+    hits: hits,
     is_stage_cleared: data.completed ?? false,
     time_seconds: timeSeconds,
     notes: 'Watch session data',

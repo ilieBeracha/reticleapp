@@ -218,6 +218,11 @@ interface SessionForPayload {
 
 /**
  * Builds the payload to send to watch for SESSION_START
+ * 
+ * Field naming clarification:
+ * - maxBullets: Total bullets for this session (for auto-complete on watch)
+ * - strings: Number of rounds/sets/magazines in the drill
+ * - rounds: Bullets per string (kept for backwards compat, same as maxBullets when strings=1)
  */
 export function buildWatchSessionPayload(
   session: SessionForPayload,
@@ -225,6 +230,14 @@ export function buildWatchSessionPayload(
   sensitivity: number = 0.5
 ) {
   const drillConfig = session.drill_config;
+  
+  // rounds_per_shooter = bullets per string/set
+  const bulletsPerString = drillConfig?.rounds_per_shooter || 0;
+  const stringsCount = drillConfig?.strings_count || 1;
+  
+  // Total bullets for the entire session (what watch uses for auto-complete)
+  const maxBullets = bulletsPerString * stringsCount;
+  
   return {
     sessionId: session.id,
     drillName: drillConfig?.name || session.drill_name || 'Training Session',
@@ -233,10 +246,14 @@ export function buildWatchSessionPayload(
     inputMethod: drillConfig?.input_method || 'manual',
     watchMode: session.watch_controlled ? 'primary' : 'supplementary',
     distance: drillConfig?.distance_m || 0,
-    rounds: drillConfig?.rounds_per_shooter || 0,
+    // maxBullets: total bullets for session (use this for auto-complete)
+    maxBullets,
+    // rounds: bullets per string (legacy, same as bulletsPerString)
+    rounds: bulletsPerString,
+    // strings: number of sets/magazines
+    strings: stringsCount,
     timeLimit: drillConfig?.time_limit_seconds || 0,
     parTime: drillConfig?.par_time_seconds || 0,
-    strings: drillConfig?.strings_count || 1,
     startedAt: Date.now(),
     autoDetect,
     sensitivity,

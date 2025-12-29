@@ -5,7 +5,19 @@
   },
   "build": {
     "development": {
-       "developmentClient": true,
+      "developmentClient": true,
+      "distribution": "internal",
+      "channel": "development",
+      "environment": "development",
+      "env": {
+        "APP_VARIANT": "development"
+      },
+      "ios": {
+        "buildConfiguration": "Debug"
+      }
+    },
+    "development:simulator": {
+      "developmentClient": true,
       "distribution": "internal",
       "channel": "development",
       "environment": "development",

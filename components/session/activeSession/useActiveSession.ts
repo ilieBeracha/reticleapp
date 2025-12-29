@@ -5,11 +5,11 @@
  * Handles data loading, timer, watch integration, and actions.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert } from 'react-native';
 
 import type { GarminSessionData } from '@/services/garminService';
 import { getDrillInputRoutes } from '@/services/session/drillInputRecipe';
@@ -26,9 +26,8 @@ import {
 } from '@/services/sessionService';
 import { useGarminStore, useIsGarminConnected, useSessionStartStatus } from '@/store/garminStore';
 import { useSessionStore } from '@/store/sessionStore';
-import { formatMaxShots, isInfiniteShots } from '@/utils/drillShots';
+import { isInfiniteShots } from '@/utils/drillShots';
 
-import type { DrillProgress, NextTargetPlan, UseActiveSessionParams, UseActiveSessionReturn } from './activeSession.types';
 import { AUTO_DETECT_ENABLED, SHOT_SENSITIVITY_DEFAULT, TIMER_INTERVAL_MS } from './activeSession.constants';
 import {
   buildEndSessionMessage,
@@ -41,6 +40,7 @@ import {
   getDefaultDistance,
   isDrillLimitReached,
 } from './activeSession.helpers';
+import type { UseActiveSessionParams, UseActiveSessionReturn } from './activeSession.types';
 
 export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActiveSessionReturn {
   const { loadPersonalSessions, loadTeamSessions } = useSessionStore();
@@ -73,6 +73,13 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
   // Watch session start failure state
   const [watchStartFailed, setWatchStartFailed] = useState(false);
   const [watchStarting, setWatchStarting] = useState(false);
+  
+  // Watch preview queued - watch received SESSION_START and is showing preview
+  // User must tap watch to actually start the session
+  const [watchPreviewQueued, setWatchPreviewQueued] = useState(false);
+  
+  // Watch app not open - user needs to open it manually
+  const [watchAppNotOpen, setWatchAppNotOpen] = useState(false);
 
   // Watch data processing
   const watchDataProcessedRef = useRef<Set<string>>(new Set());
@@ -172,6 +179,11 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     watchActivelyControlling,
     watchStartFailed,
     watchStarting: watchStarting || sessionStartStatus === 'sending',
+    // True when watch has received SESSION_START and is showing preview
+    // User must tap watch to actually start - mobile shows "Start on your watch"
+    watchPreviewQueued,
+    // True when watch is reachable but app not open - user needs to open manually
+    watchAppNotOpen,
   };
 
   // Score
@@ -200,35 +212,72 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
   // ============================================================================
   // GARMIN INTEGRATION - Start session on watch
   // ============================================================================
+  
   const startWatchSessionWithRetry = useCallback(async () => {
-    if (!session || garminStatus !== 'CONNECTED') return;
+    if (!session) return;
+    
+    // Can only send messages when app is open (CONNECTED)
+    // ONLINE means watch is reachable but app not running - can't send!
+    if (garminStatus === 'ONLINE') {
+      console.log('[Garmin] ⚠️ Watch ONLINE but app not open - waiting for user to open app');
+      setWatchAppNotOpen(true);
+      setWatchStartFailed(false);
+      setWatchPreviewQueued(false);
+      setWatchStarting(false);
+      return;
+    }
+    
+    if (garminStatus !== 'CONNECTED') {
+      console.log('[Garmin] ⚠️ Watch not reachable, status:', garminStatus);
+      setWatchStartFailed(true);
+      setWatchAppNotOpen(false);
+      setWatchPreviewQueued(false);
+      return;
+    }
+    
+    // App is open - can send!
+    setWatchAppNotOpen(false);
 
     const payload = buildWatchSessionPayload(session, AUTO_DETECT_ENABLED, SHOT_SENSITIVITY_DEFAULT);
 
     setWatchStarting(true);
     setWatchStartFailed(false);
 
-    console.log('[Garmin] 📤 Starting SESSION_START with retry...');
+    console.log('[Garmin] 📤 Sending SESSION_START...');
     const success = await startSessionWithRetry(payload);
-
     setWatchStarting(false);
 
     if (!success) {
       console.warn('[Garmin] ❌ Watch did not acknowledge SESSION_START');
       setWatchStartFailed(true);
+      setWatchPreviewQueued(false);
     } else {
-      console.log('[Garmin] ✅ Watch acknowledged SESSION_START');
+      console.log('[Garmin] ✅ Watch acknowledged SESSION_START - waiting for user to start on watch');
       setWatchStartFailed(false);
+      setWatchPreviewQueued(true);
     }
   }, [session, garminStatus, startSessionWithRetry]);
 
   useEffect(() => {
     // Only send to watch if user explicitly chose watch control
-    if (!session || !session.watch_controlled || garminNotifiedRef.current || garminStatus !== 'CONNECTED') return;
+    if (!session || !session.watch_controlled || garminNotifiedRef.current) return;
+    if (garminStatus !== 'CONNECTED' && garminStatus !== 'ONLINE') return;
 
     garminNotifiedRef.current = true;
     startWatchSessionWithRetry();
   }, [session, garminStatus, startWatchSessionWithRetry]);
+
+  // Auto-send when watch app opens (transitions from ONLINE to CONNECTED)
+  useEffect(() => {
+    if (!session || !session.watch_controlled) return;
+    if (!watchAppNotOpen) return; // Only if we were waiting for app to open
+    if (garminStatus === 'CONNECTED') {
+      console.log('[Garmin] 📲 Watch app now CONNECTED - sending session...');
+      setWatchAppNotOpen(false);
+      garminNotifiedRef.current = false; // Allow retry
+      startWatchSessionWithRetry();
+    }
+  }, [session, watchAppNotOpen, garminStatus, startWatchSessionWithRetry]);
 
   // Reset session start status when leaving screen
   useEffect(() => {
@@ -590,6 +639,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
   const handleRetryWatchConnection = useCallback(() => {
     garminNotifiedRef.current = false;
     setWatchStartFailed(false);
+    setWatchPreviewQueued(false);
     startWatchSessionWithRetry();
   }, [startWatchSessionWithRetry]);
 

@@ -1,8 +1,9 @@
 import type { SessionDrillConfig, SessionStats } from './types';
 
 export interface SessionScore {
-  mode: string;
+  mode: 'accuracy' | 'points' | 'grouping';
   value: number;
+  label: string;
 }
 
 /**
@@ -24,7 +25,7 @@ export function computeSessionScore(stats: SessionStats, drill: SessionDrillConf
       const misses = Math.max(0, shots - hits);
 
       const value = hits * pointsPerHit - misses * penaltyPerMiss;
-      return { mode: 'points', value };
+      return { mode: 'points', value, label: `${value} pts` };
     }
     default:
       return null;

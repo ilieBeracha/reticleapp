@@ -7,8 +7,8 @@
  * - Time limit: optional for all modes
  */
 
-import { useIsGarminConnected } from '@/store/garminStore';
 import type { BaseSessionConfig, DrillConfig } from '@/services/session/types';
+import { useIsGarminConnected } from '@/store/garminStore';
 import { useCallback, useState } from 'react';
 
 // ============================================================================
@@ -18,6 +18,7 @@ import { useCallback, useState } from 'react';
 export type DrillGoal = 'grouping' | 'achievement';
 export type InputMethod = 'scan' | 'manual';
 export type TargetType = 'paper' | 'tactical';
+export type ControlMode = 'phone' | 'watch';
 
 export interface SessionFormState {
   name: string;
@@ -27,13 +28,13 @@ export interface SessionFormState {
   shots: number;
   rounds: number;
   timeLimit: number | null;
+  controlMode: ControlMode;
 }
 
 export interface SessionFormContext {
   teamId: string | null;
   trainingId?: string | null;
-  drillId?: string | null;
-  drillTemplateId?: string | null;
+  drillId?: string | null;  // Reference to saved drill/preset
 }
 
 export interface UseSessionFormOptions {
@@ -62,6 +63,7 @@ export interface UseSessionFormReturn {
   setShots: (shots: number) => void;
   setRounds: (rounds: number) => void;
   setTimeLimit: (limit: number | null) => void;
+  setControlMode: (mode: ControlMode) => void;
   reset: (values?: Partial<SessionFormState>) => void;
   submit: () => void;
   handleWatchControlSelect: (watchControlled: boolean) => void;
@@ -86,6 +88,7 @@ const DEFAULT_STATE: SessionFormState = {
   shots: 5,
   rounds: 1,
   timeLimit: null,
+  controlMode: 'phone',
 };
 
 // ============================================================================
@@ -156,6 +159,10 @@ export function useSessionForm(options: UseSessionFormOptions = {}): UseSessionF
     setState(s => ({ ...s, timeLimit }));
   }, []);
   
+  const setControlMode = useCallback((controlMode: ControlMode) => {
+    setState(s => ({ ...s, controlMode }));
+  }, []);
+  
   const reset = useCallback((values?: Partial<SessionFormState>) => {
     setState({ ...DEFAULT_STATE, ...initialValues, ...values });
   }, [initialValues]);
@@ -182,8 +189,9 @@ export function useSessionForm(options: UseSessionFormOptions = {}): UseSessionF
       team_id: context.teamId,
       training_id: context.trainingId ?? null,
       drill_id: context.drillId ?? null,
-      drill_template_id: context.drillTemplateId ?? null,
-      drill_config: context.drillTemplateId ? null : buildDrillConfig(),
+      // If drill_id is provided, drill_config is null (config comes from saved drill)
+      // Otherwise, use inline drill_config
+      drill_config: context.drillId ? null : buildDrillConfig(),
       session_mode: 'solo',
       watch_controlled: watchControlled,
       start_as_pending: startAsPending,
@@ -213,12 +221,13 @@ export function useSessionForm(options: UseSessionFormOptions = {}): UseSessionF
   }, [pendingConfig, doSubmit]);
   
   const submit = useCallback(() => {
-    // If watch connected and can be used, create as pending so user sees SessionPrepView
-    // Otherwise start as active immediately
-    const startAsPending = isWatchConnected && canUseWatch;
-    const config = buildSessionConfig(false, startAsPending);
+    // Use user's control mode selection
+    const watchControlled = state.controlMode === 'watch' && canUseWatch;
+    // If watch controlled, start as pending so user sees SessionPrepView
+    const startAsPending = watchControlled;
+    const config = buildSessionConfig(watchControlled, startAsPending);
     doSubmit(config);
-  }, [buildSessionConfig, doSubmit, isWatchConnected, canUseWatch]);
+  }, [buildSessionConfig, doSubmit, state.controlMode, canUseWatch]);
   
   return {
     state,
@@ -236,6 +245,7 @@ export function useSessionForm(options: UseSessionFormOptions = {}): UseSessionF
     setShots,
     setRounds,
     setTimeLimit,
+    setControlMode,
     reset,
     submit,
     handleWatchControlSelect,

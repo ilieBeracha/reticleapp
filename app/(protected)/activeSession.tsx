@@ -262,6 +262,41 @@ export default function ActiveSessionScreen() {
       return <WatchStartingView colors={colors} insets={insets} drillName={drillName} onClose={handleClose} />;
     }
 
+    // Watch app not open - waiting for user to open it
+    if (watchState.watchAppNotOpen) {
+      return (
+        <WatchPreviewQueuedView
+          colors={colors}
+          insets={insets}
+          drillName={drillName}
+          drill={drill}
+          isWatchConnected={false}
+          watchAppNotOpen={true}
+          ending={ending}
+          onClose={handleClose}
+          onContinueWithoutWatch={handleContinueWithoutWatch}
+        />
+      );
+    }
+
+    // Watch has preview queued - waiting for user to tap watch to start
+    if (watchState.watchPreviewQueued) {
+      return (
+        <WatchPreviewQueuedView
+          colors={colors}
+          insets={insets}
+          drillName={drillName}
+          drill={drill}
+          isWatchConnected={watchState.watchActivelyControlling}
+          watchAppNotOpen={false}
+          ending={ending}
+          onClose={handleClose}
+          onContinueWithoutWatch={handleContinueWithoutWatch}
+        />
+      );
+    }
+
+    // Session is actively running on watch
     return (
       <WatchWaitingView
         colors={colors}
@@ -292,12 +327,17 @@ export default function ActiveSessionScreen() {
           </Text>
         </View>
 
-        <View style={styles.timerContainer}>
-          <View style={[styles.liveDot, drillProgress?.overTime && { backgroundColor: COLORS.error }]} />
-          <Text style={[styles.timerText, { color: drillProgress?.overTime ? COLORS.error : colors.text }]}>
-            {formatTime(elapsedTime)}
-          </Text>
-        </View>
+        {/* Only show timer if drill has time limit */}
+        {drill?.time_limit_seconds ? (
+          <View style={styles.timerContainer}>
+            <View style={[styles.liveDot, drillProgress?.overTime && { backgroundColor: COLORS.error }]} />
+            <Text style={[styles.timerText, { color: drillProgress?.overTime ? COLORS.error : colors.text }]}>
+              {formatTime(elapsedTime)}
+            </Text>
+          </View>
+        ) : (
+          <View style={{ width: 36 }} />
+        )}
       </View>
 
       {/* Drill Requirements */}
@@ -417,66 +457,7 @@ function WatchFailedView({
   onRetry,
   onContinueWithoutWatch,
 }: any) {
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.secondary }]} onPress={onClose}>
-          <X size={18} color={colors.textMuted} />
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-            {drillName}
-          </Text>
-        </View>
-        <View style={styles.timerContainer}>
-          <View style={[styles.liveDot, { backgroundColor: COLORS.error }]} />
-          <Text style={[styles.timerText, { color: colors.text }]}>{formatTime(elapsedTime)}</Text>
-        </View>
-      </View>
-
-      <View style={styles.watchWaitingContainer}>
-        <View style={[styles.watchWaitingIconBg, { backgroundColor: colors.secondary }]}>
-          <Watch size={48} color={colors.textMuted} />
-        </View>
-        <Text style={[styles.watchWaitingTitle, { color: colors.text, marginTop: 24 }]}>Watch Not Responding</Text>
-        <Text style={[styles.watchWaitingDesc, { color: colors.textMuted }]}>
-          Could not start session on watch.
-        </Text>
-
-        <View style={styles.watchFailedActions}>
-          <TouchableOpacity
-            style={[localStyles.actionBtn, { backgroundColor: colors.text, borderWidth: 0 }]}
-            onPress={onRetry}
-            disabled={watchStarting}
-          >
-            {watchStarting ? (
-              <ActivityIndicator size="small" color={colors.background} />
-            ) : (
-              <>
-                <Ionicons name="refresh" size={18} color={colors.background} />
-                <Text style={[localStyles.actionBtnText, { color: colors.background }]}>Retry</Text>
-              </>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[localStyles.actionBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={onContinueWithoutWatch}
-          >
-            <Ionicons name="phone-portrait-outline" size={18} color={colors.text} />
-            <Text style={[localStyles.actionBtnText, { color: colors.text }]}>Continue Without Watch</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={{ paddingVertical: 12 }} onPress={() => router.back()}>
-            <Text style={[localStyles.actionBtnText, { color: colors.textMuted }]}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-function WatchStartingView({ colors, insets, drillName, onClose }: any) {
+  // Simple, non-stressful error view
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
@@ -492,9 +473,142 @@ function WatchStartingView({ colors, insets, drillName, onClose }: any) {
       </View>
 
       <View style={styles.watchWaitingContainer}>
-        <ActivityIndicator size="large" color={colors.text} />
-        <Text style={[styles.watchWaitingTitle, { color: colors.text, marginTop: 24 }]}>Starting Watch...</Text>
-        <Text style={[styles.watchWaitingDesc, { color: colors.textMuted }]}>Sending session to your watch</Text>
+        <View style={[localStyles.watchIconLarge, { backgroundColor: colors.secondary }]}>
+          <Watch size={56} color={colors.textMuted} strokeWidth={1.5} />
+        </View>
+        
+        <Text style={[localStyles.calmTitle, { color: colors.text }]}>Watch Not Responding</Text>
+        <Text style={[localStyles.calmSubtitle, { color: colors.textMuted }]}>
+          No worries — you can continue on your phone
+        </Text>
+
+        <View style={[localStyles.failedActions, { marginTop: 32 }]}>
+          <TouchableOpacity
+            style={[localStyles.primaryBtn, { backgroundColor: colors.text }]}
+            onPress={onContinueWithoutWatch}
+          >
+            <Ionicons name="phone-portrait-outline" size={18} color={colors.background} />
+            <Text style={[localStyles.primaryBtnText, { color: colors.background }]}>Use Phone</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[localStyles.subtleBtn, { borderColor: colors.border, marginTop: 12 }]}
+            onPress={onRetry}
+            disabled={watchStarting}
+          >
+            {watchStarting ? (
+              <ActivityIndicator size="small" color={colors.textMuted} />
+            ) : (
+              <Text style={[localStyles.subtleBtnText, { color: colors.textMuted }]}>Try Watch Again</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function WatchStartingView({ colors, insets, drillName, onClose }: any) {
+  // Simple connecting state
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.secondary }]} onPress={onClose}>
+          <X size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+            {drillName}
+          </Text>
+        </View>
+        <View style={{ width: 36 }} />
+      </View>
+
+      <View style={styles.watchWaitingContainer}>
+        <View style={[localStyles.watchIconLarge, { backgroundColor: colors.secondary }]}>
+          <Watch size={56} color={colors.textMuted} strokeWidth={1.5} />
+        </View>
+        <Text style={[localStyles.calmTitle, { color: colors.text }]}>Connecting to Watch</Text>
+        <Text style={[localStyles.calmSubtitle, { color: colors.textMuted }]}>
+          Just a moment...
+        </Text>
+        <ActivityIndicator size="small" color={colors.textMuted} style={{ marginTop: 24 }} />
+      </View>
+    </View>
+  );
+}
+
+// Watch has preview queued - waiting for user to tap watch to start
+function WatchPreviewQueuedView({
+  colors,
+  insets,
+  drillName,
+  drill,
+  isWatchConnected,
+  watchAppNotOpen,
+  ending,
+  onClose,
+  onContinueWithoutWatch,
+}: any) {
+  // Calm, focused view
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.secondary }]} onPress={onClose}>
+          <X size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+            {drillName}
+          </Text>
+        </View>
+        <View style={{ width: 36 }} />
+      </View>
+
+      <View style={styles.watchWaitingContainer}>
+        <View style={[localStyles.watchIconLarge, { backgroundColor: watchAppNotOpen ? '#F59E0B15' : '#10B98115' }]}>
+          <Watch size={56} color={watchAppNotOpen ? '#F59E0B' : '#10B981'} strokeWidth={1.5} />
+        </View>
+        
+        <Text style={[localStyles.calmTitle, { color: colors.text }]}>
+          {watchAppNotOpen ? 'Open Watch App' : 'Tap Watch to Start'}
+        </Text>
+        <Text style={[localStyles.calmSubtitle, { color: colors.textMuted, paddingHorizontal: 40 }]}>
+          {watchAppNotOpen 
+            ? 'Open ReticleIQ on your Garmin and tap to begin'
+            : 'Session is ready. Tap your watch when you\'re in position.'
+          }
+        </Text>
+
+        {drill && (
+          <View style={[localStyles.drillChip, { backgroundColor: colors.card }]}>
+            <MapPin size={14} color={colors.textMuted} />
+            <Text style={[localStyles.drillChipText, { color: colors.text }]}>{drill.distance_m}m</Text>
+            <View style={[localStyles.drillChipDivider, { backgroundColor: colors.border }]} />
+            <Target size={14} color={colors.textMuted} />
+            <Text style={[localStyles.drillChipText, { color: colors.text }]}>{drill.rounds_per_shooter} shots</Text>
+          </View>
+        )}
+
+        {/* Subtle waiting indicator */}
+        <View style={{ marginTop: 40, alignItems: 'center' }}>
+          <ActivityIndicator size="small" color={colors.textMuted} />
+          <Text style={[{ fontSize: 12, marginTop: 8 }, { color: colors.textMuted }]}>
+            Waiting...
+          </Text>
+        </View>
+      </View>
+
+      <View style={[localStyles.bottomBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
+        <TouchableOpacity
+          style={[localStyles.subtleBtn, { borderColor: colors.border }]}
+          onPress={onContinueWithoutWatch}
+          disabled={ending}
+        >
+          <Text style={[localStyles.subtleBtnText, { color: colors.textMuted }]}>
+            Use Phone Instead
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -511,8 +625,10 @@ function WatchWaitingView({
   onClose,
   onEndSession,
 }: any) {
+  // Clean, calm view - no timer on phone (watch has it)
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Minimal header - no timer */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.secondary }]} onPress={onClose}>
           <X size={18} color={colors.textMuted} />
@@ -522,48 +638,52 @@ function WatchWaitingView({
             {drillName}
           </Text>
         </View>
-        <View style={styles.timerContainer}>
-          <View style={[styles.liveDot, { backgroundColor: isWatchConnected ? '#10B981' : COLORS.warning }]} />
-          <Text style={[styles.timerText, { color: colors.text }]}>{formatTime(elapsedTime)}</Text>
+        {/* Status indicator instead of timer */}
+        <View style={[localStyles.statusBadge, { backgroundColor: isWatchConnected ? '#10B98120' : '#F59E0B20' }]}>
+          <View style={[localStyles.statusDot, { backgroundColor: isWatchConnected ? '#10B981' : '#F59E0B' }]} />
+          <Text style={[localStyles.statusText, { color: isWatchConnected ? '#10B981' : '#F59E0B' }]}>
+            {isWatchConnected ? 'Active' : 'Disconnected'}
+          </Text>
         </View>
       </View>
 
+      {/* Calm center content */}
       <View style={styles.watchWaitingContainer}>
-        <View style={[styles.watchWaitingIconBg, { backgroundColor: colors.secondary }]}>
-          <Watch size={48} color={isWatchConnected ? '#10B981' : colors.textMuted} />
+        <View style={[localStyles.watchIconLarge, { backgroundColor: isWatchConnected ? '#10B98115' : colors.secondary }]}>
+          <Watch size={56} color={isWatchConnected ? '#10B981' : colors.textMuted} strokeWidth={1.5} />
         </View>
-        <Text style={[styles.watchWaitingTitle, { color: colors.text, marginTop: 24 }]}>
-          {isWatchConnected ? 'Watch in Control' : 'Watch Disconnected'}
+        
+        <Text style={[localStyles.calmTitle, { color: colors.text }]}>
+          Session Running on Watch
         </Text>
-        <Text style={[styles.watchWaitingDesc, { color: colors.textMuted }]}>
-          {isWatchConnected
-            ? 'End the session on your watch when finished.'
-            : 'Reconnect your watch or end manually.'}
+        <Text style={[localStyles.calmSubtitle, { color: colors.textMuted }]}>
+          Focus on your shooting. Check your wrist for time.
         </Text>
 
         {drill && (
-          <View style={[localStyles.drillMeta, { backgroundColor: colors.card, marginTop: 20 }]}>
-            <Text style={[localStyles.drillMetaText, { color: colors.text }]}>
-              {drill.distance_m}m • {drill.rounds_per_shooter} shots
-              {drill.time_limit_seconds ? ` • ${formatTime(drill.time_limit_seconds)}` : ''}
-            </Text>
+          <View style={[localStyles.drillChip, { backgroundColor: colors.card }]}>
+            <MapPin size={14} color={colors.textMuted} />
+            <Text style={[localStyles.drillChipText, { color: colors.text }]}>{drill.distance_m}m</Text>
+            <View style={[localStyles.drillChipDivider, { backgroundColor: colors.border }]} />
+            <Target size={14} color={colors.textMuted} />
+            <Text style={[localStyles.drillChipText, { color: colors.text }]}>{drill.rounds_per_shooter} shots</Text>
           </View>
         )}
       </View>
 
+      {/* Subtle end button */}
       <View style={[localStyles.bottomBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
         <TouchableOpacity
-          style={[localStyles.endBtn, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}
+          style={[localStyles.subtleBtn, { borderColor: colors.border }]}
           onPress={onEndSession}
           disabled={ending}
         >
           {ending ? (
-            <ActivityIndicator size="small" color={colors.text} />
+            <ActivityIndicator size="small" color={colors.textMuted} />
           ) : (
-            <>
-              <Square size={16} color={colors.text} />
-              <Text style={[localStyles.endBtnText, { color: colors.text }]}>End Session Manually</Text>
-            </>
+            <Text style={[localStyles.subtleBtnText, { color: colors.textMuted }]}>
+              End Session from Phone
+            </Text>
           )}
         </TouchableOpacity>
       </View>
@@ -717,4 +837,60 @@ const localStyles = StyleSheet.create({
   // Drill meta
   drillMeta: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 },
   drillMetaText: { fontSize: 14, fontWeight: '500', textAlign: 'center' },
+
+  // Watch preview queued
+  pulseIndicator: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pulseText: { fontSize: 14, fontWeight: '500' },
+
+  // Calm watch-controlled styles
+  statusBadge: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 6, 
+    paddingHorizontal: 10, 
+    paddingVertical: 6, 
+    borderRadius: 20 
+  },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusText: { fontSize: 12, fontWeight: '600' },
+  watchIconLarge: { 
+    width: 100, 
+    height: 100, 
+    borderRadius: 50, 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
+  calmTitle: { fontSize: 22, fontWeight: '700', marginTop: 28, letterSpacing: -0.3 },
+  calmSubtitle: { fontSize: 15, marginTop: 8, textAlign: 'center', lineHeight: 22 },
+  drillChip: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 8, 
+    paddingHorizontal: 16, 
+    paddingVertical: 10, 
+    borderRadius: 20, 
+    marginTop: 28 
+  },
+  drillChipText: { fontSize: 14, fontWeight: '600' },
+  drillChipDivider: { width: 1, height: 14 },
+  subtleBtn: { 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    height: 44, 
+    borderRadius: 10, 
+    borderWidth: 1 
+  },
+  subtleBtnText: { fontSize: 14, fontWeight: '500' },
+  
+  // Failed view
+  failedActions: { width: '100%', paddingHorizontal: 32 },
+  primaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    height: 50,
+    borderRadius: 12,
+  },
+  primaryBtnText: { fontSize: 16, fontWeight: '600' },
 });

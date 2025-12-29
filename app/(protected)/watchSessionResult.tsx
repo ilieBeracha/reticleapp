@@ -12,7 +12,7 @@ import { saveWatchSessionData } from '@/services/sessionService';
 import { useSessionStore } from '@/store/sessionStore';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Clock, MapPin, Target, Watch } from 'lucide-react-native';
+import { Clock, Crosshair, MapPin, Target, Watch } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -20,6 +20,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -41,11 +42,15 @@ export default function WatchSessionResultSheet() {
   }>();
 
   const [saving, setSaving] = useState(false);
+  const [hitsInput, setHitsInput] = useState('');
 
   const shotsCount = parseInt(shots || '0');
   const durationSec = parseInt(duration || '0');
   const distanceM = parseInt(distance || '0');
   const isCompleted = completed === '1';
+  
+  // Parse hits - default to shots count (assume all hits) if not entered
+  const hitsCount = hitsInput.trim() ? parseInt(hitsInput) : shotsCount;
 
   // Format duration
   const formatDuration = (secs: number) => {
@@ -63,6 +68,9 @@ export default function WatchSessionResultSheet() {
   const handleSave = useCallback(async (endSession: boolean) => {
     if (!sessionId) return;
     
+    // Validate hits count
+    const validHits = Math.min(Math.max(0, hitsCount), shotsCount);
+    
     setSaving(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
@@ -70,6 +78,7 @@ export default function WatchSessionResultSheet() {
       await saveWatchSessionData({
         sessionId,
         shotsRecorded: shotsCount,
+        hitsRecorded: validHits,
         durationMs: durationSec * 1000,
         distance: distanceM,
         completed: endSession,
@@ -102,7 +111,7 @@ export default function WatchSessionResultSheet() {
       Alert.alert('Error', error.message || 'Failed to save watch data');
       setSaving(false);
     }
-  }, [sessionId, shotsCount, durationSec, distanceM, teamId, trainingId, loadPersonalSessions, loadTeamSessions]);
+  }, [sessionId, shotsCount, hitsCount, durationSec, distanceM, teamId, trainingId, loadPersonalSessions, loadTeamSessions]);
 
   if (!sessionId) {
     return (
@@ -167,6 +176,33 @@ export default function WatchSessionResultSheet() {
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>Distance</Text>
           </View>
         </View>
+      </View>
+
+      {/* Hits Input */}
+      <View style={styles.hitsSection}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>How many hits?</Text>
+        <View style={[styles.hitsInputRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <View style={[styles.hitsIconBg, { backgroundColor: `${colors.green}22` }]}>
+            <Crosshair size={20} color={colors.green} />
+          </View>
+          <TextInput
+            style={[styles.hitsInput, { color: colors.text }]}
+            placeholder={`${shotsCount}`}
+            placeholderTextColor={colors.textMuted}
+            keyboardType="number-pad"
+            value={hitsInput}
+            onChangeText={setHitsInput}
+            maxLength={3}
+          />
+          <Text style={[styles.hitsLabel, { color: colors.textMuted }]}>
+            of {shotsCount} shots
+          </Text>
+        </View>
+        {hitsInput.trim() && (
+          <Text style={[styles.accuracyHint, { color: colors.green }]}>
+            {Math.round((hitsCount / shotsCount) * 100)}% accuracy
+          </Text>
+        )}
       </View>
 
       {/* Actions */}
@@ -300,6 +336,44 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 12,
     fontWeight: '500',
+  },
+
+  // Hits Input
+  hitsSection: {
+    marginBottom: 24,
+  },
+  hitsInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 12,
+  },
+  hitsIconBg: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hitsInput: {
+    flex: 1,
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+    minWidth: 60,
+  },
+  hitsLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  accuracyHint: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 8,
+    textAlign: 'center',
   },
 
   // Actions

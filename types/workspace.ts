@@ -311,22 +311,38 @@ export interface UpdateTrainingInput {
 // =====================================================
 
 /**
- * Drill - Simplified drill definition.
+ * DrillOwnerType - Distinguishes personal presets from team drills
+ */
+export type DrillOwnerType = 'user' | 'team';
+
+/**
+ * Drill - Unified drill definition for both team drills and personal presets.
  *
- * ESSENTIAL PROPERTIES ONLY:
+ * OWNERSHIP MODEL:
+ * - owner_type: 'user' = personal preset (owner_id = user_id)
+ * - owner_type: 'team' = team drill (owner_id = team_id)
+ * 
+ * ESSENTIAL PROPERTIES:
  * - name, goal, target_type (what kind of drill)
  * - distance, shots, time_limit, strings (how to run it)
  */
 export interface Drill {
   id: string;
-  team_id: string;
   created_by: string;
+
+  // === OWNERSHIP (NEW: unified model) ===
+  owner_type: DrillOwnerType;            // 'user' = personal preset, 'team' = team drill
+  owner_id: string;                       // user_id OR team_id based on owner_type
+  
+  /** @deprecated Use owner_id with owner_type='team' instead */
+  team_id?: string;                       // Kept for backwards compatibility
 
   // === ESSENTIAL ===
   name: string;
   description?: string | null;
   drill_goal: DrillGoal;                 // grouping vs achievement
   target_type: TargetType;               // paper vs tactical
+  is_default?: boolean;                  // True for Quick Start default drill
 
   // === DEFAULTS FOR INSTANCES ===
   distance_m: number;                    // Default distance in meters
@@ -502,14 +518,4 @@ export interface CreateDrillInstanceInput extends DrillInstanceConfig {
   // === INSTANCE-SPECIFIC ===
   instance_notes?: string;
 }
-
-// =====================================================
-// LEGACY ALIASES (for backwards compatibility)
-// =====================================================
-
-/** @deprecated Use Drill instead */
-export type DrillTemplate = Drill;
-
-/** @deprecated Use CreateDrillInput instead */
-export interface CreateDrillTemplateInput extends CreateDrillInput {}
 

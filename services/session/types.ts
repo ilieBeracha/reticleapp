@@ -20,11 +20,15 @@ export interface DrillConfig {
 /**
  * BaseSessionConfig - The unified structure ALL session creation flows must use.
  * 
+ * SIMPLIFIED (v2):
+ * - drill_id: Reference to ANY saved drill (team OR personal preset)
+ * - drill_config: Inline config for Quick Start / Custom (no saved reference)
+ * 
  * Entry points:
- * - Solo quick practice
- * - Team training start
- * - Drill library pick
- * - Custom drill create
+ * - Quick Start (one tap, uses defaults)
+ * - Custom (inline config)
+ * - My Presets (saved personal drills)
+ * - Team Training (drill from training)
  * 
  * All funnel through sessionService.createSession(config: BaseSessionConfig)
  */
@@ -32,11 +36,10 @@ export interface BaseSessionConfig {
   // Context
   team_id: string | null;           // null = personal solo session
   training_id: string | null;       // null = ad-hoc session
-  drill_id: string | null;          // Link to training drill (if from training)
   
-  // Drill source (exactly one should be set, or neither for blank session)
-  drill_template_id: string | null; // existing template
-  drill_config: DrillConfig | null; // inline custom drill
+  // Config source (ONE of these, or neither for blank session)
+  drill_id: string | null;          // Reference to saved drill/preset
+  drill_config: DrillConfig | null; // Inline custom drill
   
   // Session mode
   session_mode: 'solo' | 'group';
@@ -51,6 +54,12 @@ export interface BaseSessionConfig {
   // When true, session is created as 'pending' and user must call activateSession()
   start_as_pending?: boolean;
 }
+
+/**
+ * @deprecated Use BaseSessionConfig.drill_id instead.
+ * drill_template_id is no longer used - all saved drills use drill_id.
+ */
+export type LegacyDrillTemplateId = string | null;
 
 /**
  * @deprecated Use BaseSessionConfig instead. This type is kept for backwards compatibility.

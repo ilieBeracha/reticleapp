@@ -1,27 +1,28 @@
 /**
  * SessionPrepView
  * 
- * Shown when a session is in 'pending' status.
- * User can see:
- * - Watch connection status (live updates)
- * - Drill requirements
- * - Choose to start with watch or without
+ * Shown when session is pending - AFTER drill is already selected.
+ * Just shows:
+ * - Drill summary (what user selected)
+ * - Watch connection status
+ * - Start with Watch or Phone buttons
  */
 
 import { useColors } from '@/hooks/ui/useColors';
+import type { SessionWithDetails } from '@/services/session/types';
 import { activateSession } from '@/services/sessionService';
 import { useGarminStore, useIsGarminConnected } from '@/store/garminStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
-import { 
-  Clock, 
-  MapPin, 
-  Phone, 
-  RefreshCw, 
-  Target, 
-  Watch, 
-  X, 
+import {
+  Clock,
+  Crosshair,
+  MapPin,
+  Phone,
+  RefreshCw,
+  Trophy,
+  Watch,
+  X,
   Zap,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
@@ -42,7 +43,6 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import type { SessionWithDetails } from '@/services/session/types';
 
 interface SessionPrepViewProps {
   session: SessionWithDetails;
@@ -81,11 +81,7 @@ function PulsingRing({ color }: { color: string }) {
 
   return (
     <Animated.View
-      style={[
-        styles.pulsingRing,
-        animatedStyle,
-        { borderColor: color },
-      ]}
+      style={[styles.pulsingRing, animatedStyle, { borderColor: color }]}
     />
   );
 }
@@ -105,6 +101,7 @@ export function SessionPrepView({
   
   const drill = session.drill_config;
   const drillName = session.drill_name || drill?.name || 'Practice Session';
+  const isGrouping = drill?.drill_goal === 'grouping';
 
   const handleRefreshDevices = useCallback(async () => {
     setRefreshing(true);
@@ -160,7 +157,7 @@ export function SessionPrepView({
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-            {drillName}
+            Ready to Start
           </Text>
         </View>
         <View style={{ width: 36 }} />
@@ -168,9 +165,50 @@ export function SessionPrepView({
 
       {/* Main Content */}
       <View style={styles.content}>
-        {/* Watch Status Card */}
+        {/* Drill Summary */}
         <Animated.View 
           entering={FadeInDown.delay(100).duration(400)}
+          style={[styles.drillSummary, { backgroundColor: colors.card, borderColor: colors.border }]}
+        >
+          <View style={[styles.drillIcon, { backgroundColor: isGrouping ? `${colors.primary}15` : `${colors.orange}15` }]}>
+            {isGrouping ? (
+              <Crosshair size={24} color={colors.primary} />
+            ) : (
+              <Trophy size={24} color={colors.orange} />
+            )}
+          </View>
+          <Text style={[styles.drillName, { color: colors.text }]}>{drillName}</Text>
+          <View style={styles.drillMeta}>
+            <View style={styles.drillMetaItem}>
+              <MapPin size={14} color={colors.textMuted} />
+              <Text style={[styles.drillMetaText, { color: colors.text }]}>{drill?.distance_m || 25}m</Text>
+            </View>
+            {drill?.rounds_per_shooter && (
+              <>
+                <View style={[styles.drillMetaDot, { backgroundColor: colors.border }]} />
+                <View style={styles.drillMetaItem}>
+                  <Zap size={14} color={colors.textMuted} />
+                  <Text style={[styles.drillMetaText, { color: colors.text }]}>{drill.rounds_per_shooter} shots</Text>
+                </View>
+              </>
+            )}
+            {drill?.time_limit_seconds && (
+              <>
+                <View style={[styles.drillMetaDot, { backgroundColor: colors.border }]} />
+                <View style={styles.drillMetaItem}>
+                  <Clock size={14} color={colors.textMuted} />
+                  <Text style={[styles.drillMetaText, { color: colors.text }]}>
+                    {Math.floor(drill.time_limit_seconds / 60)}:{String(drill.time_limit_seconds % 60).padStart(2, '0')}
+                  </Text>
+                </View>
+              </>
+            )}
+          </View>
+        </Animated.View>
+
+        {/* Watch Status */}
+        <Animated.View 
+          entering={FadeInDown.delay(200).duration(400)}
           style={[styles.watchCard, { backgroundColor: colors.card, borderColor: colors.border }]}
         >
           <View style={styles.watchIconContainer}>
@@ -179,21 +217,18 @@ export function SessionPrepView({
               styles.watchIconBg, 
               { backgroundColor: isWatchConnected ? `${colors.green}15` : colors.secondary }
             ]}>
-              <Watch 
-                size={32} 
-                color={isWatchConnected ? colors.green : colors.textMuted} 
-              />
+              <Watch size={28} color={isWatchConnected ? colors.green : colors.textMuted} />
             </View>
           </View>
           
-          <Text style={[styles.watchStatus, { color: colors.text }]}>
-            {isWatchConnected ? 'Watch Connected' : 'No Watch Detected'}
-          </Text>
-          <Text style={[styles.watchHint, { color: colors.textMuted }]}>
-            {isWatchConnected 
-              ? 'Your Garmin watch is ready to track shots'
-              : 'Connect your watch or continue with phone only'}
-          </Text>
+          <View style={styles.watchText}>
+            <Text style={[styles.watchStatus, { color: colors.text }]}>
+              {isWatchConnected ? 'Watch Connected' : 'No Watch'}
+            </Text>
+            <Text style={[styles.watchHint, { color: colors.textMuted }]}>
+              {isWatchConnected ? 'Ready to track' : 'Phone only mode'}
+            </Text>
+          </View>
           
           {!isWatchConnected && (
             <TouchableOpacity
@@ -204,54 +239,13 @@ export function SessionPrepView({
               {refreshing ? (
                 <ActivityIndicator size="small" color={colors.text} />
               ) : (
-                <>
-                  <RefreshCw size={14} color={colors.text} />
-                  <Text style={[styles.refreshText, { color: colors.text }]}>Refresh</Text>
-                </>
+                <RefreshCw size={16} color={colors.text} />
               )}
             </TouchableOpacity>
           )}
         </Animated.View>
 
-        {/* Drill Info */}
-        {drill && (
-          <Animated.View 
-            entering={FadeInDown.delay(200).duration(400)}
-            style={[styles.drillCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-          >
-            <Text style={[styles.drillLabel, { color: colors.textMuted }]}>DRILL REQUIREMENTS</Text>
-            <View style={styles.drillRow}>
-              <View style={styles.drillItem}>
-                <MapPin size={16} color={colors.textMuted} />
-                <Text style={[styles.drillText, { color: colors.text }]}>{drill.distance_m}m</Text>
-              </View>
-              <View style={styles.drillItem}>
-                <Zap size={16} color={colors.textMuted} />
-                <Text style={[styles.drillText, { color: colors.text }]}>
-                  {drill.rounds_per_shooter} shots
-                </Text>
-              </View>
-              {drill.time_limit_seconds && (
-                <View style={styles.drillItem}>
-                  <Clock size={16} color={colors.textMuted} />
-                  <Text style={[styles.drillText, { color: colors.text }]}>
-                    {Math.floor(drill.time_limit_seconds / 60)}:{String(drill.time_limit_seconds % 60).padStart(2, '0')}
-                  </Text>
-                </View>
-              )}
-            </View>
-            {drill.min_accuracy_percent && (
-              <View style={[styles.drillItem, { marginTop: 8 }]}>
-                <Target size={16} color={colors.textMuted} />
-                <Text style={[styles.drillText, { color: colors.text }]}>
-                  Min {drill.min_accuracy_percent}% accuracy
-                </Text>
-              </View>
-            )}
-          </Animated.View>
-        )}
-
-        {/* Info Box */}
+        {/* Info */}
         <Animated.View 
           entering={FadeIn.delay(300).duration(400)}
           style={[styles.infoBox, { backgroundColor: `${colors.blue}10` }]}
@@ -259,8 +253,8 @@ export function SessionPrepView({
           <Ionicons name="information-circle" size={18} color={colors.blue} />
           <Text style={[styles.infoText, { color: colors.blue }]}>
             {isWatchConnected 
-              ? 'Watch will count shots and track time. Tap your watch button after each shot.'
-              : 'You can still use the watch later if you connect it during the session.'}
+              ? 'Watch will track your shots. Tap the watch button after each shot.'
+              : 'You can connect your watch later during the session.'}
           </Text>
         </Animated.View>
       </View>
@@ -293,9 +287,7 @@ export function SessionPrepView({
               disabled={activating}
             >
               <Phone size={18} color={colors.text} />
-              <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
-                Phone Only
-              </Text>
+              <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Phone Only</Text>
             </TouchableOpacity>
           </>
         ) : (
@@ -322,9 +314,9 @@ export function SessionPrepView({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -344,95 +336,105 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
     letterSpacing: -0.3,
   },
+  
+  // Content
   content: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 24,
-    gap: 16,
+    paddingTop: 16,
+    gap: 14,
+  },
+  
+  // Drill Summary
+  drillSummary: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 20,
+    alignItems: 'center',
+  },
+  drillIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  drillName: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  drillMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  drillMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  drillMetaText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  drillMetaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
   },
   
   // Watch Card
   watchCard: {
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 24,
+    flexDirection: 'row',
     alignItems: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
   },
   watchIconContainer: {
-    width: 80,
-    height: 80,
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
   },
   pulsingRing: {
     position: 'absolute',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     borderWidth: 2,
   },
   watchIconBg: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  watchText: {
+    flex: 1,
+    marginLeft: 12,
+  },
   watchStatus: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 4,
-    letterSpacing: -0.3,
+    fontSize: 15,
+    fontWeight: '600',
   },
   watchHint: {
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
+    fontSize: 12,
+    marginTop: 1,
   },
   refreshButton: {
-    flexDirection: 'row',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    marginTop: 16,
-  },
-  refreshText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  
-  // Drill Card
-  drillCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16,
-  },
-  drillLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    marginBottom: 12,
-  },
-  drillRow: {
-    flexDirection: 'row',
-    gap: 20,
-    flexWrap: 'wrap',
-  },
-  drillItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  drillText: {
-    fontSize: 14,
-    fontWeight: '600',
+    justifyContent: 'center',
   },
   
   // Info Box
@@ -454,7 +456,7 @@ const styles = StyleSheet.create({
   actions: {
     paddingHorizontal: 20,
     paddingTop: 12,
-    gap: 12,
+    gap: 10,
   },
   primaryButton: {
     flexDirection: 'row',
@@ -463,11 +465,6 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 16,
     borderRadius: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
   },
   primaryButtonText: {
     fontSize: 16,

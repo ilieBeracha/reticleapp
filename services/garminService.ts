@@ -404,7 +404,10 @@ function handleAckReceived(ackPayload: { status?: string } | null): void {
 
   // Check if ACK indicates success
   const status = ackPayload?.status;
-  if (status === 'session_started' || status === 'session_ended' || status === 'received' || status === 'weather_updated') {
+  // session_ready = new watch behavior: preview queued, waiting for user to tap watch
+  // session_started = legacy: session auto-started on watch
+  const validStatuses = ['session_ready', 'session_started', 'session_ended', 'received', 'weather_updated'];
+  if (validStatuses.includes(status || '')) {
     console.log('[GarminService] ✅ ACK received for:', wasWaiting.type, '- status:', status);
     wasWaiting.resolve(true);
   } else {

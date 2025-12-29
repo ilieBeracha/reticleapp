@@ -458,7 +458,7 @@ index a7c6f2d..69841a4 100644
      }
  }
 diff --git a/node_modules/react-native-garmin-connect/react-native-garmin-connect.podspec b/node_modules/react-native-garmin-connect/react-native-garmin-connect.podspec
-index 16e7390..fe89ac9 100644
+index 16e7390..4291ce9 100644
 --- a/node_modules/react-native-garmin-connect/react-native-garmin-connect.podspec
 +++ b/node_modules/react-native-garmin-connect/react-native-garmin-connect.podspec
 @@ -14,9 +14,19 @@ Pod::Spec.new do |s|
@@ -471,7 +471,7 @@ index 16e7390..fe89ac9 100644
 +  s.exclude_files = "ios/GarminDeviceStorage.h"
 +  s.public_header_files = "ios/GarminConnect.h"
    s.vendored_frameworks = 'ios/ConnectIQ.xcframework'
-   
+ 
 +  # Configure framework search paths for ConnectIQ
 +  # Note: PODS_ROOT is inside ios/, so ../../ goes to project root
 +  s.xcconfig = {
