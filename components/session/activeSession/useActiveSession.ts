@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 
 import type { GarminSessionData } from '@/services/garminService';
-import { getDrillInputRoutes } from '@/services/session/drillInputRecipe';
+// getDrillInputRoutes no longer used - user always chooses scan vs manual
 import { computeSessionScore } from '@/services/session/scoring';
 import {
   calculateSessionStats,
@@ -192,22 +192,9 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     return computeSessionScore(stats, drill);
   }, [stats, drill]);
 
-  // Input routes
-  const inputRoutes = useMemo(() => {
-    if (!sessionId) return null;
-    return getDrillInputRoutes({
-      sessionId,
-      defaultDistance,
-      drill: drill ?? null,
-      nextBullets: nextTargetPlan?.nextBullets ?? null,
-      allowMoreTargets: !drillLimitReached,
-    });
-  }, [sessionId, defaultDistance, drill, nextTargetPlan?.nextBullets, drillLimitReached]);
-
-  const manualRoute = inputRoutes?.primary.kind === 'manual_tactical' ? inputRoutes.primary : inputRoutes?.secondary;
-  const scanRoute = inputRoutes?.primary.kind === 'scan_paper' ? inputRoutes.primary : undefined;
-  const showManual = !!manualRoute;
-  const showScan = !!scanRoute;
+  // Input routes - user always chooses scan vs manual
+  // Routes are always available (not determined by drill config)
+  const canAddTarget = !drillLimitReached && !!sessionId;
 
   // ============================================================================
   // GARMIN INTEGRATION - Start session on watch
@@ -415,16 +402,38 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
   }, [sessionId, defaultDistance, hasDrill, drill, nextTargetPlan]);
 
   const handleManualRoute = useCallback(() => {
-    if (!manualRoute) return;
+    if (!canAddTarget) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push({ pathname: manualRoute.pathname, params: manualRoute.params } as any);
-  }, [manualRoute]);
+    router.push({
+      pathname: '/(protected)/tacticalTarget',
+      params: {
+        sessionId,
+        distance: defaultDistance.toString(),
+        ...(hasDrill ? { locked: '1' } : {}),
+        ...(hasDrill && nextTargetPlan?.nextBullets
+          ? { bullets: String(nextTargetPlan.nextBullets) }
+          : {}),
+      },
+    });
+  }, [canAddTarget, sessionId, defaultDistance, hasDrill, nextTargetPlan]);
 
   const handleScanRoute = useCallback(() => {
-    if (!scanRoute) return;
+    if (!canAddTarget) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push({ pathname: scanRoute.pathname, params: scanRoute.params } as any);
-  }, [scanRoute]);
+    const maxShots = hasDrill && drill?.rounds_per_shooter && !isInfiniteShots(drill.rounds_per_shooter)
+      ? String(drill.rounds_per_shooter)
+      : undefined;
+    router.push({
+      pathname: '/(protected)/scanTarget',
+      params: {
+        sessionId,
+        distance: String(defaultDistance),
+        ...(maxShots ? { maxShots } : {}),
+        drillGoal: isGroupingDrill ? 'grouping' : 'achievement',
+        ...(hasDrill ? { locked: '1' } : {}),
+      },
+    });
+  }, [canAddTarget, sessionId, defaultDistance, hasDrill, drill, isGroupingDrill]);
 
   const handleTargetPress = useCallback((target: SessionTargetWithResults) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -700,8 +709,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     handleRetryWatchConnection,
 
     // Route helpers
-    showManual,
-    showScan,
+    canAddTarget,
   };
 }
 

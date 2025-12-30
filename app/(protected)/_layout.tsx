@@ -174,7 +174,7 @@ export default function ProtectedLayout() {
             presentation: "formSheet",
             gestureEnabled: true,
             sheetGrabberVisible: true,
-            contentStyle: { backgroundColor: colors.card },
+            contentStyle: { backgroundColor: colors.background },
             sheetAllowedDetents: [0.9, 1],
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,

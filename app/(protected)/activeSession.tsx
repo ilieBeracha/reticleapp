@@ -171,8 +171,7 @@ export default function ActiveSessionScreen() {
     handleClose,
     handleContinueWithoutWatch,
     handleRetryWatchConnection,
-    showManual,
-    showScan,
+    canAddTarget,
   } = useActiveSession({ sessionId });
 
   const renderEmpty = useCallback(
@@ -370,18 +369,25 @@ export default function ActiveSessionScreen() {
         />
       </Animated.View>
 
-      {/* Add Target Button */}
-      {(showScan || showManual) && !drillLimitReached && (
+      {/* Add Target Buttons - User chooses scan or manual */}
+      {canAddTarget && (
         <Animated.View entering={FadeInDown.delay(100).duration(300)} style={localStyles.actionsContainer}>
-          <TouchableOpacity
-            style={[localStyles.addBtn, { backgroundColor: colors.text }]}
-            onPress={showScan ? handleScanRoute : handleManualRoute}
-          >
-            {showScan ? <Camera size={18} color={colors.background} /> : <Crosshair size={18} color={colors.background} />}
-            <Text style={[localStyles.addBtnText, { color: colors.background }]}>
-              {showScan ? 'Scan Target' : 'Add Entry'}
-            </Text>
-          </TouchableOpacity>
+          <View style={localStyles.actionRow}>
+            <TouchableOpacity
+              style={[localStyles.actionBtn, { backgroundColor: colors.text }]}
+              onPress={handleScanRoute}
+            >
+              <Camera size={18} color={colors.background} />
+              <Text style={[localStyles.actionBtnText, { color: colors.background }]}>Scan</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[localStyles.actionBtn, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}
+              onPress={handleManualRoute}
+            >
+              <Crosshair size={18} color={colors.text} />
+              <Text style={[localStyles.actionBtnText, { color: colors.text }]}>Manual</Text>
+            </TouchableOpacity>
+          </View>
         </Animated.View>
       )}
 
@@ -801,26 +807,20 @@ const localStyles = StyleSheet.create({
 
   // Actions
   actionsContainer: { paddingHorizontal: 16, marginBottom: 16 },
-  addBtn: {
+  actionRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     gap: 10,
-    height: 48,
-    borderRadius: 12,
   },
-  addBtnText: { fontSize: 15, fontWeight: '600' },
   actionBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 14,
-    borderRadius: 10,
-    borderWidth: 1,
+    height: 48,
+    borderRadius: 12,
   },
-  actionBtnText: { fontSize: 14, fontWeight: '600' },
+  actionBtnText: { fontSize: 15, fontWeight: '600' },
 
   // Bottom
   bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingTop: 12 },

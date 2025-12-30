@@ -1,10 +1,10 @@
-import { createSession } from '@/services/sessionService';
 import type { BaseSessionConfig } from '@/services/session/types';
+import { createSession } from '@/services/sessionService';
 import {
-    cancelTraining,
-    DrillInstanceOverrides,
-    finishTraining,
-    startTrainingWithConfig
+  cancelTraining,
+  DrillInstanceOverrides,
+  finishTraining,
+  startTrainingWithConfig
 } from '@/services/trainingService';
 import { useIsGarminConnected } from '@/store/garminStore';
 import { useTrainingStore } from '@/store/trainingStore';
@@ -251,7 +251,6 @@ export function useTrainingActions({
         team_id: training.team_id,
         training_id: training.id,
         drill_id: drill.id,
-        drill_template_id: null,
         drill_config: null, // Drill config comes from the training_drills table
         session_mode: 'solo',
         watch_controlled: false, // Will be set when user activates session

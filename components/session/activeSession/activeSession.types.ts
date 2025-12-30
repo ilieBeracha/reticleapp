@@ -116,7 +116,6 @@ export interface UseActiveSessionReturn {
   handleRetryWatchConnection: () => void;
   
   // Route helpers
-  showManual: boolean;
-  showScan: boolean;
+  canAddTarget: boolean;
 }
 
