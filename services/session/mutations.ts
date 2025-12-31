@@ -23,6 +23,8 @@ import type {
   SessionWithDetails,
   TargetType,
 } from './types';
+import type { TransformedWatchData, WatchDetailsPayload } from './watchTypes';
+import { buildDetailsMergePayload, buildTargetData } from './watchDataTransformer';
 
 /**
  * Convert legacy CreateSessionParams to BaseSessionConfig
@@ -1146,6 +1148,202 @@ export async function mergeWatchSessionDetails(
   }
   
   console.log('[SessionService] ✅ Watch session details merged successfully');
+  return true;
+}
+
+// ============================================================================
+// NEW TWO-PHASE SYNC FUNCTIONS (for compact watch payloads)
+// ============================================================================
+
+/**
+ * Save transformed watch data from new compact payload format.
+ * Creates a tactical target entry with comprehensive telemetry data.
+ * 
+ * @param data - Transformed watch data from transformSummaryPayload()
+ * @param shouldEnd - Whether to end the session after saving (default: true)
+ * @returns The updated session
+ */
+export async function saveTransformedWatchData(
+  data: TransformedWatchData,
+  shouldEnd: boolean = true
+): Promise<SessionWithDetails> {
+  const session = await getSessionById(data.sessionId);
+  
+  if (!session) {
+    throw new Error('Session not found');
+  }
+  
+  console.log('[SessionService] Saving transformed watch data:', {
+    sessionId: data.sessionId,
+    shots: data.shotsRecorded,
+    hits: data.hitsRecorded,
+    durationMs: data.durationMs,
+    isSummaryOnly: data.isSummaryOnly,
+  });
+  
+  // Get drill config for distance if not provided by watch
+  const drill = session.drill_config;
+  const distance = data.distance || drill?.distance_m || 0;
+  
+  // Build target_data using the transformer
+  const targetData = buildTargetData({
+    ...data,
+    distance,
+  });
+  
+  console.log('[SessionService] Target data keys:', Object.keys(targetData));
+  
+  // Create a tactical target entry with watch data
+  const target = await addSessionTarget({
+    session_id: data.sessionId,
+    target_type: 'tactical',
+    distance_m: distance,
+    notes: 'Recorded via Garmin watch',
+    target_data: targetData,
+  });
+  
+  // Calculate time in seconds from milliseconds
+  const timeSeconds = data.durationMs ? data.durationMs / 1000 : null;
+  
+  // Save the tactical result
+  await saveTacticalTargetResult({
+    session_target_id: target.id,
+    bullets_fired: data.shotsRecorded,
+    hits: data.hitsRecorded,
+    is_stage_cleared: data.completed,
+    time_seconds: timeSeconds,
+    notes: data.isSummaryOnly ? 'Watch summary (details pending)' : 'Watch session data',
+  });
+  
+  console.log('[SessionService] Transformed watch data saved as tactical target:', target.id);
+  
+  // End the session if requested
+  if (shouldEnd) {
+    // Calculate ended_at based on watch duration
+    let calculatedEndedAt: string;
+    
+    if (data.durationMs && session.started_at) {
+      const startedAtMs = new Date(session.started_at).getTime();
+      const endedAtMs = startedAtMs + data.durationMs;
+      calculatedEndedAt = new Date(endedAtMs).toISOString();
+    } else {
+      calculatedEndedAt = new Date().toISOString();
+    }
+    
+    const updatedSession = await updateSession(data.sessionId, {
+      status: 'completed',
+      ended_at: calculatedEndedAt,
+    });
+    
+    // Check drill completion if applicable
+    if (session.training_id && session.drill_id && session.drill_config) {
+      const drillConfig = session.drill_config;
+      const stats = await calculateSessionStats(data.sessionId);
+      
+      const meetsShotCount = !drillConfig.rounds_per_shooter || stats.totalShotsFired >= drillConfig.rounds_per_shooter;
+      const targetRequirement = (drillConfig.strings_count ?? 1) * (drillConfig.target_count ?? 1);
+      const meetsTargetCount = stats.targetCount >= targetRequirement;
+      const meetsAccuracy = !drillConfig.min_accuracy_percent || stats.accuracyPct >= drillConfig.min_accuracy_percent;
+      
+      const endedAt = new Date(calculatedEndedAt).getTime();
+      const startedAt = session.started_at ? new Date(session.started_at).getTime() : endedAt;
+      const durationSeconds = Math.max(0, Math.floor((endedAt - startedAt) / 1000));
+      const meetsTime = !drillConfig.time_limit_seconds || durationSeconds <= drillConfig.time_limit_seconds;
+      
+      if (meetsShotCount && meetsTargetCount && meetsAccuracy && meetsTime) {
+        await recordDrillCompletion({
+          sessionId: data.sessionId,
+          trainingId: session.training_id,
+          drillId: session.drill_id,
+          stats,
+        });
+        console.log('[SessionService] Watch session: Drill marked completed');
+      }
+    }
+    
+    return updatedSession;
+  }
+  
+  return session;
+}
+
+/**
+ * Merge Phase 2 details from new compact payload format.
+ * Updates existing garmin_watch target with per-shot data.
+ * 
+ * @param sessionId - The session to update
+ * @param details - The WatchDetailsPayload from Phase 2
+ * @returns true if merge was successful
+ */
+export async function mergeCompactWatchDetails(
+  sessionId: string,
+  details: WatchDetailsPayload
+): Promise<boolean> {
+  console.log('[SessionService] Merging compact watch details for:', sessionId);
+  
+  // Find the existing target with garmin_watch source
+  const { data: targets, error: fetchError } = await supabase
+    .from('session_targets')
+    .select('id, target_data')
+    .eq('session_id', sessionId)
+    .limit(10);
+  
+  if (fetchError) {
+    console.error('[SessionService] Error fetching target for merge:', fetchError);
+    return false;
+  }
+  
+  if (!targets || targets.length === 0) {
+    console.log('[SessionService] No target found for session');
+    return false;
+  }
+  
+  // Find the garmin_watch target
+  const watchTarget = targets.find((t) => {
+    const targetDataRaw = t.target_data as Record<string, unknown> | null;
+    return targetDataRaw?.source === 'garmin_watch';
+  });
+  
+  if (!watchTarget) {
+    console.log('[SessionService] No garmin_watch target found');
+    return false;
+  }
+  
+  const existingData = (watchTarget.target_data as Record<string, unknown>) || {};
+  
+  // Build details merge payload using transformer
+  const detailsToMerge = buildDetailsMergePayload(details);
+  
+  console.log('[SessionService] Merging keys:', Object.keys(detailsToMerge));
+  
+  // Merge with existing data
+  const mergedData = {
+    ...existingData,
+    ...detailsToMerge,
+  };
+  
+  // Update the target
+  const { error: updateError } = await supabase
+    .from('session_targets')
+    .update({ target_data: mergedData })
+    .eq('id', watchTarget.id);
+  
+  if (updateError) {
+    console.error('[SessionService] Error updating target with details:', updateError);
+    return false;
+  }
+  
+  // Also update the tactical_results notes to indicate details are merged
+  const { error: resultUpdateError } = await supabase
+    .from('tactical_results')
+    .update({ notes: 'Watch session data (details synced)' })
+    .eq('session_target_id', watchTarget.id);
+  
+  if (resultUpdateError) {
+    console.warn('[SessionService] Could not update tactical result notes:', resultUpdateError);
+  }
+  
+  console.log('[SessionService] ✅ Compact watch details merged successfully');
   return true;
 }
 

@@ -38,7 +38,12 @@ import {
   syncDrillToWatch,
 } from '@/services/garminService';
 
-import { mergeWatchSessionDetails } from '@/services/session/mutations';
+import {
+  mergeCompactWatchDetails,
+  mergeWatchSessionDetails,
+} from '@/services/session/mutations';
+import type { WatchDetailsPayload } from '@/services/session/watchTypes';
+import { buildDetailsPartial } from '@/services/session/watchDataTransformer';
 
 // Re-export types for convenience
 export type { GarminConnectionStatus, GarminDevice, GarminSessionData };
@@ -363,7 +368,31 @@ export function useGarminInitialize() {
             const sessionIdForMerge = event.data.sessionId;
             if (sessionIdForMerge) {
               console.log('[GarminStore] 📩 Saving details to DB silently...');
-              mergeWatchSessionDetails(sessionIdForMerge, event.data)
+              
+              // Check if this is the new compact format (has shotBiometrics from transformer)
+              const hasCompactFormat = event.data.steadiness?.shots?.[0]?.flinch !== undefined ||
+                event.data.biometrics?.shotBiometrics?.[0]?.shot !== undefined;
+              
+              // Try compact format first, then fall back to legacy
+              const mergePromise = hasCompactFormat
+                ? mergeCompactWatchDetails(sessionIdForMerge, {
+                    sid: sessionIdForMerge,
+                    shotData: (event.data.biometrics?.shotBiometrics || []).map((sb: { shot: number; hr?: number }) => ({
+                      n: sb.shot,
+                      t: 0, // Not available in this path
+                      hr: sb.hr || 0,
+                      st: 0, // Not available in this path
+                      fl: 0 as const,
+                    })),
+                    meta: {
+                      auto: event.data.autoDetected ?? false,
+                      sens: event.data.detectionSensitivity ?? 0,
+                      overrides: event.data.manualOverrides ?? 0,
+                    },
+                  } as WatchDetailsPayload)
+                : mergeWatchSessionDetails(sessionIdForMerge, event.data);
+              
+              mergePromise
                 .then((success) => {
                   if (success) {
                     console.log('[GarminStore] ✅ Details synced to DB');
