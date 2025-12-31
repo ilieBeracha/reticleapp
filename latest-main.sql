@@ -2067,6 +2067,7 @@ CREATE TABLE IF NOT EXISTS "public"."paper_target_results" (
     "offset_up_cm" numeric,
     "scanned_image_url" "text",
     "notes" "text",
+    "actual_shots_declared" integer,
     CONSTRAINT "paper_target_results_paper_type_check" CHECK (("paper_type" = ANY (ARRAY['achievement'::"text", 'grouping'::"text"])))
 );
 
