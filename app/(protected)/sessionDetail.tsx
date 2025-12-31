@@ -17,14 +17,19 @@ import { format, intervalToDuration } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
+  Activity,
   Award,
   Calendar,
   ChevronRight,
   Clock,
   Crosshair,
+  Heart,
   Target,
+  Timer,
   TrendingUp,
   Users,
+  Watch,
+  Wind,
   Zap,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -90,7 +95,64 @@ export default function SessionDetailScreen() {
         shots: t.paper_result?.bullets_fired ?? 0,
         isGrouping: t.paper_result?.paper_type === 'grouping',
         dispersion: t.paper_result?.dispersion_cm,
+        actualShotsDeclared: t.paper_result?.actual_shots_declared ?? null,
       }));
+  }, [targets]);
+
+  // Check if any scanned targets are missing actual shots declaration
+  const hasScannedWithoutDeclaration = useMemo(() => {
+    return targets.some(
+      (t) => 
+        t.target_type === 'paper' && 
+        t.paper_result?.paper_type === 'achievement' &&
+        !!t.paper_result?.scanned_image_url && 
+        !t.paper_result?.actual_shots_declared
+    );
+  }, [targets]);
+
+  // Count scan vs manual entries
+  const entryBreakdown = useMemo(() => {
+    let scanned = 0;
+    let manual = 0;
+    targets.forEach((t) => {
+      if (t.target_type === 'paper' && t.paper_result?.paper_type === 'achievement') {
+        if (t.paper_result?.scanned_image_url) scanned++;
+        else manual++;
+      }
+    });
+    return { scanned, manual };
+  }, [targets]);
+
+  // Extract watch/biometrics data from targets
+  const watchData = useMemo(() => {
+    const watchTarget = targets.find(
+      (t) => t.target_data && (t.target_data as any).source === 'garmin_watch'
+    );
+    if (!watchTarget) return null;
+    
+    const data = watchTarget.target_data as any;
+    return {
+      heartRate: data.heart_rate as { avg?: number; max?: number; min?: number } | undefined,
+      avgBreathRate: data.avg_breath_rate as number | undefined,
+      biometrics: data.biometrics as {
+        summary?: any;
+        hr_timeline?: [number, number, number][];
+        breath_timeline?: [number, number, number][];
+        shot_biometrics?: any[];
+      } | undefined,
+      steadiness: data.steadiness as {
+        avg_score?: number;
+        shot_count?: number;
+        trend?: string;
+        shots?: any[];
+      } | undefined,
+      splits: data.splits as number[] | undefined,
+      avgSplitMs: data.avg_split_ms as number | undefined,
+      fastestSplitMs: data.fastest_split_ms as number | undefined,
+      slowestSplitMs: data.slowest_split_ms as number | undefined,
+      shotTimestamps: data.shot_timestamps as number[] | undefined,
+      durationMs: data.duration_ms as number | undefined,
+    };
   }, [targets]);
 
   // Calculate session duration
@@ -214,22 +276,61 @@ export default function SessionDetailScreen() {
         {stats && stats.targetCount > 0 ? (
           <Animated.View entering={FadeIn.duration(300)} style={styles.statsSection}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Performance</Text>
-            <View style={styles.statsGrid}>
-              <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={[styles.statIconBg, { backgroundColor: `${colors.indigo}22` }]}>
-                  <Crosshair size={18} color={colors.indigo} />
-                </View>
-                <Text style={[styles.statValue, { color: colors.text }]}>{stats.accuracyPct}%</Text>
-                <Text style={[styles.statLabel, { color: colors.textMuted }]}>Accuracy</Text>
+            
+            {/* Entry breakdown indicator */}
+            {(entryBreakdown.scanned > 0 || entryBreakdown.manual > 0) && (
+              <View style={[styles.entryBreakdown, { backgroundColor: colors.card }]}>
+                {entryBreakdown.scanned > 0 && (
+                  <View style={styles.entryBreakdownItem}>
+                    <View style={[styles.entryBreakdownDot, { backgroundColor: '#A78BFA' }]} />
+                    <Text style={[styles.entryBreakdownText, { color: colors.textMuted }]}>
+                      {entryBreakdown.scanned} scanned
+                    </Text>
+                  </View>
+                )}
+                {entryBreakdown.manual > 0 && (
+                  <View style={styles.entryBreakdownItem}>
+                    <View style={[styles.entryBreakdownDot, { backgroundColor: '#60A5FA' }]} />
+                    <Text style={[styles.entryBreakdownText, { color: colors.textMuted }]}>
+                      {entryBreakdown.manual} manual
+                    </Text>
+                  </View>
+                )}
               </View>
+            )}
+            
+            <View style={styles.statsGrid}>
+              {/* Accuracy - only show if we have meaningful data */}
+              {stats.accuracyPct > 0 ? (
+                <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={[styles.statIconBg, { backgroundColor: `${colors.indigo}22` }]}>
+                    <Crosshair size={18} color={colors.indigo} />
+                  </View>
+                  <Text style={[styles.statValue, { color: colors.text }]}>{stats.accuracyPct}%</Text>
+                  <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                    Accuracy{hasScannedWithoutDeclaration ? '*' : ''}
+                  </Text>
+                </View>
+              ) : hasScannedWithoutDeclaration ? (
+                <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={[styles.statIconBg, { backgroundColor: `${colors.orange}22` }]}>
+                    <Crosshair size={18} color={colors.orange} />
+                  </View>
+                  <Text style={[styles.statValue, { color: colors.orange }]}>—</Text>
+                  <Text style={[styles.statLabel, { color: colors.textMuted }]}>No shot count</Text>
+                </View>
+              ) : null}
+              
               <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={[styles.statIconBg, { backgroundColor: `${colors.green}22` }]}>
                   <Target size={18} color={colors.green} />
                 </View>
                 <Text style={[styles.statValue, { color: colors.text }]}>
-                  {stats.totalHits}/{stats.totalShotsFired}
+                  {stats.totalHits}
                 </Text>
-                <Text style={[styles.statLabel, { color: colors.textMuted }]}>Hits / Shots</Text>
+                <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                  {hasScannedWithoutDeclaration ? 'Holes detected' : 'Hits'}
+                </Text>
               </View>
               <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={[styles.statIconBg, { backgroundColor: `${colors.orange}22` }]}>
@@ -248,6 +349,13 @@ export default function SessionDetailScreen() {
                 </View>
               )}
             </View>
+            
+            {/* Accuracy note if scanned without declaration */}
+            {hasScannedWithoutDeclaration && stats.accuracyPct > 0 && (
+              <Text style={[styles.accuracyNote, { color: colors.textMuted }]}>
+                * Accuracy excludes scanned targets without declared shots
+              </Text>
+            )}
           </Animated.View>
         ) : stats?.targetCount === 0 ? (
           <View style={[styles.emptyStats, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -255,6 +363,160 @@ export default function SessionDetailScreen() {
             <Text style={[styles.emptyStatsText, { color: colors.textMuted }]}>No targets recorded</Text>
           </View>
         ) : null}
+
+        {/* Watch Data / Biometrics Section */}
+        {watchData && (watchData.heartRate || watchData.steadiness || watchData.splits) && (
+          <Animated.View entering={FadeInDown.delay(150).duration(300)} style={styles.biometricsSection}>
+            <View style={styles.biometricsHeader}>
+              <Watch size={14} color={colors.green} />
+              <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Watch Data</Text>
+            </View>
+            
+            {/* Heart Rate & Breathing Row */}
+            {(watchData.heartRate?.avg || watchData.avgBreathRate) && (
+              <View style={styles.bioRow}>
+                {watchData.heartRate?.avg && (
+                  <View style={[styles.bioCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <View style={[styles.bioIconBg, { backgroundColor: `${colors.red}22` }]}>
+                      <Heart size={18} color={colors.red} />
+                    </View>
+                    <View style={styles.bioContent}>
+                      <Text style={[styles.bioLabel, { color: colors.textMuted }]}>Heart Rate</Text>
+                      <View style={styles.bioValues}>
+                        <Text style={[styles.bioValue, { color: colors.text }]}>{watchData.heartRate.avg}</Text>
+                        <Text style={[styles.bioUnit, { color: colors.textMuted }]}>avg</Text>
+                        {watchData.heartRate.max && (
+                          <>
+                            <Text style={[styles.bioValue, { color: colors.orange }]}>{watchData.heartRate.max}</Text>
+                            <Text style={[styles.bioUnit, { color: colors.textMuted }]}>max</Text>
+                          </>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                )}
+                
+                {watchData.avgBreathRate && (
+                  <View style={[styles.bioCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <View style={[styles.bioIconBg, { backgroundColor: `${colors.blue}22` }]}>
+                      <Wind size={18} color={colors.blue} />
+                    </View>
+                    <View style={styles.bioContent}>
+                      <Text style={[styles.bioLabel, { color: colors.textMuted }]}>Breathing</Text>
+                      <View style={styles.bioValues}>
+                        <Text style={[styles.bioValue, { color: colors.text }]}>{watchData.avgBreathRate}</Text>
+                        <Text style={[styles.bioUnit, { color: colors.textMuted }]}>breaths/min</Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
+            
+            {/* Steadiness */}
+            {watchData.steadiness?.avg_score !== undefined && (
+              <View style={[styles.steadinessCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={[styles.bioIconBg, { 
+                  backgroundColor: watchData.steadiness.avg_score >= 70 ? `${colors.green}22` : `${colors.orange}22` 
+                }]}>
+                  <Activity size={18} color={watchData.steadiness.avg_score >= 70 ? colors.green : colors.orange} />
+                </View>
+                <View style={styles.steadinessContent}>
+                  <Text style={[styles.bioLabel, { color: colors.textMuted }]}>Steadiness</Text>
+                  <Text style={[styles.steadinessValue, { 
+                    color: watchData.steadiness.avg_score >= 70 ? colors.green : colors.orange 
+                  }]}>
+                    {watchData.steadiness.avg_score.toFixed(0)}%
+                  </Text>
+                </View>
+                {watchData.steadiness.trend && (
+                  <View style={[styles.trendBadge, { backgroundColor: `${colors.text}10` }]}>
+                    <Text style={[styles.trendText, { color: colors.textMuted }]}>
+                      {watchData.steadiness.trend}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+            
+            {/* Split Times */}
+            {watchData.splits && watchData.splits.length > 0 && (
+              <View style={styles.splitsSection}>
+                <View style={styles.splitsHeader}>
+                  <Timer size={14} color={colors.primary} />
+                  <Text style={[styles.splitsTitle, { color: colors.text }]}>Split Times</Text>
+                </View>
+                <View style={styles.splitsRow}>
+                  {watchData.fastestSplitMs && (
+                    <View style={[styles.splitCard, { backgroundColor: `${colors.green}15` }]}>
+                      <Text style={[styles.splitValue, { color: colors.green }]}>
+                        {watchData.fastestSplitMs < 1000 
+                          ? `${watchData.fastestSplitMs}ms` 
+                          : `${(watchData.fastestSplitMs / 1000).toFixed(2)}s`}
+                      </Text>
+                      <Text style={[styles.splitLabel, { color: colors.green }]}>fastest</Text>
+                    </View>
+                  )}
+                  {watchData.avgSplitMs && (
+                    <View style={[styles.splitCard, { backgroundColor: `${colors.primary}15` }]}>
+                      <Text style={[styles.splitValue, { color: colors.primary }]}>
+                        {watchData.avgSplitMs < 1000 
+                          ? `${watchData.avgSplitMs}ms` 
+                          : `${(watchData.avgSplitMs / 1000).toFixed(2)}s`}
+                      </Text>
+                      <Text style={[styles.splitLabel, { color: colors.primary }]}>average</Text>
+                    </View>
+                  )}
+                  {watchData.slowestSplitMs && (
+                    <View style={[styles.splitCard, { backgroundColor: `${colors.orange}15` }]}>
+                      <Text style={[styles.splitValue, { color: colors.orange }]}>
+                        {watchData.slowestSplitMs < 1000 
+                          ? `${watchData.slowestSplitMs}ms` 
+                          : `${(watchData.slowestSplitMs / 1000).toFixed(2)}s`}
+                      </Text>
+                      <Text style={[styles.splitLabel, { color: colors.orange }]}>slowest</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            )}
+            
+            {/* Per-Shot Biometrics Preview */}
+            {watchData.biometrics?.shot_biometrics && watchData.biometrics.shot_biometrics.length > 0 && (
+              <View style={styles.shotBioSection}>
+                <Text style={[styles.shotBioTitle, { color: colors.textMuted }]}>Per-Shot Data</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shotBioScroll}>
+                  {watchData.biometrics.shot_biometrics.slice(0, 10).map((sb: any, idx: number) => {
+                    const shotNum = sb.shot ?? idx + 1;
+                    const hrValue = sb.hr ?? null;
+                    const phase = sb.breathPhase ?? null;
+                    const phaseColor = phase === 'pause' ? colors.green 
+                      : phase === 'exhale' ? colors.blue 
+                      : colors.orange;
+                    
+                    return (
+                      <View 
+                        key={idx} 
+                        style={[styles.shotBioChip, { backgroundColor: colors.card, borderColor: colors.border }]}
+                      >
+                        <Text style={[styles.shotBioNum, { color: colors.text }]}>#{shotNum}</Text>
+                        {hrValue !== null && (
+                          <View style={styles.shotBioStat}>
+                            <Heart size={10} color={colors.red} />
+                            <Text style={[styles.shotBioValue, { color: colors.text }]}>{hrValue}</Text>
+                          </View>
+                        )}
+                        {phase !== null && (
+                          <View style={[styles.phaseDot, { backgroundColor: phaseColor }]} />
+                        )}
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+          </Animated.View>
+        )}
 
         {/* Image Gallery */}
         {targetImages.length > 0 && (
@@ -276,7 +538,9 @@ export default function SessionDetailScreen() {
                     <Text style={styles.imageHits}>
                       {img.isGrouping 
                         ? (img.dispersion != null ? `${img.dispersion.toFixed(1)}cm` : `${img.shots} shots`)
-                        : `${img.hits}/${img.shots}`
+                        : img.actualShotsDeclared 
+                          ? `${img.hits}/${img.actualShotsDeclared} (${Math.round((img.hits / img.actualShotsDeclared) * 100)}%)`
+                          : `${img.hits} detected`
                       }
                     </Text>
                   </View>
@@ -294,15 +558,26 @@ export default function SessionDetailScreen() {
               {targets.map((target, index) => {
                 const isPaper = target.target_type === 'paper';
                 const result = isPaper ? target.paper_result : target.tactical_result;
-                const shots = result?.bullets_fired;
-                const hits = isPaper ? target.paper_result?.hits_total : target.tactical_result?.hits;
+                const shots = result?.bullets_fired ?? 0;
+                const hits = isPaper ? (target.paper_result?.hits_total ?? 0) : (target.tactical_result?.hits ?? 0);
                 
                 // Determine if this is a grouping or achievement target
                 const isGroupingTarget = isPaper && target.paper_result?.paper_type === 'grouping';
                 const dispersion = target.paper_result?.dispersion_cm;
                 
-                // Only calculate accuracy for achievement/tactical targets
-                const accuracy = !isGroupingTarget && shots && hits ? Math.round((hits / shots) * 100) : null;
+                // Check if scanned (AI detection) vs manual
+                const isScanned = isPaper && !!target.paper_result?.scanned_image_url;
+                const actualShotsDeclared = target.paper_result?.actual_shots_declared ?? null;
+                
+                // Calculate accuracy only when meaningful:
+                // - Manual entries: always meaningful
+                // - Scanned entries: only if user declared actual shots
+                // - Tactical: always meaningful (manual)
+                const canShowAccuracy = !isPaper || !isScanned || actualShotsDeclared != null;
+                const effectiveShots = isScanned && actualShotsDeclared ? actualShotsDeclared : shots;
+                const accuracy = !isGroupingTarget && canShowAccuracy && effectiveShots > 0 
+                  ? Math.round((hits / effectiveShots) * 100) 
+                  : null;
 
                 return (
                   <View key={target.id} style={styles.timelineItem}>
@@ -321,17 +596,34 @@ export default function SessionDetailScreen() {
                       style={[styles.timelineContent, { backgroundColor: colors.card, borderColor: colors.border }]}
                     >
                       <View style={styles.timelineHeader}>
-                        <View
-                          style={[
-                            styles.targetTypeBadge,
-                            { backgroundColor: isGroupingTarget ? `${colors.green}22` : (isPaper ? `${colors.indigo}22` : `${colors.orange}22`) },
-                          ]}
-                        >
-                          <Text
-                            style={[styles.targetTypeText, { color: isGroupingTarget ? colors.green : (isPaper ? colors.indigo : colors.orange) }]}
+                        <View style={styles.timelineBadges}>
+                          <View
+                            style={[
+                              styles.targetTypeBadge,
+                              { backgroundColor: isGroupingTarget ? `${colors.green}22` : (isPaper ? `${colors.indigo}22` : `${colors.orange}22`) },
+                            ]}
                           >
-                            {isGroupingTarget ? 'Grouping' : (isPaper ? 'Achievement' : 'Tactical')}
-                          </Text>
+                            <Text
+                              style={[styles.targetTypeText, { color: isGroupingTarget ? colors.green : (isPaper ? colors.indigo : colors.orange) }]}
+                            >
+                              {isGroupingTarget ? 'Grouping' : (isPaper ? 'Achievement' : 'Tactical')}
+                            </Text>
+                          </View>
+                          {/* Entry method badge for paper targets */}
+                          {isPaper && !isGroupingTarget && (
+                            <View
+                              style={[
+                                styles.entryMethodBadge,
+                                { backgroundColor: isScanned ? '#8B5CF622' : '#3B82F622' },
+                              ]}
+                            >
+                              <Text
+                                style={[styles.entryMethodText, { color: isScanned ? '#A78BFA' : '#60A5FA' }]}
+                              >
+                                {isScanned ? 'Scan' : 'Manual'}
+                              </Text>
+                            </View>
+                          )}
                         </View>
                         {target.distance_m && (
                           <Text style={[styles.distanceText, { color: colors.textMuted }]}>
@@ -342,25 +634,64 @@ export default function SessionDetailScreen() {
 
                       {result && (
                         <View style={styles.timelineStats}>
-                          <View style={styles.timelineStat}>
-                            <Text style={[styles.timelineStatValue, { color: colors.text }]}>{shots || 0}</Text>
-                            <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>shots</Text>
-                          </View>
-                          
-                          {/* Grouping: show dispersion instead of hits/accuracy */}
+                          {/* Different display based on target type and entry method */}
                           {isGroupingTarget ? (
-                            dispersion != null && (
+                            // GROUPING: Dispersion + shot count
+                            <>
+                              {dispersion != null && (
+                                <View style={styles.timelineStat}>
+                                  <Text style={[styles.timelineStatValue, { color: colors.green }]}>
+                                    {dispersion.toFixed(1)}cm
+                                  </Text>
+                                  <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>group</Text>
+                                </View>
+                              )}
                               <View style={styles.timelineStat}>
-                                <Text style={[styles.timelineStatValue, { color: colors.green }]}>
-                                  {dispersion.toFixed(1)}cm
-                                </Text>
-                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>group</Text>
+                                <Text style={[styles.timelineStatValue, { color: colors.text }]}>{shots}</Text>
+                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>shots</Text>
                               </View>
-                            )
-                          ) : (
+                            </>
+                          ) : isScanned ? (
+                            // SCANNED ACHIEVEMENT: Holes detected + optional accuracy
                             <>
                               <View style={styles.timelineStat}>
-                                <Text style={[styles.timelineStatValue, { color: colors.text }]}>{hits || 0}</Text>
+                                <Text style={[styles.timelineStatValue, { color: colors.indigo }]}>{hits}</Text>
+                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>holes</Text>
+                              </View>
+                              {actualShotsDeclared && (
+                                <>
+                                  <View style={styles.timelineStat}>
+                                    <Text style={[styles.timelineStatValue, { color: colors.text }]}>
+                                      {actualShotsDeclared}
+                                    </Text>
+                                    <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>fired</Text>
+                                  </View>
+                                  <View style={styles.timelineStat}>
+                                    <Text
+                                      style={[
+                                        styles.timelineStatValue,
+                                        {
+                                          color:
+                                            accuracy! >= 70 ? colors.green : accuracy! >= 50 ? colors.orange : colors.red,
+                                        },
+                                      ]}
+                                    >
+                                      {accuracy}%
+                                    </Text>
+                                    <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>acc</Text>
+                                  </View>
+                                </>
+                              )}
+                            </>
+                          ) : (
+                            // MANUAL ENTRY: Shots + hits + accuracy
+                            <>
+                              <View style={styles.timelineStat}>
+                                <Text style={[styles.timelineStatValue, { color: colors.text }]}>{shots}</Text>
+                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>shots</Text>
+                              </View>
+                              <View style={styles.timelineStat}>
+                                <Text style={[styles.timelineStatValue, { color: colors.text }]}>{hits}</Text>
                                 <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>hits</Text>
                               </View>
                               {accuracy !== null && (
@@ -524,6 +855,35 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
     marginBottom: 12,
   },
+  entryBreakdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  entryBreakdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  entryBreakdownDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  entryBreakdownText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  accuracyNote: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    marginTop: 8,
+    textAlign: 'center',
+  },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -654,10 +1014,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  timelineBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   targetTypeBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
+  },
+  entryMethodBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  entryMethodText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   targetTypeText: {
     fontSize: 11,
@@ -688,6 +1062,153 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 8,
     fontStyle: 'italic',
+  },
+
+  // Biometrics Section
+  biometricsSection: {
+    marginBottom: 24,
+    gap: 12,
+  },
+  biometricsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  bioRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  bioCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  bioIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bioContent: {
+    flex: 1,
+  },
+  bioLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  bioValues: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+  },
+  bioValue: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  bioUnit: {
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  steadinessCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  steadinessContent: {
+    flex: 1,
+  },
+  steadinessValue: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  trendBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  trendText: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  splitsSection: {
+    gap: 8,
+  },
+  splitsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  splitsTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  splitsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  splitCard: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 10,
+    gap: 2,
+  },
+  splitValue: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  splitLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  shotBioSection: {
+    gap: 8,
+  },
+  shotBioTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  shotBioScroll: {
+    gap: 8,
+  },
+  shotBioChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  shotBioNum: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  shotBioStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  shotBioValue: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  phaseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
 
   // View Full Button

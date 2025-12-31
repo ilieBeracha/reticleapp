@@ -6,17 +6,24 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import type { WeaponCategory } from '@/types/workspace';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
+export type DrillGoal = 'grouping' | 'achievement' | 'zeroing' | 'physical';
+
+// Re-export for convenience
+export type { WeaponCategory } from '@/types/workspace';
+
 export interface DrillPreset {
   id: string;
   name: string;
   description?: string | null;
-  drill_goal: 'grouping' | 'achievement';
+  drill_goal: DrillGoal;
   target_type: 'paper' | 'tactical';
+  weapon_category?: WeaponCategory | null; // Filter weapons by category
   distance_m: number;
   rounds_per_shooter: number;
   time_limit_seconds?: number | null;
@@ -29,8 +36,9 @@ export interface DrillPreset {
 export interface CreatePresetInput {
   name: string;
   description?: string;
-  drill_goal: 'grouping' | 'achievement';
+  drill_goal: DrillGoal;
   target_type: 'paper' | 'tactical';
+  weapon_category?: WeaponCategory | null;
   distance_m: number;
   rounds_per_shooter: number;
   time_limit_seconds?: number | null;
@@ -40,8 +48,9 @@ export interface CreatePresetInput {
 export interface UpdatePresetInput {
   name?: string;
   description?: string | null;
-  drill_goal?: 'grouping' | 'achievement';
+  drill_goal?: DrillGoal;
   target_type?: 'paper' | 'tactical';
+  weapon_category?: WeaponCategory | null;
   distance_m?: number;
   rounds_per_shooter?: number;
   time_limit_seconds?: number | null;
@@ -70,6 +79,7 @@ export async function getMyPresets(): Promise<DrillPreset[]> {
       description,
       drill_goal,
       target_type,
+      weapon_category,
       distance_m,
       rounds_per_shooter,
       time_limit_seconds,
@@ -108,6 +118,7 @@ export async function getPreset(presetId: string): Promise<DrillPreset | null> {
       description,
       drill_goal,
       target_type,
+      weapon_category,
       distance_m,
       rounds_per_shooter,
       time_limit_seconds,
@@ -144,7 +155,7 @@ export async function getDefaultPreset(): Promise<DrillPreset | null> {
   const { data: userDefault } = await supabase
     .from('drill_templates')
     .select(`
-      id, name, description, drill_goal, target_type,
+      id, name, description, drill_goal, target_type, weapon_category,
       distance_m, rounds_per_shooter, time_limit_seconds,
       strings_count, is_default, created_at, updated_at
     `)
@@ -162,6 +173,7 @@ export async function getDefaultPreset(): Promise<DrillPreset | null> {
     description: 'Standard grouping drill at 25m',
     drill_goal: 'grouping',
     target_type: 'paper',
+    weapon_category: null, // Any weapon
     distance_m: 25,
     rounds_per_shooter: 5,
     time_limit_seconds: null,
@@ -197,6 +209,7 @@ export async function createPreset(input: CreatePresetInput): Promise<DrillPrese
       description: input.description || null,
       drill_goal: input.drill_goal,
       target_type: input.target_type,
+      weapon_category: input.weapon_category || null,
       distance_m: input.distance_m,
       rounds_per_shooter: input.rounds_per_shooter,
       time_limit_seconds: input.time_limit_seconds || null,
@@ -305,8 +318,9 @@ export async function setDefaultPreset(presetId: string): Promise<void> {
 export async function saveAsPreset(
   name: string,
   config: {
-    drill_goal: 'grouping' | 'achievement';
+    drill_goal: DrillGoal;
     target_type: 'paper' | 'tactical';
+    weapon_category?: WeaponCategory | null;
     distance_m: number;
     rounds_per_shooter: number;
     time_limit_seconds?: number | null;
@@ -317,6 +331,7 @@ export async function saveAsPreset(
     name,
     drill_goal: config.drill_goal,
     target_type: config.target_type,
+    weapon_category: config.weapon_category,
     distance_m: config.distance_m,
     rounds_per_shooter: config.rounds_per_shooter,
     time_limit_seconds: config.time_limit_seconds,

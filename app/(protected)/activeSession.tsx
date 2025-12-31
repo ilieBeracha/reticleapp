@@ -46,7 +46,8 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ============================================================================
-// HERO TARGET - Large display of most recent target
+// HERO TARGET - Clean visual preview of most recent target
+// Just image + type badge + key metric - stats are in CompactStats below
 // ============================================================================
 function HeroTarget({
   target,
@@ -57,8 +58,26 @@ function HeroTarget({
   onPress: () => void;
   colors: ReturnType<typeof useColors>;
 }) {
-  const hasImage = !!target.image_url;
-  const accuracy = target.shots_fired > 0 ? Math.round((target.hits / target.shots_fired) * 100) : 0;
+  // Extract data correctly from SessionTargetWithResults
+  const isPaper = target.target_type === 'paper';
+  const paperResult = target.paper_result;
+  
+  // Image
+  const imageUrl = paperResult?.scanned_image_url;
+  const hasImage = !!imageUrl;
+  
+  // Determine entry type
+  const isScanned = isPaper && !!paperResult?.scanned_image_url;
+  const isGrouping = isPaper && paperResult?.paper_type === 'grouping';
+  
+  // Key metric for overlay
+  const distance = target.distance_m;
+  const dispersion = paperResult?.dispersion_cm;
+  const hits = paperResult?.hits_total ?? target.tactical_result?.hits ?? 0;
+
+  // Type label
+  const typeLabel = isGrouping ? 'Grouping' : isScanned ? 'Scanned' : 'Manual';
+  const typeColor = isGrouping ? '#22C55E' : isScanned ? '#A78BFA' : '#60A5FA';
 
   return (
     <TouchableOpacity
@@ -67,71 +86,157 @@ function HeroTarget({
       activeOpacity={0.8}
     >
       {hasImage ? (
-        <Image source={{ uri: target.image_url }} style={localStyles.heroImage} resizeMode="cover" />
+        <Image source={{ uri: imageUrl }} style={localStyles.heroImage} resizeMode="cover" />
       ) : (
         <View style={[localStyles.heroPlaceholder, { backgroundColor: colors.secondary }]}>
           <Target size={32} color={colors.textMuted} />
         </View>
       )}
-      <View style={localStyles.heroOverlay}>
-        <View style={localStyles.heroStats}>
-          <View style={localStyles.heroStatItem}>
-            <Text style={localStyles.heroStatValue}>{target.shots_fired}</Text>
-            <Text style={localStyles.heroStatLabel}>shots</Text>
+      
+      {/* Top badges: Distance + Type */}
+      <View style={localStyles.heroBadgeRow}>
+        {distance && (
+          <View style={localStyles.heroDistanceBadge}>
+            <Text style={localStyles.heroDistanceText}>{distance}m</Text>
           </View>
-          <View style={[localStyles.heroStatDivider, { backgroundColor: 'rgba(255,255,255,0.3)' }]} />
-          <View style={localStyles.heroStatItem}>
-            <Text style={localStyles.heroStatValue}>{target.hits}</Text>
-            <Text style={localStyles.heroStatLabel}>hits</Text>
-          </View>
-          <View style={[localStyles.heroStatDivider, { backgroundColor: 'rgba(255,255,255,0.3)' }]} />
-          <View style={localStyles.heroStatItem}>
-            <Text style={localStyles.heroStatValue}>{accuracy}%</Text>
-            <Text style={localStyles.heroStatLabel}>acc</Text>
-          </View>
+        )}
+        <View style={[localStyles.heroTypeBadge, { backgroundColor: typeColor }]}>
+          <Text style={localStyles.heroTypeText}>{typeLabel}</Text>
         </View>
+      </View>
+      
+      {/* Bottom: Key metric only */}
+      <View style={localStyles.heroOverlay}>
+        <Text style={localStyles.heroMetricValue}>
+          {isGrouping && dispersion != null 
+            ? `${dispersion.toFixed(1)}cm` 
+            : `${hits} ${isScanned ? 'holes' : 'hits'}`
+          }
+        </Text>
+        <Text style={localStyles.heroMetricLabel}>
+          {isGrouping ? 'group size' : isScanned ? 'detected' : 'recorded'}
+        </Text>
       </View>
     </TouchableOpacity>
   );
 }
 
 // ============================================================================
-// COMPACT STATS
+// COMPACT STATS - Session summary (aggregate across all targets)
+// Shows different stats for SCAN vs MANUAL sessions
 // ============================================================================
 function CompactStats({
-  accuracy,
-  totalShots,
-  totalHits,
-  totalTargets,
+  targets,
   colors,
 }: {
-  accuracy: number;
-  totalShots: number;
-  totalHits: number;
-  totalTargets: number;
+  targets: any[];
   colors: ReturnType<typeof useColors>;
 }) {
+  // Analyze targets to determine what to show
+  let manualShots = 0;
+  let manualHits = 0;
+  let scannedHoles = 0;
+  let bestDispersion: number | null = null;
+  let groupingCount = 0;
+  let scanCount = 0;
+  let manualCount = 0;
+
+  for (const t of targets) {
+    const isPaper = t.target_type === 'paper';
+    const paperResult = t.paper_result;
+    const tacticalResult = t.tactical_result;
+    const isScanned = isPaper && !!paperResult?.scanned_image_url;
+    const isGrouping = isPaper && paperResult?.paper_type === 'grouping';
+
+    if (isGrouping) {
+      groupingCount++;
+      const disp = paperResult?.dispersion_cm;
+      if (disp != null && (bestDispersion == null || disp < bestDispersion)) {
+        bestDispersion = disp;
+      }
+    } else if (isScanned) {
+      scanCount++;
+      scannedHoles += paperResult?.hits_total ?? 0;
+    } else {
+      manualCount++;
+      manualShots += paperResult?.bullets_fired ?? tacticalResult?.bullets_fired ?? 0;
+      manualHits += paperResult?.hits_total ?? tacticalResult?.hits ?? 0;
+    }
+  }
+
+  const manualAccuracy = manualShots > 0 ? Math.round((manualHits / manualShots) * 100) : 0;
+  const totalTargets = targets.length;
+
+  // Decide what to show based on predominant entry type
+  const hasManual = manualCount > 0;
+  const hasScan = scanCount > 0;
+  const hasGrouping = groupingCount > 0;
+
   return (
     <View style={[localStyles.compactStats, { backgroundColor: colors.card }]}>
-      <View style={localStyles.compactStatItem}>
-        <Text style={[localStyles.compactStatValue, { color: colors.text }]}>{accuracy}%</Text>
-        <Text style={[localStyles.compactStatLabel, { color: colors.textMuted }]}>accuracy</Text>
-      </View>
-      <View style={[localStyles.compactStatDivider, { backgroundColor: colors.border }]} />
-      <View style={localStyles.compactStatItem}>
-        <Text style={[localStyles.compactStatValue, { color: colors.text }]}>{totalShots}</Text>
-        <Text style={[localStyles.compactStatLabel, { color: colors.textMuted }]}>shots</Text>
-      </View>
-      <View style={[localStyles.compactStatDivider, { backgroundColor: colors.border }]} />
-      <View style={localStyles.compactStatItem}>
-        <Text style={[localStyles.compactStatValue, { color: colors.text }]}>{totalHits}</Text>
-        <Text style={[localStyles.compactStatLabel, { color: colors.textMuted }]}>hits</Text>
-      </View>
-      <View style={[localStyles.compactStatDivider, { backgroundColor: colors.border }]} />
+      {/* Always show target count */}
       <View style={localStyles.compactStatItem}>
         <Text style={[localStyles.compactStatValue, { color: colors.text }]}>{totalTargets}</Text>
         <Text style={[localStyles.compactStatLabel, { color: colors.textMuted }]}>targets</Text>
       </View>
+      
+      <View style={[localStyles.compactStatDivider, { backgroundColor: colors.border }]} />
+      
+      {/* Show accuracy ONLY if we have manual entries */}
+      {hasManual ? (
+        <>
+          <View style={localStyles.compactStatItem}>
+            <Text style={[
+              localStyles.compactStatValue, 
+              { color: manualAccuracy >= 70 ? '#22C55E' : manualAccuracy >= 50 ? '#F59E0B' : colors.text }
+            ]}>
+              {manualAccuracy}%
+            </Text>
+            <Text style={[localStyles.compactStatLabel, { color: colors.textMuted }]}>accuracy</Text>
+          </View>
+          <View style={[localStyles.compactStatDivider, { backgroundColor: colors.border }]} />
+          <View style={localStyles.compactStatItem}>
+            <Text style={[localStyles.compactStatValue, { color: colors.text }]}>{manualHits}/{manualShots}</Text>
+            <Text style={[localStyles.compactStatLabel, { color: colors.textMuted }]}>hits</Text>
+          </View>
+        </>
+      ) : hasScan ? (
+        <>
+          <View style={localStyles.compactStatItem}>
+            <Text style={[localStyles.compactStatValue, { color: '#A78BFA' }]}>{scannedHoles}</Text>
+            <Text style={[localStyles.compactStatLabel, { color: colors.textMuted }]}>holes</Text>
+          </View>
+          <View style={[localStyles.compactStatDivider, { backgroundColor: colors.border }]} />
+          <View style={localStyles.compactStatItem}>
+            <Text style={[localStyles.compactStatValue, { color: colors.textMuted, fontSize: 11 }]}>no acc</Text>
+            <Text style={[localStyles.compactStatLabel, { color: colors.textMuted }]}>scanned</Text>
+          </View>
+        </>
+      ) : hasGrouping && bestDispersion != null ? (
+        <>
+          <View style={localStyles.compactStatItem}>
+            <Text style={[localStyles.compactStatValue, { color: '#22C55E' }]}>{bestDispersion.toFixed(1)}cm</Text>
+            <Text style={[localStyles.compactStatLabel, { color: colors.textMuted }]}>best</Text>
+          </View>
+          <View style={[localStyles.compactStatDivider, { backgroundColor: colors.border }]} />
+          <View style={localStyles.compactStatItem}>
+            <Text style={[localStyles.compactStatValue, { color: colors.text }]}>{groupingCount}</Text>
+            <Text style={[localStyles.compactStatLabel, { color: colors.textMuted }]}>groups</Text>
+          </View>
+        </>
+      ) : (
+        <>
+          <View style={localStyles.compactStatItem}>
+            <Text style={[localStyles.compactStatValue, { color: colors.textMuted }]}>-</Text>
+            <Text style={[localStyles.compactStatLabel, { color: colors.textMuted }]}>awaiting</Text>
+          </View>
+          <View style={[localStyles.compactStatDivider, { backgroundColor: colors.border }]} />
+          <View style={localStyles.compactStatItem}>
+            <Text style={[localStyles.compactStatValue, { color: colors.textMuted }]}>-</Text>
+            <Text style={[localStyles.compactStatLabel, { color: colors.textMuted }]}>data</Text>
+          </View>
+        </>
+      )}
     </View>
   );
 }
@@ -274,6 +379,7 @@ export default function ActiveSessionScreen() {
           ending={ending}
           onClose={handleClose}
           onContinueWithoutWatch={handleContinueWithoutWatch}
+          weaponName={session.weapon_name}
         />
       );
     }
@@ -291,6 +397,7 @@ export default function ActiveSessionScreen() {
           ending={ending}
           onClose={handleClose}
           onContinueWithoutWatch={handleContinueWithoutWatch}
+          weaponName={session.weapon_name}
         />
       );
     }
@@ -348,7 +455,16 @@ export default function ActiveSessionScreen() {
           targets={targets}
           isGroupingDrill={isGroupingDrill}
           isTacticalDrill={isTacticalDrill}
+          weaponName={session.weapon_name}
         />
+      )}
+
+      {/* Weapon info when no drill */}
+      {!hasDrill && session.weapon_name && (
+        <View style={[localStyles.weaponBar, { backgroundColor: colors.card }]}>
+          <Target size={14} color={colors.primary} />
+          <Text style={[localStyles.weaponBarText, { color: colors.text }]}>{session.weapon_name}</Text>
+        </View>
       )}
 
       {/* Hero Target */}
@@ -360,13 +476,7 @@ export default function ActiveSessionScreen() {
 
       {/* Stats Bar */}
       <Animated.View entering={FadeInDown.delay(50).duration(300)} style={localStyles.statsContainer}>
-        <CompactStats
-          accuracy={accuracy}
-          totalShots={totalShots}
-          totalHits={totalHits}
-          totalTargets={targets.length}
-          colors={colors}
-        />
+        <CompactStats targets={targets} colors={colors} />
       </Animated.View>
 
       {/* Add Target Buttons - User chooses scan or manual */}
@@ -555,6 +665,7 @@ function WatchPreviewQueuedView({
   ending,
   onClose,
   onContinueWithoutWatch,
+  weaponName,
 }: any) {
   // Calm, focused view
   return (
@@ -591,8 +702,16 @@ function WatchPreviewQueuedView({
             <MapPin size={14} color={colors.textMuted} />
             <Text style={[localStyles.drillChipText, { color: colors.text }]}>{drill.distance_m}m</Text>
             <View style={[localStyles.drillChipDivider, { backgroundColor: colors.border }]} />
-            <Target size={14} color={colors.textMuted} />
+            <Zap size={14} color={colors.textMuted} />
             <Text style={[localStyles.drillChipText, { color: colors.text }]}>{drill.rounds_per_shooter} shots</Text>
+          </View>
+        )}
+
+        {/* Weapon info */}
+        {weaponName && (
+          <View style={[localStyles.drillChip, { backgroundColor: colors.card, marginTop: 8 }]}>
+            <Target size={14} color={colors.primary} />
+            <Text style={[localStyles.drillChipText, { color: colors.text }]}>{weaponName}</Text>
           </View>
         )}
 
@@ -630,6 +749,7 @@ function WatchWaitingView({
   ending,
   onClose,
   onEndSession,
+  weaponName,
 }: any) {
   // Clean, calm view - no timer on phone (watch has it)
   return (
@@ -697,7 +817,7 @@ function WatchWaitingView({
   );
 }
 
-function DrillBanner({ colors, drill, drillProgress, targets, isGroupingDrill, isTacticalDrill }: any) {
+function DrillBanner({ colors, drill, drillProgress, targets, isGroupingDrill, isTacticalDrill, weaponName }: any) {
   return (
     <View style={styles.drillBanner}>
       <View style={[styles.drillBannerInner, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -707,6 +827,12 @@ function DrillBanner({ colors, drill, drillProgress, targets, isGroupingDrill, i
           </View>
           <View style={styles.drillInfoText}>
             <View style={styles.drillRequirements}>
+              {weaponName && (
+                <View style={styles.drillReqItem}>
+                  <Target size={12} color={colors.primary} />
+                  <Text style={[styles.drillReqText, { color: colors.primary, fontWeight: '600' }]}>{weaponName}</Text>
+                </View>
+              )}
               <View style={styles.drillReqItem}>
                 <MapPin size={12} color={colors.textMuted} />
                 <Text style={[styles.drillReqText, { color: colors.text }]}>{drill.distance_m}m</Text>
@@ -778,24 +904,83 @@ function DrillBanner({ colors, drill, drillProgress, targets, isGroupingDrill, i
 // LOCAL STYLES
 // ============================================================================
 const localStyles = StyleSheet.create({
+  // Weapon bar (when no drill)
+  weaponBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+  },
+  weaponBarText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
   // Hero
   heroContainer: { paddingHorizontal: 16, marginBottom: 12 },
   heroTarget: { borderRadius: 12, overflow: 'hidden', height: 160 },
   heroImage: { width: '100%', height: '100%' },
   heroPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  // Hero badges (top row)
+  heroBadgeRow: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    right: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  heroDistanceBadge: {
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  heroDistanceText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  heroTypeBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  heroTypeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#fff',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  // Hero overlay (bottom)
   heroOverlay: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 12,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: 14,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    alignItems: 'center',
   },
-  heroStats: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20 },
-  heroStatItem: { alignItems: 'center' },
-  heroStatValue: { fontSize: 18, fontWeight: '700', color: '#fff' },
-  heroStatLabel: { fontSize: 11, color: 'rgba(255,255,255,0.7)' },
-  heroStatDivider: { width: 1, height: 24 },
+  heroMetricValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: -0.5,
+  },
+  heroMetricLabel: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.6)',
+    marginTop: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
 
   // Stats
   statsContainer: { paddingHorizontal: 16, marginBottom: 12 },

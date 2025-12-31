@@ -5,8 +5,11 @@ import { getSessionTargetsWithResults } from './targets';
  * Calculate comprehensive session stats from targets and results
  *
  * IMPORTANT:
- * - Scanned paper targets → dispersion only, NO accuracy (AI detects all holes as "hits")
- * - Manual paper targets → accuracy is meaningful (user reports actual hits/misses)
+ * - Scanned paper targets WITHOUT actual_shots_declared → dispersion only, NO accuracy 
+ *   (AI detects holes which are all "hits", bullets_fired = hits, so 100% is meaningless)
+ * - Scanned paper targets WITH actual_shots_declared → accuracy = hits / actual_shots_declared
+ *   (User declared how many shots they fired, so accuracy is meaningful)
+ * - Manual paper targets → accuracy = hits_total / bullets_fired (user enters both)
  * - Tactical targets → always count towards accuracy (manual entry)
  */
 export async function calculateSessionStats(sessionId: string): Promise<SessionStats> {
@@ -16,8 +19,8 @@ export async function calculateSessionStats(sessionId: string): Promise<SessionS
   let tacticalTargets = 0;
   let totalShotsFired = 0;
   let totalHits = 0;
-  let manualShotsFired = 0; // Only shots from manual entry (for accuracy)
-  let manualHits = 0; // Only hits from manual entry (for accuracy)
+  let accuracyShotsFired = 0; // Shots with meaningful accuracy data
+  let accuracyHits = 0; // Hits with meaningful accuracy data
   let totalDispersion = 0;
   let dispersionCount = 0;
   let bestDispersion: number | null = null;
@@ -50,11 +53,17 @@ export async function calculateSessionStats(sessionId: string): Promise<SessionS
           }
         }
 
-        if (!isScanned) {
-          // Only manual entry targets count towards accuracy calculation
-          // Scanned targets: AI detects all holes, so accuracy is always ~100% (not meaningful)
-          manualShotsFired += bullets;
-          manualHits += hits;
+        if (isScanned) {
+          // Scanned target: accuracy only meaningful if user declared actual shots
+          if (target.paper_result.actual_shots_declared != null && target.paper_result.actual_shots_declared > 0) {
+            accuracyShotsFired += target.paper_result.actual_shots_declared;
+            accuracyHits += hits;
+          }
+          // If no actual_shots_declared, don't count towards accuracy (would be 100% which is meaningless)
+        } else {
+          // Manual entry: accuracy is always meaningful
+          accuracyShotsFired += bullets;
+          accuracyHits += hits;
         }
       }
     } else if (target.target_type === 'tactical') {
@@ -65,8 +74,8 @@ export async function calculateSessionStats(sessionId: string): Promise<SessionS
         totalShotsFired += bullets;
         totalHits += hits;
         // Tactical targets always count towards accuracy (always manual entry)
-        manualShotsFired += bullets;
-        manualHits += hits;
+        accuracyShotsFired += bullets;
+        accuracyHits += hits;
 
         if (target.tactical_result.is_stage_cleared) {
           stagesCleared++;
@@ -83,9 +92,11 @@ export async function calculateSessionStats(sessionId: string): Promise<SessionS
     }
   }
 
-  // Calculate accuracy only from manual entry targets (not scanned)
-  // Scanned targets always show ~100% because AI detects all holes
-  const accuracyPct = manualShotsFired > 0 ? Math.round((manualHits / manualShotsFired) * 100 * 100) / 100 : 0;
+  // Calculate accuracy only from entries with meaningful data:
+  // - Manual entries (user provides both shots and hits)
+  // - Scanned entries where user declared actual shots fired
+  // NOT from scanned entries without actual_shots_declared (would be 100%, meaningless)
+  const accuracyPct = accuracyShotsFired > 0 ? Math.round((accuracyHits / accuracyShotsFired) * 100 * 100) / 100 : 0;
 
   const avgDispersionCm = dispersionCount > 0 ? Math.round((totalDispersion / dispersionCount) * 100) / 100 : null;
 

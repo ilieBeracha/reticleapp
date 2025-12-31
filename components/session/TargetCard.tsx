@@ -26,20 +26,30 @@ export const TargetCard = React.memo(function TargetCard({
   const isGroupingTarget = isPaper && target.paper_result?.paper_type === 'grouping';
   const isAchievementTarget = isPaper && target.paper_result?.paper_type === 'achievement';
 
+  // Check if this was scanned (AI detection) vs manual entry
+  const isScanned = isPaper && !!target.paper_result?.scanned_image_url;
+  
   // Extract results
   let hits = 0;
   let shots = 0;
   let dispersionCm: number | null = null;
+  let actualShotsDeclared: number | null = null;
   const hasImage = isPaper && target.paper_result?.scanned_image_url;
 
   if (isPaper && target.paper_result) {
     hits = target.paper_result.hits_total ?? 0;
     shots = target.paper_result.bullets_fired;
     dispersionCm = target.paper_result.dispersion_cm;
+    actualShotsDeclared = target.paper_result.actual_shots_declared ?? null;
   } else if (!isPaper && target.tactical_result) {
     hits = target.tactical_result.hits;
     shots = target.tactical_result.bullets_fired;
   }
+
+  // For scanned achievement targets, only show accuracy if user declared actual shots
+  const canShowAccuracy = !isScanned || actualShotsDeclared != null;
+  const effectiveShots = isScanned && actualShotsDeclared ? actualShotsDeclared : shots;
+  const accuracy = canShowAccuracy && effectiveShots > 0 ? Math.round((hits / effectiveShots) * 100) : null;
 
   const hasResult = (isPaper && target.paper_result) || (!isPaper && target.tactical_result);
 
@@ -70,33 +80,56 @@ export const TargetCard = React.memo(function TargetCard({
 
       {/* Content */}
       <View style={styles.content}>
-        {/* Main line: different display for grouping vs achievement */}
+        {/* Main line: different display based on entry method */}
         <View style={styles.header}>
           {hasResult ? (
             isGroupingTarget ? (
-              // Grouping: show shot count and dispersion
+              // Grouping: show dispersion (primary) and shot count
               <Text style={styles.title}>
-                {shots} shots{dispersionCm != null ? ` • ${dispersionCm.toFixed(1)}cm` : ''}
+                {dispersionCm != null ? `${dispersionCm.toFixed(1)}cm` : `${shots} shots`}
+                {dispersionCm != null && <Text style={styles.titleMuted}> • {shots} shots</Text>}
               </Text>
+            ) : isScanned ? (
+              // SCANNED: Show holes detected (not "hits" - we're counting holes on paper)
+              actualShotsDeclared ? (
+                // User declared shots → can show accuracy
+                <Text style={styles.title}>
+                  {hits}/{actualShotsDeclared} <Text style={styles.titleAccuracy}>({accuracy}%)</Text>
+                </Text>
+              ) : (
+                // No declared shots → just holes detected
+                <Text style={styles.title}>{hits} holes</Text>
+              )
             ) : (
-              // Achievement/Tactical: show hits
-              <Text style={styles.title}>{hits}/{shots} hits</Text>
+              // MANUAL: User entered shots + hits → show accuracy
+              <Text style={styles.title}>
+                {hits}/{shots} <Text style={styles.titleAccuracy}>({accuracy}%)</Text>
+              </Text>
             )
           ) : (
             <Text style={styles.title}>No result</Text>
           )}
-          {hasImage && (
-            <View style={styles.imageTag}>
-              <Ionicons name="image" size={12} color="#fff" />
-            </View>
-          )}
+          {/* Entry method indicator */}
+          <View style={[styles.entryTag, isScanned ? styles.entryTagScan : styles.entryTagManual]}>
+            <Ionicons name={isScanned ? "scan" : "create"} size={10} color="#fff" />
+          </View>
         </View>
 
         {/* Meta line */}
         <View style={styles.meta}>
+          {/* Target type badge */}
           <Text style={[styles.typeTag, isGroupingTarget ? styles.typeTagGrouping : (isAchievementTarget ? styles.typeTagAchievement : styles.typeTagTactical)]}>
-            {isGroupingTarget ? 'Grouping' : (isAchievementTarget ? 'Achievement' : (isPaper ? 'Paper' : 'Tactical'))}
+            {isGroupingTarget ? 'Grouping' : (isPaper ? 'Achievement' : 'Tactical')}
           </Text>
+          {/* Entry method for achievement/tactical */}
+          {!isGroupingTarget && isPaper && (
+            <>
+              <View style={styles.dot} />
+              <Text style={[styles.metaText, isScanned ? styles.metaTextScan : styles.metaTextManual]}>
+                {isScanned ? 'Scanned' : 'Manual'}
+              </Text>
+            </>
+          )}
           {laneInfo && (
             <>
               <View style={styles.dot} />
@@ -197,11 +230,33 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
   },
+  titleMuted: {
+    color: 'rgba(255,255,255,0.5)',
+    fontWeight: '400',
+  },
+  titleAccuracy: {
+    color: '#22C55E',
+    fontWeight: '700',
+  },
   imageTag: {
     backgroundColor: 'rgba(59, 130, 246, 0.3)',
     borderRadius: 4,
     padding: 3,
     marginLeft: 6,
+  },
+  imageTagWarning: {
+    backgroundColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  entryTag: {
+    borderRadius: 4,
+    padding: 3,
+    marginLeft: 6,
+  },
+  entryTagScan: {
+    backgroundColor: 'rgba(139, 92, 246, 0.3)', // Purple for AI scan
+  },
+  entryTagManual: {
+    backgroundColor: 'rgba(59, 130, 246, 0.3)', // Blue for manual
   },
 
   // Meta
@@ -241,6 +296,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255,255,255,0.5)',
     flex: 1,
+  },
+  metaTextScan: {
+    color: '#A78BFA', // Purple for scanned
+  },
+  metaTextManual: {
+    color: '#60A5FA', // Blue for manual
   },
 
   // Index

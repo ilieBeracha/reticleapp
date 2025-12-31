@@ -6,6 +6,7 @@ import {
   finishTraining,
   startTrainingWithConfig
 } from '@/services/trainingService';
+import { getAssignedWeapons, getOrCreatePersonalProfile } from '@/services/weaponService';
 import { useIsGarminConnected } from '@/store/garminStore';
 import { useTrainingStore } from '@/store/trainingStore';
 import type { TrainingDrill, TrainingWithDetails } from '@/types/workspace';
@@ -13,6 +14,7 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert } from 'react-native';
+import { supabase } from '@/lib/supabase';
 
 interface UseTrainingActionsProps {
   training: TrainingWithDetails | null;
@@ -245,20 +247,69 @@ export function useTrainingActions({
       setStartingDrillId(drill.id);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      // NEW FLOW: Create session as pending, let user choose watch in session screen
-      // This allows them to see watch connection status in real-time
-      const config: BaseSessionConfig = {
-        team_id: training.team_id,
-        training_id: training.id,
-        drill_id: drill.id,
-        drill_config: null, // Drill config comes from the training_drills table
-        session_mode: 'solo',
-        watch_controlled: false, // Will be set when user activates session
-        start_as_pending: true,  // Create as pending, user starts inside session screen
-      };
+      // For team trainings, check if soldier has an assigned weapon
+      if (training.team_id) {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) {
+            setStartingDrillId(null);
+            Alert.alert('Error', 'You must be logged in to start a session');
+            return;
+          }
 
-      // Go directly to session - no more prompt here
-      doCreateDrillSession(config);
+          // Check for assigned weapon
+          const assignedWeapons = await getAssignedWeapons(training.team_id, user.id);
+          
+          if (assignedWeapons.length === 0) {
+            setStartingDrillId(null);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            Alert.alert(
+              'No Weapon Assigned',
+              'You need a weapon assigned to participate in team training. Contact your commander.',
+              [{ text: 'OK' }]
+            );
+            return;
+          }
+
+          // Use the first assigned weapon (should only be one per the rule)
+          const assignedTeamWeapon = assignedWeapons[0];
+
+          // Get or create personal profile for this team weapon
+          // This links the team weapon to the user's personal weapon profiles
+          const personalProfile = await getOrCreatePersonalProfile(assignedTeamWeapon.id);
+
+          // Create session with the personal weapon profile
+          const config: BaseSessionConfig = {
+            team_id: training.team_id,
+            training_id: training.id,
+            drill_id: drill.id,
+            drill_config: null,
+            session_mode: 'solo',
+            watch_controlled: false,
+            start_as_pending: true,
+            weapon_id: personalProfile.id, // Use personal profile linked to team weapon
+          };
+
+          doCreateDrillSession(config);
+        } catch (error: any) {
+          setStartingDrillId(null);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          Alert.alert('Error', error.message || 'Failed to check weapon assignment');
+        }
+      } else {
+        // Solo session - no weapon requirement (or handle differently)
+        const config: BaseSessionConfig = {
+          team_id: null,
+          training_id: training.id,
+          drill_id: drill.id,
+          drill_config: null,
+          session_mode: 'solo',
+          watch_controlled: false,
+          start_as_pending: true,
+        };
+
+        doCreateDrillSession(config);
+      }
     },
     [training, doCreateDrillSession]
   );

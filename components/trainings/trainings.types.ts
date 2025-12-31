@@ -7,7 +7,7 @@ import type { TeamMemberWithProfile, TrainingWithDetails } from '@/types/workspa
 // ============================================================================
 // TAB TYPES
 // ============================================================================
-export type InternalTab = 'calendar' | 'manage';
+export type InternalTab = 'calendar' | 'manage' | 'team';
 
 // ============================================================================
 // ROLE CONFIG

@@ -19,6 +19,7 @@ import {
   endSession,
   getSessionById,
   getSessionTargetsWithResults,
+  saveWatchSessionData,
   SessionStats,
   SessionTargetWithResults,
   SessionWithDetails,
@@ -28,7 +29,13 @@ import { useGarminStore, useIsGarminConnected, useSessionStartStatus } from '@/s
 import { useSessionStore } from '@/store/sessionStore';
 import { isInfiniteShots } from '@/utils/drillShots';
 
-import { AUTO_DETECT_ENABLED, SHOT_SENSITIVITY_DEFAULT, TIMER_INTERVAL_MS } from './activeSession.constants';
+import {
+  AUTO_DETECT_ENABLED,
+  SHOT_MARKING_ENABLED,
+  SHOT_SENSITIVITY_DEFAULT,
+  TIMER_INTERVAL_MS,
+  VIBRATE_ON_SHOT
+} from './activeSession.constants';
 import {
   buildEndSessionMessage,
   buildWatchSessionPayload,
@@ -225,7 +232,13 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     // App is open - can send!
     setWatchAppNotOpen(false);
 
-    const payload = buildWatchSessionPayload(session, AUTO_DETECT_ENABLED, SHOT_SENSITIVITY_DEFAULT);
+    const payload = buildWatchSessionPayload(
+      session, 
+      AUTO_DETECT_ENABLED, 
+      SHOT_SENSITIVITY_DEFAULT,
+      SHOT_MARKING_ENABLED,
+      VIBRATE_ON_SHOT
+    );
 
     setWatchStarting(true);
     setWatchStartFailed(false);
@@ -284,7 +297,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
   }, [sessionId, lastSessionData, clearLastSessionData]);
 
   useEffect(() => {
-    const handleWatchSessionData = (data: GarminSessionData) => {
+    const handleWatchSessionData = async (data: GarminSessionData) => {
       console.log('[Garmin] 📩 Received session data from watch:', data);
 
       if (data.sessionId && data.sessionId !== sessionId) {
@@ -299,6 +312,30 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       }
       watchDataProcessedRef.current.add(dataKey);
 
+      // =========================================================================
+      // AUTO-SAVE: Save immediately so SESSION_DETAILS can merge into it
+      // =========================================================================
+      console.log('[Garmin] 📩 Auto-saving watch summary to DB...');
+      try {
+        await saveWatchSessionData({
+          sessionId: sessionId!,
+          shotsRecorded: data.shotsRecorded,
+          hitsRecorded: data.shotsRecorded, // Default hits = shots
+          durationMs: data.durationMs || 0,
+          distance: data.distance,
+          completed: false, // Don't end session yet - user can review
+          splitTimes: data.splitTimes,
+          avgSplitMs: data.avgSplitMs,
+          performance: data.performance,
+          biometrics: data.biometrics,
+          steadiness: data.steadiness,
+        }, false); // false = don't end session
+        console.log('[Garmin] ✅ Watch summary auto-saved successfully');
+      } catch (saveError) {
+        console.error('[Garmin] ❌ Failed to auto-save watch data:', saveError);
+        // Continue to results page anyway - user can retry save there
+      }
+
       clearLastSessionData();
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -312,6 +349,23 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
           completed: data.completed ? '1' : '0',
           teamId: session?.team_id || '',
           trainingId: session?.training_id || '',
+          // Flag indicating data was auto-saved
+          autoSaved: '1',
+          // Split times from watch
+          splitTimes: data.splitTimes ? JSON.stringify(data.splitTimes) : '',
+          avgSplitMs: data.avgSplitMs ? String(data.avgSplitMs) : '',
+          // Legacy heart rate fields (backwards compatible)
+          heartRateAvg: data.heartRate?.avg ? String(data.heartRate.avg) : '',
+          heartRateMax: data.heartRate?.max ? String(data.heartRate.max) : '',
+          heartRateMin: data.heartRate?.min ? String(data.heartRate.min) : '',
+          drillName: session?.drill_name || drill?.name || '',
+          weaponName: session?.weapon_name || '',
+          // Performance analytics (JSON stringified)
+          performance: data.performance ? JSON.stringify(data.performance) : '',
+          // Full biometrics data (JSON stringified)
+          biometrics: data.biometrics ? JSON.stringify(data.biometrics) : '',
+          // Steadiness data (JSON stringified)
+          steadiness: data.steadiness ? JSON.stringify(data.steadiness) : '',
         },
       });
     };
@@ -451,14 +505,39 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       } else {
         await loadPersonalSessions();
       }
-      router.replace('/(protected)/(tabs)');
+      
+      // Smart navigation: Only show results recap if watch data exists
+      if (lastSessionData) {
+        // Has watch data → show results page with charts
+        const resultsParams: Record<string, string> = { 
+          sessionId: sessionId!,
+          watchData: JSON.stringify(lastSessionData),
+        };
+        if (session?.training_id) {
+          resultsParams.trainingId = session.training_id;
+        }
+        router.replace({
+          pathname: '/(protected)/sessionResults',
+          params: resultsParams,
+        });
+      } else if (session?.training_id) {
+        // Team training, no watch data → back to training
+        router.replace({
+          pathname: '/(protected)/trainingDetail',
+          params: { id: session.training_id },
+        });
+      } else {
+        // Solo, no watch data → back to home
+        router.replace('/(protected)/(tabs)');
+      }
+      
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Error', error.message || 'Failed to end session');
       setEnding(false);
     }
-  }, [sessionId, session?.team_id, loadPersonalSessions, loadTeamSessions]);
+  }, [sessionId, session?.team_id, session?.training_id, loadPersonalSessions, loadTeamSessions, lastSessionData]);
 
   const handleFixResults = useCallback(() => {
     setShowCompletionModal(false);
@@ -506,15 +585,31 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
               await loadPersonalSessions();
             }
 
-            // Redirect back to training if session was part of one, otherwise home
-            if (session?.training_id) {
+            // Smart navigation: Only show results recap if watch data exists
+            if (lastSessionData) {
+              // Has watch data → show results page with charts
+              const resultsParams: Record<string, string> = { 
+                sessionId: sessionId!,
+                watchData: JSON.stringify(lastSessionData),
+              };
+              if (session?.training_id) {
+                resultsParams.trainingId = session.training_id;
+              }
+              router.replace({
+                pathname: '/(protected)/sessionResults',
+                params: resultsParams,
+              });
+            } else if (session?.training_id) {
+              // Team training, no watch data → back to training
               router.replace({
                 pathname: '/(protected)/trainingDetail',
                 params: { id: session.training_id },
               });
             } else {
+              // Solo, no watch data → back to home
               router.replace('/(protected)/(tabs)');
             }
+            
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           } catch (error: any) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -565,15 +660,20 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
                 } else {
                   await loadPersonalSessions();
                 }
-                // Redirect back to training if session was part of one
-                if (session?.training_id) {
-                  router.replace({
-                    pathname: '/(protected)/trainingDetail',
-                    params: { id: session.training_id },
-                  });
-                } else {
-                  router.replace('/(protected)/(tabs)');
+                
+                // Navigate to results page
+                const resultsParams: Record<string, string> = { sessionId: sessionId! };
+                if (lastSessionData) {
+                  resultsParams.watchData = JSON.stringify(lastSessionData);
                 }
+                if (session?.training_id) {
+                  resultsParams.trainingId = session.training_id;
+                }
+                router.replace({
+                  pathname: '/(protected)/sessionResults',
+                  params: resultsParams,
+                });
+                
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               } catch (error: any) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);

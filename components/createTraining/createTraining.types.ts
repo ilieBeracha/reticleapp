@@ -2,6 +2,7 @@
  * Type definitions for Create Training Screen
  */
 
+import type { WeaponCategory } from '@/types/workspace';
 import type { CreateTrainingDrillInput, Drill, DrillInstanceConfig } from '@/types/workspace';
 import type { DrillFormData as UnifiedDrillFormData } from '@/components/drills/UnifiedDrillModal';
 
@@ -10,6 +11,18 @@ import type { DrillFormData as UnifiedDrillFormData } from '@/components/drills/
 // ============================================================================
 export interface TrainingDrillItem extends CreateTrainingDrillInput {
   id: string;
+}
+
+// ============================================================================
+// DRILL CONFIG (from new DrillConfigSheet)
+// ============================================================================
+export interface NewDrillInstanceConfig {
+  distance_m: number;
+  rounds_per_shooter: number;
+  time_limit_seconds: number | null;
+  strings_count: number;
+  weapon_category: WeaponCategory | null;
+  input_method: 'scan' | 'manual';
 }
 
 // ============================================================================
@@ -75,6 +88,7 @@ export interface UseCreateTrainingReturn {
   handleSelectTeam: (teamId: string) => void;
   handleRemoveDrill: (drillId: string) => void;
   handleMoveDrill: (index: number, direction: 'up' | 'down') => void;
+  addDrill: (drill: TrainingDrillItem) => void;
   handleSelectDrill: (drill: Drill) => void;
   handleOpenQuickDrill: () => void;
   handleCloseDrillModal: () => void;

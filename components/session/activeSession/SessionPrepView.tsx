@@ -11,6 +11,7 @@
 import { useColors } from '@/hooks/ui/useColors';
 import type { SessionWithDetails } from '@/services/session/types';
 import { activateSession } from '@/services/sessionService';
+import { getUserWeapon, type UserWeapon } from '@/services/weaponService';
 import { useGarminStore, useIsGarminConnected } from '@/store/garminStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -20,7 +21,9 @@ import {
   MapPin,
   Phone,
   RefreshCw,
+  Target,
   Trophy,
+  Users,
   Watch,
   X,
   Zap,
@@ -98,10 +101,35 @@ export function SessionPrepView({
   
   const [activating, setActivating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [weapon, setWeapon] = useState<UserWeapon | null>(null);
   
   const drill = session.drill_config;
   const drillName = session.drill_name || drill?.name || 'Practice Session';
   const isGrouping = drill?.drill_goal === 'grouping';
+  const isTeamSession = !!session.team_id;
+
+  // Load full weapon info (for caliber, etc)
+  useEffect(() => {
+    console.log('[SessionPrepView] Session weapon data:', {
+      weapon_id: session.weapon_id,
+      weapon_name: session.weapon_name,
+    });
+    
+    if (session.weapon_id) {
+      getUserWeapon(session.weapon_id)
+        .then((w) => {
+          console.log('[SessionPrepView] Fetched weapon:', w?.name);
+          setWeapon(w);
+        })
+        .catch((err) => {
+          console.error('[SessionPrepView] Failed to fetch weapon:', err);
+        });
+    }
+  }, [session.weapon_id]);
+
+  // Use session's weapon_name if available, otherwise fall back to fetched weapon
+  const weaponName = session.weapon_name || weapon?.name;
+  const weaponCaliber = weapon?.caliber;
 
   const handleRefreshDevices = useCallback(async () => {
     setRefreshing(true);
@@ -204,6 +232,45 @@ export function SessionPrepView({
               </>
             )}
           </View>
+        </Animated.View>
+
+        {/* Session Info Row - Weapon & Team */}
+        <Animated.View 
+          entering={FadeInDown.delay(150).duration(400)}
+          style={styles.sessionInfoRow}
+        >
+          {/* Weapon Card */}
+          {(session.weapon_id && weaponName) && (
+            <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.infoCardIcon, { backgroundColor: `${colors.text}10` }]}>
+                <Target size={18} color={colors.text} />
+              </View>
+              <View style={styles.infoCardContent}>
+                <Text style={[styles.infoCardLabel, { color: colors.textMuted }]}>Weapon</Text>
+                <Text style={[styles.infoCardValue, { color: colors.text }]} numberOfLines={1}>
+                  {weaponName}
+                </Text>
+                {weaponCaliber && (
+                  <Text style={[styles.infoCardMeta, { color: colors.textMuted }]}>{weaponCaliber}</Text>
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* Team Card */}
+          {isTeamSession && session.training_title && (
+            <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.infoCardIcon, { backgroundColor: `${colors.primary}15` }]}>
+                <Users size={18} color={colors.primary} />
+              </View>
+              <View style={styles.infoCardContent}>
+                <Text style={[styles.infoCardLabel, { color: colors.textMuted }]}>Training</Text>
+                <Text style={[styles.infoCardValue, { color: colors.text }]} numberOfLines={1}>
+                  {session.training_title}
+                </Text>
+              </View>
+            </View>
+          )}
         </Animated.View>
 
         {/* Watch Status */}
@@ -387,6 +454,46 @@ const styles = StyleSheet.create({
     width: 3,
     height: 3,
     borderRadius: 1.5,
+  },
+  
+  // Session Info Row
+  sessionInfoRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  infoCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  infoCardIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoCardContent: {
+    flex: 1,
+  },
+  infoCardLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  infoCardValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  infoCardMeta: {
+    fontSize: 11,
+    marginTop: 1,
   },
   
   // Watch Card

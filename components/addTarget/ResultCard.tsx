@@ -13,6 +13,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -32,7 +33,13 @@ type DetectionResult = AnalyzeResponse | AnalyzeDocumentResponse;
 
 interface ResultCardProps {
   result: DetectionResult;
-  onDone: (finalDetections: EditableDetection[], editedImageBase64?: string) => void;
+  /** 
+   * Called when user saves. 
+   * @param finalDetections - The edited detections
+   * @param editedImageBase64 - Optional edited image
+   * @param actualShotsDeclared - Optional: how many shots user actually fired (for accuracy calc)
+   */
+  onDone: (finalDetections: EditableDetection[], editedImageBase64?: string, actualShotsDeclared?: number | null) => void;
   onRetake: () => void;
   saving: boolean;
   editedDetections: EditableDetection[];
@@ -64,6 +71,9 @@ export const ResultCard = React.memo(function ResultCard({
   // Animation for modal
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
+  
+  // Actual shots declared by user (for accurate percentage on scanned targets)
+  const [actualShotsInput, setActualShotsInput] = useState<string>("");
   
   // Handle editor toggle with animation
   const handleToggleEditor = useCallback(() => {
@@ -192,6 +202,13 @@ export const ResultCard = React.memo(function ResultCard({
     );
   }, [editedDetections, result.detections]);
 
+  // Parse actual shots declared
+  const actualShotsDeclared = useMemo(() => {
+    if (!actualShotsInput.trim()) return null;
+    const parsed = parseInt(actualShotsInput.trim(), 10);
+    return isNaN(parsed) || parsed <= 0 ? null : parsed;
+  }, [actualShotsInput]);
+
   // Handle save with the captured edited image
   const handleSave = useCallback(async () => {
     const editedImageBase64 = hasChanges ? capturedEditedImage || undefined : undefined;
@@ -202,8 +219,8 @@ export const ResultCard = React.memo(function ResultCard({
       console.log("[ResultCard] Saving with changes but no captured image");
     }
     
-    onDone(editedDetections, editedImageBase64);
-  }, [editedDetections, hasChanges, capturedEditedImage, onDone]);
+    onDone(editedDetections, editedImageBase64, actualShotsDeclared);
+  }, [editedDetections, hasChanges, capturedEditedImage, onDone, actualShotsDeclared]);
 
   return (
     <ScrollView style={[styles.scrollView, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
@@ -435,6 +452,57 @@ export const ResultCard = React.memo(function ResultCard({
           AI processed in {result.processing_time_s.toFixed(2)}s
         </Text>
       </View>
+
+      {/* Actual Shots Input - For Achievement targets to get accurate percentage */}
+      {targetType === "achievement" && (
+        <View style={[styles.actualShotsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.actualShotsHeader}>
+            <Ionicons name="analytics-outline" size={18} color={colors.primary} />
+            <Text style={[styles.actualShotsTitle, { color: colors.text }]}>
+              How many shots did you fire?
+            </Text>
+          </View>
+          <Text style={[styles.actualShotsHint, { color: colors.textMuted }]}>
+            Optional: AI detected {stats.total} hole{stats.total !== 1 ? 's' : ''}, but some shots may have missed entirely.
+            Enter your actual shot count for accurate accuracy %.
+          </Text>
+          <View style={styles.actualShotsInputRow}>
+            <TextInput
+              style={[styles.actualShotsInput, { 
+                backgroundColor: colors.secondary, 
+                color: colors.text,
+                borderColor: actualShotsDeclared && actualShotsDeclared < stats.total ? COLORS.danger : colors.border
+              }]}
+              placeholder={`e.g. ${Math.max(stats.total, 10)}`}
+              placeholderTextColor={colors.textMuted}
+              keyboardType="number-pad"
+              value={actualShotsInput}
+              onChangeText={setActualShotsInput}
+              maxLength={3}
+            />
+            <Text style={[styles.actualShotsLabel, { color: colors.textMuted }]}>shots fired</Text>
+          </View>
+          {actualShotsDeclared && actualShotsDeclared >= stats.total && (
+            <View style={styles.accuracyPreview}>
+              <Text style={[styles.accuracyPreviewLabel, { color: colors.textMuted }]}>Accuracy:</Text>
+              <Text style={[styles.accuracyPreviewValue, { 
+                color: (stats.total / actualShotsDeclared) >= 0.7 ? '#22C55E' : 
+                       (stats.total / actualShotsDeclared) >= 0.5 ? COLORS.warning : COLORS.danger 
+              }]}>
+                {Math.round((stats.total / actualShotsDeclared) * 100)}%
+              </Text>
+              <Text style={[styles.accuracyPreviewDetail, { color: colors.textMuted }]}>
+                ({stats.total}/{actualShotsDeclared})
+              </Text>
+            </View>
+          )}
+          {actualShotsDeclared && actualShotsDeclared < stats.total && (
+            <Text style={[styles.actualShotsError, { color: COLORS.danger }]}>
+              Shots fired must be ≥ detected holes ({stats.total})
+            </Text>
+          )}
+        </View>
+      )}
 
       {/* Actions */}
       <TouchableOpacity
@@ -798,6 +866,72 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
     color: COLORS.textMuted,
+  },
+  
+  // Actual Shots Input
+  actualShotsCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 20,
+  },
+  actualShotsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 8,
+  },
+  actualShotsTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  actualShotsHint: {
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  actualShotsInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  actualShotsInput: {
+    width: 80,
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    fontSize: 18,
+    fontWeight: "600",
+    textAlign: "center",
+    paddingHorizontal: 12,
+  },
+  actualShotsLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  accuracyPreview: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.1)",
+  },
+  accuracyPreviewLabel: {
+    fontSize: 13,
+  },
+  accuracyPreviewValue: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  accuracyPreviewDetail: {
+    fontSize: 12,
+  },
+  actualShotsError: {
+    fontSize: 12,
+    marginTop: 8,
+    fontWeight: "500",
   },
 });
 

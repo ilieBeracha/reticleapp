@@ -394,6 +394,20 @@ export default function TeamScreen() {
             </Text>
           </TouchableOpacity>
           
+          {/* Team Members tab for soldiers */}
+          {!canManage && (
+            <TouchableOpacity
+              style={[styles.tabItem, activeTab === 'team' && { backgroundColor: colors.card }]}
+              onPress={() => handleTabChange('team')}
+            >
+              <Users size={16} color={activeTab === 'team' ? colors.primary : colors.textMuted} />
+              <Text style={[styles.tabText, { color: activeTab === 'team' ? colors.primary : colors.textMuted }]}>
+                Team
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Manage tab for commanders */}
           {canManage && (
             <TouchableOpacity
               style={[styles.tabItem, activeTab === 'manage' && { backgroundColor: colors.card }]}
@@ -436,7 +450,16 @@ export default function TeamScreen() {
               />
             )}
 
-            {/* MANAGE TAB */}
+            {/* TEAM MEMBERS TAB (for soldiers) */}
+            {activeTab === 'team' && !canManage && (
+              <TeamMembersTab
+                colors={colors}
+                members={members}
+                activeTeam={activeTeam}
+              />
+            )}
+
+            {/* MANAGE TAB (for commanders) */}
             {activeTab === 'manage' && canManage && (
               <ManageTab
                     colors={colors}
@@ -734,3 +757,227 @@ function ManageTab({
           </>
   );
 }
+
+// ============================================================================
+// TEAM MEMBERS TAB (for soldiers - shows team roster)
+// ============================================================================
+interface TeamMembersTabProps {
+  colors: ReturnType<typeof useColors>;
+  members: any[];
+  activeTeam: any;
+}
+
+function TeamMembersTab({ colors, members, activeTeam }: TeamMembersTabProps) {
+  // Group members by role
+  const groupedMembers = useMemo(() => {
+    const groups: Record<string, any[]> = {
+      commanders: [],
+      squad_commanders: [],
+      soldiers: [],
+    };
+    
+    members.forEach(member => {
+      // Role is nested: member.role.role
+      const role = member.role?.role || 'soldier';
+      if (role === 'owner' || role === 'commander') {
+        groups.commanders.push(member);
+      } else if (role === 'squad_commander') {
+        groups.squad_commanders.push(member);
+      } else {
+        groups.soldiers.push(member);
+      }
+    });
+    
+    return groups;
+  }, [members]);
+
+  const getRoleBadge = (role: string) => {
+    switch (role) {
+      case 'owner':
+        return { label: 'Owner', color: '#F59E0B', bg: '#F59E0B20' };
+      case 'commander':
+        return { label: 'Commander', color: '#3B82F6', bg: '#3B82F620' };
+      case 'squad_commander':
+        return { label: 'Squad Cmdr', color: '#8B5CF6', bg: '#8B5CF620' };
+      default:
+        return { label: 'Soldier', color: colors.textMuted, bg: colors.secondary };
+    }
+  };
+
+  const renderMember = (member: any) => {
+    // Role is nested: member.role.role
+    const role = member.role?.role || 'soldier';
+    const badge = getRoleBadge(role);
+    const name = member.profile?.full_name || 'Unknown';
+    const squad = member.squad?.name;
+
+    return (
+      <View
+        key={member.user_id}
+        style={[teamMembersStyles.memberCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+      >
+        <View style={[teamMembersStyles.avatar, { backgroundColor: colors.primary + '20' }]}>
+          <Text style={[teamMembersStyles.avatarText, { color: colors.primary }]}>
+            {name.charAt(0).toUpperCase()}
+          </Text>
+        </View>
+        <View style={teamMembersStyles.memberInfo}>
+          <Text style={[teamMembersStyles.memberName, { color: colors.text }]}>{name}</Text>
+          <View style={teamMembersStyles.memberMeta}>
+            <View style={[teamMembersStyles.roleBadge, { backgroundColor: badge.bg }]}>
+              <Text style={[teamMembersStyles.roleBadgeText, { color: badge.color }]}>
+                {badge.label}
+              </Text>
+            </View>
+            {squad && (
+              <Text style={[teamMembersStyles.squadName, { color: colors.textMuted }]}>
+                • {squad}
+              </Text>
+            )}
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  const renderSection = (title: string, membersList: any[]) => {
+    if (membersList.length === 0) return null;
+    
+    return (
+      <View style={teamMembersStyles.section}>
+        <Text style={[teamMembersStyles.sectionTitle, { color: colors.textMuted }]}>
+          {title.toUpperCase()} ({membersList.length})
+        </Text>
+        {membersList.map(renderMember)}
+      </View>
+    );
+  };
+
+  return (
+    <View style={teamMembersStyles.container}>
+      {/* Team Header */}
+      {activeTeam && (
+        <View style={[teamMembersStyles.teamHeader, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[teamMembersStyles.teamIcon, { backgroundColor: colors.primary + '15' }]}>
+            <Users size={24} color={colors.primary} />
+          </View>
+          <View>
+            <Text style={[teamMembersStyles.teamName, { color: colors.text }]}>{activeTeam.name}</Text>
+            <Text style={[teamMembersStyles.memberCount, { color: colors.textMuted }]}>
+              {members.length} member{members.length !== 1 ? 's' : ''}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* Members List */}
+      {members.length === 0 ? (
+        <View style={teamMembersStyles.emptyState}>
+          <Users size={48} color={colors.textMuted} style={{ opacity: 0.5 }} />
+          <Text style={[teamMembersStyles.emptyText, { color: colors.textMuted }]}>
+            No team members yet
+          </Text>
+        </View>
+      ) : (
+        <>
+          {renderSection('Command', groupedMembers.commanders)}
+          {renderSection('Squad Commanders', groupedMembers.squad_commanders)}
+          {renderSection('Team', groupedMembers.soldiers)}
+        </>
+      )}
+    </View>
+  );
+}
+
+const teamMembersStyles = StyleSheet.create({
+  container: {
+    gap: 16,
+  },
+  teamHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  teamIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  teamName: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  memberCount: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  section: {
+    gap: 8,
+  },
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  memberCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  memberInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  memberName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  memberMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  roleBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  roleBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  squadName: {
+    fontSize: 12,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+    gap: 12,
+  },
+  emptyText: {
+    fontSize: 15,
+  },
+});

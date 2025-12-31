@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { markWeaponUsed } from '@/services/weaponService';
 import { getDrillRequirements } from './drillContract';
 import { mapSession } from './mappers';
 import {
@@ -37,6 +38,7 @@ function normalizeToBaseConfig(params: CreateSessionParams | BaseSessionConfig):
   return {
     team_id: legacy.team_id ?? null,
     training_id: legacy.training_id ?? null,
+    weapon_id: null, // Legacy params don't have weapon
     drill_id: legacy.drill_id ?? null,
     drill_template_id: legacy.drill_template_id ?? null,
     drill_config: legacy.custom_drill_config ?? null,
@@ -191,6 +193,7 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
       user_id: user.id,
       team_id: config.team_id,
       training_id: config.training_id,
+      weapon_id: config.weapon_id, // Link to user's weapon profile
       drill_id: config.drill_id,
       drill_template_id: config.drill_template_id,
       custom_drill_config: customDrillConfig,
@@ -205,6 +208,7 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
       user_id,
       team_id,
       training_id,
+      weapon_id,
       drill_id,
       drill_template_id,
       custom_drill_config,
@@ -219,12 +223,21 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
       teams:team_id(name),
       trainings:training_id(title),
       training_drills:drill_id(*),
-      drill_templates:drill_template_id(*)
+      drill_templates:drill_template_id(*),
+      user_weapons:weapon_id(id, name, base_weapon:weapons(*))
     `
     )
     .single();
 
   if (error) throw error;
+  
+  // Mark weapon as used (non-blocking)
+  if (config.weapon_id) {
+    markWeaponUsed(config.weapon_id).catch((err) => {
+      console.warn('[createSession] Failed to mark weapon as used:', err);
+    });
+  }
+  
   return mapSession(data);
 }
 
@@ -365,6 +378,7 @@ export async function updateSession(
       drill_id,
       drill_template_id,
       custom_drill_config,
+      weapon_id,
       session_mode,
       watch_controlled,
       status,
@@ -376,7 +390,8 @@ export async function updateSession(
       teams:team_id(name),
       trainings:training_id(title),
       training_drills:drill_id(*),
-      drill_templates:drill_template_id(*)
+      drill_templates:drill_template_id(*),
+      user_weapons:weapon_id(name, caliber)
     `
     )
     .single();
@@ -537,58 +552,19 @@ async function recordDrillCompletion(params: {
 }
 
 // ============================================================================
-// DRILL-BOUND SESSION ENFORCEMENT (Client-side)
+// DRILL LIMITS - Soft tracking only (no enforcement)
 // ============================================================================
+// 
+// Per sessions.mdc mental model:
+// - "Drills set expectations. Sessions record reality."
+// - Users can always record what actually happened
+// - Limits are tracked for analytics, not enforcement
+//
 
-async function enforceDrillLimitsForNewTarget(params: { sessionId: string; targetType: TargetType; bulletsFired: number }) {
-  const session = await getSessionById(params.sessionId);
-  if (!session) {
-    throw new Error('Session not found');
-  }
-
-  const drill = session.drill_config;
-  if (!drill) {
-    return; // No drill = no drill limits
-  }
-
-  const { rounds, requiredTargets, requiredShots, isPaper, bulletsPerRound } = getDrillRequirements(drill);
-
-  // Enforce target type matches drill type
-  if (drill.target_type !== params.targetType) {
-    throw new Error(`This drill requires ${drill.target_type} targets.`);
-  }
-
-  const stats = await calculateSessionStats(params.sessionId);
-
-  const remainingTargets = requiredTargets - stats.targetCount;
-
-  if (remainingTargets <= 0) {
-    throw new Error(`Target limit reached (${requiredTargets}).`);
-  }
-
-  // Paper targets (scan):
-  // - bulletsFired comes from AI detection (not user-entered).
-  // - The scan can exceed any configured "max shots" (we track it, but don't block saving).
-  if (params.targetType === 'paper') {
-    return;
-  }
-
-  // Tactical targets (manual): strict bullet contract.
-  const remainingShots = requiredShots - stats.totalShotsFired;
-
-  if (remainingShots <= 0) {
-    throw new Error(`Round limit reached (${requiredShots}).`);
-  }
-
-  if (params.bulletsFired > remainingShots) {
-    throw new Error(`This target exceeds remaining rounds. Remaining: ${remainingShots}.`);
-  }
-
-  const expectedNext = remainingTargets === 1 ? remainingShots : bulletsPerRound;
-
-  if (params.bulletsFired !== expectedNext) {
-    throw new Error(`This drill expects ${expectedNext} bullets for the next round.`);
-  }
+async function enforceDrillLimitsForNewTarget(_params: { sessionId: string; targetType: TargetType; bulletsFired: number }) {
+  // No enforcement - users can always add targets
+  // Stats will track actual vs expected for analytics
+  return;
 }
 
 /**
@@ -612,6 +588,8 @@ export async function addTargetWithPaperResult(params: {
   offset_up_cm?: number | null;
   scanned_image_url?: string | null;
   result_notes?: string | null;
+  /** Optional: User-declared actual shots (for scanned targets where bullets_fired = detected holes) */
+  actual_shots_declared?: number | null;
 }): Promise<SessionTargetWithResults> {
   console.log('[SessionService] addTargetWithPaperResult called');
 
@@ -645,6 +623,7 @@ export async function addTargetWithPaperResult(params: {
     offset_up_cm: params.offset_up_cm,
     scanned_image_url: params.scanned_image_url,
     notes: params.result_notes,
+    actual_shots_declared: params.actual_shots_declared,
   });
   console.log('[SessionService] Paper result created:', paperResult.id);
 
@@ -717,6 +696,95 @@ export interface WatchSessionData {
   durationMs?: number;
   distance?: number;
   completed?: boolean;
+  // Detection info
+  autoDetected?: boolean;
+  detectionSensitivity?: number;
+  manualOverrides?: number;
+  // Extended data from Garmin watch
+  splitTimes?: number[];
+  avgSplitMs?: number;
+  // Performance analytics
+  performance?: {
+    firstShotTime?: number;
+    bestSplit?: number;
+    worstSplit?: number;
+    splitStdDev?: number;
+    shotsPerMinute?: number;
+    parDelta?: number;
+    warmupAvg?: number;
+    restAvg?: number;
+    lastThreeAvg?: number;
+  };
+  // Biometrics
+  biometrics?: {
+    enabled?: boolean;
+    summary?: {
+      minHR?: number;
+      maxHR?: number;
+      avgHR?: number;
+      avgBreathRate?: number;
+      hrSamples?: number;
+      breathSamples?: number;
+      shotCount?: number;
+      // Stress data
+      stressAvg?: number;
+      stressMin?: number;
+      stressMax?: number;
+      stressTrend?: string;
+      optimalShots?: number;
+      optimalPct?: number;
+    };
+    hrTimeline?: [number, number, number][];
+    breathTimeline?: [number, number, number][];
+    shotBiometrics?: {
+      shot: number;
+      hr?: number;
+      hrAvg?: number;
+      br?: number;
+      breathPhase?: string;
+      hrTrend?: string;
+      stress?: number;
+      rmssd?: number;
+    }[];
+  };
+  // Steadiness
+  steadiness?: {
+    enabled?: boolean;
+    avgScore?: number;
+    shotCount?: number;
+    trend?: string;
+    // Flinch detection
+    flinchCount?: number;
+    flinchRate?: number;
+    // Recoil analysis
+    recoilConsistency?: number;
+    // Best/worst shots
+    bestShot?: number;
+    bestScore?: number;
+    worstShot?: number;
+    worstScore?: number;
+    // Per-shot data
+    shots?: {
+      shotNumber: number;
+      score: number;
+      grade: string;
+      tremor?: number;
+      drift?: number;
+      sway?: number;
+      samples?: number;
+      anomaly?: boolean;
+      // Flinch
+      flinch?: boolean;
+      flinchMag?: number;
+      // Recoil
+      recoilMag?: number;
+      recoilDev?: number;
+    }[];
+    gradeDistribution?: Record<string, number>;
+    // Legacy format
+    shotScores?: number[];
+    timeline?: [number, number, number][];
+  };
 }
 
 /**
@@ -743,6 +811,102 @@ export async function saveWatchSessionData(
   const drill = session.drill_config;
   const distance = data.distance ?? drill?.distance_m ?? 0;
   
+  // Build comprehensive target_data with all watch telemetry
+  const targetData: Record<string, unknown> = {
+    source: 'garmin_watch',
+    // Basic data
+    shots_recorded: data.shotsRecorded,
+    hits_recorded: data.hitsRecorded ?? data.shotsRecorded,
+    duration_ms: data.durationMs,
+    distance: distance,
+    completed: data.completed ?? false,
+    // Detection info
+    auto_detected: data.autoDetected,
+    detection_sensitivity: data.detectionSensitivity,
+    manual_overrides: data.manualOverrides,
+  };
+  
+  // Add split times if available (from watch directly)
+  if (data.splitTimes && data.splitTimes.length > 0) {
+    targetData.splits = data.splitTimes;
+    targetData.avg_split_ms = data.avgSplitMs ?? Math.round(data.splitTimes.reduce((a, b) => a + b, 0) / data.splitTimes.length);
+    targetData.fastest_split_ms = Math.min(...data.splitTimes);
+    targetData.slowest_split_ms = Math.max(...data.splitTimes);
+  }
+  
+  // Add performance analytics if available
+  if (data.performance) {
+    targetData.performance = {
+      first_shot_time: data.performance.firstShotTime,
+      best_split: data.performance.bestSplit,
+      worst_split: data.performance.worstSplit,
+      split_std_dev: data.performance.splitStdDev,
+      shots_per_minute: data.performance.shotsPerMinute,
+      par_delta: data.performance.parDelta,
+      warmup_avg: data.performance.warmupAvg,
+      rest_avg: data.performance.restAvg,
+      last_three_avg: data.performance.lastThreeAvg,
+    };
+  }
+  
+  // Add full biometrics data if available
+  if (data.biometrics?.enabled) {
+    targetData.biometrics = {
+      summary: data.biometrics.summary,
+      // Store timelines (could be large arrays)
+      hr_timeline: data.biometrics.hrTimeline,
+      breath_timeline: data.biometrics.breathTimeline,
+      shot_biometrics: data.biometrics.shotBiometrics,
+    };
+    
+    // Also store summary at top level for easy access
+    if (data.biometrics.summary) {
+      targetData.heart_rate = {
+        avg: data.biometrics.summary.avgHR,
+        max: data.biometrics.summary.maxHR,
+        min: data.biometrics.summary.minHR,
+      };
+      targetData.avg_breath_rate = data.biometrics.summary.avgBreathRate;
+      // Stress data at top level
+      targetData.stress = {
+        avg: data.biometrics.summary.stressAvg,
+        min: data.biometrics.summary.stressMin,
+        max: data.biometrics.summary.stressMax,
+        trend: data.biometrics.summary.stressTrend,
+      };
+      // Optimal shots
+      targetData.optimal_shots = data.biometrics.summary.optimalShots;
+      targetData.optimal_pct = data.biometrics.summary.optimalPct;
+    }
+  }
+  
+  // Add steadiness data if available
+  if (data.steadiness?.enabled) {
+    targetData.steadiness = {
+      avg_score: data.steadiness.avgScore,
+      shot_count: data.steadiness.shotCount,
+      trend: data.steadiness.trend,
+      // Flinch data
+      flinch_count: data.steadiness.flinchCount,
+      flinch_rate: data.steadiness.flinchRate,
+      // Recoil consistency
+      recoil_consistency: data.steadiness.recoilConsistency,
+      // Best/worst shots
+      best_shot: data.steadiness.bestShot,
+      best_score: data.steadiness.bestScore,
+      worst_shot: data.steadiness.worstShot,
+      worst_score: data.steadiness.worstScore,
+      // Per-shot data (includes flinch, recoil per shot)
+      shots: data.steadiness.shots,
+      grade_distribution: data.steadiness.gradeDistribution,
+      // Legacy format
+      shot_scores: data.steadiness.shotScores,
+      timeline: data.steadiness.timeline,
+    };
+  }
+  
+  console.log('[SessionService] Target data keys:', Object.keys(targetData));
+  
   // Create a tactical target entry with watch data
   // This allows the data to be picked up by normal stats calculation
   const target = await addSessionTarget({
@@ -750,10 +914,7 @@ export async function saveWatchSessionData(
     target_type: 'tactical',
     distance_m: distance,
     notes: 'Recorded via Garmin watch',
-    target_data: {
-      source: 'garmin_watch',
-      raw_data: data,
-    },
+    target_data: targetData,
   });
   
   // Calculate time in seconds from milliseconds
@@ -834,4 +995,157 @@ export async function saveWatchSessionData(
   return session;
 }
 
+/**
+ * Merge SESSION_DETAILS into an existing watch session target.
+ * Called when Phase 2 data arrives after Phase 1 summary was already saved.
+ * 
+ * @param sessionId - The session to update
+ * @param details - The full details data from SESSION_DETAILS
+ * @returns true if update was successful, false if no target found
+ */
+export async function mergeWatchSessionDetails(
+  sessionId: string,
+  details: Partial<WatchSessionData>
+): Promise<boolean> {
+  console.log('[SessionService] Merging watch session details for:', sessionId);
+  
+  // Find the existing target with garmin_watch source
+  // Note: session_targets doesn't have created_at, so we filter by target_data source
+  const { data: targets, error: fetchError } = await supabase
+    .from('session_targets')
+    .select('id, target_data')
+    .eq('session_id', sessionId)
+    .limit(10);  // Get all targets for this session, we'll filter for garmin_watch
+  
+  if (fetchError) {
+    console.error('[SessionService] Error fetching target for merge:', fetchError);
+    return false;
+  }
+  
+  if (!targets || targets.length === 0) {
+    console.log('[SessionService] No target found for session, details will be saved on next save');
+    return false;
+  }
+  
+  // Find the garmin_watch target
+  const watchTarget = targets.find((t) => {
+    const data = t.target_data as Record<string, unknown> | null;
+    return data?.source === 'garmin_watch';
+  });
+  
+  if (!watchTarget) {
+    console.log('[SessionService] No garmin_watch target found, details will be saved on next save');
+    return false;
+  }
+  
+  const target = watchTarget;
+  const existingData = (target.target_data as Record<string, unknown>) || {};
+  
+  console.log('[SessionService] Found existing garmin_watch target:', target.id);
+  
+  // Build the details to merge
+  const detailsToMerge: Record<string, unknown> = {};
+  
+  // Add split times if available
+  if (details.splitTimes && details.splitTimes.length > 0) {
+    detailsToMerge.splits = details.splitTimes;
+    detailsToMerge.avg_split_ms = details.avgSplitMs ?? Math.round(details.splitTimes.reduce((a, b) => a + b, 0) / details.splitTimes.length);
+    detailsToMerge.fastest_split_ms = Math.min(...details.splitTimes);
+    detailsToMerge.slowest_split_ms = Math.max(...details.splitTimes);
+  }
+  
+  // Add detection info
+  if (details.autoDetected !== undefined) detailsToMerge.auto_detected = details.autoDetected;
+  if (details.detectionSensitivity !== undefined) detailsToMerge.detection_sensitivity = details.detectionSensitivity;
+  if (details.manualOverrides !== undefined) detailsToMerge.manual_overrides = details.manualOverrides;
+  
+  // Add performance analytics if available
+  if (details.performance) {
+    detailsToMerge.performance = {
+      first_shot_time: details.performance.firstShotTime,
+      best_split: details.performance.bestSplit,
+      worst_split: details.performance.worstSplit,
+      split_std_dev: details.performance.splitStdDev,
+      shots_per_minute: details.performance.shotsPerMinute,
+      par_delta: details.performance.parDelta,
+      warmup_avg: details.performance.warmupAvg,
+      rest_avg: details.performance.restAvg,
+      last_three_avg: details.performance.lastThreeAvg,
+    };
+  }
+  
+  // Add full biometrics data if available
+  if (details.biometrics?.enabled) {
+    detailsToMerge.biometrics = {
+      summary: details.biometrics.summary,
+      hr_timeline: details.biometrics.hrTimeline,
+      breath_timeline: details.biometrics.breathTimeline,
+      shot_biometrics: details.biometrics.shotBiometrics,
+    };
+    
+    // Also update top-level fields
+    if (details.biometrics.summary) {
+      detailsToMerge.heart_rate = {
+        avg: details.biometrics.summary.avgHR,
+        max: details.biometrics.summary.maxHR,
+        min: details.biometrics.summary.minHR,
+      };
+      detailsToMerge.avg_breath_rate = details.biometrics.summary.avgBreathRate;
+      detailsToMerge.stress = {
+        avg: details.biometrics.summary.stressAvg,
+        min: details.biometrics.summary.stressMin,
+        max: details.biometrics.summary.stressMax,
+        trend: details.biometrics.summary.stressTrend,
+      };
+      detailsToMerge.optimal_shots = details.biometrics.summary.optimalShots;
+      detailsToMerge.optimal_pct = details.biometrics.summary.optimalPct;
+    }
+  }
+  
+  // Add steadiness data if available
+  if (details.steadiness?.enabled) {
+    detailsToMerge.steadiness = {
+      avg_score: details.steadiness.avgScore,
+      shot_count: details.steadiness.shotCount,
+      trend: details.steadiness.trend,
+      flinch_count: details.steadiness.flinchCount,
+      flinch_rate: details.steadiness.flinchRate,
+      recoil_consistency: details.steadiness.recoilConsistency,
+      best_shot: details.steadiness.bestShot,
+      best_score: details.steadiness.bestScore,
+      worst_shot: details.steadiness.worstShot,
+      worst_score: details.steadiness.worstScore,
+      shots: details.steadiness.shots,
+      grade_distribution: details.steadiness.gradeDistribution,
+      shot_scores: details.steadiness.shotScores,
+      timeline: details.steadiness.timeline,
+    };
+  }
+  
+  // Mark as complete (details merged)
+  detailsToMerge.details_merged = true;
+  detailsToMerge.details_merged_at = new Date().toISOString();
+  
+  // Merge with existing data
+  const mergedData = {
+    ...existingData,
+    ...detailsToMerge,
+  };
+  
+  console.log('[SessionService] Merging keys:', Object.keys(detailsToMerge));
+  
+  // Update the target
+  const { error: updateError } = await supabase
+    .from('session_targets')
+    .update({ target_data: mergedData })
+    .eq('id', target.id);
+  
+  if (updateError) {
+    console.error('[SessionService] Error updating target with details:', updateError);
+    return false;
+  }
+  
+  console.log('[SessionService] ✅ Watch session details merged successfully');
+  return true;
+}
 

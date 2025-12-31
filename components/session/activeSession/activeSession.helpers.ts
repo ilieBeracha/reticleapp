@@ -224,39 +224,84 @@ interface SessionForPayload {
  * - strings: Number of rounds/sets/magazines in the drill
  * - rounds: Bullets per string (kept for backwards compat, same as maxBullets when strings=1)
  */
+/**
+ * Builds the payload to send to watch for SESSION_START
+ * 
+ * Watch expects:
+ * - drillType: "timed" | "grouping" | "zeroing" | "qualification"
+ * - inputMethod: "manual" | "scan" | "both"
+ * - rounds: shots per string (0 = unlimited)
+ * - strings: number of strings/stages
+ * - watchMode: "primary" (shot counter) | "supplementary" (timer only)
+ * - sensitivity: G-force threshold (2.5-4.5)
+ * - emkv: enable shot marking feature
+ * - vrcv: vibrate on shot detection
+ */
 export function buildWatchSessionPayload(
   session: SessionForPayload,
   autoDetect: boolean = true,
-  sensitivity: number = 0.5
+  sensitivity: number = 3.5, // Default G-force threshold
+  emkv: boolean = false,     // Shot marking disabled by default
+  vrcv: boolean = true       // Vibrate on shot enabled by default
 ) {
   const drillConfig = session.drill_config;
   
-  // rounds_per_shooter = bullets per string/set
-  const bulletsPerString = drillConfig?.rounds_per_shooter || 0;
-  const stringsCount = drillConfig?.strings_count || 1;
+  // rounds = bullets per string (0 = unlimited)
+  const rounds = drillConfig?.rounds_per_shooter || 0;
+  const strings = drillConfig?.strings_count || 1;
   
-  // Total bullets for the entire session (what watch uses for auto-complete)
-  const maxBullets = bulletsPerString * stringsCount;
+  // Map drill_goal to watch drillType
+  const mapDrillType = (goal: string | null | undefined): string => {
+    switch (goal) {
+      case 'grouping': return 'grouping';
+      case 'zeroing': return 'zeroing';
+      case 'qualification': return 'qualification';
+      case 'achievement':
+      case 'physical':
+      default:
+        return 'timed'; // Default for tactical/achievement drills
+    }
+  };
+
+  // Map input_method to watch format
+  const mapInputMethod = (method: string | null | undefined): string => {
+    switch (method) {
+      case 'scan': return 'scan';
+      case 'both': return 'both';
+      case 'manual':
+      default:
+        return 'manual';
+    }
+  };
+
+  // Build goal description string
+  const buildGoalDescription = (): string => {
+    const parts: string[] = [];
+    if (rounds > 0) parts.push(`${rounds} shots`);
+    if (drillConfig?.time_limit_seconds) {
+      parts.push(`under ${drillConfig.time_limit_seconds}s`);
+    } else if (drillConfig?.par_time_seconds) {
+      parts.push(`par ${drillConfig.par_time_seconds}s`);
+    }
+    return parts.length > 0 ? parts.join(' ') : (drillConfig?.drill_goal || 'Practice');
+  };
   
   return {
     sessionId: session.id,
     drillName: drillConfig?.name || session.drill_name || 'Training Session',
-    drillGoal: drillConfig?.drill_goal || 'practice',
-    drillType: drillConfig?.target_type || 'tactical',
-    inputMethod: drillConfig?.input_method || 'manual',
-    watchMode: session.watch_controlled ? 'primary' : 'supplementary',
+    drillGoal: buildGoalDescription(),
+    drillType: mapDrillType(drillConfig?.drill_goal),
+    inputMethod: mapInputMethod(drillConfig?.input_method),
     distance: drillConfig?.distance_m || 0,
-    // maxBullets: total bullets for session (use this for auto-complete)
-    maxBullets,
-    // rounds: bullets per string (legacy, same as bulletsPerString)
-    rounds: bulletsPerString,
-    // strings: number of sets/magazines
-    strings: stringsCount,
+    rounds,      // Shots per string (0 = unlimited)
+    strings,     // Number of strings/stages
     timeLimit: drillConfig?.time_limit_seconds || 0,
     parTime: drillConfig?.par_time_seconds || 0,
-    startedAt: Date.now(),
+    watchMode: session.watch_controlled ? 'primary' : 'supplementary',
     autoDetect,
     sensitivity,
+    emkv,        // Shot marking feature
+    vrcv,        // Vibrate on shot detection
   };
 }
 

@@ -3,14 +3,15 @@
  * 
  * Manage team configuration and preferences - native form sheet
  */
+import { WeaponAssignmentManager } from '@/components/weapons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
-import { deleteTeam, removeTeamMember, updateTeam } from '@/services/teamService';
+import { deleteTeam, getTeamMembers, removeTeamMember, updateTeam } from '@/services/teamService';
 import { useTeamStore } from '@/store/teamStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -60,6 +61,12 @@ const SETTINGS_SECTIONS: SettingSection[] = [
       { id: 'members', icon: 'people-outline', label: 'Manage Members', description: 'View and manage team roster' },
       { id: 'roles', icon: 'shield-outline', label: 'Roles & Permissions', description: 'Configure member access levels' },
       { id: 'squads', icon: 'git-branch-outline', label: 'Squads', description: 'Organize into sub-groups' },
+    ],
+  },
+  {
+    title: 'Equipment',
+    items: [
+      { id: 'weapons', icon: 'hardware-chip-outline', label: 'Team Weapons', description: 'Manage weapons & assignments' },
     ],
   },
   {
@@ -149,6 +156,23 @@ export default function TeamSettingsSheet() {
   const [editName, setEditName] = useState(team?.name || '');
   const [editDescription, setEditDescription] = useState(team?.description || '');
   const [saving, setSaving] = useState(false);
+
+  // Weapons Modal State
+  const [weaponsModalVisible, setWeaponsModalVisible] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<{ id: string; full_name: string; avatar_url?: string | null }[]>([]);
+
+  // Load team members for weapon assignment
+  useEffect(() => {
+    if (teamId && canManage) {
+      getTeamMembers(teamId).then(members => {
+        setTeamMembers(members.map(m => ({
+          id: m.user_id,
+          full_name: m.profile?.full_name || 'Unknown',
+          avatar_url: m.profile?.avatar_url,
+        })));
+      }).catch(console.error);
+    }
+  }, [teamId, canManage]);
 
   const showComingSoon = (feature: string) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -295,6 +319,13 @@ export default function TeamSettingsSheet() {
       case 'squads':
         router.push(`/(protected)/teamSquads?teamId=${teamId}` as any);
         break;
+      case 'weapons':
+        if (!canManage) {
+          Alert.alert('Permission Denied', 'Only commanders can manage team weapons.');
+          return;
+        }
+        setWeaponsModalVisible(true);
+        break;
       case 'drill_defaults':
         showComingSoon('Drill Defaults');
         break;
@@ -334,6 +365,10 @@ export default function TeamSettingsSheet() {
         return true;
       });
       return { ...section, items: filteredItems };
+    }
+    // Only show Equipment section for commanders
+    if (section.title === 'Equipment') {
+      return canManage ? section : { ...section, items: [] };
     }
     return section;
   }).filter(section => section.items.length > 0);
@@ -451,6 +486,24 @@ export default function TeamSettingsSheet() {
               />
             </View>
           </View>
+        </View>
+      </Modal>
+
+      {/* Weapons Management Modal */}
+      <Modal
+        visible={weaponsModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setWeaponsModalVisible(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          {teamId && (
+            <WeaponAssignmentManager
+              teamId={teamId}
+              teamMembers={teamMembers}
+              onClose={() => setWeaponsModalVisible(false)}
+            />
+          )}
         </View>
       </Modal>
     </ScrollView>

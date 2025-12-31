@@ -18,7 +18,11 @@ export const WATCH_RETRY_DELAY_MS = 2000;
 // AUTO SHOT DETECTION (sent to watch)
 // ============================================================================
 export const AUTO_DETECT_ENABLED = true;
-export const SHOT_SENSITIVITY_DEFAULT = 0.5; // G-force threshold
+export const SHOT_SENSITIVITY_DEFAULT = 3.5; // G-force threshold (2.5-4.5 range)
+
+// New watch features
+export const SHOT_MARKING_ENABLED = false;   // emkv - shot marking feature
+export const VIBRATE_ON_SHOT = true;         // vrcv - vibrate on shot detection
 
 // ============================================================================
 // COLORS

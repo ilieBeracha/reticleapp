@@ -360,18 +360,14 @@ export default function ProtectedLayout() {
           }}
         />
 
-        {/* Watch Session Result - Garmin data confirmation */}
+        {/* Watch Session Result - Full screen Garmin data review */}
         <Stack.Screen
           name="watchSessionResult"
           options={{
             headerShown: false,
-            presentation: "formSheet",
-            gestureEnabled: true,
-            sheetGrabberVisible: true,
-            contentStyle: { backgroundColor: colors.card },
-            sheetAllowedDetents: [0.55],
-            sheetInitialDetentIndex: 0,
-            sheetLargestUndimmedDetentIndex: -1,
+            presentation: "card",
+            gestureEnabled: false,
+            contentStyle: { backgroundColor: colors.background },
           }}
         />
 
@@ -393,6 +389,17 @@ export default function ProtectedLayout() {
             headerShown: false,
             presentation: "card",
             gestureEnabled: true,
+            contentStyle: { backgroundColor: colors.background },
+          }}
+        />
+
+        {/* Session Results - Full screen after session ends */}
+        <Stack.Screen
+          name="sessionResults"
+          options={{
+            headerShown: false,
+            presentation: "card",
+            gestureEnabled: false,
             contentStyle: { backgroundColor: colors.background },
           }}
         />

@@ -54,38 +54,155 @@ export type GarminOutboundMessageType =
 | 'SESSION_START'  // Alias for START_SESSION (used by watch)
 | 'SESSION_END'    // Alias for END_SESSION (used by watch)
 | 'SYNC_DRILL'
-| 'PING';
+| 'PING'
+| 'ACK';           // Acknowledge receipt of SESSION_RESULT
 
 /** Message types received FROM the watch */
 export type GarminInboundMessageType =
 | 'SESSION_DATA'
-| 'SESSION_RESULT'  // Watch sends this when session ends (auto or manual)
+| 'SESSION_RESULT'  // Watch sends this when session ends (auto or manual) - LEGACY
+| 'SESSION_SUMMARY' // Phase 1: Thin summary for instant display (~300 bytes)
+| 'SESSION_DETAILS' // Phase 2: Full data sent in background (timelines, per-shot)
 | 'SHOT_RECORDED'
 | 'SESSION_ENDED'
 | 'HEARTBEAT'
 | 'PONG';
 
+/** Performance analytics from watch */
+export interface GarminPerformance {
+  firstShotTime?: number;      // Time from START to first shot (ms)
+  bestSplit?: number;          // Fastest split time (ms)
+  worstSplit?: number;         // Slowest split time (ms)
+  splitStdDev?: number;        // Standard deviation of splits (ms)
+  shotsPerMinute?: number;     // Rate of fire x10 (divide by 10)
+  parDelta?: number;           // Difference from par time (ms)
+  warmupAvg?: number;          // First 3 shots avg steadiness
+  restAvg?: number;            // Remaining shots avg steadiness
+  lastThreeAvg?: number;       // Last 3 shots avg (fatigue indicator)
+}
+
+/** Biometrics summary from watch */
+export interface BiometricsSummary {
+  minHR?: number;
+  maxHR?: number;
+  avgHR?: number;
+  avgBreathRate?: number;
+  hrSamples?: number;
+  breathSamples?: number;
+  shotCount?: number;
+  // Stress data (HRV-based)
+  stressAvg?: number;          // 0-100, lower = more relaxed
+  stressMin?: number;
+  stressMax?: number;
+  stressTrend?: 'increasing' | 'decreasing' | 'stable' | string;
+  // Optimal shots (good conditions)
+  optimalShots?: number;       // Shots with pause + stable HR + low stress
+  optimalPct?: number;         // Percentage of optimal shots
+}
+
+/** Per-shot biometrics data */
+export interface ShotBiometrics {
+  shot: number;
+  hr?: number;                 // HR at exact shot moment
+  hrAvg?: number;              // 5-second avg HR before shot
+  br?: number;                 // Breath rate (breaths/min)
+  breathPhase?: 'inhale' | 'exhale' | 'pause' | string;
+  hrTrend?: 'rising' | 'falling' | 'stable' | string;
+  stress?: number;             // HRV stress score 0-100
+  rmssd?: number;              // Raw HRV metric (deci-ms, divide by 10)
+}
+
+/** Full biometrics payload from watch */
+export interface GarminBiometrics {
+  enabled: boolean;
+  summary?: BiometricsSummary;
+  /** HR timeline: [timestamp_ms, heartRate, shotNumber] */
+  hrTimeline?: [number, number, number][];
+  /** Breath timeline: [timestamp_ms, breathRate, shotNumber] */
+  breathTimeline?: [number, number, number][];
+  /** Per-shot biometrics */
+  shotBiometrics?: ShotBiometrics[];
+}
+
+/** Per-shot steadiness data */
+export interface ShotSteadiness {
+  shotNumber: number;
+  score: number;
+  grade: string;
+  tremor?: number;             // High-freq micro-movements (0-100)
+  sway?: number;               // Low-freq body sway (0-100)
+  drift?: number;              // Gradual position change (0-100)
+  samples?: number;
+  anomaly?: boolean;
+  // Flinch detection
+  flinch?: boolean;            // Anticipation detected
+  flinchMag?: number;          // Flinch magnitude (centi-G)
+  // Recoil analysis
+  recoilMag?: number;          // Peak recoil (centi-G)
+  recoilDev?: number;          // Deviation from avg (%)
+}
+
+/** Full steadiness payload from watch */
+export interface GarminSteadiness {
+  enabled?: boolean;
+  shotCount?: number;
+  avgScore?: number;
+  trend?: string;
+  gradeDistribution?: Record<string, number>;
+  // Flinch summary
+  flinchCount?: number;        // Total shots with flinch
+  flinchRate?: number;         // Percentage with flinch
+  // Recoil consistency
+  recoilConsistency?: number;  // 0-100, higher = more consistent
+  // Best/worst shots
+  bestShot?: number;
+  bestScore?: number;
+  worstShot?: number;
+  worstScore?: number;
+  // Per-shot data
+  shots?: ShotSteadiness[];
+  // Legacy format
+  shotScores?: number[];
+  timeline?: [number, number, number][];
+}
+
 export interface GarminSessionData {
-/** Session ID (matches our DB session) */
-sessionId?: string;
-/** Total shots recorded by the watch (watch sends as shotsFired) */
-shotsRecorded: number;
-/** Shot timestamps (ms since session start) */
-shotTimestamps?: number[];
-/** Average time between shots (ms) */
-avgSplitMs?: number;
-/** Session duration (ms) - watch sends elapsedTime in seconds */
-durationMs?: number;
-/** Distance in meters (from watch) */
-distance?: number;
-/** Whether session was completed (max bullets reached) */
-completed?: boolean;
-/** Heart rate data if available */
-heartRate?: {
-  avg: number;
-  max: number;
-  min: number;
-};
+  /** Session ID (matches our DB session) */
+  sessionId?: string;
+  /** Total shots recorded by the watch (watch sends as shotsFired) */
+  shotsRecorded: number;
+  /** Shot timestamps (ms since session start) */
+  shotTimestamps?: number[];
+  /** Split times between shots (ms) */
+  splitTimes?: number[];
+  /** Average time between shots (ms) */
+  avgSplitMs?: number;
+  /** Session duration (ms) - watch sends elapsedTime in seconds */
+  durationMs?: number;
+  /** Distance in meters (from watch) */
+  distance?: number;
+  /** Whether session was completed (max bullets reached) */
+  completed?: boolean;
+  /** Auto-detection enabled */
+  autoDetected?: boolean;
+  /** Detection sensitivity used */
+  detectionSensitivity?: number;
+  /** Manual override count */
+  manualOverrides?: number;
+  /** Heart rate data if available (legacy simple format) */
+  heartRate?: {
+    avg: number;
+    max: number;
+    min: number;
+  };
+  /** Performance analytics from watch */
+  performance?: GarminPerformance;
+  /** Full biometrics data from watch */
+  biometrics?: GarminBiometrics;
+  /** Steadiness data from watch */
+  steadiness?: GarminSteadiness;
+  /** True if this is summary-only data (details coming in Phase 2) */
+  isSummaryOnly?: boolean;
 }
 
 export interface GarminInboundMessage {
@@ -101,6 +218,8 @@ export type GarminServiceEvent =
 | { event: 'devices_updated'; devices: GarminDevice[] }
 | { event: 'message_received'; message: GarminInboundMessage }
 | { event: 'session_data'; data: GarminSessionData }
+| { event: 'session_summary'; data: GarminSessionData }    // Phase 1: Thin summary for instant display
+| { event: 'session_details'; data: Partial<GarminSessionData> & { sessionId: string } }  // Phase 2: Full data to merge
 | { event: 'error'; error: Error };
 
 export type GarminServiceListener = (event: GarminServiceEvent) => void;
@@ -267,7 +386,7 @@ const msgSub = emitter.addListener('onMessage', (raw: any) => {
   emit({ event: 'message_received', message });
 
   // Special handling for session data
-  // Watch sends: SESSION_RESULT with { sessionId, shotsFired, elapsedTime, distance, completed }
+  // Watch sends: SESSION_RESULT with { sessionId, shotsFired, elapsedTime, distance, completed, biometrics, steadiness }
   if (message.type === 'SESSION_DATA' || message.type === 'SESSION_ENDED' || message.type === 'SESSION_RESULT') {
     console.log('[GarminService] 📩 Session data message detected, type:', message.type);
     
@@ -277,6 +396,10 @@ const msgSub = emitter.addListener('onMessage', (raw: any) => {
     console.log('  - shotsFired:', parsedPayload?.shotsFired);
     console.log('  - sessionId:', parsedPayload?.sessionId);
     console.log('  - distance:', parsedPayload?.distance);
+    console.log('  - performance:', parsedPayload?.performance ? 'present' : 'absent');
+    console.log('  - biometrics:', parsedPayload?.biometrics ? 'present' : 'absent');
+    console.log('  - steadiness:', parsedPayload?.steadiness ? 'present' : 'absent');
+    console.log('  - splitTimes:', parsedPayload?.splitTimes?.length ?? 0, 'items');
     
     // Map SESSION_RESULT fields to our GarminSessionData format
     const rawElapsedTime = parsedPayload?.elapsedTime ?? 0;
@@ -284,17 +407,231 @@ const msgSub = emitter.addListener('onMessage', (raw: any) => {
     
     console.log('[GarminService] 📩 Converting: elapsedTime', rawElapsedTime, 'sec → durationMs', convertedDurationMs, 'ms');
     
+    // Extract performance analytics if present
+    const performance = parsedPayload?.performance as GarminPerformance | undefined;
+    if (performance) {
+      console.log('[GarminService] 📩 Performance data:');
+      console.log('  - firstShotTime:', performance.firstShotTime);
+      console.log('  - bestSplit:', performance.bestSplit, '/ worstSplit:', performance.worstSplit);
+      console.log('  - splitStdDev:', performance.splitStdDev);
+      console.log('  - warmupAvg:', performance.warmupAvg, '/ restAvg:', performance.restAvg);
+    }
+    
+    // Extract biometrics if present
+    const biometrics = parsedPayload?.biometrics as GarminBiometrics | undefined;
+    if (biometrics?.enabled) {
+      console.log('[GarminService] 📩 Biometrics data:');
+      console.log('  - summary:', JSON.stringify(biometrics.summary));
+      console.log('  - stressAvg:', biometrics.summary?.stressAvg, '/ stressTrend:', biometrics.summary?.stressTrend);
+      console.log('  - optimalShots:', biometrics.summary?.optimalShots, '/', biometrics.summary?.optimalPct, '%');
+      console.log('  - hrTimeline samples:', biometrics.hrTimeline?.length ?? 0);
+      console.log('  - breathTimeline samples:', biometrics.breathTimeline?.length ?? 0);
+      console.log('  - shotBiometrics:', biometrics.shotBiometrics?.length ?? 0);
+    }
+    
+    // Extract steadiness if present
+    const steadiness = parsedPayload?.steadiness as GarminSteadiness | undefined;
+    if (steadiness?.enabled) {
+      console.log('[GarminService] 📩 Steadiness data:');
+      console.log('  - avgScore:', steadiness.avgScore);
+      console.log('  - flinchCount:', steadiness.flinchCount, '/ flinchRate:', steadiness.flinchRate, '%');
+      console.log('  - recoilConsistency:', steadiness.recoilConsistency);
+      console.log('  - bestShot:', steadiness.bestShot, '(', steadiness.bestScore, ')');
+      console.log('  - worstShot:', steadiness.worstShot, '(', steadiness.worstScore, ')');
+      console.log('  - shots:', steadiness.shots?.length ?? 0);
+    }
+    
+    // Build heart rate from biometrics summary for backwards compatibility
+    const heartRate = biometrics?.summary ? {
+      avg: biometrics.summary.avgHR ?? 0,
+      max: biometrics.summary.maxHR ?? 0,
+      min: biometrics.summary.minHR ?? 0,
+    } : undefined;
+    
     const sessionData: GarminSessionData = {
       sessionId: parsedPayload?.sessionId,
       shotsRecorded: parsedPayload?.shotsFired ?? 0,
       durationMs: convertedDurationMs,
-      // Additional fields from watch if available
+      // Shot timing data
+      ...(parsedPayload?.splitTimes && { splitTimes: parsedPayload.splitTimes }),
+      ...(parsedPayload?.avgSplit && { avgSplitMs: parsedPayload.avgSplit }),
+      // Detection info
+      ...(parsedPayload?.autoDetected !== undefined && { autoDetected: parsedPayload.autoDetected }),
+      ...(parsedPayload?.detectionSensitivity && { detectionSensitivity: parsedPayload.detectionSensitivity }),
+      ...(parsedPayload?.manualOverrides !== undefined && { manualOverrides: parsedPayload.manualOverrides }),
+      // Basic fields
       ...(parsedPayload?.distance && { distance: parsedPayload.distance }),
       ...(parsedPayload?.completed !== undefined && { completed: parsedPayload.completed }),
+      // Heart rate (backwards compatible)
+      ...(heartRate && heartRate.avg > 0 && { heartRate }),
+      // Performance analytics
+      ...(performance && { performance }),
+      // Full biometrics
+      ...(biometrics && { biometrics }),
+      // Steadiness data
+      ...(steadiness && { steadiness }),
     };
     
-    console.log('[GarminService] 📩 Final sessionData:', JSON.stringify(sessionData));
+    console.log('[GarminService] 📩 Final sessionData:', JSON.stringify(sessionData, null, 2));
     emit({ event: 'session_data', data: sessionData });
+    
+    // Send ACK back to watch to confirm receipt
+    // This allows watch to clear its local storage and stop retrying
+    const sessionIdForAck = parsedPayload?.sessionId;
+    if (sessionIdForAck) {
+      console.log('[GarminService] 📤 Sending ACK for sessionId:', sessionIdForAck);
+      const ackPayload = {
+        sessionId: sessionIdForAck,
+        received: true,
+      };
+      // Use setTimeout to ensure this happens after the current event processing
+      setTimeout(() => {
+        const ackSent = sendMessage('ACK', ackPayload);
+        if (ackSent) {
+          console.log('[GarminService] ✅ ACK sent successfully');
+        } else {
+          console.warn('[GarminService] ⚠️ Failed to send ACK (not connected?)');
+        }
+      }, 100);
+    } else {
+      console.warn('[GarminService] ⚠️ No sessionId in payload, cannot send ACK');
+    }
+  }
+  
+  // ============================================================================
+  // TWO-PHASE SYNC: SESSION_SUMMARY (Phase 1 - Instant, ~300 bytes)
+  // ============================================================================
+  if (message.type === 'SESSION_SUMMARY') {
+    console.log('[GarminService] 📩 SESSION_SUMMARY received (Phase 1 - instant)');
+    
+    const rawElapsedTime = parsedPayload?.elapsedTime ?? 0;
+    const convertedDurationMs = rawElapsedTime * 1000;
+    
+    // Build summary data from thin payload
+    const summaryData: GarminSessionData = {
+      sessionId: parsedPayload?.sessionId,
+      shotsRecorded: parsedPayload?.shotsFired ?? 0,
+      durationMs: convertedDurationMs,
+      distance: parsedPayload?.distance,
+      completed: parsedPayload?.completed ?? true,
+      // Split summary
+      ...(parsedPayload?.avgSplit && { avgSplitMs: parsedPayload.avgSplit }),
+      // Heart rate from summary
+      ...(parsedPayload?.hr && {
+        heartRate: {
+          avg: parsedPayload.hr.avg ?? 0,
+          max: parsedPayload.hr.max ?? 0,
+          min: parsedPayload.hr.min ?? 0,
+        }
+      }),
+      // Performance summary (best/worst splits)
+      ...(parsedPayload?.bestSplit && {
+        performance: {
+          bestSplit: parsedPayload.bestSplit,
+          worstSplit: parsedPayload.worstSplit,
+        }
+      }),
+      // Stress summary
+      ...(parsedPayload?.stress && {
+        biometrics: {
+          enabled: true,
+          summary: {
+            stressAvg: parsedPayload.stress.avg,
+            stressTrend: parsedPayload.stress.trend,
+            avgBreathRate: parsedPayload.breathRate,
+          }
+        }
+      }),
+      // Steadiness summary
+      ...(parsedPayload?.steadiness && {
+        steadiness: {
+          enabled: true,
+          avgScore: parsedPayload.steadiness.avg,
+          trend: parsedPayload.steadiness.trend,
+        }
+      }),
+      // Mark as summary-only (details coming later)
+      isSummaryOnly: true,
+    };
+    
+    console.log('[GarminService] 📩 Summary data:', JSON.stringify(summaryData, null, 2));
+    emit({ event: 'session_summary', data: summaryData });
+    
+    // Send ACK with type: "summary" so watch knows to send details next
+    const sessionIdForAck = parsedPayload?.sessionId;
+    if (sessionIdForAck) {
+      console.log('[GarminService] 📤 Sending SUMMARY ACK for sessionId:', sessionIdForAck);
+      setTimeout(() => {
+        const ackSent = sendMessage('ACK', {
+          sessionId: sessionIdForAck,
+          type: 'summary',
+          received: true,
+        });
+        if (ackSent) {
+          console.log('[GarminService] ✅ SUMMARY ACK sent successfully');
+        } else {
+          console.warn('[GarminService] ⚠️ Failed to send SUMMARY ACK');
+        }
+      }, 100);
+    }
+  }
+  
+  // ============================================================================
+  // TWO-PHASE SYNC: SESSION_DETAILS (Phase 2 - Background, full data)
+  // ============================================================================
+  if (message.type === 'SESSION_DETAILS') {
+    console.log('[GarminService] 📩 SESSION_DETAILS received (Phase 2 - background)');
+    
+    // Extract full data arrays
+    const performance = parsedPayload?.performance as GarminPerformance | undefined;
+    const biometrics = parsedPayload?.biometrics as GarminBiometrics | undefined;
+    const steadiness = parsedPayload?.steadiness as GarminSteadiness | undefined;
+    
+    console.log('[GarminService] 📩 Details content:');
+    console.log('  - splitTimes:', parsedPayload?.splitTimes?.length ?? 0, 'items');
+    console.log('  - performance:', performance ? 'present' : 'absent');
+    console.log('  - biometrics.shotBiometrics:', biometrics?.shotBiometrics?.length ?? 0, 'items');
+    console.log('  - steadiness.shots:', steadiness?.shots?.length ?? 0, 'items');
+    
+    // Build details data to merge with existing summary
+    const detailsData: Partial<GarminSessionData> & { sessionId: string } = {
+      sessionId: parsedPayload?.sessionId,
+      // Full split times array
+      ...(parsedPayload?.splitTimes && { splitTimes: parsedPayload.splitTimes }),
+      // Detection info
+      ...(parsedPayload?.autoDetected !== undefined && { autoDetected: parsedPayload.autoDetected }),
+      ...(parsedPayload?.detectionSensitivity && { detectionSensitivity: parsedPayload.detectionSensitivity }),
+      ...(parsedPayload?.manualOverrides !== undefined && { manualOverrides: parsedPayload.manualOverrides }),
+      // Full performance
+      ...(performance && { performance }),
+      // Full biometrics with timelines
+      ...(biometrics && { biometrics }),
+      // Full steadiness with per-shot data
+      ...(steadiness && { steadiness }),
+      // Mark as complete (no longer summary-only)
+      isSummaryOnly: false,
+    };
+    
+    console.log('[GarminService] 📩 Details data keys:', Object.keys(detailsData));
+    emit({ event: 'session_details', data: detailsData });
+    
+    // Send ACK with type: "details" so watch clears storage
+    const sessionIdForAck = parsedPayload?.sessionId;
+    if (sessionIdForAck) {
+      console.log('[GarminService] 📤 Sending DETAILS ACK for sessionId:', sessionIdForAck);
+      setTimeout(() => {
+        const ackSent = sendMessage('ACK', {
+          sessionId: sessionIdForAck,
+          type: 'details',
+          received: true,
+        });
+        if (ackSent) {
+          console.log('[GarminService] ✅ DETAILS ACK sent successfully');
+        } else {
+          console.warn('[GarminService] ⚠️ Failed to send DETAILS ACK');
+        }
+      }, 100);
+    }
   }
 });
 

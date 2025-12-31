@@ -4,20 +4,24 @@
  * Content only - parent handles ScrollView and button.
  */
 
+import { CreateWeaponFlow, WeaponPicker } from '@/components/weapons';
 import { useColors } from '@/hooks/ui/useColors';
+import type { UserWeapon } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
 import {
   ChevronDown,
   ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Clock,
+  Crosshair,
   Edit3,
   MapPin,
   Target,
   User,
 } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
   DISTANCE_PRESETS,
   POSITION_OPTIONS,
@@ -36,6 +40,8 @@ interface SessionContextStepProps {
   context: SessionContextState;
   onUpdateContext: (partial: Partial<SessionContextState>) => void;
   onBack: () => void;
+  /** Filter weapons by category (from preset's weapon_category) */
+  weaponCategory?: string | null;
 }
 
 // ============================================================================
@@ -277,13 +283,52 @@ export function SessionContextStep({
   context,
   onUpdateContext,
   onBack,
+  weaponCategory,
 }: SessionContextStepProps) {
   const colors = useColors();
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showWeaponPicker, setShowWeaponPicker] = useState(false);
+  const [showCreateWeapon, setShowCreateWeapon] = useState(false);
+  const [pickerKey, setPickerKey] = useState(0); // Force picker refresh
 
   const purposeOption = getPurposeOption(purpose);
   const distancePresets = DISTANCE_PRESETS[purpose] || DISTANCE_PRESETS.custom;
   const shotsPresets = SHOTS_PRESETS[purpose] || SHOTS_PRESETS.custom;
+
+  const handleWeaponSelect = useCallback((weapon: UserWeapon) => {
+    onUpdateContext({
+      weaponId: weapon.id,
+      weaponName: weapon.name,
+    });
+    setShowWeaponPicker(false);
+  }, [onUpdateContext]);
+
+  const handleWeaponCreated = useCallback(async (weaponId: string) => {
+    // After creation, fetch the weapon and auto-select it
+    setShowCreateWeapon(false);
+    
+    try {
+      // Import is already at top - getUserWeapon
+      const { getUserWeapon } = await import('@/services/weaponService');
+      const weapon = await getUserWeapon(weaponId);
+      
+      if (weapon) {
+        onUpdateContext({
+          weaponId: weapon.id,
+          weaponName: weapon.name,
+        });
+        console.log('[SessionContextStep] Auto-selected newly created weapon:', weapon.name);
+      } else {
+        // Fallback: open picker so user can select
+        setPickerKey(k => k + 1); // Force fresh load
+        setShowWeaponPicker(true);
+      }
+    } catch (error) {
+      console.error('[SessionContextStep] Failed to auto-select weapon:', error);
+      setPickerKey(k => k + 1); // Force fresh load
+      setShowWeaponPicker(true);
+    }
+  }, [onUpdateContext]);
 
   const handleBack = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -317,6 +362,45 @@ export function SessionContextStep({
           </Text>
         </View>
       </View>
+
+      {/* Weapon Selection - Required First */}
+      <TouchableOpacity
+        style={[
+          styles.weaponSelector,
+          {
+            backgroundColor: colors.card,
+            borderColor: context.weaponId ? colors.text : colors.border,
+          },
+        ]}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setShowWeaponPicker(true);
+        }}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.weaponIcon, { backgroundColor: context.weaponId ? colors.text : colors.secondary }]}>
+          <Crosshair size={18} color={context.weaponId ? colors.background : colors.textMuted} />
+        </View>
+        <View style={styles.weaponInfo}>
+          <Text style={[styles.weaponLabel, { color: colors.textMuted }]}>Weapon</Text>
+          <Text
+            style={[
+              styles.weaponName,
+              { color: context.weaponName ? colors.text : colors.textMuted },
+            ]}
+            numberOfLines={1}
+          >
+            {context.weaponName || 'Select a weapon...'}
+          </Text>
+        </View>
+        <ChevronRight size={18} color={colors.textMuted} />
+      </TouchableOpacity>
+
+      {!context.weaponId && (
+        <Text style={[styles.weaponHint, { color: colors.orange }]}>
+          Required — select a weapon to continue
+        </Text>
+      )}
 
       {/* Parameters */}
       <View style={styles.paramsContainer}>
@@ -406,11 +490,48 @@ export function SessionContextStep({
       {/* Summary */}
       <View style={[styles.summary, { borderTopColor: colors.border }]}>
         <Text style={[styles.summaryText, { color: colors.textMuted }]}>
+          {context.weaponName ? `${context.weaponName} • ` : ''}
           {context.distance}m • {context.shotsPlanned} shots
           {context.position !== 'any' ? ` • ${formatPosition(context.position)}` : ''}
           {context.timeLimit ? ` • ${formatTime(context.timeLimit)}` : ''}
         </Text>
       </View>
+
+      {/* Weapon Picker Modal */}
+      <Modal
+        visible={showWeaponPicker}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowWeaponPicker(false)}
+      >
+        <WeaponPicker
+          key={pickerKey} // Force fresh load after weapon creation
+          selectedWeaponId={context.weaponId}
+          onSelect={handleWeaponSelect}
+          onAddNew={() => {
+            setShowWeaponPicker(false);
+            setShowCreateWeapon(true);
+          }}
+          onClose={() => setShowWeaponPicker(false)}
+          weaponCategory={weaponCategory as any}
+        />
+      </Modal>
+
+      {/* Create Weapon Modal */}
+      <Modal
+        visible={showCreateWeapon}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowCreateWeapon(false)}
+      >
+        <CreateWeaponFlow
+          onComplete={handleWeaponCreated}
+          onCancel={() => {
+            setShowCreateWeapon(false);
+            setShowWeaponPicker(true);
+          }}
+        />
+      </Modal>
     </View>
   );
 }
@@ -425,6 +546,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     marginBottom: 24,
+  },
+  weaponSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    gap: 12,
+    marginBottom: 8,
+  },
+  weaponIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weaponInfo: {
+    flex: 1,
+  },
+  weaponLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    marginBottom: 2,
+  },
+  weaponName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  weaponHint: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginBottom: 16,
+    marginLeft: 4,
   },
   backBtn: {
     width: 36,

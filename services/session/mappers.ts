@@ -12,6 +12,7 @@ export function mapSession(row: any): SessionWithDetails {
   const drillTemplate = row.drill_templates ?? {};
   // NEW: Support fetching linked Drill definition via drill_id
   const linkedDrill = row.drills ?? {};
+  const userWeapon = row.user_weapons ?? {};
   const customConfig = row.custom_drill_config;
 
   // Build drill config from training_drills, drill_templates, drills, OR custom_drill_config
@@ -101,6 +102,8 @@ export function mapSession(row: any): SessionWithDetails {
     drill_id: row.drill_id ?? null,
     drill_name: row.drill_name ?? drillName,
     drill_config: drillConfig,
+    weapon_id: row.weapon_id ?? null,
+    weapon_name: userWeapon.name ?? null,
     session_mode: row.session_mode,
     status: row.status,
     watch_controlled: row.watch_controlled ?? false,

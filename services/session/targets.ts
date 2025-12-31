@@ -117,6 +117,7 @@ export async function savePaperTargetResult(params: CreatePaperResultParams): Pr
         offset_up_cm: params.offset_up_cm ?? null,
         scanned_image_url: params.scanned_image_url ?? null,
         notes: params.notes ?? null,
+        actual_shots_declared: params.actual_shots_declared ?? null,
       })
       .eq('id', existing.id)
       .select()
@@ -145,6 +146,7 @@ export async function savePaperTargetResult(params: CreatePaperResultParams): Pr
       offset_up_cm: params.offset_up_cm ?? null,
       scanned_image_url: params.scanned_image_url ?? null,
       notes: params.notes ?? null,
+      actual_shots_declared: params.actual_shots_declared ?? null,
     })
     .select()
     .single();

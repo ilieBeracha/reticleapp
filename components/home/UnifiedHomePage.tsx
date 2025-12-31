@@ -773,7 +773,7 @@ export default UnifiedHomePage;
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollView: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 8 },
+  scrollContent: { paddingHorizontal: 15, paddingTop: 8 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   // Header

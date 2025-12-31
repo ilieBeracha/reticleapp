@@ -65,7 +65,7 @@ function RootLayoutInner() {
   const colorScheme = useColorScheme();
   const mode = colorScheme === 'dark' ? 'dark' : 'light';
   return (
-    <GluestackUIProvider mode={mode as 'dark' | 'light' | 'system'}>
+    <GluestackUIProvider mode={'dark' as 'dark' | 'light' | 'system'}>
       <ModalProvider>
         <AuthProvider>
           <LayoutWithLoadingOverlay colorScheme={colorScheme} />

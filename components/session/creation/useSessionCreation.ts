@@ -260,18 +260,9 @@ export function useSessionCreation(
   const buildConfig = useCallback((): BaseSessionConfig => {
     const { purpose, context, selectedPresetId } = state;
     
-    // If using a saved preset, reference it via drill_id
-    if (selectedPresetId) {
-      return {
-        team_id: null,
-        training_id: null,
-        drill_id: selectedPresetId,
-        drill_config: null, // Will be loaded from preset
-        session_mode: 'solo',
-        watch_controlled: false, // Set in SessionPrepView after form
-        start_as_pending: true,
-      };
-    }
+    // For solo sessions, always use inline drill_config
+    // Presets update context values, so we build config from context
+    // (drill_id is only for training_drills in team context)
     
     // Build inline drill config
     // Note: input_method is not set - user chooses scan vs manual during session
@@ -294,7 +285,8 @@ export function useSessionCreation(
     return {
       team_id: null,
       training_id: null,
-      drill_id: null,
+      weapon_id: context.weaponId, // Weapon is required
+      drill_id: null, // Only used for training_drills (team context)
       drill_config: drillConfig,
       session_mode: 'solo',
       watch_controlled: false, // Set in SessionPrepView after form

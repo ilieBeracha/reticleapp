@@ -24,6 +24,7 @@ import {
 } from './createTraining.helpers';
 import type {
     DrillModalMode,
+    NewDrillInstanceConfig,
     QuickDrillPayload,
     TrainingDrillItem,
     UseCreateTrainingReturn,
@@ -125,6 +126,11 @@ export function useCreateTraining({ teamIdParam }: UseCreateTrainingParams): Use
     setDrills(prev => moveDrill(prev, index, direction));
   }, []);
 
+  const addDrill = useCallback((drill: TrainingDrillItem) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setDrills(prev => [...prev, drill]);
+  }, []);
+
   const handleSelectDrill = useCallback((drill: Drill) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedDrill(drill);
@@ -152,10 +158,17 @@ export function useCreateTraining({ teamIdParam }: UseCreateTrainingParams): Use
     setSelectedDrill(null);
   }, []);
 
-  const handleConfigureConfirm = useCallback((config: DrillInstanceConfig) => {
+  const handleConfigureConfirm = useCallback((config: DrillInstanceConfig | NewDrillInstanceConfig) => {
     if (!selectedDrill) return;
 
-    const trainingDrill = drillToTrainingInput(selectedDrill, config);
+    // Support both old DrillInstanceConfig and new NewDrillInstanceConfig
+    const baseTrainingDrill = drillToTrainingInput(selectedDrill, config);
+
+    // Add weapon_category if present in new config format
+    const trainingDrill = {
+      ...baseTrainingDrill,
+      weapon_category: 'weapon_category' in config ? config.weapon_category : null,
+    };
 
     setDrills(prev => [
       ...prev,
@@ -317,6 +330,7 @@ export function useCreateTraining({ teamIdParam }: UseCreateTrainingParams): Use
     handleSelectTeam,
     handleRemoveDrill,
     handleMoveDrill,
+    addDrill,
     handleSelectDrill,
     handleOpenQuickDrill,
     handleCloseDrillModal,

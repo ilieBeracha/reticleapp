@@ -38,6 +38,8 @@ import {
   syncDrillToWatch,
 } from '@/services/garminService';
 
+import { mergeWatchSessionDetails } from '@/services/session/mutations';
+
 // Re-export types for convenience
 export type { GarminConnectionStatus, GarminDevice, GarminSessionData };
 
@@ -333,6 +335,64 @@ export function useGarminInitialize() {
             // Call registered callback if any
             if (store.onSessionData) {
               store.onSessionData(event.data);
+            }
+            break;
+
+          // =========================================================================
+          // TWO-PHASE SYNC: SESSION_SUMMARY (Phase 1 - Instant, show results fast)
+          // =========================================================================
+          case 'session_summary':
+            console.log('[GarminStore] 📩 SESSION_SUMMARY received (Phase 1)');
+            useGarminStore.setState({ lastSessionData: event.data });
+
+            // Call registered callback if any
+            if (store.onSessionData) {
+              store.onSessionData(event.data);
+            }
+            break;
+
+          // =========================================================================
+          // TWO-PHASE SYNC: SESSION_DETAILS (Phase 2 - Merge full data)
+          // =========================================================================
+          case 'session_details':
+            // SESSION_DETAILS is Phase 2 - background data
+            // DO NOT update lastSessionData - this would cause UI glitches
+            // Just save to DB silently and show a toast
+            console.log('[GarminStore] 📩 SESSION_DETAILS received (Phase 2 - background only)');
+            
+            const sessionIdForMerge = event.data.sessionId;
+            if (sessionIdForMerge) {
+              console.log('[GarminStore] 📩 Saving details to DB silently...');
+              mergeWatchSessionDetails(sessionIdForMerge, event.data)
+                .then((success) => {
+                  if (success) {
+                    console.log('[GarminStore] ✅ Details synced to DB');
+                    // TODO: Show toast "Detailed biometrics synced ✓"
+                  } else {
+                    // No existing target - store details for when user saves
+                    console.log('[GarminStore] ℹ️ No existing target, caching details');
+                    // Cache the details so they can be included when summary is saved
+                    useGarminStore.setState((state) => {
+                      const existing = state.lastSessionData;
+                      if (existing && existing.sessionId === sessionIdForMerge) {
+                        // Merge into lastSessionData for when user saves
+                        return {
+                          lastSessionData: {
+                            ...existing,
+                            ...event.data,
+                            shotsRecorded: existing.shotsRecorded,
+                            durationMs: existing.durationMs,
+                            isSummaryOnly: false,
+                          } as GarminSessionData,
+                        };
+                      }
+                      return {};
+                    });
+                  }
+                })
+                .catch((err) => {
+                  console.error('[GarminStore] ❌ Error saving details to DB:', err);
+                });
             }
             break;
 

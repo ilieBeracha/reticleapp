@@ -37,8 +37,12 @@ export interface BaseSessionConfig {
   team_id: string | null;           // null = personal solo session
   training_id: string | null;       // null = ad-hoc session
   
+  // Weapon (required for session - user_weapons.id)
+  weapon_id: string | null;         // Reference to user's weapon profile
+  
   // Config source (ONE of these, or neither for blank session)
   drill_id: string | null;          // Reference to saved drill/preset
+  drill_template_id?: string | null; // @deprecated - use drill_id
   drill_config: DrillConfig | null; // Inline custom drill
   
   // Session mode
@@ -128,6 +132,8 @@ export interface SessionWithDetails {
   drill_id: string | null;
   drill_name?: string | null;
   drill_config?: SessionDrillConfig | null; // Full drill configuration
+  weapon_id: string | null; // Reference to user's weapon profile
+  weapon_name?: string | null; // Joined weapon name
   session_mode: 'solo' | 'group';
   status: 'pending' | 'active' | 'completed' | 'cancelled';
   watch_controlled: boolean; // Whether watch controls this session
@@ -185,6 +191,13 @@ export interface PaperTargetResult {
   offset_up_cm: number | null;
   scanned_image_url: string | null;
   notes: string | null;
+  /**
+   * Optional: User-declared actual shots for scanned targets.
+   * For scanned targets, bullets_fired = detected holes, but user may have fired more that missed entirely.
+   * If set: accuracy = hits_total / actual_shots_declared
+   * If null for scanned targets: don't show accuracy (it would always be ~100%)
+   */
+  actual_shots_declared: number | null;
 }
 
 export interface TacticalTargetResult {
@@ -208,6 +221,8 @@ export interface CreatePaperResultParams {
   offset_up_cm?: number | null;
   scanned_image_url?: string | null;
   notes?: string | null;
+  /** Optional user-declared actual shots for scanned targets */
+  actual_shots_declared?: number | null;
 }
 
 export interface CreateTacticalResultParams {

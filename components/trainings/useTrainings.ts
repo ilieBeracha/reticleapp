@@ -50,10 +50,10 @@ export function useTrainings(): UseTrainingsReturn {
     }, [activeTeamId, loadTeamTrainings])
   );
 
-  // Load team members for stats (only on Manage tab)
+  // Load team members for stats (Manage tab) and team view (Team tab for soldiers)
   useFocusEffect(
     useCallback(() => {
-      if (activeTeamId && activeTab === 'manage') {
+      if (activeTeamId && (activeTab === 'manage' || activeTab === 'team')) {
         getTeamMembers(activeTeamId)
           .then(setMembers)
           .catch(console.error);
@@ -67,7 +67,7 @@ export function useTrainings(): UseTrainingsReturn {
     await loadTeams();
     if (activeTeamId) {
       await loadTeamTrainings(activeTeamId);
-      if (activeTab === 'manage') {
+      if (activeTab === 'manage' || activeTab === 'team') {
         try {
           const membersData = await getTeamMembers(activeTeamId);
           setMembers(membersData);

@@ -593,8 +593,9 @@ CREATE TABLE IF NOT EXISTS "public"."sessions" (
     "drill_template_id" "uuid",
     "custom_drill_config" "jsonb",
     "watch_controlled" boolean DEFAULT false,
+    "weapon_id" "uuid",
     CONSTRAINT "sessions_session_mode_check" CHECK (("session_mode" = ANY (ARRAY['solo'::"text", 'group'::"text"]))),
-    CONSTRAINT "sessions_status_check" CHECK (("status" = ANY (ARRAY['active'::"text", 'completed'::"text", 'cancelled'::"text"])))
+    CONSTRAINT "sessions_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'active'::"text", 'completed'::"text", 'cancelled'::"text"])))
 );
 
 
@@ -1898,7 +1899,7 @@ Bypasses RLS for consistent validation across all users.';
 
 CREATE TABLE IF NOT EXISTS "public"."drill_templates" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "team_id" "uuid" NOT NULL,
+    "team_id" "uuid",
     "created_by" "uuid" NOT NULL,
     "name" "text" NOT NULL,
     "description" "text",
@@ -1946,17 +1947,21 @@ CREATE TABLE IF NOT EXISTS "public"."drill_templates" (
     "default_target_size" "text",
     "default_target_exposure_seconds" integer,
     "default_movement_distance_m" integer,
+    "owner_type" "text" DEFAULT 'team'::"text" NOT NULL,
+    "owner_id" "uuid",
+    "is_default" boolean DEFAULT false,
     CONSTRAINT "drill_templates_category_check" CHECK ((("category" IS NULL) OR ("category" = ANY (ARRAY['fundamentals'::"text", 'speed'::"text", 'accuracy'::"text", 'stress'::"text", 'tactical'::"text", 'competition'::"text", 'qualification'::"text"])))),
     CONSTRAINT "drill_templates_difficulty_check" CHECK ((("difficulty" IS NULL) OR ("difficulty" = ANY (ARRAY['beginner'::"text", 'intermediate'::"text", 'advanced'::"text", 'expert'::"text"])))),
-    CONSTRAINT "drill_templates_drill_goal_check" CHECK (("drill_goal" = ANY (ARRAY['grouping'::"text", 'achievement'::"text"]))),
+    CONSTRAINT "drill_templates_drill_goal_check" CHECK (("drill_goal" = ANY (ARRAY['grouping'::"text", 'achievement'::"text", 'zeroing'::"text", 'physical'::"text"]))),
     CONSTRAINT "drill_templates_min_accuracy_percent_check" CHECK ((("min_accuracy_percent" IS NULL) OR (("min_accuracy_percent" >= 0) AND ("min_accuracy_percent" <= 100)))),
     CONSTRAINT "drill_templates_movement_type_check" CHECK ((("movement_type" IS NULL) OR ("movement_type" = ANY (ARRAY['none'::"text", 'advance'::"text", 'retreat'::"text", 'lateral'::"text", 'diagonal'::"text", 'freestyle'::"text"])))),
+    CONSTRAINT "drill_templates_owner_type_check" CHECK (("owner_type" = ANY (ARRAY['user'::"text", 'team'::"text"]))),
     CONSTRAINT "drill_templates_position_check" CHECK ((("position" IS NULL) OR ("position" = ANY (ARRAY['standing'::"text", 'kneeling'::"text", 'prone'::"text", 'sitting'::"text", 'barricade'::"text", 'transition'::"text", 'freestyle'::"text"])))),
     CONSTRAINT "drill_templates_scoring_mode_check" CHECK ((("scoring_mode" IS NULL) OR ("scoring_mode" = ANY (ARRAY['accuracy'::"text", 'speed'::"text", 'combined'::"text", 'pass_fail'::"text", 'points'::"text"])))),
     CONSTRAINT "drill_templates_start_position_check" CHECK ((("start_position" IS NULL) OR ("start_position" = ANY (ARRAY['holstered'::"text", 'low_ready'::"text", 'high_ready'::"text", 'table_start'::"text", 'surrender'::"text", 'compressed_ready'::"text"])))),
     CONSTRAINT "drill_templates_target_size_check" CHECK ((("target_size" IS NULL) OR ("target_size" = ANY (ARRAY['full'::"text", 'half'::"text", 'head'::"text", 'a_zone'::"text", 'c_zone'::"text", 'steel_8in'::"text", 'steel_10in'::"text", 'custom'::"text"])))),
     CONSTRAINT "drill_templates_target_type_check" CHECK (("target_type" = ANY (ARRAY['paper'::"text", 'tactical'::"text"]))),
-    CONSTRAINT "drill_templates_weapon_category_check" CHECK ((("weapon_category" IS NULL) OR ("weapon_category" = ANY (ARRAY['rifle'::"text", 'pistol'::"text", 'shotgun'::"text", 'carbine'::"text", 'precision_rifle'::"text", 'any'::"text"]))))
+    CONSTRAINT "drill_templates_weapon_category_check" CHECK ((("weapon_category" IS NULL) OR ("weapon_category" = ANY (ARRAY['rifle'::"text", 'pistol'::"text", 'shotgun'::"text", 'carbine'::"text", 'precision_rifle'::"text", 'smg'::"text", 'any'::"text", 'other'::"text"]))))
 );
 
 
@@ -2023,6 +2028,18 @@ COMMENT ON COLUMN "public"."drill_templates"."default_target_count" IS 'Suggeste
 
 
 
+COMMENT ON COLUMN "public"."drill_templates"."owner_type" IS 'Ownership type: ''user'' for personal presets, ''team'' for team drills';
+
+
+
+COMMENT ON COLUMN "public"."drill_templates"."owner_id" IS 'Owner ID: user_id when owner_type=''user'', team_id when owner_type=''team''';
+
+
+
+COMMENT ON COLUMN "public"."drill_templates"."is_default" IS 'True for system/default drills used by Quick Start';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."notifications" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -2065,7 +2082,8 @@ CREATE TABLE IF NOT EXISTS "public"."profiles" (
     "workspace_name" "text" DEFAULT 'My Workspace'::"text",
     "workspace_slug" "text",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "is_admin" boolean DEFAULT false
 );
 
 
@@ -2208,6 +2226,34 @@ ALTER TABLE "public"."team_members" OWNER TO "postgres";
 
 COMMENT ON TABLE "public"."team_members" IS 'Team membership';
 
+
+
+CREATE TABLE IF NOT EXISTS "public"."team_weapons" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "team_id" "uuid" NOT NULL,
+    "base_weapon_id" "uuid",
+    "name" "text" NOT NULL,
+    "category" "text",
+    "caliber" "text",
+    "serial_number" "text",
+    "default_zero_distance_m" integer,
+    "suppressor_config" "text",
+    "barrel_notes" "text",
+    "notes" "text",
+    "is_active" boolean DEFAULT true,
+    "created_by" "uuid",
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"(),
+    "assigned_to" "uuid",
+    "source_user_weapon_id" "uuid",
+    "contributed_by" "uuid",
+    "contribution_status" "text" DEFAULT 'approved'::"text",
+    CONSTRAINT "team_weapons_category_check" CHECK (("category" = ANY (ARRAY['rifle'::"text", 'pistol'::"text", 'shotgun'::"text", 'carbine'::"text", 'precision_rifle'::"text", 'smg'::"text", 'other'::"text"]))),
+    CONSTRAINT "team_weapons_contribution_status_check" CHECK (("contribution_status" = ANY (ARRAY['pending'::"text", 'approved'::"text", 'rejected'::"text"])))
+);
+
+
+ALTER TABLE "public"."team_weapons" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."teams" (
@@ -2362,6 +2408,48 @@ COMMENT ON TABLE "public"."user_drill_completions" IS 'Tracks which drills each 
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."user_weapons" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "base_weapon_id" "uuid",
+    "team_weapon_id" "uuid",
+    "name" "text" NOT NULL,
+    "category" "text",
+    "caliber" "text",
+    "personal_zero_distance_m" integer,
+    "personal_notes" "text",
+    "is_favorite" boolean DEFAULT false,
+    "last_used_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"(),
+    "shared_with_team_id" "uuid",
+    "share_status" "text",
+    CONSTRAINT "user_weapons_category_check" CHECK (("category" = ANY (ARRAY['rifle'::"text", 'pistol'::"text", 'shotgun'::"text", 'carbine'::"text", 'precision_rifle'::"text", 'smg'::"text", 'other'::"text"]))),
+    CONSTRAINT "user_weapons_share_status_check" CHECK (("share_status" = ANY (ARRAY['pending'::"text", 'approved'::"text", 'rejected'::"text", NULL::"text"])))
+);
+
+
+ALTER TABLE "public"."user_weapons" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."weapons" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "name" "text" NOT NULL,
+    "category" "text" NOT NULL,
+    "manufacturer" "text",
+    "caliber" "text",
+    "description" "text",
+    "image_url" "text",
+    "is_verified" boolean DEFAULT false,
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"(),
+    CONSTRAINT "weapons_category_check" CHECK (("category" = ANY (ARRAY['rifle'::"text", 'pistol'::"text", 'shotgun'::"text", 'carbine'::"text", 'precision_rifle'::"text", 'smg'::"text", 'other'::"text"])))
+);
+
+
+ALTER TABLE "public"."weapons" OWNER TO "postgres";
+
+
 ALTER TABLE ONLY "public"."drill_templates"
     ADD CONSTRAINT "drill_templates_pkey" PRIMARY KEY ("id");
 
@@ -2452,6 +2540,11 @@ ALTER TABLE ONLY "public"."team_members"
 
 
 
+ALTER TABLE ONLY "public"."team_weapons"
+    ADD CONSTRAINT "team_weapons_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."teams"
     ADD CONSTRAINT "teams_pkey" PRIMARY KEY ("id");
 
@@ -2477,6 +2570,16 @@ ALTER TABLE ONLY "public"."user_drill_completions"
 
 
 
+ALTER TABLE ONLY "public"."user_weapons"
+    ADD CONSTRAINT "user_weapons_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."weapons"
+    ADD CONSTRAINT "weapons_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."team_invitations"
     ADD CONSTRAINT "workspace_invitations_invite_code_key" UNIQUE ("invite_code");
 
@@ -2492,6 +2595,14 @@ CREATE INDEX "idx_drill_completions_drill" ON "public"."user_drill_completions" 
 
 
 CREATE INDEX "idx_drill_completions_user_training" ON "public"."user_drill_completions" USING "btree" ("user_id", "training_id");
+
+
+
+CREATE INDEX "idx_drill_templates_is_default" ON "public"."drill_templates" USING "btree" ("is_default") WHERE ("is_default" = true);
+
+
+
+CREATE INDEX "idx_drill_templates_owner" ON "public"."drill_templates" USING "btree" ("owner_type", "owner_id");
 
 
 
@@ -2559,6 +2670,10 @@ CREATE INDEX "idx_sessions_user" ON "public"."sessions" USING "btree" ("user_id"
 
 
 
+CREATE INDEX "idx_sessions_weapon_id" ON "public"."sessions" USING "btree" ("weapon_id");
+
+
+
 CREATE INDEX "idx_team_members_squad" ON "public"."team_members" USING "btree" ("team_id", "squad_id");
 
 
@@ -2568,6 +2683,18 @@ CREATE INDEX "idx_team_members_team" ON "public"."team_members" USING "btree" ("
 
 
 CREATE INDEX "idx_team_members_user" ON "public"."team_members" USING "btree" ("user_id");
+
+
+
+CREATE INDEX "idx_team_weapons_assigned_to" ON "public"."team_weapons" USING "btree" ("assigned_to");
+
+
+
+CREATE INDEX "idx_team_weapons_base_weapon_id" ON "public"."team_weapons" USING "btree" ("base_weapon_id");
+
+
+
+CREATE INDEX "idx_team_weapons_team_id" ON "public"."team_weapons" USING "btree" ("team_id");
 
 
 
@@ -2596,6 +2723,18 @@ CREATE INDEX "idx_trainings_scheduled" ON "public"."trainings" USING "btree" ("s
 
 
 CREATE INDEX "idx_trainings_team" ON "public"."trainings" USING "btree" ("team_id");
+
+
+
+CREATE INDEX "idx_user_weapons_last_used" ON "public"."user_weapons" USING "btree" ("user_id", "last_used_at" DESC NULLS LAST);
+
+
+
+CREATE INDEX "idx_user_weapons_team_weapon_id" ON "public"."user_weapons" USING "btree" ("team_weapon_id");
+
+
+
+CREATE INDEX "idx_user_weapons_user_id" ON "public"."user_weapons" USING "btree" ("user_id");
 
 
 
@@ -2751,6 +2890,11 @@ ALTER TABLE ONLY "public"."sessions"
 
 
 
+ALTER TABLE ONLY "public"."sessions"
+    ADD CONSTRAINT "sessions_weapon_id_fkey" FOREIGN KEY ("weapon_id") REFERENCES "public"."user_weapons"("id") ON DELETE SET NULL;
+
+
+
 ALTER TABLE ONLY "public"."tactical_target_results"
     ADD CONSTRAINT "tactical_target_results_session_target_id_fkey" FOREIGN KEY ("session_target_id") REFERENCES "public"."session_targets"("id");
 
@@ -2763,6 +2907,36 @@ ALTER TABLE ONLY "public"."team_members"
 
 ALTER TABLE ONLY "public"."team_members"
     ADD CONSTRAINT "team_members_user_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."team_weapons"
+    ADD CONSTRAINT "team_weapons_assigned_to_fkey" FOREIGN KEY ("assigned_to") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."team_weapons"
+    ADD CONSTRAINT "team_weapons_base_weapon_id_fkey" FOREIGN KEY ("base_weapon_id") REFERENCES "public"."weapons"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."team_weapons"
+    ADD CONSTRAINT "team_weapons_contributed_by_fkey" FOREIGN KEY ("contributed_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."team_weapons"
+    ADD CONSTRAINT "team_weapons_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."team_weapons"
+    ADD CONSTRAINT "team_weapons_source_user_weapon_id_fkey" FOREIGN KEY ("source_user_weapon_id") REFERENCES "public"."user_weapons"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."team_weapons"
+    ADD CONSTRAINT "team_weapons_team_id_fkey" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE CASCADE;
 
 
 
@@ -2816,6 +2990,26 @@ ALTER TABLE ONLY "public"."user_drill_completions"
 
 
 
+ALTER TABLE ONLY "public"."user_weapons"
+    ADD CONSTRAINT "user_weapons_base_weapon_id_fkey" FOREIGN KEY ("base_weapon_id") REFERENCES "public"."weapons"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."user_weapons"
+    ADD CONSTRAINT "user_weapons_shared_with_team_id_fkey" FOREIGN KEY ("shared_with_team_id") REFERENCES "public"."teams"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."user_weapons"
+    ADD CONSTRAINT "user_weapons_team_weapon_id_fkey" FOREIGN KEY ("team_weapon_id") REFERENCES "public"."team_weapons"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."user_weapons"
+    ADD CONSTRAINT "user_weapons_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."team_invitations"
     ADD CONSTRAINT "workspace_invitations_accepted_by_fkey" FOREIGN KEY ("accepted_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
@@ -2831,13 +3025,53 @@ ALTER TABLE ONLY "public"."team_invitations"
 
 
 
+CREATE POLICY "Admins can delete global weapons" ON "public"."weapons" FOR DELETE USING ((EXISTS ( SELECT 1
+   FROM "public"."profiles"
+  WHERE (("profiles"."id" = "auth"."uid"()) AND ("profiles"."is_admin" = true)))));
+
+
+
+CREATE POLICY "Admins can insert global weapons" ON "public"."weapons" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
+   FROM "public"."profiles"
+  WHERE (("profiles"."id" = "auth"."uid"()) AND ("profiles"."is_admin" = true)))));
+
+
+
+CREATE POLICY "Admins can update global weapons" ON "public"."weapons" FOR UPDATE USING ((EXISTS ( SELECT 1
+   FROM "public"."profiles"
+  WHERE (("profiles"."id" = "auth"."uid"()) AND ("profiles"."is_admin" = true)))));
+
+
+
+CREATE POLICY "Anyone can read global weapons" ON "public"."weapons" FOR SELECT USING (true);
+
+
+
 CREATE POLICY "Anyone can view pending invitations" ON "public"."team_invitations" FOR SELECT USING (true);
+
+
+
+CREATE POLICY "Commanders can delete team weapons" ON "public"."team_weapons" FOR DELETE USING ((EXISTS ( SELECT 1
+   FROM "public"."team_members"
+  WHERE (("team_members"."team_id" = "team_weapons"."team_id") AND ("team_members"."user_id" = "auth"."uid"()) AND ("team_members"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text"]))))));
+
+
+
+CREATE POLICY "Commanders can insert team weapons" ON "public"."team_weapons" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
+   FROM "public"."team_members"
+  WHERE (("team_members"."team_id" = "team_weapons"."team_id") AND ("team_members"."user_id" = "auth"."uid"()) AND ("team_members"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text"]))))));
 
 
 
 CREATE POLICY "Commanders can manage drill templates" ON "public"."drill_templates" USING ((EXISTS ( SELECT 1
    FROM "public"."team_members"
   WHERE (("team_members"."team_id" = "drill_templates"."team_id") AND ("team_members"."user_id" = "auth"."uid"()) AND ("team_members"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text"]))))));
+
+
+
+CREATE POLICY "Commanders can update team weapons" ON "public"."team_weapons" FOR UPDATE USING ((EXISTS ( SELECT 1
+   FROM "public"."team_members"
+  WHERE (("team_members"."team_id" = "team_weapons"."team_id") AND ("team_members"."user_id" = "auth"."uid"()) AND ("team_members"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text"]))))));
 
 
 
@@ -2951,6 +3185,12 @@ CREATE POLICY "Owners can delete trainings" ON "public"."trainings" FOR DELETE U
 
 
 
+CREATE POLICY "Team members can read team weapons" ON "public"."team_weapons" FOR SELECT USING ((EXISTS ( SELECT 1
+   FROM "public"."team_members"
+  WHERE (("team_members"."team_id" = "team_weapons"."team_id") AND ("team_members"."user_id" = "auth"."uid"())))));
+
+
+
 CREATE POLICY "Team members can view drill templates" ON "public"."drill_templates" FOR SELECT USING ((EXISTS ( SELECT 1
    FROM "public"."team_members"
   WHERE (("team_members"."team_id" = "drill_templates"."team_id") AND ("team_members"."user_id" = "auth"."uid"())))));
@@ -2981,6 +3221,14 @@ CREATE POLICY "Users can delete own sessions" ON "public"."sessions" FOR DELETE 
 
 
 
+CREATE POLICY "Users can delete own weapons" ON "public"."user_weapons" FOR DELETE USING (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can delete their own personal drills" ON "public"."drill_templates" FOR DELETE USING ((("owner_type" = 'user'::"text") AND ("owner_id" = "auth"."uid"())));
+
+
+
 CREATE POLICY "Users can insert own drill completions" ON "public"."user_drill_completions" FOR INSERT WITH CHECK (("user_id" = "auth"."uid"()));
 
 
@@ -2990,6 +3238,10 @@ CREATE POLICY "Users can insert own push tokens" ON "public"."push_tokens" FOR I
 
 
 CREATE POLICY "Users can insert own session stats" ON "public"."session_stats" FOR INSERT WITH CHECK (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can insert own weapons" ON "public"."user_weapons" FOR INSERT WITH CHECK (("user_id" = "auth"."uid"()));
 
 
 
@@ -3013,6 +3265,14 @@ CREATE POLICY "Users can insert targets for own sessions" ON "public"."session_t
 
 
 
+CREATE POLICY "Users can insert their own personal drills" ON "public"."drill_templates" FOR INSERT WITH CHECK ((("owner_type" = 'user'::"text") AND ("owner_id" = "auth"."uid"())));
+
+
+
+CREATE POLICY "Users can read own weapons" ON "public"."user_weapons" FOR SELECT USING (("user_id" = "auth"."uid"()));
+
+
+
 CREATE POLICY "Users can update own notifications" ON "public"."notifications" FOR UPDATE USING (("auth"."uid"() = "user_id")) WITH CHECK (("auth"."uid"() = "user_id"));
 
 
@@ -3033,6 +3293,10 @@ CREATE POLICY "Users can update own sessions" ON "public"."sessions" FOR UPDATE 
 
 
 
+CREATE POLICY "Users can update own weapons" ON "public"."user_weapons" FOR UPDATE USING (("user_id" = "auth"."uid"()));
+
+
+
 CREATE POLICY "Users can update paper results from own sessions" ON "public"."paper_target_results" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM ("public"."session_targets" "st"
      JOIN "public"."sessions" "s" ON (("s"."id" = "st"."session_id")))
@@ -3050,6 +3314,10 @@ CREATE POLICY "Users can update tactical results from own sessions" ON "public".
    FROM ("public"."session_targets" "st"
      JOIN "public"."sessions" "s" ON (("s"."id" = "st"."session_id")))
   WHERE (("st"."id" = "tactical_target_results"."session_target_id") AND ("s"."user_id" = "auth"."uid"())))));
+
+
+
+CREATE POLICY "Users can update their own personal drills" ON "public"."drill_templates" FOR UPDATE USING ((("owner_type" = 'user'::"text") AND ("owner_id" = "auth"."uid"()))) WITH CHECK ((("owner_type" = 'user'::"text") AND ("owner_id" = "auth"."uid"())));
 
 
 
@@ -3113,6 +3381,10 @@ CREATE POLICY "Users can view team trainings" ON "public"."trainings" FOR SELECT
 
 
 
+CREATE POLICY "Users can view their own personal drills" ON "public"."drill_templates" FOR SELECT USING ((("owner_type" = 'user'::"text") AND ("owner_id" = "auth"."uid"())));
+
+
+
 CREATE POLICY "Users can view training drills" ON "public"."training_drills" FOR SELECT USING ((EXISTS ( SELECT 1
    FROM "public"."trainings" "t"
   WHERE (("t"."id" = "training_drills"."training_id") AND (("t"."created_by" = "auth"."uid"()) OR (("t"."team_id" IS NOT NULL) AND (EXISTS ( SELECT 1
@@ -3165,6 +3437,9 @@ ALTER TABLE "public"."team_invitations" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."team_members" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."team_weapons" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."teams" ENABLE ROW LEVEL SECURITY;
 
 
@@ -3175,6 +3450,12 @@ ALTER TABLE "public"."trainings" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."user_drill_completions" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."user_weapons" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."weapons" ENABLE ROW LEVEL SECURITY;
 
 
 GRANT USAGE ON SCHEMA "public" TO "postgres";
@@ -3502,6 +3783,12 @@ GRANT ALL ON TABLE "public"."team_members" TO "service_role";
 
 
 
+GRANT ALL ON TABLE "public"."team_weapons" TO "anon";
+GRANT ALL ON TABLE "public"."team_weapons" TO "authenticated";
+GRANT ALL ON TABLE "public"."team_weapons" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."teams" TO "anon";
 GRANT ALL ON TABLE "public"."teams" TO "authenticated";
 GRANT ALL ON TABLE "public"."teams" TO "service_role";
@@ -3523,6 +3810,18 @@ GRANT ALL ON TABLE "public"."trainings" TO "service_role";
 GRANT ALL ON TABLE "public"."user_drill_completions" TO "anon";
 GRANT ALL ON TABLE "public"."user_drill_completions" TO "authenticated";
 GRANT ALL ON TABLE "public"."user_drill_completions" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."user_weapons" TO "anon";
+GRANT ALL ON TABLE "public"."user_weapons" TO "authenticated";
+GRANT ALL ON TABLE "public"."user_weapons" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."weapons" TO "anon";
+GRANT ALL ON TABLE "public"."weapons" TO "authenticated";
+GRANT ALL ON TABLE "public"."weapons" TO "service_role";
 
 
 
