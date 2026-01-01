@@ -358,6 +358,62 @@ export async function getRecentlyUsedWeapons(limit = 3): Promise<UserWeapon[]> {
 }
 
 /**
+ * Get the user's default weapon for auto-selection
+ * Priority: 1. Favorite weapon, 2. Most recently used, 3. First weapon
+ */
+export async function getDefaultWeapon(): Promise<UserWeapon | null> {
+  // Get current user
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  // First try to get a favorite
+  const { data: favorite } = await supabase
+    .from('user_weapons')
+    .select(`
+      *,
+      base_weapon:weapons(*),
+      team_weapon:team_weapons!user_weapons_team_weapon_id_fkey(*)
+    `)
+    .eq('user_id', user.id)
+    .eq('is_favorite', true)
+    .limit(1)
+    .single();
+
+  if (favorite) return favorite;
+
+  // Then try most recently used
+  const { data: recent } = await supabase
+    .from('user_weapons')
+    .select(`
+      *,
+      base_weapon:weapons(*),
+      team_weapon:team_weapons!user_weapons_team_weapon_id_fkey(*)
+    `)
+    .eq('user_id', user.id)
+    .not('last_used_at', 'is', null)
+    .order('last_used_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (recent) return recent;
+
+  // Fall back to first weapon
+  const { data: first } = await supabase
+    .from('user_weapons')
+    .select(`
+      *,
+      base_weapon:weapons(*),
+      team_weapon:team_weapons!user_weapons_team_weapon_id_fkey(*)
+    `)
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  return first || null;
+}
+
+/**
  * Get a specific user weapon
  */
 export async function getUserWeapon(id: string): Promise<UserWeapon | null> {

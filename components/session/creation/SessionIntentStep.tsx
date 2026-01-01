@@ -1,42 +1,35 @@
 /**
- * SessionIntentStep - Step 1: "What am I going to do now?"
- * 
- * Content only - parent handles ScrollView and button.
+ * SessionIntentStep - "What's the goal?"
  */
 
 import { useColors } from '@/hooks/ui/useColors';
 import * as Haptics from 'expo-haptics';
 import {
+  ArrowRight,
   Check,
   Crosshair,
   Focus,
   HeartPulse,
-  Sliders,
-  Trophy,
+  LayoutTemplate,
+  Target,
+  type LucideIcon,
 } from 'lucide-react-native';
-import { memo, useCallback } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { SessionPurpose } from './sessionCreation.types';
 
 // ============================================================================
-// PURPOSE OPTIONS
+// DATA
 // ============================================================================
 
-const PURPOSES: {
-  id: SessionPurpose;
-  label: string;
-  hint: string;
-  Icon: React.ComponentType<any>;
-}[] = [
-  { id: 'grouping', label: 'Grouping', hint: 'Precision & dispersion', Icon: Crosshair },
-  { id: 'achievement', label: 'Target Hits', hint: 'Zone scoring', Icon: Trophy },
-  { id: 'zeroing', label: 'Zeroing', hint: 'Confirm zero', Icon: Focus },
-  { id: 'physical', label: 'Stress Drill', hint: 'Physical + pulse', Icon: HeartPulse },
-  { id: 'custom', label: 'Custom', hint: 'Manual setup', Icon: Sliders },
+const PURPOSE_OPTIONS: { id: SessionPurpose; label: string; icon: LucideIcon }[] = [
+  { id: 'grouping', label: 'Grouping', icon: Crosshair },
+  { id: 'achievement', label: 'Target Hits', icon: Target },
+  { id: 'zeroing', label: 'Zeroing', icon: Focus },
+  { id: 'physical', label: 'Stress Drill', icon: HeartPulse },
 ];
 
 // ============================================================================
-// PROPS
+// COMPONENT
 // ============================================================================
 
 interface SessionIntentStepProps {
@@ -45,104 +38,64 @@ interface SessionIntentStepProps {
   onUseSavedDrill?: () => void;
 }
 
-// ============================================================================
-// PURPOSE ROW
-// ============================================================================
-
-const PurposeRow = memo(function PurposeRow({
-  label,
-  hint,
-  Icon,
-  isSelected,
-  onPress,
-}: {
-  label: string;
-  hint: string;
-  Icon: React.ComponentType<any>;
-  isSelected: boolean;
-  onPress: () => void;
-}) {
+export function SessionIntentStep({ selectedPurpose, onSelectPurpose, onUseSavedDrill }: SessionIntentStepProps) {
   const colors = useColors();
 
-  return (
-    <TouchableOpacity
-      style={[
-        styles.row,
-        {
-          backgroundColor: isSelected ? colors.text : colors.card,
-          borderColor: isSelected ? colors.text : colors.border,
-        },
-      ]}
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
-      <Icon
-        size={18}
-        color={isSelected ? colors.background : colors.textMuted}
-        strokeWidth={1.5}
-      />
-      <View style={styles.rowText}>
-        <Text style={[styles.rowLabel, { color: isSelected ? colors.background : colors.text }]}>
-          {label}
-        </Text>
-        <Text style={[styles.rowHint, { color: isSelected ? `${colors.background}90` : colors.textMuted }]}>
-          {hint}
-        </Text>
-      </View>
-      {isSelected && (
-        <View style={[styles.check, { backgroundColor: colors.background }]}>
-          <Check size={10} color={colors.text} strokeWidth={3} />
-        </View>
-      )}
-    </TouchableOpacity>
-  );
-});
-
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
-
-export function SessionIntentStep({
-  selectedPurpose,
-  onSelectPurpose,
-  onUseSavedDrill,
-}: SessionIntentStepProps) {
-  const colors = useColors();
-
-  const handleSelect = useCallback(
-    (purpose: SessionPurpose) => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      onSelectPurpose(purpose);
-    },
-    [onSelectPurpose]
-  );
+  const handleSelect = (purpose: SessionPurpose) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onSelectPurpose(purpose);
+  };
 
   return (
-    <View style={{ marginTop: 16 }}>
-      {/* Header */}
-      <Text style={[styles.title, { color: colors.text }]}>Session Type</Text>
-      <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-        What are you training today?
+    <View style={styles.container}>
+      <Text style={[styles.question, { color: colors.text }]}>
+        What's your goal?
       </Text>
 
-      {/* Purpose List */}
-      <View style={styles.list}>
-        {PURPOSES.map((p) => (
-          <PurposeRow
-            key={p.id}
-            {...p}
-            isSelected={selectedPurpose === p.id}
-            onPress={() => handleSelect(p.id)}
-          />
-        ))}
+      <View style={styles.options}>
+        {PURPOSE_OPTIONS.map((opt) => {
+          const isSelected = selectedPurpose === opt.id;
+          const Icon = opt.icon;
+          return (
+            <TouchableOpacity
+              key={opt.id}
+              style={styles.option}
+              onPress={() => handleSelect(opt.id)}
+              activeOpacity={0.6}
+            >
+              <Icon
+                size={20}
+                color={isSelected ? colors.text : colors.textMuted}
+                strokeWidth={isSelected ? 2 : 1.5}
+              />
+              <Text
+                style={[
+                  styles.optionLabel,
+                  { color: isSelected ? colors.text : colors.textMuted },
+                  isSelected && styles.optionSelected,
+                ]}
+              >
+                {opt.label}
+              </Text>
+              {isSelected && (
+                <Check size={16} color={colors.text} strokeWidth={2.5} style={styles.check} />
+              )}
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
-      {/* Saved Drills Link */}
       {onUseSavedDrill && (
-        <TouchableOpacity style={styles.savedLink} onPress={onUseSavedDrill}>
+        <TouchableOpacity
+          style={styles.savedBtn}
+          onPress={onUseSavedDrill}
+          activeOpacity={0.6}
+        >
+          <LayoutTemplate size={16} color={colors.textMuted} strokeWidth={1.5} />
           <Text style={[styles.savedText, { color: colors.textMuted }]}>
-            Or choose from saved drills →
+            or load a saved drill
           </Text>
+          <ArrowRight size={14} color={colors.textMuted} />
         </TouchableOpacity>
       )}
     </View>
@@ -154,52 +107,13 @@ export function SessionIntentStep({
 // ============================================================================
 
 const styles = StyleSheet.create({
-  title: {
-    fontSize: 17,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 13,
-    marginBottom: 20,
-  },
-  list: {
-    gap: 8,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  rowText: {
-    flex: 1,
-  },
-  rowLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  rowHint: {
-    fontSize: 12,
-    marginTop: 1,
-  },
-  check: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  savedLink: {
-    alignItems: 'center',
-    paddingVertical: 16,
-    marginTop: 8,
-  },
-  savedText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
+  container: { paddingTop: 8 },
+  question: { fontSize: 22, fontWeight: '600', letterSpacing: -0.3, marginBottom: 28 },
+  options: { gap: 4 },
+  option: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 14 },
+  optionLabel: { fontSize: 17, flex: 1 },
+  optionSelected: { fontWeight: '600' },
+  check: { marginLeft: 'auto' },
+  savedBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 32, paddingVertical: 8 },
+  savedText: { fontSize: 14 },
 });

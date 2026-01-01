@@ -57,6 +57,8 @@ export interface SessionContextState {
   // Required
   weaponId: string | null;
   weaponName: string | null;
+  /** Weapon category - shapes the entire experience */
+  weaponCategory: string | null;
   distance: number;
   
   // Common
@@ -95,6 +97,11 @@ export interface SessionCreationState {
   selectedPresetId: string | null;
   selectedLibraryId: string | null;
   
+  // Category Drill - When selected, session MUST follow this drill
+  selectedDrillId: string | null;
+  /** True when a drill is selected and requirements are locked */
+  isDrillLocked: boolean;
+  
   // Step 2: Context
   context: SessionContextState;
   
@@ -109,6 +116,7 @@ export interface SessionCreationState {
 export const DEFAULT_CONTEXT: SessionContextState = {
   weaponId: null,
   weaponName: null,
+  weaponCategory: null,
   distance: 25,
   position: 'any',
   targetType: 'paper',
@@ -126,6 +134,8 @@ export const DEFAULT_CREATION_STATE: SessionCreationState = {
   drillSource: null,
   selectedPresetId: null,
   selectedLibraryId: null,
+  selectedDrillId: null,
+  isDrillLocked: false,
   context: DEFAULT_CONTEXT,
   isSubmitting: false,
 };

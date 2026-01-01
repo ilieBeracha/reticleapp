@@ -1,13 +1,9 @@
 /**
  * WeaponPicker - Select a weapon for a session
  * 
- * Displays weapons in prioritized sections:
- * 1. Recently Used
- * 2. My Weapons (favorites first)
- * 3. Team Weapons (if in team context)
- * 4. Standard Weapons (catalog)
- * 
- * Includes search and "Add new" option
+ * Design: Clean, monochrome, Apple-inspired
+ * - Typography-first, minimal decoration
+ * - Category indicated subtly, not with loud colors
  */
 
 import { useColors } from '@/hooks/ui/useColors';
@@ -17,7 +13,6 @@ import {
     type GlobalWeapon,
     type TeamWeapon,
     type UserWeapon,
-    type WeaponCategory,
     type WeaponPickerData,
 } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
@@ -25,6 +20,7 @@ import {
     Check,
     ChevronRight,
     Clock,
+    Crosshair,
     Plus,
     Search,
     Star,
@@ -41,6 +37,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import type { WeaponCategory } from '@/services/weaponService';
 
 // ============================================================================
 // TYPES
@@ -58,10 +55,10 @@ interface WeaponSection {
 interface WeaponPickerProps {
   selectedWeaponId?: string | null;
   onSelect: (weapon: UserWeapon) => void;
+  onSelectCatalog?: (weapon: GlobalWeapon) => void;
   onAddNew: () => void;
   onClose: () => void;
   teamId?: string;
-  /** Filter weapons by category (from drill's weapon_category) */
   weaponCategory?: WeaponCategory | 'any' | null;
 }
 
@@ -72,19 +69,20 @@ interface WeaponPickerProps {
 export function WeaponPicker({
   selectedWeaponId,
   onSelect,
+  onSelectCatalog,
   onAddNew,
   onClose,
   teamId,
   weaponCategory,
 }: WeaponPickerProps) {
   const colors = useColors();
-  
+
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<WeaponPickerData | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [showCatalog, setShowCatalog] = useState(false);
 
-  // Load weapons
   useEffect(() => {
     loadWeapons();
   }, [teamId, weaponCategory]);
@@ -103,75 +101,73 @@ export function WeaponPicker({
     }
   };
 
-  // Build sections from data
   const sections = useCallback((): WeaponSection[] => {
     if (!data) return [];
-    
+
     const result: WeaponSection[] = [];
     const usedIds = new Set<string>();
-    
-    // Recently Used (only user weapons that were recently used)
+
+    // When showing catalog, only show catalog section
+    if (showCatalog) {
+      if (data.globalWeapons.length > 0) {
+        result.push({
+          title: 'Catalog',
+          icon: <Crosshair size={12} color={colors.textMuted} />,
+          data: data.globalWeapons,
+          type: 'global',
+        });
+      }
+      return result;
+    }
+
+    // Normal view: show recent, assigned, my weapons, team (no catalog)
     if (data.recentlyUsed.length > 0) {
       result.push({
-        title: 'Recently Used',
-        icon: <Clock size={14} color={colors.textMuted} />,
+        title: 'Recent',
+        icon: <Clock size={12} color={colors.textMuted} />,
         data: data.recentlyUsed,
         type: 'recent',
       });
       data.recentlyUsed.forEach(w => usedIds.add(w.id));
     }
-    
-    // Assigned To Me (team weapons assigned to current user)
+
     if (data.assignedToMe && data.assignedToMe.length > 0) {
       const assignedFiltered = data.assignedToMe.filter(w => !usedIds.has(w.id));
       if (assignedFiltered.length > 0) {
         result.push({
-          title: 'Assigned To Me',
-          icon: <Users size={14} color={colors.primary} />,
+          title: 'Assigned',
+          icon: <Users size={12} color={colors.textMuted} />,
           data: assignedFiltered,
           type: 'assigned',
         });
         assignedFiltered.forEach(w => usedIds.add(w.id));
       }
     }
-    
-    // My Weapons (exclude already shown)
+
     const myWeaponsFiltered = data.myWeapons.filter(w => !usedIds.has(w.id));
     if (myWeaponsFiltered.length > 0) {
       result.push({
         title: 'My Weapons',
-        icon: <Star size={14} color={colors.textMuted} />,
+        icon: <Star size={12} color={colors.textMuted} />,
         data: myWeaponsFiltered,
         type: 'personal',
       });
       myWeaponsFiltered.forEach(w => usedIds.add(w.id));
     }
-    
-    // Team Weapons (exclude assigned weapons)
+
     const teamWeaponsFiltered = data.teamWeapons.filter(w => !usedIds.has(w.id));
     if (teamWeaponsFiltered.length > 0) {
       result.push({
-        title: 'Team Weapons',
-        icon: <Users size={14} color={colors.textMuted} />,
+        title: 'Team',
+        icon: <Users size={12} color={colors.textMuted} />,
         data: teamWeaponsFiltered,
         type: 'team',
       });
     }
-    
-    // Standard Weapons (global catalog)
-    if (data.globalWeapons.length > 0) {
-      result.push({
-        title: 'Standard Weapons',
-        icon: <ChevronRight size={14} color={colors.textMuted} />,
-        data: data.globalWeapons,
-        type: 'global',
-      });
-    }
-    
-    return result;
-  }, [data, colors]);
 
-  // Filter by search
+    return result;
+  }, [data, colors, showCatalog]);
+
   const filteredSections = useCallback((): WeaponSection[] => {
     const allSections = sections();
     if (!searchQuery.trim()) return allSections;
@@ -189,36 +185,67 @@ export function WeaponPicker({
       .filter(section => section.data.length > 0);
   }, [sections, searchQuery]);
 
-  // Handle selection
   const handleSelectWeapon = useCallback((weapon: AnyWeapon, type: WeaponSection['type']) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
-    if (type === 'personal' || type === 'recent') {
-      // Already a user weapon
-      onSelect(weapon as UserWeapon);
-    } else if (type === 'assigned') {
-      // Team weapon assigned to user - parent should create a personal profile
-      // Pass the team weapon for now
-      onSelect(weapon as any);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    if (type === 'global') {
+      // Catalog weapons need to be created as user weapons first
+      if (onSelectCatalog) {
+        onSelectCatalog(weapon as GlobalWeapon);
+      } else {
+        // Fallback: trigger add new flow with catalog weapon pre-selected
+        onAddNew();
+      }
     } else {
-      // TODO: For team/global weapons, we should create a user weapon reference
-      // For now, just pass it along - the parent can handle creating the link
+      // Personal, recent, assigned, team - all are user weapons
       onSelect(weapon as UserWeapon);
     }
-  }, [onSelect]);
+  }, [onSelect, onSelectCatalog, onAddNew]);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // RENDER
-  // ─────────────────────────────────────────────────────────────────────────
-  
+  const handleShowCatalog = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowCatalog(true);
+    setSearchQuery('');
+  }, []);
+
+  const handleBackToMyWeapons = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowCatalog(false);
+    setSearchQuery('');
+  }, []);
+
+  const handleCreateCustom = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onAddNew();
+  }, [onAddNew]);
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Select Weapon</Text>
-        <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-          <X size={20} color={colors.textMuted} />
+      <View style={styles.header}>
+        {showCatalog ? (
+          <TouchableOpacity
+            style={[styles.backBtn, { backgroundColor: colors.secondary }]}
+            onPress={handleBackToMyWeapons}
+          >
+            <ChevronRight size={20} color={colors.text} style={{ transform: [{ rotate: '180deg' }] }} />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.backBtn} />
+        )}
+        <TouchableOpacity
+          style={[styles.closeBtn, { backgroundColor: colors.secondary }]}
+          onPress={onClose}
+        >
+          <X size={20} color={colors.text} />
         </TouchableOpacity>
+      </View>
+
+      {/* Title */}
+      <View style={styles.titleSection}>
+        <Text style={[styles.title, { color: colors.text }]}>
+          {showCatalog ? 'Add from catalog' : 'Select weapon'}
+        </Text>
       </View>
 
       {/* Search */}
@@ -226,28 +253,44 @@ export function WeaponPicker({
         <Search size={18} color={colors.textMuted} />
         <TextInput
           style={[styles.searchInput, { color: colors.text }]}
-          placeholder="Search weapons..."
+          placeholder={showCatalog ? 'Search catalog...' : 'Search...'}
           placeholderTextColor={colors.textMuted}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <X size={16} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Add new button */}
-      <TouchableOpacity
-        style={[styles.addNewBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          onAddNew();
-        }}
-        activeOpacity={0.7}
-      >
-        <View style={[styles.addIcon, { backgroundColor: colors.text }]}>
-          <Plus size={16} color={colors.background} />
-        </View>
-        <Text style={[styles.addText, { color: colors.text }]}>Add New Weapon</Text>
-        <ChevronRight size={18} color={colors.textMuted} />
-      </TouchableOpacity>
+      {/* Action buttons based on view */}
+      {showCatalog ? (
+        <TouchableOpacity
+          style={[styles.addNewBtn, { backgroundColor: colors.card }]}
+          onPress={handleCreateCustom}
+          activeOpacity={0.7}
+        >
+          <Plus size={16} color={colors.text} strokeWidth={2} />
+          <Text style={[styles.addText, { color: colors.text }]}>
+            Create Custom Weapon
+          </Text>
+          <ChevronRight size={14} color={colors.textMuted} />
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={[styles.addNewBtn, { backgroundColor: colors.text }]}
+          onPress={handleShowCatalog}
+          activeOpacity={0.7}
+        >
+          <Plus size={16} color={colors.background} strokeWidth={2} />
+          <Text style={[styles.addText, { color: colors.background }]}>
+            Add New Weapon
+          </Text>
+          <ChevronRight size={14} color={colors.background + '80'} />
+        </TouchableOpacity>
+      )}
 
       {/* Content */}
       {loading ? (
@@ -257,8 +300,11 @@ export function WeaponPicker({
       ) : error ? (
         <View style={styles.error}>
           <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
-          <TouchableOpacity onPress={loadWeapons}>
-            <Text style={[styles.retryText, { color: colors.text }]}>Retry</Text>
+          <TouchableOpacity 
+            style={[styles.retryBtn, { backgroundColor: colors.card }]}
+            onPress={loadWeapons}
+          >
+            <Text style={[styles.retryText, { color: colors.text }]}>Try Again</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -274,7 +320,7 @@ export function WeaponPicker({
             </View>
           )}
           renderItem={({ item, section }) => (
-            <WeaponRow
+            <WeaponCard
               weapon={item}
               type={section.type}
               isSelected={selectedWeaponId === item.id}
@@ -284,16 +330,23 @@ export function WeaponPicker({
           )}
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-                {searchQuery ? 'No weapons found' : 'No weapons yet'}
+              <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
+                <Crosshair size={28} color={colors.textMuted} />
+              </View>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                {searchQuery ? 'No matches' : 'No weapons yet'}
               </Text>
               <Text style={[styles.emptyHint, { color: colors.textMuted }]}>
-                Tap "Add New Weapon" to get started
+                {searchQuery 
+                  ? 'Try a different search'
+                  : 'Add your first weapon to get started'
+                }
               </Text>
             </View>
           }
           contentContainerStyle={styles.listContent}
           stickySectionHeadersEnabled
+          showsVerticalScrollIndicator={false}
         />
       )}
     </View>
@@ -301,10 +354,10 @@ export function WeaponPicker({
 }
 
 // ============================================================================
-// SUB-COMPONENTS
+// WEAPON CARD - Clean, minimal
 // ============================================================================
 
-function WeaponRow({
+function WeaponCard({
   weapon,
   type,
   isSelected,
@@ -317,51 +370,61 @@ function WeaponRow({
   onPress: () => void;
   colors: ReturnType<typeof useColors>;
 }) {
-  // Get display info based on weapon type
   const getSubtitle = () => {
     if ('manufacturer' in weapon && weapon.manufacturer) {
-      return `${weapon.manufacturer} • ${weapon.caliber || ''}`;
+      return `${weapon.manufacturer}${weapon.caliber ? ` • ${weapon.caliber}` : ''}`;
     }
     if ('base_weapon' in weapon && weapon.base_weapon) {
-      return `${weapon.base_weapon.manufacturer || ''} • ${weapon.caliber || weapon.base_weapon.caliber || ''}`;
+      return `${weapon.base_weapon.manufacturer || ''}${weapon.caliber || weapon.base_weapon.caliber ? ` • ${weapon.caliber || weapon.base_weapon.caliber}` : ''}`;
     }
     return weapon.caliber || getCategoryLabel(weapon.category);
   };
 
   const isFavorite = 'is_favorite' in weapon && weapon.is_favorite;
-  const isVerified = 'is_verified' in weapon && weapon.is_verified;
+  const isCatalog = type === 'global';
 
   return (
     <TouchableOpacity
       style={[
-        styles.weaponRow,
-        { borderBottomColor: colors.border },
-        isSelected && { backgroundColor: `${colors.text}08` },
+        styles.weaponCard,
+        {
+          backgroundColor: colors.card,
+          borderColor: isSelected ? colors.text : colors.border,
+        },
       ]}
       onPress={onPress}
-      activeOpacity={0.7}
+      activeOpacity={0.6}
     >
-      <View style={styles.weaponInfo}>
+      <View style={styles.weaponContent}>
         <View style={styles.weaponNameRow}>
-          <Text style={[styles.weaponName, { color: colors.text }]} numberOfLines={1}>
+          <Text
+            style={[styles.weaponName, { color: colors.text }]}
+            numberOfLines={1}
+          >
             {weapon.name}
           </Text>
-          {isFavorite && <Star size={12} color={colors.orange} fill={colors.orange} />}
-          {isVerified && (
-            <View style={[styles.verifiedBadge, { backgroundColor: `${colors.green}20` }]}>
-              <Check size={10} color={colors.green} />
-            </View>
+          {isFavorite && (
+            <Star size={12} color={colors.textMuted} fill={colors.textMuted} />
           )}
         </View>
-        <Text style={[styles.weaponSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
+        <Text
+          style={[styles.weaponSubtitle, { color: colors.textMuted }]}
+          numberOfLines={1}
+        >
           {getSubtitle()}
         </Text>
       </View>
-      
-      {isSelected && (
-        <View style={[styles.selectedIndicator, { backgroundColor: colors.text }]}>
-          <Check size={14} color={colors.background} />
+
+      {isCatalog ? (
+        <View style={[styles.addBtnSmall, { backgroundColor: colors.text }]}>
+          <Plus size={14} color={colors.background} strokeWidth={2.5} />
         </View>
+      ) : isSelected ? (
+        <Check size={16} color={colors.text} strokeWidth={2.5} />
+      ) : (
+        <Text style={[styles.categoryLabel, { color: colors.textMuted }]}>
+          {getCategoryLabel(weapon.category)?.split(' ')[0]}
+        </Text>
       )}
     </TouchableOpacity>
   );
@@ -377,27 +440,39 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  closeBtn: {
-    width: 32,
-    height: 32,
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  titleSection: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 20,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '600',
+    letterSpacing: -0.3,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 16,
-    marginTop: 12,
     paddingHorizontal: 14,
     height: 44,
     borderRadius: 10,
@@ -406,30 +481,22 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
   },
   addNewBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 8,
-    padding: 14,
+    marginTop: 10,
+    marginBottom: 12,
+    padding: 12,
     borderRadius: 10,
-    borderWidth: 1,
-    gap: 12,
-  },
-  addIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: 8,
   },
   addText: {
     flex: 1,
     fontSize: 15,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   loading: {
     flex: 1,
@@ -440,24 +507,31 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
+    gap: 16,
+    padding: 20,
   },
   errorText: {
-    fontSize: 14,
+    fontSize: 15,
+    textAlign: 'center',
+  },
+  retryBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
   },
   retryText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
   },
   listContent: {
-    paddingBottom: 20,
+    paddingBottom: 40,
+    paddingHorizontal: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
     paddingVertical: 10,
-    gap: 8,
+    gap: 6,
   },
   sectionTitle: {
     fontSize: 12,
@@ -465,14 +539,15 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  weaponRow: {
+  weaponCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 6,
+    borderWidth: 1,
   },
-  weaponInfo: {
+  weaponContent: {
     flex: 1,
   },
   weaponNameRow: {
@@ -481,7 +556,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   weaponName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     flexShrink: 1,
   },
@@ -489,32 +564,36 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
-  verifiedBadge: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+  categoryLabel: {
+    fontSize: 12,
+    fontWeight: '500',
   },
-  selectedIndicator: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  addBtnSmall: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 12,
   },
   emptyState: {
-    padding: 40,
+    padding: 60,
     alignItems: 'center',
   },
-  emptyText: {
-    fontSize: 15,
-    fontWeight: '500',
+  emptyIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 17,
+    fontWeight: '600',
     marginBottom: 4,
   },
   emptyHint: {
-    fontSize: 13,
+    fontSize: 14,
+    textAlign: 'center',
   },
 });
-

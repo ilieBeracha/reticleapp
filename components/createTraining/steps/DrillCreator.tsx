@@ -616,11 +616,11 @@ function ConfigureStep({
                   }}
                 >
                   {goal === 'grouping' ? (
-                    <Crosshair size={14} color={isSelected ? '#fff' : color} />
+                    <Crosshair size={14} color={isSelected ? colors.accentForeground : color} />
                   ) : (
-                    <Target size={14} color={isSelected ? '#fff' : color} />
+                    <Target size={14} color={isSelected ? colors.accentForeground : color} />
                   )}
-                  <Text style={[styles.goalText, { color: isSelected ? '#fff' : colors.text }]}>
+                  <Text style={[styles.goalText, { color: isSelected ? colors.accentForeground : colors.text }]}>
                     {goal === 'grouping' ? 'Grouping' : 'Achievement'}
                   </Text>
                 </TouchableOpacity>

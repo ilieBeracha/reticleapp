@@ -145,7 +145,7 @@ export function CompactNumberInput({
                 <Text
                   style={[
                     styles.presetChipText,
-                    { color: isSelected ? '#fff' : colors.textMuted },
+                    { color: isSelected ? colors.accentForeground : colors.textMuted },
                   ]}
                 >
                   {preset}
@@ -204,7 +204,7 @@ export function TimeLimitInput({ value, onChange, presets, accentColor }: TimeLi
                 <Text
                   style={[
                     styles.presetChipText,
-                    { color: isSelected ? '#fff' : colors.textMuted },
+                    { color: isSelected ? colors.accentForeground : colors.textMuted },
                   ]}
                 >
                   {label}
@@ -404,7 +404,7 @@ export function PillSelector<T extends number | string | null>({
             }}
             activeOpacity={0.7}
           >
-            <Text style={[styles.pillText, { color: isSelected ? '#fff' : colors.text }]}>
+            <Text style={[styles.pillText, { color: isSelected ? colors.accentForeground : colors.text }]}>
               {label}
             </Text>
           </TouchableOpacity>

@@ -11,8 +11,9 @@
  */
 
 import type { BaseSessionConfig, DrillConfig } from '@/services/session/types';
+import { getDefaultWeapon } from '@/services/weaponService';
 import { useIsGarminConnected } from '@/store/garminStore';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   getPurposeOption,
   purposeToDrillGoal,
@@ -42,6 +43,7 @@ export interface UseSessionCreationReturn {
   
   // Derived
   isWatchConnected: boolean;
+  isLoadingWeapon: boolean;
   canGoBack: boolean;
   canGoForward: boolean;
   progressPercent: number;
@@ -61,6 +63,9 @@ export interface UseSessionCreationReturn {
   setTimeLimit: (limit: number | null) => void;
   setNotes: (notes: string) => void;
   updateContext: (partial: Partial<SessionContextState>) => void;
+  
+  // Category Drill - When selected, session MUST follow this drill
+  setDrill: (drillId: string | null) => void;
   
   // Navigation
   goBack: () => void;
@@ -93,7 +98,45 @@ export function useSessionCreation(
   const { onSubmit } = options;
   
   const [state, setState] = useState<SessionCreationState>(DEFAULT_CREATION_STATE);
+  const [isLoadingWeapon, setIsLoadingWeapon] = useState(true);
   const isWatchConnected = useIsGarminConnected();
+  
+  // ─────────────────────────────────────────────────────────────────────────
+  // AUTO-LOAD DEFAULT WEAPON
+  // User's favorite or last-used weapon is pre-selected
+  // ─────────────────────────────────────────────────────────────────────────
+  
+  useEffect(() => {
+    let cancelled = false;
+    
+    async function loadDefaultWeapon() {
+      try {
+        const weapon = await getDefaultWeapon();
+        if (weapon && !cancelled) {
+          setState(s => ({
+            ...s,
+            context: {
+              ...s.context,
+              weaponId: weapon.id,
+              weaponName: weapon.name,
+              weaponCategory: weapon.category || null,
+            },
+          }));
+          console.log('[useSessionCreation] Auto-selected default weapon:', weapon.name);
+        }
+      } catch (error) {
+        console.error('[useSessionCreation] Failed to load default weapon:', error);
+      } finally {
+        if (!cancelled) setIsLoadingWeapon(false);
+      }
+    }
+    
+    loadDefaultWeapon();
+    
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   
   // ─────────────────────────────────────────────────────────────────────────
   // DERIVED VALUES
@@ -215,6 +258,19 @@ export function useSessionCreation(
   }, []);
   
   // ─────────────────────────────────────────────────────────────────────────
+  // CATEGORY DRILL SELECTION
+  // When a drill is selected, the session MUST follow it
+  // ─────────────────────────────────────────────────────────────────────────
+  
+  const setDrill = useCallback((drillId: string | null) => {
+    setState((s) => ({
+      ...s,
+      selectedDrillId: drillId,
+      isDrillLocked: drillId !== null,
+    }));
+  }, []);
+  
+  // ─────────────────────────────────────────────────────────────────────────
   // NAVIGATION
   // ─────────────────────────────────────────────────────────────────────────
   
@@ -258,28 +314,41 @@ export function useSessionCreation(
   // ─────────────────────────────────────────────────────────────────────────
   
   const buildConfig = useCallback((): BaseSessionConfig => {
-    const { purpose, context, selectedPresetId } = state;
+    const { purpose, context, selectedDrillId, isDrillLocked } = state;
     
     // For solo sessions, always use inline drill_config
     // Presets update context values, so we build config from context
     // (drill_id is only for training_drills in team context)
     
+    // Determine drill name based on selection
+    let drillName: string;
+    if (isDrillLocked && selectedDrillId) {
+      // When following a category drill, use its name
+      // Note: We can't import getDrillById here to avoid circular deps,
+      // but the name is stored in context when drill is selected
+      drillName = `Drill: ${context.distance}m`;
+    } else if (purpose === 'zeroing') {
+      drillName = `Zeroing ${context.distance}m`;
+    } else if (purpose === 'physical') {
+      drillName = 'Physical Drill';
+    } else if (purpose === 'grouping') {
+      drillName = `Grouping ${context.distance}m`;
+    } else {
+      drillName = 'Practice Session';
+    }
+    
     // Build inline drill config
     // Note: input_method is not set - user chooses scan vs manual during session
     const drillConfig: DrillConfig = {
-      name: purpose === 'zeroing' 
-        ? `Zeroing ${context.distance}m`
-        : purpose === 'physical'
-        ? 'Physical Drill'
-        : purpose === 'grouping'
-        ? `Grouping ${context.distance}m`
-        : 'Practice Session',
+      name: drillName,
       drill_goal: purposeToDrillGoal(purpose || 'custom'),
       target_type: context.targetType === 'paper' ? 'paper' : 'tactical',
       distance_m: context.distance,
       rounds_per_shooter: context.shotsPlanned,
       time_limit_seconds: context.timeLimit,
       strings_count: 1,
+      // Include category drill reference when locked
+      category_drill_id: isDrillLocked ? selectedDrillId : undefined,
     };
     
     return {
@@ -321,6 +390,7 @@ export function useSessionCreation(
   return {
     state,
     isWatchConnected,
+    isLoadingWeapon,
     canGoBack,
     canGoForward,
     progressPercent,
@@ -336,6 +406,7 @@ export function useSessionCreation(
     setTimeLimit,
     setNotes,
     updateContext,
+    setDrill,
     goBack,
     goForward,
     goToStep,

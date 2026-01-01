@@ -17,7 +17,7 @@ import { createSession, deleteSession, getMyActiveSession } from '@/services/ses
 import { useSessionStore } from '@/store/sessionStore';
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
-import { ArrowRight, Play } from 'lucide-react-native';
+import { ArrowRight, ChevronLeft, Play } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -211,6 +211,8 @@ export default function CreateSessionScreen() {
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────
 
+  const stepNumber = creation.state.step === 'intent' ? 1 : 2;
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -218,6 +220,39 @@ export default function CreateSessionScreen() {
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
+      {/* Header with back button and step indicator */}
+      <View style={styles.header}>
+        {stepNumber > 1 ? (
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={creation.goBack}
+            activeOpacity={0.7}
+          >
+            <ChevronLeft size={22} color={colors.text} />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.backButton} />
+        )}
+
+        <View style={styles.stepIndicator}>
+          <View style={[styles.stepDot, { backgroundColor: colors.text }]} />
+          <View
+            style={[
+              styles.stepLine,
+              { backgroundColor: stepNumber >= 2 ? colors.text : colors.border }
+            ]}
+          />
+          <View
+            style={[
+              styles.stepDot,
+              { backgroundColor: stepNumber >= 2 ? colors.text : colors.border }
+            ]}
+          />
+        </View>
+
+        <View style={styles.backButton} />
+      </View>
+
       {/* Step Content */}
       {creation.state.step === 'intent' && (
         <SessionIntentStep
@@ -234,6 +269,8 @@ export default function CreateSessionScreen() {
           onUpdateContext={creation.updateContext}
           onBack={creation.goBack}
           weaponCategory={selectedPreset?.weapon_category as any}
+          selectedDrillId={creation.state.selectedDrillId}
+          onDrillChange={creation.setDrill}
         />
       )}
 
@@ -320,10 +357,39 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContent: { 
+  scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 12,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    gap: 0,
+  },
+  stepDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  stepLine: {
+    width: 40,
+    height: 2,
+    marginHorizontal: 4,
   },
   loadingContainer: {
     flex: 1,

@@ -15,6 +15,9 @@ export { EmptyTargets } from './EmptyTargets';
 export { WatchControlPrompt, useWatchControlPrompt } from './WatchControlPrompt';
 export { SaveDrillPrompt } from './SaveDrillPrompt';
 
+// Category drill picker - shows real drills that sessions MUST follow
+export { CategoryDrillPicker } from './CategoryDrillPicker';
+
 // Form system (unified session creation/editing)
 export * from './form';
 

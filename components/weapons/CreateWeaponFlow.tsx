@@ -1,10 +1,10 @@
 /**
  * CreateWeaponFlow - Guided weapon creation
  * 
- * Flow:
- * 1. Ask: "Is this based on a known weapon?"
- * 2. If yes → Search catalog → Customize name/notes
- * 3. If no → Full custom form (marked as unverified)
+ * Design: Clean, monochrome, Apple-inspired
+ * - Typography-first
+ * - Minimal color usage
+ * - Generous whitespace
  */
 
 import { useColors } from '@/hooks/ui/useColors';
@@ -18,10 +18,10 @@ import {
 } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
 import {
-    AlertTriangle,
-    ArrowRight,
+    AlertCircle,
     Check,
     ChevronLeft,
+    ChevronRight,
     Plus,
     Search,
     X,
@@ -49,7 +49,7 @@ type FlowStep = 'choice' | 'search' | 'customize' | 'custom';
 interface CreateWeaponFlowProps {
   onComplete: (weaponId: string) => void;
   onCancel: () => void;
-  teamId?: string; // If provided, creating team weapon instead
+  teamId?: string;
 }
 
 // ============================================================================
@@ -78,7 +78,6 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load all weapons on mount
   useEffect(() => {
     loadWeapons();
   }, []);
@@ -93,7 +92,6 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
     }
   };
 
-  // Search handler
   useEffect(() => {
     if (step !== 'search') return;
     
@@ -115,7 +113,6 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
     return () => clearTimeout(timer);
   }, [searchQuery, step, allWeapons]);
 
-  // Handle base weapon selection
   const handleSelectBase = useCallback((weapon: GlobalWeapon) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedBase(weapon);
@@ -125,7 +122,6 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
     setStep('customize');
   }, []);
 
-  // Submit weapon
   const handleSubmit = useCallback(async () => {
     if (!name.trim()) {
       setError('Name is required');
@@ -157,65 +153,71 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
   }, [name, selectedBase, category, caliber, zeroDistance, notes, onComplete]);
 
   // ─────────────────────────────────────────────────────────────────────────
-  // RENDER: Step 1 - Choice
+  // STEP 1: Choice
   // ─────────────────────────────────────────────────────────────────────────
   
   if (step === 'choice') {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Header title="Add Weapon" onClose={onCancel} colors={colors} />
+        <View style={styles.choiceHeader}>
+          <TouchableOpacity 
+            style={[styles.closeBtn, { backgroundColor: colors.secondary }]} 
+            onPress={onCancel}
+          >
+            <X size={20} color={colors.text} />
+          </TouchableOpacity>
+        </View>
         
         <View style={styles.content}>
-          <Text style={[styles.question, { color: colors.text }]}>
-            Is this based on a known weapon?
-          </Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            Linking to a standard weapon helps with comparisons and analytics.
+          <Text style={[styles.headline, { color: colors.text }]}>
+            Add a weapon
           </Text>
 
-          <View style={styles.choiceCards}>
+          <View style={styles.choiceList}>
+            {/* From Catalog - Primary */}
             <TouchableOpacity
-              style={[styles.choiceCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              style={[styles.choiceRow, { backgroundColor: colors.text }]}
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 setStep('search');
               }}
-              activeOpacity={0.8}
+              activeOpacity={0.7}
             >
-              <View style={[styles.choiceIcon, { backgroundColor: colors.text }]}>
-                <Search size={20} color={colors.background} />
+              <View style={[styles.choiceIconWrap, { backgroundColor: colors.background + '15' }]}>
+                <Search size={16} color={colors.background} />
               </View>
               <View style={styles.choiceText}>
-                <Text style={[styles.choiceTitle, { color: colors.text }]}>
-                  Yes, pick from catalog
+                <Text style={[styles.choiceTitle, { color: colors.background }]}>
+                  From Catalog
                 </Text>
-                <Text style={[styles.choiceDesc, { color: colors.textMuted }]}>
-                  Search M40, SR-25, Tikka, etc.
+                <Text style={[styles.choiceDesc, { color: colors.background + 'AA' }]}>
+                  M40, SR-25, Tikka, and more
                 </Text>
               </View>
-              <ArrowRight size={18} color={colors.textMuted} />
+              <ChevronRight size={16} color={colors.background + '60'} />
             </TouchableOpacity>
 
+            {/* Custom - Secondary */}
             <TouchableOpacity
-              style={[styles.choiceCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              style={[styles.choiceRow, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setStep('custom');
               }}
-              activeOpacity={0.8}
+              activeOpacity={0.7}
             >
-              <View style={[styles.choiceIcon, { backgroundColor: colors.secondary }]}>
-                <Plus size={20} color={colors.text} />
+              <View style={[styles.choiceIconWrap, { backgroundColor: colors.secondary }]}>
+                <Plus size={16} color={colors.textMuted} />
               </View>
               <View style={styles.choiceText}>
                 <Text style={[styles.choiceTitle, { color: colors.text }]}>
-                  No, create custom
+                  Create Custom
                 </Text>
                 <Text style={[styles.choiceDesc, { color: colors.textMuted }]}>
-                  For rare or custom weapons
+                  For rare or modified weapons
                 </Text>
               </View>
-              <ArrowRight size={18} color={colors.textMuted} />
+              <ChevronRight size={16} color={colors.muted} />
             </TouchableOpacity>
           </View>
         </View>
@@ -224,14 +226,14 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // RENDER: Step 2a - Search Catalog
+  // STEP 2a: Search Catalog
   // ─────────────────────────────────────────────────────────────────────────
   
   if (step === 'search') {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Header 
-          title="Select Base Weapon" 
+          title="Select Base" 
           onClose={onCancel} 
           onBack={() => setStep('choice')}
           colors={colors} 
@@ -241,7 +243,7 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
           <Search size={18} color={colors.textMuted} />
           <TextInput
             style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Search weapons..."
+            placeholder="Search..."
             placeholderTextColor={colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -257,7 +259,7 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
             <TouchableOpacity
               style={[styles.weaponRow, { borderBottomColor: colors.border }]}
               onPress={() => handleSelectBase(item)}
-              activeOpacity={0.7}
+              activeOpacity={0.6}
             >
               <View style={styles.weaponInfo}>
                 <Text style={[styles.weaponName, { color: colors.text }]}>{item.name}</Text>
@@ -266,9 +268,7 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
                 </Text>
               </View>
               {item.is_verified && (
-                <View style={[styles.verifiedBadge, { backgroundColor: `${colors.green}20` }]}>
-                  <Check size={12} color={colors.green} />
-                </View>
+                <Check size={16} color={colors.text} />
               )}
             </TouchableOpacity>
           )}
@@ -286,7 +286,7 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // RENDER: Step 2b - Custom Weapon Form
+  // STEP 2b: Custom Weapon Form
   // ─────────────────────────────────────────────────────────────────────────
   
   if (step === 'custom') {
@@ -303,10 +303,9 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
         />
 
         <ScrollView style={styles.formScroll} contentContainerStyle={styles.formContent}>
-          {/* Warning */}
-          <View style={[styles.warningBox, { backgroundColor: `${colors.orange}15` }]}>
-            <AlertTriangle size={16} color={colors.orange} />
-            <Text style={[styles.warningText, { color: colors.orange }]}>
+          <View style={[styles.notice, { backgroundColor: colors.secondary }]}>
+            <AlertCircle size={16} color={colors.textMuted} />
+            <Text style={[styles.noticeText, { color: colors.textMuted }]}>
               Custom weapons won't appear in standard comparisons
             </Text>
           </View>
@@ -323,31 +322,29 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
 
           <FormField label="Category" colors={colors}>
             <View style={styles.categoryPicker}>
-              {WEAPON_CATEGORIES.map((cat) => (
-                <TouchableOpacity
-                  key={cat.value}
-                  style={[
-                    styles.categoryChip,
-                    {
-                      backgroundColor: category === cat.value ? colors.text : 'transparent',
-                      borderColor: category === cat.value ? colors.text : colors.border,
-                    },
-                  ]}
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    setCategory(cat.value);
-                  }}
-                >
-                  <Text
+              {WEAPON_CATEGORIES.map((cat) => {
+                const isSelected = category === cat.value;
+                return (
+                  <TouchableOpacity
+                    key={cat.value}
                     style={[
-                      styles.categoryText,
-                      { color: category === cat.value ? colors.background : colors.text },
+                      styles.categoryChip,
+                      { backgroundColor: isSelected ? colors.text : colors.card },
                     ]}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setCategory(cat.value);
+                    }}
                   >
-                    {cat.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <Text style={[
+                      styles.categoryText,
+                      { color: isSelected ? colors.background : colors.text }
+                    ]}>
+                      {cat.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </FormField>
 
@@ -398,10 +395,9 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
             {submitting ? (
               <ActivityIndicator size="small" color={colors.background} />
             ) : (
-              <>
-                <Text style={[styles.submitText, { color: colors.background }]}>Create Weapon</Text>
-                <Check size={18} color={colors.background} />
-              </>
+              <Text style={[styles.submitText, { color: colors.background }]}>
+                Create Weapon
+              </Text>
             )}
           </TouchableOpacity>
         </View>
@@ -410,7 +406,7 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // RENDER: Step 3 - Customize (after selecting base)
+  // STEP 3: Customize (after selecting base)
   // ─────────────────────────────────────────────────────────────────────────
   
   return (
@@ -429,12 +425,9 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
       />
 
       <ScrollView style={styles.formScroll} contentContainerStyle={styles.formContent}>
-        {/* Selected base */}
         {selectedBase && (
           <View style={[styles.selectedBase, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={[styles.verifiedBadge, { backgroundColor: `${colors.green}20` }]}>
-              <Check size={12} color={colors.green} />
-            </View>
+            <Check size={16} color={colors.text} />
             <View style={styles.selectedBaseInfo}>
               <Text style={[styles.selectedBaseName, { color: colors.text }]}>{selectedBase.name}</Text>
               <Text style={[styles.selectedBaseMeta, { color: colors.textMuted }]}>
@@ -469,7 +462,7 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
         <FormField label="Personal Notes" colors={colors}>
           <TextInput
             style={[styles.input, styles.textArea, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-            placeholder="e.g., Zero confirmed 12/15, suppressor adds +2 MOA..."
+            placeholder="Zero confirmed date, suppressor notes..."
             placeholderTextColor={colors.textMuted}
             value={notes}
             onChangeText={setNotes}
@@ -492,10 +485,9 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
           {submitting ? (
             <ActivityIndicator size="small" color={colors.background} />
           ) : (
-            <>
-              <Text style={[styles.submitText, { color: colors.background }]}>Add Weapon</Text>
-              <Check size={18} color={colors.background} />
-            </>
+            <Text style={[styles.submitText, { color: colors.background }]}>
+              Add Weapon
+            </Text>
           )}
         </TouchableOpacity>
       </View>
@@ -565,6 +557,57 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  choiceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  content: {
+    flex: 1,
+    padding: 20,
+  },
+  headline: {
+    fontSize: 22,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+    marginBottom: 24,
+  },
+  choiceList: {
+    gap: 8,
+  },
+  choiceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    gap: 12,
+  },
+  choiceIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  choiceText: {
+    flex: 1,
+  },
+  choiceTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 1,
+  },
+  choiceDesc: {
+    fontSize: 12,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -583,50 +626,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
   },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  question: {
-    fontSize: 22,
-    fontWeight: '700',
-    marginBottom: 8,
-    letterSpacing: -0.3,
-  },
-  subtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 28,
-  },
-  choiceCards: {
-    gap: 12,
-  },
-  choiceCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 14,
-  },
-  choiceIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  choiceText: {
-    flex: 1,
-  },
-  choiceTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  choiceDesc: {
-    fontSize: 13,
-  },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -639,7 +638,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
   },
   listContent: {
     paddingBottom: 20,
@@ -655,19 +654,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   weaponName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     marginBottom: 2,
   },
   weaponMeta: {
     fontSize: 13,
-  },
-  verifiedBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   emptyState: {
     padding: 40,
@@ -683,14 +675,14 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 20,
   },
-  warningBox: {
+  notice: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     padding: 14,
     borderRadius: 10,
   },
-  warningText: {
+  noticeText: {
     flex: 1,
     fontSize: 13,
     fontWeight: '500',
@@ -702,18 +694,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     textTransform: 'uppercase',
-    letterSpacing: 0.3,
+    letterSpacing: 0.5,
   },
   input: {
-    height: 44,
+    height: 48,
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: 10,
     paddingHorizontal: 14,
-    fontSize: 15,
+    fontSize: 16,
   },
   textArea: {
-    height: 80,
-    paddingTop: 12,
+    height: 88,
+    paddingTop: 14,
     textAlignVertical: 'top',
   },
   categoryPicker: {
@@ -722,13 +714,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   categoryChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
   },
   categoryText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '500',
   },
   selectedBase: {
@@ -743,7 +734,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   selectedBaseName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
   },
   selectedBaseMeta: {
@@ -763,12 +754,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    height: 50,
-    borderRadius: 12,
+    height: 52,
+    borderRadius: 14,
   },
   submitText: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
   },
 });
-

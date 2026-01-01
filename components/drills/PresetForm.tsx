@@ -15,9 +15,8 @@ import {
   type CreatePresetInput,
   type DrillGoal,
   type DrillPreset,
-  type WeaponCategory,
 } from '@/services/presetService';
-import { getCategoryLabel, WEAPON_CATEGORIES } from '@/services/weaponService';
+import { WEAPON_CATEGORIES, type WeaponCategory } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
 import {
   Check,
@@ -25,7 +24,6 @@ import {
   Crosshair,
   Heart,
   Target,
-  X,
 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
@@ -198,17 +196,14 @@ export function PresetForm({ preset, onComplete, onCancel }: PresetFormProps) {
                   key={goal.value}
                   style={[
                     styles.goalChip,
-                    {
-                      backgroundColor: isSelected ? colors.text : 'transparent',
-                      borderColor: isSelected ? colors.text : colors.border,
-                    },
+                    { backgroundColor: isSelected ? colors.text : colors.card },
                   ]}
                   onPress={() => {
                     Haptics.selectionAsync();
                     setDrillGoal(goal.value);
                   }}
                 >
-                  <Icon size={14} color={isSelected ? colors.background : colors.textMuted} />
+                  <Icon size={14} color={isSelected ? colors.background : colors.text} />
                   <Text
                     style={[
                       styles.goalText,
@@ -234,10 +229,7 @@ export function PresetForm({ preset, onComplete, onCancel }: PresetFormProps) {
                   key={type.value}
                   style={[
                     styles.chip,
-                    {
-                      backgroundColor: isSelected ? colors.text : 'transparent',
-                      borderColor: isSelected ? colors.text : colors.border,
-                    },
+                    { backgroundColor: isSelected ? colors.text : colors.card },
                   ]}
                   onPress={() => {
                     Haptics.selectionAsync();
@@ -270,10 +262,7 @@ export function PresetForm({ preset, onComplete, onCancel }: PresetFormProps) {
             <TouchableOpacity
               style={[
                 styles.chip,
-                {
-                  backgroundColor: weaponCategory === null ? colors.text : 'transparent',
-                  borderColor: weaponCategory === null ? colors.text : colors.border,
-                },
+                { backgroundColor: weaponCategory === null ? colors.text : colors.card },
               ]}
               onPress={() => {
                 Haptics.selectionAsync();
@@ -296,10 +285,7 @@ export function PresetForm({ preset, onComplete, onCancel }: PresetFormProps) {
                   key={cat.value}
                   style={[
                     styles.chip,
-                    {
-                      backgroundColor: isSelected ? colors.text : 'transparent',
-                      borderColor: isSelected ? colors.text : colors.border,
-                    },
+                    { backgroundColor: isSelected ? colors.text : colors.card },
                   ]}
                   onPress={() => {
                     Haptics.selectionAsync();
@@ -465,10 +451,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chip: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 6,
-    borderWidth: 1,
+    borderRadius: 20,
   },
   chipText: {
     fontSize: 13,
@@ -477,10 +462,9 @@ const styles = StyleSheet.create({
   goalChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 6,
-    borderWidth: 1,
+    borderRadius: 20,
     gap: 6,
   },
   goalText: {
