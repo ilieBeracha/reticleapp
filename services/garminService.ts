@@ -17,27 +17,30 @@ import {
   Platform
 } from 'react-native';
 import {
-  type Device,
-  GarminConnect,
-  Status,
   connectDevice,
   destroy,
+  type Device,
+  GarminConnect,
   getDevicesList,
   initialize as sdkInitialize,
   sendMessage as sdkSendMessage,
   showDevicesList,
+  Status,
 } from 'react-native-garmin-connect';
 
 // Import new watch payload types and transformers
 import {
   buildDetailsPartial,
+  buildTimelineData,
   convertLegacyPayload,
+  TimelineChunkAssembler,
   transformSummaryPayload
 } from './session/watchDataTransformer';
 import type {
   TransformedWatchData,
   WatchDetailsPayload,
   WatchSummaryPayload,
+  WatchTimelineChunkPayload
 } from './session/watchTypes';
 
 // ============================================================================
@@ -61,13 +64,12 @@ export type GarminConnectionStatus =
 
 /** Message types sent TO the watch */
 export type GarminOutboundMessageType =
-| 'START_SESSION'
-| 'END_SESSION'
-| 'SESSION_START'  // Alias for START_SESSION (used by watch)
-| 'SESSION_END'    // Alias for END_SESSION (used by watch)
+| 'SESSION_START'  // Start session on watch (watch expects this exact string)
+| 'SESSION_END'    // End session on watch (watch expects this exact string)
 | 'SYNC_DRILL'
 | 'PING'
-| 'ACK';           // Acknowledge receipt of SESSION_RESULT
+| 'WEATHER'        // Send weather data to watch
+| 'ACK';           // Acknowledge receipt of SESSION_RESULT/SUMMARY/TIMELINE
 
 /** Message types received FROM the watch */
 export type GarminInboundMessageType =
@@ -75,6 +77,7 @@ export type GarminInboundMessageType =
 | 'SESSION_RESULT'  // Watch sends this when session ends (auto or manual) - LEGACY
 | 'SESSION_SUMMARY' // Phase 1: Thin summary for instant display (~300 bytes)
 | 'SESSION_DETAILS' // Phase 2: Full data sent in background (timelines, per-shot)
+| 'TIMELINE_CHUNK'  // Phase 3: Time-series biometric data (sent in chunks)
 | 'SHOT_RECORDED'
 | 'SESSION_ENDED'
 | 'HEARTBEAT'
@@ -223,6 +226,39 @@ payload?: unknown;
 sessionData?: GarminSessionData;
 timestamp?: number;
 }
+/** Timeline data from Phase 3 sync */
+export interface GarminTimelineData {
+  sessionId: string;
+  points: Array<{
+    timestamp: number;
+    heartRate: number;
+    breathRate: number;
+    stress: number;
+    eventType: 'sample' | 'shot' | 'hit';
+  }>;
+  shotDetails: Array<{
+    shotNumber: number;
+    timestamp: number;
+    heartRate: number;
+    breathRate: number;
+    breathPhase: 'inhale' | 'exhale' | 'pause';
+    stress: number;
+    steadiness: number;
+    flinch: boolean;
+  }>;
+  summary: {
+    totalPoints: number;
+    totalShots: number;
+    durationSeconds: number;
+    hrMin: number;
+    hrMax: number;
+    hrAvg: number;
+    stressMin: number;
+    stressMax: number;
+    stressAvg: number;
+  };
+}
+
 // Event types emitted by this service
 export type GarminServiceEvent =
 | { event: 'sdk_ready' }
@@ -232,6 +268,8 @@ export type GarminServiceEvent =
 | { event: 'session_data'; data: GarminSessionData }
 | { event: 'session_summary'; data: GarminSessionData }    // Phase 1: Thin summary for instant display
 | { event: 'session_details'; data: Partial<GarminSessionData> & { sessionId: string } }  // Phase 2: Full data to merge
+| { event: 'timeline_chunk'; sessionId: string; chunk: number; total: number }  // Phase 3: Progress update
+| { event: 'timeline_complete'; data: GarminTimelineData }  // Phase 3: All chunks received
 | { event: 'error'; error: Error };
 
 export type GarminServiceListener = (event: GarminServiceEvent) => void;
@@ -276,6 +314,9 @@ let pendingAck: {
   resolve: (success: boolean) => void;
   timeout: ReturnType<typeof setTimeout>;
 } | null = null;
+
+// Timeline chunk assembler (Phase 3)
+const timelineAssembler = new TimelineChunkAssembler();
 
 // ============================================================================
 // INTERNAL HELPERS
@@ -540,9 +581,9 @@ const msgSub = emitter.addListener('onMessage', (raw: any) => {
       shots: transformedData.shotsRecorded,
       hits: transformedData.hitsRecorded,
       durationMs: transformedData.durationMs,
-      splits: transformedData.splitTimes.length,
-      biometricsEnabled: transformedData.biometrics.enabled,
-      steadinessEnabled: transformedData.steadiness.enabled,
+      splits: transformedData.splitTimes?.length ?? 0,
+      biometricsEnabled: transformedData.biometrics?.enabled ?? false,
+      steadinessEnabled: transformedData.steadiness?.enabled ?? false,
     });
     
     // Convert to GarminSessionData for backwards compatibility with existing store/UI
@@ -615,10 +656,12 @@ const msgSub = emitter.addListener('onMessage', (raw: any) => {
   }
   
   // ============================================================================
-  // TWO-PHASE SYNC: SESSION_DETAILS (Phase 2 - Background, ~500 bytes)
+  // DEPRECATED: SESSION_DETAILS (kept for backward compatibility)
+  // In v2 protocol, all metadata is in SESSION_SUMMARY and per-shot data is in TIMELINE_CHUNK
+  // This handler will be removed in future versions
   // ============================================================================
   if (message.type === 'SESSION_DETAILS') {
-    console.log('[GarminService] 📩 SESSION_DETAILS received (Phase 2 - background)');
+    console.log('[GarminService] 📩 SESSION_DETAILS received (DEPRECATED - still processing for compatibility)');
     
     // Check if this is the new compact format (has 'sid' field)
     const isNewFormat = parsedPayload?.sid !== undefined;
@@ -715,6 +758,86 @@ const msgSub = emitter.addListener('onMessage', (raw: any) => {
         }
       }, 100);
     }
+  }
+  
+  // ============================================================================
+  // THREE-PHASE SYNC: TIMELINE_CHUNK (Phase 3 - Time-series biometric data)
+  // Also handles alternative names: TIMELINE, BIOMETRIC_TIMELINE, TIMELINE_DATA
+  // ============================================================================
+  const isTimelineMessage = ['TIMELINE_CHUNK', 'TIMELINE', 'BIOMETRIC_TIMELINE', 'TIMELINE_DATA'].includes(message.type);
+  if (isTimelineMessage) {
+    console.log('[GarminService] 📩 TIMELINE_CHUNK received (Phase 3 - time-series)');
+    
+    const chunkPayload = parsedPayload as WatchTimelineChunkPayload;
+    const { sid, chunk: chunkIndex, total, pts, shots } = chunkPayload;
+    
+    console.log(`[GarminService] 📩 Chunk ${chunkIndex + 1}/${total} for ${sid.slice(0, 8)}...`);
+    console.log(`[GarminService] 📩 Points in chunk: ${pts?.length ?? 0}`);
+    if (shots) {
+      console.log(`[GarminService] 📩 Shot details in chunk: ${shots.length} (last chunk)`);
+    }
+    
+    // Emit progress event
+    emit({ event: 'timeline_chunk', sessionId: sid, chunk: chunkIndex, total });
+    
+    // Add to assembler and check if complete
+    const assembledData = timelineAssembler.addChunk(chunkPayload);
+    
+    // Send ACK for this chunk
+    if (sid) {
+      console.log(`[GarminService] 📤 Sending TIMELINE ACK for chunk ${chunkIndex + 1}/${total}`);
+      setTimeout(() => {
+        const ackSent = sendMessage('ACK', {
+          sessionId: sid,
+          type: 'timeline',
+          chunk: chunkIndex,
+          status: 'received',
+        });
+        if (ackSent) {
+          console.log('[GarminService] ✅ TIMELINE ACK sent successfully');
+        } else {
+          console.warn('[GarminService] ⚠️ Failed to send TIMELINE ACK');
+        }
+      }, 100);
+    }
+    
+    // If all chunks received, emit complete event
+    if (assembledData) {
+      console.log('[GarminService] 📩 ✅ All timeline chunks received!');
+      console.log(`[GarminService] 📩 Total points: ${assembledData.points.length}`);
+      console.log(`[GarminService] 📩 Shot details: ${assembledData.shotDetails.length}`);
+      
+      // Build the timeline data in the format for storage/display
+      const timelineData = buildTimelineData(assembledData);
+      
+      // Convert to the event format
+      const eventData: GarminTimelineData = {
+        sessionId: timelineData.session_id,
+        points: timelineData.points,
+        shotDetails: timelineData.shot_details,
+        summary: {
+          totalPoints: timelineData.summary.total_points,
+          totalShots: timelineData.summary.total_shots,
+          durationSeconds: timelineData.summary.duration_seconds,
+          hrMin: timelineData.summary.hr_min,
+          hrMax: timelineData.summary.hr_max,
+          hrAvg: timelineData.summary.hr_avg,
+          stressMin: timelineData.summary.stress_min,
+          stressMax: timelineData.summary.stress_max,
+          stressAvg: timelineData.summary.stress_avg,
+        },
+      };
+      
+      console.log('[GarminService] 📩 Timeline summary:', eventData.summary);
+      emit({ event: 'timeline_complete', data: eventData });
+    }
+  }
+
+  // Log unhandled message types for debugging
+  const handledTypes = ['ACK', 'SESSION_DATA', 'SESSION_RESULT', 'SESSION_ENDED', 'SESSION_SUMMARY', 'SESSION_DETAILS', 'TIMELINE_CHUNK', 'TIMELINE', 'BIOMETRIC_TIMELINE', 'TIMELINE_DATA', 'SHOT_RECORDED', 'HEARTBEAT', 'PONG'];
+  if (!handledTypes.includes(message.type)) {
+    console.warn('[GarminService] ⚠️ UNHANDLED MESSAGE TYPE:', message.type);
+    console.warn('[GarminService] ⚠️ Full message:', JSON.stringify(message).slice(0, 500));
   }
 });
 
@@ -945,11 +1068,11 @@ export function startWatchSession(
 ): boolean {
   // If payload object, send full config
   if (typeof sessionIdOrPayload === 'object') {
-    return sendMessage('START_SESSION', sessionIdOrPayload);
+    return sendMessage('SESSION_START', sessionIdOrPayload);  // Watch expects SESSION_START
   }
 
   // Legacy: simple session start
-  return sendMessage('START_SESSION', {
+  return sendMessage('SESSION_START', {
     sessionId: sessionIdOrPayload,
     drillName,
     startedAt: Date.now(),
@@ -960,7 +1083,7 @@ export function startWatchSession(
 * Tell the watch to end the session and send back data.
 */
 export function endWatchSession(sessionId: string): boolean {
-return sendMessage('END_SESSION', { sessionId });
+return sendMessage('SESSION_END', { sessionId });  // Watch expects SESSION_END
 }
 
 /**

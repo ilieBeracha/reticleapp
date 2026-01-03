@@ -16,7 +16,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 
-// Import modular components
 import {
   CameraFlow,
   EditableDetection,
@@ -28,34 +27,20 @@ import {
   TargetType,
 } from "@/components/addTarget";
 
-// ═══════════════════════════════════════════════════════════════════════════
-// ADD TARGET SHEET
-// Main orchestrator for adding targets with Grouping vs Achievement selection
-// ═══════════════════════════════════════════════════════════════════════════
-
 export default function AddTargetSheet() {
   const { sessionId, defaultTargetType, defaultDistance, defaultInputMethod, startInManual, locked, maxShots } = useLocalSearchParams<{
     sessionId: string;
     defaultTargetType?: string;
     defaultDistance?: string;
     defaultInputMethod?: 'scan' | 'manual';
-    /** If '1', go directly to the manual achievement entry screen (when applicable). */
     startInManual?: string;
-    /** If '1', lock drill-driven fields like distance/bullets. */
     locked?: string;
-    /** Optional max shots cap (used to cap manual entry too). */
     maxShots?: string;
   }>();
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // STATE
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  // Camera
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
 
-  // Detection store
   const {
     result,
     analyze,
@@ -65,7 +50,6 @@ export default function AddTargetSheet() {
     setError,
   } = useDetectionStore();
 
-  // Navigation state
   const initialStep: Step =
     startInManual === '1' && defaultTargetType === 'achievement' && defaultInputMethod === 'manual'
       ? 'manual_entry'
@@ -74,7 +58,6 @@ export default function AddTargetSheet() {
   const [saving, setSaving] = useState(false);
   const [capturedUri, setCapturedUri] = useState<string | null>(null);
 
-  // Form state - NEW: Grouping vs Achievement
   const [targetType, setTargetType] = useState<TargetType>(
     (defaultTargetType as TargetType) || "grouping"
   );
@@ -82,32 +65,24 @@ export default function AddTargetSheet() {
     (defaultInputMethod as InputMethod) || "scan"
   );
   
-  // Distance state (used for scanned targets)
   const [selectedDistance, setSelectedDistance] = useState<number>(
     defaultDistance ? parseInt(defaultDistance) : 100
   );
   const isLocked = locked === '1';
   const maxShotsCap = maxShots ? parseInt(maxShots) : null;
 
-  // Editable detections state (for scan results)
   const [editedDetections, setEditedDetections] = useState<EditableDetection[]>([]);
 
-  // Auto-start camera if defaulting to grouping (scan-only)
   useEffect(() => {
     if (defaultTargetType === "grouping") {
       handleStartCamera();
     }
   }, []);
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // HANDLERS
-  // ═══════════════════════════════════════════════════════════════════════════
-
   const handleTargetTypeChange = useCallback((type: TargetType) => {
     setTargetType(type);
-    // Reset input method when changing target type
     if (type === "grouping") {
-      setInputMethod("scan"); // Grouping is always scan
+      setInputMethod("scan");
     }
   }, []);
 
@@ -133,30 +108,19 @@ export default function AddTargetSheet() {
     setStep("camera");
   }, [permission, requestPermission, startCapture]);
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // FORM SUBMISSION
-  // ═══════════════════════════════════════════════════════════════════════════
-
   const handleSubmit = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     if (targetType === "grouping") {
-      // Grouping: always scan
       await handleStartCamera();
     } else if (targetType === "achievement") {
       if (inputMethod === "scan") {
-        // Achievement + Scan: open camera
         await handleStartCamera();
       } else {
-        // Achievement + Manual: go to manual entry form
         setStep("manual_entry");
       }
     }
   }, [targetType, inputMethod, handleStartCamera]);
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // CAMERA HANDLERS
-  // ═══════════════════════════════════════════════════════════════════════════
 
   const handlePickImage = useCallback(async () => {
     const pickerResult = await ImagePicker.launchImageLibraryAsync({
@@ -203,7 +167,6 @@ export default function AddTargetSheet() {
     const analysisResult = await analyze();
     
     if (analysisResult) {
-      // Initialize editable detections from AI results
       const initialDetections: EditableDetection[] = analysisResult.detections.map((d, i) => ({
         ...d,
         id: `ai-${i}`,
@@ -229,14 +192,6 @@ export default function AddTargetSheet() {
     setStep("camera");
   }, [resetDetection]);
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SAVE HANDLERS
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  /**
-   * Save a scanned target (Grouping or Achievement+Scan)
-   * Both use paper_target_results with appropriate paper_type
-   */
   const saveScannedTarget = useCallback(
     async (finalDetections: EditableDetection[], editedImageBase64?: string) => {
       if (!sessionId) {
@@ -253,10 +208,8 @@ export default function AddTargetSheet() {
         ).length;
         const manualCount = finalDetections.filter((d) => d.isManual).length;
 
-        // Determine paper_type based on target type selection
         const paperType: PaperType = targetType === "grouping" ? "grouping" : "achievement";
 
-        // Build training data if user made corrections
         const trainingData =
           manualCount > 0 || finalDetections.length !== (result?.detections?.length ?? 0)
             ? {
@@ -276,35 +229,27 @@ export default function AddTargetSheet() {
               }
             : null;
 
-        // Use user-edited image if available, otherwise AI-annotated
         const finalImageBase64 = editedImageBase64 || result?.annotated_image_base64;
 
-        // Get group size from overall_stats_mm (furthest distance between any 2 bullets)
         const groupSizeCm = result?.overall_stats_mm?.max_pair?.distance_cm ?? null;
 
-        // Upload image to Supabase Storage
         let scannedImageUrl: string | null = null;
         if (finalImageBase64) {
-          console.log("[AddTarget] Uploading scanned target image to storage...");
           scannedImageUrl = await uploadScannedTargetImage(finalImageBase64, sessionId);
           if (!scannedImageUrl) {
-            console.warn("[AddTarget] Failed to upload image, saving without image");
+            console.warn("Failed to upload image, saving without image");
           }
         }
 
-        // For grouping targets, we don't track hits - only dispersion
-        // For achievement targets, we track both
         const saveParams = {
           session_id: sessionId,
           distance_m: selectedDistance,
           lane_number: null,
-          planned_shots: detectionCount, // Use detection count as bullets
+          planned_shots: detectionCount,
           notes: null,
           target_data: null,
           paper_type: paperType,
           bullets_fired: detectionCount,
-          // For grouping: hits don't matter, set to detection count
-          // For achievement: use high confidence hits
           hits_total: paperType === "grouping" ? detectionCount : Math.min(rawHighConfHits, detectionCount),
           hits_inside_scoring: paperType === "grouping" ? null : rawHighConfHits,
           dispersion_cm: groupSizeCm,
@@ -314,7 +259,6 @@ export default function AddTargetSheet() {
 
         await addTargetWithPaperResult(saveParams);
 
-        // Submit corrections for model training (fire-and-forget)
         if (trainingData && shouldSubmitForTraining(trainingData as TrainingDataPayload)) {
           submitTrainingData(trainingData as TrainingDataPayload)
             .then((res) => console.log("[Training] Submitted:", res.message))
@@ -334,9 +278,6 @@ export default function AddTargetSheet() {
     [sessionId, selectedDistance, targetType, result, resetDetection]
   );
 
-  /**
-   * Save a manually entered achievement target
-   */
   const saveManualAchievement = useCallback(
     async (data: { bulletsFired: number; hits: number; distance: number }) => {
       if (!sessionId) {
@@ -347,7 +288,6 @@ export default function AddTargetSheet() {
       setSaving(true);
 
       try {
-        // Manual achievement: paper_type = 'achievement', no image
         const saveParams = {
           session_id: sessionId,
           distance_m: data.distance,
@@ -359,8 +299,8 @@ export default function AddTargetSheet() {
           bullets_fired: data.bulletsFired,
           hits_total: data.hits,
           hits_inside_scoring: data.hits,
-          dispersion_cm: null, // No dispersion for manual entry
-          scanned_image_url: null, // No image for manual entry
+          dispersion_cm: null,
+          scanned_image_url: null,
           result_notes: null,
         };
 
@@ -379,11 +319,6 @@ export default function AddTargetSheet() {
     [sessionId, resetDetection]
   );
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // RENDER
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  // Results view (after scanning)
   if (step === "results" && result) {
     return (
       <ResultCard 
@@ -398,7 +333,6 @@ export default function AddTargetSheet() {
     );
   }
 
-  // Manual entry view (Achievement + Manual)
   if (step === "manual_entry") {
     return (
       <ManualAchievementEntry
@@ -412,8 +346,7 @@ export default function AddTargetSheet() {
       />
     );
   }
-
-  // Default: Target form + Camera flow
+  
   return (
     <>
       <TargetForm

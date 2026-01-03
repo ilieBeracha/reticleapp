@@ -40,15 +40,31 @@ export interface WatchSummaryPayload {
     /** Average split (ms) */
     avg: number;
   };
-  /** Biometrics summary */
+  /** Biometrics summary (v2 nested format) */
   bio: {
-    /** Average heart rate */
+    /** Heart rate metrics */
+    hr: {
+      avg: number;
+      min: number;
+      max: number;
+      start: number;
+      end: number;
+    };
+    /** Stress metrics */
+    stress: {
+      avg: number;
+      min: number;
+      max: number;
+    };
+    /** Breath metrics */
+    breath: {
+      avg: number;
+    };
+  } | {
+    // Legacy flat format (backward compat)
     hrAvg: number;
-    /** Minimum heart rate */
     hrMin: number;
-    /** Maximum heart rate */
     hrMax: number;
-    /** Average breath rate */
     brAvg: number;
   };
   /** Steadiness summary */
@@ -59,6 +75,17 @@ export interface WatchSummaryPayload {
     trend: 'improving' | 'declining' | 'stable' | 'unknown';
     /** Flinch count */
     flinch: number;
+    /** Steadiness at shot moments (average) */
+    shots?: number;
+  };
+  /** Detection metadata (v2 - moved from SESSION_DETAILS) */
+  detection?: {
+    /** Was auto-detection enabled? */
+    auto: boolean;
+    /** Detection sensitivity (1-5) */
+    sens: number;
+    /** Manual shot count overrides by user */
+    overrides: number;
   };
 }
 
@@ -134,7 +161,12 @@ export interface TransformedWatchData {
       avgHR: number;
       minHR: number;
       maxHR: number;
+      startHR?: number;
+      endHR?: number;
       avgBreathRate: number;
+      avgStress?: number;
+      minStress?: number;
+      maxStress?: number;
     };
   };
 
@@ -166,6 +198,117 @@ export interface TransformedWatchData {
 }
 
 // ============================================================================
+// PHASE 3: TIMELINE CHUNK PAYLOAD
+// ============================================================================
+
+/**
+ * Event types in timeline points.
+ * 0 = regular biometric sample (every 3 seconds)
+ * 1 = shot fired
+ * 2 = hit confirmed
+ */
+export type TimelineEventType = 0 | 1 | 2;
+
+/**
+ * Timeline point format: [timestamp_sec, hr, breathRate, stress, eventType]
+ * Compact array format from watch (~5 bytes per point).
+ */
+export type TimelinePoint = [number, number, number, number, TimelineEventType];
+
+/**
+ * Shot detail from timeline - only in last chunk.
+ * Contains detailed biometrics at exact shot moment.
+ */
+export interface TimelineShotDetail {
+  /** Shot number (1-indexed) */
+  n: number;
+  /** Timestamp in seconds from session start */
+  t: number;
+  /** Heart rate at shot moment */
+  hr: number;
+  /** Breath rate at shot moment */
+  br: number;
+  /** Breath phase: 0=inhale, 1=exhale, 2=pause */
+  bp: 0 | 1 | 2;
+  /** Stress score (0-100) */
+  st: number;
+  /** Steadiness score (0-100, higher = better) */
+  sd: number;
+  /** Flinch detected: 0=no, 1=yes */
+  fl: 0 | 1;
+}
+
+/**
+ * Phase 3: Watch TIMELINE_CHUNK payload - sent in chunks after details ACK.
+ * Contains time-series biometric data (~25 points per chunk).
+ */
+export interface WatchTimelineChunkPayload {
+  /** Session ID (must match summary/details) */
+  sid: string;
+  /** Chunk index (0-indexed) */
+  chunk: number;
+  /** Total number of chunks */
+  total: number;
+  /** Timeline points for this chunk */
+  pts: TimelinePoint[];
+  /** Shot details - ONLY present in the last chunk (chunk === total - 1) */
+  shots?: TimelineShotDetail[];
+}
+
+/**
+ * Assembled timeline data after all chunks received.
+ * This is the internal format for storage and visualization.
+ */
+export interface AssembledTimelineData {
+  sessionId: string;
+  /** All timeline points merged from chunks */
+  points: TimelinePoint[];
+  /** Shot details from last chunk */
+  shotDetails: TimelineShotDetail[];
+  /** Metadata */
+  totalChunks: number;
+  receivedAt: string;
+}
+
+/**
+ * Timeline point in expanded/readable format for storage/display.
+ */
+export interface TimelinePointExpanded {
+  /** Seconds from session start */
+  timestamp: number;
+  /** Heart rate BPM */
+  heartRate: number;
+  /** Breath rate (breaths/min) */
+  breathRate: number;
+  /** Stress score (0-100, higher = more stressed) */
+  stress: number;
+  /** Event type: 'sample' | 'shot' | 'hit' */
+  eventType: 'sample' | 'shot' | 'hit';
+}
+
+/**
+ * Shot detail in expanded/readable format for storage/display.
+ */
+export interface ShotDetailExpanded {
+  /** Shot number (1-indexed) */
+  shotNumber: number;
+  /** Seconds from session start */
+  timestamp: number;
+  /** Heart rate at shot */
+  heartRate: number;
+  /** Breath rate at shot */
+  breathRate: number;
+  /** Breath phase at shot */
+  breathPhase: 'inhale' | 'exhale' | 'pause';
+  /** Stress score (0-100) */
+  stress: number;
+  /** Steadiness score (0-100) */
+  steadiness: number;
+  /** Flinch detected */
+  flinch: boolean;
+}
+
+// ============================================================================
 // ACK PAYLOADS - Sent back to watch
 // ============================================================================
 
@@ -186,6 +329,17 @@ export interface DetailsAckPayload {
   sessionId: string;
   type: 'details';
   status: 'received' | 'error';
+  error?: string;
+}
+
+/**
+ * ACK payload for timeline chunk.
+ */
+export interface TimelineAckPayload {
+  sessionId: string;
+  type: 'timeline';
+  status: 'received' | 'error';
+  chunk?: number;
   error?: string;
 }
 

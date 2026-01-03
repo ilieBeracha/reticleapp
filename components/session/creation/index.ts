@@ -1,10 +1,11 @@
 /**
  * Session Creation Module
- * 
- * 2-step session creation flow following the mental model:
- * 1. Intent - What am I going to do?
- * 2. Context - Under what conditions?
- * 
+ *
+ * 3-step session creation flow:
+ * 1. Intent - What's my goal?
+ * 2. Weapon - Which weapon?
+ * 3. Context - Session details (distance, rounds, drill)
+ *
  * After form submission:
  * - SessionPrepView handles watch/phone selection
  * - activeSession.tsx handles scan/manual (based on drill config)
@@ -20,8 +21,8 @@ export * from './sessionCreation.constants';
 export { useSessionCreation } from './useSessionCreation';
 export type { UseSessionCreationOptions, UseSessionCreationReturn } from './useSessionCreation';
 
-// Components (only 2 steps now)
+// Components (3 steps)
 export { SessionContextStep } from './SessionContextStep';
 export { SessionIntentStep } from './SessionIntentStep';
-// SessionMeasurementStep removed - watch/phone handled by SessionPrepView, scan/manual by activeSession
+export { SessionWeaponStep } from './SessionWeaponStep';
 

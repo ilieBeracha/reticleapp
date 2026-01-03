@@ -78,11 +78,12 @@ export interface SessionContextState {
 // COMBINED SESSION CREATION STATE
 // ============================================================================
 
-// Note: Only 2 steps in the form:
-// - Watch/Phone selection → SessionPrepView after form
-// - Scan/Manual selection → activeSession.tsx during session (based on drill config)
+// Note: 3 steps in the form:
+// 1. Intent - What's my goal?
+// 2. Weapon - Which weapon?
+// 3. Context - Session details (distance, rounds, drill, etc.)
 
-export type CreationStep = 'intent' | 'context' | 'ready';
+export type CreationStep = 'intent' | 'weapon' | 'context' | 'ready';
 
 // Legacy type for drill config compatibility
 export type InputMethod = 'scan' | 'manual';

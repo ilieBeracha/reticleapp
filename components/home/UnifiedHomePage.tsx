@@ -8,6 +8,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useModals } from '@/contexts/ModalContext';
 import { useColors } from '@/hooks/ui/useColors';
+import { type SessionTimeline } from '@/services/session/timelineService';
 import {
   deleteSession,
   getMyActivePersonalSession,
@@ -19,6 +20,7 @@ import { useSessionStore } from '@/store/sessionStore';
 import { useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
 import { Ionicons } from '@expo/vector-icons';
+import BottomSheet from '@gorhom/bottom-sheet';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -29,10 +31,11 @@ import {
   Clock,
   Crosshair,
   Flame,
+  Heart,
   Target,
   TrendingUp,
   Users,
-  Zap,
+  Zap
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -321,7 +324,7 @@ function TeamTrainingCard({
 }
 
 // ============================================================================
-// RECENT SESSION ROW
+// RECENT SESSION ROW - Simple, opens bottom sheet on click
 // ============================================================================
 function RecentSessionRow({
   session,
@@ -333,6 +336,7 @@ function RecentSessionRow({
   onPress: () => void;
 }) {
   const isTeam = session.origin === 'team';
+  const hasWatchData = session.sourceSession?.watch_controlled ?? false;
   const timeAgo = session.endedAt
     ? formatTimeAgo(session.endedAt)
     : session.startedAt
@@ -340,20 +344,34 @@ function RecentSessionRow({
     : '';
 
   return (
-    <TouchableOpacity style={styles.recentRow} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity 
+      style={styles.recentRow} 
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
       <View style={[styles.recentIcon, { backgroundColor: isTeam ? `${colors.blue}12` : `${colors.indigo}12` }]}>
         {isTeam ? <Users size={14} color={colors.blue} /> : <Crosshair size={14} color={colors.indigo} />}
       </View>
       <View style={styles.recentContent}>
-        <Text style={[styles.recentTitle, { color: colors.text }]} numberOfLines={1}>
-          {session.drillName || (isTeam ? 'Team Session' : 'Practice Session')}
-        </Text>
+        <View style={styles.recentTitleRow}>
+          <Text style={[styles.recentTitle, { color: colors.text }]} numberOfLines={1}>
+            {session.drillName || (isTeam ? 'Team Session' : 'Practice Session')}
+          </Text>
+          {hasWatchData && (
+            <View style={[styles.bioBadge, { backgroundColor: '#EF444415' }]}>
+              <Heart size={10} color="#EF4444" />
+            </View>
+          )}
+        </View>
         <Text style={[styles.recentMeta, { color: colors.textMuted }]}>
           {session.stats?.shots ? `${session.stats.shots} shots` : 'No shots'}
           {session.stats?.accuracy ? ` · ${session.stats.accuracy}%` : ''}
         </Text>
       </View>
-      <Text style={[styles.recentTime, { color: colors.textMuted }]}>{timeAgo}</Text>
+      <View style={styles.recentRight}>
+        <Text style={[styles.recentTime, { color: colors.textMuted }]}>{timeAgo}</Text>
+        <ChevronRight size={14} color={colors.textMuted} />
+      </View>
     </TouchableOpacity>
   );
 }
@@ -406,6 +424,13 @@ export function UnifiedHomePage() {
   const [allSessions, setAllSessions] = useState<SessionWithDetails[]>([]);
   const [loadingAllSessions, setLoadingAllSessions] = useState(true);
   const initialLoadDone = useRef(false);
+
+  // Bottom sheet state
+  const sheetRef = useRef<BottomSheet>(null);
+  const [sheetSession, setSheetSession] = useState<HomeSession | null>(null);
+  const [sheetTimeline, setSheetTimeline] = useState<SessionTimeline | null>(null);
+  const [sheetLoading, setSheetLoading] = useState(false);
+  const snapPoints = useMemo(() => ['50%', '85%'], []);
 
   // Load recent sessions
   const loadAllSessions = useCallback(async () => {
@@ -749,7 +774,11 @@ export function UnifiedHomePage() {
             <View style={[styles.recentList, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {recentSessions.map((session, idx) => (
                 <View key={session.id}>
-                  <RecentSessionRow session={session} colors={colors} onPress={() => handleSessionPress(session)} />
+                  <RecentSessionRow 
+                    session={session} 
+                    colors={colors} 
+                    onPress={() => handleSessionPress(session)}
+                  />
                   {idx < recentSessions.length - 1 && (
                     <View style={[styles.recentDivider, { backgroundColor: colors.border }]} />
                   )}
@@ -1019,8 +1048,107 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   recentContent: { flex: 1 },
-  recentTitle: { fontSize: 14, fontWeight: '600', marginBottom: 2 },
+  recentTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  recentTitle: { fontSize: 14, fontWeight: '600', flex: 1 },
   recentMeta: { fontSize: 12 },
+  recentRight: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
   recentTime: { fontSize: 11, fontWeight: '500' },
   recentDivider: { height: 1, marginLeft: 62 },
+  bioBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ═══════════════════════════════════════════════════════════════════
+  // INSIGHTS STYLES (Below session cards)
+  // ═══════════════════════════════════════════════════════════════════
+  insightsContainer: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    paddingTop: 0,
+    gap: 8,
+  },
+  insightsMetricsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 16,
+  },
+  insightMetricSmall: {
+    alignItems: 'center',
+  },
+  insightValueSmall: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  insightLabelSmall: {
+    fontSize: 9,
+    fontWeight: '500',
+  },
+  trendBadgeSmall: {
+    padding: 4,
+    borderRadius: 6,
+  },
+  hrBadgeSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  hrValueSmall: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  shotBarsRowSmall: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 3,
+    height: 32,
+    marginLeft: 48,
+  },
+  shotBarColSmall: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  shotBarSmall: {
+    width: 6,
+    borderRadius: 2,
+  },
+  shotBreathDotSmall: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+  shotBarsMoreSmall: {
+    fontSize: 9,
+    fontWeight: '500',
+    marginLeft: 4,
+  },
+  bestWorstRowSmall: {
+    flexDirection: 'row',
+    gap: 8,
+    marginLeft: 48,
+  },
+  bestWorstBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  bestWorstTextSmall: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
 });

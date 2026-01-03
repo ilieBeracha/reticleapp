@@ -45,10 +45,6 @@ import {
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// ============================================================================
-// HERO TARGET - Clean visual preview of most recent target
-// Just image + type badge + key metric - stats are in CompactStats below
-// ============================================================================
 function HeroTarget({
   target,
   onPress,
@@ -58,24 +54,19 @@ function HeroTarget({
   onPress: () => void;
   colors: ReturnType<typeof useColors>;
 }) {
-  // Extract data correctly from SessionTargetWithResults
   const isPaper = target.target_type === 'paper';
   const paperResult = target.paper_result;
   
-  // Image
   const imageUrl = paperResult?.scanned_image_url;
   const hasImage = !!imageUrl;
   
-  // Determine entry type
   const isScanned = isPaper && !!paperResult?.scanned_image_url;
   const isGrouping = isPaper && paperResult?.paper_type === 'grouping';
   
-  // Key metric for overlay
   const distance = target.distance_m;
   const dispersion = paperResult?.dispersion_cm;
   const hits = paperResult?.hits_total ?? target.tactical_result?.hits ?? 0;
 
-  // Type label
   const typeLabel = isGrouping ? 'Grouping' : isScanned ? 'Scanned' : 'Manual';
   const typeColor = isGrouping ? '#22C55E' : isScanned ? '#A78BFA' : '#60A5FA';
 
@@ -121,10 +112,6 @@ function HeroTarget({
   );
 }
 
-// ============================================================================
-// COMPACT STATS - Session summary (aggregate across all targets)
-// Shows different stats for SCAN vs MANUAL sessions
-// ============================================================================
 function CompactStats({
   targets,
   colors,
@@ -132,7 +119,6 @@ function CompactStats({
   targets: any[];
   colors: ReturnType<typeof useColors>;
 }) {
-  // Analyze targets to determine what to show
   let manualShots = 0;
   let manualHits = 0;
   let scannedHoles = 0;
@@ -167,14 +153,12 @@ function CompactStats({
   const manualAccuracy = manualShots > 0 ? Math.round((manualHits / manualShots) * 100) : 0;
   const totalTargets = targets.length;
 
-  // Decide what to show based on predominant entry type
   const hasManual = manualCount > 0;
   const hasScan = scanCount > 0;
   const hasGrouping = groupingCount > 0;
 
   return (
     <View style={[localStyles.compactStats, { backgroundColor: colors.card }]}>
-      {/* Always show target count */}
       <View style={localStyles.compactStatItem}>
         <Text style={[localStyles.compactStatValue, { color: colors.text }]}>{totalTargets}</Text>
         <Text style={[localStyles.compactStatLabel, { color: colors.textMuted }]}>targets</Text>
@@ -182,7 +166,6 @@ function CompactStats({
       
       <View style={[localStyles.compactStatDivider, { backgroundColor: colors.border }]} />
       
-      {/* Show accuracy ONLY if we have manual entries */}
       {hasManual ? (
         <>
           <View style={localStyles.compactStatItem}>
@@ -241,9 +224,6 @@ function CompactStats({
   );
 }
 
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
 export default function ActiveSessionScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
@@ -294,7 +274,6 @@ export default function ActiveSessionScreen() {
     [colors]
   );
 
-  // Loading
   if (loading) {
     return (
       <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
@@ -303,7 +282,6 @@ export default function ActiveSessionScreen() {
     );
   }
 
-  // Error / Completed / Cancelled
   if (!session || (session.status !== 'active' && session.status !== 'pending')) {
     const isCompleted = session?.status === 'completed';
     return (
@@ -328,14 +306,12 @@ export default function ActiveSessionScreen() {
     );
   }
 
-  // Pending session - show prep view to select watch or phone
   if (session.status === 'pending') {
     return (
       <SessionPrepView
         session={session}
         insets={insets}
         onSessionActivated={(activated) => {
-          // Session is now active, the hook will reload data
           handleRefresh();
         }}
         onClose={handleClose}
@@ -343,7 +319,6 @@ export default function ActiveSessionScreen() {
     );
   }
 
-  // Watch controlled states
   if (watchState.isWatchControlled) {
     const drillName = session.drill_name || session.training_title || 'Practice Session';
 
@@ -366,7 +341,6 @@ export default function ActiveSessionScreen() {
       return <WatchStartingView colors={colors} insets={insets} drillName={drillName} onClose={handleClose} />;
     }
 
-    // Watch app not open - waiting for user to open it
     if (watchState.watchAppNotOpen) {
       return (
         <WatchPreviewQueuedView
@@ -384,7 +358,6 @@ export default function ActiveSessionScreen() {
       );
     }
 
-    // Watch has preview queued - waiting for user to tap watch to start
     if (watchState.watchPreviewQueued) {
       return (
         <WatchPreviewQueuedView
@@ -402,7 +375,6 @@ export default function ActiveSessionScreen() {
       );
     }
 
-    // Session is actively running on watch
     return (
       <WatchWaitingView
         colors={colors}
@@ -418,10 +390,8 @@ export default function ActiveSessionScreen() {
     );
   }
 
-  // Main render
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.secondary }]} onPress={handleClose}>
           <X size={18} color={colors.textMuted} />
@@ -433,7 +403,6 @@ export default function ActiveSessionScreen() {
           </Text>
         </View>
 
-        {/* Only show timer if drill has time limit */}
         {drill?.time_limit_seconds ? (
           <View style={styles.timerContainer}>
             <View style={[styles.liveDot, drillProgress?.overTime && { backgroundColor: COLORS.error }]} />
@@ -446,7 +415,6 @@ export default function ActiveSessionScreen() {
         )}
       </View>
 
-      {/* Drill Requirements */}
       {hasDrill && drill && (
         <DrillBanner
           colors={colors}
@@ -459,7 +427,6 @@ export default function ActiveSessionScreen() {
         />
       )}
 
-      {/* Weapon info when no drill */}
       {!hasDrill && session.weapon_name && (
         <View style={[localStyles.weaponBar, { backgroundColor: colors.card }]}>
           <Target size={14} color={colors.primary} />
@@ -467,19 +434,16 @@ export default function ActiveSessionScreen() {
         </View>
       )}
 
-      {/* Hero Target */}
       {targets.length > 0 && (
         <Animated.View entering={FadeIn.duration(300)} style={localStyles.heroContainer}>
           <HeroTarget target={targets[0]} onPress={() => handleTargetPress(targets[0])} colors={colors} />
         </Animated.View>
       )}
 
-      {/* Stats Bar */}
       <Animated.View entering={FadeInDown.delay(50).duration(300)} style={localStyles.statsContainer}>
         <CompactStats targets={targets} colors={colors} />
       </Animated.View>
 
-      {/* Add Target Buttons - User chooses scan or manual */}
       {canAddTarget && (
         <Animated.View entering={FadeInDown.delay(100).duration(300)} style={localStyles.actionsContainer}>
           <View style={localStyles.actionRow}>
@@ -501,7 +465,6 @@ export default function ActiveSessionScreen() {
         </Animated.View>
       )}
 
-      {/* Previous Targets */}
       <View style={styles.listContainer}>
         {targets.length > 1 && (
           <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>PREVIOUS ({targets.length - 1})</Text>
@@ -519,7 +482,6 @@ export default function ActiveSessionScreen() {
         />
       </View>
 
-      {/* End Session Button */}
       <View style={[localStyles.bottomBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
         <TouchableOpacity
           style={[
@@ -559,10 +521,6 @@ export default function ActiveSessionScreen() {
   );
 }
 
-// ============================================================================
-// SUB-COMPONENTS
-// ============================================================================
-
 function WatchFailedView({
   colors,
   insets,
@@ -573,7 +531,6 @@ function WatchFailedView({
   onRetry,
   onContinueWithoutWatch,
 }: any) {
-  // Simple, non-stressful error view
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
@@ -625,7 +582,6 @@ function WatchFailedView({
 }
 
 function WatchStartingView({ colors, insets, drillName, onClose }: any) {
-  // Simple connecting state
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
@@ -654,7 +610,6 @@ function WatchStartingView({ colors, insets, drillName, onClose }: any) {
   );
 }
 
-// Watch has preview queued - waiting for user to tap watch to start
 function WatchPreviewQueuedView({
   colors,
   insets,
@@ -667,7 +622,6 @@ function WatchPreviewQueuedView({
   onContinueWithoutWatch,
   weaponName,
 }: any) {
-  // Calm, focused view
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
@@ -707,7 +661,6 @@ function WatchPreviewQueuedView({
           </View>
         )}
 
-        {/* Weapon info */}
         {weaponName && (
           <View style={[localStyles.drillChip, { backgroundColor: colors.card, marginTop: 8 }]}>
             <Target size={14} color={colors.primary} />
@@ -715,7 +668,6 @@ function WatchPreviewQueuedView({
           </View>
         )}
 
-        {/* Subtle waiting indicator */}
         <View style={{ marginTop: 40, alignItems: 'center' }}>
           <ActivityIndicator size="small" color={colors.textMuted} />
           <Text style={[{ fontSize: 12, marginTop: 8 }, { color: colors.textMuted }]}>
@@ -743,18 +695,14 @@ function WatchWaitingView({
   colors,
   insets,
   drillName,
-  elapsedTime,
   drill,
   isWatchConnected,
   ending,
   onClose,
   onEndSession,
-  weaponName,
 }: any) {
-  // Clean, calm view - no timer on phone (watch has it)
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Minimal header - no timer */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.secondary }]} onPress={onClose}>
           <X size={18} color={colors.textMuted} />
@@ -764,7 +712,6 @@ function WatchWaitingView({
             {drillName}
           </Text>
         </View>
-        {/* Status indicator instead of timer */}
         <View style={[localStyles.statusBadge, { backgroundColor: isWatchConnected ? '#10B98120' : '#F59E0B20' }]}>
           <View style={[localStyles.statusDot, { backgroundColor: isWatchConnected ? '#10B981' : '#F59E0B' }]} />
           <Text style={[localStyles.statusText, { color: isWatchConnected ? '#10B981' : '#F59E0B' }]}>
@@ -773,7 +720,6 @@ function WatchWaitingView({
         </View>
       </View>
 
-      {/* Calm center content */}
       <View style={styles.watchWaitingContainer}>
         <View style={[localStyles.watchIconLarge, { backgroundColor: isWatchConnected ? '#10B98115' : colors.secondary }]}>
           <Watch size={56} color={isWatchConnected ? '#10B981' : colors.textMuted} strokeWidth={1.5} />
@@ -797,7 +743,6 @@ function WatchWaitingView({
         )}
       </View>
 
-      {/* Subtle end button */}
       <View style={[localStyles.bottomBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
         <TouchableOpacity
           style={[localStyles.subtleBtn, { borderColor: colors.border }]}
@@ -900,11 +845,7 @@ function DrillBanner({ colors, drill, drillProgress, targets, isGroupingDrill, i
   );
 }
 
-// ============================================================================
-// LOCAL STYLES
-// ============================================================================
 const localStyles = StyleSheet.create({
-  // Weapon bar (when no drill)
   weaponBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -921,12 +862,10 @@ const localStyles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Hero
   heroContainer: { paddingHorizontal: 16, marginBottom: 12 },
   heroTarget: { borderRadius: 12, overflow: 'hidden', height: 160 },
   heroImage: { width: '100%', height: '100%' },
   heroPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  // Hero badges (top row)
   heroBadgeRow: {
     position: 'absolute',
     top: 10,
@@ -958,7 +897,6 @@ const localStyles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  // Hero overlay (bottom)
   heroOverlay: {
     position: 'absolute',
     bottom: 0,
@@ -981,16 +919,12 @@ const localStyles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-
-  // Stats
   statsContainer: { paddingHorizontal: 16, marginBottom: 12 },
   compactStats: { flexDirection: 'row', borderRadius: 10, padding: 12 },
   compactStatItem: { flex: 1, alignItems: 'center' },
   compactStatValue: { fontSize: 16, fontWeight: '700' },
   compactStatLabel: { fontSize: 11, marginTop: 2 },
   compactStatDivider: { width: 1, height: 28 },
-
-  // Actions
   actionsContainer: { paddingHorizontal: 16, marginBottom: 16 },
   actionRow: {
     flexDirection: 'row',
@@ -1007,7 +941,6 @@ const localStyles = StyleSheet.create({
   },
   actionBtnText: { fontSize: 15, fontWeight: '600' },
 
-  // Bottom
   bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingTop: 12 },
   endBtn: {
     flexDirection: 'row',
@@ -1019,15 +952,12 @@ const localStyles = StyleSheet.create({
   },
   endBtnText: { fontSize: 16, fontWeight: '600' },
 
-  // Drill meta
   drillMeta: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 },
   drillMetaText: { fontSize: 14, fontWeight: '500', textAlign: 'center' },
 
-  // Watch preview queued
   pulseIndicator: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pulseText: { fontSize: 14, fontWeight: '500' },
 
-  // Calm watch-controlled styles
   statusBadge: { 
     flexDirection: 'row', 
     alignItems: 'center', 
@@ -1066,8 +996,6 @@ const localStyles = StyleSheet.create({
     borderWidth: 1 
   },
   subtleBtnText: { fontSize: 14, fontWeight: '500' },
-  
-  // Failed view
   failedActions: { width: '100%', paddingHorizontal: 32 },
   primaryBtn: {
     flexDirection: 'row',

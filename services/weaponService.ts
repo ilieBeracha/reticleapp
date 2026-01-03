@@ -58,6 +58,9 @@ export interface TeamWeapon {
   assigned_user?: { id: string; full_name: string; avatar_url: string | null };
 }
 
+// Cleaning interval types
+export type CleaningIntervalType = 'rounds' | 'sessions' | 'days';
+
 // Layer 3: Personal Weapon
 export interface UserWeapon {
   id: string;
@@ -73,9 +76,16 @@ export interface UserWeapon {
   last_used_at: string | null;
   created_at: string;
   updated_at: string;
-  // Sharing fields (new)
+  // Sharing fields
   shared_with_team_id: string | null;
   share_status: 'pending' | 'approved' | 'rejected' | null;
+  // Cleaning routine fields
+  cleaning_enabled: boolean;
+  cleaning_interval_type: CleaningIntervalType | null;
+  cleaning_interval_value: number | null;
+  last_cleaned_at: string | null;
+  rounds_since_cleaning: number;
+  sessions_since_cleaning: number;
   // Joined
   base_weapon?: GlobalWeapon;
   team_weapon?: TeamWeapon;
@@ -452,6 +462,10 @@ export async function createUserWeapon(weapon: {
   personal_zero_distance_m?: number;
   personal_notes?: string;
   is_favorite?: boolean;
+  // Cleaning routine
+  cleaning_enabled?: boolean;
+  cleaning_interval_type?: CleaningIntervalType;
+  cleaning_interval_value?: number;
 }): Promise<UserWeapon> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
@@ -905,5 +919,143 @@ export async function getOrCreatePersonalProfile(
 
   if (createError) throw createError;
   return profile;
+}
+
+// ============================================================================
+// WEAPON STATISTICS
+// ============================================================================
+
+export interface WeaponStats {
+  weapon_id: string;
+  total_sessions: number;
+  total_rounds_fired: number;
+  last_used_at: string | null;
+  avg_accuracy_pct: number | null;
+  best_dispersion_cm: number | null;
+}
+
+/**
+ * Get statistics for all user weapons
+ * Aggregates session data per weapon
+ */
+export async function getWeaponStats(): Promise<Map<string, WeaponStats>> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return new Map();
+
+  // Get all sessions with weapon_id for current user
+  const { data: sessions, error } = await supabase
+    .from('sessions')
+    .select(`
+      id,
+      weapon_id,
+      started_at,
+      status
+    `)
+    .eq('user_id', user.id)
+    .not('weapon_id', 'is', null);
+
+  if (error) {
+    console.error('[getWeaponStats] Error fetching sessions:', error);
+    return new Map();
+  }
+
+  if (!sessions || sessions.length === 0) return new Map();
+
+  // Group sessions by weapon_id
+  const weaponSessions = new Map<string, {
+    sessions: typeof sessions;
+    lastUsed: string | null;
+  }>();
+
+  sessions.forEach((session: any) => {
+    const wid = session.weapon_id;
+    if (!weaponSessions.has(wid)) {
+      weaponSessions.set(wid, { sessions: [], lastUsed: null });
+    }
+    const ws = weaponSessions.get(wid)!;
+    ws.sessions.push(session);
+    if (!ws.lastUsed || session.started_at > ws.lastUsed) {
+      ws.lastUsed = session.started_at;
+    }
+  });
+
+  // Get session IDs for stats aggregation
+  const sessionIds = sessions.map((s: any) => s.id);
+
+  // Fetch target results for all sessions
+  const { data: targets, error: targetsError } = await supabase
+    .from('session_targets')
+    .select(`
+      session_id,
+      paper_target_results(bullets_fired, hits_total, dispersion_cm),
+      tactical_target_results(bullets_fired, hits)
+    `)
+    .in('session_id', sessionIds);
+
+  if (targetsError) {
+    console.error('[getWeaponStats] Error fetching targets:', targetsError);
+  }
+
+  // Map session_id to weapon_id
+  const sessionToWeapon = new Map<string, string>();
+  sessions.forEach((s: any) => {
+    sessionToWeapon.set(s.id, s.weapon_id);
+  });
+
+  // Aggregate stats per weapon
+  const weaponAggregates = new Map<string, {
+    rounds: number;
+    hits: number;
+    bestDispersion: number | null;
+  }>();
+
+  (targets ?? []).forEach((target: any) => {
+    const weaponId = sessionToWeapon.get(target.session_id);
+    if (!weaponId) return;
+
+    if (!weaponAggregates.has(weaponId)) {
+      weaponAggregates.set(weaponId, { rounds: 0, hits: 0, bestDispersion: null });
+    }
+    const agg = weaponAggregates.get(weaponId)!;
+
+    // Paper results
+    const paper = target.paper_target_results;
+    if (paper) {
+      agg.rounds += paper.bullets_fired ?? 0;
+      agg.hits += paper.hits_total ?? 0;
+      if (paper.dispersion_cm != null) {
+        if (agg.bestDispersion === null || paper.dispersion_cm < agg.bestDispersion) {
+          agg.bestDispersion = paper.dispersion_cm;
+        }
+      }
+    }
+
+    // Tactical results
+    const tactical = target.tactical_target_results;
+    if (tactical) {
+      agg.rounds += tactical.bullets_fired ?? 0;
+      agg.hits += tactical.hits ?? 0;
+    }
+  });
+
+  // Build final stats map
+  const statsMap = new Map<string, WeaponStats>();
+
+  weaponSessions.forEach((data, weaponId) => {
+    const agg = weaponAggregates.get(weaponId);
+    const rounds = agg?.rounds ?? 0;
+    const hits = agg?.hits ?? 0;
+
+    statsMap.set(weaponId, {
+      weapon_id: weaponId,
+      total_sessions: data.sessions.length,
+      total_rounds_fired: rounds,
+      last_used_at: data.lastUsed,
+      avg_accuracy_pct: rounds > 0 ? Math.round((hits / rounds) * 100) : null,
+      best_dispersion_cm: agg?.bestDispersion ?? null,
+    });
+  });
+
+  return statsMap;
 }
 

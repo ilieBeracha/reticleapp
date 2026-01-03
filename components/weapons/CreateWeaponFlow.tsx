@@ -1,48 +1,42 @@
 /**
  * CreateWeaponFlow - Guided weapon creation
- * 
- * Design: Clean, monochrome, Apple-inspired
- * - Typography-first
- * - Minimal color usage
- * - Generous whitespace
  */
 
 import { useColors } from '@/hooks/ui/useColors';
 import {
-    createUserWeapon,
-    getGlobalWeapons,
-    searchGlobalWeapons,
-    WEAPON_CATEGORIES,
-    type GlobalWeapon,
-    type WeaponCategory,
+  createUserWeapon,
+  getGlobalWeapons,
+  searchGlobalWeapons,
+  WEAPON_CATEGORIES,
+  type CleaningIntervalType,
+  type GlobalWeapon,
+  type WeaponCategory,
 } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
 import {
-    AlertCircle,
-    Check,
-    ChevronLeft,
-    ChevronRight,
-    Plus,
-    Search,
-    X,
+  AlertCircle,
+  Bell,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Search,
+  Sparkles,
+  X,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-
-// ============================================================================
-// TYPES
-// ============================================================================
 
 type FlowStep = 'choice' | 'search' | 'customize' | 'custom';
 
@@ -52,29 +46,28 @@ interface CreateWeaponFlowProps {
   teamId?: string;
 }
 
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
-
 export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponFlowProps) {
   const colors = useColors();
   
   const [step, setStep] = useState<FlowStep>('choice');
   const [selectedBase, setSelectedBase] = useState<GlobalWeapon | null>(null);
   
-  // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<GlobalWeapon[]>([]);
   const [allWeapons, setAllWeapons] = useState<GlobalWeapon[]>([]);
   const [searching, setSearching] = useState(false);
   
-  // Form state
   const [name, setName] = useState('');
   const [category, setCategory] = useState<WeaponCategory>('precision_rifle');
   const [caliber, setCaliber] = useState('');
   const [notes, setNotes] = useState('');
   const [zeroDistance, setZeroDistance] = useState('');
-  
+
+  // Cleaning routine
+  const [cleaningEnabled, setCleaningEnabled] = useState(false);
+  const [cleaningIntervalType, setCleaningIntervalType] = useState<CleaningIntervalType>('rounds');
+  const [cleaningIntervalValue, setCleaningIntervalValue] = useState('');
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -128,6 +121,12 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
       return;
     }
 
+    // Validate cleaning config if enabled
+    if (cleaningEnabled && !cleaningIntervalValue) {
+      setError('Please set a cleaning interval');
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
@@ -139,6 +138,12 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
         caliber: caliber.trim() || undefined,
         personal_zero_distance_m: zeroDistance ? parseInt(zeroDistance, 10) : undefined,
         personal_notes: notes.trim() || undefined,
+        // Cleaning routine
+        cleaning_enabled: cleaningEnabled,
+        cleaning_interval_type: cleaningEnabled ? cleaningIntervalType : undefined,
+        cleaning_interval_value: cleaningEnabled && cleaningIntervalValue
+          ? parseInt(cleaningIntervalValue, 10)
+          : undefined,
       });
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -150,12 +155,9 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
     } finally {
       setSubmitting(false);
     }
-  }, [name, selectedBase, category, caliber, zeroDistance, notes, onComplete]);
+  }, [name, selectedBase, category, caliber, zeroDistance, notes, cleaningEnabled, cleaningIntervalType, cleaningIntervalValue, onComplete]);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // STEP 1: Choice
-  // ─────────────────────────────────────────────────────────────────────────
-  
+ 
   if (step === 'choice') {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -285,10 +287,6 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // STEP 2b: Custom Weapon Form
-  // ─────────────────────────────────────────────────────────────────────────
-  
   if (step === 'custom') {
     return (
       <KeyboardAvoidingView 
@@ -381,6 +379,17 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
             />
           </FormField>
 
+          {/* Cleaning Routine */}
+          <CleaningRoutineSection
+            enabled={cleaningEnabled}
+            onToggle={() => setCleaningEnabled(!cleaningEnabled)}
+            intervalType={cleaningIntervalType}
+            onIntervalTypeChange={setCleaningIntervalType}
+            intervalValue={cleaningIntervalValue}
+            onIntervalValueChange={setCleaningIntervalValue}
+            colors={colors}
+          />
+
           {error && (
             <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
           )}
@@ -405,10 +414,6 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // STEP 3: Customize (after selecting base)
-  // ─────────────────────────────────────────────────────────────────────────
-  
   return (
     <KeyboardAvoidingView 
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -448,6 +453,16 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
           />
         </FormField>
 
+        <FormField label="Caliber" colors={colors}>
+          <TextInput
+            style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+            placeholder="e.g., .308 Winchester"
+            placeholderTextColor={colors.textMuted}
+            value={caliber}
+            onChangeText={setCaliber}
+          />
+        </FormField>
+
         <FormField label="Zero Distance (m)" colors={colors}>
           <TextInput
             style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
@@ -470,6 +485,17 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
             numberOfLines={3}
           />
         </FormField>
+
+        {/* Cleaning Routine */}
+        <CleaningRoutineSection
+          enabled={cleaningEnabled}
+          onToggle={() => setCleaningEnabled(!cleaningEnabled)}
+          intervalType={cleaningIntervalType}
+          onIntervalTypeChange={setCleaningIntervalType}
+          intervalValue={cleaningIntervalValue}
+          onIntervalValueChange={setCleaningIntervalValue}
+          colors={colors}
+        />
 
         {error && (
           <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
@@ -494,10 +520,6 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
     </KeyboardAvoidingView>
   );
 }
-
-// ============================================================================
-// SUB-COMPONENTS
-// ============================================================================
 
 function Header({ 
   title, 
@@ -527,13 +549,13 @@ function Header({
   );
 }
 
-function FormField({ 
-  label, 
-  required, 
-  children, 
-  colors 
-}: { 
-  label: string; 
+function FormField({
+  label,
+  required,
+  children,
+  colors
+}: {
+  label: string;
   required?: boolean;
   children: React.ReactNode;
   colors: ReturnType<typeof useColors>;
@@ -549,9 +571,141 @@ function FormField({
   );
 }
 
-// ============================================================================
-// STYLES
-// ============================================================================
+// Cleaning interval options
+const CLEANING_INTERVALS: { type: CleaningIntervalType; label: string; placeholder: string; hint: string }[] = [
+  { type: 'rounds', label: 'Rounds', placeholder: '500', hint: 'rounds fired' },
+  { type: 'sessions', label: 'Sessions', placeholder: '10', hint: 'training sessions' },
+  { type: 'days', label: 'Days', placeholder: '30', hint: 'days since last clean' },
+];
+
+function CleaningRoutineSection({
+  enabled,
+  onToggle,
+  intervalType,
+  onIntervalTypeChange,
+  intervalValue,
+  onIntervalValueChange,
+  colors,
+}: {
+  enabled: boolean;
+  onToggle: () => void;
+  intervalType: CleaningIntervalType;
+  onIntervalTypeChange: (type: CleaningIntervalType) => void;
+  intervalValue: string;
+  onIntervalValueChange: (value: string) => void;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const selectedInterval = CLEANING_INTERVALS.find((i) => i.type === intervalType)!;
+
+  return (
+    <View style={styles.cleaningSection}>
+      {/* Toggle Row */}
+      <TouchableOpacity
+        style={[styles.cleaningToggle, { backgroundColor: colors.card }]}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          onToggle();
+        }}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.cleaningIconWrap, { backgroundColor: enabled ? colors.text : colors.secondary }]}>
+          <Bell size={16} color={enabled ? colors.background : colors.textMuted} />
+        </View>
+        <View style={styles.cleaningToggleText}>
+          <Text style={[styles.cleaningToggleTitle, { color: colors.text }]}>
+            Cleaning Reminders
+          </Text>
+          <Text style={[styles.cleaningToggleDesc, { color: colors.textMuted }]}>
+            Get notified when maintenance is due
+          </Text>
+        </View>
+        <View
+          style={[
+            styles.toggleSwitch,
+            { backgroundColor: enabled ? colors.text : colors.secondary },
+          ]}
+        >
+          <View
+            style={[
+              styles.toggleKnob,
+              { backgroundColor: colors.background },
+              enabled && styles.toggleKnobActive,
+            ]}
+          />
+        </View>
+      </TouchableOpacity>
+
+      {/* Expanded Config */}
+      {enabled && (
+        <View style={[styles.cleaningConfig, { backgroundColor: colors.card }]}>
+          {/* Interval Type Selector */}
+          <Text style={[styles.cleaningConfigLabel, { color: colors.textMuted }]}>
+            Remind me after
+          </Text>
+          <View style={styles.intervalTypeRow}>
+            {CLEANING_INTERVALS.map((interval) => {
+              const isSelected = intervalType === interval.type;
+              return (
+                <TouchableOpacity
+                  key={interval.type}
+                  style={[
+                    styles.intervalChip,
+                    {
+                      backgroundColor: isSelected ? colors.text : colors.background,
+                      borderColor: isSelected ? colors.text : colors.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    onIntervalTypeChange(interval.type);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.intervalChipText,
+                      { color: isSelected ? colors.background : colors.text },
+                    ]}
+                  >
+                    {interval.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Value Input */}
+          <View style={styles.intervalValueRow}>
+            <TextInput
+              style={[
+                styles.intervalInput,
+                { backgroundColor: colors.background, borderColor: colors.border, color: colors.text },
+              ]}
+              placeholder={selectedInterval.placeholder}
+              placeholderTextColor={colors.textMuted}
+              value={intervalValue}
+              onChangeText={onIntervalValueChange}
+              keyboardType="number-pad"
+              maxLength={5}
+            />
+            <Text style={[styles.intervalHint, { color: colors.textMuted }]}>
+              {selectedInterval.hint}
+            </Text>
+          </View>
+
+          {/* Smart hint */}
+          <View style={[styles.cleaningHint, { backgroundColor: colors.background }]}>
+            <Sparkles size={14} color={colors.textMuted} />
+            <Text style={[styles.cleaningHintText, { color: colors.textMuted }]}>
+              {intervalType === 'rounds' && 'We\'ll track rounds automatically from sessions'}
+              {intervalType === 'sessions' && 'We\'ll count each completed session'}
+              {intervalType === 'days' && 'Calendar-based reminder from last cleaning'}
+            </Text>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -760,5 +914,105 @@ const styles = StyleSheet.create({
   submitText: {
     fontSize: 17,
     fontWeight: '600',
+  },
+
+  // Cleaning section styles
+  cleaningSection: {
+    gap: 8,
+  },
+  cleaningToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 14,
+    gap: 12,
+  },
+  cleaningIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cleaningToggleText: {
+    flex: 1,
+  },
+  cleaningToggleTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  cleaningToggleDesc: {
+    fontSize: 12,
+  },
+  toggleSwitch: {
+    width: 48,
+    height: 28,
+    borderRadius: 14,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  toggleKnob: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+  },
+  toggleKnobActive: {
+    alignSelf: 'flex-end',
+  },
+  cleaningConfig: {
+    padding: 16,
+    borderRadius: 14,
+    gap: 14,
+  },
+  cleaningConfigLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  intervalTypeRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  intervalChip: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  intervalChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  intervalValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  intervalInput: {
+    width: 80,
+    height: 44,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  intervalHint: {
+    flex: 1,
+    fontSize: 14,
+  },
+  cleaningHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: 10,
+  },
+  cleaningHintText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
   },
 });

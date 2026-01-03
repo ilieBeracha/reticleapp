@@ -14,11 +14,7 @@ import * as Haptics from 'expo-haptics';
 import {
   Award,
   Check,
-  Clock,
-  Crosshair,
-  MapPin,
-  Target,
-  Zap,
+  Target
 } from 'lucide-react-native';
 import { memo } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -98,7 +94,11 @@ export function CategoryDrillPicker({
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={!showHeader ? styles.contentNoHeader : undefined}
+      showsVerticalScrollIndicator={false}
+    >
       {showHeader && categoryConfig && (
         <View style={styles.header}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
@@ -215,6 +215,7 @@ const DrillCard = memo(function DrillCard({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  contentNoHeader: { paddingTop: 16 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
   emptyIcon: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   emptyText: { fontSize: 14, textAlign: 'center' },

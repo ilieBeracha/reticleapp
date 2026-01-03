@@ -45,14 +45,12 @@ export default function AcceptInviteSheet() {
   const handleOpenTeam = useCallback((teamId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    // 1) Set active team + kick off refetches
     useTeamStore.getState().setActiveTeam(teamId);
     Promise.all([
       useTeamStore.getState().loadActiveTeam(),
       useTrainingStore.getState().loadTeamTrainings(teamId),
     ]).catch((e) => console.warn("Post-invite refresh failed:", e));
 
-    // 2) Close the form sheet, then land on Team root
     router.back();
     setTimeout(() => {
       router.replace('/(protected)/(tabs)');
@@ -107,10 +105,8 @@ export default function AcceptInviteSheet() {
     try {
       const result = await acceptTeamInvitation(validatedInvite.invite_code);
       
-      // Reload teams to include the new one
       await useTeamStore.getState().loadTeams();
       
-      // Show success state
       setAcceptedResult(result);
       setIsAccepted(true);
       setIsAccepting(false);
@@ -150,7 +146,6 @@ export default function AcceptInviteSheet() {
   }, []);
 
   const getRoleColor = (role: TeamRole | string | null | undefined) => {
-    // Accept both current (`team_commander`) and legacy (`commander`) strings.
     const roleColors: Record<string, string> = {
       owner: '#5B6B8C',
       commander: '#7C3AED',
@@ -182,12 +177,10 @@ export default function AcceptInviteSheet() {
       squad_commander: 'Squad Commander',
       soldier: 'Soldier',
     };
-    // No "member" role anymore. If role missing, default label is Soldier (least-privileged).
     if (!role) return 'Soldier';
     return labels[String(role)] || String(role);
   };
 
-  // Success state
   if (isAccepted && acceptedResult) {
     return (
       <View style={[styles.successContainer, { backgroundColor: colors.card }]}>
@@ -247,7 +240,6 @@ export default function AcceptInviteSheet() {
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
-      {/* Sheet header (grabber + close) */}
       <View style={styles.sheetHeader}>
         <View style={[styles.grabber, { backgroundColor: colors.border }]} />
         <TouchableOpacity
@@ -259,7 +251,6 @@ export default function AcceptInviteSheet() {
         </TouchableOpacity>
       </View>
 
-      {/* Header */}
       <View style={styles.headerSection}>
         <View style={[styles.headerIcon, { backgroundColor: colors.primary + '15' }]}>
           <Ionicons name="enter" size={28} color={colors.primary} />
@@ -282,7 +273,6 @@ export default function AcceptInviteSheet() {
       </View>
 
       {!validatedInvite ? (
-        // Step 1: Enter and Validate Code
         <>
           <View style={[styles.inputCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.inputLabel, { color: colors.text }]}>
@@ -341,7 +331,6 @@ export default function AcceptInviteSheet() {
             )}
           </TouchableOpacity>
 
-          {/* Help Section */}
           <View style={[styles.helpCard, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
             <Ionicons name="help-circle-outline" size={20} color={colors.textMuted} />
             <View style={styles.helpContent}>
@@ -355,7 +344,6 @@ export default function AcceptInviteSheet() {
           </View>
         </>
       ) : (
-        // Step 2: Review and Accept
         <>
           <View style={[styles.teamCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.inviteCardTopRow}>
@@ -471,7 +459,6 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 28 },
 
-  // Sheet header
   sheetHeader: {
     paddingTop: 10,
     paddingBottom: 8,
@@ -495,7 +482,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
 
-  // Header
   headerSection: {
     alignItems: 'center',
     paddingTop: 16,
@@ -534,7 +520,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Input Card
   inputCard: {
     padding: 16,
     borderRadius: 14,
@@ -722,7 +707,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 
-  // Actions
   actionsContainer: {
     flexDirection: 'row',
     gap: 12,
@@ -762,7 +746,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Success state
   successContainer: {
     flex: 1,
     alignItems: 'center',

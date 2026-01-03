@@ -305,9 +305,11 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
         return;
       }
 
-      const dataKey = `${data.sessionId}-${data.shotsRecorded}-${data.durationMs}`;
+      // Use just sessionId as key - we should only process ONE summary per session
+      // This prevents duplicates from watch retries (which may have slightly different durations)
+      const dataKey = `summary-${data.sessionId}`;
       if (watchDataProcessedRef.current.has(dataKey)) {
-        console.log('[Garmin] 📩 Already processed this data, ignoring');
+        console.log('[Garmin] 📩 Already processed summary for this session (retry detected), ignoring');
         return;
       }
       watchDataProcessedRef.current.add(dataKey);

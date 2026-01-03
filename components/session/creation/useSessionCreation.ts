@@ -1,10 +1,11 @@
 /**
  * useSessionCreation - Hook for step-based session creation
- * 
- * Implements the 2-step pre-shooting flow:
+ *
+ * Implements the 3-step pre-shooting flow:
  * 1. Intent - What am I going to do?
- * 2. Context - Under what conditions?
- * 
+ * 2. Weapon - Which weapon?
+ * 3. Context - Session details (distance, rounds, drill, etc.)
+ *
  * Then hands off to:
  * - SessionPrepView for watch/phone selection
  * - activeSession.tsx for scan/manual selection (based on drill config)
@@ -79,10 +80,10 @@ export interface UseSessionCreationReturn {
 }
 
 // ============================================================================
-// STEP ORDER (only 2 steps now)
+// STEP ORDER (3 user-facing steps)
 // ============================================================================
 
-const STEP_ORDER: CreationStep[] = ['intent', 'context', 'ready'];
+const STEP_ORDER: CreationStep[] = ['intent', 'weapon', 'context', 'ready'];
 
 function getStepIndex(step: CreationStep): number {
   return STEP_ORDER.indexOf(step);
@@ -148,6 +149,8 @@ export function useSessionCreation(
     switch (state.step) {
       case 'intent':
         return state.purpose !== null;
+      case 'weapon':
+        return state.context.weaponId !== null;
       case 'context':
         return state.context.distance > 0 && state.context.shotsPlanned > 0;
       case 'ready':
@@ -157,8 +160,8 @@ export function useSessionCreation(
     }
   }, [state.step, state.purpose, state.context]);
   
-  // Progress: 2 user-facing steps (intent, context)
-  const progressPercent = ((stepIndex + 1) / 2) * 100;
+  // Progress: 3 user-facing steps (intent, weapon, context)
+  const progressPercent = ((stepIndex + 1) / 3) * 100;
   
   // ─────────────────────────────────────────────────────────────────────────
   // STEP 1: INTENT
@@ -286,12 +289,15 @@ export function useSessionCreation(
     setState((s) => {
       const currentIndex = STEP_ORDER.indexOf(s.step);
       if (currentIndex >= STEP_ORDER.length - 1) return s;
-      
+
       // Validate current step before advancing
       let canAdvance = false;
       switch (s.step) {
         case 'intent':
           canAdvance = s.purpose !== null;
+          break;
+        case 'weapon':
+          canAdvance = s.context.weaponId !== null;
           break;
         case 'context':
           canAdvance = s.context.distance > 0 && s.context.shotsPlanned > 0;
@@ -299,7 +305,7 @@ export function useSessionCreation(
         default:
           canAdvance = false;
       }
-      
+
       if (!canAdvance) return s;
       return { ...s, step: STEP_ORDER[currentIndex + 1] };
     });

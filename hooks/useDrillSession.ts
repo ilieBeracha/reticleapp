@@ -11,12 +11,12 @@
  * This is not optional configuration - this is STRUCTURE.
  */
 
-import { useCallback, useMemo, useState } from 'react';
 import {
   type CategoryDrill,
   evaluateDrillResult,
   getDrillById,
 } from '@/constants/categoryDrills';
+import { useCallback, useMemo, useState } from 'react';
 
 // ============================================================================
 // TYPES

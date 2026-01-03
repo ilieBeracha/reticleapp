@@ -7,16 +7,16 @@ import * as Haptics from 'expo-haptics';
 import { router } from "expo-router";
 import { useCallback } from "react";
 import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
 
 /**
- * USER MENU - Native Form Sheet
+ * User Menu - Native Form Sheet
  * 
  * Quick access to account actions.
  */

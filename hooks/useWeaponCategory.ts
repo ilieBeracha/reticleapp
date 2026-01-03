@@ -7,19 +7,19 @@
  */
 
 import {
-    CATEGORY_CONFIGS,
-    type CategoryConfig,
-    type QuickPreset,
-    evaluateDispersion,
-    evaluateSplitTime,
-    getCategoryConfig,
-    getCategoryDistances,
-    getCategoryDrillDefaults,
-    getCategoryPresets,
-    getCategoryZeroDistance,
-    getSuggestedTimeLimit,
-    isDistanceAppropriate,
-    presetToDrillConfig,
+  CATEGORY_CONFIGS,
+  type CategoryConfig,
+  type QuickPreset,
+  evaluateDispersion,
+  evaluateSplitTime,
+  getCategoryConfig,
+  getCategoryDistances,
+  getCategoryDrillDefaults,
+  getCategoryPresets,
+  getCategoryZeroDistance,
+  getSuggestedTimeLimit,
+  isDistanceAppropriate,
+  presetToDrillConfig,
 } from '@/constants/weaponCategories';
 import type { DrillConfig } from '@/services/session/types';
 import type { WeaponCategory } from '@/types/workspace';

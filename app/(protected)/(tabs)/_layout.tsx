@@ -49,6 +49,14 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen
+        name="equipment"
+        options={{
+          title: 'Equipment',
+          tabBarIcon: ({ focused }) => getTabIcon('', focused ? 'hardware-chip' : 'hardware-chip-outline'),
+        }}
+      />
+
+      <Tabs.Screen
         name="trainings"
         options={{
           role: 'search',

@@ -23,8 +23,8 @@ import type {
   SessionWithDetails,
   TargetType,
 } from './types';
-import type { TransformedWatchData, WatchDetailsPayload } from './watchTypes';
 import { buildDetailsMergePayload, buildTargetData } from './watchDataTransformer';
+import type { TransformedWatchData, WatchDetailsPayload } from './watchTypes';
 
 /**
  * Convert legacy CreateSessionParams to BaseSessionConfig
@@ -808,6 +808,17 @@ export async function saveWatchSessionData(
   }
   
   console.log('[SessionService] Saving watch data:', data);
+  
+  // Check if we already have a watch target for this session (prevent duplicates from retries)
+  const existingTargets = session.session_targets || [];
+  const hasWatchTarget = existingTargets.some(
+    (t: { target_data?: { source?: string } }) => t.target_data?.source === 'garmin_watch'
+  );
+  
+  if (hasWatchTarget) {
+    console.log('[SessionService] ⚠️ Watch target already exists for session, skipping duplicate save');
+    return session;
+  }
   
   // Get drill config for distance if not provided by watch
   const drill = session.drill_config;

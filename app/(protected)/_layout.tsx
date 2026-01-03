@@ -6,27 +6,10 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useGarminInitialize } from '@/store/garminStore';
 import { router, Stack } from 'expo-router';
 
-/**
- * Protected Layout - Unified Architecture
- * 
- * This layout wraps all authenticated routes.
- * 
- * Key change: No more "personal mode" vs "team mode".
- * Single unified tab bar at /(protected)/(tabs)/.
- * 
- * Route Structure:
- * - /(protected)/(tabs)/* - Main app tabs (Home, Trainings, Insights, Profile)
- * - /(protected)/teamDetail - Team detail/management sheet
- * - /(protected)/trainingDetail - Training detail sheet
- * - /(protected)/activeSession - Active session (full screen)
- * - etc.
- */
 export default function ProtectedLayout() {
   const colors = useColors();
   useGarminInitialize();
-  // Register push notifications on authenticated user
   usePushNotifications();
-  // Check for orphaned sessions on app start
   useOrphanedSessionCheck();
 
 
@@ -46,13 +29,11 @@ export default function ProtectedLayout() {
           headerTintColor: colors.text,
         }}
       >
-        {/* Index redirect - hide from stack */}
         <Stack.Screen
           name="index"
           options={{ headerShown: false }}
         />
         
-        {/* Unified Tabs */}
         <Stack.Screen 
           name="(tabs)" 
           options={{ 
@@ -61,7 +42,6 @@ export default function ProtectedLayout() {
           }}
         />
         
-        {/* Profile Sheet - Quick profile access from header */}
         <Stack.Screen
           name="profileSheet"
           options={{
@@ -76,7 +56,6 @@ export default function ProtectedLayout() {
           }}
         />
 
-        {/* User Menu */}
         <Stack.Screen
           name="userMenu"
           options={{
@@ -91,7 +70,6 @@ export default function ProtectedLayout() {
           }}
         />
 
-        {/* Notifications */}
         <Stack.Screen
           name="notifications"
           options={{
@@ -106,7 +84,6 @@ export default function ProtectedLayout() {
           }}
         />
         
-        {/* Team Detail - View/manage a specific team */}
         <Stack.Screen
           name="teamDetail"
           options={{
@@ -121,7 +98,6 @@ export default function ProtectedLayout() {
           }}
         />
         
-        {/* Create Team */}
         <Stack.Screen
           name="createTeam"
           options={{
@@ -136,7 +112,6 @@ export default function ProtectedLayout() {
         }}
       />
 
-        {/* Accept Invite */}
         <Stack.Screen
           name="acceptInvite"
           options={{
@@ -151,7 +126,6 @@ export default function ProtectedLayout() {
           }}
       />
         
-        {/* Create Training */}
         <Stack.Screen
           name="createTraining"
           options={{
@@ -166,7 +140,6 @@ export default function ProtectedLayout() {
         }}
       />
         
-        {/* Create Session */}
         <Stack.Screen
           name="createSession"
           options={{
@@ -181,7 +154,6 @@ export default function ProtectedLayout() {
         }}
       />
         
-        {/* Invite Team Member */}
         <Stack.Screen
           name="inviteTeamMember"
           options={{
@@ -196,7 +168,6 @@ export default function ProtectedLayout() {
           }}
         />
 
-        {/* Team Members */}
         <Stack.Screen
           name="teamMembers"
           options={{
@@ -211,7 +182,6 @@ export default function ProtectedLayout() {
           }}
         />
 
-        {/* Team Settings */}
         <Stack.Screen
           name="teamSettings"
           options={{
@@ -226,7 +196,6 @@ export default function ProtectedLayout() {
           }}
         />
         
-        {/* Team Preview */}
         <Stack.Screen
           name="teamPreview"
           options={{
@@ -241,7 +210,6 @@ export default function ProtectedLayout() {
           }}
       />
         
-        {/* Member Preview */}
         <Stack.Screen
           name="memberPreview"
           options={{
@@ -256,7 +224,6 @@ export default function ProtectedLayout() {
         }}
       />
         
-        {/* Member Activity */}
         <Stack.Screen
           name="memberActivity"
           options={{
@@ -267,7 +234,6 @@ export default function ProtectedLayout() {
           }}
         />
         
-        {/* Session Detail - Summary sheet */}
         <Stack.Screen
           name="sessionDetail"
           options={{
@@ -282,7 +248,6 @@ export default function ProtectedLayout() {
           }}
         />
         
-        {/* Training Detail - Full screen */}
         <Stack.Screen
           name="trainingDetail"
           options={{
@@ -293,7 +258,6 @@ export default function ProtectedLayout() {
           }}
         />
         
-        {/* Active Session - Full screen */}
         <Stack.Screen
           name="activeSession"
           options={{
@@ -304,7 +268,6 @@ export default function ProtectedLayout() {
           }}
         />
         
-        {/* Training Live Dashboard - Full screen */}
         <Stack.Screen
           name="trainingLive"
           options={{
@@ -315,7 +278,6 @@ export default function ProtectedLayout() {
           }}
         />
         
-        {/* Add Target - Sheet */}
         <Stack.Screen
           name="addTarget"
           options={{
@@ -330,7 +292,6 @@ export default function ProtectedLayout() {
           }}
         />
 
-        {/* Scan Target - Paper only, opens camera directly */}
         <Stack.Screen
           name="scanTarget"
           options={{
@@ -345,7 +306,6 @@ export default function ProtectedLayout() {
           }}
         />
 
-        {/* Tactical Target - Manual entry only */}
         <Stack.Screen
           name="tacticalTarget"
           options={{
@@ -360,7 +320,6 @@ export default function ProtectedLayout() {
           }}
         />
 
-        {/* Watch Session Result - Full screen Garmin data review */}
         <Stack.Screen
           name="watchSessionResult"
           options={{
@@ -371,7 +330,6 @@ export default function ProtectedLayout() {
           }}
         />
 
-        {/* Scans Gallery - Full screen */}
         <Stack.Screen
           name="scans"
           options={{
@@ -382,7 +340,6 @@ export default function ProtectedLayout() {
           }}
         />
 
-        {/* Drill Library - Card navigation from Team > Manage */}
         <Stack.Screen
           name="drillLibrary"
           options={{
@@ -393,7 +350,6 @@ export default function ProtectedLayout() {
           }}
         />
 
-        {/* Session Results - Full screen after session ends */}
         <Stack.Screen
           name="sessionResults"
           options={{

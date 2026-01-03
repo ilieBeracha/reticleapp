@@ -24,6 +24,7 @@ import {
   type GarminInboundMessage,
   type GarminOutboundMessageType,
   type GarminSessionData,
+  type GarminTimelineData,
   endWatchSession,
   getCurrentStatus,
   getIsReady,
@@ -38,15 +39,16 @@ import {
   syncDrillToWatch,
 } from '@/services/garminService';
 
+import { saveSessionTimeline } from '@/services/session/timelineService';
+
 import {
   mergeCompactWatchDetails,
   mergeWatchSessionDetails,
 } from '@/services/session/mutations';
 import type { WatchDetailsPayload } from '@/services/session/watchTypes';
-import { buildDetailsPartial } from '@/services/session/watchDataTransformer';
 
 // Re-export types for convenience
-export type { GarminConnectionStatus, GarminDevice, GarminSessionData };
+export type { GarminConnectionStatus, GarminDevice, GarminSessionData, GarminTimelineData };
 
 // ============================================================================
 // TYPES
@@ -80,8 +82,13 @@ interface GarminState {
   // Session data received from watch
   lastSessionData: GarminSessionData | null;
 
+  // Timeline data received from watch (Phase 3)
+  lastTimelineData: GarminTimelineData | null;
+  timelineProgress: { chunk: number; total: number } | null;
+
   // Callbacks for session data (set by active session screen)
   onSessionData: ((data: GarminSessionData) => void) | null;
+  onTimelineComplete: ((data: GarminTimelineData) => void) | null;
 
   // ---------------------------------------------------------------------------
   // Session Start Retry State
@@ -122,6 +129,8 @@ interface GarminState {
 
   // Callback registration
   setSessionDataCallback: (callback: ((data: GarminSessionData) => void) | null) => void;
+  setTimelineCompleteCallback: (callback: ((data: GarminTimelineData) => void) | null) => void;
+  clearTimelineData: () => void;
 
   // Internal: called by initialization hook
   _syncFromService: () => void;
@@ -143,7 +152,10 @@ export const useGarminStore = create<GarminState>((set, get) => ({
   isReady: false,
   messages: [],
   lastSessionData: null,
+  lastTimelineData: null,
+  timelineProgress: null,
   onSessionData: null,
+  onTimelineComplete: null,
   sessionStartStatus: 'idle',
   sessionStartAttempts: 0,
 
@@ -248,6 +260,14 @@ export const useGarminStore = create<GarminState>((set, get) => ({
 
   setSessionDataCallback: (callback) => {
     set({ onSessionData: callback });
+  },
+
+  setTimelineCompleteCallback: (callback) => {
+    set({ onTimelineComplete: callback });
+  },
+
+  clearTimelineData: () => {
+    set({ lastTimelineData: null, timelineProgress: null });
   },
 
   // ---------------------------------------------------------------------------
@@ -425,6 +445,49 @@ export function useGarminInitialize() {
             }
             break;
 
+          // =========================================================================
+          // THREE-PHASE SYNC: TIMELINE_CHUNK (Phase 3 - Progress update)
+          // =========================================================================
+          case 'timeline_chunk':
+            console.log(`[GarminStore] 📩 TIMELINE_CHUNK ${event.chunk + 1}/${event.total}`);
+            useGarminStore.setState({
+              timelineProgress: { chunk: event.chunk + 1, total: event.total },
+            });
+            break;
+
+          // =========================================================================
+          // THREE-PHASE SYNC: TIMELINE_COMPLETE (Phase 3 - All chunks received)
+          // =========================================================================
+          case 'timeline_complete':
+            console.log('[GarminStore] 📩 TIMELINE_COMPLETE received');
+            console.log('[GarminStore] 📩 Timeline summary:', event.data.summary);
+            
+            // Update state with timeline data
+            useGarminStore.setState({
+              lastTimelineData: event.data,
+              timelineProgress: null, // Clear progress
+            });
+            
+            // Call registered callback if any
+            if (store.onTimelineComplete) {
+              store.onTimelineComplete(event.data);
+            }
+            
+            // Save to database
+            const timelineSessionId = event.data.sessionId;
+            if (timelineSessionId) {
+              console.log('[GarminStore] 📩 Saving timeline to DB...');
+              saveSessionTimeline(event.data)
+                .then((saved) => {
+                  console.log('[GarminStore] ✅ Timeline saved to DB:', saved.id);
+                  // TODO: Show toast "Biometric timeline synced ✓"
+                })
+                .catch((err) => {
+                  console.error('[GarminStore] ❌ Error saving timeline to DB:', err);
+                });
+            }
+            break;
+
           case 'error':
             console.error('[GarminStore] Service error:', event.error);
             break;
@@ -508,3 +571,9 @@ export const useWatchEnabledLoaded = () => useGarminStore((s) => s.watchEnabledL
 
 /** Returns the session start status for retry UI */
 export const useSessionStartStatus = () => useGarminStore((s) => s.sessionStartStatus);
+
+/** Returns the last timeline data received from watch */
+export const useGarminTimelineData = () => useGarminStore((s) => s.lastTimelineData);
+
+/** Returns timeline sync progress (chunk/total) */
+export const useTimelineProgress = () => useGarminStore((s) => s.timelineProgress);

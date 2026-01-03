@@ -1,23 +1,28 @@
 /**
- * CREATE SESSION - Step-Based Flow
- * 
- * View container with ScrollView for content and fixed footer for button.
+ * CREATE SESSION - 3-Step Flow
+ *
+ * 1. Intent - What's my goal?
+ * 2. Weapon - Which weapon?
+ * 3. Context - Session details (distance, rounds, drill)
  */
 
 import { DrillPresetPicker, PresetForm } from '@/components/drills';
 import {
   SessionContextStep,
   SessionIntentStep,
+  SessionWeaponStep,
   useSessionCreation,
 } from '@/components/session/creation';
+import type { SessionPurpose } from '@/components/session/creation/sessionCreation.types';
 import { useColors } from '@/hooks/ui/useColors';
 import type { DrillPreset } from '@/services/presetService';
 import type { BaseSessionConfig } from '@/services/session/types';
 import { createSession, deleteSession, getMyActiveSession } from '@/services/sessionService';
 import { useSessionStore } from '@/store/sessionStore';
 import { useFocusEffect } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { ArrowRight, ChevronLeft, Play } from 'lucide-react-native';
+import { ChevronLeft, Play } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -132,6 +137,28 @@ export default function CreateSessionScreen() {
     setShowPresetPicker(true);
   }, []);
 
+  // Auto-advance to step 2 when purpose is selected
+  const handlePurposeSelect = useCallback((purpose: SessionPurpose) => {
+    creation.setPurpose(purpose);
+    // Small delay for visual feedback before advancing
+    setTimeout(() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      creation.goForward();
+    }, 150);
+  }, [creation]);
+
+  // Purpose label for step 2 header
+  const getPurposeLabel = (purpose: SessionPurpose | null): string => {
+    const labels: Record<SessionPurpose, string> = {
+      grouping: 'Grouping',
+      achievement: 'Target Hits',
+      zeroing: 'Zeroing',
+      physical: 'Stress Drill',
+      custom: 'Custom',
+    };
+    return purpose ? labels[purpose] : '';
+  };
+
   const handlePresetSelect = useCallback((preset: DrillPreset) => {
     setSelectedPreset(preset);
     setShowPresetPicker(false);
@@ -188,15 +215,15 @@ export default function CreateSessionScreen() {
   // BUTTON CONFIG
   // ─────────────────────────────────────────────────────────────────────────
 
-  // Only 2 steps: intent → context → submit
+  // 3 steps: intent → weapon → context → submit
   const isLastStep = creation.state.step === 'context';
   const canContinue =
     creation.state.step === 'intent'
       ? creation.state.purpose !== null
+      : creation.state.step === 'weapon'
+      ? creation.state.context.weaponId !== null
       : creation.state.step === 'context'
-      ? creation.state.context.weaponId !== null && // Weapon is required
-        creation.state.context.distance > 0 && 
-        creation.state.context.shotsPlanned > 0
+      ? creation.state.context.distance > 0 && creation.state.context.shotsPlanned > 0
       : false;
 
   const handleButtonPress = () => {
@@ -211,7 +238,7 @@ export default function CreateSessionScreen() {
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────
 
-  const stepNumber = creation.state.step === 'intent' ? 1 : 2;
+  const stepNumber = creation.state.step === 'intent' ? 1 : creation.state.step === 'weapon' ? 2 : 3;
 
   return (
     <ScrollView
@@ -248,6 +275,18 @@ export default function CreateSessionScreen() {
               { backgroundColor: stepNumber >= 2 ? colors.text : colors.border }
             ]}
           />
+          <View
+            style={[
+              styles.stepLine,
+              { backgroundColor: stepNumber >= 3 ? colors.text : colors.border }
+            ]}
+          />
+          <View
+            style={[
+              styles.stepDot,
+              { backgroundColor: stepNumber >= 3 ? colors.text : colors.border }
+            ]}
+          />
         </View>
 
         <View style={styles.backButton} />
@@ -257,64 +296,84 @@ export default function CreateSessionScreen() {
       {creation.state.step === 'intent' && (
         <SessionIntentStep
           selectedPurpose={creation.state.purpose}
-          onSelectPurpose={creation.setPurpose}
+          onSelectPurpose={handlePurposeSelect}
           onUseSavedDrill={handleUseSavedDrill}
         />
       )}
 
-      {creation.state.step === 'context' && (
-        <SessionContextStep
-          purpose={creation.state.purpose!}
+      {creation.state.step === 'weapon' && (
+        <SessionWeaponStep
           context={creation.state.context}
           onUpdateContext={creation.updateContext}
-          onBack={creation.goBack}
-          weaponCategory={selectedPreset?.weapon_category as any}
-          selectedDrillId={creation.state.selectedDrillId}
-          onDrillChange={creation.setDrill}
+          onContinue={creation.goForward}
         />
+      )}
+
+      {creation.state.step === 'context' && (
+        <>
+          {/* Step 3 header with weapon badge */}
+          <View style={styles.step2Header}>
+            <Text style={[styles.step2Title, { color: colors.text }]}>
+              Session details
+            </Text>
+            <TouchableOpacity
+              style={[styles.purposeBadge, { backgroundColor: colors.card }]}
+              onPress={creation.goBack}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.purposeBadgeText, { color: colors.text }]}>
+                {creation.state.context.weaponName || 'Weapon'}
+              </Text>
+              <ChevronLeft size={14} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+          <SessionContextStep
+            purpose={creation.state.purpose!}
+            context={creation.state.context}
+            onUpdateContext={creation.updateContext}
+            onBack={creation.goBack}
+            weaponCategory={selectedPreset?.weapon_category as any}
+            selectedDrillId={creation.state.selectedDrillId}
+            onDrillChange={creation.setDrill}
+          />
+        </>
       )}
 
       {/* Spacer - pushes button to bottom when content is short */}
       <View style={styles.spacer} />
 
-      {/* Button */}
-          <TouchableOpacity
-        style={[
-          styles.button,
-          { backgroundColor: canContinue ? colors.text : colors.secondary },
-        ]}
-        onPress={handleButtonPress}
-        disabled={!canContinue || creation.state.isSubmitting}
-        activeOpacity={0.85}
-      >
-        {creation.state.isSubmitting ? (
-          <ActivityIndicator size="small" color={colors.background} />
-        ) : (
-          <>
-            <Text
-              style={[
-                styles.buttonText,
-                { color: canContinue ? colors.background : colors.textMuted },
-              ]}
-            >
-              {isLastStep ? 'Start Session' : 'Continue'}
-          </Text>
-            {isLastStep ? (
+      {/* Button - only show on step 3 since steps 1 and 2 auto-advance */}
+      {isLastStep && (
+        <TouchableOpacity
+          style={[
+            styles.button,
+            { backgroundColor: canContinue ? colors.text : colors.secondary },
+          ]}
+          onPress={handleButtonPress}
+          disabled={!canContinue || creation.state.isSubmitting}
+          activeOpacity={0.85}
+        >
+          {creation.state.isSubmitting ? (
+            <ActivityIndicator size="small" color={colors.background} />
+          ) : (
+            <>
+              <Text
+                style={[
+                  styles.buttonText,
+                  { color: canContinue ? colors.background : colors.textMuted },
+                ]}
+              >
+                Start Session
+              </Text>
               <Play
                 size={16}
                 color={canContinue ? colors.background : colors.textMuted}
                 fill={canContinue ? colors.background : colors.textMuted}
               />
-            ) : (
-              <ArrowRight
-                size={16}
-                color={canContinue ? colors.background : colors.textMuted}
-                strokeWidth={2}
-              />
-            )}
-          </>
-        )}
+            </>
+          )}
         </TouchableOpacity>
+      )}
 
       {/* Preset Picker Modal */}
       <Modal
@@ -390,6 +449,30 @@ const styles = StyleSheet.create({
     width: 40,
     height: 2,
     marginHorizontal: 4,
+  },
+  step2Header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    paddingTop: 4,
+  },
+  step2Title: {
+    fontSize: 22,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+  },
+  purposeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 4,
+  },
+  purposeBadgeText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
   loadingContainer: {
     flex: 1,
