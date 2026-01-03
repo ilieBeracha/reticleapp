@@ -56,10 +56,12 @@ interface WeaponPickerProps {
   selectedWeaponId?: string | null;
   onSelect: (weapon: UserWeapon) => void;
   onSelectCatalog?: (weapon: GlobalWeapon) => void;
-  onAddNew: () => void;
+  onAddNew?: () => void;
   onClose: () => void;
   teamId?: string;
   weaponCategory?: WeaponCategory | 'any' | null;
+  /** Hide the "Add New Weapon" option - for contexts where weapon creation isn't allowed */
+  hideAddNew?: boolean;
 }
 
 // ============================================================================
@@ -74,6 +76,7 @@ export function WeaponPicker({
   onClose,
   teamId,
   weaponCategory,
+  hideAddNew = false,
 }: WeaponPickerProps) {
   const colors = useColors();
 
@@ -192,7 +195,7 @@ export function WeaponPicker({
       // Catalog weapons need to be created as user weapons first
       if (onSelectCatalog) {
         onSelectCatalog(weapon as GlobalWeapon);
-      } else {
+      } else if (onAddNew && !hideAddNew) {
         // Fallback: trigger add new flow with catalog weapon pre-selected
         onAddNew();
       }
@@ -200,7 +203,7 @@ export function WeaponPicker({
       // Personal, recent, assigned, team - all are user weapons
       onSelect(weapon as UserWeapon);
     }
-  }, [onSelect, onSelectCatalog, onAddNew]);
+  }, [onSelect, onSelectCatalog, onAddNew, hideAddNew]);
 
   const handleShowCatalog = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -215,9 +218,11 @@ export function WeaponPicker({
   }, []);
 
   const handleCreateCustom = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onAddNew();
-  }, [onAddNew]);
+    if (onAddNew && !hideAddNew) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      onAddNew();
+    }
+  }, [onAddNew, hideAddNew]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -265,31 +270,33 @@ export function WeaponPicker({
         )}
       </View>
 
-      {/* Action buttons based on view */}
-      {showCatalog ? (
-        <TouchableOpacity
-          style={[styles.addNewBtn, { backgroundColor: colors.card }]}
-          onPress={handleCreateCustom}
-          activeOpacity={0.7}
-        >
-          <Plus size={16} color={colors.text} strokeWidth={2} />
-          <Text style={[styles.addText, { color: colors.text }]}>
-            Create Custom Weapon
-          </Text>
-          <ChevronRight size={14} color={colors.textMuted} />
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity
-          style={[styles.addNewBtn, { backgroundColor: colors.text }]}
-          onPress={handleShowCatalog}
-          activeOpacity={0.7}
-        >
-          <Plus size={16} color={colors.background} strokeWidth={2} />
-          <Text style={[styles.addText, { color: colors.background }]}>
-            Add New Weapon
-          </Text>
-          <ChevronRight size={14} color={colors.background + '80'} />
-        </TouchableOpacity>
+      {/* Action buttons based on view - hidden when hideAddNew is true */}
+      {!hideAddNew && (
+        showCatalog ? (
+          <TouchableOpacity
+            style={[styles.addNewBtn, { backgroundColor: colors.card }]}
+            onPress={handleCreateCustom}
+            activeOpacity={0.7}
+          >
+            <Plus size={16} color={colors.text} strokeWidth={2} />
+            <Text style={[styles.addText, { color: colors.text }]}>
+              Create Custom Weapon
+            </Text>
+            <ChevronRight size={14} color={colors.textMuted} />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.addNewBtn, { backgroundColor: colors.text }]}
+            onPress={handleShowCatalog}
+            activeOpacity={0.7}
+          >
+            <Plus size={16} color={colors.background} strokeWidth={2} />
+            <Text style={[styles.addText, { color: colors.background }]}>
+              Add New Weapon
+            </Text>
+            <ChevronRight size={14} color={colors.background + '80'} />
+          </TouchableOpacity>
+        )
       )}
 
       {/* Content */}

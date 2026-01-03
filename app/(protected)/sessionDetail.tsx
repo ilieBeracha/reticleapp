@@ -1,11 +1,10 @@
 /**
  * Session Detail Sheet
  * 
- * Shows session summary, stats, image previews, and timeline.
+ * Shows session summary, stats, and image previews.
  * Opens as a formSheet modal above tabs.
  */
 import { useColors } from '@/hooks/ui/useColors';
-import { getSessionTimeline, type SessionTimeline } from '@/services/session/timelineService';
 import {
   calculateSessionStats,
   getSessionById,
@@ -19,17 +18,19 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   Activity,
-  ArrowDown,
-  ArrowUp,
+  Crosshair as AimIcon,
   Award,
   Calendar,
   ChevronRight,
   Clock,
   Crosshair,
+  Focus,
   Heart,
+  Ruler,
+  Scan,
+  Settings2,
   Target,
   Timer,
-  TrendingDown,
   TrendingUp,
   Users,
   Watch,
@@ -60,7 +61,6 @@ export default function SessionDetailScreen() {
   const [session, setSession] = useState<SessionWithDetails | null>(null);
   const [stats, setStats] = useState<SessionStats | null>(null);
   const [targets, setTargets] = useState<SessionTargetWithResults[]>([]);
-  const [timeline, setTimeline] = useState<SessionTimeline | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Load session data
@@ -78,14 +78,6 @@ export default function SessionDetailScreen() {
         setSession(sessionData);
         setStats(sessionStats);
         setTargets(sessionTargets);
-        
-        // Load timeline data (separate try-catch so it doesn't fail the whole load)
-        try {
-          const timelineData = await getSessionTimeline(sessionId);
-          setTimeline(timelineData);
-        } catch {
-          // No timeline data available - that's okay
-        }
       } catch (error) {
         console.error('Failed to load session details:', error);
       } finally {
@@ -167,67 +159,6 @@ export default function SessionDetailScreen() {
       durationMs: data.duration_ms as number | undefined,
     };
   }, [targets]);
-
-  // ============================================================================
-  // COMPUTED INSIGHTS FROM TIMELINE DATA
-  // ============================================================================
-  const insights = useMemo(() => {
-    if (!timeline || !timeline.shotDetails || timeline.shotDetails.length < 2) {
-      return null;
-    }
-    
-    const shots = timeline.shotDetails;
-    const steadinessSum = shots.reduce((sum, s) => sum + (s.steadiness || 0), 0);
-    const hasRealSteadiness = steadinessSum > 0;
-    
-    // Performance scores (use steadiness or inverted stress as calmness)
-    const scores = hasRealSteadiness 
-      ? shots.map(s => s.steadiness)
-      : shots.map(s => Math.max(0, 100 - s.stress));
-    
-    const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-    
-    // Trend analysis (compare first half vs second half)
-    const half = Math.floor(scores.length / 2);
-    const firstHalf = scores.slice(0, half).reduce((a, b) => a + b, 0) / half;
-    const secondHalf = scores.slice(half).reduce((a, b) => a + b, 0) / (scores.length - half);
-    const trend: 'improving' | 'declining' | 'stable' = 
-      secondHalf - firstHalf > 5 ? 'improving' : 
-      secondHalf - firstHalf < -5 ? 'declining' : 'stable';
-    
-    // Breath quality
-    const pauseCount = shots.filter(s => s.breathPhase === 'pause').length;
-    const exhaleCount = shots.filter(s => s.breathPhase === 'exhale').length;
-    const inhaleCount = shots.filter(s => s.breathPhase === 'inhale').length;
-    const pausePct = Math.round((pauseCount / shots.length) * 100);
-    const exhalePct = Math.round((exhaleCount / shots.length) * 100);
-    const inhalePct = Math.round((inhaleCount / shots.length) * 100);
-    
-    // Best/worst shots
-    const maxScore = Math.max(...scores);
-    const minScore = Math.min(...scores);
-    const bestIdx = scores.indexOf(maxScore);
-    const worstIdx = scores.indexOf(minScore);
-    
-    // Flinch count
-    const flinchCount = shots.filter(s => s.flinch).length;
-    
-    return {
-      scores,
-      avgScore,
-      trend,
-      pausePct,
-      exhalePct,
-      inhalePct,
-      usingStress: !hasRealSteadiness,
-      bestShot: shots[bestIdx].shotNumber,
-      worstShot: shots[worstIdx].shotNumber,
-      bestScore: maxScore,
-      worstScore: minScore,
-      flinchCount,
-      shots,
-    };
-  }, [timeline]);
 
   // Calculate session duration
   const getDuration = useCallback(() => {
@@ -345,6 +276,164 @@ export default function SessionDetailScreen() {
             )}
           </View>
         </View>
+
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* SESSION CONTEXT - What was being done */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        <Animated.View entering={FadeIn.duration(250)} style={styles.contextSection}>
+          <View style={[styles.contextCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {/* Row 1: Weapon & Position */}
+            <View style={styles.contextRow}>
+              {session.weapon_name && (
+                <View style={styles.contextItem}>
+                  <View style={[styles.contextIconBg, { backgroundColor: `${colors.orange}15` }]}>
+                    <AimIcon size={14} color={colors.orange} />
+                  </View>
+                  <View style={styles.contextItemContent}>
+                    <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Weapon</Text>
+                    <Text style={[styles.contextValue, { color: colors.text }]} numberOfLines={1}>
+                      {session.weapon_name}
+                    </Text>
+                  </View>
+                </View>
+              )}
+              
+              {session.drill_config?.position && (
+                <View style={styles.contextItem}>
+                  <View style={[styles.contextIconBg, { backgroundColor: `${colors.blue}15` }]}>
+                    <Focus size={14} color={colors.blue} />
+                  </View>
+                  <View style={styles.contextItemContent}>
+                    <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Position</Text>
+                    <Text style={[styles.contextValue, { color: colors.text }]} numberOfLines={1}>
+                      {session.drill_config.position.charAt(0).toUpperCase() + session.drill_config.position.slice(1)}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* Row 2: Distance & Drill Goal */}
+            <View style={styles.contextRow}>
+              {session.drill_config?.distance_m && (
+                <View style={styles.contextItem}>
+                  <View style={[styles.contextIconBg, { backgroundColor: `${colors.indigo}15` }]}>
+                    <Ruler size={14} color={colors.indigo} />
+                  </View>
+                  <View style={styles.contextItemContent}>
+                    <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Distance</Text>
+                    <Text style={[styles.contextValue, { color: colors.text }]}>
+                      {session.drill_config.distance_m}m
+                    </Text>
+                  </View>
+                </View>
+              )}
+              
+              {session.drill_config?.drill_goal && (
+                <View style={styles.contextItem}>
+                  <View style={[styles.contextIconBg, { 
+                    backgroundColor: session.drill_config.drill_goal === 'grouping' ? `${colors.green}15` : `${colors.primary}15`
+                  }]}>
+                    <Target size={14} color={session.drill_config.drill_goal === 'grouping' ? colors.green : colors.primary} />
+                  </View>
+                  <View style={styles.contextItemContent}>
+                    <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Type</Text>
+                    <Text style={[styles.contextValue, { color: colors.text }]}>
+                      {session.drill_config.drill_goal === 'grouping' ? 'Grouping' : 'Achievement'}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* Row 3: Measurement Method & Time Limit */}
+            <View style={styles.contextRow}>
+              <View style={styles.contextItem}>
+                <View style={[styles.contextIconBg, { 
+                  backgroundColor: session.watch_controlled ? `${colors.green}15` : `${colors.textMuted}15`
+                }]}>
+                  {session.watch_controlled ? (
+                    <Watch size={14} color={colors.green} />
+                  ) : (
+                    <Scan size={14} color={colors.textMuted} />
+                  )}
+                </View>
+                <View style={styles.contextItemContent}>
+                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Measured</Text>
+                  <Text style={[styles.contextValue, { color: colors.text }]}>
+                    {session.watch_controlled ? 'Watch-assisted' : 'Manual entry'}
+                  </Text>
+                </View>
+              </View>
+              
+              {session.drill_config?.time_limit_seconds && (
+                <View style={styles.contextItem}>
+                  <View style={[styles.contextIconBg, { backgroundColor: `${colors.red}15` }]}>
+                    <Timer size={14} color={colors.red} />
+                  </View>
+                  <View style={styles.contextItemContent}>
+                    <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Time Limit</Text>
+                    <Text style={[styles.contextValue, { color: colors.text }]}>
+                      {session.drill_config.time_limit_seconds >= 60 
+                        ? `${Math.floor(session.drill_config.time_limit_seconds / 60)}m ${session.drill_config.time_limit_seconds % 60 > 0 ? `${session.drill_config.time_limit_seconds % 60}s` : ''}`
+                        : `${session.drill_config.time_limit_seconds}s`
+                      }
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* Rounds per shooter (if set) */}
+            {session.drill_config?.rounds_per_shooter && session.drill_config.rounds_per_shooter > 0 && (
+              <View style={styles.contextRow}>
+                <View style={styles.contextItem}>
+                  <View style={[styles.contextIconBg, { backgroundColor: `${colors.textMuted}15` }]}>
+                    <Target size={14} color={colors.textMuted} />
+                  </View>
+                  <View style={styles.contextItemContent}>
+                    <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Rounds</Text>
+                    <Text style={[styles.contextValue, { color: colors.text }]}>
+                      {session.drill_config.rounds_per_shooter} per shooter
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* Input Method Preference (if set) */}
+            {session.drill_config?.input_method && (
+              <View style={[styles.inputMethodBadge, { 
+                backgroundColor: session.drill_config.input_method === 'scan' ? `${colors.primary}12` : `${colors.blue}12`
+              }]}>
+                <Settings2 size={12} color={session.drill_config.input_method === 'scan' ? colors.primary : colors.blue} />
+                <Text style={[styles.inputMethodText, { 
+                  color: session.drill_config.input_method === 'scan' ? colors.primary : colors.blue
+                }]}>
+                  {session.drill_config.input_method === 'scan' ? 'AI Scan preferred' : 'Manual entry preferred'}
+                </Text>
+              </View>
+            )}
+
+            {/* Training Context (if part of a training) */}
+            {session.training_id && session.training_title && (
+              <TouchableOpacity 
+                style={[styles.trainingContextBadge, { backgroundColor: `${colors.green}10`, borderColor: `${colors.green}30` }]}
+                onPress={() => router.push(`/(protected)/trainingDetail?id=${session.training_id}`)}
+                activeOpacity={0.7}
+              >
+                <Users size={14} color={colors.green} />
+                <View style={styles.trainingContextContent}>
+                  <Text style={[styles.trainingContextLabel, { color: colors.green }]}>Part of Team Training</Text>
+                  <Text style={[styles.trainingContextTitle, { color: colors.text }]} numberOfLines={1}>
+                    {session.training_title}
+                  </Text>
+                </View>
+                <ChevronRight size={14} color={colors.green} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </Animated.View>
 
         {/* Stats Grid */}
         {stats && stats.targetCount > 0 ? (
@@ -589,182 +678,6 @@ export default function SessionDetailScreen() {
                 </ScrollView>
               </View>
             )}
-          </Animated.View>
-        )}
-
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* BIOMETRIC INSIGHTS - Unique per-session analysis */}
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {insights && (
-          <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.insightsSection}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Performance Insights</Text>
-            
-            {/* Main Metrics Row */}
-            <View style={[styles.insightsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.insightsRow}>
-                {/* Calmness/Steadiness Score */}
-                <View style={styles.insightMetric}>
-                  <Text style={[styles.insightValue, { 
-                    color: insights.avgScore >= 50 ? colors.green : insights.avgScore >= 30 ? colors.orange : colors.red 
-                  }]}>
-                    {insights.avgScore}%
-                  </Text>
-                  <Text style={[styles.insightLabel, { color: colors.textMuted }]}>
-                    {insights.usingStress ? 'Calmness' : 'Steadiness'}
-                  </Text>
-                </View>
-
-                {/* Trend */}
-                {insights.trend !== 'stable' && (
-                  <View style={[styles.insightTrendBadge, { 
-                    backgroundColor: insights.trend === 'improving' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)' 
-                  }]}>
-                    {insights.trend === 'improving' ? (
-                      <TrendingUp size={16} color={colors.green} />
-                    ) : (
-                      <TrendingDown size={16} color={colors.red} />
-                    )}
-                    <Text style={[styles.insightTrendText, { 
-                      color: insights.trend === 'improving' ? colors.green : colors.red 
-                    }]}>
-                      {insights.trend === 'improving' ? 'Improving' : 'Declining'}
-                    </Text>
-                  </View>
-                )}
-
-                {/* Breath Pause % */}
-                <View style={styles.insightMetric}>
-                  <Text style={[styles.insightValue, { 
-                    color: insights.pausePct >= 50 ? colors.green : colors.orange 
-                  }]}>
-                    {insights.pausePct}%
-                  </Text>
-                  <Text style={[styles.insightLabel, { color: colors.textMuted }]}>Breath Pause</Text>
-                </View>
-
-                {/* Flinch Count */}
-                {insights.flinchCount > 0 && (
-                  <View style={styles.insightMetric}>
-                    <Text style={[styles.insightValue, { color: colors.red }]}>
-                      {insights.flinchCount}
-                    </Text>
-                    <Text style={[styles.insightLabel, { color: colors.textMuted }]}>Flinches</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-
-            {/* Shot-by-Shot Performance Bars */}
-            <View style={[styles.shotBarsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.shotBarsTitle, { color: colors.textMuted }]}>Shot-by-Shot Performance</Text>
-              <View style={styles.shotBarsContainer}>
-                {insights.shots.slice(0, 25).map((shot, idx) => {
-                  const score = insights.scores[idx];
-                  const barHeight = Math.max(6, (score / 100) * 48);
-                  const barColor = score >= 50 ? colors.green : score >= 30 ? colors.orange : colors.red;
-                  const breathColor = shot.breathPhase === 'pause' ? colors.green : 
-                                     shot.breathPhase === 'exhale' ? colors.orange : colors.red;
-                  return (
-                    <View key={shot.shotNumber} style={styles.shotBarColumn}>
-                      <View style={[styles.shotBarFill, { height: barHeight, backgroundColor: barColor }]} />
-                      <View style={[styles.breathDot, { backgroundColor: breathColor }]} />
-                      <Text style={[styles.shotBarLabel, { color: colors.textMuted }]}>{shot.shotNumber}</Text>
-                    </View>
-                  );
-                })}
-              </View>
-              {insights.shots.length > 25 && (
-                <Text style={[styles.shotBarsMore, { color: colors.textMuted }]}>
-                  +{insights.shots.length - 25} more shots
-                </Text>
-              )}
-              
-              {/* Legend */}
-              <View style={styles.barsLegend}>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: colors.green }]} />
-                  <Text style={[styles.legendText, { color: colors.textMuted }]}>Pause</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: colors.orange }]} />
-                  <Text style={[styles.legendText, { color: colors.textMuted }]}>Exhale</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: colors.red }]} />
-                  <Text style={[styles.legendText, { color: colors.textMuted }]}>Inhale</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Best/Worst Shots */}
-            {insights.bestScore !== insights.worstScore && (
-              <View style={styles.bestWorstRow}>
-                <View style={[styles.bestWorstCard, { backgroundColor: 'rgba(16,185,129,0.1)', borderColor: 'rgba(16,185,129,0.3)' }]}>
-                  <ArrowUp size={16} color={colors.green} />
-                  <View>
-                    <Text style={[styles.bestWorstValue, { color: colors.green }]}>
-                      Shot #{insights.bestShot}
-                    </Text>
-                    <Text style={[styles.bestWorstScore, { color: colors.green }]}>
-                      {insights.bestScore}% {insights.usingStress ? 'calm' : 'steady'}
-                    </Text>
-                  </View>
-                </View>
-                <View style={[styles.bestWorstCard, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)' }]}>
-                  <ArrowDown size={16} color={colors.red} />
-                  <View>
-                    <Text style={[styles.bestWorstValue, { color: colors.red }]}>
-                      Shot #{insights.worstShot}
-                    </Text>
-                    <Text style={[styles.bestWorstScore, { color: colors.red }]}>
-                      {insights.worstScore}% {insights.usingStress ? 'calm' : 'steady'}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            )}
-
-            {/* Breath Discipline Breakdown */}
-            <View style={[styles.breathBreakdownCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.breathBreakdownTitle, { color: colors.text }]}>Breath Discipline</Text>
-              <View style={styles.breathBar}>
-                {insights.pausePct > 0 && (
-                  <View style={[styles.breathSegment, { flex: insights.pausePct, backgroundColor: colors.green }]}>
-                    {insights.pausePct >= 15 && (
-                      <Text style={styles.breathSegmentText}>{insights.pausePct}%</Text>
-                    )}
-                  </View>
-                )}
-                {insights.exhalePct > 0 && (
-                  <View style={[styles.breathSegment, { flex: insights.exhalePct, backgroundColor: colors.orange }]}>
-                    {insights.exhalePct >= 15 && (
-                      <Text style={styles.breathSegmentText}>{insights.exhalePct}%</Text>
-                    )}
-                  </View>
-                )}
-                {insights.inhalePct > 0 && (
-                  <View style={[styles.breathSegment, { flex: insights.inhalePct, backgroundColor: colors.red }]}>
-                    {insights.inhalePct >= 15 && (
-                      <Text style={styles.breathSegmentText}>{insights.inhalePct}%</Text>
-                    )}
-                  </View>
-                )}
-              </View>
-              <View style={styles.breathBreakdownLegend}>
-                <View style={styles.breathLegendItem}>
-                  <View style={[styles.breathLegendDot, { backgroundColor: colors.green }]} />
-                  <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>Pause (optimal)</Text>
-                </View>
-                <View style={styles.breathLegendItem}>
-                  <View style={[styles.breathLegendDot, { backgroundColor: colors.orange }]} />
-                  <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>Exhale</Text>
-                </View>
-                <View style={styles.breathLegendItem}>
-                  <View style={[styles.breathLegendDot, { backgroundColor: colors.red }]} />
-                  <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>Inhale</Text>
-                </View>
-              </View>
-            </View>
           </Animated.View>
         )}
 
@@ -1044,7 +957,7 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   headerTop: {
     flexDirection: 'row',
@@ -1059,6 +972,86 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
+  },
+
+  // Session Context
+  contextSection: {
+    marginBottom: 20,
+  },
+  contextCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    gap: 12,
+  },
+  contextRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  contextItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  contextIconBg: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  contextItemContent: {
+    flex: 1,
+  },
+  contextLabel: {
+    fontSize: 10,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    marginBottom: 1,
+  },
+  contextValue: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  inputMethodBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  inputMethodText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  trainingContextBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  trainingContextContent: {
+    flex: 1,
+  },
+  trainingContextLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  trainingContextTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 2,
   },
   sourceText: {
     fontSize: 12,
@@ -1459,181 +1452,6 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-  },
-
-  // ═══════════════════════════════════════════════════════════════════
-  // INSIGHTS STYLES
-  // ═══════════════════════════════════════════════════════════════════
-  insightsSection: {
-    marginBottom: 24,
-    gap: 12,
-  },
-  insightsCard: {
-    padding: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  insightsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-  },
-  insightMetric: {
-    alignItems: 'center',
-  },
-  insightValue: {
-    fontSize: 24,
-    fontWeight: '800',
-  },
-  insightLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  insightTrendBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  insightTrendText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-
-  // Shot Bars
-  shotBarsCard: {
-    padding: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  shotBarsTitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  shotBarsContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    gap: 4,
-    height: 70,
-  },
-  shotBarColumn: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  shotBarFill: {
-    width: 10,
-    borderRadius: 3,
-  },
-  breathDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  shotBarLabel: {
-    fontSize: 8,
-    fontWeight: '500',
-  },
-  shotBarsMore: {
-    fontSize: 10,
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  barsLegend: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
-    marginTop: 12,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  legendText: {
-    fontSize: 10,
-    fontWeight: '500',
-  },
-
-  // Best/Worst
-  bestWorstRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  bestWorstCard: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  bestWorstValue: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  bestWorstScore: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-
-  // Breath Breakdown
-  breathBreakdownCard: {
-    padding: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  breathBreakdownTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  breathBar: {
-    flexDirection: 'row',
-    height: 28,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  breathSegment: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  breathSegmentText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  breathBreakdownLegend: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 12,
-  },
-  breathLegendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  breathLegendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  breathLegendText: {
-    fontSize: 11,
-    fontWeight: '500',
   },
 
   // View Full Button

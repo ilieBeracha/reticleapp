@@ -54,7 +54,7 @@ function PillPicker({
   selected,
   onSelect,
   allowCustom,
-  customSuffix,
+  customSuffix = '',
 }: {
   options: number[];
   selected: number;
@@ -75,24 +75,29 @@ function PillPicker({
   };
 
   return (
-    <View style={styles.pills}>
-      {options.map((opt) => {
-        const active = opt === selected && !editing;
-        return (
-          <TouchableOpacity
-            key={opt}
-            style={[
-              styles.pill,
-              { backgroundColor: active ? colors.text : colors.card },
-            ]}
-            onPress={() => { Haptics.selectionAsync(); onSelect(opt); setEditing(false); }}
-          >
-            <Text style={[styles.pillText, { color: active ? colors.background : colors.text }]}>
-              {opt}{customSuffix}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
+    <View style={styles.pillsContainer}>
+      {/* Preset options */}
+      <View style={styles.pillsPresets}>
+        {options.map((opt) => {
+          const active = opt === selected && !editing;
+          return (
+            <TouchableOpacity
+              key={opt}
+              style={[
+                styles.pill,
+                { backgroundColor: active ? colors.text : colors.card },
+              ]}
+              onPress={() => { Haptics.selectionAsync(); onSelect(opt); setEditing(false); }}
+            >
+              <Text style={[styles.pillText, { color: active ? colors.background : colors.text }]}>
+                {opt}{customSuffix}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      
+      {/* Custom input - pushed to the right */}
       {allowCustom && (
         editing ? (
           <View style={[
@@ -111,7 +116,9 @@ function PillPicker({
               autoFocus
               selectTextOnFocus
             />
-            <Text style={[styles.pillInputSuffix, { color: colors.text }]}>{customSuffix}</Text>
+            {customSuffix ? (
+              <Text style={[styles.pillInputSuffix, { color: colors.text }]}>{customSuffix}</Text>
+            ) : null}
           </View>
         ) : (
           <TouchableOpacity
@@ -123,6 +130,98 @@ function PillPicker({
           >
             <Text style={[styles.pillText, { color: isCustom ? colors.background : colors.text }]}>
               {isCustom ? `${selected}${customSuffix}` : 'Other'}
+            </Text>
+          </TouchableOpacity>
+        )
+      )}
+    </View>
+  );
+}
+
+// ============================================================================
+// TIME PILL PICKER (handles null + seconds)
+// ============================================================================
+
+function TimePillPicker({
+  options,
+  selected,
+  onSelect,
+  allowCustom = true,
+}: {
+  options: (number | null)[];
+  selected: number | null;
+  onSelect: (v: number | null) => void;
+  allowCustom?: boolean;
+}) {
+  const colors = useColors();
+  const inputRef = useRef<TextInput>(null);
+  const isCustom = selected !== null && !options.includes(selected);
+  const [editing, setEditing] = useState(false);
+  const [customText, setCustomText] = useState(selected ? String(selected) : '60');
+
+  const formatTime = (s: number | null) => 
+    s === null ? 'None' : s < 60 ? `${s}s` : `${Math.floor(s / 60)}m`;
+
+  const handleCustomSubmit = () => {
+    const num = parseInt(customText, 10);
+    if (!isNaN(num) && num > 0) onSelect(num);
+    setEditing(false);
+  };
+
+  return (
+    <View style={styles.pillsContainer}>
+      {/* Preset options */}
+      <View style={styles.pillsPresets}>
+        {options.map((opt) => {
+          const active = opt === selected && !editing;
+          return (
+            <TouchableOpacity
+              key={String(opt)}
+              style={[
+                styles.pill,
+                { backgroundColor: active ? colors.text : colors.card },
+              ]}
+              onPress={() => { Haptics.selectionAsync(); onSelect(opt); setEditing(false); }}
+            >
+              <Text style={[styles.pillText, { color: active ? colors.background : colors.text }]}>
+                {formatTime(opt)}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      
+      {/* Custom input - pushed to the right */}
+      {allowCustom && (
+        editing ? (
+          <View style={[
+            styles.pill,
+            styles.pillInputContainer,
+            { backgroundColor: colors.card, borderColor: colors.text }
+          ]}>
+            <TextInput
+              ref={inputRef}
+              style={[styles.pillInputText, { color: colors.text }]}
+              value={customText}
+              onChangeText={setCustomText}
+              onBlur={handleCustomSubmit}
+              onSubmitEditing={handleCustomSubmit}
+              keyboardType="number-pad"
+              autoFocus
+              selectTextOnFocus
+            />
+            <Text style={[styles.pillInputSuffix, { color: colors.text }]}>s</Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={[
+              styles.pill,
+              { backgroundColor: isCustom ? colors.text : colors.card },
+            ]}
+            onPress={() => { setCustomText(selected ? String(selected) : '60'); setEditing(true); }}
+          >
+            <Text style={[styles.pillText, { color: isCustom ? colors.background : colors.text }]}>
+              {isCustom ? formatTime(selected) : 'Other'}
             </Text>
           </TouchableOpacity>
         )
@@ -325,7 +424,7 @@ export function SessionContextStep({
               </View>
 
               <View style={styles.paramRow}>
-                <Text style={[styles.paramLabel, { color: colors.textMuted }]}>Rounds</Text>
+                <Text style={[styles.paramLabel, { color: colors.textMuted }]}>Bullets</Text>
                 <PillPicker
                   options={shotsPresets.slice(0, 4)}
                   selected={context.shotsPlanned}
@@ -336,25 +435,11 @@ export function SessionContextStep({
 
               <View style={styles.paramRow}>
                 <Text style={[styles.paramLabel, { color: colors.textMuted }]}>Time limit</Text>
-                <View style={styles.pills}>
-                  {TIME_PRESETS.map((t) => {
-                    const active = context.timeLimit === t;
-                    return (
-                      <TouchableOpacity
-                        key={String(t)}
-                        style={[
-                          styles.pill,
-                          { backgroundColor: active ? colors.text : colors.card },
-                        ]}
-                        onPress={() => { Haptics.selectionAsync(); onUpdateContext({ timeLimit: t }); }}
-                      >
-                        <Text style={[styles.pillText, { color: active ? colors.background : colors.text }]}>
-                          {formatTime(t)}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                <TimePillPicker
+                  options={TIME_PRESETS}
+                  selected={context.timeLimit}
+                  onSelect={(t) => onUpdateContext({ timeLimit: t })}
+                />
               </View>
             </>
           )}
@@ -363,7 +448,7 @@ export function SessionContextStep({
           {!isEditingDrill && (
             <View style={styles.drillSummary}>
               <Text style={[styles.drillSummaryText, { color: colors.textMuted }]}>
-                {context.distance}m • {context.shotsPlanned} rounds{context.timeLimit ? ` • ${formatTime(context.timeLimit)}` : ''}
+                {context.distance}m • {context.shotsPlanned} bullets{context.timeLimit ? ` • ${formatTime(context.timeLimit)}` : ''}
               </Text>
             </View>
           )}
@@ -385,7 +470,7 @@ export function SessionContextStep({
           </View>
 
           <View style={styles.paramRow}>
-            <Text style={[styles.paramLabel, { color: colors.textMuted }]}>Rounds</Text>
+            <Text style={[styles.paramLabel, { color: colors.textMuted }]}>Bullets</Text>
             <PillPicker
               options={shotsPresets.slice(0, 4)}
               selected={context.shotsPlanned}
@@ -432,25 +517,11 @@ export function SessionContextStep({
 
               <View style={styles.paramRow}>
                 <Text style={[styles.paramLabel, { color: colors.textMuted }]}>Time limit</Text>
-                <View style={styles.pills}>
-                  {TIME_PRESETS.map((t) => {
-                    const active = context.timeLimit === t;
-                    return (
-                      <TouchableOpacity
-                        key={String(t)}
-                        style={[
-                          styles.pill,
-                          { backgroundColor: active ? colors.text : colors.card },
-                        ]}
-                        onPress={() => { Haptics.selectionAsync(); onUpdateContext({ timeLimit: t }); }}
-                      >
-                        <Text style={[styles.pillText, { color: active ? colors.background : colors.text }]}>
-                          {formatTime(t)}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                <TimePillPicker
+                  options={TIME_PRESETS}
+                  selected={context.timeLimit}
+                  onSelect={(t) => onUpdateContext({ timeLimit: t })}
+                />
               </View>
 
               <View style={styles.notesRow}>
@@ -537,6 +608,8 @@ const styles = StyleSheet.create({
   drillSummaryText: { fontSize: 14 },
 
   // Pills
+  pillsContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  pillsPresets: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   pill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
   pillText: { fontSize: 14, fontWeight: '500' },

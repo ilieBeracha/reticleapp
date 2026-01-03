@@ -9,6 +9,10 @@
 
 import { supabase } from '@/lib/supabase';
 import type { WeaponCategory } from '@/types/workspace';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// AsyncStorage key for default weapon
+const DEFAULT_WEAPON_KEY = '@reticle:default_weapon_id';
 
 // Re-export for convenience
 export type { WeaponCategory } from '@/types/workspace';
@@ -368,15 +372,61 @@ export async function getRecentlyUsedWeapons(limit = 3): Promise<UserWeapon[]> {
 }
 
 /**
+ * Get the stored default weapon ID from AsyncStorage
+ */
+export async function getDefaultWeaponId(): Promise<string | null> {
+  try {
+    const id = await AsyncStorage.getItem(DEFAULT_WEAPON_KEY);
+    return id;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Set the default weapon ID in AsyncStorage
+ */
+export async function setDefaultWeaponId(weaponId: string | null): Promise<void> {
+  try {
+    if (weaponId) {
+      await AsyncStorage.setItem(DEFAULT_WEAPON_KEY, weaponId);
+    } else {
+      await AsyncStorage.removeItem(DEFAULT_WEAPON_KEY);
+    }
+  } catch (error) {
+    console.error('[weaponService] Failed to save default weapon:', error);
+  }
+}
+
+/**
  * Get the user's default weapon for auto-selection
- * Priority: 1. Favorite weapon, 2. Most recently used, 3. First weapon
+ * Priority: 1. Stored default, 2. Favorite weapon, 3. Most recently used, 4. First weapon
  */
 export async function getDefaultWeapon(): Promise<UserWeapon | null> {
   // Get current user
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  // First try to get a favorite
+  // 1. First check for stored default weapon
+  const storedDefaultId = await getDefaultWeaponId();
+  if (storedDefaultId) {
+    const { data: storedDefault } = await supabase
+      .from('user_weapons')
+      .select(`
+        *,
+        base_weapon:weapons(*),
+        team_weapon:team_weapons!user_weapons_team_weapon_id_fkey(*)
+      `)
+      .eq('id', storedDefaultId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (storedDefault) return storedDefault;
+    // If stored default no longer exists, clear it
+    await setDefaultWeaponId(null);
+  }
+
+  // 2. Try to get a favorite
   const { data: favorite } = await supabase
     .from('user_weapons')
     .select(`
@@ -391,7 +441,7 @@ export async function getDefaultWeapon(): Promise<UserWeapon | null> {
 
   if (favorite) return favorite;
 
-  // Then try most recently used
+  // 3. Then try most recently used
   const { data: recent } = await supabase
     .from('user_weapons')
     .select(`
@@ -407,7 +457,7 @@ export async function getDefaultWeapon(): Promise<UserWeapon | null> {
 
   if (recent) return recent;
 
-  // Fall back to first weapon
+  // 4. Fall back to first weapon
   const { data: first } = await supabase
     .from('user_weapons')
     .select(`

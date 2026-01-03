@@ -11,6 +11,7 @@ import {
 import { calculateSessionStats } from './stats';
 import {
   addSessionTarget,
+  getSessionTargets,
   savePaperTargetResult,
   saveTacticalTargetResult,
 } from './targets';
@@ -810,9 +811,9 @@ export async function saveWatchSessionData(
   console.log('[SessionService] Saving watch data:', data);
   
   // Check if we already have a watch target for this session (prevent duplicates from retries)
-  const existingTargets = session.session_targets || [];
+  const existingTargets = await getSessionTargets(data.sessionId);
   const hasWatchTarget = existingTargets.some(
-    (t: { target_data?: { source?: string } }) => t.target_data?.source === 'garmin_watch'
+    (t) => (t.target_data as Record<string, unknown> | null)?.source === 'garmin_watch'
   );
   
   if (hasWatchTarget) {

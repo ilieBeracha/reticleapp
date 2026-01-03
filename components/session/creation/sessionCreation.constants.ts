@@ -115,7 +115,7 @@ export const POSITION_OPTIONS: { value: Position; label: string }[] = [
 // TIME LIMIT PRESETS (seconds)
 // ============================================================================
 
-export const TIME_PRESETS: (number | null)[] = [null, 30, 60, 120, 300];
+export const TIME_PRESETS: (number | null)[] = [null, 30, 60, 120];
 
 // ============================================================================
 // UI COPY - Human-friendly questions (from mental model)

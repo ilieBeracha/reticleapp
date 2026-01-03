@@ -52,12 +52,12 @@ export default function TabsLayout() {
         name="equipment"
         options={{
           title: 'Equipment',
-          tabBarIcon: ({ focused }) => getTabIcon('', focused ? 'hardware-chip' : 'hardware-chip-outline'),
+          tabBarIcon: ({ focused }) => getTabIcon('scope', focused ? 'aperture' : 'aperture-outline'),
         }}
       />
 
       <Tabs.Screen
-        name="trainings"
+        name="team"
         options={{
           role: 'search',
           title: 'Team',

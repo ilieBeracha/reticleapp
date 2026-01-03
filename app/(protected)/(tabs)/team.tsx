@@ -488,7 +488,7 @@ export default function TeamScreen() {
 }
 
 // ============================================================================
-// MANAGE TAB COMPONENT
+// MANAGE TAB COMPONENT - Commander Dashboard
 // ============================================================================
 interface ManageTabProps {
   colors: ReturnType<typeof useColors>;
@@ -522,241 +522,475 @@ function ManageTab({
   onInviteMember,
   onTeamSettings,
 }: ManageTabProps) {
+  const progressPct = Math.min(100, (teamStats.totalShots / teamStats.weeklyGoal) * 100);
+
   return (
-    <>
-      {/* Live Session Status */}
-            {liveTraining && (
-              <TouchableOpacity
-                style={[styles.liveStatusCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+    <View style={manageStyles.container}>
+      {/* Live Session Banner - Full width, prominent */}
+      {liveTraining && (
+        <TouchableOpacity
+          style={[manageStyles.liveBanner, { borderColor: COLORS.live + '40' }]}
           onPress={() => onTrainingPress(liveTraining)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.liveStatusLeft}>
-            <View style={[styles.liveStatusDot, { backgroundColor: COLORS.live }]}>
-                    <View style={styles.liveStatusDotInner} />
-                  </View>
-                  <View style={styles.liveStatusContent}>
-                    <Text style={[styles.liveStatusLabel, { color: colors.textMuted }]}>SESSION IN PROGRESS</Text>
-                    <Text style={[styles.liveStatusTitle, { color: colors.text }]} numberOfLines={1}>
-                      {liveTraining.title}
-                    </Text>
-                    <Text style={[styles.liveStatusMeta, { color: colors.textMuted }]}>
-                      {memberStats.training} member{memberStats.training !== 1 ? 's' : ''} active
-                    </Text>
-                  </View>
-                </View>
-                <View style={[styles.liveStatusAction, { backgroundColor: colors.secondary }]}>
-                  <ChevronRight size={16} color={colors.textMuted} />
-                </View>
-              </TouchableOpacity>
-            )}
+          activeOpacity={0.85}
+        >
+          <View style={manageStyles.liveBannerGlow} />
+          <View style={manageStyles.liveIndicator}>
+            <PulseDot color="#fff" />
+            <Text style={manageStyles.liveLabel}>LIVE</Text>
+          </View>
+          <View style={manageStyles.liveBannerContent}>
+            <Text style={manageStyles.liveBannerTitle} numberOfLines={1}>
+              {liveTraining.title}
+            </Text>
+            <Text style={manageStyles.liveBannerMeta}>
+              {memberStats.training} active • Tap to view
+            </Text>
+          </View>
+          <ChevronRight size={20} color="rgba(255,255,255,0.7)" />
+        </TouchableOpacity>
+      )}
 
-      {/* Team Stats */}
-            <View style={[styles.section, !liveTraining && { marginTop: 0 }]}>
-              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>THIS WEEK</Text>
-              <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={styles.statsGrid}>
-                  <View style={styles.statItem}>
-                    <View style={[styles.statIcon, { backgroundColor: '#3B82F620' }]}>
-                      <Activity size={18} color="#3B82F6" />
-                    </View>
-                    <Text style={[styles.statValue, { color: colors.text }]}>{teamStats.sessionsThisWeek}</Text>
-                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>Sessions</Text>
-                  </View>
-                  <View style={styles.statItem}>
-                    <View style={[styles.statIcon, { backgroundColor: '#F59E0B20' }]}>
-                      <Zap size={18} color="#F59E0B" />
-                    </View>
-                    <Text style={[styles.statValue, { color: colors.text }]}>{teamStats.totalShots.toLocaleString()}</Text>
-                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>Shots</Text>
-                  </View>
-                  <View style={styles.statItem}>
-                    <View style={[styles.statIcon, { backgroundColor: '#10B98120' }]}>
-                      <Target size={18} color="#10B981" />
-                    </View>
-                    <Text style={[styles.statValue, { color: colors.text }]}>{teamStats.avgAccuracy}%</Text>
-                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>Accuracy</Text>
-                  </View>
-                </View>
-                <View style={styles.progressSection}>
-                  <View style={styles.progressHeader}>
-                    <Text style={[styles.progressLabel, { color: colors.textMuted }]}>Weekly Goal</Text>
-                    <Text style={[styles.progressValue, { color: colors.text }]}>
-                      {teamStats.totalShots.toLocaleString()} / {teamStats.weeklyGoal.toLocaleString()}
-                    </Text>
-                  </View>
-                  <View style={[styles.progressBg, { backgroundColor: colors.secondary }]}>
-                    <View
-                      style={[
-                        styles.progressFill,
-                        {
-                          width: `${Math.min(100, (teamStats.totalShots / teamStats.weeklyGoal) * 100)}%`,
-                          backgroundColor: colors.primary,
-                        },
-                      ]}
-                    />
-                  </View>
-                </View>
-              </View>
-            </View>
-
-            {/* Member Status */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>TEAM STATUS</Text>
-          <TouchableOpacity onPress={onViewMembers}>
-                  <Text style={[styles.sectionLink, { color: colors.primary }]}>View All</Text>
-                </TouchableOpacity>
-              </View>
-              <TouchableOpacity
-                style={[styles.memberStatusCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={onViewMembers}
-                activeOpacity={0.7}
-              >
-                <View style={styles.statusRow}>
-                  <View style={styles.statusItem}>
-              <View style={[styles.statusDot, { backgroundColor: COLORS.training }]} />
-                    <Text style={[styles.statusCount, { color: colors.text }]}>{memberStats.training}</Text>
-                    <Text style={[styles.statusLabel, { color: colors.textMuted }]}>Training</Text>
-                  </View>
-                  <View style={styles.statusItem}>
-              <View style={[styles.statusDot, { backgroundColor: COLORS.online }]} />
-                    <Text style={[styles.statusCount, { color: colors.text }]}>{memberStats.online}</Text>
-                    <Text style={[styles.statusLabel, { color: colors.textMuted }]}>Online</Text>
-                  </View>
-                  <View style={styles.statusItem}>
-              <View style={[styles.statusDot, { backgroundColor: COLORS.idle }]} />
-                    <Text style={[styles.statusCount, { color: colors.text }]}>{memberStats.idle}</Text>
-                    <Text style={[styles.statusLabel, { color: colors.textMuted }]}>Idle</Text>
-                  </View>
-                  <View style={styles.statusItem}>
-                    <View style={[styles.statusDot, { backgroundColor: colors.textMuted }]} />
-                    <Text style={[styles.statusCount, { color: colors.text }]}>{memberStats.offline}</Text>
-                    <Text style={[styles.statusLabel, { color: colors.textMuted }]}>Offline</Text>
-                  </View>
-                </View>
-                <View style={[styles.memberRow, { borderTopColor: colors.border }]}>
-                  <View style={styles.memberAvatars}>
-                    {members.slice(0, 5).map((m, i) => (
-                      <View
-                        key={m.user_id}
-                        style={[
-                          styles.memberAvatar,
-                          { backgroundColor: colors.primary, marginLeft: i > 0 ? -8 : 0, zIndex: 5 - i },
-                        ]}
-                      >
-                        <Text style={styles.memberAvatarText}>
-                          {m.profile.full_name?.charAt(0) || m.profile.email.charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-                    ))}
-                    {members.length > 5 && (
-                      <View style={[styles.memberAvatar, { backgroundColor: colors.secondary, marginLeft: -8 }]}>
-                        <Text style={[styles.memberAvatarText, { color: colors.textMuted }]}>+{members.length - 5}</Text>
-                      </View>
-                    )}
-                  </View>
-                  <ChevronRight size={18} color={colors.textMuted} />
-                </View>
-              </TouchableOpacity>
-            </View>
-
-            {/* Quick Actions */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>ACTIONS</Text>
-              <View style={styles.manageGrid}>
-                <TouchableOpacity
-                  style={[styles.manageCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={onCreateTraining}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.manageIcon, { backgroundColor: '#10B98115' }]}>
-                    <Plus size={22} color="#10B981" />
-                  </View>
-                  <Text style={[styles.manageTitle, { color: colors.text }]}>New Session</Text>
-                  <Text style={[styles.manageDesc, { color: colors.textMuted }]}>Schedule</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.manageCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={onOpenLibrary}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.manageIcon, { backgroundColor: '#3B82F615' }]}>
-                    <BookOpen size={22} color="#3B82F6" />
-                  </View>
-                  <Text style={[styles.manageTitle, { color: colors.text }]}>Drill Library</Text>
-                  <Text style={[styles.manageDesc, { color: colors.textMuted }]}>Templates</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-      {/* Team Management */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>TEAM</Text>
-              <TouchableOpacity
-                style={[styles.manageRow, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={onViewMembers}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.manageRowIcon, { backgroundColor: colors.primary + '15' }]}>
-                  <Users size={18} color={colors.primary} />
-                </View>
-                <View style={styles.manageRowContent}>
-                  <Text style={[styles.manageRowTitle, { color: colors.text }]}>Members</Text>
-            <Text style={[styles.manageRowDesc, { color: colors.textMuted }]}>View and manage team roster</Text>
-                </View>
-                <ChevronRight size={18} color={colors.textMuted} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.manageRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+      {/* Quick Actions - Top level for easy access */}
+      <View style={manageStyles.quickActions}>
+        <TouchableOpacity
+          style={[manageStyles.primaryAction, { backgroundColor: colors.text }]}
+          onPress={onCreateTraining}
+          activeOpacity={0.85}
+        >
+          <Plus size={20} color={colors.background} strokeWidth={2.5} />
+          <Text style={[manageStyles.primaryActionText, { color: colors.background }]}>
+            New Training
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[manageStyles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={onOpenLibrary}
+          activeOpacity={0.7}
+        >
+          <BookOpen size={18} color={colors.text} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[manageStyles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}
           onPress={onInviteMember}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.manageRowIcon, { backgroundColor: '#A78BFA15' }]}>
-                  <UserPlus size={18} color="#A78BFA" />
-                </View>
-                <View style={styles.manageRowContent}>
-                  <Text style={[styles.manageRowTitle, { color: colors.text }]}>Invite Members</Text>
-            <Text style={[styles.manageRowDesc, { color: colors.textMuted }]}>Add new members to the team</Text>
-                </View>
-                <ChevronRight size={18} color={colors.textMuted} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.manageRow, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={onTeamSettings}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.manageRowIcon, { backgroundColor: colors.secondary }]}>
-                  <Settings size={18} color={colors.textMuted} />
-                </View>
-                <View style={styles.manageRowContent}>
-                  <Text style={[styles.manageRowTitle, { color: colors.text }]}>Team Settings</Text>
-            <Text style={[styles.manageRowDesc, { color: colors.textMuted }]}>Configuration and preferences</Text>
-                </View>
-                <ChevronRight size={18} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
+          activeOpacity={0.7}
+        >
+          <UserPlus size={18} color={colors.text} />
+        </TouchableOpacity>
+      </View>
 
-      {/* Team Info Card */}
-            {activeTeam && (
-              <View style={styles.section}>
-                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>CURRENT TEAM</Text>
-                <View style={[styles.teamInfoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <View style={[styles.teamRowIcon, { backgroundColor: colors.primary + '15' }]}>
-                    <Users size={18} color={colors.primary} />
+      {/* Stats Overview - Clean horizontal cards */}
+      <View style={manageStyles.statsSection}>
+        <View style={manageStyles.statsHeader}>
+          <Text style={[manageStyles.statsSectionTitle, { color: colors.text }]}>This Week</Text>
+          <View style={[manageStyles.goalPill, { backgroundColor: progressPct >= 100 ? '#10B98115' : colors.secondary }]}>
+            <Text style={[manageStyles.goalPillText, { color: progressPct >= 100 ? '#10B981' : colors.textMuted }]}>
+              {Math.round(progressPct)}% of goal
+            </Text>
+          </View>
+        </View>
+        
+        <View style={manageStyles.statsRow}>
+          <View style={[manageStyles.statCard, { backgroundColor: colors.card }]}>
+            <Activity size={16} color="#3B82F6" />
+            <Text style={[manageStyles.statCardValue, { color: colors.text }]}>
+              {teamStats.sessionsThisWeek}
+            </Text>
+            <Text style={[manageStyles.statCardLabel, { color: colors.textMuted }]}>Sessions</Text>
+          </View>
+          <View style={[manageStyles.statCard, { backgroundColor: colors.card }]}>
+            <Zap size={16} color="#F59E0B" />
+            <Text style={[manageStyles.statCardValue, { color: colors.text }]}>
+              {teamStats.totalShots >= 1000 
+                ? `${(teamStats.totalShots / 1000).toFixed(1)}k`
+                : teamStats.totalShots}
+            </Text>
+            <Text style={[manageStyles.statCardLabel, { color: colors.textMuted }]}>Shots</Text>
+          </View>
+          <View style={[manageStyles.statCard, { backgroundColor: colors.card }]}>
+            <Target size={16} color="#10B981" />
+            <Text style={[manageStyles.statCardValue, { color: colors.text }]}>
+              {teamStats.avgAccuracy}%
+            </Text>
+            <Text style={[manageStyles.statCardLabel, { color: colors.textMuted }]}>Accuracy</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Team Status - Compact member overview */}
+      <TouchableOpacity
+        style={[manageStyles.teamCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+        onPress={onViewMembers}
+        activeOpacity={0.7}
+      >
+        <View style={manageStyles.teamCardHeader}>
+          <View style={manageStyles.teamCardLeft}>
+            <View style={manageStyles.memberAvatarStack}>
+              {members.slice(0, 4).map((m, i) => (
+                <View
+                  key={m.user_id}
+                  style={[
+                    manageStyles.stackedAvatar,
+                    { 
+                      backgroundColor: ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6'][i % 4],
+                      marginLeft: i > 0 ? -10 : 0,
+                      zIndex: 4 - i,
+                    },
+                  ]}
+                >
+                  <Text style={manageStyles.stackedAvatarText}>
+                    {(m.profile?.full_name?.charAt(0) || m.profile?.email?.charAt(0) || '?').toUpperCase()}
+                  </Text>
+                </View>
+              ))}
+              {members.length > 4 && (
+                <View style={[manageStyles.stackedAvatar, manageStyles.moreAvatar, { backgroundColor: colors.secondary, marginLeft: -10 }]}>
+                  <Text style={[manageStyles.stackedAvatarText, { color: colors.textMuted, fontSize: 10 }]}>
+                    +{members.length - 4}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View>
+              <Text style={[manageStyles.teamCardTitle, { color: colors.text }]}>
+                {members.length} Members
+              </Text>
+              <View style={manageStyles.statusDots}>
+                {memberStats.training > 0 && (
+                  <View style={manageStyles.statusDotItem}>
+                    <View style={[manageStyles.miniDot, { backgroundColor: COLORS.training }]} />
+                    <Text style={[manageStyles.statusDotText, { color: colors.textMuted }]}>{memberStats.training}</Text>
                   </View>
-                  <View style={styles.teamRowContent}>
-                    <Text style={[styles.teamRowName, { color: colors.text }]}>{activeTeam.name}</Text>
-                    {roleConfig && (
-                <Text style={[styles.teamRowRole, { color: roleConfig.color }]}>{roleConfig.label}</Text>
-                    )}
-                  </View>
+                )}
+                <View style={manageStyles.statusDotItem}>
+                  <View style={[manageStyles.miniDot, { backgroundColor: COLORS.online }]} />
+                  <Text style={[manageStyles.statusDotText, { color: colors.textMuted }]}>{memberStats.online}</Text>
+                </View>
+                <View style={manageStyles.statusDotItem}>
+                  <View style={[manageStyles.miniDot, { backgroundColor: colors.textMuted, opacity: 0.4 }]} />
+                  <Text style={[manageStyles.statusDotText, { color: colors.textMuted }]}>{memberStats.offline}</Text>
                 </View>
               </View>
-            )}
-          </>
+            </View>
+          </View>
+          <ChevronRight size={18} color={colors.textMuted} />
+        </View>
+      </TouchableOpacity>
+
+      {/* Management Menu - Clean list */}
+      <View style={manageStyles.menuSection}>
+        <Text style={[manageStyles.menuSectionTitle, { color: colors.textMuted }]}>MANAGE</Text>
+        
+        <View style={[manageStyles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <TouchableOpacity
+            style={manageStyles.menuItem}
+            onPress={onViewMembers}
+            activeOpacity={0.6}
+          >
+            <View style={[manageStyles.menuIcon, { backgroundColor: colors.primary + '12' }]}>
+              <Users size={16} color={colors.primary} />
+            </View>
+            <Text style={[manageStyles.menuItemText, { color: colors.text }]}>Members & Roles</Text>
+            <ChevronRight size={16} color={colors.border} />
+          </TouchableOpacity>
+
+          <View style={[manageStyles.menuDivider, { backgroundColor: colors.border }]} />
+
+          <TouchableOpacity
+            style={manageStyles.menuItem}
+            onPress={onOpenLibrary}
+            activeOpacity={0.6}
+          >
+            <View style={[manageStyles.menuIcon, { backgroundColor: '#3B82F612' }]}>
+              <BookOpen size={16} color="#3B82F6" />
+            </View>
+            <Text style={[manageStyles.menuItemText, { color: colors.text }]}>Drill Library</Text>
+            <ChevronRight size={16} color={colors.border} />
+          </TouchableOpacity>
+
+          <View style={[manageStyles.menuDivider, { backgroundColor: colors.border }]} />
+
+          <TouchableOpacity
+            style={manageStyles.menuItem}
+            onPress={onTeamSettings}
+            activeOpacity={0.6}
+          >
+            <View style={[manageStyles.menuIcon, { backgroundColor: colors.secondary }]}>
+              <Settings size={16} color={colors.textMuted} />
+            </View>
+            <Text style={[manageStyles.menuItemText, { color: colors.text }]}>Settings</Text>
+            <ChevronRight size={16} color={colors.border} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Team Identity Footer */}
+      {activeTeam && roleConfig && (
+        <View style={manageStyles.teamFooter}>
+          <View style={[manageStyles.teamBadge, { backgroundColor: colors.card }]}>
+            <Users size={14} color={colors.textMuted} />
+            <Text style={[manageStyles.teamBadgeText, { color: colors.text }]}>{activeTeam.name}</Text>
+            <View style={[manageStyles.rolePill, { backgroundColor: roleConfig.color + '15' }]}>
+              <Text style={[manageStyles.rolePillText, { color: roleConfig.color }]}>{roleConfig.label}</Text>
+            </View>
+          </View>
+        </View>
+      )}
+    </View>
   );
 }
+
+// Elegant manage tab styles
+const manageStyles = StyleSheet.create({
+  container: {
+    gap: 20,
+  },
+
+  // Live Banner
+  liveBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: COLORS.live,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  liveBannerGlow: {
+    position: 'absolute',
+    top: -50,
+    right: -50,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  liveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginRight: 12,
+  },
+  liveLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: 0.5,
+  },
+  liveBannerContent: {
+    flex: 1,
+  },
+  liveBannerTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 2,
+  },
+  liveBannerMeta: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+  },
+
+  // Quick Actions
+  quickActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  primaryAction: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 48,
+    borderRadius: 12,
+  },
+  primaryActionText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  secondaryAction: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+
+  // Stats Section
+  statsSection: {
+    gap: 12,
+  },
+  statsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statsSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  goalPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  goalPillText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  statCard: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    gap: 6,
+  },
+  statCardValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+  },
+  statCardLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+
+  // Team Card
+  teamCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  teamCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+  },
+  teamCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  memberAvatarStack: {
+    flexDirection: 'row',
+  },
+  stackedAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  stackedAvatarText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  moreAvatar: {
+    borderWidth: 0,
+  },
+  teamCardTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  statusDots: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  statusDotItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  miniDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusDotText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+
+  // Menu Section
+  menuSection: {
+    gap: 10,
+  },
+  menuSectionTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  menuCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    gap: 12,
+  },
+  menuIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuItemText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  menuDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 58,
+  },
+
+  // Team Footer
+  teamFooter: {
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  teamBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  teamBadgeText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  rolePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  rolePillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+});
 
 // ============================================================================
 // TEAM MEMBERS TAB (for soldiers - shows team roster)

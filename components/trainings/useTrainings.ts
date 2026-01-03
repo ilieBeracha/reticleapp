@@ -31,6 +31,11 @@ export function useTrainings(): UseTrainingsReturn {
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [members, setMembers] = useState<TeamMemberWithProfile[]>([]);
 
+  // Reset tab to calendar when switching teams
+  useEffect(() => {
+    setActiveTab('calendar');
+  }, [activeTeamId]);
+
   // ============================================================================
   // DATA LOADING
   // ============================================================================

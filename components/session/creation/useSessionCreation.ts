@@ -307,7 +307,15 @@ export function useSessionCreation(
       }
 
       if (!canAdvance) return s;
-      return { ...s, step: STEP_ORDER[currentIndex + 1] };
+      
+      let nextStep = STEP_ORDER[currentIndex + 1];
+      
+      // Skip weapon step if coming from intent AND weapon is already selected
+      if (s.step === 'intent' && s.context.weaponId !== null) {
+        nextStep = 'context';
+      }
+      
+      return { ...s, step: nextStep };
     });
   }, []);
   

@@ -11,8 +11,10 @@ import { useColors } from '@/hooks/ui/useColors';
 import { getMyTeams } from '@/services/teamService';
 import {
     createUserWeapon,
+    getDefaultWeaponId,
     getUserWeapons,
     getWeaponStats,
+    setDefaultWeaponId,
     toggleUserWeaponFavorite,
     type GlobalWeapon,
     type UserWeapon,
@@ -28,6 +30,7 @@ import {
     Crosshair,
     Heart,
     Plus,
+    Star,
     Target,
     Users,
 } from 'lucide-react-native';
@@ -178,11 +181,13 @@ function formatLastUsed(date: string | null): string {
 interface WeaponCardProps {
   weapon: UserWeapon;
   stats: WeaponStats | undefined;
+  isDefault: boolean;
   onPress: () => void;
   onFavorite: () => void;
+  onSetDefault: () => void;
 }
 
-function WeaponCard({ weapon, stats, onPress, onFavorite }: WeaponCardProps) {
+function WeaponCard({ weapon, stats, isDefault, onPress, onFavorite, onSetDefault }: WeaponCardProps) {
   const colors = useColors();
   const categoryConfig = weapon.category ? getCategoryConfig(weapon.category) : null;
   const Silhouette = getWeaponSilhouette(weapon.category);
@@ -191,6 +196,11 @@ function WeaponCard({ weapon, stats, onPress, onFavorite }: WeaponCardProps) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onFavorite();
   }, [onFavorite]);
+
+  const handleSetDefault = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onSetDefault();
+  }, [onSetDefault]);
 
   return (
     <TouchableOpacity
@@ -204,19 +214,43 @@ function WeaponCard({ weapon, stats, onPress, onFavorite }: WeaponCardProps) {
           <Silhouette color={colors.text} size={56} />
         </View>
 
-        {/* Favorite button */}
-        <TouchableOpacity
-          style={styles.favoriteButton}
-          onPress={handleFavorite}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Heart
-            size={20}
-            color={weapon.is_favorite ? '#ef4444' : colors.textMuted}
-            fill={weapon.is_favorite ? '#ef4444' : 'none'}
-          />
-        </TouchableOpacity>
+        {/* Action buttons */}
+        <View style={styles.cardActions}>
+          {/* Default indicator / button */}
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleSetDefault}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Star
+              size={18}
+              color={isDefault ? '#f59e0b' : colors.textMuted}
+              fill={isDefault ? '#f59e0b' : 'none'}
+            />
+          </TouchableOpacity>
+          
+          {/* Favorite button */}
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleFavorite}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Heart
+              size={18}
+              color={weapon.is_favorite ? '#ef4444' : colors.textMuted}
+              fill={weapon.is_favorite ? '#ef4444' : 'none'}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
+      
+      {/* Default badge */}
+      {isDefault && (
+        <View style={[styles.defaultBadge, { backgroundColor: '#f59e0b20' }]}>
+          <Star size={10} color="#f59e0b" fill="#f59e0b" />
+          <Text style={styles.defaultBadgeText}>Default for new sessions</Text>
+        </View>
+      )}
 
       {/* Weapon info */}
       <View style={styles.cardInfo}>
@@ -305,19 +339,22 @@ export default function EquipmentScreen() {
   const [hasTeams, setHasTeams] = useState(false);
   const [showAddWeapon, setShowAddWeapon] = useState(false);
   const [showWeaponPicker, setShowWeaponPicker] = useState(false);
+  const [defaultWeaponId, setDefaultWeaponIdState] = useState<string | null>(null);
 
   // Load data
   const loadData = useCallback(async () => {
     try {
-      const [weaponsData, statsData, teamsData] = await Promise.all([
+      const [weaponsData, statsData, teamsData, storedDefaultId] = await Promise.all([
         getUserWeapons(),
         getWeaponStats(),
         getMyTeams(),
+        getDefaultWeaponId(),
       ]);
 
       setWeapons(weaponsData);
       setWeaponStats(statsData);
       setHasTeams(teamsData.length > 0);
+      setDefaultWeaponIdState(storedDefaultId);
     } catch (error) {
       console.error('[EquipmentScreen] Failed to load data:', error);
     } finally {
@@ -371,6 +408,20 @@ export default function EquipmentScreen() {
       console.error('Failed to toggle favorite:', error);
     }
   }, []);
+
+  const handleSetDefault = useCallback(async (weaponId: string) => {
+    try {
+      // Toggle: if already default, remove it; otherwise set it
+      const newDefaultId = defaultWeaponId === weaponId ? null : weaponId;
+      await setDefaultWeaponId(newDefaultId);
+      setDefaultWeaponIdState(newDefaultId);
+      Haptics.notificationAsync(
+        newDefaultId ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning
+      );
+    } catch (error) {
+      console.error('Failed to set default weapon:', error);
+    }
+  }, [defaultWeaponId]);
 
   const handleAddWeapon = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -512,8 +563,10 @@ export default function EquipmentScreen() {
                 key={weapon.id}
                 weapon={weapon}
                 stats={weaponStats.get(weapon.id)}
+                isDefault={defaultWeaponId === weapon.id}
                 onPress={() => handleWeaponPress(weapon)}
                 onFavorite={() => handleToggleFavorite(weapon.id)}
+                onSetDefault={() => handleSetDefault(weapon.id)}
               />
             ))}
           </>
@@ -536,8 +589,10 @@ export default function EquipmentScreen() {
               key={weapon.id}
               weapon={weapon}
               stats={weaponStats.get(weapon.id)}
+              isDefault={defaultWeaponId === weapon.id}
               onPress={() => handleWeaponPress(weapon)}
               onFavorite={() => handleToggleFavorite(weapon.id)}
+              onSetDefault={() => handleSetDefault(weapon.id)}
             />
           ))
         ) : weapons.length === 0 ? (
@@ -749,9 +804,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  favoriteButton: {
+  cardActions: {
+    flexDirection: 'row',
     marginLeft: 'auto',
-    padding: 4,
+    gap: 8,
+  },
+  actionButton: {
+    padding: 6,
+  },
+  defaultBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    marginHorizontal: 16,
+    marginBottom: 8,
+  },
+  defaultBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#f59e0b',
   },
   cardInfo: {
     paddingHorizontal: 16,

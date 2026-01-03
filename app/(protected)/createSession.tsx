@@ -239,6 +239,7 @@ export default function CreateSessionScreen() {
   // ─────────────────────────────────────────────────────────────────────────
 
   const stepNumber = creation.state.step === 'intent' ? 1 : creation.state.step === 'weapon' ? 2 : 3;
+  const stepLabels = ['Goal', 'Weapon', 'Details'];
 
   return (
     <ScrollView
@@ -247,49 +248,54 @@ export default function CreateSessionScreen() {
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
-      {/* Header with back button and step indicator */}
+      {/* Minimal header with back + progress */}
       <View style={styles.header}>
         {stepNumber > 1 ? (
           <TouchableOpacity
-            style={styles.backButton}
+            style={[styles.backButton, { backgroundColor: colors.card }]}
             onPress={creation.goBack}
             activeOpacity={0.7}
           >
-            <ChevronLeft size={22} color={colors.text} />
+            <ChevronLeft size={20} color={colors.text} />
           </TouchableOpacity>
         ) : (
-          <View style={styles.backButton} />
+          <View style={styles.backButtonPlaceholder} />
         )}
 
-        <View style={styles.stepIndicator}>
-          <View style={[styles.stepDot, { backgroundColor: colors.text }]} />
-          <View
-            style={[
-              styles.stepLine,
-              { backgroundColor: stepNumber >= 2 ? colors.text : colors.border }
-            ]}
-          />
-          <View
-            style={[
-              styles.stepDot,
-              { backgroundColor: stepNumber >= 2 ? colors.text : colors.border }
-            ]}
-          />
-          <View
-            style={[
-              styles.stepLine,
-              { backgroundColor: stepNumber >= 3 ? colors.text : colors.border }
-            ]}
-          />
-          <View
-            style={[
-              styles.stepDot,
-              { backgroundColor: stepNumber >= 3 ? colors.text : colors.border }
-            ]}
-          />
+        {/* Step progress with labels */}
+        <View style={styles.progressContainer}>
+          {[1, 2, 3].map((step, idx) => (
+            <View key={step} style={styles.progressItem}>
+              <View
+                style={[
+                  styles.progressDot,
+                  {
+                    backgroundColor: stepNumber >= step ? colors.text : colors.border,
+                    transform: [{ scale: stepNumber === step ? 1.2 : 1 }],
+                  },
+                ]}
+              />
+              <Text
+                style={[
+                  styles.progressLabel,
+                  { color: stepNumber >= step ? colors.text : colors.textMuted },
+                ]}
+              >
+                {stepLabels[idx]}
+              </Text>
+              {idx < 2 && (
+                <View
+                  style={[
+                    styles.progressLine,
+                    { backgroundColor: stepNumber > step ? colors.text : colors.border },
+                  ]}
+                />
+              )}
+            </View>
+          ))}
         </View>
 
-        <View style={styles.backButton} />
+        <View style={styles.backButtonPlaceholder} />
       </View>
 
       {/* Step Content */}
@@ -306,6 +312,7 @@ export default function CreateSessionScreen() {
           context={creation.state.context}
           onUpdateContext={creation.updateContext}
           onContinue={creation.goForward}
+          isLoadingWeapon={creation.isLoadingWeapon}
         />
       )}
 
@@ -317,14 +324,16 @@ export default function CreateSessionScreen() {
               Session details
             </Text>
             <TouchableOpacity
-              style={[styles.purposeBadge, { backgroundColor: colors.card }]}
+              style={[styles.weaponBadge, { backgroundColor: colors.card, borderColor: colors.border }]}
               onPress={creation.goBack}
               activeOpacity={0.7}
             >
-              <Text style={[styles.purposeBadgeText, { color: colors.text }]}>
-                {creation.state.context.weaponName || 'Weapon'}
+              <Text style={[styles.weaponBadgeLabel, { color: colors.textMuted }]}>
+                Weapon
               </Text>
-              <ChevronLeft size={14} color={colors.textMuted} />
+              <Text style={[styles.weaponBadgeName, { color: colors.text }]} numberOfLines={1}>
+                {creation.state.context.weaponName || 'Select'}
+              </Text>
             </TouchableOpacity>
           </View>
           <SessionContextStep
@@ -425,31 +434,51 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 16,
   },
   backButton: {
     width: 36,
     height: 36,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepIndicator: {
+  backButtonPlaceholder: {
+    width: 36,
+  },
+  
+  // Progress indicator
+  progressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    gap: 0,
+    marginTop: 4,
+    flex: 1,
   },
-  stepDot: {
+  progressItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  progressDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
   },
-  stepLine: {
-    width: 40,
-    height: 2,
-    marginHorizontal: 4,
+  progressLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginLeft: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
+  progressLine: {
+    width: 24,
+    height: 2,
+    marginHorizontal: 8,
+    marginVertical: 4,
+    borderRadius: 1,
+  },
+
   step2Header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -474,6 +503,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
   },
+  weaponBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    maxWidth: 140,
+  },
+  weaponBadgeLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  weaponBadgeName: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -492,11 +538,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    height: 48,
-    borderRadius: 10,
+    height: 52,
+    borderRadius: 14,
   },
   buttonText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
   },
 });

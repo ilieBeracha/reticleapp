@@ -23,6 +23,7 @@ interface TrainingStore {
   
   // Team trainings (when in team mode)
   teamTrainings: TrainingWithDetails[];
+  currentTeamId: string | null; // Track which team data we have loaded
   
   // Loading states
   loadingMyTrainings: boolean;
@@ -49,6 +50,7 @@ export const useTrainingStore = create<TrainingStore>((set, get) => ({
   myUpcomingTrainings: [],
   myStats: { upcoming: 0, completed: 0, total: 0 },
   teamTrainings: [],
+  currentTeamId: null,
   loadingMyTrainings: false,
   loadingTeamTrainings: false,
   myTrainingsInitialized: false,
@@ -112,14 +114,22 @@ export const useTrainingStore = create<TrainingStore>((set, get) => ({
 
   loadTeamTrainings: async (teamId?: string) => {
     const activeTeamId = teamId || useTeamStore.getState().activeTeamId;
+    const { teamTrainingsInitialized, currentTeamId } = get();
     
     if (!activeTeamId) {
-      set({ teamTrainings: [], loadingTeamTrainings: false, teamTrainingsInitialized: true });
+      set({ teamTrainings: [], loadingTeamTrainings: false, teamTrainingsInitialized: true, currentTeamId: null });
       return;
     }
 
-    // Always show loading when switching teams or on first load
-    set({ loadingTeamTrainings: true, error: null });
+    // Only show full-page loader on:
+    // 1. First load (not initialized yet)
+    // 2. Switching to a different team
+    const isSwitchingTeams = currentTeamId !== null && currentTeamId !== activeTeamId;
+    const isFirstLoad = !teamTrainingsInitialized;
+    
+    if (isFirstLoad || isSwitchingTeams) {
+      set({ loadingTeamTrainings: true, error: null });
+    }
     
     try {
       const trainings = await getTeamTrainings(activeTeamId);
@@ -127,6 +137,7 @@ export const useTrainingStore = create<TrainingStore>((set, get) => ({
         teamTrainings: trainings, 
         loadingTeamTrainings: false,
         teamTrainingsInitialized: true,
+        currentTeamId: activeTeamId,
         error: null,
       });
     } catch (error: any) {
@@ -150,6 +161,7 @@ export const useTrainingStore = create<TrainingStore>((set, get) => ({
     myUpcomingTrainings: [],
     myStats: { upcoming: 0, completed: 0, total: 0 },
     teamTrainings: [],
+    currentTeamId: null,
     loadingMyTrainings: false,
     loadingTeamTrainings: false,
     myTrainingsInitialized: false,

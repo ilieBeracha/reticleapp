@@ -1,18 +1,20 @@
 /**
  * SessionWeaponStep - "Which weapon?"
  *
- * Step 2 in the 3-step flow. Premium 3D-style weapon selection.
+ * Step 2 in the 3-step flow. Simple weapon selection from user's arsenal.
+ * No weapon creation here - user should add weapons in their arsenal first.
  */
 
-import { CreateWeaponFlow, WeaponPicker } from '@/components/weapons';
+import { WeaponPicker } from '@/components/weapons';
 import { getCategoryConfig } from '@/constants/weaponCategories';
 import { useColors } from '@/hooks/ui/useColors';
-import { createUserWeapon, type GlobalWeapon, type UserWeapon } from '@/services/weaponService';
+import type { UserWeapon } from '@/services/weaponService';
 import type { WeaponCategory } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
-import { ArrowRight, Check, Crosshair, RefreshCw } from 'lucide-react-native';
+import { ChevronRight, Crosshair, Target } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import type { Position, SessionContextState } from './sessionCreation.types';
 
 // ============================================================================
@@ -23,6 +25,7 @@ interface SessionWeaponStepProps {
   context: SessionContextState;
   onUpdateContext: (partial: Partial<SessionContextState>) => void;
   onContinue: () => void;
+  isLoadingWeapon?: boolean;
 }
 
 // ============================================================================
@@ -33,11 +36,10 @@ export function SessionWeaponStep({
   context,
   onUpdateContext,
   onContinue,
+  isLoadingWeapon = false,
 }: SessionWeaponStepProps) {
   const colors = useColors();
   const [showWeaponPicker, setShowWeaponPicker] = useState(false);
-  const [showCreateWeapon, setShowCreateWeapon] = useState(false);
-  const [pickerKey, setPickerKey] = useState(0);
 
   const effectiveCategory = context.weaponCategory as WeaponCategory | null;
   const categoryConfig = useMemo(
@@ -62,71 +64,14 @@ export function SessionWeaponStep({
       onUpdateContext(update);
       setShowWeaponPicker(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+      // Auto-advance after selection
+      setTimeout(() => {
+        onContinue();
+      }, 200);
     },
-    [onUpdateContext]
+    [onUpdateContext, onContinue]
   );
-
-  const handleCatalogWeaponSelect = useCallback(
-    async (catalogWeapon: GlobalWeapon) => {
-      try {
-        const userWeapon = await createUserWeapon({
-          name: catalogWeapon.name,
-          base_weapon_id: catalogWeapon.id,
-          category: catalogWeapon.category,
-          caliber: catalogWeapon.caliber || undefined,
-        });
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        const config = userWeapon.category ? getCategoryConfig(userWeapon.category) : null;
-        const update: Partial<SessionContextState> = {
-          weaponId: userWeapon.id,
-          weaponName: userWeapon.name,
-          weaponCategory: userWeapon.category || null,
-        };
-        if (config) {
-          update.distance = config.distances.zeroDistance;
-          update.position = config.drillDefaults.defaultPosition as Position;
-        }
-        onUpdateContext(update);
-        setShowWeaponPicker(false);
-      } catch {
-        setShowWeaponPicker(false);
-        setShowCreateWeapon(true);
-      }
-    },
-    [onUpdateContext]
-  );
-
-  const handleWeaponCreated = useCallback(
-    async (weaponId: string) => {
-      setShowCreateWeapon(false);
-      try {
-        const { getUserWeapon } = await import('@/services/weaponService');
-        const weapon = await getUserWeapon(weaponId);
-        if (weapon) {
-          const config = weapon.category ? getCategoryConfig(weapon.category) : null;
-          const update: Partial<SessionContextState> = {
-            weaponId: weapon.id,
-            weaponName: weapon.name,
-            weaponCategory: weapon.category || null,
-          };
-          if (config) {
-            update.distance = config.distances.zeroDistance;
-            update.position = config.drillDefaults.defaultPosition as Position;
-          }
-          onUpdateContext(update);
-        }
-      } catch {
-        setPickerKey((k) => k + 1);
-        setShowWeaponPicker(true);
-      }
-    },
-    [onUpdateContext]
-  );
-
-  const handleContinue = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    onContinue();
-  }, [onContinue]);
 
   const openPicker = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -135,125 +80,91 @@ export function SessionWeaponStep({
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.question, { color: colors.text }]}>Which weapon?</Text>
-
-      {/* 3D Weapon Card */}
-      <TouchableOpacity
-        style={styles.cardWrapper}
-        onPress={openPicker}
-        activeOpacity={0.9}
-      >
-        {/* Shadow layers for 3D effect */}
-        <View style={[styles.cardShadow3, { backgroundColor: colors.border }]} />
-        <View style={[styles.cardShadow2, { backgroundColor: colors.secondary }]} />
-        <View style={[styles.cardShadow1, { backgroundColor: colors.card }]} />
-
-        {/* Main card */}
-        <View style={[styles.card, { backgroundColor: colors.card }]}>
-          {hasWeapon ? (
-            // Selected weapon display
-            <>
-              {/* Icon with glow effect */}
-              <View style={styles.iconWrapper}>
-                <View style={[styles.iconGlow, { backgroundColor: colors.text, opacity: 0.1 }]} />
-                <View style={[styles.iconCircle, { backgroundColor: colors.background }]}>
-                  <Crosshair size={36} color={colors.text} strokeWidth={1.5} />
-                </View>
-              </View>
-
-              {/* Weapon info */}
-              <View style={styles.weaponInfo}>
-                <Text style={[styles.weaponName, { color: colors.text }]} numberOfLines={1}>
-                  {context.weaponName}
-                </Text>
-                {categoryConfig && (
-                  <View style={[styles.categoryBadge, { backgroundColor: colors.background }]}>
-                    <Text style={[styles.categoryText, { color: colors.textMuted }]}>
-                      {categoryConfig.label}
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              {/* Check indicator */}
-              <View style={[styles.checkCircle, { backgroundColor: colors.text }]}>
-                <Check size={16} color={colors.background} strokeWidth={3} />
-              </View>
-            </>
-          ) : (
-            // Empty state
-            <>
-              <View style={styles.iconWrapper}>
-                <View style={[styles.iconGlow, { backgroundColor: colors.textMuted, opacity: 0.05 }]} />
-                <View style={[styles.iconCircle, styles.iconCircleEmpty, { backgroundColor: colors.secondary }]}>
-                  <Crosshair size={36} color={colors.textMuted} strokeWidth={1.5} />
-                </View>
-              </View>
-
-              <View style={styles.weaponInfo}>
-                <Text style={[styles.emptyTitle, { color: colors.textMuted }]}>
-                  Tap to select
-                </Text>
-                <Text style={[styles.emptySubtitle, { color: colors.border }]}>
-                  Choose from your arsenal
-                </Text>
-              </View>
-            </>
-          )}
-        </View>
-      </TouchableOpacity>
-
-      {/* Change weapon button - only when weapon selected */}
-      {hasWeapon && (
-        <TouchableOpacity
-          style={[styles.changeButton, { backgroundColor: colors.card }]}
-          onPress={openPicker}
-          activeOpacity={0.7}
-        >
-          <RefreshCw size={16} color={colors.textMuted} strokeWidth={2} />
-          <Text style={[styles.changeText, { color: colors.textMuted }]}>
-            Change weapon
+      {/* Loading State - waiting for default weapon */}
+      {isLoadingWeapon ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color={colors.textMuted} />
+          <Text style={[styles.loadingText, { color: colors.textMuted }]}>
+            Loading your weapon...
           </Text>
-        </TouchableOpacity>
+        </View>
+      ) : hasWeapon ? (
+        /* Selected Weapon State */
+        <Animated.View entering={FadeIn.duration(200)}>
+          {/* Compact header when weapon is selected */}
+          <View style={styles.selectedHeader}>
+            <Text style={[styles.selectedLabel, { color: colors.textMuted }]}>Weapon</Text>
+            <TouchableOpacity 
+              onPress={openPicker} 
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={[styles.changeLink, { color: colors.primary }]}>Change</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Selected weapon card */}
+          <TouchableOpacity
+            style={[styles.selectedCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={openPicker}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.selectedIcon, { backgroundColor: `${colors.primary}15` }]}>
+              <Crosshair size={24} color={colors.primary} strokeWidth={1.5} />
+            </View>
+            <View style={styles.selectedInfo}>
+              <Text style={[styles.selectedName, { color: colors.text }]} numberOfLines={1}>
+                {context.weaponName}
+              </Text>
+              {categoryConfig && (
+                <View style={styles.categoryRow}>
+                  <View style={[styles.categoryDot, { backgroundColor: colors.primary }]} />
+                  <Text style={[styles.categoryLabel, { color: colors.textMuted }]}>
+                    {categoryConfig.label}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <ChevronRight size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+
+          {/* Context hint */}
+          <Text style={[styles.contextHint, { color: colors.textMuted }]}>
+            Tap "Change" to switch weapon
+          </Text>
+        </Animated.View>
+      ) : (
+        /* Empty State - No weapon available */
+        <Animated.View entering={FadeInDown.duration(300)} style={styles.emptyContainer}>
+          {/* Icon */}
+          <View style={[styles.emptyIconContainer, { backgroundColor: `${colors.textMuted}08` }]}>
+            <View style={[styles.emptyIconInner, { borderColor: `${colors.textMuted}20` }]}>
+              <Target size={40} color={colors.textMuted} strokeWidth={1.2} />
+            </View>
+          </View>
+
+          {/* Text */}
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>
+            No weapon selected
+          </Text>
+          <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
+            Choose from your arsenal to continue
+          </Text>
+
+          {/* CTA Button */}
+          <TouchableOpacity
+            style={[styles.selectButton, { backgroundColor: colors.text }]}
+            onPress={openPicker}
+            activeOpacity={0.8}
+          >
+            <Crosshair size={18} color={colors.background} strokeWidth={2} />
+            <Text style={[styles.selectButtonText, { color: colors.background }]}>
+              Choose Weapon
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
       )}
 
-      {/* Spacer */}
-      <View style={styles.spacer} />
-
-      {/* Continue Button - 3D style */}
-      <View style={styles.continueWrapper}>
-        {hasWeapon && (
-          <View style={[styles.continueShadow, { backgroundColor: colors.border }]} />
-        )}
-        <TouchableOpacity
-          style={[
-            styles.continueButton,
-            {
-              backgroundColor: hasWeapon ? colors.text : colors.secondary,
-              transform: hasWeapon ? [{ translateY: -2 }] : [],
-            },
-          ]}
-          onPress={handleContinue}
-          disabled={!hasWeapon}
-          activeOpacity={0.85}
-        >
-          <Text
-            style={[
-              styles.continueText,
-              { color: hasWeapon ? colors.background : colors.textMuted },
-            ]}
-          >
-            Continue
-          </Text>
-          <ArrowRight
-            size={20}
-            color={hasWeapon ? colors.background : colors.textMuted}
-            strokeWidth={2.5}
-          />
-        </TouchableOpacity>
-      </View>
-
-      {/* Modals */}
+      {/* Weapon Picker Modal */}
       <Modal
         visible={showWeaponPicker}
         animationType="slide"
@@ -261,30 +172,10 @@ export function SessionWeaponStep({
         onRequestClose={() => setShowWeaponPicker(false)}
       >
         <WeaponPicker
-          key={pickerKey}
           selectedWeaponId={context.weaponId}
           onSelect={handleWeaponSelect}
-          onSelectCatalog={handleCatalogWeaponSelect}
-          onAddNew={() => {
-            setShowWeaponPicker(false);
-            setShowCreateWeapon(true);
-          }}
           onClose={() => setShowWeaponPicker(false)}
-        />
-      </Modal>
-
-      <Modal
-        visible={showCreateWeapon}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowCreateWeapon(false)}
-      >
-        <CreateWeaponFlow
-          onComplete={handleWeaponCreated}
-          onCancel={() => {
-            setShowCreateWeapon(false);
-            setShowWeaponPicker(true);
-          }}
+          hideAddNew
         />
       </Modal>
     </View>
@@ -300,194 +191,133 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 8,
   },
-  question: {
-    fontSize: 24,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-    marginBottom: 32,
-  },
 
-  // 3D Card wrapper
-  cardWrapper: {
-    position: 'relative',
-    height: 180,
-    marginBottom: 16,
-  },
-
-  // Shadow layers for 3D depth
-  cardShadow3: {
-    position: 'absolute',
-    left: 8,
-    right: 8,
-    bottom: 0,
-    height: 170,
-    borderRadius: 20,
-    opacity: 0.3,
-  },
-  cardShadow2: {
-    position: 'absolute',
-    left: 4,
-    right: 4,
-    bottom: 4,
-    height: 172,
-    borderRadius: 22,
-  },
-  cardShadow1: {
-    position: 'absolute',
-    left: 2,
-    right: 2,
-    bottom: 6,
-    height: 174,
-    borderRadius: 24,
-    opacity: 0.7,
-  },
-
-  // Main card
-  card: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 8,
-    height: 172,
-    borderRadius: 24,
-    padding: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 20,
-    // iOS shadow
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    // Android shadow
-    elevation: 12,
-  },
-
-  // Icon with glow
-  iconWrapper: {
-    position: 'relative',
-    width: 80,
-    height: 80,
+  // ─────────────────────────────────────────────────────────────────────────
+  // LOADING STATE
+  // ─────────────────────────────────────────────────────────────────────────
+  loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 40,
+    gap: 12,
   },
-  iconGlow: {
-    position: 'absolute',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-  },
-  iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    // iOS shadow
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  iconCircleEmpty: {
-    borderWidth: 2,
-    borderColor: 'rgba(128,128,128,0.2)',
-    borderStyle: 'dashed',
-  },
-
-  // Weapon info
-  weaponInfo: {
-    flex: 1,
-    gap: 8,
-  },
-  weaponName: {
-    fontSize: 22,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
-  categoryBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  categoryText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-
-  // Empty state
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  emptySubtitle: {
+  loadingText: {
     fontSize: 14,
-  },
-
-  // Check indicator
-  checkCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    // iOS shadow
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-
-  // Change button
-  changeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 14,
-  },
-  changeText: {
-    fontSize: 15,
     fontWeight: '500',
   },
 
-  spacer: {
+  // ─────────────────────────────────────────────────────────────────────────
+  // SELECTED STATE
+  // ─────────────────────────────────────────────────────────────────────────
+  selectedHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  selectedLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  changeLink: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  selectedCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 14,
+  },
+  selectedIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedInfo: {
     flex: 1,
+    gap: 4,
+  },
+  selectedName: {
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  categoryDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  categoryLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  contextHint: {
+    fontSize: 12,
+    marginTop: 12,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 
-  // Continue button with 3D
-  continueWrapper: {
-    position: 'relative',
+  // ─────────────────────────────────────────────────────────────────────────
+  // EMPTY STATE
+  // ─────────────────────────────────────────────────────────────────────────
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 60,
+  },
+  emptyIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  emptyIconInner: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.5,
     marginBottom: 8,
   },
-  continueShadow: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 54,
-    borderRadius: 14,
+  emptySubtitle: {
+    fontSize: 15,
+    marginBottom: 32,
+    textAlign: 'center',
   },
-  continueButton: {
+  selectButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    height: 54,
-    borderRadius: 14,
-    // iOS shadow
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 24,
   },
-  continueText: {
-    fontSize: 17,
+  selectButtonText: {
+    fontSize: 16,
     fontWeight: '700',
     letterSpacing: -0.3,
   },
