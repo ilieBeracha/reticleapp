@@ -5,6 +5,7 @@
 
 import { ACCURACY_THRESHOLDS, COLORS } from './activeSession.constants';
 import type { DrillProgress, NextTargetPlan } from './activeSession.types';
+import { deriveDetectionConfig, type DetectionConfig } from '@/utils/detectionSensitivity';
 
 // ============================================================================
 // TIME FORMATTING
@@ -213,17 +214,38 @@ interface SessionForPayload {
     time_limit_seconds?: number | null;
     par_time_seconds?: number | null;
     strings_count?: number | null;
+    /** User-calibrated detection sensitivity in G-force */
+    detection_sensitivity?: number | null;
   } | null;
 }
 
 /**
- * Builds the payload to send to watch for SESSION_START
- * 
- * Field naming clarification:
- * - maxBullets: Total bullets for this session (for auto-complete on watch)
- * - strings: Number of rounds/sets/magazines in the drill
- * - rounds: Bullets per string (kept for backwards compat, same as maxBullets when strings=1)
+ * Weapon info for detection sensitivity derivation
  */
+export interface WeaponForDetection {
+  category?: string | null;
+  caliber?: string | null;
+  has_suppressor?: boolean;
+  has_muzzle_brake?: boolean;
+  custom_sensitivity?: number | null;
+}
+
+/**
+ * Options for building watch session payload
+ */
+export interface WatchPayloadOptions {
+  /** Enable automatic shot detection (default: true) */
+  autoDetect?: boolean;
+  /** Manual sensitivity override (G-force). If not set, derived from weapon */
+  sensitivity?: number;
+  /** Enable shot marking feature on watch (default: false) */
+  emkv?: boolean;
+  /** Vibrate on shot detection (default: true) */
+  vrcv?: boolean;
+  /** Weapon info for auto-deriving sensitivity */
+  weapon?: WeaponForDetection | null;
+}
+
 /**
  * Builds the payload to send to watch for SESSION_START
  * 
@@ -233,22 +255,80 @@ interface SessionForPayload {
  * - rounds: shots per string (0 = unlimited)
  * - strings: number of strings/stages
  * - watchMode: "primary" (shot counter) | "supplementary" (timer only)
- * - sensitivity: G-force threshold (2.5-4.5)
+ * - detection: { sensitivity, minThreshold, maxThreshold, cooldownMs, profile }
  * - emkv: enable shot marking feature
  * - vrcv: vibrate on shot detection
  */
 export function buildWatchSessionPayload(
   session: SessionForPayload,
-  autoDetect: boolean = true,
-  sensitivity: number = 3.5, // Default G-force threshold
-  emkv: boolean = false,     // Shot marking disabled by default
-  vrcv: boolean = true       // Vibrate on shot enabled by default
+  options: WatchPayloadOptions = {}
 ) {
+  const {
+    autoDetect = true,
+    sensitivity: manualSensitivity,
+    emkv = false,
+    vrcv = true,
+    weapon,
+  } = options;
+  
   const drillConfig = session.drill_config;
   
   // rounds = bullets per string (0 = unlimited)
   const rounds = drillConfig?.rounds_per_shooter || 0;
   const strings = drillConfig?.strings_count || 1;
+  
+  // Priority for custom sensitivity:
+  // 1. Manual override from options.sensitivity
+  // 2. User-calibrated value saved in drill_config.detection_sensitivity
+  // 3. Weapon-based derivation (via weapon.custom_sensitivity)
+  // 4. Default fallback based on weapon category/caliber
+  const savedCustomSensitivity = drillConfig?.detection_sensitivity;
+  
+  // Derive detection config
+  let detectionConfig: DetectionConfig;
+  if (manualSensitivity !== undefined) {
+    // Manual override from options - highest priority
+    detectionConfig = {
+      sensitivity: manualSensitivity,
+      minThreshold: manualSensitivity * 0.5,
+      maxThreshold: manualSensitivity * 3.0,
+      cooldownMs: 80,
+      profile: 'rifle',
+      description: 'Manual',
+    };
+  } else if (savedCustomSensitivity !== undefined && savedCustomSensitivity !== null) {
+    // User-calibrated sensitivity saved in session
+    // IMPORTANT: Clamp to safe range (watch calibration uses 1.5-10.0G)
+    // Values below 1.0G cause constant false positives and can crash the watch
+    const clampedSensitivity = Math.max(1.0, Math.min(10.0, savedCustomSensitivity));
+    if (clampedSensitivity !== savedCustomSensitivity) {
+      console.warn(`[Payload] ⚠️ Clamping sensitivity from ${savedCustomSensitivity}G to ${clampedSensitivity}G (safe range: 1.0-10.0G)`);
+    }
+    
+    const profile = weapon?.category === 'handgun' ? 'handgun' : 
+                    weapon?.category === 'shotgun' ? 'shotgun' : 'rifle';
+    detectionConfig = {
+      sensitivity: clampedSensitivity,
+      minThreshold: clampedSensitivity * 0.5, // 50% (matches watch's derivation)
+      maxThreshold: clampedSensitivity * 3.0,
+      cooldownMs: profile === 'handgun' ? 60 : profile === 'shotgun' ? 120 : 80,
+      profile,
+      description: 'Custom calibrated',
+    };
+    console.log(`[Payload] Using saved custom sensitivity: ${clampedSensitivity}G`);
+  } else if (weapon) {
+    // Derive from weapon properties (may include weapon.custom_sensitivity)
+    detectionConfig = deriveDetectionConfig({
+      category: weapon.category as any,
+      caliber: weapon.caliber,
+      hasSuppressor: weapon.has_suppressor,
+      hasMuzzleBrake: weapon.has_muzzle_brake,
+      customSensitivity: weapon.custom_sensitivity,
+    });
+  } else {
+    // Default fallback
+    detectionConfig = deriveDetectionConfig({});
+  }
   
   // Map drill_goal to watch drillType
   const mapDrillType = (goal: string | null | undefined): string => {
@@ -298,11 +378,42 @@ export function buildWatchSessionPayload(
     timeLimit: drillConfig?.time_limit_seconds || 0,
     parTime: drillConfig?.par_time_seconds || 0,
     watchMode: session.watch_controlled ? 'primary' : 'supplementary',
+    
+    // Detection configuration (new enhanced format)
     autoDetect,
-    sensitivity,
+    detection: {
+      sensitivity: detectionConfig.sensitivity,
+      minThreshold: detectionConfig.minThreshold,
+      maxThreshold: detectionConfig.maxThreshold,
+      cooldownMs: detectionConfig.cooldownMs,
+      profile: detectionConfig.profile,
+    },
+    
+    // Legacy: Keep flat sensitivity for backwards compatibility
+    sensitivity: detectionConfig.sensitivity,
+    
     emkv,        // Shot marking feature
     vrcv,        // Vibrate on shot detection
   };
+}
+
+/**
+ * Legacy overload for backwards compatibility
+ * @deprecated Use buildWatchSessionPayload(session, options) instead
+ */
+export function buildWatchSessionPayloadLegacy(
+  session: SessionForPayload,
+  autoDetect: boolean = true,
+  sensitivity: number = 3.5,
+  emkv: boolean = false,
+  vrcv: boolean = true
+) {
+  return buildWatchSessionPayload(session, {
+    autoDetect,
+    sensitivity,
+    emkv,
+    vrcv,
+  });
 }
 
 // ============================================================================

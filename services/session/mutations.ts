@@ -345,6 +345,8 @@ export async function updateSession(
     ended_at?: string;
     started_at?: string;
     watch_controlled?: boolean;
+    /** Update custom drill config (e.g., to save detection_sensitivity) */
+    custom_drill_config?: Record<string, any>;
   }
 ) {
   const updatePayload: Record<string, any> = {
@@ -363,8 +365,12 @@ export async function updateSession(
     updatePayload.started_at = updates.started_at;
   }
 
-   if (typeof updates.watch_controlled !== 'undefined') {
+  if (typeof updates.watch_controlled !== 'undefined') {
     updatePayload.watch_controlled = updates.watch_controlled;
+  }
+
+  if (typeof updates.custom_drill_config !== 'undefined') {
+    updatePayload.custom_drill_config = updates.custom_drill_config;
   }
 
   // Return a fully-hydrated session payload so callers don't lose drill context after updates.

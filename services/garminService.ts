@@ -318,6 +318,38 @@ let pendingAck: {
 // Timeline chunk assembler (Phase 3)
 const timelineAssembler = new TimelineChunkAssembler();
 
+// Timeout tracking for incomplete timeline chunks (30 second timeout)
+const TIMELINE_CHUNK_TIMEOUT_MS = 30000;
+const timelineTimeouts: Map<string, ReturnType<typeof setTimeout>> = new Map();
+
+function resetTimelineTimeout(sessionId: string) {
+  // Clear existing timeout
+  const existing = timelineTimeouts.get(sessionId);
+  if (existing) {
+    clearTimeout(existing);
+  }
+  
+  // Set new timeout
+  const timeout = setTimeout(() => {
+    const pending = timelineAssembler.getPendingInfo(sessionId);
+    if (pending) {
+      console.warn(`[GarminService] ⚠️ Timeline sync timed out for ${sessionId.slice(0, 8)}... (received ${pending.received}/${pending.expected} chunks)`);
+      timelineAssembler.clearSession(sessionId);
+      timelineTimeouts.delete(sessionId);
+    }
+  }, TIMELINE_CHUNK_TIMEOUT_MS);
+  
+  timelineTimeouts.set(sessionId, timeout);
+}
+
+function clearTimelineTimeout(sessionId: string) {
+  const timeout = timelineTimeouts.get(sessionId);
+  if (timeout) {
+    clearTimeout(timeout);
+    timelineTimeouts.delete(sessionId);
+  }
+}
+
 // ============================================================================
 // INTERNAL HELPERS
 // ============================================================================
@@ -780,6 +812,9 @@ const msgSub = emitter.addListener('onMessage', (raw: any) => {
     // Emit progress event
     emit({ event: 'timeline_chunk', sessionId: sid, chunk: chunkIndex, total });
     
+    // Reset timeout (will clear incomplete chunks after 30s of inactivity)
+    resetTimelineTimeout(sid);
+    
     // Add to assembler and check if complete
     const assembledData = timelineAssembler.addChunk(chunkPayload);
     
@@ -803,6 +838,9 @@ const msgSub = emitter.addListener('onMessage', (raw: any) => {
     
     // If all chunks received, emit complete event
     if (assembledData) {
+      // Clear timeout since we completed successfully
+      clearTimelineTimeout(sid);
+      
       console.log('[GarminService] 📩 ✅ All timeline chunks received!');
       console.log(`[GarminService] 📩 Total points: ${assembledData.points.length}`);
       console.log(`[GarminService] 📩 Shot details: ${assembledData.shotDetails.length}`);
@@ -1038,6 +1076,20 @@ export async function sendMessageWithRetry(
 // SESSION-SPECIFIC HELPERS
 // ============================================================================
 
+/** Detection configuration for shot auto-detection on watch */
+export interface WatchDetectionConfig {
+  /** Sensitivity value (0.0-1.0) */
+  sensitivity: number;
+  /** Minimum acceleration threshold (G-force) */
+  minThreshold: number;
+  /** Maximum acceleration threshold (G-force) */
+  maxThreshold: number;
+  /** Cooldown between shots (ms) */
+  cooldownMs: number;
+  /** Detection profile: 'handgun' | 'rifle' | 'shotgun' | 'custom' */
+  profile: string;
+}
+
 /**
  * Configuration for starting a watch session.
  * Import WatchSessionConfig from @/utils/garminHelpers for building this.
@@ -1045,15 +1097,34 @@ export async function sendMessageWithRetry(
 export interface StartWatchSessionPayload {
   sessionId: string;
   drillName: string;
+  /** Brief description of drill goal (e.g., "6 shots under 2 seconds") */
+  drillGoal?: string;
+  /** Drill type: 'timed' | 'untimed' | 'par' | 'grouping' | 'custom' */
   drillType: string;
+  /** Input method: 'manual' | 'auto' | 'watch' */
   inputMethod: string;
-  watchMode: 'primary' | 'supplementary';
+  /** Distance in meters */
   distance: number;
+  /** Number of rounds/shots expected */
   rounds: number;
-  timeLimit: number | null;
-  parTime: number | null;
+  /** Number of strings in drill */
   strings: number;
-  startedAt: number;
+  /** Time limit in seconds (0 = no limit) */
+  timeLimit: number;
+  /** Par time in seconds (0 = no par) */
+  parTime: number;
+  /** Watch role: 'primary' = watch controls session, 'supplementary' = phone controls */
+  watchMode: 'primary' | 'supplementary';
+  /** Enable automatic shot detection */
+  autoDetect?: boolean;
+  /** Detection configuration (required if autoDetect is true) */
+  detection?: WatchDetectionConfig;
+  /** Legacy sensitivity value for backwards compatibility */
+  sensitivity?: number;
+  /** Enable EMKV (Extended Metric Key-Value) data */
+  emkv?: boolean;
+  /** Enable VRCV (Voice Recognition Command Verification) */
+  vrcv?: boolean;
 }
 
 /**
@@ -1071,11 +1142,18 @@ export function startWatchSession(
     return sendMessage('SESSION_START', sessionIdOrPayload);  // Watch expects SESSION_START
   }
 
-  // Legacy: simple session start
+  // Legacy: simple session start (minimal payload)
   return sendMessage('SESSION_START', {
     sessionId: sessionIdOrPayload,
-    drillName,
-    startedAt: Date.now(),
+    drillName: drillName ?? 'Quick Session',
+    drillType: 'untimed',
+    inputMethod: 'manual',
+    distance: 0,
+    rounds: 0,
+    strings: 1,
+    timeLimit: 0,
+    parTime: 0,
+    watchMode: 'supplementary',
   });
 }
 

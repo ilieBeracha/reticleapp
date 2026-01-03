@@ -53,6 +53,8 @@ export function mapSession(row: any): SessionWithDetails {
       category: drillSource.category ?? null,
       instructions: drillSource.instructions ?? null,
       safety_notes: drillSource.safety_notes ?? null,
+      // Include custom detection sensitivity if overridden by user
+      detection_sensitivity: customConfig?.detection_sensitivity ?? null,
     };
   } else if (customConfig) {
     // Use custom drill config (inline, no template)
@@ -85,6 +87,7 @@ export function mapSession(row: any): SessionWithDetails {
       category: null,
       instructions: null,
       safety_notes: null,
+      detection_sensitivity: customConfig.detection_sensitivity ?? null,
     };
   }
 
@@ -104,6 +107,8 @@ export function mapSession(row: any): SessionWithDetails {
     drill_config: drillConfig,
     weapon_id: row.weapon_id ?? null,
     weapon_name: userWeapon.name ?? null,
+    weapon_category: userWeapon.category ?? null,
+    weapon_caliber: userWeapon.caliber ?? null,
     session_mode: row.session_mode,
     status: row.status,
     watch_controlled: row.watch_controlled ?? false,

@@ -96,6 +96,75 @@ export interface UserWeapon {
 }
 
 // ============================================================================
+// UNIFIED WEAPON LOOKUP (for detection sensitivity)
+// ============================================================================
+
+/**
+ * Normalized weapon info for detection sensitivity derivation
+ */
+export interface WeaponForDetection {
+  id: string;
+  name: string;
+  category: WeaponCategory | null;
+  caliber: string | null;
+  has_suppressor?: boolean;
+  has_muzzle_brake?: boolean;
+}
+
+/**
+ * Get weapon by ID (unified lookup across all layers)
+ * Returns normalized data for detection sensitivity derivation
+ */
+export async function getWeaponById(id: string): Promise<WeaponForDetection | null> {
+  // First try user weapon (most common case)
+  const userWeapon = await getUserWeapon(id);
+  if (userWeapon) {
+    // Parse suppressor info from team weapon or notes
+    const hasSuppressor = userWeapon.team_weapon?.suppressor_config != null ||
+      userWeapon.personal_notes?.toLowerCase().includes('suppressor') ||
+      userWeapon.personal_notes?.toLowerCase().includes('silencer');
+    
+    return {
+      id: userWeapon.id,
+      name: userWeapon.name,
+      category: userWeapon.category,
+      caliber: userWeapon.caliber || userWeapon.base_weapon?.caliber || null,
+      has_suppressor: hasSuppressor,
+    };
+  }
+  
+  // Try team weapon
+  const teamWeapon = await getTeamWeapon(id);
+  if (teamWeapon) {
+    return {
+      id: teamWeapon.id,
+      name: teamWeapon.name,
+      category: teamWeapon.category,
+      caliber: teamWeapon.caliber || teamWeapon.base_weapon?.caliber || null,
+      has_suppressor: teamWeapon.suppressor_config != null,
+    };
+  }
+  
+  // Try global weapon
+  const { data: globalWeapon } = await supabase
+    .from('weapons')
+    .select('*')
+    .eq('id', id)
+    .single();
+    
+  if (globalWeapon) {
+    return {
+      id: globalWeapon.id,
+      name: globalWeapon.name,
+      category: globalWeapon.category,
+      caliber: globalWeapon.caliber,
+    };
+  }
+  
+  return null;
+}
+
+// ============================================================================
 // LAYER 1: GLOBAL WEAPONS (Admin-managed)
 // ============================================================================
 

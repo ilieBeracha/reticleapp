@@ -111,6 +111,8 @@ export interface SessionDrillConfig {
   category?: string | null;
   instructions?: string | null;
   safety_notes?: string | null;
+  /** Custom detection sensitivity in G-force (user calibrated) */
+  detection_sensitivity?: number | null;
 }
 
 /** Aggregated session statistics (computed from targets) */
@@ -136,6 +138,8 @@ export interface SessionWithDetails {
   drill_config?: SessionDrillConfig | null; // Full drill configuration
   weapon_id: string | null; // Reference to user's weapon profile
   weapon_name?: string | null; // Joined weapon name
+  weapon_category?: string | null; // Weapon category for detection sensitivity
+  weapon_caliber?: string | null; // Caliber for detection sensitivity derivation
   session_mode: 'solo' | 'group';
   status: 'pending' | 'active' | 'completed' | 'cancelled';
   watch_controlled: boolean; // Whether watch controls this session

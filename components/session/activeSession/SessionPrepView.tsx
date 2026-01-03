@@ -10,17 +10,21 @@
 
 import { useColors } from '@/hooks/ui/useColors';
 import type { SessionWithDetails } from '@/services/session/types';
-import { activateSession } from '@/services/sessionService';
+import { activateSession, updateSession } from '@/services/sessionService';
 import { getUserWeapon, type UserWeapon } from '@/services/weaponService';
 import { useGarminStore, useIsGarminConnected } from '@/store/garminStore';
+import { deriveDetectionConfig } from '@/utils/detectionSensitivity';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
+  ChevronDown,
+  ChevronUp,
   Clock,
   Crosshair,
   MapPin,
   Phone,
   RefreshCw,
+  Settings,
   Target,
   Trophy,
   Users,
@@ -28,7 +32,7 @@ import {
   X,
   Zap,
 } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -102,6 +106,8 @@ export function SessionPrepView({
   const [activating, setActivating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [weapon, setWeapon] = useState<UserWeapon | null>(null);
+  const [showSensitivity, setShowSensitivity] = useState(false);
+  const [customSensitivity, setCustomSensitivity] = useState<number | null>(null);
   
   const drill = session.drill_config;
   const drillName = session.drill_name || drill?.name || 'Practice Session';
@@ -129,7 +135,20 @@ export function SessionPrepView({
 
   // Use session's weapon_name if available, otherwise fall back to fetched weapon
   const weaponName = session.weapon_name || weapon?.name;
-  const weaponCaliber = weapon?.caliber;
+  const weaponCaliber = session.weapon_caliber || weapon?.caliber;
+  const weaponCategory = session.weapon_category || weapon?.category;
+
+  // Derive detection sensitivity from weapon
+  const detectionConfig = useMemo(() => {
+    return deriveDetectionConfig({
+      category: weaponCategory as any,
+      caliber: weaponCaliber,
+      customSensitivity: customSensitivity,
+    });
+  }, [weaponCategory, weaponCaliber, customSensitivity]);
+
+  const isAutoSensitivity = customSensitivity === null;
+  const currentSensitivity = detectionConfig.sensitivity;
 
   const handleRefreshDevices = useCallback(async () => {
     setRefreshing(true);
@@ -144,14 +163,31 @@ export function SessionPrepView({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
     try {
+      // Store the sensitivity preference in session metadata
+      // This will be used by useActiveSession when building watch payload
+      if (customSensitivity !== null) {
+        await updateSession(session.id, {
+          custom_drill_config: {
+            ...(session.drill_config || {}),
+            detection_sensitivity: customSensitivity,
+          },
+        });
+        console.log(`[SessionPrep] Saved custom sensitivity: ${customSensitivity}G`);
+      }
+      
       const activated = await activateSession(session.id, true);
-      onSessionActivated(activated);
+      // Pass detection config through to the activated session
+      onSessionActivated({
+        ...activated,
+        weapon_caliber: weaponCaliber,
+        weapon_category: weaponCategory,
+      });
     } catch (error: any) {
       console.error('[SessionPrep] Failed to activate:', error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setActivating(false);
     }
-  }, [session.id, activating, onSessionActivated]);
+  }, [session.id, session.drill_config, activating, onSessionActivated, customSensitivity, weaponCaliber, weaponCategory]);
 
   const handleStartWithPhone = useCallback(async () => {
     if (activating) return;
@@ -311,6 +347,110 @@ export function SessionPrepView({
             </TouchableOpacity>
           )}
         </Animated.View>
+
+        {/* Shot Detection Sensitivity (only when watch connected) */}
+        {isWatchConnected && (
+          <Animated.View 
+            entering={FadeInDown.delay(250).duration(400)}
+            style={[styles.sensitivityCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+          >
+            <TouchableOpacity
+              style={styles.sensitivityHeader}
+              onPress={() => setShowSensitivity(!showSensitivity)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.sensitivityIcon, { backgroundColor: `${colors.orange}15` }]}>
+                <Settings size={18} color={colors.orange} />
+              </View>
+              <View style={styles.sensitivityHeaderText}>
+                <Text style={[styles.sensitivityLabel, { color: colors.textMuted }]}>
+                  Shot Detection
+                </Text>
+                <Text style={[styles.sensitivityValue, { color: colors.text }]}>
+                  {currentSensitivity.toFixed(1)}G{' '}
+                  <Text style={{ color: colors.textMuted, fontWeight: '400' }}>
+                    ({detectionConfig.description})
+                  </Text>
+                </Text>
+              </View>
+              {showSensitivity ? (
+                <ChevronUp size={20} color={colors.textMuted} />
+              ) : (
+                <ChevronDown size={20} color={colors.textMuted} />
+              )}
+            </TouchableOpacity>
+
+            {showSensitivity && (
+              <Animated.View entering={FadeIn.duration(200)} style={styles.sensitivityContent}>
+                {/* Preset Buttons */}
+                <View style={styles.sensitivityPresets}>
+                  {[
+                    { id: 'light', label: 'Light', value: 0.8, desc: '.22, test' },
+                    { id: 'medium', label: 'Medium', value: 2.5, desc: '9mm, 5.56' },
+                    { id: 'heavy', label: 'Heavy', value: 4.0, desc: '.45, .308' },
+                    { id: 'shotgun', label: 'Shotgun', value: 5.5, desc: '12ga' },
+                  ].map((preset) => {
+                    const isSelected = Math.abs(currentSensitivity - preset.value) < 0.3;
+                    return (
+                      <TouchableOpacity
+                        key={preset.id}
+                        style={[
+                          styles.presetButton,
+                          { 
+                            backgroundColor: isSelected ? `${colors.orange}15` : colors.secondary,
+                            borderColor: isSelected ? colors.orange : 'transparent',
+                          },
+                        ]}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          setCustomSensitivity(preset.value);
+                        }}
+                      >
+                        <Text style={[
+                          styles.presetLabel, 
+                          { color: isSelected ? colors.orange : colors.text }
+                        ]}>
+                          {preset.label}
+                        </Text>
+                        <Text style={[styles.presetValue, { color: colors.textMuted }]}>
+                          {preset.value}G
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Auto button */}
+                {weaponCaliber && (
+                  <TouchableOpacity
+                    style={[
+                      styles.autoButton,
+                      {
+                        backgroundColor: isAutoSensitivity ? `${colors.green}15` : colors.secondary,
+                        borderColor: isAutoSensitivity ? colors.green : 'transparent',
+                      },
+                    ]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setCustomSensitivity(null);
+                    }}
+                  >
+                    <Text style={[
+                      styles.autoButtonText, 
+                      { color: isAutoSensitivity ? colors.green : colors.text }
+                    ]}>
+                      ✨ Auto ({weaponCaliber})
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                <Text style={[styles.sensitivityHint, { color: colors.textMuted }]}>
+                  Lower = detects lighter recoil. Higher = reduces false positives.
+                </Text>
+              </Animated.View>
+            )}
+          </Animated.View>
+        )}
 
         {/* Info */}
         <Animated.View 
@@ -589,6 +729,80 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  
+  // Sensitivity Card
+  sensitivityCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  sensitivityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    gap: 12,
+  },
+  sensitivityIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sensitivityHeaderText: {
+    flex: 1,
+  },
+  sensitivityLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  sensitivityValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  sensitivityContent: {
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+    gap: 10,
+  },
+  sensitivityPresets: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  presetButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    borderWidth: 1.5,
+  },
+  presetLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  presetValue: {
+    fontSize: 10,
+    marginTop: 2,
+  },
+  autoButton: {
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1.5,
+  },
+  autoButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  sensitivityHint: {
+    fontSize: 11,
+    textAlign: 'center',
+    lineHeight: 15,
   },
 });
 

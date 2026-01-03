@@ -39,7 +39,7 @@ export async function getMyActiveSessionForTraining(trainingId: string): Promise
       trainings:training_id(title),
       training_drills:drill_id(name),
       drill_templates:drill_template_id(name),
-      user_weapons:weapon_id(name, caliber)
+      user_weapons:weapon_id(name, caliber, category)
     `
     )
     .eq('training_id', trainingId)
@@ -90,7 +90,7 @@ export async function getMyActiveSession(): Promise<SessionWithDetails | null> {
       trainings:training_id(title),
       training_drills:drill_id(name),
       drill_templates:drill_template_id(name),
-      user_weapons:weapon_id(name, caliber)
+      user_weapons:weapon_id(name, caliber, category)
     `
     )
     .eq('user_id', user.id)
@@ -144,7 +144,7 @@ export async function getMyActivePersonalSession(): Promise<SessionWithDetails |
       trainings:training_id(title),
       training_drills:drill_id(name),
       drill_templates:drill_template_id(name),
-      user_weapons:weapon_id(name, caliber)
+      user_weapons:weapon_id(name, caliber, category)
     `
     )
     .eq('user_id', user.id)
@@ -204,7 +204,7 @@ export async function getMyActiveSessionsAll(): Promise<SessionWithDetails[]> {
       trainings:training_id(title),
       training_drills:drill_id(name),
       drill_templates:drill_template_id(name),
-      user_weapons:weapon_id(name, caliber)
+      user_weapons:weapon_id(name, caliber, category)
     `
     )
     .eq('user_id', user.id)
@@ -298,7 +298,7 @@ export async function getSessions(teamId?: string | null): Promise<SessionWithDe
       trainings:training_id(title),
       training_drills:drill_id(name),
       drill_templates:drill_template_id(name),
-      user_weapons:weapon_id(name, caliber)
+      user_weapons:weapon_id(name, caliber, category)
     `
     )
     .order('started_at', { ascending: false });
@@ -758,7 +758,7 @@ export async function getTrainingSessions(trainingId: string): Promise<SessionWi
       trainings:training_id(title),
       training_drills:drill_id(name),
       drill_templates:drill_template_id(name),
-      user_weapons:weapon_id(name, caliber)
+      user_weapons:weapon_id(name, caliber, category)
     `
     )
     .eq('training_id', trainingId)
@@ -982,7 +982,7 @@ export async function getTeamSessions(teamId: string): Promise<SessionWithDetail
       trainings:training_id(title),
       training_drills:drill_id(name),
       drill_templates:drill_template_id(name),
-      user_weapons:weapon_id(name, caliber)
+      user_weapons:weapon_id(name, caliber, category)
     `
     )
     .eq('team_id', teamId)
@@ -1068,7 +1068,7 @@ export async function getSessionById(sessionId: string): Promise<SessionWithDeta
         instructions,
         safety_notes
       ),
-      user_weapons:weapon_id(name, caliber)
+      user_weapons:weapon_id(name, caliber, category)
     `
     )
     .eq('id', sessionId)

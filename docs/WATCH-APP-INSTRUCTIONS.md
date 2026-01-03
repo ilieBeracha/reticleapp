@@ -103,13 +103,25 @@ When the phone sends `SESSION_START`, it now includes:
     "drillName": "Bill Drill",
     "drillType": "timed",
     "inputMethod": "manual",
-    "watchMode": "primary",       // ← NEW: "primary" or "supplementary"
+    "watchMode": "primary",       // "primary" or "supplementary"
     "distance": 7,
-    "rounds": 6,                   // ← Max shots (0 = unlimited)
+    "rounds": 6,                   // Max shots (0 = unlimited)
     "timeLimit": null,
     "parTime": 2.0,
     "strings": 1,
-    "startedAt": 1703500000000
+    "startedAt": 1703500000000,
+    
+    // === NEW: Shot Detection Config ===
+    "autoDetect": true,            // Enable accelerometer shot detection
+    "detection": {
+      "sensitivity": 3.2,          // Primary G-force threshold
+      "minThreshold": 1.6,         // Reject peaks below this
+      "maxThreshold": 9.6,         // Expected max peak
+      "cooldownMs": 80,            // Min time between shots (ms)
+      "profile": "handgun"         // "handgun" | "rifle" | "shotgun"
+    },
+    "sensitivity": 3.2,            // Legacy field (same as detection.sensitivity)
+    "vrcv": true                   // Vibrate on shot detection
   }
 }
 ```
@@ -122,6 +134,30 @@ When the phone sends `SESSION_START`, it now includes:
 | `inputMethod` | `"scan"` \| `"manual"` \| `"both"` | How user inputs data (FYI) |
 | `rounds` | Number | Max shots allowed (0 = no limit) |
 | `parTime` | Number \| null | Par time in seconds (null = none) |
+
+### Detection Configuration (NEW)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `detection.sensitivity` | Number | Primary G-force threshold (1.0 - 7.0) |
+| `detection.minThreshold` | Number | Reject peaks below this (false positive rejection) |
+| `detection.maxThreshold` | Number | Expected max peak for normalization |
+| `detection.cooldownMs` | Number | Minimum ms between detected shots |
+| `detection.profile` | String | Weapon profile: "handgun", "rifle", "shotgun" |
+| `vrcv` | Boolean | Vibrate when shot is detected |
+
+**⚠️ IMPORTANT:** Different firearms have different recoil. The phone derives sensitivity from weapon caliber:
+
+| Caliber | Sensitivity |
+|---------|-------------|
+| .22 LR | 2.0G |
+| 9mm | 3.2G |
+| .45 ACP | 4.2G |
+| 5.56 rifle | 3.5G |
+| .308 rifle | 4.5G |
+| 12ga shotgun | 5.5G |
+
+See `docs/shot-detection-calibration.md` for the full algorithm.
 
 ---
 

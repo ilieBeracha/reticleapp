@@ -16,47 +16,39 @@
 
 import { useColors } from '@/hooks/ui/useColors';
 import type { GarminBiometrics, ShotBiometrics } from '@/services/garminService';
-import { getSessionTimeline, type SessionTimeline } from '@/services/session/timelineService';
 import { endSession, saveWatchSessionData } from '@/services/sessionService';
-import { useGarminTimelineData, useTimelineProgress } from '@/store/garminStore';
 import { useSessionStore } from '@/store/sessionStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
-  Activity,
-  ArrowDown,
-  ArrowUp,
-  CheckCircle,
-  Clock,
-  Crosshair,
-  Heart,
-  MapPin,
-  Target,
-  Timer,
-  TrendingDown,
-  TrendingUp,
-  Watch,
-  Wind,
-  Zap,
+    Activity,
+    CheckCircle,
+    Clock,
+    Crosshair,
+    Heart,
+    MapPin,
+    Target,
+    Timer,
+    TrendingUp,
+    Watch,
+    Wind,
+    Zap,
 } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CHART_WIDTH = SCREEN_WIDTH - 64;
 
 interface SteadinessShotData {
   shotNumber: number;
@@ -161,51 +153,6 @@ export default function WatchSessionResultPage() {
 
   const [saving, setSaving] = useState(false);
   const [hitsInput, setHitsInput] = useState('');
-  const [savedTimeline, setSavedTimeline] = useState<SessionTimeline | null>(null);
-  const [loadingTimeline, setLoadingTimeline] = useState(false);
-  
-  // Subscribe to real-time timeline data from watch
-  const liveTimelineData = useGarminTimelineData();
-  const timelineProgress = useTimelineProgress();
-  
-  // Check if we have live timeline data for this session
-  const hasLiveTimeline = liveTimelineData?.sessionId === sessionId && liveTimelineData?.points?.length > 0;
-  
-  // Load saved timeline from database if we don't have live data
-  useEffect(() => {
-    if (!hasLiveTimeline && sessionId && !savedTimeline && !loadingTimeline) {
-      setLoadingTimeline(true);
-      getSessionTimeline(sessionId)
-        .then((data) => {
-          setSavedTimeline(data);
-        })
-        .catch((err) => {
-          console.log('[WatchResult] No saved timeline:', err.message);
-        })
-        .finally(() => setLoadingTimeline(false));
-    }
-  }, [sessionId, hasLiveTimeline, savedTimeline, loadingTimeline]);
-  
-  // Combined timeline data: prefer live, fallback to saved
-  const timelineData = useMemo(() => {
-    if (hasLiveTimeline && liveTimelineData) {
-      return {
-        points: liveTimelineData.points,
-        shotDetails: liveTimelineData.shotDetails,
-        summary: liveTimelineData.summary,
-      };
-    }
-    if (savedTimeline) {
-      return {
-        points: savedTimeline.points,
-        shotDetails: savedTimeline.shotDetails,
-        summary: savedTimeline.summary,
-      };
-    }
-    return null;
-  }, [hasLiveTimeline, liveTimelineData, savedTimeline]);
-  
-  const hasTimelineData = timelineData !== null && timelineData.points?.length > 0;
 
   // Parse basic values
   const shotsCount = parseInt(shots || '0');
@@ -314,115 +261,6 @@ export default function WatchSessionResultPage() {
     }));
   }, [splits, splitStats, colors]);
 
-  // ============================================================================
-  // COMPUTED INSIGHTS FROM TIMELINE DATA
-  // ============================================================================
-  const insights = useMemo(() => {
-    if (!hasTimelineData || !timelineData?.shotDetails || timelineData.shotDetails.length < 2) {
-      return null;
-    }
-    
-    const shots = timelineData.shotDetails;
-    const steadinessSum = shots.reduce((sum, s) => sum + (s.steadiness || 0), 0);
-    const hasRealSteadiness = steadinessSum > 0;
-    
-    // Performance scores (use steadiness or inverted stress as calmness)
-    const scores = hasRealSteadiness 
-      ? shots.map(s => s.steadiness)
-      : shots.map(s => Math.max(0, 100 - s.stress));
-    
-    const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-    
-    // Trend analysis (compare first half vs second half)
-    const half = Math.floor(scores.length / 2);
-    const firstHalf = scores.slice(0, half).reduce((a, b) => a + b, 0) / half;
-    const secondHalf = scores.slice(half).reduce((a, b) => a + b, 0) / (scores.length - half);
-    const trend: 'improving' | 'declining' | 'stable' = 
-      secondHalf - firstHalf > 5 ? 'improving' : 
-      secondHalf - firstHalf < -5 ? 'declining' : 'stable';
-    
-    // Breath quality
-    const pauseCount = shots.filter(s => s.breathPhase === 'pause').length;
-    const exhaleCount = shots.filter(s => s.breathPhase === 'exhale').length;
-    const inhaleCount = shots.filter(s => s.breathPhase === 'inhale').length;
-    const pausePct = Math.round((pauseCount / shots.length) * 100);
-    const exhalePct = Math.round((exhaleCount / shots.length) * 100);
-    const inhalePct = Math.round((inhaleCount / shots.length) * 100);
-    
-    // Best/worst shots
-    const maxScore = Math.max(...scores);
-    const minScore = Math.min(...scores);
-    const bestIdx = scores.indexOf(maxScore);
-    const worstIdx = scores.indexOf(minScore);
-    
-    // Flinch count
-    const flinchCount = shots.filter(s => s.flinch).length;
-    
-    return {
-      scores,
-      avgScore,
-      trend,
-      pausePct,
-      exhalePct,
-      inhalePct,
-      usingStress: !hasRealSteadiness,
-      bestShot: shots[bestIdx].shotNumber,
-      worstShot: shots[worstIdx].shotNumber,
-      bestScore: maxScore,
-      worstScore: minScore,
-      flinchCount,
-      shots,
-    };
-  }, [hasTimelineData, timelineData]);
-  
-  // HR Timeline chart data with shot markers - USE REAL TIMELINE DATA
-  const hrTimelineData = useMemo(() => {
-    // Prefer real timeline data from TIMELINE_CHUNK
-    if (hasTimelineData && timelineData?.points) {
-      return timelineData.points.map((point) => {
-        const isShot = point.eventType === 'shot' || point.eventType === 'hit';
-        return {
-          value: point.heartRate || 0,
-          dataPointColor: isShot ? colors.orange : colors.primary,
-          dataPointRadius: isShot ? 6 : 3,
-          label: isShot ? '' : undefined,
-          timestamp: point.timestamp,
-        };
-      }).filter(p => p.value > 0); // Only show points with HR data
-    }
-    // Fallback to legacy biometrics.hrTimeline
-    if (!biometrics?.hrTimeline || biometrics.hrTimeline.length === 0) return [];
-    return biometrics.hrTimeline.map(([timestamp, hr, shotNum]) => ({
-      value: hr,
-      dataPointColor: shotNum > 0 ? colors.orange : colors.primary,
-      dataPointRadius: shotNum > 0 ? 6 : 3,
-      ...(shotNum > 0 && { dataPointText: `${shotNum}` }),
-    }));
-  }, [hasTimelineData, timelineData, biometrics, colors]);
-  
-  // Breathing timeline chart data - USE REAL TIMELINE DATA
-  const breathTimelineData = useMemo(() => {
-    // Prefer real timeline data from TIMELINE_CHUNK
-    if (hasTimelineData && timelineData?.points) {
-      return timelineData.points.map((point) => {
-        const isShot = point.eventType === 'shot' || point.eventType === 'hit';
-        return {
-          value: point.breathRate || 0,
-          dataPointColor: isShot ? colors.green : colors.blue,
-          dataPointRadius: isShot ? 5 : 2,
-          timestamp: point.timestamp,
-        };
-      }).filter(p => p.value > 0); // Only show points with breath data
-    }
-    // Fallback to legacy biometrics.breathTimeline
-    if (!biometrics?.breathTimeline || biometrics.breathTimeline.length === 0) return [];
-    return biometrics.breathTimeline.map(([timestamp, br, shotNum]) => ({
-      value: br,
-      dataPointColor: shotNum > 0 ? colors.green : colors.blue,
-      dataPointRadius: shotNum > 0 ? 5 : 2,
-    }));
-  }, [hasTimelineData, timelineData, biometrics, colors]);
-  
   // Steadiness chart data - supports both new format (shots array) and legacy (shotScores)
   const steadinessChartData = useMemo(() => {
     // New format: shots array with objects (includes flinch and recoil data)
@@ -556,9 +394,6 @@ export default function WatchSessionResultPage() {
     );
   }
 
-  const hasChartData = splitTimes.length > 0;
-  const hasHRTimeline = hrTimelineData.length > 0;
-  const hasBreathTimeline = breathTimelineData.length > 0;
   const hasSteadiness = steadinessChartData.length > 0;
   const hasShotBiometrics = shotBiometricsWithColors.length > 0;
 
@@ -667,203 +502,6 @@ export default function WatchSessionResultPage() {
                     <Text style={[styles.heartRateLabel, { color: colors.textMuted }]}>Min</Text>
                   </View>
                 )}
-              </View>
-            </View>
-          </Animated.View>
-        )}
-
-        {/* HR Timeline Chart - Simplified: Only show if explicitly requested */}
-        {/* Timeline charts removed for faster display - data still saved */}
-
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* BIOMETRIC INSIGHTS - Unique per-session analysis */}
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {loadingTimeline && !insights && (
-          <Animated.View entering={FadeInDown.delay(175).duration(400)} style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Performance Insights</Text>
-            <View style={[styles.insightsCard, { backgroundColor: colors.card, borderColor: colors.border, alignItems: 'center', paddingVertical: 24 }]}>
-              <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading biometric data...</Text>
-            </View>
-          </Animated.View>
-        )}
-        {!loadingTimeline && !insights && hasTimelineData && (
-          <Animated.View entering={FadeInDown.delay(175).duration(400)} style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Performance Insights</Text>
-            <View style={[styles.insightsCard, { backgroundColor: colors.card, borderColor: colors.border, alignItems: 'center', paddingVertical: 24 }]}>
-              <Activity size={24} color={colors.textMuted} />
-              <Text style={[styles.loadingText, { color: colors.textMuted }]}>Need at least 2 shots for insights</Text>
-            </View>
-          </Animated.View>
-        )}
-        {insights && (
-          <Animated.View entering={FadeInDown.delay(175).duration(400)} style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Performance Insights</Text>
-            
-            {/* Main Metrics Row */}
-            <View style={[styles.insightsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.insightsRow}>
-                {/* Calmness/Steadiness Score */}
-                <View style={styles.insightMetric}>
-                  <Text style={[styles.insightValue, { 
-                    color: insights.avgScore >= 50 ? colors.green : insights.avgScore >= 30 ? colors.orange : colors.red 
-                  }]}>
-                    {insights.avgScore}%
-                  </Text>
-                  <Text style={[styles.insightLabel, { color: colors.textMuted }]}>
-                    {insights.usingStress ? 'Calmness' : 'Steadiness'}
-                  </Text>
-                </View>
-
-                {/* Trend */}
-                {insights.trend !== 'stable' && (
-                  <View style={[styles.trendBadge, { 
-                    backgroundColor: insights.trend === 'improving' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)' 
-                  }]}>
-                    {insights.trend === 'improving' ? (
-                      <TrendingUp size={16} color={colors.green} />
-                    ) : (
-                      <TrendingDown size={16} color={colors.red} />
-                    )}
-                    <Text style={[styles.trendText, { 
-                      color: insights.trend === 'improving' ? colors.green : colors.red 
-                    }]}>
-                      {insights.trend === 'improving' ? 'Improving' : 'Declining'}
-                    </Text>
-                  </View>
-                )}
-
-                {/* Breath Pause % */}
-                <View style={styles.insightMetric}>
-                  <Text style={[styles.insightValue, { 
-                    color: insights.pausePct >= 50 ? colors.green : colors.orange 
-                  }]}>
-                    {insights.pausePct}%
-                  </Text>
-                  <Text style={[styles.insightLabel, { color: colors.textMuted }]}>Breath Pause</Text>
-                </View>
-
-                {/* Flinch Count */}
-                {insights.flinchCount > 0 && (
-                  <View style={styles.insightMetric}>
-                    <Text style={[styles.insightValue, { color: colors.red }]}>
-                      {insights.flinchCount}
-                    </Text>
-                    <Text style={[styles.insightLabel, { color: colors.textMuted }]}>Flinches</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-
-            {/* Shot-by-Shot Performance Bars */}
-            <View style={[styles.shotBarsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.shotBarsTitle, { color: colors.textMuted }]}>Shot-by-Shot Performance</Text>
-              <View style={styles.shotBarsContainer}>
-                {insights.shots.slice(0, 25).map((shot, idx) => {
-                  const score = insights.scores[idx];
-                  const barHeight = Math.max(6, (score / 100) * 48);
-                  const barColor = score >= 50 ? colors.green : score >= 30 ? colors.orange : colors.red;
-                  const breathColor = shot.breathPhase === 'pause' ? colors.green : 
-                                     shot.breathPhase === 'exhale' ? colors.orange : colors.red;
-                  return (
-                    <View key={shot.shotNumber} style={styles.shotBarColumn}>
-                      <View style={[styles.shotBarFill, { height: barHeight, backgroundColor: barColor }]} />
-                      <View style={[styles.breathDot, { backgroundColor: breathColor }]} />
-                      <Text style={[styles.shotBarLabel, { color: colors.textMuted }]}>{shot.shotNumber}</Text>
-                    </View>
-                  );
-                })}
-              </View>
-              {insights.shots.length > 25 && (
-                <Text style={[styles.shotBarsMore, { color: colors.textMuted }]}>
-                  +{insights.shots.length - 25} more shots
-                </Text>
-              )}
-              
-              {/* Legend */}
-              <View style={styles.barsLegend}>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: colors.green }]} />
-                  <Text style={[styles.legendText, { color: colors.textMuted }]}>Pause</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: colors.orange }]} />
-                  <Text style={[styles.legendText, { color: colors.textMuted }]}>Exhale</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: colors.red }]} />
-                  <Text style={[styles.legendText, { color: colors.textMuted }]}>Inhale</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Best/Worst Shots */}
-            {insights.bestScore !== insights.worstScore && (
-              <View style={styles.bestWorstRow}>
-                <View style={[styles.bestWorstCard, { backgroundColor: 'rgba(16,185,129,0.1)', borderColor: 'rgba(16,185,129,0.3)' }]}>
-                  <ArrowUp size={16} color={colors.green} />
-                  <View>
-                    <Text style={[styles.bestWorstValue, { color: colors.green }]}>
-                      Shot #{insights.bestShot}
-                    </Text>
-                    <Text style={[styles.bestWorstScore, { color: colors.green }]}>
-                      {insights.bestScore}% {insights.usingStress ? 'calm' : 'steady'}
-                    </Text>
-                  </View>
-                </View>
-                <View style={[styles.bestWorstCard, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)' }]}>
-                  <ArrowDown size={16} color={colors.red} />
-                  <View>
-                    <Text style={[styles.bestWorstValue, { color: colors.red }]}>
-                      Shot #{insights.worstShot}
-                    </Text>
-                    <Text style={[styles.bestWorstScore, { color: colors.red }]}>
-                      {insights.worstScore}% {insights.usingStress ? 'calm' : 'steady'}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            )}
-
-            {/* Breath Discipline Breakdown */}
-            <View style={[styles.breathBreakdownCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.breathBreakdownTitle, { color: colors.text }]}>Breath Discipline</Text>
-              <View style={styles.breathBar}>
-                {insights.pausePct > 0 && (
-                  <View style={[styles.breathSegment, { flex: insights.pausePct, backgroundColor: colors.green }]}>
-                    {insights.pausePct >= 15 && (
-                      <Text style={styles.breathSegmentText}>{insights.pausePct}%</Text>
-                    )}
-                  </View>
-                )}
-                {insights.exhalePct > 0 && (
-                  <View style={[styles.breathSegment, { flex: insights.exhalePct, backgroundColor: colors.orange }]}>
-                    {insights.exhalePct >= 15 && (
-                      <Text style={styles.breathSegmentText}>{insights.exhalePct}%</Text>
-                    )}
-                  </View>
-                )}
-                {insights.inhalePct > 0 && (
-                  <View style={[styles.breathSegment, { flex: insights.inhalePct, backgroundColor: colors.red }]}>
-                    {insights.inhalePct >= 15 && (
-                      <Text style={styles.breathSegmentText}>{insights.inhalePct}%</Text>
-                    )}
-                  </View>
-                )}
-              </View>
-              <View style={styles.breathBreakdownLegend}>
-                <View style={styles.breathLegendItem}>
-                  <View style={[styles.breathLegendDot, { backgroundColor: colors.green }]} />
-                  <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>Pause (optimal)</Text>
-                </View>
-                <View style={styles.breathLegendItem}>
-                  <View style={[styles.breathLegendDot, { backgroundColor: colors.orange }]} />
-                  <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>Exhale</Text>
-                </View>
-                <View style={styles.breathLegendItem}>
-                  <View style={[styles.breathLegendDot, { backgroundColor: colors.red }]} />
-                  <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>Inhale</Text>
-                </View>
               </View>
             </View>
           </Animated.View>
@@ -1020,7 +658,7 @@ export default function WatchSessionResultPage() {
         </Animated.View>
 
         {/* Raw Data Debug */}
-        {(hasChartData || biometrics || steadiness) && (
+        {(splitTimes.length > 0 || biometrics || steadiness) && (
           <Animated.View entering={FadeIn.delay(400).duration(400)} style={styles.section}>
             <View style={[styles.rawDataCard, { backgroundColor: `${colors.text}08` }]}>
               <Ionicons name="code-outline" size={14} color={colors.textMuted} />
@@ -1183,49 +821,6 @@ const styles = StyleSheet.create({
   rawDataCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 10, borderRadius: 8 },
   rawDataText: { flex: 1, fontSize: 10, fontFamily: 'SpaceMono', lineHeight: 14 },
 
-  // ═══════════════════════════════════════════════════════════════════
-  // INSIGHTS STYLES
-  // ═══════════════════════════════════════════════════════════════════
-  insightsCard: { padding: 16, borderRadius: 14, borderWidth: 1, marginBottom: 12 },
-  loadingText: { fontSize: 12, fontWeight: '500', marginTop: 8 },
-  insightsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
-  insightMetric: { alignItems: 'center' },
-  insightValue: { fontSize: 26, fontWeight: '800' },
-  insightLabel: { fontSize: 11, fontWeight: '500', marginTop: 2 },
-  trendBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
-  trendText: { fontSize: 13, fontWeight: '600' },
-
-  // Shot Bars
-  shotBarsCard: { padding: 16, borderRadius: 14, borderWidth: 1, marginBottom: 12 },
-  shotBarsTitle: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12, textAlign: 'center' },
-  shotBarsContainer: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 4, height: 70 },
-  shotBarColumn: { alignItems: 'center', gap: 4 },
-  shotBarFill: { width: 10, borderRadius: 3 },
-  breathDot: { width: 6, height: 6, borderRadius: 3 },
-  shotBarLabel: { fontSize: 8, fontWeight: '500' },
-  shotBarsMore: { fontSize: 10, textAlign: 'center', marginTop: 8 },
-  barsLegend: { flexDirection: 'row', justifyContent: 'center', gap: 16, marginTop: 12 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontSize: 10, fontWeight: '500' },
-
-  // Best/Worst
-  bestWorstRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  bestWorstCard: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, borderWidth: 1 },
-  bestWorstValue: { fontSize: 14, fontWeight: '700' },
-  bestWorstScore: { fontSize: 11, fontWeight: '500' },
-
-  // Breath Breakdown
-  breathBreakdownCard: { padding: 16, borderRadius: 14, borderWidth: 1 },
-  breathBreakdownTitle: { fontSize: 13, fontWeight: '700', marginBottom: 12 },
-  breathBar: { flexDirection: 'row', height: 28, borderRadius: 8, overflow: 'hidden' },
-  breathSegment: { alignItems: 'center', justifyContent: 'center' },
-  breathSegmentText: { fontSize: 11, fontWeight: '700', color: '#fff' },
-  breathBreakdownLegend: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 12 },
-  breathLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  breathLegendDot: { width: 10, height: 10, borderRadius: 5 },
-  breathLegendText: { fontSize: 11, fontWeight: '500' },
-  
   // Footer
   footer: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingTop: 12, borderTopWidth: 1 },
   autoSavedBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, marginBottom: 10 },

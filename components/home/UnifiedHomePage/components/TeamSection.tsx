@@ -4,14 +4,13 @@
  * Displays team training section with upcoming trainings or empty state.
  */
 
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
-import { Calendar, ChevronRight, Users } from 'lucide-react-native';
 import { router } from 'expo-router';
+import { Calendar, ChevronRight, Users } from 'lucide-react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { styles } from '../UnifiedHomePage.styles';
-import { TeamTrainingCard } from './TeamTrainingCard';
 import type { TeamSectionProps } from '../UnifiedHomePage.types';
+import { TeamTrainingCard } from './TeamTrainingCard';
 
 export function TeamSection({ 
   trainings, 
@@ -49,7 +48,7 @@ export function TeamSection({
           </Text>
           <TouchableOpacity
             style={styles.viewScheduleBtn}
-            onPress={() => router.push('/(protected)/(tabs)/trainings')}
+            onPress={() => router.push('/(protected)/(tabs)/team')}
           >
             <Text style={[styles.viewScheduleText, { color: colors.primary }]}>Schedule</Text>
             <ChevronRight size={14} color={colors.primary} />

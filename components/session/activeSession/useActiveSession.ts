@@ -29,10 +29,9 @@ import { useGarminStore, useIsGarminConnected, useSessionStartStatus } from '@/s
 import { useSessionStore } from '@/store/sessionStore';
 import { isInfiniteShots } from '@/utils/drillShots';
 
+import { deriveDetectionConfig } from '@/utils/detectionSensitivity';
 import {
-  AUTO_DETECT_ENABLED,
   SHOT_MARKING_ENABLED,
-  SHOT_SENSITIVITY_DEFAULT,
   TIMER_INTERVAL_MS,
   VIBRATE_ON_SHOT
 } from './activeSession.constants';
@@ -232,13 +231,30 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     // App is open - can send!
     setWatchAppNotOpen(false);
 
-    const payload = buildWatchSessionPayload(
-      session, 
-      AUTO_DETECT_ENABLED, 
-      SHOT_SENSITIVITY_DEFAULT,
-      SHOT_MARKING_ENABLED,
-      VIBRATE_ON_SHOT
-    );
+    // Derive detection sensitivity from weapon
+    // Uses caliber-specific thresholds for accurate shot detection
+    const weaponInfo = session.weapon_id ? {
+      category: session.weapon_category,
+      caliber: session.weapon_caliber,
+      // Could add suppressor detection from weapon config
+    } : undefined;
+    
+    const detectionConfig = deriveDetectionConfig({
+      category: weaponInfo?.category as any,
+      caliber: weaponInfo?.caliber,
+    });
+    
+    console.log(`[Garmin] 🎯 Detection config: ${detectionConfig.sensitivity}G (${detectionConfig.description})`);
+
+    const payload = buildWatchSessionPayload(session, {
+      autoDetect: true,
+      weapon: weaponInfo ? {
+        category: weaponInfo.category,
+        caliber: weaponInfo.caliber,
+      } : undefined,
+      emkv: SHOT_MARKING_ENABLED,
+      vrcv: VIBRATE_ON_SHOT,
+    });
 
     setWatchStarting(true);
     setWatchStartFailed(false);

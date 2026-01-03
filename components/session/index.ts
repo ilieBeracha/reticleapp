@@ -15,6 +15,9 @@ export { TargetDetailModal } from './TargetDetailModal';
 export { SaveDrillPrompt } from './SaveDrillPrompt';
 export { useWatchControlPrompt, WatchControlPrompt } from './WatchControlPrompt';
 
+// Watch detection sensitivity
+export { SensitivitySelector } from './SensitivitySelector';
+
 // Category drill picker - shows real drills that sessions MUST follow
 export { CategoryDrillPicker } from './CategoryDrillPicker';
 

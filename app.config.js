@@ -1,5 +1,6 @@
 const IS_DEV = process.env.APP_VARIANT === 'development';
 const IS_PREVIEW = process.env.APP_VARIANT === 'preview';
+
 const getAppName = () => {
   if (IS_DEV) return 'Retic (Dev)';
   if (IS_PREVIEW) return 'Retic';
