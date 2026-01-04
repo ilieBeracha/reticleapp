@@ -460,7 +460,7 @@ export function getExpectedPeakRange(caliber: string | null): {
 // ============================================================================
 
 export {
-    CALIBER_SENSITIVITY_MAP,
-    CATEGORY_DEFAULT_SENSITIVITY
+  CALIBER_SENSITIVITY_MAP,
+  CATEGORY_DEFAULT_SENSITIVITY
 };
 

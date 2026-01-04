@@ -7,37 +7,37 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
+import type { WeaponCategory } from '@/services/weaponService';
 import {
-    getCategoryLabel,
-    getWeaponPickerData,
-    type GlobalWeapon,
-    type TeamWeapon,
-    type UserWeapon,
-    type WeaponPickerData,
+  getCategoryLabel,
+  getWeaponPickerData,
+  type GlobalWeapon,
+  type TeamWeapon,
+  type UserWeapon,
+  type WeaponPickerData,
 } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
 import {
-    Check,
-    ChevronRight,
-    Clock,
-    Crosshair,
-    Plus,
-    Search,
-    Star,
-    Users,
-    X,
+  Check,
+  ChevronRight,
+  Clock,
+  Crosshair,
+  Plus,
+  Search,
+  Star,
+  Users,
+  X,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    SectionList,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  SectionList,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
-import type { WeaponCategory } from '@/services/weaponService';
 
 // ============================================================================
 // TYPES
@@ -226,32 +226,8 @@ export function WeaponPicker({
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        {showCatalog ? (
-          <TouchableOpacity
-            style={[styles.backBtn, { backgroundColor: colors.secondary }]}
-            onPress={handleBackToMyWeapons}
-          >
-            <ChevronRight size={20} color={colors.text} style={{ transform: [{ rotate: '180deg' }] }} />
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.backBtn} />
-        )}
-        <TouchableOpacity
-          style={[styles.closeBtn, { backgroundColor: colors.secondary }]}
-          onPress={onClose}
-        >
-          <X size={20} color={colors.text} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Title */}
-      <View style={styles.titleSection}>
-        <Text style={[styles.title, { color: colors.text }]}>
-          {showCatalog ? 'Add from catalog' : 'Select weapon'}
-        </Text>
-      </View>
+    
+   
 
       {/* Search */}
       <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -444,6 +420,7 @@ function WeaponCard({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingTop: 16,
   },
   header: {
     flexDirection: 'row',

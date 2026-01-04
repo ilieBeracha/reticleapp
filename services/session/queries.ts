@@ -1,6 +1,12 @@
 import { supabase } from '@/lib/supabase';
 import { withQueryTiming } from '@/services/_shared/instrumentation';
 import { mapSession } from './mappers';
+import {
+  SESSION_SELECT_MINIMAL,
+  SESSION_SELECT_WITH_FULL_DRILL,
+  SESSION_SELECT_WITH_WEAPON,
+  TARGET_STATS_SELECT,
+} from './selectClauses';
 import type { SessionAggregatedStats, SessionWithDetails } from './types';
 
 /**
@@ -17,31 +23,8 @@ export async function getMyActiveSessionForTraining(trainingId: string): Promise
 
   const { data, error } = await supabase
     .from('sessions')
-    .select(
-      `
-      id,
-      user_id,
-      team_id,
-      training_id,
-      drill_id,
-      drill_template_id,
-      custom_drill_config,
-      weapon_id,
-      session_mode,
-      watch_controlled,
-      status,
-      started_at,
-      ended_at,
-      created_at,
-      updated_at,
-      profiles:user_id(full_name),
-      teams:team_id(name),
-      trainings:training_id(title),
-      training_drills:drill_id(name),
-      drill_templates:drill_template_id(name),
-      user_weapons:weapon_id(name, caliber, category)
-    `
-    )
+    .select(SESSION_SELECT_WITH_WEAPON)
+    
     .eq('training_id', trainingId)
     .eq('user_id', user.id)
     .eq('status', 'active')
@@ -68,31 +51,7 @@ export async function getMyActiveSession(): Promise<SessionWithDetails | null> {
 
   const { data, error } = await supabase
     .from('sessions')
-    .select(
-      `
-      id,
-      user_id,
-      team_id,
-      training_id,
-      drill_id,
-      drill_template_id,
-      custom_drill_config,
-      weapon_id,
-      session_mode,
-      watch_controlled,
-      status,
-      started_at,
-      ended_at,
-      created_at,
-      updated_at,
-      profiles:user_id(full_name),
-      teams:team_id(name),
-      trainings:training_id(title),
-      training_drills:drill_id(name),
-      drill_templates:drill_template_id(name),
-      user_weapons:weapon_id(name, caliber, category)
-    `
-    )
+    .select(SESSION_SELECT_WITH_WEAPON)
     .eq('user_id', user.id)
     .eq('status', 'active')
     .order('started_at', { ascending: false })
@@ -122,31 +81,7 @@ export async function getMyActivePersonalSession(): Promise<SessionWithDetails |
 
   const { data, error } = await supabase
     .from('sessions')
-    .select(
-      `
-      id,
-      user_id,
-      team_id,
-      training_id,
-      drill_id,
-      drill_template_id,
-      custom_drill_config,
-      weapon_id,
-      session_mode,
-      watch_controlled,
-      status,
-      started_at,
-      ended_at,
-      created_at,
-      updated_at,
-      profiles:user_id(full_name),
-      teams:team_id(name),
-      trainings:training_id(title),
-      training_drills:drill_id(name),
-      drill_templates:drill_template_id(name),
-      user_weapons:weapon_id(name, caliber, category)
-    `
-    )
+    .select(SESSION_SELECT_WITH_WEAPON)
     .eq('user_id', user.id)
     .eq('status', 'active')
     .is('team_id', null) // Personal sessions have no team
@@ -182,31 +117,7 @@ export async function getMyActiveSessionsAll(): Promise<SessionWithDetails[]> {
 
   const { data, error } = await supabase
     .from('sessions')
-    .select(
-      `
-      id,
-      user_id,
-      team_id,
-      training_id,
-      drill_id,
-      drill_template_id,
-      custom_drill_config,
-      weapon_id,
-      session_mode,
-      watch_controlled,
-      status,
-      started_at,
-      ended_at,
-      created_at,
-      updated_at,
-      profiles:user_id(full_name),
-      teams:team_id(name),
-      trainings:training_id(title),
-      training_drills:drill_id(name),
-      drill_templates:drill_template_id(name),
-      user_weapons:weapon_id(name, caliber, category)
-    `
-    )
+    .select(SESSION_SELECT_WITH_WEAPON)
     .eq('user_id', user.id)
     .eq('status', 'active')
     .order('started_at', { ascending: false });
@@ -276,31 +187,7 @@ export function getSessionAge(session: SessionWithDetails): string {
 export async function getSessions(teamId?: string | null): Promise<SessionWithDetails[]> {
   let query = supabase
     .from('sessions')
-    .select(
-      `
-      id,
-      user_id,
-      team_id,
-      training_id,
-      drill_id,
-      drill_template_id,
-      custom_drill_config,
-      weapon_id,
-      session_mode,
-      watch_controlled,
-      status,
-      started_at,
-      ended_at,
-      created_at,
-      updated_at,
-      profiles:user_id(full_name),
-      teams:team_id(name),
-      trainings:training_id(title),
-      training_drills:drill_id(name),
-      drill_templates:drill_template_id(name),
-      user_weapons:weapon_id(name, caliber, category)
-    `
-    )
+    .select(SESSION_SELECT_WITH_WEAPON)
     .order('started_at', { ascending: false });
 
   // Filter by team if provided
@@ -339,29 +226,7 @@ export async function getSessionsPage(options: {
 
     let query = supabase
       .from('sessions')
-      .select(
-        `
-        id,
-        user_id,
-        team_id,
-        training_id,
-        drill_id,
-        drill_template_id,
-        custom_drill_config,
-        session_mode,
-        watch_controlled,
-        status,
-        started_at,
-        ended_at,
-        created_at,
-        updated_at,
-        profiles:user_id(full_name),
-        teams:team_id(name),
-        trainings:training_id(title),
-        training_drills:drill_id(name),
-        drill_templates:drill_template_id(name)
-      `
-      )
+      .select(SESSION_SELECT_MINIMAL)
       .order('started_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -400,22 +265,7 @@ export async function getSessionsWithStats(teamId?: string | null): Promise<Sess
 
   const { data: statsData, error: statsError } = await supabase
     .from('session_targets')
-    .select(
-      `
-      session_id,
-      distance_m,
-      paper_target_results(
-        bullets_fired,
-        hits_total,
-        dispersion_cm,
-        scanned_image_url
-      ),
-      tactical_target_results(
-        bullets_fired,
-        hits
-      )
-    `
-    )
+    .select(TARGET_STATS_SELECT)
     .in('session_id', sessionIds);
 
   if (statsError) {
@@ -559,29 +409,7 @@ export async function getRecentSessionsWithStats(
     // Build base query with date filter
     let query = supabase
       .from('sessions')
-      .select(
-        `
-        id,
-        user_id,
-        team_id,
-        training_id,
-        drill_id,
-        drill_template_id,
-        custom_drill_config,
-        session_mode,
-        watch_controlled,
-        status,
-        started_at,
-        ended_at,
-        created_at,
-        updated_at,
-        profiles:user_id(full_name),
-        teams:team_id(name),
-        trainings:training_id(title),
-        training_drills:drill_id(name),
-        drill_templates:drill_template_id(name)
-      `
-      )
+      .select(SESSION_SELECT_MINIMAL)
       .or(`started_at.gte.${dateThresholdISO},status.eq.active`)
       .order('started_at', { ascending: false })
       .limit(limit);
@@ -608,22 +436,7 @@ export async function getRecentSessionsWithStats(
 
     const { data: statsData, error: statsError } = await supabase
       .from('session_targets')
-      .select(
-        `
-        session_id,
-        distance_m,
-        paper_target_results(
-          bullets_fired,
-          hits_total,
-          dispersion_cm,
-          scanned_image_url
-        ),
-        tactical_target_results(
-          bullets_fired,
-          hits
-        )
-      `
-      )
+      .select(TARGET_STATS_SELECT)
       .in('session_id', sessionIds);
 
     if (statsError) {
@@ -736,31 +549,7 @@ export async function getRecentSessionsWithStats(
 export async function getTrainingSessions(trainingId: string): Promise<SessionWithDetails[]> {
   const { data, error } = await supabase
     .from('sessions')
-    .select(
-      `
-      id,
-      user_id,
-      team_id,
-      training_id,
-      drill_id,
-      drill_template_id,
-      custom_drill_config,
-      weapon_id,
-      session_mode,
-      watch_controlled,
-      status,
-      started_at,
-      ended_at,
-      created_at,
-      updated_at,
-      profiles:user_id(full_name),
-      teams:team_id(name),
-      trainings:training_id(title),
-      training_drills:drill_id(name),
-      drill_templates:drill_template_id(name),
-      user_weapons:weapon_id(name, caliber, category)
-    `
-    )
+    .select(SESSION_SELECT_WITH_WEAPON)
     .eq('training_id', trainingId)
     .order('started_at', { ascending: false });
 
@@ -776,29 +565,7 @@ export async function getTrainingSessionsWithStats(trainingId: string): Promise<
   return withQueryTiming('sessions.getTrainingSessionsWithStats', async () => {
     const { data, error } = await supabase
       .from('sessions')
-      .select(
-        `
-        id,
-        user_id,
-        team_id,
-        training_id,
-        drill_id,
-        drill_template_id,
-        custom_drill_config,
-        session_mode,
-        watch_controlled,
-        status,
-        started_at,
-        ended_at,
-        created_at,
-        updated_at,
-        profiles:user_id(full_name),
-        teams:team_id(name),
-        trainings:training_id(title),
-        training_drills:drill_id(name),
-        drill_templates:drill_template_id(name)
-      `
-      )
+      .select(SESSION_SELECT_MINIMAL)
       .eq('training_id', trainingId)
       .order('started_at', { ascending: false });
 
@@ -813,22 +580,7 @@ export async function getTrainingSessionsWithStats(trainingId: string): Promise<
 
     const { data: statsData, error: statsError } = await supabase
       .from('session_targets')
-      .select(
-        `
-        session_id,
-        distance_m,
-        paper_target_results(
-          bullets_fired,
-          hits_total,
-          dispersion_cm,
-          scanned_image_url
-        ),
-        tactical_target_results(
-          bullets_fired,
-          hits
-        )
-      `
-      )
+      .select(TARGET_STATS_SELECT)
       .in('session_id', sessionIds);
 
     if (statsError) {
@@ -960,31 +712,7 @@ export async function getWorkspaceSessions(teamId: string | null): Promise<Sessi
 export async function getTeamSessions(teamId: string): Promise<SessionWithDetails[]> {
   const { data, error } = await supabase
     .from('sessions')
-    .select(
-      `
-      id,
-      user_id,
-      team_id,
-      training_id,
-      drill_id,
-      drill_template_id,
-      custom_drill_config,
-      weapon_id,
-      session_mode,
-      watch_controlled,
-      status,
-      started_at,
-      ended_at,
-      created_at,
-      updated_at,
-      profiles:user_id(full_name),
-      teams:team_id(name),
-      trainings:training_id(title),
-      training_drills:drill_id(name),
-      drill_templates:drill_template_id(name),
-      user_weapons:weapon_id(name, caliber, category)
-    `
-    )
+    .select(SESSION_SELECT_WITH_WEAPON)
     .eq('team_id', teamId)
     .order('started_at', { ascending: false });
 
@@ -998,79 +726,7 @@ export async function getTeamSessions(teamId: string): Promise<SessionWithDetail
 export async function getSessionById(sessionId: string): Promise<SessionWithDetails | null> {
   const { data, error } = await supabase
     .from('sessions')
-    .select(
-      `
-      id,
-      user_id,
-      team_id,
-      training_id,
-      drill_id,
-      drill_template_id,
-      custom_drill_config,
-      weapon_id,
-      session_mode,
-      watch_controlled,
-      status,
-      started_at,
-      ended_at,
-      created_at,
-      updated_at,
-      profiles:user_id(full_name),
-      teams:team_id(name),
-      trainings:training_id(title),
-      training_drills:drill_id(
-        id,
-        name,
-        drill_goal,
-        target_type,
-        distance_m,
-        rounds_per_shooter,
-        time_limit_seconds,
-        par_time_seconds,
-        scoring_mode,
-        min_accuracy_percent,
-        target_count,
-        target_size,
-        shots_per_target,
-        position,
-        start_position,
-        weapon_category,
-        strings_count,
-        reload_required,
-        movement_type,
-        difficulty,
-        category,
-        instructions,
-        safety_notes
-      ),
-      drill_templates:drill_template_id(
-        id,
-        name,
-        drill_goal,
-        target_type,
-        distance_m,
-        rounds_per_shooter,
-        time_limit_seconds,
-        par_time_seconds,
-        scoring_mode,
-        min_accuracy_percent,
-        target_count,
-        target_size,
-        shots_per_target,
-        position,
-        start_position,
-        weapon_category,
-        strings_count,
-        reload_required,
-        movement_type,
-        difficulty,
-        category,
-        instructions,
-        safety_notes
-      ),
-      user_weapons:weapon_id(name, caliber, category)
-    `
-    )
+    .select(SESSION_SELECT_WITH_FULL_DRILL)
     .eq('id', sessionId)
     .single();
 

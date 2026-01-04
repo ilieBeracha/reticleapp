@@ -3,9 +3,9 @@
  * No React dependencies, no side effects
  */
 
+import { deriveDetectionConfig, type DetectionConfig } from '@/utils/detectionSensitivity';
 import { ACCURACY_THRESHOLDS, COLORS } from './activeSession.constants';
 import type { DrillProgress, NextTargetPlan } from './activeSession.types';
-import { deriveDetectionConfig, type DetectionConfig } from '@/utils/detectionSensitivity';
 
 // ============================================================================
 // TIME FORMATTING

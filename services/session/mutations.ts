@@ -8,6 +8,10 @@ import {
   getSessionById,
   shouldAutoCancelSession,
 } from './queries';
+import {
+  SESSION_SELECT_AFTER_CREATE,
+  SESSION_SELECT_AFTER_UPDATE,
+} from './selectClauses';
 import { calculateSessionStats } from './stats';
 import {
   addSessionTarget,
@@ -205,31 +209,7 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
       status,
       started_at: startedAt,
     })
-    .select(
-      `
-      id,
-      user_id,
-      team_id,
-      training_id,
-      weapon_id,
-      drill_id,
-      drill_template_id,
-      custom_drill_config,
-      session_mode,
-      watch_controlled,
-      status,
-      started_at,
-      ended_at,
-      created_at,
-      updated_at,
-      profiles:user_id(full_name),
-      teams:team_id(name),
-      trainings:training_id(title),
-      training_drills:drill_id(*),
-      drill_templates:drill_template_id(*),
-      user_weapons:weapon_id(id, name, base_weapon:weapons(*))
-    `
-    )
+    .select(SESSION_SELECT_AFTER_CREATE)
     .single();
 
   if (error) throw error;
@@ -378,31 +358,7 @@ export async function updateSession(
     .from('sessions')
     .update(updatePayload)
     .eq('id', sessionId)
-    .select(
-      `
-      id,
-      user_id,
-      team_id,
-      training_id,
-      drill_id,
-      drill_template_id,
-      custom_drill_config,
-      weapon_id,
-      session_mode,
-      watch_controlled,
-      status,
-      started_at,
-      ended_at,
-      created_at,
-      updated_at,
-      profiles:user_id(full_name),
-      teams:team_id(name),
-      trainings:training_id(title),
-      training_drills:drill_id(*),
-      drill_templates:drill_template_id(*),
-      user_weapons:weapon_id(name, caliber)
-    `
-    )
+    .select(SESSION_SELECT_AFTER_UPDATE)
     .single();
 
   if (error) throw error;

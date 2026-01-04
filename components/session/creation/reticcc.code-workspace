@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "../../.."
+		},
+		{
+			"path": "../../../../scopes-project/ml-trained-bullet-detector"
 		}
 	],
 	"settings": {}
