@@ -1,9 +1,10 @@
 /**
- * CREATE TRAINING - Premium 2-Step Flow
+ * CREATE TRAINING - 2-Step Flow
  *
- * A polished, premium training creation experience.
- * Step 1: Details - Team, name, schedule
- * Step 2: Program - Build drill sequence
+ * 1. Details - Team, name, schedule
+ * 2. Drills - Build training timeline
+ *
+ * Training is a team entity that groups multiple drill sessions.
  */
 
 import {
@@ -21,34 +22,21 @@ import { createDrill } from '@/services/drillService';
 import type { Drill } from '@/types/workspace';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowRight, Check, ChevronLeft, Play, Users, X } from 'lucide-react-native';
+import { ArrowRight, Check, ChevronLeft, Play, Users } from 'lucide-react-native';
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  FadeInUp,
-  FadeOut,
-  SlideInRight,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring
-} from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ============================================================================
 // MAIN COMPONENT
@@ -94,21 +82,6 @@ export default function CreateTrainingScreen() {
     handleBackStep,
     handleCreate,
   } = useCreateTraining({ teamIdParam });
-
-  // Animation values
-  const buttonScale = useSharedValue(1);
-
-  const animatedButtonStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: buttonScale.value }],
-  }));
-
-  const handleButtonPressIn = () => {
-    buttonScale.value = withSpring(0.97);
-  };
-
-  const handleButtonPressOut = () => {
-    buttonScale.value = withSpring(1);
-  };
 
   // ─────────────────────────────────────────────────────────────────────────
   // DRILL HANDLERS
@@ -183,15 +156,13 @@ export default function CreateTrainingScreen() {
   if (teams.length === 0) {
     return (
       <View style={[styles.emptyContainer, { backgroundColor: colors.background }]}>
-        <Animated.View entering={FadeIn.duration(400)} style={styles.emptyContent}>
-          <View style={[styles.emptyIconOuter, { backgroundColor: `${colors.text}08` }]}>
-            <View style={[styles.emptyIcon, { backgroundColor: colors.card }]}>
-              <Users size={32} color={colors.textMuted} strokeWidth={1.5} />
-            </View>
+        <Animated.View entering={FadeIn.duration(300)} style={styles.emptyContent}>
+          <View style={[styles.emptyIcon, { backgroundColor: colors.card }]}>
+            <Users size={32} color={colors.textMuted} strokeWidth={1.5} />
           </View>
           <Text style={[styles.emptyTitle, { color: colors.text }]}>No Teams Yet</Text>
           <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
-            Create or join a team to start{'\n'}scheduling team trainings
+            Create or join a team to schedule trainings
           </Text>
           <View style={styles.emptyActions}>
             <TouchableOpacity
@@ -213,22 +184,18 @@ export default function CreateTrainingScreen() {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // COMPUTED
-  // ─────────────────────────────────────────────────────────────────────────
-
-  const totalShots = drills.reduce((sum, d) => sum + d.rounds_per_shooter * (d.strings_count || 1), 0);
-
-  // ─────────────────────────────────────────────────────────────────────────
   // MAIN RENDER
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Premium Header */}
-      <Animated.View 
-        entering={FadeInDown.duration(400)} 
-        style={[styles.header, { paddingTop: insets.top + 16 }]}
-      >
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top - 20 }]}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
+      {/* Header with back + step indicator */}
+      <View style={styles.header}>
         <TouchableOpacity
           style={[styles.backButton, { backgroundColor: colors.card }]}
           onPress={() => {
@@ -241,43 +208,24 @@ export default function CreateTrainingScreen() {
           }}
           activeOpacity={0.7}
         >
-          <ChevronLeft size={20} color={colors.text} strokeWidth={2} />
+          <ChevronLeft size={20} color={colors.text} strokeWidth={1.5} />
         </TouchableOpacity>
 
-        {/* Title + Sparkle */}
-        <View style={styles.headerCenter}>
-          <View style={styles.titleRow}>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>
-              {currentStep === 1 ? 'New Training' : 'Build Program'}
-            </Text>
-          </View>
-          <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
-            {currentStep === 1 
-              ? 'Set up your team training session' 
-              : `${drills.length} drill${drills.length !== 1 ? 's' : ''} · ${totalShots} shots`
-            }
-          </Text>
-        </View>
-
-        <View style={styles.headerSpacer} />
-      </Animated.View>
-
-      {/* Step Indicator */}
-      <Animated.View entering={FadeIn.delay(100).duration(400)} style={styles.stepIndicator}>
-        <View style={styles.stepRow}>
-          {[1, 2].map((step) => {
+        {/* Step Progress */}
+        <View style={styles.progressContainer}>
+          {[1, 2].map((step, idx) => {
             const isComplete = step === 1 ? step1Complete : step2Complete;
             const isActive = currentStep === step;
             const labels = ['Details', 'Program'];
             
             return (
-              <View key={step} style={styles.stepItem}>
+              <View key={step} style={styles.progressItem}>
                 <View
                   style={[
-                    styles.stepDot,
+                    styles.progressDot,
                     {
                       backgroundColor: isComplete ? colors.text : isActive ? colors.text : colors.border,
-                      width: isActive ? 28 : 8,
+                      transform: [{ scale: isActive ? 1.2 : 1 }],
                     },
                   ]}
                 >
@@ -285,138 +233,118 @@ export default function CreateTrainingScreen() {
                 </View>
                 <Text
                   style={[
-                    styles.stepLabel,
-                    { color: isActive || isComplete ? colors.text : colors.textMuted },
+                    styles.progressLabel,
+                    { color: currentStep >= step ? colors.text : colors.textMuted },
                   ]}
                 >
-                  {labels[step - 1]}
+                  {labels[idx]}
                 </Text>
+                {idx < 1 && (
+                  <View
+                    style={[
+                      styles.progressLine,
+                      { backgroundColor: isComplete ? colors.text : colors.border },
+                    ]}
+                  />
+                )}
               </View>
             );
           })}
         </View>
-      </Animated.View>
 
-      {/* Content */}
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 140 }]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {currentStep === 1 ? (
-          <Animated.View 
-            key="step1"
-            entering={SlideInRight.duration(300)} 
-            exiting={FadeOut.duration(150)}
-          >
-            <TrainingDetailsStep
-              teams={teams}
-              selectedTeamId={selectedTeamId}
-              isTeamLocked={isTeamLocked}
-              title={title}
-              scheduledDate={scheduledDate}
-              manualStart={manualStart}
-              teamDrillsCount={teamDrills.length}
-              onSelectTeam={handleSelectTeam}
-              onTitleChange={setTitle}
-              onOpenDatePicker={() => setShowDatePicker(true)}
-              onOpenTimePicker={() => setShowTimePicker(true)}
-              onToggleManualStart={() => setManualStart(!manualStart)}
-              onViewDrillLibrary={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                handleNextStep();
-              }}
-            />
-          </Animated.View>
-        ) : (
-          <Animated.View 
-            key="step2"
-            entering={SlideInRight.duration(300)} 
-            exiting={FadeOut.duration(150)}
-          >
-            <TrainingDrillsStep
-              drills={drills}
-              teamDrills={teamDrills}
-              hasTeam={!!selectedTeamId}
-              canCreateDrills={canCreateDrills}
-              onSelectDrill={handleDrillSelect}
-              onRemoveDrill={handleRemoveDrill}
-              onMoveDrill={handleMoveDrill}
-              onCreateNew={() => setShowDrillCreator(true)}
-            />
-          </Animated.View>
-        )}
-      </ScrollView>
+        <View style={styles.backButtonPlaceholder} />
+      </View>
 
-      {/* Bottom Action Bar */}
-      <Animated.View 
-        entering={FadeInUp.delay(200).duration(400)}
-        style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}
-      >
-        <LinearGradient
-          colors={[`${colors.background}00`, colors.background, colors.background]}
-          style={styles.bottomGradient}
-        />
-        <Animated.View style={animatedButtonStyle}>
-          {currentStep === 1 ? (
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                { backgroundColor: step1Complete ? colors.text : colors.card },
-              ]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                handleNextStep();
-              }}
-              onPressIn={handleButtonPressIn}
-              onPressOut={handleButtonPressOut}
-              disabled={!step1Complete}
-              activeOpacity={0.9}
-            >
-              <Text style={[styles.actionText, { color: step1Complete ? colors.background : colors.textMuted }]}>
-                Continue
-              </Text>
-              <ArrowRight size={18} color={step1Complete ? colors.background : colors.textMuted} strokeWidth={2.5} />
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                { backgroundColor: canCreate ? colors.text : colors.card },
-              ]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                handleCreate();
-              }}
-              onPressIn={handleButtonPressIn}
-              onPressOut={handleButtonPressOut}
-              disabled={!canCreate}
-              activeOpacity={0.9}
-            >
-              {submitting ? (
-                <ActivityIndicator size="small" color={colors.background} />
-              ) : (
-                <>
-                  <Text style={[styles.actionText, { color: canCreate ? colors.background : colors.textMuted }]}>
-                    Create Training
-                  </Text>
-                  <Play size={16} color={canCreate ? colors.background : colors.textMuted} fill={canCreate ? colors.background : colors.textMuted} />
-                </>
-              )}
-            </TouchableOpacity>
-          )}
+      {/* Step Content */}
+      {currentStep === 1 && (
+        <Animated.View entering={FadeInDown.duration(300)}>
+          <TrainingDetailsStep
+            teams={teams}
+            selectedTeamId={selectedTeamId}
+            isTeamLocked={isTeamLocked}
+            title={title}
+            scheduledDate={scheduledDate}
+            manualStart={manualStart}
+            onSelectTeam={handleSelectTeam}
+            onTitleChange={setTitle}
+            onOpenDatePicker={() => setShowDatePicker(true)}
+            onOpenTimePicker={() => setShowTimePicker(true)}
+            onToggleManualStart={() => setManualStart(!manualStart)}
+          />
         </Animated.View>
+      )}
 
-        {currentStep === 2 && drills.length > 0 && (
-          <Animated.Text 
-            entering={FadeIn.delay(300).duration(300)}
-            style={[styles.footerHint, { color: colors.textMuted }]}
-          >
-            Team will be notified when training is created
-          </Animated.Text>
-        )}
-      </Animated.View>
+      {currentStep === 2 && (
+        <Animated.View entering={FadeInDown.duration(300)}>
+          <TrainingDrillsStep
+            drills={drills}
+            teamDrills={teamDrills}
+            hasTeam={!!selectedTeamId}
+            canCreateDrills={canCreateDrills}
+            onSelectDrill={handleDrillSelect}
+            onRemoveDrill={handleRemoveDrill}
+            onMoveDrill={handleMoveDrill}
+            onCreateNew={() => setShowDrillCreator(true)}
+          />
+        </Animated.View>
+      )}
+
+      {/* Spacer - pushes button to bottom when content is short */}
+      <View style={styles.spacer} />
+
+      {/* Action Button */}
+      {currentStep === 1 ? (
+        <TouchableOpacity
+          style={[
+            styles.actionButton,
+            { backgroundColor: step1Complete ? colors.text : colors.secondary },
+          ]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            handleNextStep();
+          }}
+          disabled={!step1Complete}
+          activeOpacity={0.85}
+        >
+          <Text style={[styles.actionText, { color: step1Complete ? colors.background : colors.textMuted }]}>
+            Next: Add Drills
+          </Text>
+          <ArrowRight size={18} color={step1Complete ? colors.background : colors.textMuted} strokeWidth={2} />
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={[
+            styles.actionButton,
+            { backgroundColor: canCreate ? colors.text : colors.secondary },
+          ]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            handleCreate();
+          }}
+          disabled={!canCreate}
+          activeOpacity={0.85}
+        >
+          {submitting ? (
+            <ActivityIndicator size="small" color={colors.background} />
+          ) : (
+            <>
+              <Text style={[styles.actionText, { color: canCreate ? colors.background : colors.textMuted }]}>
+                Create Training
+              </Text>
+              <Play size={16} color={canCreate ? colors.background : colors.textMuted} fill={canCreate ? colors.background : colors.textMuted} />
+            </>
+          )}
+        </TouchableOpacity>
+      )}
+
+      {currentStep === 2 && drills.length > 0 && (
+        <Text style={[styles.footerHint, { color: colors.textMuted }]}>
+          Team will be notified when training is created
+        </Text>
+      )}
+
+      {/* Bottom padding for scroll */}
+      <View style={{ height: insets.bottom + 20 }} />
 
       {/* ═══════════════════════════════════════════════════════════════════
           MODALS
@@ -442,63 +370,61 @@ export default function CreateTrainingScreen() {
 
       {/* Date Picker */}
       {showDatePicker && (
-        <Modal visible transparent animationType="fade" onRequestClose={() => setShowDatePicker(false)}>
+        <Modal visible transparent animationType="slide" onRequestClose={() => setShowDatePicker(false)}>
           <Pressable style={styles.pickerOverlay} onPress={() => setShowDatePicker(false)}>
-            <Animated.View entering={FadeInUp.springify()}>
-              <Pressable style={[styles.pickerSheet, { backgroundColor: colors.card }]} onPress={e => e.stopPropagation()}>
-                <View style={styles.pickerHeader}>
-                  <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                    <X size={20} color={colors.textMuted} />
-                  </TouchableOpacity>
-                  <Text style={[styles.pickerTitle, { color: colors.text }]}>Select Date</Text>
-                  <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                    <Text style={[styles.pickerDone, { color: colors.text }]}>Done</Text>
-                  </TouchableOpacity>
-                </View>
-                <DateTimePicker
-                  value={scheduledDate}
-                  mode="date"
-                  display="spinner"
-                  onChange={(_, date) => date && setScheduledDate(date)}
-                  minimumDate={new Date()}
-                  style={styles.picker}
-                />
-                <View style={{ height: insets.bottom }} />
-              </Pressable>
-            </Animated.View>
+            <Pressable style={[styles.pickerSheet, { backgroundColor: colors.card }]} onPress={e => e.stopPropagation()}>
+              <View style={[styles.pickerGrabber, { backgroundColor: colors.border }]} />
+              <View style={styles.pickerHeader}>
+                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                  <Text style={[styles.pickerCancel, { color: colors.textMuted }]}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={[styles.pickerTitle, { color: colors.text }]}>Select Date</Text>
+                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                  <Text style={[styles.pickerDone, { color: colors.text }]}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={scheduledDate}
+                mode="date"
+                display="spinner"
+                onChange={(_, date) => date && setScheduledDate(date)}
+                minimumDate={new Date()}
+                style={styles.picker}
+              />
+              <View style={{ height: insets.bottom }} />
+            </Pressable>
           </Pressable>
         </Modal>
       )}
 
       {/* Time Picker */}
       {showTimePicker && (
-        <Modal visible transparent animationType="fade" onRequestClose={() => setShowTimePicker(false)}>
+        <Modal visible transparent animationType="slide" onRequestClose={() => setShowTimePicker(false)}>
           <Pressable style={styles.pickerOverlay} onPress={() => setShowTimePicker(false)}>
-            <Animated.View entering={FadeInUp.springify()}>
-              <Pressable style={[styles.pickerSheet, { backgroundColor: colors.card }]} onPress={e => e.stopPropagation()}>
-                <View style={styles.pickerHeader}>
-                  <TouchableOpacity onPress={() => setShowTimePicker(false)}>
-                    <X size={20} color={colors.textMuted} />
-                  </TouchableOpacity>
-                  <Text style={[styles.pickerTitle, { color: colors.text }]}>Select Time</Text>
-                  <TouchableOpacity onPress={() => setShowTimePicker(false)}>
-                    <Text style={[styles.pickerDone, { color: colors.text }]}>Done</Text>
-                  </TouchableOpacity>
-                </View>
-                <DateTimePicker
-                  value={scheduledDate}
-                  mode="time"
-                  display="spinner"
-                  onChange={(_, date) => date && setScheduledDate(date)}
-                  style={styles.picker}
-                />
-                <View style={{ height: insets.bottom }} />
-              </Pressable>
-            </Animated.View>
+            <Pressable style={[styles.pickerSheet, { backgroundColor: colors.card }]} onPress={e => e.stopPropagation()}>
+              <View style={[styles.pickerGrabber, { backgroundColor: colors.border }]} />
+              <View style={styles.pickerHeader}>
+                <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                  <Text style={[styles.pickerCancel, { color: colors.textMuted }]}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={[styles.pickerTitle, { color: colors.text }]}>Select Time</Text>
+                <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                  <Text style={[styles.pickerDone, { color: colors.text }]}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={scheduledDate}
+                mode="time"
+                display="spinner"
+                onChange={(_, date) => date && setScheduledDate(date)}
+                style={styles.picker}
+              />
+              <View style={{ height: insets.bottom }} />
+            </Pressable>
           </Pressable>
         </Modal>
       )}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -510,110 +436,77 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  scrollContent: {
+    paddingHorizontal: 20,
+  },
   // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingBottom: 24,
+    marginBottom: 24,
   },
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerCenter: {
+  backButtonPlaceholder: {
+    width: 40,
+  },
+  // Progress
+  progressContainer: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 4,
   },
-  titleRow: {
+  progressItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
   },
-  headerTitle: {
-    fontSize: 19,
-    fontWeight: '700',
-    letterSpacing: -0.4,
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    letterSpacing: 0.1,
-  },
-  headerSpacer: {
-    width: 44,
-  },
-  // Step Indicator
-  stepIndicator: {
-    alignItems: 'center',
-    paddingTop: 8,
-    paddingBottom: 28,
-  },
-  stepRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 32,
-  },
-  stepItem: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepDot: {
-    height: 8,
-    borderRadius: 4,
+  progressDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepLabel: {
+  progressLabel: {
     fontSize: 12,
     fontWeight: '600',
-    letterSpacing: 0.2,
+    marginLeft: 6,
   },
-  // Scroll
-  scroll: {
+  progressLine: {
+    width: 32,
+    height: 2,
+    marginHorizontal: 8,
+  },
+  // Spacer
+  spacer: {
     flex: 1,
+    minHeight: 32,
   },
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 8,
-  },
-  // Bottom Bar
-  bottomBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 24,
-    paddingTop: 24,
-  },
-  bottomGradient: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    top: 0,
-  },
+  // Action Button
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
-    height: 58,
-    borderRadius: 18,
+    gap: 8,
+    height: 52,
+    borderRadius: 14,
+    marginTop: 16,
   },
   actionText: {
-    fontSize: 17,
-    fontWeight: '700',
-    letterSpacing: -0.2,
+    fontSize: 16,
+    fontWeight: '600',
   },
   footerHint: {
     fontSize: 12,
     textAlign: 'center',
-    marginTop: 14,
-    letterSpacing: 0.1,
+    marginTop: 12,
   },
   // Empty State
   emptyContainer: {
@@ -625,86 +518,83 @@ const styles = StyleSheet.create({
   emptyContent: {
     alignItems: 'center',
   },
-  emptyIconOuter: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-  },
   emptyIcon: {
     width: 72,
     height: 72,
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 20,
   },
   emptyTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '700',
     marginBottom: 8,
-    letterSpacing: -0.5,
   },
   emptyDesc: {
     fontSize: 15,
     textAlign: 'center',
-    marginBottom: 32,
-    lineHeight: 22,
+    marginBottom: 28,
   },
   emptyActions: {
     gap: 12,
   },
   emptyBtn: {
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 14,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 12,
   },
   emptyBtnText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   emptyBtnSecondary: {
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 14,
-    borderWidth: 1.5,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
   },
   emptyBtnSecondaryText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   // Picker Modals
   pickerOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',
   },
   pickerSheet: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     paddingTop: 8,
+  },
+  pickerGrabber: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 8,
   },
   pickerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingVertical: 18,
-    borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(128,128,128,0.15)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  pickerCancel: {
+    fontSize: 16,
   },
   pickerTitle: {
     fontSize: 17,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+    fontWeight: '600',
   },
   pickerDone: {
     fontSize: 16,
     fontWeight: '600',
   },
   picker: {
-    height: 220,
-    marginVertical: 8,
+    height: 200,
   },
 });

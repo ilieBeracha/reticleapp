@@ -12,11 +12,11 @@ import { useColors } from '@/hooks/ui/useColors';
 import { ActivityIndicator, RefreshControl, ScrollView, View } from 'react-native';
 import { styles } from './UnifiedHomePage.styles';
 import {
-  CoachMessage,
-  HomeHeader,
-  PersonalSection,
-  RecentActivitySection,
-  TeamSection,
+    CoachMessage,
+    HomeHeader,
+    PersonalSection,
+    RecentActivitySection,
+    TeamSection,
 } from './components';
 import { useUnifiedHomePage } from './useUnifiedHomePage';
 
@@ -51,7 +51,6 @@ export function UnifiedHomePage() {
     onRefresh,
     handleStartSession,
     handleActiveSessionPress,
-    handleCancelSession,
     handleSessionPress,
     handleTrainingPress,
   } = useUnifiedHomePage();
@@ -115,7 +114,6 @@ export function UnifiedHomePage() {
           starting={starting}
           colors={colors}
           onActiveSessionPress={handleActiveSessionPress}
-          onCancelSession={handleCancelSession}
           onStartSession={handleStartSession}
         />
 

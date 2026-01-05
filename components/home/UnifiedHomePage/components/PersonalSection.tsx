@@ -4,13 +4,14 @@
  * Displays either active session or start practice card, plus weekly stats.
  */
 
+import React from 'react';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { HomeSession } from '../../types';
 import { styles } from '../UnifiedHomePage.styles';
-import type { Colors, WeeklyStats } from '../UnifiedHomePage.types';
 import { ActiveSessionCard } from './ActiveSessionCard';
 import { StartPracticeCard } from './StartPracticeCard';
 import { WeeklyStatsCard } from './WeeklyStatsCard';
+import type { HomeSession } from '../../types';
+import type { Colors, WeeklyStats } from '../UnifiedHomePage.types';
 
 interface PersonalSectionProps {
   activeSession: HomeSession | null;
@@ -21,7 +22,6 @@ interface PersonalSectionProps {
   starting: boolean;
   colors: Colors;
   onActiveSessionPress: () => void;
-  onCancelSession?: () => void;
   onStartSession: () => void;
 }
 
@@ -34,7 +34,6 @@ export function PersonalSection({
   starting,
   colors,
   onActiveSessionPress,
-  onCancelSession,
   onStartSession,
 }: PersonalSectionProps) {
   return (
@@ -45,7 +44,6 @@ export function PersonalSection({
           session={activeSession}
           colors={colors}
           onPress={onActiveSessionPress}
-          onCancel={onCancelSession}
         />
       ) : (
         <StartPracticeCard

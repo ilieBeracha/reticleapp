@@ -1,10 +1,9 @@
 /**
- * CREATE SESSION - 2-Step Flow
+ * CREATE SESSION - 3-Step Flow
  *
- * 1. Intent - What's your goal?
- * 2. Details - Session details (distance, rounds, drill)
- *
- * Weapon is auto-selected from default or shown as a badge in step 2.
+ * 1. Intent - What's my goal?
+ * 2. Weapon - Which weapon?
+ * 3. Context - Session details (distance, rounds, drill)
  */
 
 import { DrillPresetPicker, PresetForm } from '@/components/drills';
@@ -239,14 +238,13 @@ export default function CreateSessionScreen() {
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────
 
-  // 2 user-facing steps: Goal → Details (weapon is auto-selected or shown as badge)
-  const stepNumber = creation.state.step === 'intent' ? 1 : 2;
-  const stepLabels = ['Goal', 'Details'];
+  const stepNumber = creation.state.step === 'intent' ? 1 : creation.state.step === 'weapon' ? 2 : 3;
+  const stepLabels = ['Goal', 'Weapon', 'Details'];
 
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={[styles.scrollContent]}
+      contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
@@ -264,9 +262,9 @@ export default function CreateSessionScreen() {
           <View style={styles.backButtonPlaceholder} />
         )}
 
-        {/* Step progress with labels - 2 steps */}
+        {/* Step progress with labels */}
         <View style={styles.progressContainer}>
-          {[1, 2].map((step, idx) => (
+          {[1, 2, 3].map((step, idx) => (
             <View key={step} style={styles.progressItem}>
               <View
                 style={[
@@ -285,7 +283,7 @@ export default function CreateSessionScreen() {
               >
                 {stepLabels[idx]}
               </Text>
-              {idx < 1 && (
+              {idx < 2 && (
                 <View
                   style={[
                     styles.progressLine,
@@ -319,15 +317,35 @@ export default function CreateSessionScreen() {
       )}
 
       {creation.state.step === 'context' && (
-        <SessionContextStep
-          purpose={creation.state.purpose!}
-          context={creation.state.context}
-          onUpdateContext={creation.updateContext}
-          onBack={creation.goBack}
-          weaponCategory={selectedPreset?.weapon_category as any}
-          selectedDrillId={creation.state.selectedDrillId}
-          onDrillChange={creation.setDrill}
-        />
+        <>
+          {/* Step 3 header with weapon badge */}
+          <View style={styles.step2Header}>
+            <Text style={[styles.step2Title, { color: colors.text }]}>
+              Session details
+            </Text>
+            <TouchableOpacity
+              style={[styles.weaponBadge, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={creation.goBack}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.weaponBadgeLabel, { color: colors.textMuted }]}>
+                Weapon
+              </Text>
+              <Text style={[styles.weaponBadgeName, { color: colors.text }]} numberOfLines={1}>
+                {creation.state.context.weaponName || 'Select'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <SessionContextStep
+            purpose={creation.state.purpose!}
+            context={creation.state.context}
+            onUpdateContext={creation.updateContext}
+            onBack={creation.goBack}
+            weaponCategory={selectedPreset?.weapon_category as any}
+            selectedDrillId={creation.state.selectedDrillId}
+            onDrillChange={creation.setDrill}
+          />
+        </>
       )}
 
       {/* Spacer - pushes button to bottom when content is short */}
@@ -408,28 +426,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-
+    flexGrow: 1,
     paddingHorizontal: 20,
+    paddingTop: 12,
   },
-  
-  // ─────────────────────────────────────────────────────────────────────────
-  // PAGE TITLE
-  // ─────────────────────────────────────────────────────────────────────────
-  pageTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-    marginBottom: 20,
-  },
-  
-  // ─────────────────────────────────────────────────────────────────────────
-  // HEADER & PROGRESS
-  // ─────────────────────────────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   backButton: {
     width: 36,
@@ -441,10 +446,13 @@ const styles = StyleSheet.create({
   backButtonPlaceholder: {
     width: 36,
   },
+  
+  // Progress indicator
   progressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 4,
     flex: 1,
   },
   progressItem: {
@@ -467,13 +475,51 @@ const styles = StyleSheet.create({
     width: 24,
     height: 2,
     marginHorizontal: 8,
+    marginVertical: 4,
     borderRadius: 1,
   },
 
-  
-  // ─────────────────────────────────────────────────────────────────────────
-  // LOADING
-  // ─────────────────────────────────────────────────────────────────────────
+  step2Header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    paddingTop: 4,
+  },
+  step2Title: {
+    fontSize: 22,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+  },
+  purposeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 4,
+  },
+  purposeBadgeText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  weaponBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    maxWidth: 140,
+  },
+  weaponBadgeLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  weaponBadgeName: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -483,10 +529,6 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 14,
   },
-  
-  // ─────────────────────────────────────────────────────────────────────────
-  // BUTTON
-  // ─────────────────────────────────────────────────────────────────────────
   spacer: {
     flexGrow: 1,
     minHeight: 24,
