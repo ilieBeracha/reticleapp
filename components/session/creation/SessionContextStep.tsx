@@ -70,7 +70,11 @@ function PillPicker({
 
   const handleCustomSubmit = () => {
     const num = parseInt(customText, 10);
-    if (!isNaN(num) && num > 0) onSelect(num);
+    console.log('[PillPicker] handleCustomSubmit:', { customText, num, isValid: !isNaN(num) && num > 0 });
+    if (!isNaN(num) && num > 0) {
+      console.log('[PillPicker] Calling onSelect with:', num);
+      onSelect(num);
+    }
     setEditing(false);
   };
 
@@ -86,7 +90,9 @@ function PillPicker({
               style={[
                 styles.pill,
                 { backgroundColor: active ? colors.text : colors.card },
+                editing && { opacity: 0.5 },
               ]}
+              disabled={editing}
               onPress={() => { Haptics.selectionAsync(); onSelect(opt); setEditing(false); }}
             >
               <Text style={[styles.pillText, { color: active ? colors.background : colors.text }]}>
@@ -428,7 +434,10 @@ export function SessionContextStep({
                 <PillPicker
                   options={shotsPresets.slice(0, 4)}
                   selected={context.shotsPlanned}
-                  onSelect={(s) => onUpdateContext({ shotsPlanned: s })}
+                  onSelect={(s) => {
+                    console.log('[SessionContextStep] Bullets onSelect:', s, 'current:', context.shotsPlanned);
+                    onUpdateContext({ shotsPlanned: s });
+                  }}
                   allowCustom
                 />
               </View>
@@ -474,7 +483,10 @@ export function SessionContextStep({
             <PillPicker
               options={shotsPresets.slice(0, 4)}
               selected={context.shotsPlanned}
-              onSelect={(s) => onUpdateContext({ shotsPlanned: s })}
+              onSelect={(s) => {
+                console.log('[SessionContextStep] Bullets (custom) onSelect:', s, 'current:', context.shotsPlanned);
+                onUpdateContext({ shotsPlanned: s });
+              }}
               allowCustom
             />
           </View>

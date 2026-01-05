@@ -47,6 +47,21 @@ export {
     sendMessage,
     sendMessageWithRetry,
     // Session helpers
-    startWatchSession, subscribe, syncDrillToWatch
+    startWatchSession, subscribe, syncDrillToWatch,
+    // Diagnostics
+    exportDiagnostics,
+    exportDiagnosticsAsText,
+    clearDiagnostics,
+    getConnectionHealth,
+    getHeartbeatState,
 } from '../garminService';
+
+// Re-export diagnostic types
+export type {
+    DiagnosticMessage,
+    DiagnosticError,
+    HeartbeatState,
+    ConnectionHealth,
+    DiagnosticExport,
+} from './garmin.diagnostics';
 

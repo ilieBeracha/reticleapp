@@ -254,10 +254,15 @@ export function useSessionCreation(
   }, []);
   
   const updateContext = useCallback((partial: Partial<SessionContextState>) => {
-    setState((s) => ({
-      ...s,
-      context: { ...s.context, ...partial },
-    }));
+    console.log('[useSessionCreation] updateContext called with:', partial);
+    setState((s) => {
+      const newContext = { ...s.context, ...partial };
+      console.log('[useSessionCreation] New context:', { shotsPlanned: newContext.shotsPlanned, distance: newContext.distance });
+      return {
+        ...s,
+        context: newContext,
+      };
+    });
   }, []);
   
   // ─────────────────────────────────────────────────────────────────────────
@@ -338,6 +343,7 @@ export function useSessionCreation(
   
   const buildConfig = useCallback((): BaseSessionConfig => {
     const { purpose, context, selectedDrillId, isDrillLocked } = state;
+    console.log('[useSessionCreation] buildConfig - context:', { shotsPlanned: context.shotsPlanned, distance: context.distance });
     
     // For solo sessions, always use inline drill_config
     // Presets update context values, so we build config from context

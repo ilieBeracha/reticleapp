@@ -33,6 +33,21 @@ import { TimelineChunkAssembler } from './session/watchDataTransformer';
 // Import message handlers
 import { routeMessage, type MessageHandlerContext } from './garmin/garmin.handlers';
 
+// Import diagnostics
+import {
+  logOutboundMessage,
+  logInboundMessage,
+  logError,
+  startHeartbeat,
+  stopHeartbeat,
+  onHeartbeatResponse,
+  exportDiagnostics,
+  exportDiagnosticsAsText,
+  clearDiagnostics,
+  getConnectionHealth,
+  getHeartbeatState,
+} from './garmin/garmin.diagnostics';
+
 // ============================================================================
 // TYPES (re-exported from garmin.types.ts)
 // ============================================================================
@@ -228,6 +243,22 @@ const statusSub = emitter.addListener('onDeviceStatusChanged', (event: any) => {
   const reason = event.reason || '';
   console.log(`[GarminService] 📱 Status: ${status}${reason ? ` (${reason})` : ''}`);
 
+  // Heartbeat disabled - session completion now detected via TIMELINE_COMPLETE
+  // The heartbeat added overhead without much benefit for our use case.
+  // Keep the code in garmin.diagnostics.ts for future debugging if needed.
+  // 
+  // if (status === 'CONNECTED') {
+  //   startHeartbeat(
+  //     () => sendMessage('HEARTBEAT', { timestamp: Date.now() }),
+  //     () => {
+  //       console.warn('[GarminService] 💔 Heartbeat timeout - connection may be stale');
+  //       emit({ event: 'error', error: new Error('Heartbeat timeout - connection stale') });
+  //     }
+  //   );
+  // } else {
+  //   stopHeartbeat();
+  // }
+
   currentStatus = status;
   emit({ event: 'status_changed', status, reason });
 });
@@ -259,6 +290,27 @@ const msgSub = emitter.addListener('onMessage', (raw: any) => {
     timestamp: Date.now(),
   };
 
+  // Log inbound message for diagnostics
+  logInboundMessage(message.type, parsedPayload);
+
+  // Handle HEARTBEAT_ACK (or PONG as legacy response)
+  if (message.type === 'HEARTBEAT_ACK' || message.type === 'PONG') {
+    onHeartbeatResponse(parsedPayload);
+    
+    // Emit heartbeat state so store can track watch state
+    // This enables session completion detection when watch goes idle
+    if (parsedPayload) {
+      emit({
+        event: 'heartbeat_state',
+        state: parsedPayload.state as string,
+        sessionId: parsedPayload.sessionId as string,
+        shotCount: parsedPayload.shotCount as number,
+        syncPhase: parsedPayload.syncPhase as number,
+      });
+    }
+    return;
+  }
+
   console.log('[GarminService] 📩 Emitting message_received:', message.type);
   emit({ event: 'message_received', message });
 
@@ -278,6 +330,7 @@ const msgSub = emitter.addListener('onMessage', (raw: any) => {
 // Errors
 const errSub = emitter.addListener('onError', (error: any) => {
   console.error('[GarminService] ❌ Error:', error);
+  logError('NativeSDK', error);
   emit({ event: 'error', error: new Error(String(error)) });
 });
 
@@ -287,6 +340,7 @@ sdkInitialize(urlScheme);
 // Cleanup function
 return () => {
   console.log('[GarminService] Cleaning up...');
+  stopHeartbeat();
   sdkSub.remove();
   statusSub.remove();
   msgSub.remove();
@@ -353,13 +407,23 @@ showDevicesList();
 export function sendMessage(type: GarminOutboundMessageType | string, payload?: unknown): boolean {
 if (currentStatus !== 'CONNECTED') {
   console.log('[GarminService] Cannot send - status:', currentStatus);
+  logOutboundMessage(type, payload, false, 'Not connected');
   return false;
 }
 
 const message = JSON.stringify({ type, payload });
 console.log('[GarminService] 📤 Sending:', message);
-sdkSendMessage(message);
-return true;
+
+try {
+  sdkSendMessage(message);
+  logOutboundMessage(type, payload, true);
+  return true;
+} catch (err) {
+  const errorMsg = err instanceof Error ? err.message : String(err);
+  logOutboundMessage(type, payload, false, errorMsg);
+  logError('sendMessage', err instanceof Error ? err : new Error(errorMsg));
+  return false;
+}
 }
 
 // ============================================================================
@@ -584,3 +648,15 @@ return pairedDevices;
 export function isConnected(): boolean {
 return currentStatus === 'CONNECTED';
 }
+
+// ============================================================================
+// DIAGNOSTICS (connection health, message logs, export)
+// ============================================================================
+
+export {
+  exportDiagnostics,
+  exportDiagnosticsAsText,
+  clearDiagnostics,
+  getConnectionHealth,
+  getHeartbeatState,
+};

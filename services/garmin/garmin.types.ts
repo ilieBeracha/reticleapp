@@ -34,6 +34,7 @@ export type GarminOutboundMessageType =
   | 'SESSION_END'    // End session on watch (watch expects this exact string)
   | 'SYNC_DRILL'
   | 'PING'
+  | 'HEARTBEAT'      // Connection health check (watch responds with HEARTBEAT_ACK)
   | 'WEATHER'        // Send weather data to watch
   | 'ACK';           // Acknowledge receipt of SESSION_RESULT/SUMMARY/TIMELINE
 
@@ -47,6 +48,7 @@ export type GarminInboundMessageType =
   | 'SHOT_RECORDED'
   | 'SESSION_ENDED'
   | 'HEARTBEAT'
+  | 'HEARTBEAT_ACK'   // Response to HEARTBEAT with connection health
   | 'PONG';
 
 // ============================================================================

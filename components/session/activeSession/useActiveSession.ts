@@ -55,6 +55,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     send: sendToGarmin,
     lastSessionData,
     setSessionDataCallback,
+    setWatchSessionCompleteCallback,
     clearLastSessionData,
     startSessionWithRetry,
     resetSessionStartStatus,
@@ -244,7 +245,8 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       caliber: weaponInfo?.caliber,
     });
     
-    console.log(`[Garmin] 🎯 Detection config: ${detectionConfig.sensitivity}G (${detectionConfig.description})`);
+    console.log(`[Garmin] 🎯 Weapon: ${weaponInfo?.caliber || 'unknown'} (${weaponInfo?.category || 'any'})`);
+    console.log(`[Garmin] 🎯 Detection: ${detectionConfig.sensitivity}G, cooldown=${detectionConfig.cooldownMs}ms, profile=${detectionConfig.profile} (${detectionConfig.description})`);
 
     const payload = buildWatchSessionPayload(session, {
       autoDetect: true,
@@ -394,6 +396,38 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       setSessionDataCallback(null);
     };
   }, [sessionId, session?.team_id, session?.training_id, setSessionDataCallback, clearLastSessionData]);
+
+  // ============================================================================
+  // WATCH SESSION COMPLETE DETECTION (via heartbeat state)
+  // When watch goes from active/preview to idle, session is complete
+  // This catches completion even if SESSION_SUMMARY was lost
+  // ============================================================================
+  useEffect(() => {
+    if (!sessionId || !isWatchConnected) return;
+
+    const handleWatchSessionComplete = (watchSessionId: string, shotCount: number) => {
+      console.log(`[ActiveSession] 🏁 Watch session complete: ${watchSessionId}, shots: ${shotCount}`);
+      
+      // Only process if this is our session
+      if (watchSessionId !== sessionId) {
+        console.log(`[ActiveSession] ⚠️ Session ID mismatch (expected: ${sessionId})`);
+        return;
+      }
+
+      // Reload data to get latest from DB (timeline should be saved by now)
+      console.log('[ActiveSession] 🔄 Reloading session data after watch completion...');
+      loadData();
+
+      // Show completion feedback
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    };
+
+    setWatchSessionCompleteCallback(handleWatchSessionComplete);
+
+    return () => {
+      setWatchSessionCompleteCallback(null);
+    };
+  }, [sessionId, isWatchConnected, setWatchSessionCompleteCallback, loadData]);
 
   // ============================================================================
   // AUTO-COMPLETION DETECTION

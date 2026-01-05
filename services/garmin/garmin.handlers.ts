@@ -49,6 +49,65 @@ export interface MessageHandlerContext {
 }
 
 // ============================================================================
+// ACK SENDING WITH RETRY
+// ============================================================================
+
+/**
+ * ACK retry configuration
+ */
+const ACK_RETRY_CONFIG = {
+    maxRetries: 5,
+    initialDelayMs: 150,      // Start with 150ms delay
+    maxDelayMs: 2000,         // Cap at 2 seconds
+    backoffMultiplier: 1.5,   // Exponential backoff factor
+};
+
+/**
+ * Send an ACK message with retry logic and exponential backoff.
+ * This handles transient "Failure_InternalError" from ConnectIQ SDK.
+ */
+export function sendAckWithRetry(
+    ctx: MessageHandlerContext,
+    ackPayload: Record<string, unknown>,
+    ackType: string,
+    attempt: number = 1
+): void {
+    const { maxRetries, initialDelayMs, maxDelayMs, backoffMultiplier } = ACK_RETRY_CONFIG;
+    
+    // Calculate delay with exponential backoff
+    const delay = Math.min(
+        initialDelayMs * Math.pow(backoffMultiplier, attempt - 1),
+        maxDelayMs
+    );
+    
+    setTimeout(() => {
+        try {
+            const success = ctx.sendMessage('ACK', ackPayload);
+            
+            if (success) {
+                console.log(`[GarminHandlers] ✅ ${ackType} ACK sent successfully${attempt > 1 ? ` (attempt ${attempt})` : ''}`);
+            } else {
+                // sendMessage returned false - not connected
+                if (attempt < maxRetries) {
+                    console.warn(`[GarminHandlers] ⚠️ ${ackType} ACK failed (not connected), retry ${attempt + 1}/${maxRetries} in ${Math.round(delay * backoffMultiplier)}ms`);
+                    sendAckWithRetry(ctx, ackPayload, ackType, attempt + 1);
+                } else {
+                    console.error(`[GarminHandlers] ❌ ${ackType} ACK failed after ${maxRetries} attempts - watch will retry`);
+                }
+            }
+        } catch (error) {
+            // Exception during send
+            if (attempt < maxRetries) {
+                console.warn(`[GarminHandlers] ⚠️ ${ackType} ACK error: ${error}, retry ${attempt + 1}/${maxRetries}`);
+                sendAckWithRetry(ctx, ackPayload, ackType, attempt + 1);
+            } else {
+                console.error(`[GarminHandlers] ❌ ${ackType} ACK failed after ${maxRetries} attempts:`, error);
+            }
+        }
+    }, delay);
+}
+
+// ============================================================================
 // ACK HANDLER
 // ============================================================================
 
@@ -263,18 +322,11 @@ export function handleSessionSummaryMessage(
     const sessionIdForAck = transformedData.sessionId;
     if (sessionIdForAck) {
         console.log('[GarminHandlers] 📤 Sending SUMMARY ACK for sessionId:', sessionIdForAck);
-        setTimeout(() => {
-            const ackSent = ctx.sendMessage('ACK', {
-                sessionId: sessionIdForAck,
-                type: 'summary',
-                status: 'received',
-            });
-            if (ackSent) {
-                console.log('[GarminHandlers] ✅ SUMMARY ACK sent successfully');
-            } else {
-                console.warn('[GarminHandlers] ⚠️ Failed to send SUMMARY ACK');
-            }
-        }, 100);
+        sendAckWithRetry(ctx, {
+            sessionId: sessionIdForAck,
+            type: 'summary',
+            status: 'received',
+        }, 'SUMMARY');
     }
 }
 
@@ -375,18 +427,11 @@ export function handleSessionDetailsMessage(
     // Send ACK with type: "details" so watch clears storage
     if (sessionId) {
         console.log('[GarminHandlers] 📤 Sending DETAILS ACK for sessionId:', sessionId);
-        setTimeout(() => {
-            const ackSent = ctx.sendMessage('ACK', {
-                sessionId,
-                type: 'details',
-                status: 'received',
-            });
-            if (ackSent) {
-                console.log('[GarminHandlers] ✅ DETAILS ACK sent successfully');
-            } else {
-                console.warn('[GarminHandlers] ⚠️ Failed to send DETAILS ACK');
-            }
-        }, 100);
+        sendAckWithRetry(ctx, {
+            sessionId,
+            type: 'details',
+            status: 'received',
+        }, 'DETAILS');
     }
 }
 
@@ -422,22 +467,15 @@ export function handleTimelineChunkMessage(
     // Add to assembler and check if complete
     const assembledData = ctx.timelineAssembler.addChunk(chunkPayload);
 
-    // Send ACK for this chunk
+    // Send ACK for this chunk with retry
     if (sid) {
         console.log(`[GarminHandlers] 📤 Sending TIMELINE ACK for chunk ${chunkIndex + 1}/${total}`);
-        setTimeout(() => {
-            const ackSent = ctx.sendMessage('ACK', {
-                sessionId: sid,
-                type: 'timeline',
-                chunk: chunkIndex,
-                status: 'received',
-            });
-            if (ackSent) {
-                console.log('[GarminHandlers] ✅ TIMELINE ACK sent successfully');
-            } else {
-                console.warn('[GarminHandlers] ⚠️ Failed to send TIMELINE ACK');
-            }
-        }, 100);
+        sendAckWithRetry(ctx, {
+            sessionId: sid,
+            type: 'timeline',
+            chunk: chunkIndex,
+            status: 'received',
+        }, `TIMELINE chunk ${chunkIndex + 1}/${total}`);
     }
 
     // If all chunks received, emit complete event
@@ -488,19 +526,10 @@ function sendSessionAck(
 ): void {
     if (sessionId) {
         console.log('[GarminHandlers] 📤 Sending ACK for sessionId:', sessionId);
-        const ackPayload = {
+        sendAckWithRetry(ctx, {
             sessionId,
             received: true,
-        };
-        // Use setTimeout to ensure this happens after the current event processing
-        setTimeout(() => {
-            const ackSent = ctx.sendMessage('ACK', ackPayload);
-            if (ackSent) {
-                console.log('[GarminHandlers] ✅ ACK sent successfully');
-            } else {
-                console.warn('[GarminHandlers] ⚠️ Failed to send ACK (not connected?)');
-            }
-        }, 100);
+        }, 'SESSION');
     } else {
         console.warn('[GarminHandlers] ⚠️ No sessionId in payload, cannot send ACK');
     }

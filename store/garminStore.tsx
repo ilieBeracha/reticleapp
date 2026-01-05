@@ -86,9 +86,20 @@ interface GarminState {
   lastTimelineData: GarminTimelineData | null;
   timelineProgress: { chunk: number; total: number } | null;
 
+  // Watch heartbeat state (from HEARTBEAT_ACK)
+  watchState: {
+    state: 'idle' | 'preview' | 'active' | 'syncing' | 'unknown';
+    sessionId: string | null;
+    shotCount: number;
+    syncPhase: number;
+    lastUpdate: number;
+  };
+
   // Callbacks for session data (set by active session screen)
   onSessionData: ((data: GarminSessionData) => void) | null;
   onTimelineComplete: ((data: GarminTimelineData) => void) | null;
+  /** Called when watch session completes (state goes from active to idle) */
+  onWatchSessionComplete: ((sessionId: string, shotCount: number) => void) | null;
 
   // ---------------------------------------------------------------------------
   // Session Start Retry State
@@ -130,6 +141,7 @@ interface GarminState {
   // Callback registration
   setSessionDataCallback: (callback: ((data: GarminSessionData) => void) | null) => void;
   setTimelineCompleteCallback: (callback: ((data: GarminTimelineData) => void) | null) => void;
+  setWatchSessionCompleteCallback: (callback: ((sessionId: string, shotCount: number) => void) | null) => void;
   clearTimelineData: () => void;
 
   // Internal: called by initialization hook
@@ -154,8 +166,16 @@ export const useGarminStore = create<GarminState>((set, get) => ({
   lastSessionData: null,
   lastTimelineData: null,
   timelineProgress: null,
+  watchState: {
+    state: 'unknown',
+    sessionId: null,
+    shotCount: 0,
+    syncPhase: 0,
+    lastUpdate: 0,
+  },
   onSessionData: null,
   onTimelineComplete: null,
+  onWatchSessionComplete: null,
   sessionStartStatus: 'idle',
   sessionStartAttempts: 0,
 
@@ -266,6 +286,10 @@ export const useGarminStore = create<GarminState>((set, get) => ({
     set({ onTimelineComplete: callback });
   },
 
+  setWatchSessionCompleteCallback: (callback) => {
+    set({ onWatchSessionComplete: callback });
+  },
+
   clearTimelineData: () => {
     set({ lastTimelineData: null, timelineProgress: null });
   },
@@ -374,6 +398,15 @@ export function useGarminInitialize() {
             if (store.onSessionData) {
               store.onSessionData(event.data);
             }
+            
+            // SESSION_SUMMARY = session is DONE! (Timeline syncs in background)
+            // This is Phase 1 - instant, user shouldn't wait for timeline
+            if (event.data?.completed && event.data?.sessionId) {
+              console.log('[GarminStore] 🏁 Session complete (from SESSION_SUMMARY)');
+              if (store.onWatchSessionComplete) {
+                store.onWatchSessionComplete(event.data.sessionId, event.data.shotsRecorded || 0);
+              }
+            }
             break;
 
           // =========================================================================
@@ -473,20 +506,61 @@ export function useGarminInitialize() {
               store.onTimelineComplete(event.data);
             }
             
-            // Save to database
+            // Save to database (background - user already sees results from SESSION_SUMMARY)
             const timelineSessionId = event.data.sessionId;
             if (timelineSessionId) {
               console.log('[GarminStore] 📩 Saving timeline to DB...');
               saveSessionTimeline(event.data)
                 .then((saved) => {
                   console.log('[GarminStore] ✅ Timeline saved to DB:', saved.id);
-                  // TODO: Show toast "Biometric timeline synced ✓"
+                  // Timeline syncs silently - session completion already triggered by SESSION_SUMMARY
                 })
                 .catch((err) => {
                   console.error('[GarminStore] ❌ Error saving timeline to DB:', err);
                 });
             }
             break;
+
+          // =========================================================================
+          // HEARTBEAT STATE (Watch state from HEARTBEAT_ACK)
+          // =========================================================================
+          case 'heartbeat_state': {
+            const prevState = store.watchState;
+            const newState = event.state as 'idle' | 'preview' | 'active' | 'syncing' | 'unknown';
+            const sessionId = event.sessionId as string;
+            const shotCount = event.shotCount as number;
+            const syncPhase = event.syncPhase as number;
+
+            // Update watch state
+            useGarminStore.setState({
+              watchState: {
+                state: newState,
+                sessionId,
+                shotCount,
+                syncPhase,
+                lastUpdate: Date.now(),
+              },
+            });
+
+            // Detect session completion:
+            // - active/syncing → idle means shooting done AND sync complete
+            // - We also check if session ID matches to avoid false triggers on new sessions
+            const wasActive = prevState.state === 'active' || prevState.state === 'preview' || prevState.state === 'syncing';
+            const isNowIdle = newState === 'idle';
+            const sameSession = prevState.sessionId === sessionId || (prevState.sessionId && sessionId === '');
+
+            if (wasActive && isNowIdle && sameSession) {
+              const finalSessionId = prevState.sessionId || sessionId;
+              console.log('[GarminStore] 🏁 Watch session complete detected! (state: active/syncing → idle)');
+              console.log(`[GarminStore] 🏁 Session: ${finalSessionId}, Shots: ${shotCount}`);
+
+              // Call registered callback
+              if (store.onWatchSessionComplete && finalSessionId) {
+                store.onWatchSessionComplete(finalSessionId, shotCount);
+              }
+            }
+            break;
+          }
 
           case 'error':
             console.error('[GarminStore] Service error:', event.error);
