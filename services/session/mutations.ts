@@ -688,6 +688,8 @@ export interface WatchSessionData {
       maxHR?: number;
       avgHR?: number;
       avgBreathRate?: number;
+      /** Breathing source: "native" = device sensor, "estimated" = HRV-derived, "none" = unavailable */
+      breathingSource?: 'native' | 'estimated' | 'none';
       hrSamples?: number;
       breathSamples?: number;
       shotCount?: number;
@@ -843,6 +845,8 @@ export async function saveWatchSessionData(
         min: data.biometrics.summary.minHR,
       };
       targetData.avg_breath_rate = data.biometrics.summary.avgBreathRate;
+      // Breathing source: "native" = device sensor, "estimated" = HRV-derived, "none" = unavailable
+      targetData.breathing_source = data.biometrics.summary.breathingSource ?? 'estimated';
       // Stress data at top level
       targetData.stress = {
         avg: data.biometrics.summary.stressAvg,
@@ -1067,6 +1071,8 @@ export async function mergeWatchSessionDetails(
         min: details.biometrics.summary.minHR,
       };
       detailsToMerge.avg_breath_rate = details.biometrics.summary.avgBreathRate;
+      // Breathing source: "native" = device sensor, "estimated" = HRV-derived, "none" = unavailable
+      detailsToMerge.breathing_source = details.biometrics.summary.breathingSource ?? 'estimated';
       detailsToMerge.stress = {
         avg: details.biometrics.summary.stressAvg,
         min: details.biometrics.summary.stressMin,

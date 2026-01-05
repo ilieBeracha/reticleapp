@@ -1,9 +1,15 @@
 /**
  * Session Detail Sheet
  * 
- * Shows session summary, stats, and image previews.
+ * Redesigned to focus on actionable insights from reliable watch data.
  * Opens as a formSheet modal above tabs.
  */
+import {
+  calculateHRInsights,
+  formatTimeMs,
+  SessionTimelineChart,
+  useSessionTimeline,
+} from '@/components/session/timeline';
 import { useColors } from '@/hooks/ui/useColors';
 import {
   calculateSessionStats,
@@ -13,25 +19,21 @@ import {
   type SessionTargetWithResults,
   type SessionWithDetails,
 } from '@/services/sessionService';
-import { useSessionTimeline } from '@/components/session/timeline/useSessionTimeline';
 import { format, intervalToDuration } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   Activity,
+  Crosshair as AimIcon,
+  AlertTriangle,
   ArrowDown,
   ArrowUp,
-  Crosshair as AimIcon,
-  Award,
   Calendar,
   ChevronRight,
   Clock,
-  Crosshair,
   Focus,
   Heart,
   Ruler,
-  Scan,
-  Settings2,
   Target,
   Timer,
   TrendingDown,
@@ -39,7 +41,7 @@ import {
   Users,
   Watch,
   Wind,
-  Zap,
+  Zap
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -52,14 +54,12 @@ import {
   View,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IMAGE_SIZE = (SCREEN_WIDTH - 64) / 3;
 
 export default function SessionDetailScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
 
   const [session, setSession] = useState<SessionWithDetails | null>(null);
@@ -124,19 +124,6 @@ export default function SessionDetailScreen() {
     );
   }, [targets]);
 
-  // Count scan vs manual entries
-  const entryBreakdown = useMemo(() => {
-    let scanned = 0;
-    let manual = 0;
-    targets.forEach((t) => {
-      if (t.target_type === 'paper' && t.paper_result?.paper_type === 'achievement') {
-        if (t.paper_result?.scanned_image_url) scanned++;
-        else manual++;
-      }
-    });
-    return { scanned, manual };
-  }, [targets]);
-
   // Extract watch/biometrics data from targets
   const watchData = useMemo(() => {
     const watchTarget = targets.find(
@@ -145,90 +132,123 @@ export default function SessionDetailScreen() {
     if (!watchTarget) return null;
     
     const data = watchTarget.target_data as any;
+    
+    // Get breathing source - only show if native sensor
+    const breathSource = data.breathing_source ?? data.biometrics?.summary?.breathingSource ?? 'estimated';
+    const hasReliableBreathing = breathSource === 'native';
+    
     return {
+      // Heart Rate (reliable)
       heartRate: data.heart_rate as { avg?: number; max?: number; min?: number } | undefined,
-      avgBreathRate: data.avg_breath_rate as number | undefined,
-      biometrics: data.biometrics as {
-        summary?: any;
-        hr_timeline?: [number, number, number][];
-        breath_timeline?: [number, number, number][];
-        shot_biometrics?: any[];
-      } | undefined,
+      hrStart: data.biometrics?.summary?.startHR as number | undefined,
+      hrEnd: data.biometrics?.summary?.endHR as number | undefined,
+      
+      // Stress (reliable - HRV based)
+      stress: data.stress as { avg?: number; min?: number; max?: number; trend?: string } | undefined,
+      
+      // Breathing (only if native sensor)
+      avgBreathRate: hasReliableBreathing ? (data.avg_breath_rate as number | undefined) : undefined,
+      breathingSource: breathSource as 'native' | 'estimated' | 'none',
+      hasReliableBreathing,
+      
+      // Steadiness (reliable)
       steadiness: data.steadiness as {
         avg_score?: number;
         shot_count?: number;
         trend?: string;
-        shots?: any[];
+        flinch_count?: number;
+        flinch_rate?: number;
+        recoil_consistency?: number;
+        best_shot?: number;
+        best_score?: number;
+        worst_shot?: number;
+        worst_score?: number;
       } | undefined,
+      
+      // Performance (reliable)
       splits: data.splits as number[] | undefined,
       avgSplitMs: data.avg_split_ms as number | undefined,
       fastestSplitMs: data.fastest_split_ms as number | undefined,
       slowestSplitMs: data.slowest_split_ms as number | undefined,
-      shotTimestamps: data.shot_timestamps as number[] | undefined,
+      firstShotTimeMs: data.performance?.first_shot_time as number | undefined,
+      shotsPerMinute: data.performance?.spm ? (data.performance.spm as number) / 10 : undefined,
+      
+      // Detection info
+      autoDetected: data.auto_detected as boolean | undefined,
+      sensitivity: data.detection_sensitivity as number | undefined,
+      
+      // Duration
       durationMs: data.duration_ms as number | undefined,
+      shotCount: data.shots_recorded as number | undefined,
     };
   }, [targets]);
 
   // ============================================================================
-  // TIMELINE INSIGHTS (from saved timeline data)
+  // COMPUTED INSIGHTS (using shared analytics helpers)
   // ============================================================================
-  const timelineInsights = useMemo(() => {
-    if (!timeline || !timeline.shotDetails || timeline.shotDetails.length < 2) {
-      return null;
-    }
+  
+  const hrInsights = useMemo(() => {
+    if (!watchData?.heartRate) return null;
+    return calculateHRInsights(watchData.heartRate, watchData.hrStart, watchData.hrEnd);
+  }, [watchData]);
+
+  const steadinessInsights = useMemo(() => {
+    if (!watchData?.steadiness?.avg_score) return null;
     
-    const shots = timeline.shotDetails;
-    const steadinessSum = shots.reduce((sum, s) => sum + (s.steadiness || 0), 0);
-    const hasRealSteadiness = steadinessSum > 0;
-    
-    // Performance scores (use steadiness or inverted stress as calmness)
-    const scores = hasRealSteadiness 
-      ? shots.map(s => s.steadiness)
-      : shots.map(s => Math.max(0, 100 - s.stress));
-    
-    const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-    
-    // Trend analysis (compare first half vs second half)
-    const half = Math.floor(scores.length / 2);
-    const firstHalf = scores.slice(0, half).reduce((a, b) => a + b, 0) / half;
-    const secondHalf = scores.slice(half).reduce((a, b) => a + b, 0) / (scores.length - half);
-    const trend: 'improving' | 'declining' | 'stable' = 
-      secondHalf - firstHalf > 5 ? 'improving' : 
-      secondHalf - firstHalf < -5 ? 'declining' : 'stable';
-    
-    // Breath quality
-    const pauseCount = shots.filter(s => s.breathPhase === 'pause').length;
-    const exhaleCount = shots.filter(s => s.breathPhase === 'exhale').length;
-    const inhaleCount = shots.filter(s => s.breathPhase === 'inhale').length;
-    const pausePct = Math.round((pauseCount / shots.length) * 100);
-    const exhalePct = Math.round((exhaleCount / shots.length) * 100);
-    const inhalePct = Math.round((inhaleCount / shots.length) * 100);
-    
-    // Best/worst shots
-    const maxScore = Math.max(...scores);
-    const minScore = Math.min(...scores);
-    const bestIdx = scores.indexOf(maxScore);
-    const worstIdx = scores.indexOf(minScore);
-    
-    // Flinch count
-    const flinchCount = shots.filter(s => s.flinch).length;
+    const s = watchData.steadiness;
+    const grade = (s.avg_score ?? 0) >= 80 ? 'Excellent' :
+                  (s.avg_score ?? 0) >= 60 ? 'Good' :
+                  (s.avg_score ?? 0) >= 40 ? 'Fair' : 'Needs Work';
     
     return {
-      scores,
-      avgScore,
-      trend,
-      pausePct,
-      exhalePct,
-      inhalePct,
-      usingStress: !hasRealSteadiness,
-      bestShot: shots[bestIdx].shotNumber,
-      worstShot: shots[worstIdx].shotNumber,
-      bestScore: maxScore,
-      worstScore: minScore,
-      flinchCount,
-      shots,
+      avgScore: s.avg_score,
+      grade,
+      trend: s.trend,
+      flinchCount: s.flinch_count ?? 0,
+      flinchRate: s.flinch_rate ?? 0,
+      recoilConsistency: s.recoil_consistency ?? 0,
+      bestShot: s.best_shot,
+      bestScore: s.best_score,
+      worstShot: s.worst_shot,
+      worstScore: s.worst_score,
     };
-  }, [timeline]);
+  }, [watchData]);
+
+  const timingInsights = useMemo(() => {
+    if (!watchData?.splits || watchData.splits.length === 0) return null;
+    
+    const splits = watchData.splits;
+    const firstThree = splits.slice(0, 3);
+    const lastThree = splits.slice(-3);
+    
+    const avgFirst = firstThree.length > 0 ? firstThree.reduce((a, b) => a + b, 0) / firstThree.length : 0;
+    const avgLast = lastThree.length > 0 ? lastThree.reduce((a, b) => a + b, 0) / lastThree.length : 0;
+    
+    // Fatigue indicator: are last shots slower?
+    let fatigue: 'none' | 'mild' | 'significant' = 'none';
+    if (avgLast > avgFirst * 1.2) fatigue = 'significant';
+    else if (avgLast > avgFirst * 1.1) fatigue = 'mild';
+    
+    // Consistency (coefficient of variation)
+    const mean = splits.reduce((a, b) => a + b, 0) / splits.length;
+    const variance = splits.reduce((acc, s) => acc + Math.pow(s - mean, 2), 0) / splits.length;
+    const stdDev = Math.sqrt(variance);
+    const cv = mean > 0 ? (stdDev / mean) * 100 : 0;
+    const consistency = cv < 15 ? 'Very consistent' : cv < 30 ? 'Consistent' : 'Variable';
+    
+    return {
+      firstShot: watchData.firstShotTimeMs,
+      avgSplit: watchData.avgSplitMs,
+      fastest: watchData.fastestSplitMs,
+      slowest: watchData.slowestSplitMs,
+      spm: watchData.shotsPerMinute,
+      fatigue,
+      consistency,
+      cv: Math.round(cv),
+    };
+  }, [watchData]);
+
+  // Note: Timeline analytics are now handled by SessionTimelineChart component
 
   // Calculate session duration
   const getDuration = useCallback(() => {
@@ -245,14 +265,7 @@ export default function SessionDetailScreen() {
     return parts.join(' ') || '< 1m';
   }, [session]);
 
-  const handleViewFullSession = () => {
-    if (session) {
-      router.back();
-      setTimeout(() => {
-        router.push(`/(protected)/activeSession?sessionId=${session.id}`);
-      }, 100);
-    }
-  };
+  // Use formatTimeMs from shared helpers
 
   if (loading) {
     return (
@@ -265,7 +278,6 @@ export default function SessionDetailScreen() {
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading session...</Text>
         </View>
-
       </ScrollView>
     );
   }
@@ -294,1622 +306,668 @@ export default function SessionDetailScreen() {
   const isCompleted = session.status === 'completed';
 
   return (
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingTop: 24}]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerTop}>
-            <View
-              style={[
-                styles.sourceTag,
-                { backgroundColor: session.team_id ? `${colors.green}22` : `${colors.indigo}22` },
-              ]}
-            >
-              {session.team_id ? (
-                <Users size={12} color={colors.green} />
-              ) : (
-                <Target size={12} color={colors.indigo} />
-              )}
-              <Text style={[styles.sourceText, { color: session.team_id ? colors.green : colors.indigo }]}>
-                {source}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.statusBadge,
-                { backgroundColor: isCompleted ? `${colors.green}22` : `${colors.orange}22` },
-              ]}
-            >
-              <Text style={[styles.statusText, { color: isCompleted ? colors.green : colors.orange }]}>
-                {isCompleted ? 'Completed' : 'In Progress'}
-              </Text>
-            </View>
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={[styles.scrollContent, { paddingTop: 24}]}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* ══════════════════════════════════════════════════════════════════════
+          HEADER
+      ══════════════════════════════════════════════════════════════════════ */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <View
+            style={[
+              styles.sourceTag,
+              { backgroundColor: session.team_id ? `${colors.green}22` : `${colors.indigo}22` },
+            ]}
+          >
+            {session.team_id ? (
+              <Users size={12} color={colors.green} />
+            ) : (
+              <Target size={12} color={colors.indigo} />
+            )}
+            <Text style={[styles.sourceText, { color: session.team_id ? colors.green : colors.indigo }]}>
+              {source}
+            </Text>
           </View>
-          <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-          <View style={styles.metaRow}>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: isCompleted ? `${colors.green}22` : `${colors.orange}22` },
+            ]}
+          >
+            <Text style={[styles.statusText, { color: isCompleted ? colors.green : colors.orange }]}>
+              {isCompleted ? 'Completed' : 'In Progress'}
+            </Text>
+          </View>
+        </View>
+        <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+        <View style={styles.metaRow}>
+          <View style={styles.metaItem}>
+            <Calendar size={14} color={colors.textMuted} />
+            <Text style={[styles.metaText, { color: colors.textMuted }]}>{sessionDate}</Text>
+          </View>
+          <View style={styles.metaItem}>
+            <Clock size={14} color={colors.textMuted} />
+            <Text style={[styles.metaText, { color: colors.textMuted }]}>{sessionTime}</Text>
+          </View>
+          {getDuration() && (
             <View style={styles.metaItem}>
-              <Calendar size={14} color={colors.textMuted} />
-              <Text style={[styles.metaText, { color: colors.textMuted }]}>{sessionDate}</Text>
+              <Timer size={14} color={colors.textMuted} />
+              <Text style={[styles.metaText, { color: colors.textMuted }]}>{getDuration()}</Text>
             </View>
-            <View style={styles.metaItem}>
-              <Clock size={14} color={colors.textMuted} />
-              <Text style={[styles.metaText, { color: colors.textMuted }]}>{sessionTime}</Text>
-            </View>
-            {getDuration() && (
-              <View style={styles.metaItem}>
-                <Zap size={14} color={colors.textMuted} />
-                <Text style={[styles.metaText, { color: colors.textMuted }]}>{getDuration()}</Text>
+          )}
+        </View>
+      </View>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          SESSION CONTEXT
+      ══════════════════════════════════════════════════════════════════════ */}
+      <Animated.View entering={FadeIn.duration(250)} style={styles.contextSection}>
+        <View style={[styles.contextCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.contextGrid}>
+            {session.weapon_name && (
+              <View style={styles.contextChip}>
+                <AimIcon size={14} color={colors.orange} />
+                <Text style={[styles.contextChipText, { color: colors.text }]} numberOfLines={1}>
+                  {session.weapon_name}
+                </Text>
+              </View>
+            )}
+            {session.drill_config?.distance_m && (
+              <View style={styles.contextChip}>
+                <Ruler size={14} color={colors.indigo} />
+                <Text style={[styles.contextChipText, { color: colors.text }]}>
+                  {session.drill_config.distance_m}m
+                </Text>
+              </View>
+            )}
+            {session.drill_config?.position && (
+              <View style={styles.contextChip}>
+                <Focus size={14} color={colors.blue} />
+                <Text style={[styles.contextChipText, { color: colors.text }]}>
+                  {session.drill_config.position.charAt(0).toUpperCase() + session.drill_config.position.slice(1)}
+                </Text>
+              </View>
+            )}
+            {session.watch_controlled && (
+              <View style={styles.contextChip}>
+                <Watch size={14} color={colors.green} />
+                <Text style={[styles.contextChipText, { color: colors.text }]}>Watch</Text>
               </View>
             )}
           </View>
         </View>
+      </Animated.View>
 
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* SESSION CONTEXT - What was being done */}
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        <Animated.View entering={FadeIn.duration(250)} style={styles.contextSection}>
-          <View style={[styles.contextCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {/* Row 1: Weapon & Position */}
-            <View style={styles.contextRow}>
-              {session.weapon_name && (
-                <View style={styles.contextItem}>
-                  <View style={[styles.contextIconBg, { backgroundColor: `${colors.orange}15` }]}>
-                    <AimIcon size={14} color={colors.orange} />
-                  </View>
-                  <View style={styles.contextItemContent}>
-                    <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Weapon</Text>
-                    <Text style={[styles.contextValue, { color: colors.text }]} numberOfLines={1}>
-                      {session.weapon_name}
-                    </Text>
-                  </View>
-                </View>
-              )}
-              
-              {session.drill_config?.position && (
-                <View style={styles.contextItem}>
-                  <View style={[styles.contextIconBg, { backgroundColor: `${colors.blue}15` }]}>
-                    <Focus size={14} color={colors.blue} />
-                  </View>
-                  <View style={styles.contextItemContent}>
-                    <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Position</Text>
-                    <Text style={[styles.contextValue, { color: colors.text }]} numberOfLines={1}>
-                      {session.drill_config.position.charAt(0).toUpperCase() + session.drill_config.position.slice(1)}
-                    </Text>
-                  </View>
-                </View>
-              )}
+      {/* ══════════════════════════════════════════════════════════════════════
+          QUICK STATS (Target Results)
+      ══════════════════════════════════════════════════════════════════════ */}
+      {stats && stats.targetCount > 0 && (
+        <Animated.View entering={FadeIn.duration(300)} style={styles.statsSection}>
+          <View style={styles.quickStatsRow}>
+            <View style={[styles.quickStat, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.quickStatValue, { color: colors.green }]}>{stats.totalHits}</Text>
+              <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>Hits</Text>
             </View>
-
-            {/* Row 2: Distance & Drill Goal */}
-            <View style={styles.contextRow}>
-              {session.drill_config?.distance_m && (
-                <View style={styles.contextItem}>
-                  <View style={[styles.contextIconBg, { backgroundColor: `${colors.indigo}15` }]}>
-                    <Ruler size={14} color={colors.indigo} />
-                  </View>
-                  <View style={styles.contextItemContent}>
-                    <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Distance</Text>
-                    <Text style={[styles.contextValue, { color: colors.text }]}>
-                      {session.drill_config.distance_m}m
-                    </Text>
-                  </View>
-                </View>
-              )}
-              
-              {session.drill_config?.drill_goal && (
-                <View style={styles.contextItem}>
-                  <View style={[styles.contextIconBg, { 
-                    backgroundColor: session.drill_config.drill_goal === 'grouping' ? `${colors.green}15` : `${colors.primary}15`
-                  }]}>
-                    <Target size={14} color={session.drill_config.drill_goal === 'grouping' ? colors.green : colors.primary} />
-                  </View>
-                  <View style={styles.contextItemContent}>
-                    <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Type</Text>
-                    <Text style={[styles.contextValue, { color: colors.text }]}>
-                      {session.drill_config.drill_goal === 'grouping' ? 'Grouping' : 'Achievement'}
-                    </Text>
-                  </View>
-                </View>
-              )}
+            <View style={[styles.quickStat, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.quickStatValue, { color: colors.text }]}>{stats.totalShotsFired}</Text>
+              <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>Shots</Text>
             </View>
-
-            {/* Row 3: Measurement Method & Time Limit */}
-            <View style={styles.contextRow}>
-              <View style={styles.contextItem}>
-                <View style={[styles.contextIconBg, { 
-                  backgroundColor: session.watch_controlled ? `${colors.green}15` : `${colors.textMuted}15`
+            {stats.accuracyPct > 0 && (
+              <View style={[styles.quickStat, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.quickStatValue, { 
+                  color: stats.accuracyPct >= 80 ? colors.green : stats.accuracyPct >= 60 ? colors.orange : colors.red 
                 }]}>
-                  {session.watch_controlled ? (
-                    <Watch size={14} color={colors.green} />
-                  ) : (
-                    <Scan size={14} color={colors.textMuted} />
-                  )}
-                </View>
-                <View style={styles.contextItemContent}>
-                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Measured</Text>
-                  <Text style={[styles.contextValue, { color: colors.text }]}>
-                    {session.watch_controlled ? 'Watch-assisted' : 'Manual entry'}
-                  </Text>
-                </View>
-              </View>
-              
-              {session.drill_config?.time_limit_seconds && (
-                <View style={styles.contextItem}>
-                  <View style={[styles.contextIconBg, { backgroundColor: `${colors.red}15` }]}>
-                    <Timer size={14} color={colors.red} />
-                  </View>
-                  <View style={styles.contextItemContent}>
-                    <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Time Limit</Text>
-                    <Text style={[styles.contextValue, { color: colors.text }]}>
-                      {session.drill_config.time_limit_seconds >= 60 
-                        ? `${Math.floor(session.drill_config.time_limit_seconds / 60)}m ${session.drill_config.time_limit_seconds % 60 > 0 ? `${session.drill_config.time_limit_seconds % 60}s` : ''}`
-                        : `${session.drill_config.time_limit_seconds}s`
-                      }
-                    </Text>
-                  </View>
-                </View>
-              )}
-            </View>
-
-            {/* Rounds per shooter (if set) */}
-            {session.drill_config?.rounds_per_shooter && session.drill_config.rounds_per_shooter > 0 && (
-              <View style={styles.contextRow}>
-                <View style={styles.contextItem}>
-                  <View style={[styles.contextIconBg, { backgroundColor: `${colors.textMuted}15` }]}>
-                    <Target size={14} color={colors.textMuted} />
-                  </View>
-                  <View style={styles.contextItemContent}>
-                    <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Rounds</Text>
-                    <Text style={[styles.contextValue, { color: colors.text }]}>
-                      {session.drill_config.rounds_per_shooter} per shooter
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            )}
-
-            {/* Input Method Preference (if set) */}
-            {session.drill_config?.input_method && (
-              <View style={[styles.inputMethodBadge, { 
-                backgroundColor: session.drill_config.input_method === 'scan' ? `${colors.primary}12` : `${colors.blue}12`
-              }]}>
-                <Settings2 size={12} color={session.drill_config.input_method === 'scan' ? colors.primary : colors.blue} />
-                <Text style={[styles.inputMethodText, { 
-                  color: session.drill_config.input_method === 'scan' ? colors.primary : colors.blue
-                }]}>
-                  {session.drill_config.input_method === 'scan' ? 'AI Scan preferred' : 'Manual entry preferred'}
+                  {stats.accuracyPct}%
                 </Text>
+                <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>Accuracy</Text>
               </View>
             )}
-
-            {/* Training Context (if part of a training) */}
-            {session.training_id && session.training_title && (
-              <TouchableOpacity 
-                style={[styles.trainingContextBadge, { backgroundColor: `${colors.green}10`, borderColor: `${colors.green}30` }]}
-                onPress={() => router.push(`/(protected)/trainingDetail?id=${session.training_id}`)}
-                activeOpacity={0.7}
-              >
-                <Users size={14} color={colors.green} />
-                <View style={styles.trainingContextContent}>
-                  <Text style={[styles.trainingContextLabel, { color: colors.green }]}>Part of Team Training</Text>
-                  <Text style={[styles.trainingContextTitle, { color: colors.text }]} numberOfLines={1}>
-                    {session.training_title}
-                  </Text>
-                </View>
-                <ChevronRight size={14} color={colors.green} />
-              </TouchableOpacity>
+            {stats.bestDispersionCm !== null && (
+              <View style={[styles.quickStat, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.quickStatValue, { color: colors.primary }]}>{stats.bestDispersionCm}cm</Text>
+                <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>Best Group</Text>
+              </View>
             )}
           </View>
         </Animated.View>
+      )}
 
-        {/* Stats Grid */}
-        {stats && stats.targetCount > 0 ? (
-          <Animated.View entering={FadeIn.duration(300)} style={styles.statsSection}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Performance</Text>
-            
-            {/* Entry breakdown indicator */}
-            {(entryBreakdown.scanned > 0 || entryBreakdown.manual > 0) && (
-              <View style={[styles.entryBreakdown, { backgroundColor: colors.card }]}>
-                {entryBreakdown.scanned > 0 && (
-                  <View style={styles.entryBreakdownItem}>
-                    <View style={[styles.entryBreakdownDot, { backgroundColor: '#A78BFA' }]} />
-                    <Text style={[styles.entryBreakdownText, { color: colors.textMuted }]}>
-                      {entryBreakdown.scanned} scanned
-                    </Text>
-                  </View>
-                )}
-                {entryBreakdown.manual > 0 && (
-                  <View style={styles.entryBreakdownItem}>
-                    <View style={[styles.entryBreakdownDot, { backgroundColor: '#60A5FA' }]} />
-                    <Text style={[styles.entryBreakdownText, { color: colors.textMuted }]}>
-                      {entryBreakdown.manual} manual
-                    </Text>
-                  </View>
-                )}
-              </View>
-            )}
-            
-            <View style={styles.statsGrid}>
-              {/* Accuracy - only show if we have meaningful data */}
-              {stats.accuracyPct > 0 ? (
-                <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <View style={[styles.statIconBg, { backgroundColor: `${colors.indigo}22` }]}>
-                    <Crosshair size={18} color={colors.indigo} />
-                  </View>
-                  <Text style={[styles.statValue, { color: colors.text }]}>{stats.accuracyPct}%</Text>
-                  <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-                    Accuracy{hasScannedWithoutDeclaration ? '*' : ''}
-                  </Text>
-                </View>
-              ) : hasScannedWithoutDeclaration ? (
-                <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <View style={[styles.statIconBg, { backgroundColor: `${colors.orange}22` }]}>
-                    <Crosshair size={18} color={colors.orange} />
-                  </View>
-                  <Text style={[styles.statValue, { color: colors.orange }]}>—</Text>
-                  <Text style={[styles.statLabel, { color: colors.textMuted }]}>No shot count</Text>
-                </View>
-              ) : null}
-              
-              <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={[styles.statIconBg, { backgroundColor: `${colors.green}22` }]}>
-                  <Target size={18} color={colors.green} />
-                </View>
-                <Text style={[styles.statValue, { color: colors.text }]}>
-                  {stats.totalHits}
-                </Text>
-                <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-                  {hasScannedWithoutDeclaration ? 'Holes detected' : 'Hits'}
-                </Text>
-              </View>
-              <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={[styles.statIconBg, { backgroundColor: `${colors.orange}22` }]}>
-                  <Award size={18} color={colors.orange} />
-                </View>
-                <Text style={[styles.statValue, { color: colors.text }]}>{stats.targetCount}</Text>
-                <Text style={[styles.statLabel, { color: colors.textMuted }]}>Targets</Text>
-              </View>
-              {stats.bestDispersionCm !== null && (
-                <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <View style={[styles.statIconBg, { backgroundColor: `${colors.red}22` }]}>
-                    <TrendingUp size={18} color={colors.red} />
-                  </View>
-                  <Text style={[styles.statValue, { color: colors.text }]}>{stats.bestDispersionCm}cm</Text>
-                  <Text style={[styles.statLabel, { color: colors.textMuted }]}>Best Group</Text>
-                </View>
-              )}
-            </View>
-            
-            {/* Accuracy note if scanned without declaration */}
-            {hasScannedWithoutDeclaration && stats.accuracyPct > 0 && (
-              <Text style={[styles.accuracyNote, { color: colors.textMuted }]}>
-                * Accuracy excludes scanned targets without declared shots
-              </Text>
-            )}
-          </Animated.View>
-        ) : stats?.targetCount === 0 ? (
-          <View style={[styles.emptyStats, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Target size={32} color={colors.textMuted} />
-            <Text style={[styles.emptyStatsText, { color: colors.textMuted }]}>No targets recorded</Text>
+      {/* ══════════════════════════════════════════════════════════════════════
+          WATCH INSIGHTS - The Three Pillars
+      ══════════════════════════════════════════════════════════════════════ */}
+      {watchData && (hrInsights || steadinessInsights || timingInsights) && (
+        <Animated.View entering={FadeInDown.delay(100).duration(300)} style={styles.insightsSection}>
+          <View style={styles.sectionHeader}>
+            <Watch size={16} color={colors.green} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Watch Insights</Text>
           </View>
-        ) : null}
 
-        {/* Watch Data / Biometrics Section */}
-        {watchData && (watchData.heartRate || watchData.steadiness || watchData.splits) && (
-          <Animated.View entering={FadeInDown.delay(150).duration(300)} style={styles.biometricsSection}>
-            <View style={styles.biometricsHeader}>
-              <Watch size={14} color={colors.green} />
-              <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Watch Data</Text>
-            </View>
-            
-            {/* Heart Rate & Breathing Row */}
-            {(watchData.heartRate?.avg != null || watchData.avgBreathRate != null) && (
-              <View style={styles.bioRow}>
-                {watchData.heartRate?.avg && (
-                  <View style={[styles.bioCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <View style={[styles.bioIconBg, { backgroundColor: `${colors.red}22` }]}>
-                      <Heart size={18} color={colors.red} />
-                    </View>
-                    <View style={styles.bioContent}>
-                      <Text style={[styles.bioLabel, { color: colors.textMuted }]}>Heart Rate</Text>
-                      <View style={styles.bioValues}>
-                        <Text style={[styles.bioValue, { color: colors.text }]}>{watchData.heartRate.avg}</Text>
-                        <Text style={[styles.bioUnit, { color: colors.textMuted }]}>avg</Text>
-                        {watchData.heartRate.max != null && (
-                          <>
-                            <Text style={[styles.bioValue, { color: colors.orange }]}>{watchData.heartRate.max}</Text>
-                            <Text style={[styles.bioUnit, { color: colors.textMuted }]}>max</Text>
-                          </>
-                        )}
-                      </View>
-                    </View>
-                  </View>
-                )}
-                
-                {watchData.avgBreathRate != null && (
-                  <View style={[styles.bioCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <View style={[styles.bioIconBg, { backgroundColor: `${colors.blue}22` }]}>
-                      <Wind size={18} color={colors.blue} />
-                    </View>
-                    <View style={styles.bioContent}>
-                      <Text style={[styles.bioLabel, { color: colors.textMuted }]}>Breathing</Text>
-                      <View style={styles.bioValues}>
-                        <Text style={[styles.bioValue, { color: colors.text }]}>{watchData.avgBreathRate}</Text>
-                        <Text style={[styles.bioUnit, { color: colors.textMuted }]}>breaths/min</Text>
-                      </View>
-                    </View>
-                  </View>
-                )}
-              </View>
-            )}
-            
-            {/* Steadiness */}
-            {watchData.steadiness?.avg_score !== undefined && (
-              <View style={[styles.steadinessCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={[styles.bioIconBg, { 
-                  backgroundColor: watchData.steadiness.avg_score >= 70 ? `${colors.green}22` : `${colors.orange}22` 
-                }]}>
-                  <Activity size={18} color={watchData.steadiness.avg_score >= 70 ? colors.green : colors.orange} />
+          {/* ═══════════════════════════════════════════════════════════════
+              PILLAR 1: PHYSIOLOGY (Heart Rate + Stress)
+          ═══════════════════════════════════════════════════════════════ */}
+          {hrInsights && (
+            <View style={[styles.pillarCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.pillarHeader}>
+                <View style={[styles.pillarIcon, { backgroundColor: `${colors.red}20` }]}>
+                  <Heart size={16} color={colors.red} />
                 </View>
-                <View style={styles.steadinessContent}>
-                  <Text style={[styles.bioLabel, { color: colors.textMuted }]}>Steadiness</Text>
-                  <Text style={[styles.steadinessValue, { 
-                    color: watchData.steadiness.avg_score >= 70 ? colors.green : colors.orange 
+                <Text style={[styles.pillarTitle, { color: colors.text }]}>Physiology</Text>
+                {hrInsights.hrChange && hrInsights.hrChange !== 'stable' && (
+                  <View style={[styles.trendPill, { 
+                    backgroundColor: hrInsights.hrChange === 'increased' ? `${colors.orange}20` : `${colors.green}20` 
                   }]}>
-                    {watchData.steadiness.avg_score.toFixed(0)}%
-                  </Text>
-                </View>
-                {!!watchData.steadiness.trend && (
-                  <View style={[styles.trendBadge, { backgroundColor: `${colors.text}10` }]}>
-                    <Text style={[styles.trendText, { color: colors.textMuted }]}>
-                      {watchData.steadiness.trend}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            )}
-            
-            {/* Split Times */}
-            {watchData.splits && watchData.splits.length > 0 && (
-              <View style={styles.splitsSection}>
-                <View style={styles.splitsHeader}>
-                  <Timer size={14} color={colors.primary} />
-                  <Text style={[styles.splitsTitle, { color: colors.text }]}>Split Times</Text>
-                </View>
-                <View style={styles.splitsRow}>
-                  {watchData.fastestSplitMs != null && (
-                    <View style={[styles.splitCard, { backgroundColor: `${colors.green}15` }]}>
-                      <Text style={[styles.splitValue, { color: colors.green }]}>
-                        {watchData.fastestSplitMs < 1000 
-                          ? `${watchData.fastestSplitMs}ms` 
-                          : `${(watchData.fastestSplitMs / 1000).toFixed(2)}s`}
-                      </Text>
-                      <Text style={[styles.splitLabel, { color: colors.green }]}>fastest</Text>
-                    </View>
-                  )}
-                  {watchData.avgSplitMs != null && (
-                    <View style={[styles.splitCard, { backgroundColor: `${colors.primary}15` }]}>
-                      <Text style={[styles.splitValue, { color: colors.primary }]}>
-                        {watchData.avgSplitMs < 1000 
-                          ? `${watchData.avgSplitMs}ms` 
-                          : `${(watchData.avgSplitMs / 1000).toFixed(2)}s`}
-                      </Text>
-                      <Text style={[styles.splitLabel, { color: colors.primary }]}>average</Text>
-                    </View>
-                  )}
-                  {watchData.slowestSplitMs != null && (
-                    <View style={[styles.splitCard, { backgroundColor: `${colors.orange}15` }]}>
-                      <Text style={[styles.splitValue, { color: colors.orange }]}>
-                        {watchData.slowestSplitMs < 1000 
-                          ? `${watchData.slowestSplitMs}ms` 
-                          : `${(watchData.slowestSplitMs / 1000).toFixed(2)}s`}
-                      </Text>
-                      <Text style={[styles.splitLabel, { color: colors.orange }]}>slowest</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            )}
-            
-            {/* Per-Shot Biometrics Preview */}
-            {watchData.biometrics?.shot_biometrics && watchData.biometrics.shot_biometrics.length > 0 && (
-              <View style={styles.shotBioSection}>
-                <Text style={[styles.shotBioTitle, { color: colors.textMuted }]}>Per-Shot Data</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shotBioScroll}>
-                  {watchData.biometrics.shot_biometrics.slice(0, 10).map((sb: any, idx: number) => {
-                    const shotNum = sb.shot ?? idx + 1;
-                    const hrValue = sb.hr ?? null;
-                    const phase = sb.breathPhase ?? null;
-                    const phaseColor = phase === 'pause' ? colors.green 
-                      : phase === 'exhale' ? colors.blue 
-                      : colors.orange;
-                    
-                    return (
-                      <View 
-                        key={idx} 
-                        style={[styles.shotBioChip, { backgroundColor: colors.card, borderColor: colors.border }]}
-                      >
-                        <Text style={[styles.shotBioNum, { color: colors.text }]}>#{shotNum}</Text>
-                        {hrValue !== null && (
-                          <View style={styles.shotBioStat}>
-                            <Heart size={10} color={colors.red} />
-                            <Text style={[styles.shotBioValue, { color: colors.text }]}>{hrValue}</Text>
-                          </View>
-                        )}
-                        {phase !== null && (
-                          <View style={[styles.phaseDot, { backgroundColor: phaseColor }]} />
-                        )}
-                      </View>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            )}
-          </Animated.View>
-        )}
-
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* PERFORMANCE INSIGHTS (from saved timeline data) */}
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {hasTimeline && timelineInsights && (
-          <Animated.View entering={FadeInDown.delay(175).duration(300)} style={styles.insightsSection}>
-            <View style={styles.insightsHeader}>
-              <Activity size={14} color={colors.primary} />
-              <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Performance Insights</Text>
-            </View>
-            
-            {/* Main Metrics Row */}
-            <View style={[styles.insightsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.insightsRow}>
-                {/* Calmness/Steadiness Score */}
-                <View style={styles.insightMetric}>
-                  <Text style={[styles.insightValue, { 
-                    color: timelineInsights.avgScore >= 50 ? colors.green : timelineInsights.avgScore >= 30 ? colors.orange : colors.red 
-                  }]}>
-                    {timelineInsights.avgScore}%
-                  </Text>
-                  <Text style={[styles.insightLabel, { color: colors.textMuted }]}>
-                    {timelineInsights.usingStress ? 'Calmness' : 'Steadiness'}
-                  </Text>
-                </View>
-
-                {/* Trend */}
-                {timelineInsights.trend !== 'stable' && (
-                  <View style={[styles.insightTrendBadge, { 
-                    backgroundColor: timelineInsights.trend === 'improving' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)' 
-                  }]}>
-                    {timelineInsights.trend === 'improving' ? (
-                      <TrendingUp size={14} color={colors.green} />
+                    {hrInsights.hrChange === 'increased' ? (
+                      <TrendingUp size={12} color={colors.orange} />
                     ) : (
-                      <TrendingDown size={14} color={colors.red} />
+                      <TrendingDown size={12} color={colors.green} />
                     )}
-                    <Text style={[styles.insightTrendText, { 
-                      color: timelineInsights.trend === 'improving' ? colors.green : colors.red 
+                    <Text style={[styles.trendPillText, { 
+                      color: hrInsights.hrChange === 'increased' ? colors.orange : colors.green 
                     }]}>
-                      {timelineInsights.trend === 'improving' ? 'Improving' : 'Declining'}
+                      {Math.abs(hrInsights.hrChangePct)}%
                     </Text>
                   </View>
                 )}
-
-                {/* Breath Pause % */}
-                <View style={styles.insightMetric}>
-                  <Text style={[styles.insightValue, { 
-                    color: timelineInsights.pausePct >= 50 ? colors.green : colors.orange 
-                  }]}>
-                    {timelineInsights.pausePct}%
-                  </Text>
-                  <Text style={[styles.insightLabel, { color: colors.textMuted }]}>Breath Pause</Text>
+              </View>
+              
+              <View style={styles.pillarMetrics}>
+                <View style={styles.metricBlock}>
+                  <Text style={[styles.metricValue, { color: colors.text }]}>{hrInsights.avg}</Text>
+                  <Text style={[styles.metricLabel, { color: colors.textMuted }]}>avg BPM</Text>
                 </View>
-
-                {/* Flinch Count */}
-                {timelineInsights.flinchCount > 0 && (
-                  <View style={styles.insightMetric}>
-                    <Text style={[styles.insightValue, { color: colors.red }]}>
-                      {timelineInsights.flinchCount}
-                    </Text>
-                    <Text style={[styles.insightLabel, { color: colors.textMuted }]}>Flinches</Text>
-                  </View>
-                )}
+                <View style={styles.metricDivider} />
+                <View style={styles.metricBlock}>
+                  <Text style={[styles.metricValue, { color: colors.blue }]}>{hrInsights.min}</Text>
+                  <Text style={[styles.metricLabel, { color: colors.textMuted }]}>min</Text>
+                </View>
+                <View style={styles.metricBlock}>
+                  <Text style={[styles.metricValue, { color: colors.orange }]}>{hrInsights.max}</Text>
+                  <Text style={[styles.metricLabel, { color: colors.textMuted }]}>max</Text>
+                </View>
               </View>
-            </View>
-
-            {/* Shot-by-Shot Performance Bars */}
-            <View style={[styles.shotBarsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.shotBarsTitle, { color: colors.textMuted }]}>Shot-by-Shot Performance</Text>
-              <View style={styles.shotBarsContainer}>
-                {timelineInsights.shots.slice(0, 25).map((shot, idx) => {
-                  const score = timelineInsights.scores[idx];
-                  const barHeight = Math.max(6, (score / 100) * 48);
-                  const barColor = score >= 50 ? colors.green : score >= 30 ? colors.orange : colors.red;
-                  const breathColor = shot.breathPhase === 'pause' ? colors.green : 
-                                     shot.breathPhase === 'exhale' ? colors.orange : colors.red;
-                  return (
-                    <View key={shot.shotNumber} style={styles.shotBarColumn}>
-                      <View style={[styles.shotBarFill, { height: barHeight, backgroundColor: barColor }]} />
-                      <View style={[styles.breathDot, { backgroundColor: breathColor }]} />
-                      <Text style={[styles.shotBarLabel, { color: colors.textMuted }]}>{shot.shotNumber}</Text>
-                    </View>
-                  );
-                })}
-              </View>
-              {timelineInsights.shots.length > 25 && (
-                <Text style={[styles.shotBarsMore, { color: colors.textMuted }]}>
-                  +{timelineInsights.shots.length - 25} more shots
-                </Text>
+              
+              {(hrInsights.start && hrInsights.end) && (
+                <View style={styles.pillarFooter}>
+                  <Text style={[styles.footerText, { color: colors.textMuted }]}>
+                    {hrInsights.start} BPM → {hrInsights.end} BPM ({hrInsights.rangeLabel})
+                  </Text>
+                </View>
               )}
               
-              {/* Legend */}
-              <View style={styles.barsLegend}>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: colors.green }]} />
-                  <Text style={[styles.legendText, { color: colors.textMuted }]}>Pause</Text>
+              {/* Stress info if available */}
+              {watchData.stress?.avg !== undefined && (
+                <View style={[styles.subMetric, { borderTopColor: colors.border }]}>
+                  <Text style={[styles.subMetricLabel, { color: colors.textMuted }]}>Stress Level</Text>
+                  <Text style={[styles.subMetricValue, { 
+                    color: (watchData.stress.avg ?? 50) < 40 ? colors.green : 
+                           (watchData.stress.avg ?? 50) < 60 ? colors.orange : colors.red 
+                  }]}>
+                    {watchData.stress.avg < 40 ? 'Low' : watchData.stress.avg < 60 ? 'Moderate' : 'High'}
+                  </Text>
                 </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: colors.orange }]} />
-                  <Text style={[styles.legendText, { color: colors.textMuted }]}>Exhale</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: colors.red }]} />
-                  <Text style={[styles.legendText, { color: colors.textMuted }]}>Inhale</Text>
-                </View>
-              </View>
+              )}
             </View>
+          )}
 
-            {/* Best/Worst Shots */}
-            {timelineInsights.bestScore !== timelineInsights.worstScore && (
-              <View style={styles.bestWorstRow}>
-                <View style={[styles.bestWorstCard, { backgroundColor: 'rgba(16,185,129,0.1)', borderColor: 'rgba(16,185,129,0.3)' }]}>
-                  <ArrowUp size={14} color={colors.green} />
-                  <View>
-                    <Text style={[styles.bestWorstValue, { color: colors.green }]}>
-                      Shot #{timelineInsights.bestShot}
-                    </Text>
-                    <Text style={[styles.bestWorstScore, { color: colors.green }]}>
-                      {timelineInsights.bestScore}% {timelineInsights.usingStress ? 'calm' : 'steady'}
-                    </Text>
-                  </View>
+          {/* ═══════════════════════════════════════════════════════════════
+              PILLAR 2: STEADINESS & CONTROL
+          ═══════════════════════════════════════════════════════════════ */}
+          {steadinessInsights && (
+            <View style={[styles.pillarCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.pillarHeader}>
+                <View style={[styles.pillarIcon, { backgroundColor: `${colors.primary}20` }]}>
+                  <Activity size={16} color={colors.primary} />
                 </View>
-                <View style={[styles.bestWorstCard, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)' }]}>
-                  <ArrowDown size={14} color={colors.red} />
-                  <View>
-                    <Text style={[styles.bestWorstValue, { color: colors.red }]}>
-                      Shot #{timelineInsights.worstShot}
-                    </Text>
-                    <Text style={[styles.bestWorstScore, { color: colors.red }]}>
-                      {timelineInsights.worstScore}% {timelineInsights.usingStress ? 'calm' : 'steady'}
-                    </Text>
-                  </View>
+                <Text style={[styles.pillarTitle, { color: colors.text }]}>Steadiness</Text>
+                <View style={[styles.gradePill, { 
+                  backgroundColor: (steadinessInsights.avgScore ?? 0) >= 60 ? `${colors.green}20` : `${colors.orange}20` 
+                }]}>
+                  <Text style={[styles.gradePillText, { 
+                    color: (steadinessInsights.avgScore ?? 0) >= 60 ? colors.green : colors.orange 
+                  }]}>
+                    {steadinessInsights.grade}
+                  </Text>
                 </View>
               </View>
-            )}
-
-            {/* Breath Discipline Breakdown */}
-            <View style={[styles.breathBreakdownCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.breathBreakdownTitle, { color: colors.text }]}>Breath Discipline</Text>
-              <View style={styles.breathBar}>
-                {timelineInsights.pausePct > 0 && (
-                  <View style={[styles.breathSegment, { flex: timelineInsights.pausePct, backgroundColor: colors.green }]}>
-                    {timelineInsights.pausePct >= 15 && (
-                      <Text style={styles.breathSegmentText}>{timelineInsights.pausePct}%</Text>
-                    )}
-                  </View>
-                )}
-                {timelineInsights.exhalePct > 0 && (
-                  <View style={[styles.breathSegment, { flex: timelineInsights.exhalePct, backgroundColor: colors.orange }]}>
-                    {timelineInsights.exhalePct >= 15 && (
-                      <Text style={styles.breathSegmentText}>{timelineInsights.exhalePct}%</Text>
-                    )}
-                  </View>
-                )}
-                {timelineInsights.inhalePct > 0 && (
-                  <View style={[styles.breathSegment, { flex: timelineInsights.inhalePct, backgroundColor: colors.red }]}>
-                    {timelineInsights.inhalePct >= 15 && (
-                      <Text style={styles.breathSegmentText}>{timelineInsights.inhalePct}%</Text>
-                    )}
-                  </View>
-                )}
-              </View>
-              <View style={styles.breathBreakdownLegend}>
-                <View style={styles.breathLegendItem}>
-                  <View style={[styles.breathLegendDot, { backgroundColor: colors.green }]} />
-                  <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>Pause (optimal)</Text>
+              
+              <View style={styles.steadinessMain}>
+                <View style={styles.steadinessScore}>
+                  <Text style={[styles.bigScore, { 
+                    color: (steadinessInsights.avgScore ?? 0) >= 60 ? colors.green : 
+                           (steadinessInsights.avgScore ?? 0) >= 40 ? colors.orange : colors.red 
+                  }]}>
+                    {steadinessInsights.avgScore ?? 0}
+                  </Text>
+                  <Text style={[styles.bigScoreUnit, { color: colors.textMuted }]}>%</Text>
                 </View>
-                <View style={styles.breathLegendItem}>
-                  <View style={[styles.breathLegendDot, { backgroundColor: colors.orange }]} />
-                  <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>Exhale</Text>
-                </View>
-                <View style={styles.breathLegendItem}>
-                  <View style={[styles.breathLegendDot, { backgroundColor: colors.red }]} />
-                  <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>Inhale</Text>
-                </View>
-              </View>
-            </View>
-          </Animated.View>
-        )}
-
-        {/* Timeline data loading indicator */}
-        {session?.watch_controlled && !hasTimeline && timelineLoading && (
-          <Animated.View entering={FadeIn.duration(200)} style={styles.insightsSection}>
-            <View style={[styles.insightsCard, { backgroundColor: colors.card, borderColor: colors.border, alignItems: 'center', paddingVertical: 20 }]}>
-              <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={[styles.loadingInsightsText, { color: colors.textMuted }]}>Loading biometric insights...</Text>
-            </View>
-          </Animated.View>
-        )}
-
-        {/* Image Gallery */}
-        {targetImages.length > 0 && (
-          <Animated.View entering={FadeInDown.delay(100).duration(300)} style={styles.imagesSection}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Target Scans</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.imagesScroll}
-            >
-              {targetImages.map((img, index) => (
-                <TouchableOpacity
-                  key={img.id}
-                  style={[styles.imageCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.imageOverlay}>
-                    <Text style={styles.imageLabel}>#{img.sequence || index + 1}</Text>
-                    <Text style={styles.imageHits}>
-                      {img.isGrouping 
-                        ? (img.dispersion != null ? `${img.dispersion.toFixed(1)}cm` : `${img.shots} shots`)
-                        : img.actualShotsDeclared 
-                          ? `${img.hits}/${img.actualShotsDeclared} (${Math.round((img.hits / img.actualShotsDeclared) * 100)}%)`
-                          : `${img.hits} detected`
-                      }
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </Animated.View>
-        )}
-
-        {/* Timeline */}
-        {targets.length > 0 && (
-          <Animated.View entering={FadeInDown.delay(200).duration(300)} style={styles.timelineSection}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Session Timeline</Text>
-            <View style={styles.timeline}>
-              {targets.map((target, index) => {
-                const isPaper = target.target_type === 'paper';
-                const result = isPaper ? target.paper_result : target.tactical_result;
-                const shots = result?.bullets_fired ?? 0;
-                const hits = isPaper ? (target.paper_result?.hits_total ?? 0) : (target.tactical_result?.hits ?? 0);
                 
-                // Determine if this is a grouping or achievement target
-                const isGroupingTarget = isPaper && target.paper_result?.paper_type === 'grouping';
-                const dispersion = target.paper_result?.dispersion_cm;
-                
-                // Check if scanned (AI detection) vs manual
-                const isScanned = isPaper && !!target.paper_result?.scanned_image_url;
-                const actualShotsDeclared = target.paper_result?.actual_shots_declared ?? null;
-                
-                // Calculate accuracy only when meaningful:
-                // - Manual entries: always meaningful
-                // - Scanned entries: only if user declared actual shots
-                // - Tactical: always meaningful (manual)
-                const canShowAccuracy = !isPaper || !isScanned || actualShotsDeclared != null;
-                const effectiveShots = isScanned && actualShotsDeclared ? actualShotsDeclared : shots;
-                const accuracy = !isGroupingTarget && canShowAccuracy && effectiveShots > 0 
-                  ? Math.round((hits / effectiveShots) * 100) 
-                  : null;
-
-                return (
-                  <View key={target.id} style={styles.timelineItem}>
-                    {/* Connector line */}
-                    {index < targets.length - 1 && (
-                      <View style={[styles.timelineLine, { backgroundColor: colors.border }]} />
-                    )}
-
-                    {/* Dot */}
-                    <View style={[styles.timelineDot, { backgroundColor: isGroupingTarget ? colors.green : colors.indigo }]}>
-                      <Text style={styles.timelineDotText}>{index + 1}</Text>
+                <View style={styles.steadinessDetails}>
+                  {steadinessInsights.flinchCount > 0 && (
+                    <View style={styles.detailRow}>
+                      <AlertTriangle size={12} color={colors.red} />
+                      <Text style={[styles.detailText, { color: colors.text }]}>
+                        {steadinessInsights.flinchCount} flinch{steadinessInsights.flinchCount > 1 ? 'es' : ''} detected
+                      </Text>
                     </View>
-
-                    {/* Content */}
-                    <View
-                      style={[styles.timelineContent, { backgroundColor: colors.card, borderColor: colors.border }]}
-                    >
-                      <View style={styles.timelineHeader}>
-                        <View style={styles.timelineBadges}>
-                          <View
-                            style={[
-                              styles.targetTypeBadge,
-                              { backgroundColor: isGroupingTarget ? `${colors.green}22` : (isPaper ? `${colors.indigo}22` : `${colors.orange}22`) },
-                            ]}
-                          >
-                            <Text
-                              style={[styles.targetTypeText, { color: isGroupingTarget ? colors.green : (isPaper ? colors.indigo : colors.orange) }]}
-                            >
-                              {isGroupingTarget ? 'Grouping' : (isPaper ? 'Achievement' : 'Tactical')}
-                            </Text>
-                          </View>
-                          {/* Entry method badge for paper targets */}
-                          {isPaper && !isGroupingTarget && (
-                            <View
-                              style={[
-                                styles.entryMethodBadge,
-                                { backgroundColor: isScanned ? '#8B5CF622' : '#3B82F622' },
-                              ]}
-                            >
-                              <Text
-                                style={[styles.entryMethodText, { color: isScanned ? '#A78BFA' : '#60A5FA' }]}
-                              >
-                                {isScanned ? 'Scan' : 'Manual'}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                        {target.distance_m && (
-                          <Text style={[styles.distanceText, { color: colors.textMuted }]}>
-                            {target.distance_m}m
-                          </Text>
-                        )}
-                      </View>
-
-                      {result && (
-                        <View style={styles.timelineStats}>
-                          {/* Different display based on target type and entry method */}
-                          {isGroupingTarget ? (
-                            // GROUPING: Dispersion + shot count
-                            <>
-                              {dispersion != null && (
-                                <View style={styles.timelineStat}>
-                                  <Text style={[styles.timelineStatValue, { color: colors.green }]}>
-                                    {dispersion.toFixed(1)}cm
-                                  </Text>
-                                  <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>group</Text>
-                                </View>
-                              )}
-                              <View style={styles.timelineStat}>
-                                <Text style={[styles.timelineStatValue, { color: colors.text }]}>{shots}</Text>
-                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>shots</Text>
-                              </View>
-                            </>
-                          ) : isScanned ? (
-                            // SCANNED ACHIEVEMENT: Holes detected + optional accuracy
-                            <>
-                              <View style={styles.timelineStat}>
-                                <Text style={[styles.timelineStatValue, { color: colors.indigo }]}>{hits}</Text>
-                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>holes</Text>
-                              </View>
-                              {actualShotsDeclared && (
-                                <>
-                                  <View style={styles.timelineStat}>
-                                    <Text style={[styles.timelineStatValue, { color: colors.text }]}>
-                                      {actualShotsDeclared}
-                                    </Text>
-                                    <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>fired</Text>
-                                  </View>
-                                  <View style={styles.timelineStat}>
-                                    <Text
-                                      style={[
-                                        styles.timelineStatValue,
-                                        {
-                                          color:
-                                            accuracy! >= 70 ? colors.green : accuracy! >= 50 ? colors.orange : colors.red,
-                                        },
-                                      ]}
-                                    >
-                                      {accuracy}%
-                                    </Text>
-                                    <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>acc</Text>
-                                  </View>
-                                </>
-                              )}
-                            </>
-                          ) : (
-                            // MANUAL ENTRY: Shots + hits + accuracy
-                            <>
-                              <View style={styles.timelineStat}>
-                                <Text style={[styles.timelineStatValue, { color: colors.text }]}>{shots}</Text>
-                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>shots</Text>
-                              </View>
-                              <View style={styles.timelineStat}>
-                                <Text style={[styles.timelineStatValue, { color: colors.text }]}>{hits}</Text>
-                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>hits</Text>
-                              </View>
-                              {accuracy !== null && (
-                                <View style={styles.timelineStat}>
-                                  <Text
-                                    style={[
-                                      styles.timelineStatValue,
-                                      {
-                                        color:
-                                          accuracy >= 70 ? colors.green : accuracy >= 50 ? colors.orange : colors.red,
-                                      },
-                                    ]}
-                                  >
-                                    {accuracy}%
-                                  </Text>
-                                  <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>acc</Text>
-                                </View>
-                              )}
-                            </>
-                          )}
-                        </View>
+                  )}
+                  {steadinessInsights.recoilConsistency > 0 && (
+                    <View style={styles.detailRow}>
+                      <Zap size={12} color={colors.blue} />
+                      <Text style={[styles.detailText, { color: colors.text }]}>
+                        {steadinessInsights.recoilConsistency}% recoil consistency
+                      </Text>
+                    </View>
+                  )}
+                  {steadinessInsights.trend && steadinessInsights.trend !== 'stable' && (
+                    <View style={styles.detailRow}>
+                      {steadinessInsights.trend === 'improving' ? (
+                        <TrendingUp size={12} color={colors.green} />
+                      ) : (
+                        <TrendingDown size={12} color={colors.red} />
                       )}
+                      <Text style={[styles.detailText, { 
+                        color: steadinessInsights.trend === 'improving' ? colors.green : colors.red 
+                      }]}>
+                        {steadinessInsights.trend === 'improving' ? 'Improving' : 'Declining'} through session
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+              
+              {/* Best/Worst Shot */}
+              {steadinessInsights.bestShot !== undefined && steadinessInsights.worstShot !== undefined && (
+                <View style={styles.bestWorstRow}>
+                  <View style={[styles.bestWorstItem, { backgroundColor: `${colors.green}10` }]}>
+                    <ArrowUp size={12} color={colors.green} />
+                    <Text style={[styles.bestWorstText, { color: colors.green }]}>
+                      Shot #{steadinessInsights.bestShot} ({steadinessInsights.bestScore}%)
+                    </Text>
+                  </View>
+                  <View style={[styles.bestWorstItem, { backgroundColor: `${colors.red}10` }]}>
+                    <ArrowDown size={12} color={colors.red} />
+                    <Text style={[styles.bestWorstText, { color: colors.red }]}>
+                      Shot #{steadinessInsights.worstShot} ({steadinessInsights.worstScore}%)
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+          )}
 
-                      {target.notes && (
-                        <Text style={[styles.targetNotes, { color: colors.textMuted }]} numberOfLines={2}>
-                          {target.notes}
+          {/* ═══════════════════════════════════════════════════════════════
+              PILLAR 3: TIMING & RHYTHM
+          ═══════════════════════════════════════════════════════════════ */}
+          {timingInsights && (
+            <View style={[styles.pillarCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.pillarHeader}>
+                <View style={[styles.pillarIcon, { backgroundColor: `${colors.indigo}20` }]}>
+                  <Timer size={16} color={colors.indigo} />
+                </View>
+                <Text style={[styles.pillarTitle, { color: colors.text }]}>Timing</Text>
+                <View style={[styles.consistencyPill, { backgroundColor: `${colors.text}10` }]}>
+                  <Text style={[styles.consistencyPillText, { color: colors.textMuted }]}>
+                    {timingInsights.consistency}
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={styles.timingGrid}>
+                {timingInsights.firstShot !== undefined && (
+                  <View style={styles.timingCell}>
+                    <Text style={[styles.timingValue, { color: colors.text }]}>
+                      {formatTimeMs(timingInsights.firstShot)}
+                    </Text>
+                    <Text style={[styles.timingLabel, { color: colors.textMuted }]}>First Shot</Text>
+                  </View>
+                )}
+                <View style={styles.timingCell}>
+                  <Text style={[styles.timingValue, { color: colors.primary }]}>
+                    {formatTimeMs(timingInsights.avgSplit)}
+                  </Text>
+                  <Text style={[styles.timingLabel, { color: colors.textMuted }]}>Avg Split</Text>
+                </View>
+                <View style={styles.timingCell}>
+                  <Text style={[styles.timingValue, { color: colors.green }]}>
+                    {formatTimeMs(timingInsights.fastest)}
+                  </Text>
+                  <Text style={[styles.timingLabel, { color: colors.textMuted }]}>Fastest</Text>
+                </View>
+                <View style={styles.timingCell}>
+                  <Text style={[styles.timingValue, { color: colors.orange }]}>
+                    {formatTimeMs(timingInsights.slowest)}
+                  </Text>
+                  <Text style={[styles.timingLabel, { color: colors.textMuted }]}>Slowest</Text>
+                </View>
+              </View>
+              
+              {/* SPM and Fatigue */}
+              <View style={styles.timingFooter}>
+                {timingInsights.spm !== undefined && (
+                  <Text style={[styles.spmText, { color: colors.textMuted }]}>
+                    {timingInsights.spm.toFixed(1)} shots/min
+                  </Text>
+                )}
+                {timingInsights.fatigue !== 'none' && (
+                  <View style={[styles.fatigueBadge, { backgroundColor: `${colors.orange}15` }]}>
+                    <Text style={[styles.fatigueBadgeText, { color: colors.orange }]}>
+                      {timingInsights.fatigue === 'significant' ? 'Fatigue detected' : 'Slight slowdown'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════════
+              BREATHING (Only if native sensor)
+          ═══════════════════════════════════════════════════════════════ */}
+          {watchData.hasReliableBreathing && watchData.avgBreathRate && (
+            <View style={[styles.pillarCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.pillarHeader}>
+                <View style={[styles.pillarIcon, { backgroundColor: `${colors.blue}20` }]}>
+                  <Wind size={16} color={colors.blue} />
+                </View>
+                <Text style={[styles.pillarTitle, { color: colors.text }]}>Breathing</Text>
+                <View style={[styles.nativeBadge, { backgroundColor: `${colors.green}20` }]}>
+                  <Text style={[styles.nativeBadgeText, { color: colors.green }]}>Native Sensor</Text>
+                </View>
+              </View>
+              <View style={styles.breathingContent}>
+                <Text style={[styles.breathingValue, { color: colors.text }]}>
+                  {watchData.avgBreathRate}
+                </Text>
+                <Text style={[styles.breathingUnit, { color: colors.textMuted }]}>breaths/min</Text>
+              </View>
+            </View>
+          )}
+        </Animated.View>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          SESSION TIMELINE CHART (from watch biometrics)
+          Uses SessionTimelineChart which has all analytics built-in
+      ══════════════════════════════════════════════════════════════════════ */}
+      {hasTimeline && timeline && timeline.points.length > 0 && (
+        <Animated.View entering={FadeInDown.delay(150).duration(300)} style={styles.timelineSection}>
+          <SessionTimelineChart
+            points={timeline.points}
+            shotDetails={timeline.shotDetails}
+            summary={timeline.summary}
+            compact={false}
+            maxHeight={350}
+          />
+        </Animated.View>
+      )}
+
+      {/* Timeline loading */}
+      {session?.watch_controlled && !hasTimeline && timelineLoading && (
+        <View style={[styles.loadingCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={[styles.loadingCardText, { color: colors.textMuted }]}>Loading watch data...</Text>
+        </View>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          TARGET IMAGES
+      ══════════════════════════════════════════════════════════════════════ */}
+      {targetImages.length > 0 && (
+        <Animated.View entering={FadeInDown.delay(200).duration(300)} style={styles.imagesSection}>
+          <Text style={[styles.sectionTitleSimple, { color: colors.text }]}>Target Scans</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.imagesScroll}
+          >
+            {targetImages.map((img, index) => (
+              <TouchableOpacity
+                key={img.id}
+                style={[styles.imageCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                activeOpacity={0.8}
+              >
+                <View style={styles.imageOverlay}>
+                  <Text style={styles.imageLabel}>#{img.sequence || index + 1}</Text>
+                  <Text style={styles.imageHits}>
+                    {img.isGrouping 
+                      ? (img.dispersion != null ? `${img.dispersion.toFixed(1)}cm` : `${img.shots} shots`)
+                      : img.actualShotsDeclared 
+                        ? `${img.hits}/${img.actualShotsDeclared}`
+                        : `${img.hits} holes`
+                    }
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </Animated.View>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          SESSION TIMELINE (Targets)
+      ══════════════════════════════════════════════════════════════════════ */}
+      {targets.length > 0 && (
+        <Animated.View entering={FadeInDown.delay(250).duration(300)} style={styles.timelineSection}>
+          <Text style={[styles.sectionTitleSimple, { color: colors.text }]}>Timeline</Text>
+          <View style={styles.timeline}>
+            {targets.slice(0, 5).map((target, index) => {
+              const isPaper = target.target_type === 'paper';
+              const result = isPaper ? target.paper_result : target.tactical_result;
+              const shots = result?.bullets_fired ?? 0;
+              const hits = isPaper ? (target.paper_result?.hits_total ?? 0) : (target.tactical_result?.hits ?? 0);
+              const isGrouping = isPaper && target.paper_result?.paper_type === 'grouping';
+              const dispersion = target.paper_result?.dispersion_cm;
+
+              return (
+                <View key={target.id} style={styles.timelineItem}>
+                  {index < Math.min(targets.length, 5) - 1 && (
+                    <View style={[styles.timelineLine, { backgroundColor: colors.border }]} />
+                  )}
+                  <View style={[styles.timelineDot, { backgroundColor: isGrouping ? colors.green : colors.indigo }]}>
+                    <Text style={styles.timelineDotText}>{index + 1}</Text>
+                  </View>
+                  <View style={[styles.timelineContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <View style={styles.timelineRow}>
+                      <Text style={[styles.timelineType, { 
+                        color: isGrouping ? colors.green : colors.indigo 
+                      }]}>
+                        {isGrouping ? 'Grouping' : 'Achievement'}
+                      </Text>
+                      {target.distance_m && (
+                        <Text style={[styles.timelineDistance, { color: colors.textMuted }]}>
+                          {target.distance_m}m
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.timelineStats}>
+                      {isGrouping && dispersion != null ? (
+                        <Text style={[styles.timelineStatText, { color: colors.text }]}>
+                          {dispersion.toFixed(1)}cm group • {shots} shots
+                        </Text>
+                      ) : (
+                        <Text style={[styles.timelineStatText, { color: colors.text }]}>
+                          {hits}/{shots} hits ({shots > 0 ? Math.round((hits/shots)*100) : 0}%)
                         </Text>
                       )}
                     </View>
                   </View>
-                );
-              })}
-            </View>
-          </Animated.View>
-        )}
+                </View>
+              );
+            })}
+            {targets.length > 5 && (
+              <Text style={[styles.moreTargets, { color: colors.textMuted }]}>
+                +{targets.length - 5} more targets
+              </Text>
+            )}
+          </View>
+        </Animated.View>
+      )}
 
-        
-          <LinearGradient
-            style={[styles.viewFullButton, { backgroundColor: colors.indigo }]}
-            colors={[colors.ring, colors.teal]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          >
-            <Text style={styles.viewFullButtonText}>Analyze Session</Text>
-            <ChevronRight size={18} color="#fff" />
-          </LinearGradient>
-      </ScrollView>
-
+      {/* ══════════════════════════════════════════════════════════════════════
+          ACTION BUTTON
+      ══════════════════════════════════════════════════════════════════════ */}
+      <TouchableOpacity activeOpacity={0.85}>
+        <LinearGradient
+          style={styles.actionButton}
+          colors={[colors.ring, colors.teal]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+        >
+          <Text style={styles.actionButtonText}>Analyze Session</Text>
+          <ChevronRight size={18} color="#fff" />
+        </LinearGradient>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 0,
-  },
-  scrollView: {
-    flex: 0,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 24,
-  },
+  container: { flex: 1 },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 32 },
 
-  // Loading
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-  },
-  loadingText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-
-  // Empty
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-    padding: 32,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  backButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginTop: 8,
-  },
-  backButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
+  // Loading & Empty
+  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingTop: 100 },
+  loadingText: { fontSize: 14, fontWeight: '500' },
+  emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 32 },
+  emptyTitle: { fontSize: 18, fontWeight: '600' },
+  backButton: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, borderWidth: 1, marginTop: 8 },
+  backButtonText: { fontSize: 15, fontWeight: '600' },
 
   // Header
-  header: {
-    marginBottom: 16,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  sourceTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
+  header: { marginBottom: 16 },
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sourceTag: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
+  sourceText: { fontSize: 12, fontWeight: '600' },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
+  statusText: { fontSize: 12, fontWeight: '600' },
+  title: { fontSize: 24, fontWeight: '700', letterSpacing: -0.5, marginBottom: 8 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap' },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  metaText: { fontSize: 13, fontWeight: '500' },
 
-  // Session Context
-  contextSection: {
-    marginBottom: 20,
-  },
-  contextCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 14,
-    gap: 12,
-  },
-  contextRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  contextItem: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  contextIconBg: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  contextItemContent: {
-    flex: 1,
-  },
-  contextLabel: {
-    fontSize: 10,
-    fontWeight: '500',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-    marginBottom: 1,
-  },
-  contextValue: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  inputMethodBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    marginTop: 4,
-  },
-  inputMethodText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  trainingContextBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginTop: 4,
-  },
-  trainingContextContent: {
-    flex: 1,
-  },
-  trainingContextLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-  trainingContextTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  sourceText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-    marginBottom: 8,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    flexWrap: 'wrap',
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  metaText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
+  // Context Section
+  contextSection: { marginBottom: 16 },
+  contextCard: { borderRadius: 12, borderWidth: 1, padding: 12 },
+  contextGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  contextChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.03)' },
+  contextChipText: { fontSize: 13, fontWeight: '600' },
 
-  // Stats Section
-  statsSection: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-    marginBottom: 12,
-  },
-  entryBreakdown: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  entryBreakdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  entryBreakdownDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  entryBreakdownText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  accuracyNote: {
-    fontSize: 11,
-    fontStyle: 'italic',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    minWidth: '45%',
-    padding: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-    alignItems: 'center',
-    gap: 8,
-  },
-  statIconBg: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
-  statLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  emptyStats: {
-    alignItems: 'center',
-    padding: 32,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 12,
-    marginBottom: 24,
-  },
-  emptyStatsText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
+  // Quick Stats
+  statsSection: { marginBottom: 16 },
+  quickStatsRow: { flexDirection: 'row', gap: 10 },
+  quickStat: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 12, borderWidth: 1 },
+  quickStatValue: { fontSize: 20, fontWeight: '800' },
+  quickStatLabel: { fontSize: 10, fontWeight: '500', marginTop: 2, textTransform: 'uppercase' },
 
-  // Images Section
-  imagesSection: {
-    marginBottom: 24,
-  },
-  imagesScroll: {
-    gap: 12,
-  },
-  imageCard: {
-    width: IMAGE_SIZE,
-    height: IMAGE_SIZE,
-    borderRadius: 12,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  targetImage: {
-    width: '100%',
-    height: '100%',
-  },
-  imageOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-  },
-  imageLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  imageHits: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#22C55E',
-  },
+  // Section Headers
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  sectionTitle: { fontSize: 16, fontWeight: '700' },
+  sectionTitleSimple: { fontSize: 16, fontWeight: '700', marginBottom: 12 },
 
-  // Timeline Section
-  timelineSection: {
-    marginBottom: 24,
-  },
-  timeline: {
-    gap: 0,
-  },
-  timelineItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    position: 'relative',
-  },
-  timelineLine: {
-    position: 'absolute',
-    left: 14,
-    top: 32,
-    bottom: -16,
-    width: 2,
-  },
-  timelineDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1,
-  },
-  timelineDotText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  timelineContent: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 12,
-  },
-  timelineHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  timelineBadges: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  targetTypeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  entryMethodBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 4,
-  },
-  entryMethodText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  targetTypeText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  distanceText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  timelineStats: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  timelineStat: {
-    alignItems: 'center',
-  },
-  timelineStatValue: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  timelineStatLabel: {
-    fontSize: 10,
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  targetNotes: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: 8,
-    fontStyle: 'italic',
-  },
+  // Insights Section
+  insightsSection: { marginBottom: 20, gap: 12 },
 
-  // Biometrics Section
-  biometricsSection: {
-    marginBottom: 24,
-    gap: 12,
-  },
-  biometricsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  bioRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  bioCard: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  bioIconBg: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bioContent: {
-    flex: 1,
-  },
-  bioLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  bioValues: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 4,
-  },
-  bioValue: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  bioUnit: {
-    fontSize: 10,
-    fontWeight: '500',
-  },
-  steadinessCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  steadinessContent: {
-    flex: 1,
-  },
-  steadinessValue: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  trendBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  trendText: {
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
-  splitsSection: {
-    gap: 8,
-  },
-  splitsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  splitsTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  splitsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  splitCard: {
-    flex: 1,
-    alignItems: 'center',
-    padding: 10,
-    borderRadius: 10,
-    gap: 2,
-  },
-  splitValue: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  splitLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  shotBioSection: {
-    gap: 8,
-  },
-  shotBioTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  shotBioScroll: {
-    gap: 8,
-  },
-  shotBioChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  shotBioNum: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  shotBioStat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  shotBioValue: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  phaseDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
+  // Pillar Cards
+  pillarCard: { borderRadius: 14, borderWidth: 1, padding: 14, gap: 12 },
+  pillarHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  pillarIcon: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  pillarTitle: { flex: 1, fontSize: 14, fontWeight: '700' },
+  trendPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  trendPillText: { fontSize: 11, fontWeight: '700' },
+  gradePill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  gradePillText: { fontSize: 11, fontWeight: '700' },
+  consistencyPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  consistencyPillText: { fontSize: 10, fontWeight: '600' },
+  nativeBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  nativeBadgeText: { fontSize: 10, fontWeight: '600' },
 
-  // Performance Insights Section
-  insightsSection: {
-    marginBottom: 24,
-    gap: 12,
-  },
-  insightsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  insightsCard: {
-    padding: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  insightsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-  },
-  insightMetric: {
-    alignItems: 'center',
-  },
-  insightValue: {
-    fontSize: 22,
-    fontWeight: '800',
-  },
-  insightLabel: {
-    fontSize: 10,
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  insightTrendBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  insightTrendText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  loadingInsightsText: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: 8,
-  },
+  // Pillar Metrics
+  pillarMetrics: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  metricBlock: { alignItems: 'center' },
+  metricValue: { fontSize: 24, fontWeight: '800' },
+  metricLabel: { fontSize: 10, fontWeight: '500', marginTop: 2 },
+  metricDivider: { width: 1, height: 24, backgroundColor: 'rgba(0,0,0,0.1)' },
+  pillarFooter: { paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)' },
+  footerText: { fontSize: 11, fontWeight: '500' },
+  subMetric: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTopWidth: 1 },
+  subMetricLabel: { fontSize: 12, fontWeight: '500' },
+  subMetricValue: { fontSize: 13, fontWeight: '700' },
 
-  // Shot Bars
-  shotBarsCard: {
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  shotBarsTitle: {
-    fontSize: 10,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  shotBarsContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    gap: 3,
-    height: 60,
-  },
-  shotBarColumn: {
-    alignItems: 'center',
-    gap: 3,
-  },
-  shotBarFill: {
-    width: 8,
-    borderRadius: 2,
-  },
-  breathDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-  },
-  shotBarLabel: {
-    fontSize: 7,
-    fontWeight: '500',
-  },
-  shotBarsMore: {
-    fontSize: 9,
-    textAlign: 'center',
-    marginTop: 6,
-  },
-  barsLegend: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 14,
-    marginTop: 10,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  legendDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  legendText: {
-    fontSize: 9,
-    fontWeight: '500',
-  },
+  // Steadiness
+  steadinessMain: { flexDirection: 'row', alignItems: 'center', gap: 20 },
+  steadinessScore: { flexDirection: 'row', alignItems: 'baseline' },
+  bigScore: { fontSize: 42, fontWeight: '800' },
+  bigScoreUnit: { fontSize: 18, fontWeight: '600', marginLeft: 2 },
+  steadinessDetails: { flex: 1, gap: 6 },
+  detailRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  detailText: { fontSize: 12, fontWeight: '500' },
+  bestWorstRow: { flexDirection: 'row', gap: 8 },
+  bestWorstItem: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8 },
+  bestWorstText: { fontSize: 11, fontWeight: '600' },
 
-  // Best/Worst
-  bestWorstRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  bestWorstCard: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  bestWorstValue: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  bestWorstScore: {
-    fontSize: 10,
-    fontWeight: '500',
-  },
+  // Timing
+  timingGrid: { flexDirection: 'row', justifyContent: 'space-between' },
+  timingCell: { alignItems: 'center', flex: 1 },
+  timingValue: { fontSize: 16, fontWeight: '700' },
+  timingLabel: { fontSize: 9, fontWeight: '500', marginTop: 2, textTransform: 'uppercase' },
+  timingFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)' },
+  spmText: { fontSize: 12, fontWeight: '600' },
+  fatigueBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  fatigueBadgeText: { fontSize: 10, fontWeight: '600' },
 
-  // Breath Breakdown
-  breathBreakdownCard: {
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  breathBreakdownTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 10,
-  },
-  breathBar: {
-    flexDirection: 'row',
-    height: 24,
-    borderRadius: 6,
-    overflow: 'hidden',
-  },
-  breathSegment: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  breathSegmentText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  breathBreakdownLegend: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 10,
-  },
-  breathLegendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  breathLegendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  breathLegendText: {
-    fontSize: 10,
-    fontWeight: '500',
-  },
+  // Breathing
+  breathingContent: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  breathingValue: { fontSize: 28, fontWeight: '800' },
+  breathingUnit: { fontSize: 14, fontWeight: '500' },
 
-  // View Full Button
-  viewFullButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    padding: 16,
-    borderRadius: 14,
-    marginTop: 8,
-  },
-  viewFullButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#fff',
-  },
+  // Shot Visualization
+  shotVizSection: { marginBottom: 20 },
+  shotVizCard: { borderRadius: 14, borderWidth: 1, padding: 16 },
+  shotBarsContainer: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 4, height: 70, marginBottom: 12 },
+  shotBarColumn: { alignItems: 'center', gap: 4 },
+  shotBar: { width: 10, borderRadius: 3 },
+  shotBarBest: { borderWidth: 2, borderColor: 'rgba(16,185,129,0.8)' },
+  shotBarWorst: { borderWidth: 2, borderColor: 'rgba(239,68,68,0.8)' },
+  shotNum: { fontSize: 8, fontWeight: '500' },
+  moreShots: { fontSize: 10, textAlign: 'center', marginBottom: 12 },
+  shotSummaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)' },
+  shotSummaryItem: { alignItems: 'center' },
+  shotSummaryValue: { fontSize: 18, fontWeight: '800' },
+  shotSummaryLabel: { fontSize: 9, fontWeight: '500', marginTop: 2 },
+  trendIndicator: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  trendIndicatorText: { fontSize: 11, fontWeight: '600', textTransform: 'capitalize' },
+
+  // Loading Card
+  loadingCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 16, borderRadius: 12, borderWidth: 1, marginBottom: 16 },
+  loadingCardText: { fontSize: 13, fontWeight: '500' },
+
+  // Images
+  imagesSection: { marginBottom: 20 },
+  imagesScroll: { gap: 12 },
+  imageCard: { width: IMAGE_SIZE, height: IMAGE_SIZE, borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
+  imageOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6 },
+  imageLabel: { fontSize: 11, fontWeight: '600', color: '#fff' },
+  imageHits: { fontSize: 11, fontWeight: '700', color: '#22C55E' },
+
+  // Timeline
+  timelineSection: { marginBottom: 20 },
+  timeline: { gap: 0 },
+  timelineItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, position: 'relative' },
+  timelineLine: { position: 'absolute', left: 11, top: 26, bottom: -10, width: 2 },
+  timelineDot: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
+  timelineDotText: { fontSize: 10, fontWeight: '700', color: '#fff' },
+  timelineContent: { flex: 1, padding: 10, borderRadius: 10, borderWidth: 1, marginBottom: 10 },
+  timelineRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  timelineType: { fontSize: 12, fontWeight: '700' },
+  timelineDistance: { fontSize: 11, fontWeight: '500' },
+  timelineStats: {},
+  timelineStatText: { fontSize: 13, fontWeight: '600' },
+  moreTargets: { fontSize: 11, textAlign: 'center', marginTop: 4 },
+
+  // Action Button
+  actionButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 16, borderRadius: 14, marginTop: 8 },
+  actionButtonText: { fontSize: 15, fontWeight: '700', color: '#fff' },
 });

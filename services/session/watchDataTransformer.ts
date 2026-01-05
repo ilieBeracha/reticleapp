@@ -38,6 +38,8 @@ export function transformSummaryPayload(payload: WatchSummaryPayload): Transform
   const hrStart = isV2Format ? bio.hr.start : undefined;
   const hrEnd = isV2Format ? bio.hr.end : undefined;
   const brAvg = isV2Format ? bio.breath.avg : bio.brAvg;
+  // Breathing source: "native" = device sensor, "estimated" = HRV-derived, "none" = unavailable
+  const breathSource = isV2Format ? bio.breath.source : 'estimated';
   const stressAvg = isV2Format ? bio.stress?.avg : undefined;
   const stressMin = isV2Format ? bio.stress?.min : undefined;
   const stressMax = isV2Format ? bio.stress?.max : undefined;
@@ -97,6 +99,8 @@ export function transformSummaryPayload(payload: WatchSummaryPayload): Transform
         startHR: hrStart,
         endHR: hrEnd,
         avgBreathRate: brAvg,
+        // Breathing source: "native" = device sensor, "estimated" = HRV-derived, "none" = unavailable
+        breathingSource: breathSource as 'native' | 'estimated' | 'none',
         avgStress: stressAvg,
         minStress: stressMin,
         maxStress: stressMax,

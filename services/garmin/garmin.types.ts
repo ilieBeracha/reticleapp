@@ -66,12 +66,17 @@ export interface GarminPerformance {
   lastThreeAvg?: number;       // Last 3 shots avg (fatigue indicator)
 }
 
+/** Breathing data source indicator */
+export type BreathingSource = 'native' | 'estimated' | 'none';
+
 /** Biometrics summary from watch */
 export interface BiometricsSummary {
   minHR?: number;
   maxHR?: number;
   avgHR?: number;
   avgBreathRate?: number;
+  /** Breathing data source: 'native' = device sensor, 'estimated' = HRV-derived, 'none' = unavailable */
+  breathingSource?: BreathingSource;
   hrSamples?: number;
   breathSamples?: number;
   shotCount?: number;

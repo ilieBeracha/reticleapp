@@ -42,6 +42,7 @@ export interface ActiveSessionCardProps {
   session: HomeSession;
   colors: Colors;
   onPress: () => void;
+  onCancel?: () => void;
 }
 
 /** Props for StartPracticeCard */

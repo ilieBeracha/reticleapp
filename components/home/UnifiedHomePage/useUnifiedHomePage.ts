@@ -14,10 +14,10 @@ import { Alert } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModals } from '@/contexts/ModalContext';
 import {
-    deleteSession,
-    getMyActivePersonalSession,
-    getRecentSessionsWithStats,
-    type SessionWithDetails,
+  deleteSession,
+  getMyActivePersonalSession,
+  getRecentSessionsWithStats,
+  type SessionWithDetails,
 } from '@/services/sessionService';
 import { useGarminStore } from '@/store/garminStore';
 import { useSessionStore } from '@/store/sessionStore';
@@ -27,11 +27,11 @@ import { mapSessionToHomeSession, type HomeSession } from '../types';
 import { useHomeState } from '../useHomeState';
 import { RECENT_SESSIONS_LIMIT, SESSION_FETCH_DAYS, SESSION_FETCH_LIMIT } from './UnifiedHomePage.constants';
 import {
-    calculateLastSessionDaysAgo,
-    calculateStreak,
-    calculateWeeklyStats,
-    getCoachMessage,
-    getGreeting,
+  calculateLastSessionDaysAgo,
+  calculateStreak,
+  calculateWeeklyStats,
+  getCoachMessage,
+  getGreeting,
 } from './UnifiedHomePage.helpers';
 import type { WeeklyStats } from './UnifiedHomePage.types';
 
@@ -242,6 +242,17 @@ export function useUnifiedHomePage() {
     router.push(`/(protected)/trainingDetail?id=${training.id}`);
   }, []);
 
+  const handleCancelSession = useCallback(async () => {
+    if (!homeState.activeSession?.sourceSession) return;
+    try {
+      await deleteSession(homeState.activeSession.sourceSession.id);
+      await loadAllSessions();
+    } catch (error) {
+      console.error('Failed to cancel session:', error);
+      Alert.alert('Error', 'Failed to cancel session');
+    }
+  }, [homeState.activeSession, loadAllSessions]);
+
   // ═══════════════════════════════════════════════════════════════════════════
   // RETURN
   // ═══════════════════════════════════════════════════════════════════════════
@@ -274,6 +285,7 @@ export function useUnifiedHomePage() {
     onRefresh,
     handleStartSession,
     handleActiveSessionPress,
+    handleCancelSession,
     handleSessionPress,
     handleTrainingPress,
   };

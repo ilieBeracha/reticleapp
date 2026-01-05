@@ -59,6 +59,8 @@ export interface WatchSummaryPayload {
     /** Breath metrics */
     breath: {
       avg: number;
+      /** Source: "native" = device sensor, "estimated" = HRV-derived, "none" = unavailable */
+      source?: 'native' | 'estimated' | 'none';
     };
   } | {
     // Legacy flat format (backward compat)
@@ -164,6 +166,8 @@ export interface TransformedWatchData {
       startHR?: number;
       endHR?: number;
       avgBreathRate: number;
+      /** Source: "native" = device sensor, "estimated" = HRV-derived, "none" = unavailable */
+      breathingSource?: 'native' | 'estimated' | 'none';
       avgStress?: number;
       minStress?: number;
       maxStress?: number;

@@ -507,8 +507,8 @@ export default function WatchSessionResultPage() {
           </Animated.View>
         )}
 
-        {/* Breathing Summary */}
-        {biometrics?.summary?.avgBreathRate && (
+        {/* Breathing Summary - Only show if native sensor (estimated is unreliable - shows 4 bpm) */}
+        {biometrics?.summary?.avgBreathRate && biometrics.summary.breathingSource === 'native' && (
           <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Breathing</Text>
             <View style={[styles.breathCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -519,7 +519,9 @@ export default function WatchSessionResultPage() {
                 <Text style={[styles.breathValue, { color: colors.text }]}>
                   {biometrics.summary.avgBreathRate} <Text style={styles.breathUnit}>breaths/min</Text>
                 </Text>
-                <Text style={[styles.breathLabel, { color: colors.textMuted }]}>Average Breathing Rate</Text>
+                <Text style={[styles.breathLabel, { color: colors.textMuted }]}>
+                  From device respiration sensor
+                </Text>
               </View>
             </View>
           </Animated.View>

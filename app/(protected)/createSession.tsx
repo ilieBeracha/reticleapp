@@ -246,7 +246,7 @@ export default function CreateSessionScreen() {
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={[styles.scrollContent, {  paddingTop: insets.top - 20 }]}
+      contentContainerStyle={[styles.scrollContent]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    flexGrow: 1,
+
     paddingHorizontal: 20,
   },
   
