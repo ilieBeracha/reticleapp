@@ -24,7 +24,8 @@ import type {
     GarminServiceEvent,
     GarminSessionData,
     GarminSteadiness,
-    GarminTimelineData
+    GarminTimelineData,
+    WatchErrorPayload
 } from './garmin.types';
 
 // ============================================================================
@@ -536,12 +537,54 @@ function sendSessionAck(
 }
 
 // ============================================================================
+// WATCH ERROR HANDLER
+// ============================================================================
+
+/**
+ * Handle ERROR messages from the watch.
+ * These report communication failures, ACK timeouts, and sync issues.
+ */
+export function handleWatchErrorMessage(
+    parsedPayload: Record<string, unknown>
+): void {
+    const payload = parsedPayload as unknown as WatchErrorPayload;
+    const { code, message, timestamp, errorCount } = payload;
+
+    // Convert Unix timestamp to ISO string
+    const deviceTime = timestamp > 0
+        ? new Date(timestamp * 1000).toISOString()
+        : new Date().toISOString();
+
+    // Log error with full context
+    console.error(`[GarminHandlers] 🚨 WATCH ERROR: ${code}`);
+    console.error(`[GarminHandlers] 🚨 Message: ${message}`);
+    console.error(`[GarminHandlers] 🚨 Device time: ${deviceTime}`);
+    console.error(`[GarminHandlers] 🚨 Total errors this session: ${errorCount}`);
+
+    // Log specific guidance based on error code
+    switch (code) {
+        case 'SEND_FAILED':
+            console.warn('[GarminHandlers] ⚠️ Check Bluetooth connection to watch');
+            break;
+        case 'ACK_TIMEOUT':
+            console.warn('[GarminHandlers] ⚠️ Phone may not be receiving messages - check app is in foreground');
+            break;
+        case 'SYNC_PARTIAL':
+            console.warn('[GarminHandlers] ⚠️ Some timeline data may be missing - data saved on watch for retry');
+            break;
+        default:
+            console.warn(`[GarminHandlers] ⚠️ Unknown error code: ${code}`);
+    }
+}
+
+// ============================================================================
 // MESSAGE TYPE CONSTANTS
 // ============================================================================
 
 /** Message types that are handled by this module */
 export const HANDLED_MESSAGE_TYPES = [
     'ACK',
+    'ERROR',
     'SESSION_DATA',
     'SESSION_RESULT',
     'SESSION_ENDED',
@@ -593,6 +636,12 @@ export function routeMessage(
     // ACK messages
     if (type === 'ACK') {
         handleAckMessage(parsedPayload, handleAckReceived);
+        return true;
+    }
+
+    // Error messages from watch
+    if (type === 'ERROR') {
+        handleWatchErrorMessage(parsedPayload as Record<string, unknown>);
         return true;
     }
 

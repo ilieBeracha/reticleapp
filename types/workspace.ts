@@ -134,6 +134,7 @@ export interface Training {
   description?: string | null;
   scheduled_at: string;
   manual_start?: boolean; // If true, commander starts training manually (no auto-start)
+  auto_close_at?: string | null; // If set, training auto-closes at this time
   status: TrainingStatus;
   started_at?: string | null; // When training was actually started
   ended_at?: string | null; // When training was finished
@@ -304,6 +305,7 @@ export interface UpdateTrainingInput {
   description?: string;
   scheduled_at?: string;
   status?: TrainingStatus;
+  auto_close_at?: string | null;
 }
 
 // =====================================================

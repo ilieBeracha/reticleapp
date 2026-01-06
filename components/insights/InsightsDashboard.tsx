@@ -1,12 +1,77 @@
 import { useColors } from '@/hooks/ui/useColors';
 import { getRecentSessionsWithStats, type SessionWithDetails } from '@/services/sessionService';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-// Time filter type
-type TimeFilter = 'week' | 'month' | 'year' | 'all';
+// ============================================================================
+// FILTER TYPES
+// ============================================================================
 
-// Time filter button component
+type TimeFilter = 'week' | 'month' | 'year' | 'all';
+type SourceFilter = 'all' | 'watch' | 'manual';
+type ContextFilter = 'all' | 'personal' | 'team';
+
+interface InsightFilters {
+  time: TimeFilter;
+  source: SourceFilter;
+  context: ContextFilter;
+}
+
+const DEFAULT_FILTERS: InsightFilters = {
+  time: 'all',
+  source: 'all',
+  context: 'all',
+};
+
+// ============================================================================
+// FILTER CHIP COMPONENT
+// ============================================================================
+
+interface FilterChipProps {
+  label: string;
+  icon?: string;
+  selected: boolean;
+  onPress: () => void;
+  colors: ReturnType<typeof useColors>;
+}
+
+function FilterChip({ label, icon, selected, onPress, colors }: FilterChipProps) {
+  return (
+    <TouchableOpacity
+      style={[
+        styles.filterChip,
+        { 
+          backgroundColor: selected ? colors.primary : colors.card,
+          borderColor: selected ? colors.primary : colors.border,
+        }
+      ]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      {icon && (
+        <Ionicons 
+          name={icon as any} 
+          size={14} 
+          color={selected ? '#fff' : colors.textMuted} 
+          style={styles.filterChipIcon}
+        />
+      )}
+      <Text style={[
+        styles.filterChipText,
+        { color: selected ? '#fff' : colors.text }
+      ]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+// ============================================================================
+// TIME FILTER BUTTON
+// ============================================================================
+
 function TimeFilterButton({ 
   filter, 
   selected, 
@@ -131,6 +196,7 @@ function CompactStatsRow({ sessions }: { sessions: SessionWithDetails[] }) {
 
 export function InsightsDashboard() {
   const colors = useColors();
+  const router = useRouter();
 
   // Original insights data (for streak)
   const {
@@ -145,8 +211,27 @@ export function InsightsDashboard() {
   const [loadingStats, setLoadingStats] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   
-  // Time filter state
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
+  // Filter state
+  const [filters, setFilters] = useState<InsightFilters>(DEFAULT_FILTERS);
+  
+  // Filter update helper
+  const updateFilter = useCallback(<K extends keyof InsightFilters>(key: K, value: InsightFilters[K]) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  }, []);
+  
+  // Count active filters (excluding 'all' selections)
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.time !== 'all') count++;
+    if (filters.source !== 'all') count++;
+    if (filters.context !== 'all') count++;
+    return count;
+  }, [filters]);
+  
+  // Reset filters
+  const resetFilters = useCallback(() => {
+    setFilters(DEFAULT_FILTERS);
+  }, []);
 
   const loadSessionsWithStats = useCallback(async () => {
     try {
@@ -169,21 +254,38 @@ export function InsightsDashboard() {
     setRefreshing(false);
   }, [storeRefresh, loadSessionsWithStats]);
 
-  // Filter sessions based on time selection
+  // Filter sessions based on all filter selections
   const filteredSessions = useMemo(() => {
-    if (timeFilter === 'all') return sessionsWithStats;
-    
-    const now = new Date();
-    const thresholdDays: Record<Exclude<TimeFilter, 'all'>, number> = {
-      week: 7,
-      month: 30,
-      year: 365,
-    };
-    const days = thresholdDays[timeFilter];
-    const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-    
-    return sessionsWithStats.filter(s => new Date(s.started_at) >= cutoff);
-  }, [sessionsWithStats, timeFilter]);
+    return sessionsWithStats.filter(session => {
+      // Time filter
+      if (filters.time !== 'all') {
+        const now = new Date();
+        const thresholdDays: Record<Exclude<TimeFilter, 'all'>, number> = {
+          week: 7,
+          month: 30,
+          year: 365,
+        };
+        const days = thresholdDays[filters.time];
+        const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+        if (new Date(session.started_at) < cutoff) return false;
+      }
+      
+      // Source filter (watch vs manual)
+      if (filters.source !== 'all') {
+        if (filters.source === 'watch' && !session.watch_controlled) return false;
+        if (filters.source === 'manual' && session.watch_controlled) return false;
+      }
+      
+      // Context filter (personal vs team)
+      if (filters.context !== 'all') {
+        const hasTeam = session.team_id !== null;
+        if (filters.context === 'team' && !hasTeam) return false;
+        if (filters.context === 'personal' && hasTeam) return false;
+      }
+      
+      return true;
+    });
+  }, [sessionsWithStats, filters]);
 
   const isLoading = storeLoading || loadingStats;
 
@@ -207,20 +309,78 @@ export function InsightsDashboard() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.text} />
         }
       >
-        {/* Header with Filter */}
+        {/* Header */}
         <View style={styles.headerRow}>
           <Text style={[styles.pageTitle, { color: colors.text }]}>Insights</Text>
+        </View>
+
+        {/* Filter Bar */}
+        <View style={styles.filterSection}>
+          {/* Time Filter Row */}
           <View style={styles.filterRow}>
             {(['week', 'month', 'year', 'all'] as TimeFilter[]).map((filter) => (
               <TimeFilterButton
                 key={filter}
                 filter={filter}
-                selected={timeFilter === filter}
-                onPress={() => setTimeFilter(filter)}
+                selected={filters.time === filter}
+                onPress={() => updateFilter('time', filter)}
                 colors={colors}
               />
             ))}
           </View>
+          
+          {/* Additional Filters Row */}
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterChipsRow}
+          >
+            {/* Source */}
+            <FilterChip
+              label="Watch"
+              icon="watch-outline"
+              selected={filters.source === 'watch'}
+              onPress={() => updateFilter('source', filters.source === 'watch' ? 'all' : 'watch')}
+              colors={colors}
+            />
+            <FilterChip
+              label="Manual"
+              icon="create-outline"
+              selected={filters.source === 'manual'}
+              onPress={() => updateFilter('source', filters.source === 'manual' ? 'all' : 'manual')}
+              colors={colors}
+            />
+            
+            <View style={styles.filterSpacer} />
+            
+            {/* Context */}
+            <FilterChip
+              label="Personal"
+              icon="person-outline"
+              selected={filters.context === 'personal'}
+              onPress={() => updateFilter('context', filters.context === 'personal' ? 'all' : 'personal')}
+              colors={colors}
+            />
+            <FilterChip
+              label="Team"
+              icon="people-outline"
+              selected={filters.context === 'team'}
+              onPress={() => updateFilter('context', filters.context === 'team' ? 'all' : 'team')}
+              colors={colors}
+            />
+          </ScrollView>
+          
+          {/* Active filter indicator & reset */}
+          {activeFilterCount > 0 && (
+            <View style={styles.activeFiltersRow}>
+              <Text style={[styles.activeFiltersText, { color: colors.textMuted }]}>
+                {activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active • {filteredSessions.length} session{filteredSessions.length !== 1 ? 's' : ''}
+              </Text>
+              <TouchableOpacity onPress={resetFilters}>
+                <Text style={[styles.clearFiltersText, { color: colors.primary }]}>Clear all</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {hasData ? (
@@ -228,6 +388,24 @@ export function InsightsDashboard() {
             {/* Overview Section */}
             <SectionHeader title="Overview" />
             <CompactStatsRow sessions={filteredSessions} />
+
+            {/* View All Sessions Button */}
+            <TouchableOpacity
+              style={[styles.viewAllButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={() => router.push('/sessionHistory')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.viewAllContent}>
+                <Ionicons name="list-outline" size={20} color={colors.text} />
+                <View style={styles.viewAllText}>
+                  <Text style={[styles.viewAllTitle, { color: colors.text }]}>Session History</Text>
+                  <Text style={[styles.viewAllSubtitle, { color: colors.textMuted }]}>
+                    View all {sessionsWithStats.length} sessions with filters
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+            </TouchableOpacity>
 
             {/* Trends Section */}
             <SectionHeader title="Trends" subtitle="Your progress over time" />
@@ -274,27 +452,77 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 8 : 16,
   },
   
-  // Header with filter
+  // Header
   headerRow: {
-    marginBottom: 8,
+    marginBottom: 4,
   },
   pageTitle: {
     fontSize: 28,
     fontWeight: '800',
     letterSpacing: -0.5,
-    marginBottom: 12,
+  },
+  
+  // Filter Section
+  filterSection: {
+    marginTop: 12,
+    marginBottom: 4,
   },
   filterRow: {
     flexDirection: 'row',
     gap: 8,
+    marginBottom: 14,
   },
   filterButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
     borderWidth: 1,
   },
   filterButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  
+  // Filter Chips
+  filterChipsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingRight: 20,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  filterChipIcon: {
+    marginRight: 6,
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  filterSpacer: {
+    width: 12,
+  },
+  
+  // Active filters indicator
+  activeFiltersRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(128, 128, 128, 0.2)',
+  },
+  activeFiltersText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  clearFiltersText: {
     fontSize: 13,
     fontWeight: '600',
   },
@@ -352,6 +580,32 @@ const styles = StyleSheet.create({
 
   bottomSpacer: {
     height: 100,
+  },
+
+  // View All Button
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 16,
+  },
+  viewAllContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  viewAllText: {
+    gap: 2,
+  },
+  viewAllTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  viewAllSubtitle: {
+    fontSize: 12,
   },
 });
 

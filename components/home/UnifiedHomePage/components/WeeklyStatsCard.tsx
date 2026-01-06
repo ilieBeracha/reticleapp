@@ -1,13 +1,12 @@
 /**
  * WeeklyStatsCard Component
  * 
- * Displays weekly shooting statistics in a compact card.
+ * Displays weekly shooting statistics in a compact, visually appealing card.
  */
 
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Clock, Crosshair, Flame, Target, TrendingUp } from 'lucide-react-native';
-import { styles } from '../UnifiedHomePage.styles';
 import { STREAK_DISPLAY_THRESHOLD } from '../UnifiedHomePage.constants';
 import { formatDuration } from '../UnifiedHomePage.helpers';
 import type { WeeklyStatsCardProps } from '../UnifiedHomePage.types';
@@ -16,50 +15,49 @@ export function WeeklyStatsCard({ stats, streak, colors }: WeeklyStatsCardProps)
   if (stats.sessions === 0) return null;
 
   return (
-    <View style={[styles.weeklyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <View style={[localStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       {/* Header with streak */}
-      <View style={styles.weeklyHeader}>
-        <Text style={[styles.weeklyTitle, { color: colors.text }]}>This Week</Text>
-        <View style={styles.weeklyHeaderRight}>
-          {streak >= STREAK_DISPLAY_THRESHOLD && (
-            <View style={[styles.streakBadge, { backgroundColor: '#F9731615' }]}>
-              <Flame size={12} color="#F97316" />
-              <Text style={styles.streakText}>{streak}d</Text>
-            </View>
-          )}
-          <Text style={[styles.weeklySessionCount, { color: colors.textMuted }]}>
-            {stats.sessions} session{stats.sessions !== 1 ? 's' : ''}
-          </Text>
+      <View style={localStyles.header}>
+        <View style={localStyles.headerLeft}>
+          <Text style={[localStyles.title, { color: colors.text }]}>This Week</Text>
+          <View style={[localStyles.sessionBadge, { backgroundColor: `${colors.primary}15` }]}>
+            <Text style={[localStyles.sessionBadgeText, { color: colors.primary }]}>
+              {stats.sessions} session{stats.sessions !== 1 ? 's' : ''}
+            </Text>
+          </View>
         </View>
+        {streak >= STREAK_DISPLAY_THRESHOLD && (
+          <View style={localStyles.streakBadge}>
+            <Flame size={14} color="#F97316" fill="#F97316" />
+            <Text style={localStyles.streakText}>{streak} day streak</Text>
+          </View>
+        )}
       </View>
 
-      {/* Stats Row */}
-      <View style={styles.weeklyStatsRow}>
+      {/* Stats Grid */}
+      <View style={localStyles.statsGrid}>
         <StatItem
-          icon={<Target size={14} color={colors.indigo} />}
+          icon={<Target size={16} color={colors.indigo} />}
           value={stats.shots.toLocaleString()}
-          label="shots"
+          label="Shots"
           colors={colors}
         />
-        <View style={[styles.weeklyStatDivider, { backgroundColor: colors.border }]} />
         <StatItem
-          icon={<TrendingUp size={14} color={colors.green} />}
+          icon={<TrendingUp size={16} color={colors.green} />}
           value={`${stats.accuracy}%`}
-          label="accuracy"
+          label="Accuracy"
           colors={colors}
         />
-        <View style={[styles.weeklyStatDivider, { backgroundColor: colors.border }]} />
         <StatItem
-          icon={<Crosshair size={14} color={colors.orange} />}
+          icon={<Crosshair size={16} color={colors.orange} />}
           value={stats.bestGroup}
-          label="best"
+          label="Best Group"
           colors={colors}
         />
-        <View style={[styles.weeklyStatDivider, { backgroundColor: colors.border }]} />
         <StatItem
-          icon={<Clock size={14} color={colors.blue} />}
+          icon={<Clock size={16} color={colors.blue} />}
           value={formatDuration(stats.totalTimeMinutes)}
-          label="time"
+          label="Time"
           colors={colors}
         />
       </View>
@@ -76,11 +74,88 @@ interface StatItemProps {
 
 function StatItem({ icon, value, label, colors }: StatItemProps) {
   return (
-    <View style={styles.weeklyStat}>
-      {icon}
-      <Text style={[styles.weeklyStatValue, { color: colors.text }]}>{value}</Text>
-      <Text style={[styles.weeklyStatLabel, { color: colors.textMuted }]}>{label}</Text>
+    <View style={localStyles.stat}>
+      <View style={localStyles.statHeader}>
+        {icon}
+        <Text style={[localStyles.statLabel, { color: colors.textMuted }]}>{label}</Text>
+      </View>
+      <Text style={[localStyles.statValue, { color: colors.text }]}>{value}</Text>
     </View>
   );
 }
+
+const localStyles = StyleSheet.create({
+  card: {
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 14,
+    padding: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  title: {
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  sessionBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  sessionBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#F9731610',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  streakText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#F97316',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  stat: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: 'rgba(128, 128, 128, 0.05)',
+    borderRadius: 10,
+    padding: 12,
+  },
+  statHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  statLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+});
 

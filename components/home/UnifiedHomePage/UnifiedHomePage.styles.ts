@@ -64,11 +64,11 @@ export const styles = StyleSheet.create({
   // COACH MESSAGE
   // ═══════════════════════════════════════════════════════════════════════════
   coachMessage: {
-    fontSize: 15,
-    fontWeight: '500',
-    lineHeight: 22,
-    marginBottom: 24,
-    opacity: 0.85,
+    fontSize: 14,
+    fontWeight: '400',
+    lineHeight: 20,
+    marginBottom: 20,
+    opacity: 0.7,
     width: '65%',
   },
 

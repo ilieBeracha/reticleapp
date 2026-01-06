@@ -19,6 +19,7 @@ import type { DrillPreset } from '@/services/presetService';
 import type { BaseSessionConfig } from '@/services/session/types';
 import { createSession, deleteSession, getMyActiveSession } from '@/services/sessionService';
 import { useSessionStore } from '@/store/sessionStore';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -147,18 +148,6 @@ export default function CreateSessionScreen() {
     }, 150);
   }, [creation]);
 
-  // Purpose label for step 2 header
-  const getPurposeLabel = (purpose: SessionPurpose | null): string => {
-    const labels: Record<SessionPurpose, string> = {
-      grouping: 'Grouping',
-      achievement: 'Target Hits',
-      zeroing: 'Zeroing',
-      physical: 'Stress Drill',
-      custom: 'Custom',
-    };
-    return purpose ? labels[purpose] : '';
-  };
-
   const handlePresetSelect = useCallback((preset: DrillPreset) => {
     setSelectedPreset(preset);
     setShowPresetPicker(false);
@@ -204,9 +193,8 @@ export default function CreateSessionScreen() {
 
   if (checkingSession) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator color={colors.text} size="large" />
-        <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+        <ActivityIndicator color={colors.textMuted} size="large" />
       </View>
     );
   }
@@ -248,54 +236,54 @@ export default function CreateSessionScreen() {
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
-      {/* Minimal header with back + progress */}
+      {/* Header with back/close + title */}
       <View style={styles.header}>
-        {stepNumber > 1 ? (
-          <TouchableOpacity
-            style={[styles.backButton, { backgroundColor: colors.card }]}
-            onPress={creation.goBack}
-            activeOpacity={0.7}
-          >
+        <TouchableOpacity
+          style={[styles.headerButton, { backgroundColor: colors.card }]}
+          onPress={stepNumber > 1 ? creation.goBack : () => router.back()}
+          activeOpacity={0.7}
+        >
+          {stepNumber > 1 ? (
             <ChevronLeft size={20} color={colors.text} />
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.backButtonPlaceholder} />
-        )}
+          ) : (
+            <Ionicons name="close" size={20} color={colors.text} />
+          )}
+        </TouchableOpacity>
 
-        {/* Step progress with labels */}
-        <View style={styles.progressContainer}>
-          {[1, 2, 3].map((step, idx) => (
-            <View key={step} style={styles.progressItem}>
-              <View
-                style={[
-                  styles.progressDot,
-                  {
-                    backgroundColor: stepNumber >= step ? colors.text : colors.border,
-                    transform: [{ scale: stepNumber === step ? 1.2 : 1 }],
-                  },
-                ]}
-              />
-              <Text
-                style={[
-                  styles.progressLabel,
-                  { color: stepNumber >= step ? colors.text : colors.textMuted },
-                ]}
-              >
-                {stepLabels[idx]}
-              </Text>
-              {idx < 2 && (
-                <View
-                  style={[
-                    styles.progressLine,
-                    { backgroundColor: stepNumber > step ? colors.text : colors.border },
-                  ]}
-                />
-              )}
-            </View>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>New Session</Text>
+
+        <View style={styles.headerButtonPlaceholder} />
+      </View>
+
+      {/* Step Progress Bar */}
+      <View style={styles.progressBar}>
+        <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
+          <View 
+            style={[
+              styles.progressFill, 
+              { 
+                backgroundColor: colors.primary,
+                width: `${(stepNumber / 3) * 100}%`,
+              }
+            ]} 
+          />
+        </View>
+        <View style={styles.progressLabels}>
+          {stepLabels.map((label, idx) => (
+            <Text
+              key={label}
+              style={[
+                styles.progressLabel,
+                { 
+                  color: stepNumber > idx ? colors.text : colors.textMuted,
+                  fontWeight: stepNumber === idx + 1 ? '600' : '400',
+                },
+              ]}
+            >
+              {label}
+            </Text>
           ))}
         </View>
-
-        <View style={styles.backButtonPlaceholder} />
       </View>
 
       {/* Step Content */}
@@ -319,13 +307,13 @@ export default function CreateSessionScreen() {
       {creation.state.step === 'context' && (
         <>
           {/* Step 3 header with weapon badge */}
-          <View style={styles.step2Header}>
-            <Text style={[styles.step2Title, { color: colors.text }]}>
+          <View style={styles.step3Header}>
+            <Text style={[styles.step3Title, { color: colors.text }]}>
               Session details
             </Text>
             <TouchableOpacity
               style={[styles.weaponBadge, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={creation.goBack}
+              onPress={() => creation.goToStep('weapon')}
               activeOpacity={0.7}
             >
               <Text style={[styles.weaponBadgeLabel, { color: colors.textMuted }]}>
@@ -351,37 +339,31 @@ export default function CreateSessionScreen() {
       {/* Spacer - pushes button to bottom when content is short */}
       <View style={styles.spacer} />
 
-      {/* Button - only show on step 3 since steps 1 and 2 auto-advance */}
+      {/* Start Button - only show on step 3 since steps 1 and 2 auto-advance */}
       {isLastStep && (
-        <TouchableOpacity
-          style={[
-            styles.button,
-            { backgroundColor: canContinue ? colors.text : colors.secondary },
-          ]}
-          onPress={handleButtonPress}
-          disabled={!canContinue || creation.state.isSubmitting}
-          activeOpacity={0.85}
-        >
-          {creation.state.isSubmitting ? (
-            <ActivityIndicator size="small" color={colors.background} />
-          ) : (
-            <>
-              <Text
-                style={[
-                  styles.buttonText,
-                  { color: canContinue ? colors.background : colors.textMuted },
-                ]}
-              >
-                Start Session
-              </Text>
-              <Play
-                size={16}
-                color={canContinue ? colors.background : colors.textMuted}
-                fill={canContinue ? colors.background : colors.textMuted}
-              />
-            </>
-          )}
-        </TouchableOpacity>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={[
+              styles.button,
+              { 
+                backgroundColor: canContinue ? colors.primary : colors.secondary,
+                opacity: canContinue ? 1 : 0.6,
+              },
+            ]}
+            onPress={handleButtonPress}
+            disabled={!canContinue || creation.state.isSubmitting}
+            activeOpacity={0.85}
+          >
+            {creation.state.isSubmitting ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Play size={18} color="#fff" fill="#fff" />
+                <Text style={styles.buttonText}>Start Session</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
       )}
 
       {/* Preset Picker Modal */}
@@ -430,82 +412,69 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
   },
+  
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 16,
   },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backButtonPlaceholder: {
-    width: 36,
+  headerButtonPlaceholder: {
+    width: 40,
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: -0.3,
   },
   
-  // Progress indicator
-  progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-    flex: 1,
+  // Progress
+  progressBar: {
+    marginBottom: 24,
   },
-  progressItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  progressTrack: {
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
   },
-  progressDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  progressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  progressLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
   },
   progressLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginLeft: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-  progressLine: {
-    width: 24,
-    height: 2,
-    marginHorizontal: 8,
-    marginVertical: 4,
-    borderRadius: 1,
+    fontSize: 12,
+    letterSpacing: 0.2,
   },
 
-  step2Header: {
+  // Step 3 header
+  step3Header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 20,
     paddingTop: 4,
   },
-  step2Title: {
-    fontSize: 22,
-    fontWeight: '600',
-    letterSpacing: -0.3,
-  },
-  purposeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 4,
-  },
-  purposeBadgeText: {
-    fontSize: 13,
-    fontWeight: '500',
+  step3Title: {
+    fontSize: 24,
+    fontWeight: '700',
+    letterSpacing: -0.5,
   },
   weaponBadge: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 10,
     borderWidth: 1,
     maxWidth: 140,
@@ -520,29 +489,34 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  
+  // Loading
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 16,
   },
-  loadingText: {
-    fontSize: 14,
-  },
+  
+  // Spacer & Button
   spacer: {
     flexGrow: 1,
-    minHeight: 24,
+    minHeight: 32,
+  },
+  buttonContainer: {
+    paddingTop: 16,
   },
   button: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    height: 52,
-    borderRadius: 14,
+    gap: 10,
+    height: 56,
+    borderRadius: 16,
   },
   buttonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: -0.2,
   },
 });

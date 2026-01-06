@@ -335,7 +335,7 @@ index 46e8be4..81f65a0 100644
      }
  }
 diff --git a/node_modules/react-native-garmin-connect/ios/GarminDeviceStorage.swift b/node_modules/react-native-garmin-connect/ios/GarminDeviceStorage.swift
-index a7c6f2d..69841a4 100644
+index a7c6f2d..46676e1 100644
 --- a/node_modules/react-native-garmin-connect/ios/GarminDeviceStorage.swift
 +++ b/node_modules/react-native-garmin-connect/ios/GarminDeviceStorage.swift
 @@ -1,30 +1,82 @@
@@ -346,7 +346,7 @@ index a7c6f2d..69841a4 100644
  @objc(GarminDeviceStorage)
  public class GarminDeviceStorage: NSObject {
 -    static var urlScheme = ""
-+    static var urlScheme = "retic"
++    static var urlScheme = "retic-dev"
 +    static var appId = "467f4bb7-cd3c-45c4-a39b-9bb78260c9ed"
      static var devicesListKey = "devicesListKey"
      

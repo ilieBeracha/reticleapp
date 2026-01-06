@@ -290,7 +290,6 @@ export function useSessionCreation(
       let prevStep = STEP_ORDER[currentIndex - 1];
       
       // Skip weapon step if going back from context AND weapon was auto-selected
-      // (This mirrors the goForward behavior)
       if (s.step === 'context' && prevStep === 'weapon' && s.context.weaponId !== null) {
         prevStep = 'intent';
       }

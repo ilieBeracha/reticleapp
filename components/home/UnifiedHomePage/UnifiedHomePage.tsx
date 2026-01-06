@@ -9,7 +9,9 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import { ActivityIndicator, RefreshControl, ScrollView, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { styles } from './UnifiedHomePage.styles';
 import {
     CoachMessage,
@@ -22,6 +24,7 @@ import { useUnifiedHomePage } from './useUnifiedHomePage';
 
 export function UnifiedHomePage() {
   const colors = useColors();
+  const router = useRouter();
 
   const {
     // User info
@@ -136,12 +139,72 @@ export function UnifiedHomePage() {
           onSessionPress={handleSessionPress}
         />
 
+        {/* ─────────────────────────────────────────────────────────────────── */}
+        {/* VIEW ALL SESSIONS LINK */}
+        {/* ─────────────────────────────────────────────────────────────────── */}
+        {recentSessions.length > 0 && (
+          <TouchableOpacity
+            style={[localStyles.viewAllLink, { borderColor: colors.border }]}
+            onPress={() => router.push('/sessionHistory')}
+            activeOpacity={0.7}
+          >
+            <View style={localStyles.viewAllContent}>
+              <View style={[localStyles.viewAllIcon, { backgroundColor: `${colors.primary}12` }]}>
+                <Ionicons name="time-outline" size={18} color={colors.primary} />
+              </View>
+              <View>
+                <Text style={[localStyles.viewAllTitle, { color: colors.text }]}>
+                  View All Sessions
+                </Text>
+                <Text style={[localStyles.viewAllSubtitle, { color: colors.textMuted }]}>
+                  Full history with filters
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
+
         {/* Bottom spacing */}
         <View style={{ height: 100 }} />
       </ScrollView>
     </View>
   );
 }
+
+const localStyles = StyleSheet.create({
+  viewAllLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    marginBottom: 16,
+  },
+  viewAllContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  viewAllIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewAllTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  viewAllSubtitle: {
+    fontSize: 12,
+    marginTop: 1,
+  },
+});
 
 export default UnifiedHomePage;
 

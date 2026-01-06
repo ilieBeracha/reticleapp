@@ -12,7 +12,7 @@ import type { UserWeapon } from '@/services/weaponService';
 import type { WeaponCategory } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { ChevronRight, Crosshair, Target } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import type { Position, SessionContextState } from './sessionCreation.types';
@@ -48,6 +48,17 @@ export function SessionWeaponStep({
   );
 
   const hasWeapon = context.weaponId !== null;
+
+  // Auto-open weapon picker on mount
+  useEffect(() => {
+    if (!isLoadingWeapon) {
+      // Small delay for smooth transition
+      const timer = setTimeout(() => {
+        setShowWeaponPicker(true);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoadingWeapon]);
 
   const handleWeaponSelect = useCallback(
     (weapon: UserWeapon) => {
@@ -91,18 +102,10 @@ export function SessionWeaponStep({
       ) : hasWeapon ? (
         /* Selected Weapon State */
         <Animated.View entering={FadeIn.duration(200)}>
-          {/* Compact header when weapon is selected */}
-          <View style={styles.selectedHeader}>
-            <Text style={[styles.selectedLabel, { color: colors.textMuted }]}>Weapon</Text>
-            <TouchableOpacity 
-              onPress={openPicker} 
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Text style={[styles.changeLink, { color: colors.primary }]}>Change</Text>
-            </TouchableOpacity>
-          </View>
+          {/* Header */}
+          <Text style={[styles.selectedLabel, { color: colors.textMuted }]}>Selected Weapon</Text>
 
-          {/* Selected weapon card */}
+          {/* Selected weapon card - tap to change */}
           <TouchableOpacity
             style={[styles.selectedCard, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={openPicker}
@@ -124,13 +127,8 @@ export function SessionWeaponStep({
                 </View>
               )}
             </View>
-            <ChevronRight size={18} color={colors.textMuted} />
+            <Text style={[styles.changeLink, { color: colors.primary }]}>Change</Text>
           </TouchableOpacity>
-
-          {/* Context hint */}
-          <Text style={[styles.contextHint, { color: colors.textMuted }]}>
-            Tap "Change" to switch weapon
-          </Text>
         </Animated.View>
       ) : (
         /* Empty State - No weapon available */
@@ -209,17 +207,12 @@ const styles = StyleSheet.create({
   // ─────────────────────────────────────────────────────────────────────────
   // SELECTED STATE
   // ─────────────────────────────────────────────────────────────────────────
-  selectedHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
   selectedLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    marginBottom: 12,
   },
   changeLink: {
     fontSize: 14,
@@ -262,12 +255,6 @@ const styles = StyleSheet.create({
   categoryLabel: {
     fontSize: 13,
     fontWeight: '500',
-  },
-  contextHint: {
-    fontSize: 12,
-    marginTop: 12,
-    textAlign: 'center',
-    fontStyle: 'italic',
   },
 
   // ─────────────────────────────────────────────────────────────────────────

@@ -152,10 +152,14 @@ export function useTrainingActions({
             console.log('[TrainingActions] finishTraining result:', result);
             
             if (!result) {
-              console.log('[TrainingActions] Training not found or already finished');
+              console.log('[TrainingActions] Training not found or update blocked by RLS');
               Alert.alert('Info', 'Training was already finished or not found');
+              // Don't update local state if API failed
+              setActionLoading(false);
+              return;
             }
             
+            // Only update local state if API succeeded
             setTraining((prev) => (prev ? { ...prev, status: 'finished' } : null));
             onTrainingUpdated?.();
             // Refresh store so home page updates

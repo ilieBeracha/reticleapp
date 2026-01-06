@@ -347,6 +347,7 @@ export async function updateTraining(
   if (updates.description !== undefined) updatePayload.description = updates.description;
   if (updates.scheduled_at !== undefined) updatePayload.scheduled_at = updates.scheduled_at;
   if (updates.status !== undefined) updatePayload.status = updates.status;
+  if (updates.auto_close_at !== undefined) updatePayload.auto_close_at = updates.auto_close_at;
 
   const { data, error } = await supabase
     .from('trainings')

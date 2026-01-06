@@ -1,12 +1,13 @@
 /**
  * SessionIntentStep - "What's the goal?"
+ * 
+ * Clean card-based goal selection with subtle animations.
  */
 
 import { useColors } from '@/hooks/ui/useColors';
 import * as Haptics from 'expo-haptics';
 import {
   ArrowRight,
-  Check,
   Crosshair,
   Focus,
   HeartPulse,
@@ -15,17 +16,23 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { SessionPurpose } from './sessionCreation.types';
 
 // ============================================================================
 // DATA
 // ============================================================================
 
-const PURPOSE_OPTIONS: { id: SessionPurpose; label: string; icon: LucideIcon }[] = [
-  { id: 'grouping', label: 'Grouping', icon: Crosshair },
-  { id: 'achievement', label: 'Target Hits', icon: Target },
-  { id: 'zeroing', label: 'Zeroing', icon: Focus },
-  { id: 'physical', label: 'Stress Drill', icon: HeartPulse },
+const PURPOSE_OPTIONS: { 
+  id: SessionPurpose; 
+  label: string; 
+  description: string;
+  icon: LucideIcon;
+}[] = [
+  { id: 'grouping', label: 'Grouping', description: 'Measure shot dispersion', icon: Crosshair },
+  { id: 'achievement', label: 'Target Hits', description: 'Count hits on target', icon: Target },
+  { id: 'zeroing', label: 'Zeroing', description: 'Dial in your optic', icon: Focus },
+  { id: 'physical', label: 'Stress Drill', description: 'Shoot under pressure', icon: HeartPulse },
 ];
 
 // ============================================================================
@@ -48,55 +55,94 @@ export function SessionIntentStep({ selectedPurpose, onSelectPurpose, onUseSaved
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.question, { color: colors.text }]}>
+      <Animated.Text 
+        entering={FadeInDown.duration(300)} 
+        style={[styles.question, { color: colors.text }]}
+      >
         What's your goal?
-      </Text>
+      </Animated.Text>
 
       <View style={styles.options}>
-        {PURPOSE_OPTIONS.map((opt) => {
+        {PURPOSE_OPTIONS.map((opt, index) => {
           const isSelected = selectedPurpose === opt.id;
           const Icon = opt.icon;
           return (
-            <TouchableOpacity
-              key={opt.id}
-              style={styles.option}
-              onPress={() => handleSelect(opt.id)}
-              activeOpacity={0.6}
+            <Animated.View 
+              key={opt.id} 
+              entering={FadeInDown.duration(300).delay(50 + index * 50)}
             >
-              <Icon
-                size={20}
-                color={isSelected ? colors.text : colors.textMuted}
-                strokeWidth={isSelected ? 2 : 1.5}
-              />
-              <Text
+              <TouchableOpacity
                 style={[
-                  styles.optionLabel,
-                  { color: isSelected ? colors.text : colors.textMuted },
-                  isSelected && styles.optionSelected,
+                  styles.optionCard,
+                  { 
+                    backgroundColor: isSelected ? `${colors.primary}10` : colors.card,
+                    borderColor: isSelected ? colors.primary : colors.border,
+                  },
                 ]}
+                onPress={() => handleSelect(opt.id)}
+                activeOpacity={0.7}
               >
-                {opt.label}
-              </Text>
-              {isSelected && (
-                <Check size={16} color={colors.text} strokeWidth={2.5} style={styles.check} />
-              )}
-            </TouchableOpacity>
+                <View 
+                  style={[
+                    styles.optionIcon, 
+                    { backgroundColor: isSelected ? colors.primary : `${colors.textMuted}15` }
+                  ]}
+                >
+                  <Icon
+                    size={20}
+                    color={isSelected ? '#fff' : colors.textMuted}
+                    strokeWidth={2}
+                  />
+                </View>
+                <View style={styles.optionContent}>
+                  <Text
+                    style={[
+                      styles.optionLabel,
+                      { color: colors.text },
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.optionDescription,
+                      { color: colors.textMuted },
+                    ]}
+                  >
+                    {opt.description}
+                  </Text>
+                </View>
+                <View 
+                  style={[
+                    styles.optionRadio,
+                    { 
+                      borderColor: isSelected ? colors.primary : colors.border,
+                      backgroundColor: isSelected ? colors.primary : 'transparent',
+                    },
+                  ]}
+                >
+                  {isSelected && <View style={styles.optionRadioInner} />}
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
           );
         })}
       </View>
 
       {onUseSavedDrill && (
-        <TouchableOpacity
-          style={styles.savedBtn}
-          onPress={onUseSavedDrill}
-          activeOpacity={0.6}
-        >
-          <LayoutTemplate size={16} color={colors.textMuted} strokeWidth={1.5} />
-          <Text style={[styles.savedText, { color: colors.textMuted }]}>
-            or load a saved drill
-          </Text>
-          <ArrowRight size={14} color={colors.textMuted} />
-        </TouchableOpacity>
+        <Animated.View entering={FadeInDown.duration(300).delay(300)}>
+          <TouchableOpacity
+            style={[styles.savedBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={onUseSavedDrill}
+            activeOpacity={0.7}
+          >
+            <LayoutTemplate size={18} color={colors.textMuted} strokeWidth={1.5} />
+            <Text style={[styles.savedText, { color: colors.textMuted }]}>
+              Load a saved drill
+            </Text>
+            <ArrowRight size={16} color={colors.textMuted} />
+          </TouchableOpacity>
+        </Animated.View>
       )}
     </View>
   );
@@ -107,13 +153,72 @@ export function SessionIntentStep({ selectedPurpose, onSelectPurpose, onUseSaved
 // ============================================================================
 
 const styles = StyleSheet.create({
-  container: { paddingTop: 8 },
-  question: { fontSize: 22, fontWeight: '600', letterSpacing: -0.3, marginBottom: 28 },
-  options: { gap: 4 },
-  option: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 14 },
-  optionLabel: { fontSize: 17, flex: 1 },
-  optionSelected: { fontWeight: '600' },
-  check: { marginLeft: 'auto' },
-  savedBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 32, paddingVertical: 8 },
-  savedText: { fontSize: 14 },
+  container: { 
+    paddingTop: 8,
+  },
+  question: { 
+    fontSize: 26, 
+    fontWeight: '700', 
+    letterSpacing: -0.5, 
+    marginBottom: 24,
+  },
+  options: { 
+    gap: 10,
+  },
+  optionCard: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 14,
+  },
+  optionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionContent: {
+    flex: 1,
+    gap: 2,
+  },
+  optionLabel: { 
+    fontSize: 16, 
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
+  optionDescription: { 
+    fontSize: 13,
+  },
+  optionRadio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionRadioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#fff',
+  },
+  savedBtn: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    gap: 10, 
+    marginTop: 28,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
+  savedText: { 
+    fontSize: 14,
+    fontWeight: '500',
+  },
 });

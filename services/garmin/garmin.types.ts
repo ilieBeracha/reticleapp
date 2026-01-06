@@ -48,6 +48,7 @@ export type GarminInboundMessageType =
   | 'SHOT_RECORDED'
   | 'SESSION_ENDED'
   | 'HEARTBEAT'
+  | 'ERROR'           // Watch error report (SEND_FAILED, ACK_TIMEOUT, SYNC_PARTIAL)
   | 'HEARTBEAT_ACK'   // Response to HEARTBEAT with connection health
   | 'PONG';
 
@@ -200,6 +201,14 @@ export interface GarminSessionData {
   steadiness?: GarminSteadiness;
   /** True if this is summary-only data (details coming in Phase 2) */
   isSummaryOnly?: boolean;
+}
+
+/** Watch error payload - sent when watch encounters communication errors */
+export interface WatchErrorPayload {
+  code: string;        // Error code: SEND_FAILED, ACK_TIMEOUT, SYNC_PARTIAL
+  message: string;     // Human-readable error description
+  timestamp: number;   // Unix timestamp (seconds)
+  errorCount: number;  // Total errors this session
 }
 
 export interface GarminInboundMessage {

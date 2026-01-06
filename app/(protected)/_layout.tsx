@@ -85,20 +85,6 @@ export default function ProtectedLayout() {
         />
         
         <Stack.Screen
-          name="teamDetail"
-          options={{
-            headerShown: false,
-            presentation: "formSheet",
-            gestureEnabled: true,
-            sheetGrabberVisible: true,
-            contentStyle: { backgroundColor: colors.card },
-            sheetAllowedDetents: [0.92, 1],
-            sheetInitialDetentIndex: 0,
-            sheetLargestUndimmedDetentIndex: -1,
-          }}
-        />
-        
-        <Stack.Screen
           name="createTeam"
           options={{
             headerShown: false,
@@ -195,20 +181,6 @@ export default function ProtectedLayout() {
             sheetLargestUndimmedDetentIndex: -1,
           }}
         />
-        
-        <Stack.Screen
-          name="teamPreview"
-          options={{
-            headerShown: false,
-            presentation: "formSheet",
-            gestureEnabled: true,
-            sheetGrabberVisible: true,
-            contentStyle: { backgroundColor: colors.card },
-            sheetAllowedDetents: [0.5, 0.7],
-            sheetInitialDetentIndex: 0,
-            sheetLargestUndimmedDetentIndex: -1,
-          }}
-      />
         
         <Stack.Screen
           name="memberPreview"
