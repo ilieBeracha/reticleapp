@@ -35,17 +35,15 @@ import { routeMessage, type MessageHandlerContext } from './garmin/garmin.handle
 
 // Import diagnostics
 import {
-  logOutboundMessage,
-  logInboundMessage,
-  logError,
-  startHeartbeat,
-  stopHeartbeat,
-  onHeartbeatResponse,
+  clearDiagnostics,
   exportDiagnostics,
   exportDiagnosticsAsText,
-  clearDiagnostics,
   getConnectionHealth,
   getHeartbeatState,
+  logError,
+  logInboundMessage,
+  logOutboundMessage,
+  stopHeartbeat
 } from './garmin/garmin.diagnostics';
 
 // ============================================================================
@@ -292,24 +290,6 @@ const msgSub = emitter.addListener('onMessage', (raw: any) => {
 
   // Log inbound message for diagnostics
   logInboundMessage(message.type, parsedPayload);
-
-  // Handle HEARTBEAT_ACK (or PONG as legacy response)
-  if (message.type === 'HEARTBEAT_ACK' || message.type === 'PONG') {
-    onHeartbeatResponse(parsedPayload);
-    
-    // Emit heartbeat state so store can track watch state
-    // This enables session completion detection when watch goes idle
-    if (parsedPayload) {
-      emit({
-        event: 'heartbeat_state',
-        state: parsedPayload.state as string,
-        sessionId: parsedPayload.sessionId as string,
-        shotCount: parsedPayload.shotCount as number,
-        syncPhase: parsedPayload.syncPhase as number,
-      });
-    }
-    return;
-  }
 
   console.log('[GarminService] 📩 Emitting message_received:', message.type);
   emit({ event: 'message_received', message });
@@ -654,9 +634,7 @@ return currentStatus === 'CONNECTED';
 // ============================================================================
 
 export {
-  exportDiagnostics,
-  exportDiagnosticsAsText,
-  clearDiagnostics,
-  getConnectionHealth,
-  getHeartbeatState,
+  clearDiagnostics, exportDiagnostics,
+  exportDiagnosticsAsText, getConnectionHealth,
+  getHeartbeatState
 };

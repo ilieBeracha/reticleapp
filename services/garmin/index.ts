@@ -30,13 +30,16 @@ export type {
 
 // Service functions and constants (from main service file)
 export {
-    endWatchSession,
+    clearDiagnostics, endWatchSession,
+    // Diagnostics
+    exportDiagnostics,
+    exportDiagnosticsAsText,
     // Constants
     GARMIN_DEFAULT_CONFIG,
     // Re-export Status enum from SDK
     GarminDeviceStatus,
     // State getters
-    getConfig, getCurrentStatus, getIsReady, getPairedDevices,
+    getConfig, getConnectionHealth, getCurrentStatus, getHeartbeatState, getIsReady, getPairedDevices,
     // Initialization
     initialize, isConnected,
     // Mock utilities
@@ -47,21 +50,11 @@ export {
     sendMessage,
     sendMessageWithRetry,
     // Session helpers
-    startWatchSession, subscribe, syncDrillToWatch,
-    // Diagnostics
-    exportDiagnostics,
-    exportDiagnosticsAsText,
-    clearDiagnostics,
-    getConnectionHealth,
-    getHeartbeatState,
+    startWatchSession, subscribe, syncDrillToWatch
 } from '../garminService';
 
 // Re-export diagnostic types
 export type {
-    DiagnosticMessage,
-    DiagnosticError,
-    HeartbeatState,
-    ConnectionHealth,
-    DiagnosticExport,
+    ConnectionHealth, DiagnosticError, DiagnosticExport, DiagnosticMessage, HeartbeatState
 } from './garmin.diagnostics';
 

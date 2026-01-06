@@ -4,9 +4,9 @@
  * Displays weekly shooting statistics in a compact, visually appealing card.
  */
 
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
 import { Clock, Crosshair, Flame, Target, TrendingUp } from 'lucide-react-native';
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { STREAK_DISPLAY_THRESHOLD } from '../UnifiedHomePage.constants';
 import { formatDuration } from '../UnifiedHomePage.helpers';
 import type { WeeklyStatsCardProps } from '../UnifiedHomePage.types';
@@ -158,4 +158,3 @@ const localStyles = StyleSheet.create({
     letterSpacing: -0.3,
   },
 });
-

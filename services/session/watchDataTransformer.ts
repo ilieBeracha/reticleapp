@@ -22,6 +22,7 @@ import type {
   WatchSummaryPayload,
   WatchTimelineChunkPayload,
 } from './watchTypes';
+import { decodeWeather } from './weatherDecoder';
 
 /**
  * Transform watch SUMMARY payload to internal format.
@@ -117,6 +118,9 @@ export function transformSummaryPayload(payload: WatchSummaryPayload): Transform
       detectionSensitivity: payload.detection.sens,
       manualOverrides: payload.detection.overrides,
     }),
+
+    // Weather conditions (decode from compact format)
+    weather: decodeWeather(payload.weather),
 
     // Sync status
     isSummaryOnly: true,
@@ -240,6 +244,25 @@ export function buildTargetData(data: TransformedWatchData): Record<string, unkn
   }
   if (data.manualOverrides !== undefined) {
     result.manual_overrides = data.manualOverrides;
+  }
+
+  // Weather conditions (critical for shooting analytics)
+  if (data.weather) {
+    result.weather = {
+      temperature_c: data.weather.temperatureC,
+      temperature_f: data.weather.temperatureF,
+      humidity: data.weather.humidity,
+      wind_speed_mps: data.weather.windSpeedMps,
+      wind_speed_mph: data.weather.windSpeedMph,
+      wind_speed_kph: data.weather.windSpeedKph,
+      wind_direction: data.weather.windDirection,
+      wind_bearing: data.weather.windBearing,
+      pressure_hpa: data.weather.pressureHpa,
+      condition: data.weather.condition,
+      // Computed analytics fields
+      wind_impact: data.weather.windImpact,
+      condition_severity: data.weather.conditionSeverity,
+    };
   }
 
   // Sync status markers

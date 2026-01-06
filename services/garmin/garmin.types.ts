@@ -199,6 +199,20 @@ export interface GarminSessionData {
   biometrics?: GarminBiometrics;
   /** Steadiness data from watch */
   steadiness?: GarminSteadiness;
+  /** Weather conditions at session location */
+  weather?: {
+    temperatureC?: number | null;
+    temperatureF?: number | null;
+    humidity?: number | null;
+    windSpeedMps?: number | null;
+    windSpeedMph?: number | null;
+    windDirection?: string | null;
+    windBearing?: number | null;
+    pressureHpa?: number | null;
+    condition?: string | null;
+    windImpact?: 'calm' | 'light' | 'moderate' | 'strong';
+    conditionSeverity?: 'ideal' | 'good' | 'challenging' | 'difficult' | 'extreme';
+  };
   /** True if this is summary-only data (details coming in Phase 2) */
   isSummaryOnly?: boolean;
 }

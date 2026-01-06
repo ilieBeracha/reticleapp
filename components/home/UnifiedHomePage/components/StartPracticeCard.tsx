@@ -5,9 +5,8 @@
  * Dark, sleek design for prominence.
  */
 
-import React from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { ChevronRight, Crosshair } from 'lucide-react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getStartPracticeSubtitle } from '../UnifiedHomePage.helpers';
 import type { StartPracticeCardProps } from '../UnifiedHomePage.types';
 
@@ -87,4 +86,3 @@ const localStyles = StyleSheet.create({
     justifyContent: 'center',
   },
 });
-

@@ -5,6 +5,7 @@
 export { HomeHeader } from './HomeHeader';
 export { CoachMessage } from './CoachMessage';
 export { WeeklyStatsCard } from './WeeklyStatsCard';
+export { InsightsCard } from './InsightsCard';
 export { ActiveSessionCard } from './ActiveSessionCard';
 export { StartPracticeCard } from './StartPracticeCard';
 export { TeamTrainingCard } from './TeamTrainingCard';

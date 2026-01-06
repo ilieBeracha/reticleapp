@@ -14,11 +14,11 @@ import { useRouter } from 'expo-router';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { styles } from './UnifiedHomePage.styles';
 import {
-    CoachMessage,
-    HomeHeader,
-    PersonalSection,
-    RecentActivitySection,
-    TeamSection,
+  CoachMessage,
+  HomeHeader,
+  PersonalSection,
+  RecentActivitySection,
+  TeamSection,
 } from './components';
 import { useUnifiedHomePage } from './useUnifiedHomePage';
 

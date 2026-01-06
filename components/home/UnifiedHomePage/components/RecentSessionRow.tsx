@@ -1,13 +1,11 @@
 /**
  * RecentSessionRow Component
  * 
- * A single row in the recent sessions list.
+ * Clean session row with key metrics.
  */
 
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
 import { ChevronRight, Crosshair, Heart, Users } from 'lucide-react-native';
-import { styles } from '../UnifiedHomePage.styles';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { formatTimeAgo } from '../UnifiedHomePage.helpers';
 import type { RecentSessionRowProps } from '../UnifiedHomePage.types';
 
@@ -21,47 +19,113 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
     ? formatTimeAgo(session.startedAt)
     : '';
 
+  const accuracy = session.stats?.accuracy;
+  const shots = session.stats?.shots || 0;
+
   return (
     <TouchableOpacity 
-      style={styles.recentRow} 
+      style={s.row} 
       onPress={onPress}
-      activeOpacity={0.7}
+      activeOpacity={0.6}
     >
-      <View 
-        style={[
-          styles.recentIcon, 
-          { backgroundColor: isTeam ? `${colors.blue}12` : `${colors.indigo}12` }
-        ]}
-      >
+      {/* Icon */}
+      <View style={[s.icon, { backgroundColor: isTeam ? `${colors.blue}12` : `${colors.indigo}12` }]}>
         {isTeam ? (
-          <Users size={14} color={colors.blue} />
+          <Users size={16} color={colors.blue} />
         ) : (
-          <Crosshair size={14} color={colors.indigo} />
+          <Crosshair size={16} color={colors.indigo} />
         )}
       </View>
       
-      <View style={styles.recentContent}>
-        <View style={styles.recentTitleRow}>
-          <Text style={[styles.recentTitle, { color: colors.text }]} numberOfLines={1}>
-            {session.drillName || (isTeam ? 'Team Session' : 'Practice Session')}
+      {/* Content */}
+      <View style={s.content}>
+        <View style={s.titleRow}>
+          <Text style={[s.title, { color: colors.text }]} numberOfLines={1}>
+            {session.drillName || (isTeam ? 'Team Session' : 'Practice')}
           </Text>
           {hasWatchData && (
-            <View style={[styles.bioBadge, { backgroundColor: '#EF444415' }]}>
-              <Heart size={10} color="#EF4444" />
-            </View>
+            <Heart size={12} color="#EF4444" fill="#EF4444" style={{ opacity: 0.8 }} />
           )}
         </View>
-        <Text style={[styles.recentMeta, { color: colors.textMuted }]}>
-          {session.stats?.shots ? `${session.stats.shots} shots` : 'No shots'}
-          {session.stats?.accuracy ? ` · ${session.stats.accuracy}%` : ''}
-        </Text>
+        
+        {/* Stats row */}
+        <View style={s.statsRow}>
+          {shots > 0 && (
+            <Text style={[s.stat, { color: colors.textMuted }]}>
+              {shots} shots
+            </Text>
+          )}
+          {accuracy !== undefined && accuracy > 0 && (
+            <>
+              <View style={[s.dot, { backgroundColor: colors.textMuted }]} />
+              <Text style={[s.stat, { color: accuracy >= 70 ? colors.green : colors.textMuted }]}>
+                {accuracy}%
+              </Text>
+            </>
+          )}
+        </View>
       </View>
       
-      <View style={styles.recentRight}>
-        <Text style={[styles.recentTime, { color: colors.textMuted }]}>{timeAgo}</Text>
-        <ChevronRight size={14} color={colors.textMuted} />
+      {/* Right side */}
+      <View style={s.right}>
+        <Text style={[s.time, { color: colors.textMuted }]}>{timeAgo}</Text>
+        <ChevronRight size={14} color={colors.border} />
       </View>
     </TouchableOpacity>
   );
 }
 
+const s = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    gap: 12,
+  },
+  icon: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  content: {
+    flex: 1,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  title: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+    flex: 1,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 3,
+  },
+  stat: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  dot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    marginHorizontal: 6,
+    opacity: 0.5,
+  },
+  right: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  time: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+});

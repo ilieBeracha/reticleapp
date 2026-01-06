@@ -8,37 +8,40 @@
  * - Watch data details
  */
 
+import { WeatherCard } from '@/components/session/WeatherDisplay';
 import { useColors } from '@/hooks/ui/useColors';
 import type { GarminSessionData } from '@/services/garminService';
 import { getSessionById } from '@/services/session/queries';
 import { getSessionTargetsWithResults } from '@/services/session/targets';
 import type { SessionTargetWithResults, SessionWithDetails } from '@/services/session/types';
+import type { DecodedWeather } from '@/services/session/watchTypes';
+import { decodeWeather } from '@/services/session/weatherDecoder';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
-    Activity,
-    CheckCircle,
-    Clock,
-    Crosshair,
-    Focus,
-    Heart,
-    MapPin,
-    Scan,
-    Target,
-    Timer,
-    TrendingUp,
-    Watch,
-    X,
-    Zap,
+  Activity,
+  CheckCircle,
+  Clock,
+  Crosshair,
+  Focus,
+  Heart,
+  MapPin,
+  Scan,
+  Target,
+  Timer,
+  TrendingUp,
+  Watch,
+  X,
+  Zap,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { BarChart, LineChart } from 'react-native-gifted-charts';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -193,6 +196,21 @@ export default function SessionResultsScreen() {
 
   const drill = session?.drill_config;
   const drillName = session?.drill_name || drill?.name || 'Practice Session';
+  
+  // Decode weather from watch data (if available)
+  const weather: DecodedWeather | null = useMemo(() => {
+    // watchData may have weather in different locations depending on format
+    const rawWeather = (watchData as any)?.weather;
+    if (rawWeather) {
+      // If already decoded (has temperatureC), use as-is
+      if (rawWeather.temperatureC !== undefined) {
+        return rawWeather as DecodedWeather;
+      }
+      // Otherwise decode from compact format
+      return decodeWeather(rawWeather);
+    }
+    return null;
+  }, [watchData]);
   
   // Calculate splits from timestamps
   const shotTimestamps = watchData?.shotTimestamps || [];
@@ -530,6 +548,9 @@ export default function SessionResultsScreen() {
             </View>
           </View>
         )}
+
+        {/* Weather Conditions */}
+        {weather && <WeatherCard weather={weather} />}
 
         {/* Raw Data (Collapsible) */}
         {watchData && (

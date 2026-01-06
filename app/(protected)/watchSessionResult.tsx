@@ -1,52 +1,53 @@
 /**
  * Watch Session Result - Full Page
  * 
- * Full-screen page that shows when Garmin watch sends session data.
- * User can review detailed stats, charts, and save the watch data to their session.
- * Cannot be accidentally dismissed - requires explicit action.
+ * Two-step flow:
+ * 1. Hits Input - Elegant prompt for accuracy data
+ * 2. Session Details - Full stats and charts
  * 
- * Displays:
- * - Shot summary (shots, duration, distance)
- * - Split times (fastest/slowest/avg)
- * - HR timeline chart with shot markers
- * - Breathing data with phase indicators
- * - Per-shot biometrics
- * - Steadiness scores
+ * The hits input is prioritized as it's essential for learning patterns.
  */
 
+import { WeatherCard } from '@/components/session/WeatherDisplay';
 import { useColors } from '@/hooks/ui/useColors';
 import type { GarminBiometrics, ShotBiometrics } from '@/services/garminService';
-import { endSession, saveWatchSessionData } from '@/services/sessionService';
+import type { DecodedWeather } from '@/services/session/watchTypes';
+import { decodeWeather } from '@/services/session/weatherDecoder';
+import { endSession, saveWatchSessionData, updateSessionHits } from '@/services/sessionService';
 import { useSessionStore } from '@/store/sessionStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
-    Activity,
-    CheckCircle,
-    Clock,
-    Crosshair,
-    Heart,
-    MapPin,
-    Target,
-    Timer,
-    TrendingUp,
-    Watch,
-    Wind,
-    Zap,
+  Activity,
+  CheckCircle,
+  Clock,
+  Crosshair,
+  MapPin,
+  Target,
+  Timer,
+  TrendingUp,
+  Watch,
+  Wind,
+  Zap,
 } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Keyboard,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeInUp,
+  SlideInRight
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 
@@ -59,10 +60,8 @@ interface SteadinessShotData {
   sway?: number;
   samples?: number;
   anomaly?: boolean;
-  // Flinch detection
   flinch?: boolean;
   flinchMag?: number;
-  // Recoil analysis
   recoilMag?: number;
   recoilDev?: number;
 }
@@ -72,20 +71,15 @@ interface SteadinessData {
   avgScore?: number;
   shotCount?: number;
   trend?: string;
-  // Flinch summary
   flinchCount?: number;
   flinchRate?: number;
-  // Recoil consistency
   recoilConsistency?: number;
-  // Best/worst shots
   bestShot?: number;
   bestScore?: number;
   worstShot?: number;
   worstScore?: number;
-  // Per-shot data
   shots?: SteadinessShotData[];
   gradeDistribution?: Record<string, number>;
-  // Legacy format support
   shotScores?: number[];
   timeline?: [number, number, number][];
 }
@@ -102,10 +96,15 @@ interface PerformanceData {
   lastThreeAvg?: number;
 }
 
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
 export default function WatchSessionResultPage() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { loadPersonalSessions, loadTeamSessions } = useSessionStore();
+  const inputRef = useRef<TextInput>(null);
   
   const params = useLocalSearchParams<{
     sessionId: string;
@@ -118,14 +117,12 @@ export default function WatchSessionResultPage() {
     autoSaved?: string;
     splitTimes?: string;
     avgSplitMs?: string;
-    heartRateAvg?: string;
-    heartRateMax?: string;
-    heartRateMin?: string;
     drillName?: string;
     weaponName?: string;
     performance?: string;
     biometrics?: string;
     steadiness?: string;
+    weather?: string;
   }>();
   
   const {
@@ -139,29 +136,35 @@ export default function WatchSessionResultPage() {
     autoSaved,
     splitTimes: splitTimesJson,
     avgSplitMs,
-    heartRateAvg,
-    heartRateMax,
-    heartRateMin,
     drillName,
     weaponName,
     performance: performanceJson,
     biometrics: biometricsJson,
     steadiness: steadinessJson,
+    weather: weatherJson,
   } = params;
   
   const isAutoSaved = autoSaved === '1';
 
+  // ============================================================================
+  // STATE
+  // ============================================================================
+  
+  const [step, setStep] = useState<'hits' | 'results'>('hits');
   const [saving, setSaving] = useState(false);
   const [hitsInput, setHitsInput] = useState('');
+  const [hitsConfirmed, setHitsConfirmed] = useState(false);
 
-  // Parse basic values
+  // ============================================================================
+  // PARSED DATA
+  // ============================================================================
+
   const shotsCount = parseInt(shots || '0');
   const durationSec = parseInt(duration || '0');
   const distanceM = parseInt(distance || '0');
   const isCompleted = completed === '1';
   const avgSplit = avgSplitMs ? parseInt(avgSplitMs) : null;
   
-  // Parse split times array (from watch directly)
   const splitTimes = useMemo(() => {
     if (!splitTimesJson) return [];
     try {
@@ -171,7 +174,6 @@ export default function WatchSessionResultPage() {
     }
   }, [splitTimesJson]);
   
-  // Parse performance analytics
   const performance = useMemo((): PerformanceData | null => {
     if (!performanceJson) return null;
     try {
@@ -181,7 +183,6 @@ export default function WatchSessionResultPage() {
     }
   }, [performanceJson]);
   
-  // Parse biometrics data
   const biometrics = useMemo((): GarminBiometrics | null => {
     if (!biometricsJson) return null;
     try {
@@ -191,7 +192,6 @@ export default function WatchSessionResultPage() {
     }
   }, [biometricsJson]);
   
-  // Parse steadiness data
   const steadiness = useMemo((): SteadinessData | null => {
     if (!steadinessJson) return null;
     try {
@@ -201,34 +201,22 @@ export default function WatchSessionResultPage() {
     }
   }, [steadinessJson]);
   
-  // Legacy heart rate (backwards compatible)
-  const legacyHeartRate = useMemo(() => {
-    if (!heartRateAvg) return null;
-    return {
-      avg: parseInt(heartRateAvg),
-      max: heartRateMax ? parseInt(heartRateMax) : undefined,
-      min: heartRateMin ? parseInt(heartRateMin) : undefined,
-    };
-  }, [heartRateAvg, heartRateMax, heartRateMin]);
-  
-  // Combined heart rate (prefer biometrics, fallback to legacy)
-  const heartRate = useMemo(() => {
-    if (biometrics?.summary) {
-      return {
-        avg: biometrics.summary.avgHR ?? 0,
-        max: biometrics.summary.maxHR,
-        min: biometrics.summary.minHR,
-      };
+  const weather = useMemo((): DecodedWeather | null => {
+    if (!weatherJson) return null;
+    try {
+      const parsed = JSON.parse(weatherJson);
+      if (parsed.temperatureC !== undefined) {
+        return parsed as DecodedWeather;
+      }
+      return decodeWeather(parsed);
+    } catch {
+      return null;
     }
-    return legacyHeartRate;
-  }, [biometrics, legacyHeartRate]);
+  }, [weatherJson]);
   
-  // Use watch's split times directly, no need to calculate
   const splits = splitTimes;
   
-  // Use performance data from watch if available, otherwise calculate
   const splitStats = useMemo(() => {
-    // Prefer watch's performance data
     if (performance) {
       return {
         fastest: performance.bestSplit ?? 0,
@@ -238,7 +226,6 @@ export default function WatchSessionResultPage() {
         firstShotTime: performance.firstShotTime,
       };
     }
-    // Fallback to calculating from split times
     if (splits.length === 0) return null;
     const sorted = [...splits].sort((a, b) => a - b);
     return {
@@ -247,42 +234,19 @@ export default function WatchSessionResultPage() {
       avg: Math.round(splits.reduce((a, b) => a + b, 0) / splits.length),
     };
   }, [splits, performance, avgSplit]);
-  
-  // Prepare chart data for splits
-  const splitChartData = useMemo(() => {
-    return splits.map((split, index) => ({
-      value: split,
-      label: `${index + 1}`,
-      frontColor: split === splitStats?.fastest 
-        ? colors.green 
-        : split === splitStats?.slowest 
-          ? colors.orange 
-          : colors.primary,
-    }));
-  }, [splits, splitStats, colors]);
 
-  // Steadiness chart data - supports both new format (shots array) and legacy (shotScores)
   const steadinessChartData = useMemo(() => {
-    // New format: shots array with objects (includes flinch and recoil data)
     if (steadiness?.shots && steadiness.shots.length > 0) {
       return steadiness.shots.map((shot) => ({
         value: shot.score,
         label: `${shot.shotNumber}`,
         frontColor: shot.flinch 
-          ? colors.red  // Red border for flinch shots
+          ? colors.red
           : shot.score >= 80 ? colors.green : shot.score >= 50 ? colors.orange : colors.red,
-        // Additional data for tooltips
         grade: shot.grade,
-        tremor: shot.tremor,
-        drift: shot.drift,
-        sway: shot.sway,
         flinch: shot.flinch,
-        flinchMag: shot.flinchMag,
-        recoilMag: shot.recoilMag,
-        recoilDev: shot.recoilDev,
       }));
     }
-    // Legacy format: shotScores number array
     if (steadiness?.shotScores && steadiness.shotScores.length > 0) {
       return steadiness.shotScores.map((score, index) => ({
         value: score,
@@ -293,7 +257,6 @@ export default function WatchSessionResultPage() {
     return [];
   }, [steadiness, colors]);
   
-  // Per-shot biometrics with breath phase colors
   const shotBiometricsWithColors = useMemo(() => {
     if (!biometrics?.shotBiometrics) return [];
     return biometrics.shotBiometrics.map((sb: ShotBiometrics) => ({
@@ -307,11 +270,17 @@ export default function WatchSessionResultPage() {
     }));
   }, [biometrics, colors]);
   
-  // Parse hits
-  const hitsCount = hitsInput.trim() ? parseInt(hitsInput) : shotsCount;
+  // Computed values - clamp hits to max of shotsCount
+  const rawHits = hitsInput.trim() ? parseInt(hitsInput) : shotsCount;
+  const hitsCount = Math.min(Math.max(0, rawHits || 0), shotsCount);
   const accuracy = shotsCount > 0 ? Math.round((hitsCount / shotsCount) * 100) : 0;
+  const isInputValid = !hitsInput.trim() || (rawHits >= 0 && rawHits <= shotsCount);
+  const isOverMax = rawHits > shotsCount;
 
-  // Format helpers
+  // ============================================================================
+  // HELPERS
+  // ============================================================================
+
   const formatDuration = (secs: number) => {
     if (secs < 60) return `${secs}s`;
     const mins = Math.floor(secs / 60);
@@ -324,6 +293,48 @@ export default function WatchSessionResultPage() {
     return `${(ms / 1000).toFixed(2)}s`;
   };
 
+  // ============================================================================
+  // HANDLERS
+  // ============================================================================
+
+  const handleHitsChange = useCallback((text: string) => {
+    // Only allow digits
+    const cleaned = text.replace(/[^0-9]/g, '');
+    
+    // Clamp to max shots if input exceeds
+    if (cleaned) {
+      const num = parseInt(cleaned);
+      if (num > shotsCount) {
+        setHitsInput(String(shotsCount));
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        return;
+      }
+    }
+    
+    setHitsInput(cleaned);
+  }, [shotsCount]);
+
+  const handleConfirmHits = useCallback(() => {
+    Keyboard.dismiss();
+    // Small delay to ensure keyboard is dismissed
+    setTimeout(() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setHitsConfirmed(true);
+      setStep('results');
+    }, 100);
+  }, []);
+
+  const handleSkipHits = useCallback(() => {
+    Keyboard.dismiss();
+    // Default to all hits
+    setHitsInput(String(shotsCount));
+    setTimeout(() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setHitsConfirmed(true);
+      setStep('results');
+    }, 100);
+  }, [shotsCount]);
+
   const handleSave = useCallback(async (shouldEndSession: boolean) => {
     if (!sessionId) return;
     
@@ -331,16 +342,17 @@ export default function WatchSessionResultPage() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
     try {
+      const validHits = Math.min(Math.max(0, hitsCount), shotsCount);
+      
       if (isAutoSaved) {
-        // Data already saved - just end session if requested
+        // Auto-saved sessions: update hits if user confirmed them (even if same as shots)
+        if (hitsConfirmed) {
+          await updateSessionHits(sessionId, validHits);
+        }
         if (shouldEndSession) {
-          console.log('[WatchResult] Auto-saved: just ending session...');
           await endSession(sessionId);
         }
-        // If not ending, nothing to do - data is already saved
       } else {
-        // Not auto-saved - save everything
-        const validHits = Math.min(Math.max(0, hitsCount), shotsCount);
         await saveWatchSessionData({
           sessionId,
           shotsRecorded: shotsCount,
@@ -377,12 +389,113 @@ export default function WatchSessionResultPage() {
         router.back();
       }
     } catch (error: any) {
-      console.error('[WatchResult] Failed to save:', error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Error', error.message || 'Failed to save watch data');
       setSaving(false);
     }
-  }, [sessionId, isAutoSaved, shotsCount, hitsCount, durationSec, distanceM, teamId, trainingId, splitTimes, avgSplit, performance, biometrics, steadiness, loadPersonalSessions, loadTeamSessions]);
+  }, [sessionId, isAutoSaved, shotsCount, hitsCount, hitsConfirmed, durationSec, distanceM, teamId, trainingId, splitTimes, avgSplit, performance, biometrics, steadiness, loadPersonalSessions, loadTeamSessions]);
+
+  // ============================================================================
+  // RENDER - STEP 1: HITS INPUT
+  // ============================================================================
+
+  if (step === 'hits') {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Animated.View 
+          entering={FadeIn.duration(300)}
+          style={[styles.hitsContainer, { paddingTop: insets.top + 60, paddingBottom: insets.bottom + 20 }]}
+        >
+          {/* Header */}
+          <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.hitsHeader}>
+            <Text style={[styles.hitsTitle, { color: colors.text }]}>
+              Hits Recorded
+            </Text>
+            <Text style={[styles.hitsSubtitle, { color: colors.textMuted }]}>
+              {shotsCount} shots • {formatDuration(durationSec)}
+            </Text>
+          </Animated.View>
+
+          {/* Input area */}
+          <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.hitsInputArea}>
+            <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.card }]}>
+              <TextInput
+                ref={inputRef}
+                style={[styles.bigInput, { color: colors.text }]}
+                placeholder="0"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="numeric"
+                returnKeyType="done"
+                value={hitsInput}
+                onChangeText={handleHitsChange}
+                onSubmitEditing={handleConfirmHits}
+                blurOnSubmit={false}
+                maxLength={String(shotsCount).length}
+                autoFocus
+                selectTextOnFocus
+              />
+              <View style={styles.inputDivider} />
+              <Text style={[styles.inputTotal, { color: colors.textMuted }]}>
+                {shotsCount}
+              </Text>
+            </View>
+
+            {/* Live accuracy */}
+            {hitsInput.trim() !== '' && (
+              <Animated.View entering={FadeIn.duration(200)} style={styles.accuracyPreview}>
+                <Text style={[styles.accuracyPreviewText, { 
+                  color: accuracy >= 80 ? colors.green : accuracy >= 50 ? colors.orange : colors.textMuted 
+                }]}>
+                  {accuracy}%
+                </Text>
+              </Animated.View>
+            )}
+          </Animated.View>
+
+          {/* Hint */}
+          <Animated.View entering={FadeIn.delay(300).duration(400)} style={styles.hintRow}>
+            <Text style={[styles.hintText, { color: colors.textMuted }]}>
+              Best estimate is fine — this helps track your progress
+            </Text>
+          </Animated.View>
+
+          {/* Action buttons */}
+          <Animated.View entering={FadeInUp.delay(400).duration(400)} style={styles.hitsActions}>
+            <TouchableOpacity
+              style={[styles.continueBtn, { 
+                backgroundColor: hitsInput.trim() ? colors.primary : colors.card,
+                borderWidth: hitsInput.trim() ? 0 : 1,
+                borderColor: colors.border,
+              }]}
+              onPress={handleConfirmHits}
+              disabled={!hitsInput.trim()}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.continueBtnText, { 
+                color: hitsInput.trim() ? '#fff' : colors.textMuted 
+              }]}>
+                Confirm
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.skipBtn}
+              onPress={handleSkipHits}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.skipBtnText, { color: colors.textMuted }]}>
+                Skip — assume all hit
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </Animated.View>
+      </View>
+    );
+  }
+
+  // ============================================================================
+  // RENDER - STEP 2: FULL RESULTS
+  // ============================================================================
 
   if (!sessionId) {
     return (
@@ -399,29 +512,30 @@ export default function WatchSessionResultPage() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-    <ScrollView
+      <Animated.ScrollView
+        entering={SlideInRight.duration(300)}
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { 
           paddingTop: insets.top + 16,
           paddingBottom: insets.bottom + 120,
         }]}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Header */}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
         <Animated.View entering={FadeInDown.delay(0).duration(400)} style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={[styles.sourceTag, { backgroundColor: `${colors.green}22` }]}>
+          <View style={styles.headerTop}>
+            <View style={[styles.sourceTag, { backgroundColor: `${colors.green}22` }]}>
               <Watch size={14} color={colors.green} />
               <Text style={[styles.sourceText, { color: colors.green }]}>Garmin Watch</Text>
-          </View>
-          {isCompleted && (
-            <View style={[styles.statusBadge, { backgroundColor: `${colors.green}22` }]}>
-                <CheckCircle size={12} color={colors.green} />
-              <Text style={[styles.statusText, { color: colors.green }]}>Completed</Text>
             </View>
-          )}
-        </View>
-          <Text style={[styles.title, { color: colors.text }]}>Session Data</Text>
+            {isCompleted && (
+              <View style={[styles.statusBadge, { backgroundColor: `${colors.green}22` }]}>
+                <CheckCircle size={12} color={colors.green} />
+                <Text style={[styles.statusText, { color: colors.green }]}>Completed</Text>
+              </View>
+            )}
+          </View>
+          <Text style={[styles.title, { color: colors.text }]}>Session Results</Text>
           {(drillName || weaponName) && (
             <View style={styles.headerMeta}>
               {drillName && (
@@ -433,37 +547,60 @@ export default function WatchSessionResultPage() {
               {weaponName && (
                 <Text style={[styles.weaponName, { color: colors.textMuted }]}>{weaponName}</Text>
               )}
-      </View>
+            </View>
           )}
+        </Animated.View>
+
+        {/* Accuracy Highlight */}
+        <Animated.View entering={FadeInDown.delay(50).duration(400)} style={styles.section}>
+          <View style={[styles.accuracyCard, { 
+            backgroundColor: accuracy >= 80 ? `${colors.green}12` : accuracy >= 50 ? `${colors.orange}12` : `${colors.red}12`,
+            borderColor: accuracy >= 80 ? `${colors.green}30` : accuracy >= 50 ? `${colors.orange}30` : `${colors.red}30`,
+          }]}>
+            <View style={styles.accuracyMain}>
+              <Crosshair size={28} color={accuracy >= 80 ? colors.green : accuracy >= 50 ? colors.orange : colors.red} />
+              <Text style={[styles.accuracyValue, { 
+                color: accuracy >= 80 ? colors.green : accuracy >= 50 ? colors.orange : colors.red 
+              }]}>
+                {accuracy}%
+              </Text>
+              <Text style={[styles.accuracyLabel, { color: colors.textMuted }]}>Accuracy</Text>
+            </View>
+            <View style={styles.accuracyDetails}>
+              <Text style={[styles.accuracyDetailText, { color: colors.text }]}>
+                {hitsCount} hits / {shotsCount} shots
+              </Text>
+            </View>
+          </View>
         </Animated.View>
 
         {/* Primary Stats Grid */}
         <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Summary</Text>
-        <View style={styles.statsGrid}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Summary</Text>
+          <View style={styles.statsGrid}>
             <View style={[styles.statCard, styles.statCardLarge, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={[styles.statIconBg, { backgroundColor: `${colors.indigo}22` }]}>
+              <View style={[styles.statIconBg, { backgroundColor: `${colors.indigo}22` }]}>
                 <Target size={22} color={colors.indigo} />
               </View>
               <Text style={[styles.statValue, styles.statValueLarge, { color: colors.text }]}>{shotsCount}</Text>
               <Text style={[styles.statLabel, { color: colors.textMuted }]}>Shots Fired</Text>
-          </View>
+            </View>
 
             <View style={[styles.statCard, styles.statCardLarge, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={[styles.statIconBg, { backgroundColor: `${colors.orange}22` }]}>
+              <View style={[styles.statIconBg, { backgroundColor: `${colors.orange}22` }]}>
                 <Clock size={22} color={colors.orange} />
               </View>
               <Text style={[styles.statValue, styles.statValueLarge, { color: colors.text }]}>{formatDuration(durationSec)}</Text>
               <Text style={[styles.statLabel, { color: colors.textMuted }]}>Duration</Text>
-          </View>
+            </View>
 
             <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={[styles.statIconBg, { backgroundColor: `${colors.green}22` }]}>
-              <MapPin size={18} color={colors.green} />
+              <View style={[styles.statIconBg, { backgroundColor: `${colors.green}22` }]}>
+                <MapPin size={18} color={colors.green} />
+              </View>
+              <Text style={[styles.statValue, { color: colors.text }]}>{distanceM}m</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Distance</Text>
             </View>
-            <Text style={[styles.statValue, { color: colors.text }]}>{distanceM}m</Text>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Distance</Text>
-          </View>
 
             {avgSplit && (
               <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -476,36 +613,6 @@ export default function WatchSessionResultPage() {
             )}
           </View>
         </Animated.View>
-
-        {/* Heart Rate Summary */}
-        {heartRate && heartRate.avg > 0 && (
-          <Animated.View entering={FadeInDown.delay(150).duration(400)} style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Heart Rate</Text>
-            <View style={[styles.heartRateCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={[styles.heartIconBg, { backgroundColor: `${colors.red}22` }]}>
-                <Heart size={24} color={colors.red} fill={colors.red} />
-              </View>
-              <View style={styles.heartRateStats}>
-                <View style={styles.heartRateStat}>
-                  <Text style={[styles.heartRateValue, { color: colors.text }]}>{heartRate.avg}</Text>
-                  <Text style={[styles.heartRateLabel, { color: colors.textMuted }]}>Avg BPM</Text>
-                </View>
-                {heartRate.max && (
-                  <View style={styles.heartRateStat}>
-                    <Text style={[styles.heartRateValue, { color: colors.orange }]}>{heartRate.max}</Text>
-                    <Text style={[styles.heartRateLabel, { color: colors.textMuted }]}>Max</Text>
-                  </View>
-                )}
-                {heartRate.min && (
-                  <View style={styles.heartRateStat}>
-                    <Text style={[styles.heartRateValue, { color: colors.green }]}>{heartRate.min}</Text>
-                    <Text style={[styles.heartRateLabel, { color: colors.textMuted }]}>Min</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          </Animated.View>
-        )}
 
         {/* Breathing Summary */}
         {biometrics?.summary?.avgBreathRate && (
@@ -525,7 +632,13 @@ export default function WatchSessionResultPage() {
           </Animated.View>
         )}
 
-        {/* Breathing Timeline Chart - Simplified: Removed for faster display */}
+        {/* Weather Conditions */}
+        {weather && (
+          <Animated.View entering={FadeInDown.delay(220).duration(400)} style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Weather Conditions</Text>
+            <WeatherCard weather={weather} />
+          </Animated.View>
+        )}
 
         {/* Per-Shot Biometrics */}
         {hasShotBiometrics && (
@@ -546,13 +659,6 @@ export default function WatchSessionResultPage() {
                     </View>
                   </View>
                   <View style={styles.shotBioStats}>
-                    <View style={styles.shotBioStat}>
-                      <Heart size={12} color={colors.red} />
-                      <Text style={[styles.shotBioValue, { color: colors.text }]}>
-                        {sb.hr ?? '-'}
-                        <Text style={{ fontSize: 10, color: colors.textMuted }}> {sb.trendIcon}</Text>
-                      </Text>
-                    </View>
                     {sb.br !== undefined && sb.br !== null && (
                       <View style={styles.shotBioStat}>
                         <Wind size={12} color={colors.blue} />
@@ -566,7 +672,7 @@ export default function WatchSessionResultPage() {
           </Animated.View>
         )}
 
-        {/* Steadiness - Summary Only (chart removed for speed) */}
+        {/* Steadiness */}
         {steadiness?.avgScore && (
           <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Steadiness</Text>
@@ -612,50 +718,10 @@ export default function WatchSessionResultPage() {
                 <TrendingUp size={16} color={colors.orange} />
                 <Text style={[styles.splitStatValue, { color: colors.orange }]}>{formatMs(splitStats.slowest)}</Text>
                 <Text style={[styles.splitStatLabel, { color: colors.orange }]}>Slowest</Text>
-        </View>
-      </View>
+              </View>
+            </View>
           </Animated.View>
         )}
-
-        {/* Split Chart - Removed for faster display (data still saved) */}
-
-      {/* Hits Input */}
-        <Animated.View entering={FadeInDown.delay(350).duration(400)} style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Record Hits</Text>
-          <View style={[styles.hitsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.hitsInputRow}>
-          <View style={[styles.hitsIconBg, { backgroundColor: `${colors.green}22` }]}>
-                <Crosshair size={22} color={colors.green} />
-          </View>
-          <TextInput
-            style={[styles.hitsInput, { color: colors.text }]}
-            placeholder={`${shotsCount}`}
-            placeholderTextColor={colors.textMuted}
-            keyboardType="number-pad"
-            value={hitsInput}
-            onChangeText={setHitsInput}
-            maxLength={3}
-          />
-          <Text style={[styles.hitsLabel, { color: colors.textMuted }]}>
-            of {shotsCount} shots
-          </Text>
-        </View>
-            {hitsInput.trim() !== '' && (
-              <View style={[styles.accuracyBadge, { 
-                backgroundColor: accuracy >= 80 ? `${colors.green}22` : accuracy >= 50 ? `${colors.orange}22` : `${colors.red}22` 
-              }]}>
-                <Text style={[styles.accuracyText, { 
-                  color: accuracy >= 80 ? colors.green : accuracy >= 50 ? colors.orange : colors.red 
-                }]}>
-                  {accuracy}% Accuracy
-                </Text>
-              </View>
-            )}
-            <Text style={[styles.hitsHint, { color: colors.textMuted }]}>
-              Leave empty to assume all shots hit
-            </Text>
-          </View>
-        </Animated.View>
 
         {/* Raw Data Debug */}
         {(splitTimes.length > 0 || biometrics || steadiness) && (
@@ -666,11 +732,11 @@ export default function WatchSessionResultPage() {
                 {biometrics ? `Biometrics: ${biometrics.hrTimeline?.length ?? 0} HR samples, ${biometrics.shotBiometrics?.length ?? 0} shot records` : ''}
                 {steadiness ? `\nSteadiness: ${steadiness.shotScores?.length ?? 0} scores` : ''}
                 {splitTimes.length > 0 ? `\nSplits: [${splitTimes.join(', ')}]` : ''}
-          </Text>
+              </Text>
             </View>
           </Animated.View>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* Fixed Footer Actions */}
       <View style={[styles.footer, { 
@@ -678,14 +744,13 @@ export default function WatchSessionResultPage() {
         backgroundColor: colors.background,
         borderTopColor: colors.border,
       }]}>
-        {/* Auto-saved indicator */}
         {isAutoSaved && (
           <View style={[styles.autoSavedBadge, { backgroundColor: colors.green + '20' }]}>
             <CheckCircle size={14} color={colors.green} />
             <Text style={[styles.autoSavedText, { color: colors.green }]}>
               Data saved automatically
             </Text>
-      </View>
+          </View>
         )}
 
         <TouchableOpacity
@@ -706,37 +771,152 @@ export default function WatchSessionResultPage() {
         </TouchableOpacity>
 
         <View style={styles.secondaryActions}>
-        <TouchableOpacity
-          onPress={() => handleSave(false)}
-          disabled={saving}
+          <TouchableOpacity
+            onPress={() => handleSave(false)}
+            disabled={saving}
             style={[styles.secondaryButton, { backgroundColor: colors.card, borderColor: colors.border }]}
-        >
-          <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
+          >
+            <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
               {isAutoSaved ? 'Continue Shooting' : 'Save & Continue'}
-          </Text>
-        </TouchableOpacity>
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
+          <TouchableOpacity
             onPress={() => router.back()}
-          disabled={saving}
+            disabled={saving}
             style={[styles.secondaryButton, { backgroundColor: colors.card, borderColor: colors.border }]}
-        >
+          >
             <Text style={[styles.secondaryButtonText, { color: colors.textMuted }]}>
               Cancel
-          </Text>
-        </TouchableOpacity>
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
     </View>
   );
 }
 
+// ============================================================================
+// STYLES
+// ============================================================================
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 20 },
 
-  // Header
+  // ============================================================================
+  // STEP 1: HITS INPUT STYLES
+  // ============================================================================
+  
+  hitsContainer: {
+    flex: 1,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+  },
+  hitsHeader: {
+    alignItems: 'center',
+    marginBottom: 48,
+  },
+  hitsTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+    marginBottom: 6,
+  },
+  hitsSubtitle: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  hitsInputArea: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 32,
+    paddingVertical: 20,
+  },
+  bigInput: {
+    fontSize: 56,
+    fontWeight: '700',
+    textAlign: 'center',
+    minWidth: 70,
+    letterSpacing: -2,
+  },
+  inputDivider: {
+    width: 2,
+    height: 40,
+    backgroundColor: '#888',
+    marginHorizontal: 16,
+    opacity: 0.3,
+    transform: [{ rotate: '15deg' }],
+  },
+  inputTotal: {
+    fontSize: 56,
+    fontWeight: '700',
+    letterSpacing: -2,
+    opacity: 0.4,
+  },
+  accuracyPreview: {
+    marginTop: 20,
+  },
+  accuracyPreviewText: {
+    fontSize: 32,
+    fontWeight: '700',
+    letterSpacing: -1,
+  },
+  hintRow: {
+    marginBottom: 48,
+    paddingHorizontal: 20,
+  },
+  hintText: {
+    fontSize: 13,
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  encourageTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  encourageText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  hitsActions: {
+    width: '100%',
+    gap: 16,
+  },
+  continueBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 10,
+  },
+  continueBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  skipBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  skipBtnText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+
+  // ============================================================================
+  // STEP 2: RESULTS STYLES
+  // ============================================================================
+
   header: { marginBottom: 24 },
   headerTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   sourceTag: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
@@ -749,10 +929,38 @@ const styles = StyleSheet.create({
   weaponName: { fontSize: 14, fontWeight: '500' },
   metaDot: { width: 4, height: 4, borderRadius: 2 },
   
-  // Sections
   section: { marginBottom: 20 },
   sectionTitle: { fontSize: 15, fontWeight: '700', marginBottom: 10, letterSpacing: -0.3 },
   
+  // Accuracy highlight
+  accuracyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  accuracyMain: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  accuracyValue: {
+    fontSize: 40,
+    fontWeight: '800',
+    letterSpacing: -1,
+  },
+  accuracyLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  accuracyDetails: {},
+  accuracyDetailText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+
   // Stats Grid
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   statCard: { flex: 1, minWidth: '45%', alignItems: 'center', padding: 14, borderRadius: 12, borderWidth: 1, gap: 6 },
@@ -762,14 +970,6 @@ const styles = StyleSheet.create({
   statValueLarge: { fontSize: 22 },
   statLabel: { fontSize: 11, fontWeight: '500' },
   
-  // Heart Rate
-  heartRateCard: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 12, borderWidth: 1, gap: 14 },
-  heartIconBg: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  heartRateStats: { flex: 1, flexDirection: 'row', justifyContent: 'space-around' },
-  heartRateStat: { alignItems: 'center' },
-  heartRateValue: { fontSize: 20, fontWeight: '700' },
-  heartRateLabel: { fontSize: 10, fontWeight: '500', marginTop: 2 },
-  
   // Breathing
   breathCard: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 12, borderWidth: 1, gap: 14 },
   breathIconBg: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
@@ -777,10 +977,6 @@ const styles = StyleSheet.create({
   breathValue: { fontSize: 22, fontWeight: '700' },
   breathUnit: { fontSize: 14, fontWeight: '500' },
   breathLabel: { fontSize: 12, marginTop: 2 },
-  
-  // Charts
-  chartCard: { padding: 14, borderRadius: 12, borderWidth: 1, alignItems: 'center', overflow: 'hidden' },
-  chartHint: { fontSize: 10, marginTop: 10, textAlign: 'center' },
   
   // Shot Biometrics Grid
   shotBiometricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -807,16 +1003,6 @@ const styles = StyleSheet.create({
   splitStatValue: { fontSize: 14, fontWeight: '700' },
   splitStatLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.3 },
 
-  // Hits Input
-  hitsCard: { padding: 14, borderRadius: 12, borderWidth: 1, gap: 10 },
-  hitsInputRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  hitsIconBg: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  hitsInput: { flex: 1, fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
-  hitsLabel: { fontSize: 13, fontWeight: '500' },
-  accuracyBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
-  accuracyText: { fontSize: 12, fontWeight: '700' },
-  hitsHint: { fontSize: 11, fontStyle: 'italic' },
-  
   // Raw Data
   rawDataCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 10, borderRadius: 8 },
   rawDataText: { flex: 1, fontSize: 10, fontFamily: 'SpaceMono', lineHeight: 14 },

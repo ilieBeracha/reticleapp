@@ -1,12 +1,12 @@
 import { supabase } from '@/lib/supabase';
 import type {
-    CreatePaperResultParams,
-    CreateTacticalResultParams,
-    CreateTargetParams,
-    PaperTargetResult,
-    SessionTarget,
-    SessionTargetWithResults,
-    TacticalTargetResult,
+  CreatePaperResultParams,
+  CreateTacticalResultParams,
+  CreateTargetParams,
+  PaperTargetResult,
+  SessionTarget,
+  SessionTargetWithResults,
+  TacticalTargetResult,
 } from './types';
 
 /**
@@ -240,6 +240,39 @@ export async function saveTacticalTargetResult(params: CreateTacticalResultParam
 
   if (error) throw error;
   return data;
+}
+
+/**
+ * Update hits count for a session's tactical target
+ * Returns true if updated, false if no tactical target found
+ */
+export async function updateSessionHits(sessionId: string, hits: number): Promise<boolean> {
+  // First find the tactical target for this session
+  const { data: targets, error: targetsError } = await supabase
+    .from('session_targets')
+    .select('id')
+    .eq('session_id', sessionId)
+    .eq('target_type', 'tactical');
+
+  if (targetsError || !targets || targets.length === 0) {
+    console.log('[Targets] No tactical target found for session:', sessionId);
+    return false;
+  }
+
+  // Update the tactical target result
+  const targetId = targets[0].id;
+  const { error: updateError } = await supabase
+    .from('tactical_target_results')
+    .update({ hits })
+    .eq('session_target_id', targetId);
+
+  if (updateError) {
+    console.error('[Targets] Failed to update hits:', updateError);
+    throw updateError;
+  }
+
+  console.log('[Targets] Updated hits for session:', sessionId, 'to', hits);
+  return true;
 }
 
 /**

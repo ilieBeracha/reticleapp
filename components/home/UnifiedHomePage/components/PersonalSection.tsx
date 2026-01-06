@@ -1,17 +1,16 @@
 /**
  * PersonalSection Component
  * 
- * Displays either active session or start practice card, plus weekly stats.
+ * Displays active session or start practice card, weekly stats, and insights.
  */
 
-import React from 'react';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import type { HomeSession } from '../../types';
 import { styles } from '../UnifiedHomePage.styles';
+import type { Colors, WeeklyStats } from '../UnifiedHomePage.types';
 import { ActiveSessionCard } from './ActiveSessionCard';
 import { StartPracticeCard } from './StartPracticeCard';
 import { WeeklyStatsCard } from './WeeklyStatsCard';
-import type { HomeSession } from '../../types';
-import type { Colors, WeeklyStats } from '../UnifiedHomePage.types';
 
 interface PersonalSectionProps {
   activeSession: HomeSession | null;
@@ -59,4 +58,3 @@ export function PersonalSection({
     </Animated.View>
   );
 }
-

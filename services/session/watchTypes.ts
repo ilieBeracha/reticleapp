@@ -87,7 +87,113 @@ export interface WatchSummaryPayload {
     /** Manual shot count overrides by user */
     overrides: number;
   };
+  /** Weather conditions at session location (from Garmin Weather API) */
+  weather?: WatchWeatherPayload | null;
 }
+
+// ============================================================================
+// WEATHER PAYLOAD - From Garmin Weather API
+// ============================================================================
+
+/**
+ * Weather condition strings from Garmin Weather API.
+ */
+export type WeatherCondition =
+  | 'Clear'
+  | 'PartlyCloudy'
+  | 'MostlyCloudy'
+  | 'Cloudy'
+  | 'Rain'
+  | 'LightRain'
+  | 'HeavyRain'
+  | 'Snow'
+  | 'LightSnow'
+  | 'HeavySnow'
+  | 'Windy'
+  | 'Thunderstorms'
+  | 'Fog'
+  | 'Hazy'
+  | 'Hail'
+  | 'ScatteredShowers'
+  | 'ScatteredThunderstorms'
+  | 'Dust'
+  | 'Drizzle'
+  | 'Tornado'
+  | 'Smoke'
+  | 'Ice'
+  | 'Sand'
+  | 'Squall'
+  | 'Sandstorm'
+  | 'VolcanicAsh'
+  | 'Fair'
+  | 'Hurricane'
+  | 'TropicalStorm'
+  | 'Unknown';
+
+/**
+ * Compact weather payload from watch.
+ * Supports both compact format (t, h, ws) and verbose format (temp, hum, press).
+ */
+export interface WatchWeatherPayload {
+  // Compact format (planned)
+  /** Temperature in Celsius × 10 (e.g., 220 = 22.0°C) */
+  t?: number;
+  /** Humidity percentage (0-100) */
+  h?: number;
+  /** Wind speed in m/s × 10 (e.g., 35 = 3.5 m/s) */
+  ws?: number;
+  /** Wind direction cardinal (N, NE, E, SE, S, SW, W, NW) */
+  wd?: string;
+  /** Wind bearing in degrees (0-360) */
+  wb?: number;
+  /** Pressure in hPa (millibars) */
+  p?: number;
+  /** Condition string */
+  c?: WeatherCondition | string;
+  
+  // Verbose format (actual watch output)
+  /** Temperature in Celsius (raw, not × 10) */
+  temp?: number;
+  /** Humidity percentage (0-100) */
+  hum?: number;
+  /** Pressure in hPa */
+  press?: number;
+  /** Wind speed in m/s (raw, not × 10) */
+  wind?: number;
+  /** Wind direction cardinal */
+  windDir?: string;
+  /** Condition string */
+  cond?: string;
+}
+
+/**
+ * Decoded weather data - human-readable format for storage and display.
+ */
+export interface DecodedWeather {
+  /** Temperature in Celsius */
+  temperatureC: number | null;
+  /** Temperature in Fahrenheit */
+  temperatureF: number | null;
+  /** Humidity percentage (0-100) */
+  humidity: number | null;
+  /** Wind speed in meters per second */
+  windSpeedMps: number | null;
+  /** Wind speed in miles per hour */
+  windSpeedMph: number | null;
+  /** Wind speed in km/h */
+  windSpeedKph: number | null;
+  /** Wind direction cardinal (N, NE, E, etc.) */
+  windDirection: string | null;
+  /** Wind bearing in degrees (0-360) */
+  windBearing: number | null;
+  /** Atmospheric pressure in hPa */
+  pressureHpa: number | null;
+  /** Weather condition string */
+  condition: string | null;
+  /** Wind impact assessment for shooting */
+  windImpact: 'calm' | 'light' | 'moderate' | 'strong';
+  /** Overall condition severity for shooting */
+  conditionSeverity: 'ideal' | 'good' | 'challenging' | 'difficult' | 'extreme';
 
 /**
  * Per-shot data in details payload.
@@ -191,6 +297,9 @@ export interface TransformedWatchData {
   autoDetected?: boolean;
   detectionSensitivity?: number;
   manualOverrides?: number;
+
+  // Weather conditions (from summary)
+  weather?: DecodedWeather | null;
 
   // Sync status
   isSummaryOnly: boolean;
