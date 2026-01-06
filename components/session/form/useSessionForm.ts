@@ -9,13 +9,14 @@
 
 import type { BaseSessionConfig, DrillConfig } from '@/services/session/types';
 import { useIsGarminConnected } from '@/store/garminStore';
+import type { DrillGoal } from '@/types/workspace';
 import { useCallback, useState } from 'react';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-export type DrillGoal = 'grouping' | 'achievement';
+export type { DrillGoal } from '@/types/workspace';
 export type InputMethod = 'scan' | 'manual';
 export type TargetType = 'paper' | 'tactical';
 export type ControlMode = 'phone' | 'watch';
@@ -35,6 +36,7 @@ export interface SessionFormContext {
   teamId: string | null;
   trainingId?: string | null;
   drillId?: string | null;  // Reference to saved drill/preset
+  weaponId?: string | null; // Reference to user's weapon profile
 }
 
 export interface UseSessionFormOptions {
@@ -188,6 +190,7 @@ export function useSessionForm(options: UseSessionFormOptions = {}): UseSessionF
     return {
       team_id: context.teamId,
       training_id: context.trainingId ?? null,
+      weapon_id: context.weaponId ?? null,
       drill_id: context.drillId ?? null,
       // If drill_id is provided, drill_config is null (config comes from saved drill)
       // Otherwise, use inline drill_config

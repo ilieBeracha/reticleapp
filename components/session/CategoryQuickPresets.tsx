@@ -144,7 +144,7 @@ function getPresetIcon(preset: QuickPreset): string {
   if (preset.name.toLowerCase().includes('group')) return 'target';
   if (preset.name.toLowerCase().includes('drill')) return 'zap';
   if (preset.name.toLowerCase().includes('cold')) return 'thermometer';
-  if (preset.drillGoal === 'achievement') return 'check-circle';
+  if (preset.drillGoal === 'achievement' || preset.drillGoal === 'engagement') return 'check-circle';
   return 'circle';
 }
 

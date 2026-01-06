@@ -90,7 +90,7 @@ export interface UseActiveSessionReturn {
   
   // Drill type flags
   isGroupingDrill: boolean;
-  isAchievementDrill: boolean;
+  isEngagementDrill: boolean;
   isPaperDrill: boolean;
   isTacticalDrill: boolean;
   

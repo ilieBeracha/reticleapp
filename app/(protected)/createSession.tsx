@@ -22,8 +22,8 @@ import { useSessionStore } from '@/store/sessionStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
-import { ChevronLeft, Play } from 'lucide-react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { ChevronLeft, CornerDownRight } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -46,6 +46,18 @@ export default function CreateSessionScreen() {
   const insets = useSafeAreaInsets();
   const { loadSessions } = useSessionStore();
   
+  // Edit mode params (coming back from SessionPrepView)
+  const params = useLocalSearchParams<{
+    editSessionId?: string;
+    weaponId?: string;
+    weaponName?: string;
+    purpose?: string;
+    distance?: string;
+    shots?: string;
+  }>();
+  
+  const isEditMode = !!params.editSessionId;
+  
   const [checkingSession, setCheckingSession] = useState(true);
   const [showPresetPicker, setShowPresetPicker] = useState(false);
   const [showPresetForm, setShowPresetForm] = useState(false);
@@ -53,6 +65,17 @@ export default function CreateSessionScreen() {
 
   const creation = useSessionCreation({
     onSubmit: handleSubmit,
+    // Pre-fill from edit params
+    initialState: isEditMode ? {
+      step: 'context' as const,
+      purpose: (params.purpose as SessionPurpose) || 'grouping',
+      context: {
+        weaponId: params.weaponId || null,
+        weaponName: params.weaponName || null,
+        distance: params.distance ? parseInt(params.distance, 10) : 25,
+        shotsPlanned: params.shots ? parseInt(params.shots, 10) : 5,
+      },
+    } : undefined,
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -153,13 +176,11 @@ export default function CreateSessionScreen() {
     setShowPresetPicker(false);
     
     // Map drill_goal to SessionPurpose
-    const purposeMap: Record<string, 'grouping' | 'achievement' | 'zeroing' | 'physical' | 'custom'> = {
+    const purposeMap: Record<string, 'grouping' | 'engagement'> = {
       grouping: 'grouping',
-      achievement: 'achievement',
-      zeroing: 'zeroing',
-      physical: 'physical',
+      engagement: 'engagement',
     };
-    const purpose = purposeMap[preset.drill_goal] || 'custom';
+    const purpose = purposeMap[preset.drill_goal] || 'engagement';
     
     // Set purpose and prefill context
     creation.setPurpose(purpose);
@@ -358,8 +379,8 @@ export default function CreateSessionScreen() {
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <>
-                <Play size={18} color="#fff" fill="#fff" />
-                <Text style={styles.buttonText}>Start Session</Text>
+                <CornerDownRight size={18} color="#fff" fill="#fff" />
+                <Text style={styles.buttonText}>Preview Session</Text>
               </>
             )}
           </TouchableOpacity>

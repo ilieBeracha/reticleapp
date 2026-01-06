@@ -31,7 +31,7 @@ import {
 // TYPES
 // ============================================================================
 
-export type DrillGoal = 'grouping' | 'achievement';
+export type { DrillGoal } from '@/types/workspace';
 export type InputMethod = 'scan' | 'manual';
 
 export interface OptionCardProps {

@@ -21,7 +21,7 @@ import {
   X,
 } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Alert, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CategoryDrillPicker } from '../CategoryDrillPicker';
 import {
   DISTANCE_PRESETS,
@@ -154,19 +154,19 @@ function TimePillPicker({
   onSelect,
   allowCustom = true,
 }: {
-  options: (number | null)[];
-  selected: number | null;
-  onSelect: (v: number | null) => void;
+  options: number[];
+  selected: number;
+  onSelect: (v: number) => void;
   allowCustom?: boolean;
 }) {
   const colors = useColors();
   const inputRef = useRef<TextInput>(null);
-  const isCustom = selected !== null && !options.includes(selected);
+  const isCustom = !options.includes(selected);
   const [editing, setEditing] = useState(false);
-  const [customText, setCustomText] = useState(selected ? String(selected) : '60');
+  const [customText, setCustomText] = useState(String(selected));
 
-  const formatTime = (s: number | null) => 
-    s === null ? 'None' : s < 60 ? `${s}s` : `${Math.floor(s / 60)}m`;
+  const formatTime = (s: number) => 
+    s < 60 ? `${s}s` : `${Math.floor(s / 60)}m`;
 
   const handleCustomSubmit = () => {
     const num = parseInt(customText, 10);
@@ -224,7 +224,7 @@ function TimePillPicker({
               styles.pill,
               { backgroundColor: isCustom ? colors.text : colors.card },
             ]}
-            onPress={() => { setCustomText(selected ? String(selected) : '60'); setEditing(true); }}
+            onPress={() => { setCustomText(String(selected)); setEditing(true); }}
           >
             <Text style={[styles.pillText, { color: isCustom ? colors.background : colors.text }]}>
               {isCustom ? formatTime(selected) : 'Other'}
@@ -272,10 +272,10 @@ export function SessionContextStep({
 
   const distancePresets = useMemo(() => {
     if (effectiveCategory) return getCategoryDistances(effectiveCategory);
-    return DISTANCE_PRESETS[purpose] || DISTANCE_PRESETS.custom;
+    return DISTANCE_PRESETS[purpose] || DISTANCE_PRESETS.engagement;
   }, [effectiveCategory, purpose]);
 
-  const shotsPresets = SHOTS_PRESETS[purpose] || SHOTS_PRESETS.custom;
+  const shotsPresets = SHOTS_PRESETS[purpose] || SHOTS_PRESETS.engagement;
 
   const positionOptions = useMemo(() => {
     if (categoryConfig) {
@@ -304,11 +304,9 @@ export function SessionContextStep({
 
   // Map purpose to drill goal for preset
   const purposeToDrillGoal = (p: SessionPurpose): DrillGoal => {
-    const map: Record<SessionPurpose, DrillGoal> = {
+    const map: Record<string, DrillGoal> = {
       grouping: 'grouping',
-      achievement: 'achievement',
-      zeroing: 'zeroing',
-      physical: 'physical',
+      engagement: 'engagement',
       custom: 'grouping',
     };
     return map[p];
@@ -316,12 +314,9 @@ export function SessionContextStep({
 
   // Map purpose to drill types for filtering
   const purposeToDrillTypes = useMemo((): DrillType[] | undefined => {
-    const map: Record<SessionPurpose, DrillType[]> = {
-      zeroing: ['zeroing', 'diagnostic'],
+    const map: Record<string, DrillType[]> = {
       grouping: ['grouping', 'accuracy'],
-      achievement: ['qualification', 'competition'],
-      physical: ['stress', 'movement', 'speed'],
-      custom: [], // Empty = show all
+      engagement: ['qualification', 'competition'],
     };
     const types = map[purpose];
     return types.length > 0 ? types : undefined;
@@ -429,24 +424,24 @@ export function SessionContextStep({
                 />
               </View>
 
-              <View style={styles.paramRow}>
-                <Text style={[styles.paramLabel, { color: colors.textMuted }]}>Bullets</Text>
-                <PillPicker
-                  options={shotsPresets.slice(0, 4)}
-                  selected={context.shotsPlanned}
-                  onSelect={(s) => {
-                    console.log('[SessionContextStep] Bullets onSelect:', s, 'current:', context.shotsPlanned);
-                    onUpdateContext({ shotsPlanned: s });
-                  }}
-                  allowCustom
-                />
-              </View>
+              {/* Only show bullets for engagement - grouping gets count from scan */}
+              {purpose !== 'grouping' && (
+                <View style={styles.paramRow}>
+                  <Text style={[styles.paramLabel, { color: colors.textMuted }]}>Bullets</Text>
+                  <PillPicker
+                    options={shotsPresets.slice(0, 4)}
+                    selected={context.shotsPlanned}
+                    onSelect={(s) => onUpdateContext({ shotsPlanned: s })}
+                    allowCustom
+                  />
+                </View>
+              )}
 
               <View style={styles.paramRow}>
                 <Text style={[styles.paramLabel, { color: colors.textMuted }]}>Time limit</Text>
                 <TimePillPicker
                   options={TIME_PRESETS}
-                  selected={context.timeLimit}
+                  selected={context.timeLimit ?? 60}
                   onSelect={(t) => onUpdateContext({ timeLimit: t })}
                 />
               </View>
@@ -457,7 +452,7 @@ export function SessionContextStep({
           {!isEditingDrill && (
             <View style={styles.drillSummary}>
               <Text style={[styles.drillSummaryText, { color: colors.textMuted }]}>
-                {context.distance}m • {context.shotsPlanned} bullets{context.timeLimit ? ` • ${formatTime(context.timeLimit)}` : ''}
+                {context.distance}m{purpose !== 'grouping' ? ` • ${context.shotsPlanned} bullets` : ''}{context.timeLimit ? ` • ${formatTime(context.timeLimit)}` : ''}
               </Text>
             </View>
           )}
@@ -478,17 +473,41 @@ export function SessionContextStep({
             />
           </View>
 
+          {/* Only show bullets for engagement - grouping gets count from scan */}
+          {purpose !== 'grouping' && (
+            <View style={styles.paramRow}>
+              <Text style={[styles.paramLabel, { color: colors.textMuted }]}>Bullets</Text>
+              <PillPicker
+                options={shotsPresets.slice(0, 4)}
+                selected={context.shotsPlanned}
+                onSelect={(s) => onUpdateContext({ shotsPlanned: s })}
+                allowCustom
+              />
+            </View>
+          )}
+
+          {/* Position - always visible */}
           <View style={styles.paramRow}>
-            <Text style={[styles.paramLabel, { color: colors.textMuted }]}>Bullets</Text>
-            <PillPicker
-              options={shotsPresets.slice(0, 4)}
-              selected={context.shotsPlanned}
-              onSelect={(s) => {
-                console.log('[SessionContextStep] Bullets (custom) onSelect:', s, 'current:', context.shotsPlanned);
-                onUpdateContext({ shotsPlanned: s });
-              }}
-              allowCustom
-            />
+            <Text style={[styles.paramLabel, { color: colors.textMuted }]}>Position</Text>
+            <View style={styles.pills}>
+              {positionOptions.map((opt) => {
+                const active = context.position === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[
+                      styles.pill,
+                      { backgroundColor: active ? colors.text : colors.card },
+                    ]}
+                    onPress={() => { Haptics.selectionAsync(); onUpdateContext({ position: opt.value }); }}
+                  >
+                    <Text style={[styles.pillText, { color: active ? colors.background : colors.text }]}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
 
           {/* Advanced toggle */}
@@ -504,35 +523,52 @@ export function SessionContextStep({
 
           {showAdvanced && (
             <>
-              <View style={styles.paramRow}>
-                <Text style={[styles.paramLabel, { color: colors.textMuted }]}>Position</Text>
-                <View style={styles.pills}>
-                  {positionOptions.map((opt) => {
-                    const active = context.position === opt.value;
-                    return (
-                      <TouchableOpacity
-                        key={opt.value}
-                        style={[
-                          styles.pill,
-                          { backgroundColor: active ? colors.text : colors.card },
-                        ]}
-                        onPress={() => { Haptics.selectionAsync(); onUpdateContext({ position: opt.value }); }}
-                      >
-                        <Text style={[styles.pillText, { color: active ? colors.background : colors.text }]}>
-                          {opt.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+              {/* Time Limit Toggle */}
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleLabel}>
+                  <Text style={[styles.paramLabel, { color: colors.text, marginBottom: 0 }]}>Time limit</Text>
+                  <Text style={[styles.toggleHint, { color: colors.textMuted }]}>
+                    Set a countdown timer
+                  </Text>
                 </View>
+                <Switch
+                  value={context.timeLimit !== null}
+                  onValueChange={(enabled) => {
+                    Haptics.selectionAsync();
+                    onUpdateContext({ timeLimit: enabled ? 60 : null });
+                  }}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  thumbColor={colors.background}
+                />
               </View>
 
-              <View style={styles.paramRow}>
-                <Text style={[styles.paramLabel, { color: colors.textMuted }]}>Time limit</Text>
-                <TimePillPicker
-                  options={TIME_PRESETS}
-                  selected={context.timeLimit}
-                  onSelect={(t) => onUpdateContext({ timeLimit: t })}
+              {/* Time picker - only show when enabled */}
+              {context.timeLimit !== null && (
+                <View style={[styles.paramRow, { paddingTop: 0 }]}>
+                  <TimePillPicker
+                    options={TIME_PRESETS}
+                    selected={context.timeLimit}
+                    onSelect={(t) => onUpdateContext({ timeLimit: t })}
+                  />
+                </View>
+              )}
+
+              {/* Stress Drill Toggle */}
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleLabel}>
+                  <Text style={[styles.paramLabel, { color: colors.text, marginBottom: 0 }]}>Stress drill</Text>
+                  <Text style={[styles.toggleHint, { color: colors.textMuted }]}>
+                    Physical activity before shooting
+                  </Text>
+                </View>
+                <Switch
+                  value={context.stressDrill}
+                  onValueChange={(enabled) => {
+                    Haptics.selectionAsync();
+                    onUpdateContext({ stressDrill: enabled });
+                  }}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  thumbColor={colors.background}
                 />
               </View>
 
@@ -632,6 +668,11 @@ const styles = StyleSheet.create({
   // Advanced
   advancedToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 12 },
   advancedText: { fontSize: 13 },
+
+  // Toggle row
+  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 },
+  toggleLabel: { flex: 1 },
+  toggleHint: { fontSize: 12, marginTop: 2 },
 
   // Notes
   notesRow: { paddingVertical: 8 },

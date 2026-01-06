@@ -2,19 +2,20 @@ import { TacticalTargetFlow } from "@/components/addTarget";
 import { useLocalSearchParams } from "expo-router";
 
 /**
- * TACTICAL TARGET - Manual Entry Only
+ * TACTICAL/GROUPING TARGET - Manual Entry
  * 
- * Route: /(protected)/tacticalTarget?sessionId=xxx&distance=25&bullets=10
+ * Route: /(protected)/tacticalTarget?sessionId=xxx&distance=25&bullets=10&isGrouping=1
  * 
- * Goes directly to tactical target setup and results entry.
- * No target type selection needed.
+ * For engagement: Shows hits counter
+ * For grouping: Shows group size (cm) input
  */
 export default function TacticalTargetSheet() {
-  const { sessionId, distance, bullets, locked } = useLocalSearchParams<{
+  const { sessionId, distance, bullets, locked, isGrouping } = useLocalSearchParams<{
     sessionId: string;
     distance?: string;
     bullets?: string;
     locked?: string;
+    isGrouping?: string;
   }>();
 
   if (!sessionId) {
@@ -28,6 +29,7 @@ export default function TacticalTargetSheet() {
       defaultBullets={bullets ? parseInt(bullets) : 10}
       lockDistance={locked === '1'}
       lockBullets={locked === '1'}
+      isGrouping={isGrouping === '1'}
     />
   );
 }

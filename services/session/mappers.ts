@@ -27,7 +27,7 @@ export function mapSession(row: any): SessionWithDetails {
     drillConfig = {
       id: drillSource.id,
       name: drillSource.name,
-      drill_goal: drillSource.drill_goal ?? 'achievement',
+      drill_goal: drillSource.drill_goal ?? 'engagement',
       target_type: drillSource.target_type,
       input_method: drillSource.input_method ?? null, // Commander's choice
       distance_m: drillSource.distance_m,

@@ -1,29 +1,30 @@
-import { addTargetWithTacticalResult } from "@/services/sessionService";
+import { addTargetWithPaperResult, addTargetWithTacticalResult } from "@/services/sessionService";
+import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from "@/theme/colors";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import {
-    ArrowLeft,
-    Check,
-    ChevronRight,
-    Crosshair,
-    Minus,
-    Plus,
-    Target,
-    Timer,
+  ArrowLeft,
+  Check,
+  ChevronRight,
+  Crosshair,
+  Minus,
+  Plus,
+  Ruler,
+  Target,
+  Timer,
 } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
-import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from "@/theme/colors";
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { COLORS } from "./types";
 
@@ -344,6 +345,8 @@ interface TacticalTargetFlowProps {
   defaultBullets?: number;
   lockDistance?: boolean;
   lockBullets?: boolean;
+  /** When true, shows group size (cm) input instead of hits counter */
+  isGrouping?: boolean;
   onComplete?: () => void;
   onCancel?: () => void;
 }
@@ -354,6 +357,7 @@ export function TacticalTargetFlow({
   defaultBullets = 10,
   lockDistance = false,
   lockBullets = false,
+  isGrouping = false,
   onComplete,
   onCancel,
 }: TacticalTargetFlowProps) {
@@ -367,6 +371,7 @@ export function TacticalTargetFlow({
 
   // Results state
   const [hits, setHits] = useState(0);
+  const [groupSizeCm, setGroupSizeCm] = useState("");  // For grouping mode
   const [time, setTime] = useState("");
   const [stageCleared, setStageCleared] = useState(false);
   const [notes, setNotes] = useState("");
@@ -401,26 +406,47 @@ export function TacticalTargetFlow({
       return;
     }
 
-    if (hits > bullets) {
+    if (!isGrouping && hits > bullets) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       Alert.alert("Invalid Hits", "Hits cannot exceed rounds fired.");
+      return;
+    }
+
+    if (isGrouping && !groupSizeCm) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      Alert.alert("Missing Group Size", "Please enter the group size in cm.");
       return;
     }
 
     setSaving(true);
 
     try {
-      await addTargetWithTacticalResult({
-        session_id: sessionId,
-        distance_m: distance,
-        lane_number: null,
-        planned_shots: bullets,
-        bullets_fired: bullets,
-        hits: hits,
-        is_stage_cleared: stageCleared,
-        time_seconds: time ? parseFloat(time) : null,
-        result_notes: notes || null,
-      });
+      if (isGrouping) {
+        // For grouping: Use paper target with dispersion
+        await addTargetWithPaperResult({
+          session_id: sessionId,
+          distance_m: distance,
+          lane_number: null,
+          planned_shots: bullets,
+          paper_type: 'grouping',
+          bullets_fired: bullets,
+          dispersion_cm: parseFloat(groupSizeCm),
+          result_notes: notes || null,
+        });
+      } else {
+        // For engagement: Use tactical target with hits
+        await addTargetWithTacticalResult({
+          session_id: sessionId,
+          distance_m: distance,
+          lane_number: null,
+          planned_shots: bullets,
+          bullets_fired: bullets,
+          hits: hits,
+          is_stage_cleared: stageCleared,
+          time_seconds: time ? parseFloat(time) : null,
+          result_notes: notes || null,
+        });
+      }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
@@ -430,12 +456,12 @@ export function TacticalTargetFlow({
         router.back();
       }
     } catch (error: any) {
-      console.error("Failed to add tactical target:", error);
+      console.error("Failed to add target:", error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert("Error", error.message || "Failed to add target");
       setSaving(false);
     }
-  }, [sessionId, distance, bullets, hits, time, stageCleared, notes, onComplete]);
+  }, [sessionId, distance, bullets, hits, groupSizeCm, isGrouping, time, stageCleared, notes, onComplete]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // SETUP STEP
@@ -452,11 +478,15 @@ export function TacticalTargetFlow({
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <View style={styles.headerIconContainer}>
-              <Crosshair size={24} color={COLORS.primary} />
+              {isGrouping ? (
+                <Target size={24} color={COLORS.primary} />
+              ) : (
+                <Crosshair size={24} color={COLORS.primary} />
+              )}
             </View>
             <View>
-              <Text style={styles.headerTitle}>Tactical Target</Text>
-              <Text style={styles.headerSubtitle}>Manual hit logging</Text>
+              <Text style={styles.headerTitle}>{isGrouping ? 'Grouping Target' : 'Tactical Target'}</Text>
+              <Text style={styles.headerSubtitle}>{isGrouping ? 'Manual group size entry' : 'Manual hit logging'}</Text>
             </View>
           </View>
           <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
@@ -504,12 +534,12 @@ export function TacticalTargetFlow({
         {/* Rounds Stepper */}
         <View style={styles.section}>
           <Stepper
-            label="Rounds to Fire"
+            label={isGrouping ? "Shots in Group" : "Rounds to Fire"}
             value={bullets}
             onChange={lockBullets ? () => {} : setBullets}
             min={lockBullets ? bullets : 1}
             max={lockBullets ? bullets : 100}
-            unit="rds"
+            unit={isGrouping ? "shots" : "rds"}
             disabled={lockBullets}
           />
         </View>
@@ -558,66 +588,120 @@ export function TacticalTargetFlow({
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Log Results</Text>
           <View style={styles.headerMeta}>
-            <Crosshair size={14} color={COLORS.primary} />
+            {isGrouping ? (
+              <Target size={14} color={COLORS.primary} />
+            ) : (
+              <Crosshair size={14} color={COLORS.primary} />
+            )}
             <Text style={styles.headerSubtitle}>
-              Tactical • {distance}m • {bullets} rounds
+              {isGrouping ? 'Grouping' : 'Tactical'} • {distance}m • {bullets} rounds
             </Text>
           </View>
         </View>
         <View style={{ width: 40 }} />
       </View>
 
-      {/* Hits Stepper */}
-      <View style={styles.hitsSection}>
-        <HitsStepper value={hits} max={bullets} onChange={setHits} />
-      </View>
-
-      {/* Time Input */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <View style={styles.cardIconBox}>
-            <Timer size={18} color={COLORS.primary} />
+      {/* Hits Stepper OR Group Size Input */}
+      {isGrouping ? (
+        // GROUPING: Show group size input
+        <View style={styles.groupingSection}>
+          <View style={styles.groupingHeader}>
+            <View style={styles.groupingIconContainer}>
+              <Ruler size={24} color={COLORS.primary} />
+            </View>
+            <Text style={styles.groupingTitle}>Group Size</Text>
+            <Text style={styles.groupingSublabel}>Measure shot dispersion</Text>
           </View>
-          <View style={styles.cardHeaderText}>
-            <Text style={styles.cardTitle}>Engagement Time</Text>
-            <Text style={styles.cardHint}>Optional - how fast?</Text>
+          
+          <View style={styles.groupingInputRow}>
+            <TextInput
+              style={styles.groupingInput}
+              value={groupSizeCm}
+              onChangeText={setGroupSizeCm}
+              placeholder="0.0"
+              placeholderTextColor={COLORS.textDim}
+              keyboardType="decimal-pad"
+              returnKeyType="done"
+            />
+            <View style={styles.groupingUnitBox}>
+              <Text style={styles.groupingUnit}>cm</Text>
+            </View>
+          </View>
+          
+          <View style={styles.groupingQuickRow}>
+            {[1, 2, 3, 5, 10].map((val) => (
+              <TouchableOpacity
+                key={val}
+                style={[styles.groupingQuickBtn, groupSizeCm === String(val) && styles.groupingQuickBtnActive]}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setGroupSizeCm(String(val));
+                }}
+              >
+                <Text style={[styles.groupingQuickText, groupSizeCm === String(val) && styles.groupingQuickTextActive]}>
+                  {val}cm
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
-        <View style={styles.timeInputContainer}>
-          <TextInput
-            style={styles.timeInput}
-            value={time}
-            onChangeText={setTime}
-            placeholder="0.0"
-            placeholderTextColor={COLORS.textDim}
-            keyboardType="decimal-pad"
-            returnKeyType="done"
+      ) : (
+        // ENGAGEMENT: Show hits stepper
+        <View style={styles.hitsSection}>
+          <HitsStepper value={hits} max={bullets} onChange={setHits} />
+        </View>
+      )}
+
+      {/* Time Input - only for engagement */}
+      {!isGrouping && (
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardIconBox}>
+              <Timer size={18} color={COLORS.primary} />
+            </View>
+            <View style={styles.cardHeaderText}>
+              <Text style={styles.cardTitle}>Engagement Time</Text>
+              <Text style={styles.cardHint}>Optional - how fast?</Text>
+            </View>
+          </View>
+          <View style={styles.timeInputContainer}>
+            <TextInput
+              style={styles.timeInput}
+              value={time}
+              onChangeText={setTime}
+              placeholder="0.0"
+              placeholderTextColor={COLORS.textDim}
+              keyboardType="decimal-pad"
+              returnKeyType="done"
+            />
+            <Text style={styles.timeUnit}>seconds</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Stage Cleared Toggle - only for engagement */}
+      {!isGrouping && (
+        <View style={styles.toggleCard}>
+          <View style={styles.toggleLeft}>
+            <View style={[styles.cardIconBox, stageCleared && styles.cardIconBoxActive]}>
+              <Check size={18} color={stageCleared ? "#000" : COLORS.textMuted} />
+            </View>
+            <View>
+              <Text style={styles.toggleTitle}>Stage Cleared</Text>
+              <Text style={styles.toggleHint}>Completed tactical objective?</Text>
+            </View>
+          </View>
+          <Switch
+            value={stageCleared}
+            onValueChange={(val) => {
+              Haptics.selectionAsync();
+              setStageCleared(val);
+            }}
+            trackColor={{ false: COLORS.borderLight, true: `${COLORS.primary}50` }}
+            thumbColor={stageCleared ? COLORS.primary : "#6B7280"}
           />
-          <Text style={styles.timeUnit}>seconds</Text>
         </View>
-      </View>
-
-      {/* Stage Cleared Toggle */}
-      <View style={styles.toggleCard}>
-        <View style={styles.toggleLeft}>
-          <View style={[styles.cardIconBox, stageCleared && styles.cardIconBoxActive]}>
-            <Check size={18} color={stageCleared ? "#000" : COLORS.textMuted} />
-          </View>
-          <View>
-            <Text style={styles.toggleTitle}>Stage Cleared</Text>
-            <Text style={styles.toggleHint}>Completed tactical objective?</Text>
-          </View>
-        </View>
-        <Switch
-          value={stageCleared}
-          onValueChange={(val) => {
-            Haptics.selectionAsync();
-            setStageCleared(val);
-          }}
-          trackColor={{ false: COLORS.borderLight, true: `${COLORS.primary}50` }}
-          thumbColor={stageCleared ? COLORS.primary : "#6B7280"}
-        />
-      </View>
+      )}
 
       {/* Notes */}
       <View style={styles.notesSection}>
@@ -628,7 +712,7 @@ export function TacticalTargetFlow({
           style={styles.notesInput}
           value={notes}
           onChangeText={setNotes}
-          placeholder="Any notes about this engagement..."
+          placeholder={isGrouping ? "Any notes about this group..." : "Any notes about this engagement..."}
           placeholderTextColor={COLORS.textDim}
           multiline
           numberOfLines={3}
@@ -858,6 +942,93 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
     borderWidth: 1,
     borderColor: COLORS.border,
+  },
+
+  // Grouping Section
+  groupingSection: {
+    backgroundColor: COLORS.card,
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: "center",
+  },
+  groupingHeader: {
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  groupingIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: `${COLORS.primary}20`,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  groupingTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.white,
+    marginBottom: 4,
+  },
+  groupingSublabel: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+  },
+  groupingInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 20,
+  },
+  groupingInput: {
+    width: 120,
+    height: 64,
+    backgroundColor: COLORS.cardHover,
+    borderRadius: 16,
+    fontSize: 32,
+    fontWeight: "700",
+    color: COLORS.white,
+    textAlign: "center",
+    fontVariant: ["tabular-nums"],
+  },
+  groupingUnitBox: {
+    height: 64,
+    paddingHorizontal: 16,
+    backgroundColor: COLORS.cardHover,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  groupingUnit: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: COLORS.textMuted,
+  },
+  groupingQuickRow: {
+    flexDirection: "row",
+    gap: 8,
+    flexWrap: "wrap",
+    justifyContent: "center",
+  },
+  groupingQuickBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: COLORS.cardHover,
+  },
+  groupingQuickBtnActive: {
+    backgroundColor: `${COLORS.primary}25`,
+  },
+  groupingQuickText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.textMuted,
+  },
+  groupingQuickTextActive: {
+    color: COLORS.primary,
   },
 
   // Buttons

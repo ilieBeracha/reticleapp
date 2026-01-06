@@ -29,7 +29,7 @@ export default function ScanTargetSheet() {
   // - grouping → 'grouping' (dispersion only, no hit %)
   // - achievement → 'achievement' (tracks hit %)
   // - no drill_goal → default to 'grouping' for scan targets
-  const paperType: PaperType = drillGoal === 'achievement' ? 'achievement' : 'grouping';
+  const paperType: PaperType = (drillGoal === 'achievement' || drillGoal === 'engagement') ? 'engagement' : 'grouping';
 
   return (
     <PaperTargetFlow

@@ -90,11 +90,19 @@ export type TrainingStatus = 'planned' | 'ongoing' | 'finished' | 'cancelled';
 export type TargetType = 'paper' | 'tactical';
 
 /**
- * DrillGoal - Primary classification for drills
- * - grouping: Measure shot consistency/dispersion (scan-only, no hit %)
- * - achievement: Measure accuracy/hits (scan OR manual, tracks hit %)
+ * DrillGoal - Primary classification for drills/sessions
+ * 
+ * This is the SINGLE SOURCE OF TRUTH for drill goal types.
+ * Import this type everywhere instead of defining locally.
+ * 
+ * Values:
+ * - 'grouping': Measure shot consistency/dispersion (scan-only, no hit %)
+ * - 'engagement': Measure accuracy/hits (scan OR manual, tracks hit %)
  */
-export type DrillGoal = 'grouping' | 'achievement';
+export type DrillGoal = 'grouping' | 'engagement';
+
+/** All valid drill goal values as an array (for iteration/validation) */
+export const DRILL_GOALS: DrillGoal[] = ['grouping', 'engagement'] as const;
 
 // =====================================================
 // DRILL TYPES (SIMPLIFIED)

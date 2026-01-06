@@ -6,49 +6,50 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
+import type { DrillGoal } from '@/types/workspace';
 import BottomSheet, {
-    BottomSheetBackdrop,
-    BottomSheetScrollView,
-    BottomSheetTextInput,
+  BottomSheetBackdrop,
+  BottomSheetScrollView,
+  BottomSheetTextInput,
 } from '@gorhom/bottom-sheet';
 import * as Haptics from 'expo-haptics';
 import {
-    Camera,
-    Check,
-    Crosshair,
-    Hand,
-    Target,
-    Trophy,
-    X,
+  Camera,
+  Check,
+  Crosshair,
+  Hand,
+  Target,
+  Trophy,
+  X,
 } from 'lucide-react-native';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import {
-    Keyboard,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Keyboard,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-    ConfigCard,
-    ConfigRow,
-    DISTANCE_PRESETS,
-    HintBox,
-    OptionCard,
-    ROUNDS_PRESETS,
-    SectionLabel,
-    SHOTS_PRESETS,
-    TIME_PRESETS,
-    TimeRow,
+  ConfigCard,
+  ConfigRow,
+  DISTANCE_PRESETS,
+  HintBox,
+  OptionCard,
+  ROUNDS_PRESETS,
+  SectionLabel,
+  SHOTS_PRESETS,
+  TIME_PRESETS,
+  TimeRow,
 } from './DrillFormComponents';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-export type DrillGoal = 'grouping' | 'achievement';
 export type InputMethod = 'scan' | 'manual';
+export type { DrillGoal } from '@/types/workspace';
 
 export interface QuickDrillFormData {
   name: string;
@@ -94,7 +95,7 @@ export const DrillFormSheet = forwardRef<DrillFormSheetRef, DrillFormSheetProps>
 
     // Form state
     const [name, setName] = useState(initialData?.name ?? '');
-    const [drillGoal, setDrillGoal] = useState<DrillGoal>(initialData?.drillGoal ?? 'achievement');
+    const [drillGoal, setDrillGoal] = useState<DrillGoal>(initialData?.drillGoal ?? 'engagement');
     const [inputMethod, setInputMethod] = useState<InputMethod>(initialData?.inputMethod ?? 'manual');
     const [distance, setDistance] = useState(initialData?.distance ?? 25);
     const [shots, setShots] = useState(initialData?.shots ?? 5);
@@ -120,7 +121,7 @@ export const DrillFormSheet = forwardRef<DrillFormSheetRef, DrillFormSheetProps>
     useEffect(() => {
       if (initialData) {
         setName(initialData.name ?? '');
-        setDrillGoal(initialData.drillGoal ?? 'achievement');
+        setDrillGoal(initialData.drillGoal ?? 'engagement');
         setInputMethod(initialData.inputMethod ?? 'manual');
         setDistance(initialData.distance ?? 25);
         setShots(initialData.shots ?? 5);
@@ -249,10 +250,10 @@ export const DrillFormSheet = forwardRef<DrillFormSheetRef, DrillFormSheetProps>
               />
               <OptionCard
                 icon={<Trophy size={18} color={colors.text} strokeWidth={1.5} />}
-                label="Achievement"
+                label="Engagement"
                 description="Zone-based scoring"
-                active={drillGoal === 'achievement'}
-                onPress={() => setDrillGoal('achievement')}
+                active={drillGoal === 'engagement'}
+                onPress={() => setDrillGoal('engagement')}
               />
             </View>
           </View>

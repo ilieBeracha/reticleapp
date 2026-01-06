@@ -51,9 +51,10 @@ interface TrainingDrillsStepProps {
 // CONSTANTS
 // ============================================================================
 
-const GOAL_COLORS = {
+const GOAL_COLORS: Record<string, string> = {
   grouping: '#10B981', // Green
-  achievement: '#F59E0B', // Orange
+  achievement: '#F59E0B', // Orange (legacy)
+  engagement: '#F59E0B', // Orange
 };
 
 // ============================================================================
@@ -87,7 +88,7 @@ export function TrainingDrillsStep({
   const counts = {
     all: teamDrills.length,
     grouping: teamDrills.filter(d => d.drill_goal === 'grouping').length,
-    achievement: teamDrills.filter(d => d.drill_goal === 'achievement').length,
+    engagement: teamDrills.filter(d => d.drill_goal === 'achievement' || d.drill_goal === 'engagement').length,
   };
 
   // Calculate totals
@@ -278,7 +279,7 @@ export function TrainingDrillsStep({
               {(['all', 'grouping', 'achievement'] as const).map(filter => {
                 const isActive = activeFilter === filter;
                 const color = filter === 'grouping' ? GOAL_COLORS.grouping 
-                  : filter === 'achievement' ? GOAL_COLORS.achievement 
+                  : (filter === 'achievement' || filter === 'engagement') ? GOAL_COLORS.engagement 
                   : colors.text;
                 
                 return (

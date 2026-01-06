@@ -123,8 +123,8 @@ export function SessionFormSheet({
             icon={<Trophy size={18} color={colors.text} strokeWidth={1.5} />}
             label="Achievement"
             description="Zone-based scoring"
-            active={form.state.drillGoal === 'achievement'}
-            onPress={() => form.setDrillGoal('achievement')}
+            active={form.state.drillGoal === 'achievement' || form.state.drillGoal === 'engagement'}
+            onPress={() => form.setDrillGoal('engagement')}
           />
         </View>
       </View>

@@ -6,8 +6,8 @@
  */
 
 import { supabase } from '@/lib/supabase';
-import type { CreateDrillInput, Drill, DrillInstanceConfig } from '@/types/workspace';
 import type { DrillTemplate } from '@/types/drillTypes';
+import type { CreateDrillInput, Drill, DrillGoal, DrillInstanceConfig } from '@/types/workspace';
 
 // =====================================================
 // DRILL CRUD
@@ -177,7 +177,7 @@ export async function createPersonalDrill(input: CreateDrillInput): Promise<Dril
 export async function saveSessionDrillAsTemplate(
   drillConfig: {
     name: string;
-    drill_goal: 'grouping' | 'achievement';
+    drill_goal: DrillGoal;
     target_type: 'paper' | 'tactical';
     distance_m: number;
     rounds_per_shooter: number;
@@ -326,10 +326,10 @@ export async function duplicateTemplateToTeam(
   }
 
   // Map drill type to goal
-  const drillGoal: 'grouping' | 'achievement' =
+  const drillGoal: DrillGoal =
     template.drillType === 'zeroing' || template.drillType === 'grouping'
       ? 'grouping'
-      : 'achievement';
+      : 'engagement';
 
   // Map drill type to target type
   const targetType: 'paper' | 'tactical' =

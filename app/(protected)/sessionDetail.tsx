@@ -4,6 +4,7 @@
  * Shows session summary, stats, and image previews.
  * Opens as a formSheet modal above tabs.
  */
+import { useSessionTimeline } from '@/components/session/timeline/useSessionTimeline';
 import { useColors } from '@/hooks/ui/useColors';
 import {
   calculateSessionStats,
@@ -13,15 +14,14 @@ import {
   type SessionTargetWithResults,
   type SessionWithDetails,
 } from '@/services/sessionService';
-import { useSessionTimeline } from '@/components/session/timeline/useSessionTimeline';
 import { format, intervalToDuration } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   Activity,
+  Crosshair as AimIcon,
   ArrowDown,
   ArrowUp,
-  Crosshair as AimIcon,
   Award,
   Calendar,
   ChevronRight,
@@ -118,7 +118,7 @@ export default function SessionDetailScreen() {
     return targets.some(
       (t) => 
         t.target_type === 'paper' && 
-        t.paper_result?.paper_type === 'achievement' &&
+        (t.paper_result?.paper_type === 'achievement' || t.paper_result?.paper_type === 'engagement') &&
         !!t.paper_result?.scanned_image_url && 
         !t.paper_result?.actual_shots_declared
     );
@@ -129,7 +129,7 @@ export default function SessionDetailScreen() {
     let scanned = 0;
     let manual = 0;
     targets.forEach((t) => {
-      if (t.target_type === 'paper' && t.paper_result?.paper_type === 'achievement') {
+      if (t.target_type === 'paper' && (t.paper_result?.paper_type === 'achievement' || t.paper_result?.paper_type === 'engagement')) {
         if (t.paper_result?.scanned_image_url) scanned++;
         else manual++;
       }
@@ -292,6 +292,9 @@ export default function SessionDetailScreen() {
   const sessionDate = format(new Date(session.started_at), 'MMM d, yyyy');
   const sessionTime = format(new Date(session.started_at), 'HH:mm');
   const isCompleted = session.status === 'completed';
+  
+  // Determine if this is a grouping or engagement session
+  const isGroupingSession = session.drill_config?.drill_goal === 'grouping';
 
   return (
       <ScrollView
@@ -402,14 +405,14 @@ export default function SessionDetailScreen() {
               {session.drill_config?.drill_goal && (
                 <View style={styles.contextItem}>
                   <View style={[styles.contextIconBg, { 
-                    backgroundColor: session.drill_config.drill_goal === 'grouping' ? `${colors.green}15` : `${colors.primary}15`
+                    backgroundColor: isGroupingSession ? `${colors.green}15` : `${colors.primary}15`
                   }]}>
-                    <Target size={14} color={session.drill_config.drill_goal === 'grouping' ? colors.green : colors.primary} />
+                    <Target size={14} color={isGroupingSession ? colors.green : colors.primary} />
                   </View>
                   <View style={styles.contextItemContent}>
                     <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Type</Text>
                     <Text style={[styles.contextValue, { color: colors.text }]}>
-                      {session.drill_config.drill_goal === 'grouping' ? 'Grouping' : 'Achievement'}
+                      {isGroupingSession ? 'Grouping' : 'Engagement'}
                     </Text>
                   </View>
                 </View>
@@ -533,58 +536,89 @@ export default function SessionDetailScreen() {
             )}
             
             <View style={styles.statsGrid}>
-              {/* Accuracy - only show if we have meaningful data */}
-              {stats.accuracyPct > 0 ? (
-                <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <View style={[styles.statIconBg, { backgroundColor: `${colors.indigo}22` }]}>
-                    <Crosshair size={18} color={colors.indigo} />
+              {isGroupingSession ? (
+                // GROUPING: Show shots + group size - NO accuracy or hits
+                <>
+                  {/* Shots Fired */}
+                  <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <View style={[styles.statIconBg, { backgroundColor: `${colors.indigo}22` }]}>
+                      <Target size={18} color={colors.indigo} />
+                    </View>
+                    <Text style={[styles.statValue, { color: colors.text }]}>{stats.totalShotsFired}</Text>
+                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>Shots</Text>
                   </View>
-                  <Text style={[styles.statValue, { color: colors.text }]}>{stats.accuracyPct}%</Text>
-                  <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-                    Accuracy{hasScannedWithoutDeclaration ? '*' : ''}
-                  </Text>
-                </View>
-              ) : hasScannedWithoutDeclaration ? (
-                <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <View style={[styles.statIconBg, { backgroundColor: `${colors.orange}22` }]}>
-                    <Crosshair size={18} color={colors.orange} />
+                  
+                  {/* Best Group Size */}
+                  <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <View style={[styles.statIconBg, { backgroundColor: `${colors.orange}22` }]}>
+                      <Ruler size={18} color={colors.orange} />
+                    </View>
+                    <Text style={[styles.statValue, { color: stats.bestDispersionCm !== null ? colors.orange : colors.textMuted }]}>
+                      {stats.bestDispersionCm !== null ? `${stats.bestDispersionCm}cm` : '—'}
+                    </Text>
+                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>Best Group</Text>
                   </View>
-                  <Text style={[styles.statValue, { color: colors.orange }]}>—</Text>
-                  <Text style={[styles.statLabel, { color: colors.textMuted }]}>No shot count</Text>
-                </View>
-              ) : null}
-              
-              <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={[styles.statIconBg, { backgroundColor: `${colors.green}22` }]}>
-                  <Target size={18} color={colors.green} />
-                </View>
-                <Text style={[styles.statValue, { color: colors.text }]}>
-                  {stats.totalHits}
-                </Text>
-                <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-                  {hasScannedWithoutDeclaration ? 'Holes detected' : 'Hits'}
-                </Text>
-              </View>
-              <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={[styles.statIconBg, { backgroundColor: `${colors.orange}22` }]}>
-                  <Award size={18} color={colors.orange} />
-                </View>
-                <Text style={[styles.statValue, { color: colors.text }]}>{stats.targetCount}</Text>
-                <Text style={[styles.statLabel, { color: colors.textMuted }]}>Targets</Text>
-              </View>
-              {stats.bestDispersionCm !== null && (
-                <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <View style={[styles.statIconBg, { backgroundColor: `${colors.red}22` }]}>
-                    <TrendingUp size={18} color={colors.red} />
+                  
+                  {/* Targets */}
+                  <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <View style={[styles.statIconBg, { backgroundColor: `${colors.green}22` }]}>
+                      <Award size={18} color={colors.green} />
+                    </View>
+                    <Text style={[styles.statValue, { color: colors.text }]}>{stats.targetCount}</Text>
+                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>Targets</Text>
                   </View>
-                  <Text style={[styles.statValue, { color: colors.text }]}>{stats.bestDispersionCm}cm</Text>
-                  <Text style={[styles.statLabel, { color: colors.textMuted }]}>Best Group</Text>
-                </View>
+                </>
+              ) : (
+                // ENGAGEMENT: Show hits, shots, accuracy
+                <>
+                  {/* Accuracy - only show if we have meaningful data */}
+                  {stats.accuracyPct > 0 ? (
+                    <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      <View style={[styles.statIconBg, { backgroundColor: `${colors.indigo}22` }]}>
+                        <Crosshair size={18} color={colors.indigo} />
+                      </View>
+                      <Text style={[styles.statValue, { color: colors.text }]}>{stats.accuracyPct}%</Text>
+                      <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                        Accuracy{hasScannedWithoutDeclaration ? '*' : ''}
+                      </Text>
+                    </View>
+                  ) : hasScannedWithoutDeclaration ? (
+                    <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      <View style={[styles.statIconBg, { backgroundColor: `${colors.orange}22` }]}>
+                        <Crosshair size={18} color={colors.orange} />
+                      </View>
+                      <Text style={[styles.statValue, { color: colors.orange }]}>—</Text>
+                      <Text style={[styles.statLabel, { color: colors.textMuted }]}>No shot count</Text>
+                    </View>
+                  ) : null}
+                  
+                  {/* Hits */}
+                  <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <View style={[styles.statIconBg, { backgroundColor: `${colors.green}22` }]}>
+                      <Target size={18} color={colors.green} />
+                    </View>
+                    <Text style={[styles.statValue, { color: colors.text }]}>
+                      {stats.totalHits}/{stats.totalShotsFired}
+                    </Text>
+                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                      {hasScannedWithoutDeclaration ? 'Holes detected' : 'Hits'}
+                    </Text>
+                  </View>
+                  
+                  {/* Targets */}
+                  <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <View style={[styles.statIconBg, { backgroundColor: `${colors.orange}22` }]}>
+                      <Award size={18} color={colors.orange} />
+                    </View>
+                    <Text style={[styles.statValue, { color: colors.text }]}>{stats.targetCount}</Text>
+                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>Targets</Text>
+                  </View>
+                </>
               )}
             </View>
             
-            {/* Accuracy note if scanned without declaration */}
-            {hasScannedWithoutDeclaration && stats.accuracyPct > 0 && (
+            {/* Accuracy note if scanned without declaration - only for engagement */}
+            {!isGroupingSession && hasScannedWithoutDeclaration && stats.accuracyPct > 0 && (
               <Text style={[styles.accuracyNote, { color: colors.textMuted }]}>
                 * Accuracy excludes scanned targets without declared shots
               </Text>

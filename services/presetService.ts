@@ -6,16 +6,14 @@
  */
 
 import { supabase } from '@/lib/supabase';
-import type { WeaponCategory } from '@/types/workspace';
+import type { DrillGoal, WeaponCategory } from '@/types/workspace';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-export type DrillGoal = 'grouping' | 'achievement' | 'zeroing' | 'physical';
-
 // Re-export for convenience
-export type { WeaponCategory } from '@/types/workspace';
+export type { DrillGoal, WeaponCategory } from '@/types/workspace';
 
 export interface DrillPreset {
   id: string;

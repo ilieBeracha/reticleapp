@@ -150,7 +150,7 @@ export const TargetDetailModal = React.memo(function TargetDetailModal({
   
   // Determine target purpose
   const isGroupingTarget = isPaper && paperResult?.paper_type === 'grouping';
-  const isAchievementTarget = isPaper && paperResult?.paper_type === 'achievement';
+  const isEngagementTarget = isPaper && (paperResult?.paper_type === 'achievement' || paperResult?.paper_type === 'engagement');
   
   // Get display label for target type
   const targetTypeLabel = isGroupingTarget 

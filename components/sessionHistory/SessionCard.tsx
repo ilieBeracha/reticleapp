@@ -1,7 +1,6 @@
 import { useColors } from '@/hooks/ui/useColors';
 import type { SessionWithDetails } from '@/services/session/types';
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { STATUS_COLORS } from './SessionHistory.constants';
@@ -21,17 +20,22 @@ interface SessionCardProps {
 export function SessionCard({ session, onPress, compact = false }: SessionCardProps) {
   const colors = useColors();
   
+  // Determine if this is a grouping session
+  const isGrouping = session.drill_config?.drill_goal === 'grouping';
+  
   // Calculate stats
   const accuracy = calculateAccuracy(session);
   const durationMins = getSessionDurationMinutes(session);
   const shots = session.stats?.shots_fired || 0;
+  const hits = session.stats?.hits_total || 0;
   const distance = session.drill_config?.distance_m;
   const drillName = session.drill_config?.name || session.drill_name || 'Quick Practice';
   const weaponName = session.weapon_name;
   const statusColor = STATUS_COLORS[session.status] || colors.textMuted;
+  const bestDispersion = session.stats?.best_dispersion_cm;
   
   // Drill goal icon
-  const goalIcon = session.drill_config?.drill_goal === 'grouping' 
+  const goalIcon = isGrouping 
     ? 'ellipse-outline' 
     : 'trophy-outline';
     
@@ -58,7 +62,13 @@ export function SessionCard({ session, onPress, compact = false }: SessionCardPr
           </View>
         </View>
         <View style={styles.compactRight}>
-          <Text style={[styles.compactStat, { color: colors.text }]}>{shots}</Text>
+          {/* Compact stat: group size for grouping, hits for engagement */}
+          <Text style={[styles.compactStat, { color: isGrouping ? colors.orange : colors.text }]}>
+            {isGrouping 
+              ? (bestDispersion != null ? `${bestDispersion.toFixed(1)}cm` : `${shots}`)
+              : `${hits}/${shots}`
+            }
+          </Text>
           <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
         </View>
       </TouchableOpacity>
@@ -92,7 +102,7 @@ export function SessionCard({ session, onPress, compact = false }: SessionCardPr
         </View>
       </View>
 
-      {/* Stats Row */}
+      {/* Stats Row - Different for grouping vs engagement */}
       <View style={styles.statsRow}>
         {/* Shots */}
         <View style={styles.stat}>
@@ -100,38 +110,68 @@ export function SessionCard({ session, onPress, compact = false }: SessionCardPr
           <Text style={[styles.statLabel, { color: colors.textMuted }]}>shots</Text>
         </View>
 
-        {/* Accuracy */}
-        <View style={styles.stat}>
-          <Text style={[styles.statValue, { color: accuracy !== null ? colors.text : colors.textMuted }]}>
-            {accuracy !== null ? `${accuracy}%` : '—'}
-          </Text>
-          <Text style={[styles.statLabel, { color: colors.textMuted }]}>acc</Text>
-        </View>
+        {isGrouping ? (
+          // GROUPING: Show group size (cm) - NO accuracy
+          <>
+            {/* Group Size */}
+            <View style={styles.stat}>
+              <Text style={[styles.statValue, { color: bestDispersion != null ? colors.orange : colors.textMuted }]}>
+                {bestDispersion != null ? `${bestDispersion.toFixed(1)}cm` : '—'}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>group</Text>
+            </View>
 
-        {/* Distance */}
-        <View style={styles.stat}>
-          <Text style={[styles.statValue, { color: distance ? colors.text : colors.textMuted }]}>
-            {distance ? `${distance}m` : '—'}
-          </Text>
-          <Text style={[styles.statLabel, { color: colors.textMuted }]}>dist</Text>
-        </View>
+            {/* Distance */}
+            <View style={styles.stat}>
+              <Text style={[styles.statValue, { color: distance ? colors.text : colors.textMuted }]}>
+                {distance ? `${distance}m` : '—'}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>dist</Text>
+            </View>
 
-        {/* Duration */}
-        <View style={styles.stat}>
-          <Text style={[styles.statValue, { color: durationMins ? colors.text : colors.textMuted }]}>
-            {formatDuration(durationMins)}
-          </Text>
-          <Text style={[styles.statLabel, { color: colors.textMuted }]}>time</Text>
-        </View>
+            {/* Duration */}
+            <View style={styles.stat}>
+              <Text style={[styles.statValue, { color: durationMins ? colors.text : colors.textMuted }]}>
+                {formatDuration(durationMins)}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>time</Text>
+            </View>
+          </>
+        ) : (
+          // ENGAGEMENT: Show hits/accuracy
+          <>
+            {/* Hits */}
+            <View style={styles.stat}>
+              <Text style={[styles.statValue, { color: colors.text }]}>
+                {hits}/{shots}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>hits</Text>
+            </View>
 
-        {/* Dispersion (if grouping) */}
-        {session.stats?.best_dispersion_cm != null && (
-          <View style={styles.stat}>
-            <Text style={[styles.statValue, { color: colors.text }]}>
-              {session.stats.best_dispersion_cm.toFixed(1)}cm
-            </Text>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>group</Text>
-          </View>
+            {/* Accuracy */}
+            <View style={styles.stat}>
+              <Text style={[styles.statValue, { color: accuracy !== null ? colors.text : colors.textMuted }]}>
+                {accuracy !== null ? `${accuracy}%` : '—'}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>acc</Text>
+            </View>
+
+            {/* Distance */}
+            <View style={styles.stat}>
+              <Text style={[styles.statValue, { color: distance ? colors.text : colors.textMuted }]}>
+                {distance ? `${distance}m` : '—'}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>dist</Text>
+            </View>
+
+            {/* Duration */}
+            <View style={styles.stat}>
+              <Text style={[styles.statValue, { color: durationMins ? colors.text : colors.textMuted }]}>
+                {formatDuration(durationMins)}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>time</Text>
+            </View>
+          </>
         )}
       </View>
 

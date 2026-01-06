@@ -273,8 +273,8 @@ function QuickDrillSheet({
                 icon={<Trophy size={18} color={colors.text} strokeWidth={1.5} />}
                 label="Achievement"
                 description="Zone-based scoring"
-                active={drillGoal === 'achievement'}
-                onPress={() => setDrillGoal('achievement')}
+                active={drillGoal === 'achievement' || drillGoal === 'engagement'}
+                onPress={() => setDrillGoal('engagement')}
               />
             </View>
           </View>

@@ -2163,11 +2163,34 @@ CREATE TABLE IF NOT EXISTS "public"."session_targets" (
     "notes" "text",
     "planned_shots" integer,
     "target_data" "jsonb",
+    "created_at" timestamp with time zone DEFAULT "now"(),
     CONSTRAINT "session_targets_target_type_check" CHECK (("target_type" = ANY (ARRAY['paper'::"text", 'tactical'::"text"])))
 );
 
 
 ALTER TABLE "public"."session_targets" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."session_timelines" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "session_id" "uuid" NOT NULL,
+    "points" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
+    "shot_details" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
+    "summary" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "total_chunks" integer DEFAULT 1 NOT NULL,
+    "received_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."session_timelines" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."session_timelines" IS 'Stores time-series biometric data from Garmin watch sessions. 
+Points are recorded every 3 seconds with HR, breath rate, stress, and event markers.
+Shot details contain detailed biometrics at each shot moment.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."tactical_target_results" (
@@ -2369,6 +2392,7 @@ CREATE TABLE IF NOT EXISTS "public"."trainings" (
     "started_at" timestamp with time zone,
     "ended_at" timestamp with time zone,
     "expires_at" timestamp with time zone,
+    "auto_close_at" timestamp with time zone,
     CONSTRAINT "trainings_status_check" CHECK (("status" = ANY (ARRAY['planned'::"text", 'ongoing'::"text", 'finished'::"text", 'cancelled'::"text"])))
 );
 
@@ -2425,12 +2449,43 @@ CREATE TABLE IF NOT EXISTS "public"."user_weapons" (
     "updated_at" timestamp with time zone DEFAULT "now"(),
     "shared_with_team_id" "uuid",
     "share_status" "text",
+    "cleaning_enabled" boolean DEFAULT false,
+    "cleaning_interval_type" "text",
+    "cleaning_interval_value" integer,
+    "last_cleaned_at" timestamp with time zone,
+    "rounds_since_cleaning" integer DEFAULT 0,
+    "sessions_since_cleaning" integer DEFAULT 0,
     CONSTRAINT "user_weapons_category_check" CHECK (("category" = ANY (ARRAY['rifle'::"text", 'pistol'::"text", 'shotgun'::"text", 'carbine'::"text", 'precision_rifle'::"text", 'smg'::"text", 'other'::"text"]))),
+    CONSTRAINT "user_weapons_cleaning_interval_type_check" CHECK (("cleaning_interval_type" = ANY (ARRAY['rounds'::"text", 'sessions'::"text", 'days'::"text"]))),
     CONSTRAINT "user_weapons_share_status_check" CHECK (("share_status" = ANY (ARRAY['pending'::"text", 'approved'::"text", 'rejected'::"text", NULL::"text"])))
 );
 
 
 ALTER TABLE "public"."user_weapons" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."user_weapons"."cleaning_enabled" IS 'Whether cleaning reminders are enabled for this weapon';
+
+
+
+COMMENT ON COLUMN "public"."user_weapons"."cleaning_interval_type" IS 'Type of cleaning interval: rounds, sessions, or days';
+
+
+
+COMMENT ON COLUMN "public"."user_weapons"."cleaning_interval_value" IS 'Number of rounds/sessions/days before cleaning reminder';
+
+
+
+COMMENT ON COLUMN "public"."user_weapons"."last_cleaned_at" IS 'When the weapon was last cleaned';
+
+
+
+COMMENT ON COLUMN "public"."user_weapons"."rounds_since_cleaning" IS 'Rounds fired since last cleaning (auto-updated)';
+
+
+
+COMMENT ON COLUMN "public"."user_weapons"."sessions_since_cleaning" IS 'Sessions completed since last cleaning (auto-updated)';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."weapons" (
@@ -2518,6 +2573,16 @@ ALTER TABLE ONLY "public"."session_stats"
 
 ALTER TABLE ONLY "public"."session_targets"
     ADD CONSTRAINT "session_targets_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."session_timelines"
+    ADD CONSTRAINT "session_timelines_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."session_timelines"
+    ADD CONSTRAINT "session_timelines_session_id_key" UNIQUE ("session_id");
 
 
 
@@ -2632,6 +2697,14 @@ CREATE INDEX "idx_session_targets_session" ON "public"."session_targets" USING "
 
 
 CREATE INDEX "idx_session_targets_type" ON "public"."session_targets" USING "btree" ("target_type");
+
+
+
+CREATE INDEX "idx_session_timelines_received" ON "public"."session_timelines" USING "btree" ("received_at" DESC);
+
+
+
+CREATE INDEX "idx_session_timelines_session" ON "public"."session_timelines" USING "btree" ("session_id");
 
 
 
@@ -2863,6 +2936,11 @@ ALTER TABLE ONLY "public"."session_stats"
 
 ALTER TABLE ONLY "public"."session_targets"
     ADD CONSTRAINT "session_targets_session_id_fkey" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."session_timelines"
+    ADD CONSTRAINT "session_timelines_session_id_fkey" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id") ON DELETE CASCADE;
 
 
 
@@ -3102,6 +3180,13 @@ CREATE POLICY "Commanders can view targets from team trainings" ON "public"."ses
 
 
 
+CREATE POLICY "Commanders can view timelines from team trainings" ON "public"."session_timelines" FOR SELECT USING ((EXISTS ( SELECT 1
+   FROM ("public"."sessions" "s"
+     JOIN "public"."team_members" "tm" ON (("tm"."team_id" = "s"."team_id")))
+  WHERE (("s"."id" = "session_timelines"."session_id") AND ("tm"."user_id" = "auth"."uid"()) AND ("tm"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text", 'admin'::"text"]))))));
+
+
+
 CREATE POLICY "Owners and commanders can add members" ON "public"."team_members" FOR INSERT WITH CHECK ("public"."is_team_admin"("team_id"));
 
 
@@ -3230,6 +3315,12 @@ CREATE POLICY "Users can delete their own personal drills" ON "public"."drill_te
 
 
 
+CREATE POLICY "Users can delete timelines for own sessions" ON "public"."session_timelines" FOR DELETE USING ((EXISTS ( SELECT 1
+   FROM "public"."sessions" "s"
+  WHERE (("s"."id" = "session_timelines"."session_id") AND ("s"."user_id" = "auth"."uid"())))));
+
+
+
 CREATE POLICY "Users can insert own drill completions" ON "public"."user_drill_completions" FOR INSERT WITH CHECK (("user_id" = "auth"."uid"()));
 
 
@@ -3267,6 +3358,12 @@ CREATE POLICY "Users can insert targets for own sessions" ON "public"."session_t
 
 
 CREATE POLICY "Users can insert their own personal drills" ON "public"."drill_templates" FOR INSERT WITH CHECK ((("owner_type" = 'user'::"text") AND ("owner_id" = "auth"."uid"())));
+
+
+
+CREATE POLICY "Users can insert timelines for own sessions" ON "public"."session_timelines" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
+   FROM "public"."sessions" "s"
+  WHERE (("s"."id" = "session_timelines"."session_id") AND ("s"."user_id" = "auth"."uid"())))));
 
 
 
@@ -3319,6 +3416,12 @@ CREATE POLICY "Users can update tactical results from own sessions" ON "public".
 
 
 CREATE POLICY "Users can update their own personal drills" ON "public"."drill_templates" FOR UPDATE USING ((("owner_type" = 'user'::"text") AND ("owner_id" = "auth"."uid"()))) WITH CHECK ((("owner_type" = 'user'::"text") AND ("owner_id" = "auth"."uid"())));
+
+
+
+CREATE POLICY "Users can update timelines for own sessions" ON "public"."session_timelines" FOR UPDATE USING ((EXISTS ( SELECT 1
+   FROM "public"."sessions" "s"
+  WHERE (("s"."id" = "session_timelines"."session_id") AND ("s"."user_id" = "auth"."uid"())))));
 
 
 
@@ -3386,6 +3489,12 @@ CREATE POLICY "Users can view their own personal drills" ON "public"."drill_temp
 
 
 
+CREATE POLICY "Users can view timelines from own sessions" ON "public"."session_timelines" FOR SELECT USING ((EXISTS ( SELECT 1
+   FROM "public"."sessions" "s"
+  WHERE (("s"."id" = "session_timelines"."session_id") AND ("s"."user_id" = "auth"."uid"())))));
+
+
+
 CREATE POLICY "Users can view training drills" ON "public"."training_drills" FOR SELECT USING ((EXISTS ( SELECT 1
    FROM "public"."trainings" "t"
   WHERE (("t"."id" = "training_drills"."training_id") AND (("t"."created_by" = "auth"."uid"()) OR (("t"."team_id" IS NOT NULL) AND (EXISTS ( SELECT 1
@@ -3424,6 +3533,9 @@ ALTER TABLE "public"."session_stats" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."session_targets" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."session_timelines" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."sessions" ENABLE ROW LEVEL SECURITY;
@@ -3763,6 +3875,12 @@ GRANT ALL ON TABLE "public"."session_stats" TO "service_role";
 GRANT ALL ON TABLE "public"."session_targets" TO "anon";
 GRANT ALL ON TABLE "public"."session_targets" TO "authenticated";
 GRANT ALL ON TABLE "public"."session_targets" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."session_timelines" TO "anon";
+GRANT ALL ON TABLE "public"."session_timelines" TO "authenticated";
+GRANT ALL ON TABLE "public"."session_timelines" TO "service_role";
 
 
 

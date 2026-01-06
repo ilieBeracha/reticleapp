@@ -14,6 +14,13 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
 
 export function SessionCard({ session, colors }: SessionCardProps) {
   const status = STATUS_COLORS[session.status] || STATUS_COLORS.completed;
+  
+  // Determine if grouping or engagement
+  const isGrouping = session.drill_config?.drill_goal === 'grouping';
+  const shots = session.stats?.shots_fired || 0;
+  const hits = session.stats?.hits_total || 0;
+  const bestDispersion = session.stats?.best_dispersion_cm;
+  const accuracy = shots > 0 ? Math.round((hits / shots) * 100) : 0;
 
   return (
     <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.border }]}>
@@ -36,6 +43,15 @@ export function SessionCard({ session, colors }: SessionCardProps) {
           </Text>
           {session.drill_name && (
             <Text style={[styles.metaText, { color: colors.textMuted }]}>• {session.drill_name}</Text>
+          )}
+          {/* Stats based on drill goal */}
+          {shots > 0 && (
+            <Text style={[styles.metaText, { color: colors.textMuted }]}>
+              {isGrouping 
+                ? `• ${shots} shots${bestDispersion != null ? ` • ${bestDispersion.toFixed(1)}cm` : ''}`
+                : `• ${hits}/${shots} (${accuracy}%)`
+              }
+            </Text>
           )}
         </View>
       </View>

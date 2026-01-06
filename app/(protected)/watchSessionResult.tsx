@@ -119,6 +119,7 @@ export default function WatchSessionResultPage() {
     avgSplitMs?: string;
     drillName?: string;
     weaponName?: string;
+    drillGoal?: string;
     performance?: string;
     biometrics?: string;
     steadiness?: string;
@@ -138,11 +139,14 @@ export default function WatchSessionResultPage() {
     avgSplitMs,
     drillName,
     weaponName,
+    drillGoal,
     performance: performanceJson,
     biometrics: biometricsJson,
     steadiness: steadinessJson,
     weather: weatherJson,
   } = params;
+  
+  const isGroupingDrill = drillGoal === 'grouping';
   
   const isAutoSaved = autoSaved === '1';
 
@@ -150,10 +154,12 @@ export default function WatchSessionResultPage() {
   // STATE
   // ============================================================================
   
-  const [step, setStep] = useState<'hits' | 'results'>('hits');
+  // For engagement: hits input, for grouping: group size input
+  const [step, setStep] = useState<'input' | 'results'>('input');
   const [saving, setSaving] = useState(false);
   const [hitsInput, setHitsInput] = useState('');
-  const [hitsConfirmed, setHitsConfirmed] = useState(false);
+  const [groupSizeInput, setGroupSizeInput] = useState('');
+  const [inputConfirmed, setInputConfirmed] = useState(false);
 
   // ============================================================================
   // PARSED DATA
@@ -270,12 +276,16 @@ export default function WatchSessionResultPage() {
     }));
   }, [biometrics, colors]);
   
-  // Computed values - clamp hits to max of shotsCount
+  // Computed values for engagement - clamp hits to max of shotsCount
   const rawHits = hitsInput.trim() ? parseInt(hitsInput) : shotsCount;
   const hitsCount = Math.min(Math.max(0, rawHits || 0), shotsCount);
   const accuracy = shotsCount > 0 ? Math.round((hitsCount / shotsCount) * 100) : 0;
-  const isInputValid = !hitsInput.trim() || (rawHits >= 0 && rawHits <= shotsCount);
+  const isHitsInputValid = !hitsInput.trim() || (rawHits >= 0 && rawHits <= shotsCount);
   const isOverMax = rawHits > shotsCount;
+  
+  // Computed values for grouping - group size in cm
+  const groupSizeCm = groupSizeInput.trim() ? parseFloat(groupSizeInput) : null;
+  const isGroupSizeValid = !groupSizeInput.trim() || (groupSizeCm !== null && groupSizeCm > 0 && groupSizeCm <= 100);
 
   // ============================================================================
   // HELPERS
@@ -314,26 +324,43 @@ export default function WatchSessionResultPage() {
     setHitsInput(cleaned);
   }, [shotsCount]);
 
-  const handleConfirmHits = useCallback(() => {
+  const handleGroupSizeChange = useCallback((text: string) => {
+    // Allow digits and one decimal point
+    const cleaned = text.replace(/[^0-9.]/g, '');
+    // Ensure only one decimal point
+    const parts = cleaned.split('.');
+    const formatted = parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : cleaned;
+    setGroupSizeInput(formatted);
+  }, []);
+
+  const handleConfirmInput = useCallback(() => {
     Keyboard.dismiss();
     // Small delay to ensure keyboard is dismissed
     setTimeout(() => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      setHitsConfirmed(true);
+      setInputConfirmed(true);
       setStep('results');
     }, 100);
   }, []);
 
-  const handleSkipHits = useCallback(() => {
+  const handleSkipInput = useCallback(() => {
     Keyboard.dismiss();
-    // Default to all hits
-    setHitsInput(String(shotsCount));
-    setTimeout(() => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      setHitsConfirmed(true);
-      setStep('results');
-    }, 100);
-  }, [shotsCount]);
+    if (isGroupingDrill) {
+      // Skip group size - will leave it empty/unknown
+      setTimeout(() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setStep('results');
+      }, 100);
+    } else {
+      // Default to all hits for engagement
+      setHitsInput(String(shotsCount));
+      setTimeout(() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setInputConfirmed(true);
+        setStep('results');
+      }, 100);
+    }
+  }, [shotsCount, isGroupingDrill]);
 
   const handleSave = useCallback(async (shouldEndSession: boolean) => {
     if (!sessionId) return;
@@ -342,30 +369,57 @@ export default function WatchSessionResultPage() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
     try {
-      const validHits = Math.min(Math.max(0, hitsCount), shotsCount);
-      
-      if (isAutoSaved) {
-        // Auto-saved sessions: update hits if user confirmed them (even if same as shots)
-        if (hitsConfirmed) {
-          await updateSessionHits(sessionId, validHits);
-        }
-        if (shouldEndSession) {
-          await endSession(sessionId);
+      if (isGroupingDrill) {
+        // Grouping: save group size in cm
+        if (isAutoSaved) {
+          if (inputConfirmed && groupSizeCm) {
+            await updateSessionGroupSize(sessionId, groupSizeCm);
+          }
+          if (shouldEndSession) {
+            await endSession(sessionId);
+          }
+        } else {
+          await saveWatchSessionData({
+            sessionId,
+            shotsRecorded: shotsCount,
+            hitsRecorded: shotsCount, // For grouping, all shots count
+            groupSizeCm: groupSizeCm ?? undefined,
+            durationMs: durationSec * 1000,
+            distance: distanceM,
+            completed: shouldEndSession,
+            splitTimes: splitTimes.length > 0 ? splitTimes : undefined,
+            avgSplitMs: avgSplit ?? undefined,
+            performance: performance ?? undefined,
+            biometrics: biometrics ?? undefined,
+            steadiness: steadiness ?? undefined,
+          }, shouldEndSession);
         }
       } else {
-        await saveWatchSessionData({
-          sessionId,
-          shotsRecorded: shotsCount,
-          hitsRecorded: validHits,
-          durationMs: durationSec * 1000,
-          distance: distanceM,
-          completed: shouldEndSession,
-          splitTimes: splitTimes.length > 0 ? splitTimes : undefined,
-          avgSplitMs: avgSplit ?? undefined,
-          performance: performance ?? undefined,
-          biometrics: biometrics ?? undefined,
-          steadiness: steadiness ?? undefined,
-        }, shouldEndSession);
+        // Engagement: save hits
+        const validHits = Math.min(Math.max(0, hitsCount), shotsCount);
+        
+        if (isAutoSaved) {
+          if (inputConfirmed) {
+            await updateSessionHits(sessionId, validHits);
+          }
+          if (shouldEndSession) {
+            await endSession(sessionId);
+          }
+        } else {
+          await saveWatchSessionData({
+            sessionId,
+            shotsRecorded: shotsCount,
+            hitsRecorded: validHits,
+            durationMs: durationSec * 1000,
+            distance: distanceM,
+            completed: shouldEndSession,
+            splitTimes: splitTimes.length > 0 ? splitTimes : undefined,
+            avgSplitMs: avgSplit ?? undefined,
+            performance: performance ?? undefined,
+            biometrics: biometrics ?? undefined,
+            steadiness: steadiness ?? undefined,
+          }, shouldEndSession);
+        }
       }
 
       if (shouldEndSession) {
@@ -393,13 +447,107 @@ export default function WatchSessionResultPage() {
       Alert.alert('Error', error.message || 'Failed to save watch data');
       setSaving(false);
     }
-  }, [sessionId, isAutoSaved, shotsCount, hitsCount, hitsConfirmed, durationSec, distanceM, teamId, trainingId, splitTimes, avgSplit, performance, biometrics, steadiness, loadPersonalSessions, loadTeamSessions]);
+  }, [sessionId, isAutoSaved, isGroupingDrill, shotsCount, hitsCount, groupSizeCm, inputConfirmed, durationSec, distanceM, teamId, trainingId, splitTimes, avgSplit, performance, biometrics, steadiness, loadPersonalSessions, loadTeamSessions]);
 
   // ============================================================================
-  // RENDER - STEP 1: HITS INPUT
+  // RENDER - STEP 1: INPUT (Hits for Engagement, Group Size for Grouping)
   // ============================================================================
 
-  if (step === 'hits') {
+  if (step === 'input') {
+    // Grouping: Show group size input
+    if (isGroupingDrill) {
+      return (
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+          <Animated.View 
+            entering={FadeIn.duration(300)}
+            style={[styles.hitsContainer, { paddingTop: insets.top + 60, paddingBottom: insets.bottom + 20 }]}
+          >
+            {/* Header */}
+            <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.hitsHeader}>
+              <Text style={[styles.hitsTitle, { color: colors.text }]}>
+                Group Size
+              </Text>
+              <Text style={[styles.hitsSubtitle, { color: colors.textMuted }]}>
+                {shotsCount} shots • {distanceM}m • {formatDuration(durationSec)}
+              </Text>
+            </Animated.View>
+
+            {/* Input area */}
+            <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.hitsInputArea}>
+              <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                <TextInput
+                  ref={inputRef}
+                  style={[styles.bigInput, { color: colors.text }]}
+                  placeholder="0.0"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="decimal-pad"
+                  returnKeyType="done"
+                  value={groupSizeInput}
+                  onChangeText={handleGroupSizeChange}
+                  onSubmitEditing={handleConfirmInput}
+                  blurOnSubmit={false}
+                  autoFocus
+                  selectTextOnFocus
+                />
+                <Text style={[styles.inputUnit, { color: colors.textMuted }]}>
+                  cm
+                </Text>
+              </View>
+
+              {/* Group quality indicator */}
+              {groupSizeInput.trim() !== '' && groupSizeCm && (
+                <Animated.View entering={FadeIn.duration(200)} style={styles.accuracyPreview}>
+                  <Text style={[styles.accuracyPreviewText, { 
+                    color: groupSizeCm <= 3 ? colors.green : groupSizeCm <= 6 ? colors.orange : colors.textMuted 
+                  }]}>
+                    {groupSizeCm <= 2 ? 'Excellent' : groupSizeCm <= 4 ? 'Good' : groupSizeCm <= 6 ? 'Average' : 'Practice more'}
+                  </Text>
+                </Animated.View>
+              )}
+            </Animated.View>
+
+            {/* Hint */}
+            <Animated.View entering={FadeIn.delay(300).duration(400)} style={styles.hintRow}>
+              <Text style={[styles.hintText, { color: colors.textMuted }]}>
+                Measure the widest spread between shots
+              </Text>
+            </Animated.View>
+
+            {/* Action buttons */}
+            <Animated.View entering={FadeInUp.delay(400).duration(400)} style={styles.hitsActions}>
+              <TouchableOpacity
+                style={[styles.continueBtn, { 
+                  backgroundColor: groupSizeInput.trim() ? colors.primary : colors.card,
+                  borderWidth: groupSizeInput.trim() ? 0 : 1,
+                  borderColor: colors.border,
+                }]}
+                onPress={handleConfirmInput}
+                disabled={!groupSizeInput.trim() || !isGroupSizeValid}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.continueBtnText, { 
+                  color: groupSizeInput.trim() ? '#fff' : colors.textMuted 
+                }]}>
+                  Confirm
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.skipBtn}
+                onPress={handleSkipInput}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.skipBtnText, { color: colors.textMuted }]}>
+                  Skip — add later via scan
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </Animated.View>
+        </View>
+      );
+    }
+
+    // Engagement: Show hits input
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Animated.View 
@@ -428,7 +576,7 @@ export default function WatchSessionResultPage() {
                 returnKeyType="done"
                 value={hitsInput}
                 onChangeText={handleHitsChange}
-                onSubmitEditing={handleConfirmHits}
+                onSubmitEditing={handleConfirmInput}
                 blurOnSubmit={false}
                 maxLength={String(shotsCount).length}
                 autoFocus

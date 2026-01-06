@@ -12,7 +12,7 @@
  * your results are interpreted.
  */
 
-import type { WeaponCategory } from '@/types/workspace';
+import type { DrillGoal, WeaponCategory } from '@/types/workspace';
 
 // ============================================================================
 // CATEGORY CONFIGURATION TYPES
@@ -31,9 +31,9 @@ export interface CategoryDistanceRange {
 
 export interface CategoryDrillDefaults {
   /** Primary drill goal */
-  primaryGoal: 'grouping' | 'achievement';
+  primaryGoal: DrillGoal;
   /** Secondary drill goals */
-  secondaryGoals: ('grouping' | 'achievement')[];
+  secondaryGoals: DrillGoal[];
   /** Default target type */
   targetType: 'paper' | 'tactical';
   /** Common positions */
@@ -91,7 +91,7 @@ export interface QuickPreset {
   id: string;
   name: string;
   description: string;
-  drillGoal: 'grouping' | 'achievement';
+  drillGoal: DrillGoal;
   targetType: 'paper' | 'tactical';
   distance: number;
   rounds: number;
@@ -117,7 +117,7 @@ export const CATEGORY_CONFIGS: Record<WeaponCategory, CategoryConfig> = {
     },
     drillDefaults: {
       primaryGoal: 'grouping',
-      secondaryGoals: ['achievement'],
+      secondaryGoals: ['engagement'],
       targetType: 'paper',
       positions: ['prone', 'prone_supported', 'sitting', 'kneeling'],
       defaultPosition: 'prone',
@@ -196,7 +196,7 @@ export const CATEGORY_CONFIGS: Record<WeaponCategory, CategoryConfig> = {
     },
     drillDefaults: {
       primaryGoal: 'grouping',
-      secondaryGoals: ['achievement'],
+      secondaryGoals: ['engagement'],
       targetType: 'paper',
       positions: ['prone', 'kneeling', 'standing', 'sitting'],
       defaultPosition: 'prone',
@@ -231,7 +231,7 @@ export const CATEGORY_CONFIGS: Record<WeaponCategory, CategoryConfig> = {
         id: 'r-qual-25',
         name: 'Qualification',
         description: 'Standard qual at 25m',
-        drillGoal: 'achievement',
+        drillGoal: 'engagement',
         targetType: 'tactical',
         distance: 25,
         rounds: 10,
@@ -252,7 +252,7 @@ export const CATEGORY_CONFIGS: Record<WeaponCategory, CategoryConfig> = {
       zeroDistance: 50,
     },
     drillDefaults: {
-      primaryGoal: 'achievement',
+      primaryGoal: 'engagement',
       secondaryGoals: ['grouping'],
       targetType: 'tactical',
       positions: ['standing', 'kneeling', 'prone'],
@@ -288,7 +288,7 @@ export const CATEGORY_CONFIGS: Record<WeaponCategory, CategoryConfig> = {
         id: 'c-drill-25',
         name: 'Combat Drill',
         description: 'Rapid engagement at 25m',
-        drillGoal: 'achievement',
+        drillGoal: 'engagement',
         targetType: 'tactical',
         distance: 25,
         rounds: 10,
@@ -299,7 +299,7 @@ export const CATEGORY_CONFIGS: Record<WeaponCategory, CategoryConfig> = {
         id: 'c-trans-drill',
         name: 'Transitions',
         description: 'Multiple target transitions',
-        drillGoal: 'achievement',
+        drillGoal: 'engagement',
         targetType: 'tactical',
         distance: 15,
         rounds: 6,
@@ -320,7 +320,7 @@ export const CATEGORY_CONFIGS: Record<WeaponCategory, CategoryConfig> = {
       zeroDistance: 15,
     },
     drillDefaults: {
-      primaryGoal: 'achievement',
+      primaryGoal: 'engagement',
       secondaryGoals: ['grouping'],
       targetType: 'tactical',
       positions: ['standing', 'kneeling'],
@@ -356,7 +356,7 @@ export const CATEGORY_CONFIGS: Record<WeaponCategory, CategoryConfig> = {
         id: 'p-bill-drill',
         name: 'Bill Drill',
         description: '6 shots, 7m, fast',
-        drillGoal: 'achievement',
+        drillGoal: 'engagement',
         targetType: 'tactical',
         distance: 7,
         rounds: 6,
@@ -367,7 +367,7 @@ export const CATEGORY_CONFIGS: Record<WeaponCategory, CategoryConfig> = {
         id: 'p-el-pres',
         name: 'El Presidente',
         description: 'Classic drill',
-        drillGoal: 'achievement',
+        drillGoal: 'engagement',
         targetType: 'tactical',
         distance: 10,
         rounds: 12,
@@ -378,7 +378,7 @@ export const CATEGORY_CONFIGS: Record<WeaponCategory, CategoryConfig> = {
         id: 'p-draw-fire',
         name: 'Draw & Fire',
         description: 'Draw to first shot',
-        drillGoal: 'achievement',
+        drillGoal: 'engagement',
         targetType: 'tactical',
         distance: 5,
         rounds: 1,
@@ -399,7 +399,7 @@ export const CATEGORY_CONFIGS: Record<WeaponCategory, CategoryConfig> = {
       zeroDistance: 25,
     },
     drillDefaults: {
-      primaryGoal: 'achievement',
+      primaryGoal: 'engagement',
       secondaryGoals: [],
       targetType: 'tactical',
       positions: ['standing', 'kneeling'],
@@ -424,7 +424,7 @@ export const CATEGORY_CONFIGS: Record<WeaponCategory, CategoryConfig> = {
         id: 's-breach',
         name: 'Breach Drill',
         description: 'Close range engagement',
-        drillGoal: 'achievement',
+        drillGoal: 'engagement',
         targetType: 'tactical',
         distance: 5,
         rounds: 4,
@@ -446,7 +446,7 @@ export const CATEGORY_CONFIGS: Record<WeaponCategory, CategoryConfig> = {
     },
     drillDefaults: {
       primaryGoal: 'grouping',
-      secondaryGoals: ['achievement'],
+      secondaryGoals: ['engagement'],
       targetType: 'paper',
       positions: ['standing', 'kneeling', 'prone'],
       defaultPosition: 'standing',

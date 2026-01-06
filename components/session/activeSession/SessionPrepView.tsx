@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
   ChevronDown,
+  ChevronLeft,
   ChevronUp,
   Clock,
   Crosshair,
@@ -55,7 +56,8 @@ interface SessionPrepViewProps {
   session: SessionWithDetails;
   insets: { top: number; bottom: number };
   onSessionActivated: (session: SessionWithDetails) => void;
-  onClose: () => void;
+  onBack?: () => void;  // Go back to edit session details
+  onClose: () => void;  // Cancel/close entirely
 }
 
 function PulsingRing({ color }: { color: string }) {
@@ -97,6 +99,7 @@ export function SessionPrepView({
   session,
   insets,
   onSessionActivated,
+  onBack,
   onClose,
 }: SessionPrepViewProps) {
   const colors = useColors();
@@ -204,6 +207,15 @@ export function SessionPrepView({
     }
   }, [session.id, activating, onSessionActivated]);
 
+  const handleBack = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (onBack) {
+      onBack();
+    } else {
+      onClose();
+    }
+  }, [onBack, onClose]);
+
   const handleClose = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onClose();
@@ -214,17 +226,22 @@ export function SessionPrepView({
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.secondary }]}
-          onPress={handleClose}
+          style={[styles.backButton, { backgroundColor: colors.secondary }]}
+          onPress={handleBack}
         >
-          <X size={18} color={colors.textMuted} />
+          <ChevronLeft size={20} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
             Ready to Start
           </Text>
         </View>
-        <View style={{ width: 36 }} />
+        <TouchableOpacity
+          style={[styles.closeButton, { backgroundColor: colors.secondary }]}
+          onPress={handleClose}
+        >
+          <X size={18} color={colors.textMuted} />
+        </TouchableOpacity>
       </View>
 
       {/* Main Content */}
@@ -529,6 +546,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingBottom: 12,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   closeButton: {
     width: 36,

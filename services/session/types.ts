@@ -1,3 +1,5 @@
+import type { DrillGoal } from '@/types/workspace';
+
 // ============================================================================
 // BASE SESSION CONFIG - Unified structure for ALL session creation
 // ============================================================================
@@ -8,7 +10,7 @@
  */
 export interface DrillConfig {
   name: string;
-  drill_goal: 'grouping' | 'achievement';
+  drill_goal: DrillGoal;
   target_type: 'paper' | 'tactical';
   input_method?: 'scan' | 'manual' | null; // User's explicit choice
   distance_m: number;
@@ -85,7 +87,7 @@ export interface CreateSessionParams {
 export interface SessionDrillConfig {
   id: string;
   name: string;
-  drill_goal: 'grouping' | 'achievement'; // Primary: what the drill measures
+  drill_goal: DrillGoal; // Primary: what the drill measures
   target_type: 'paper' | 'tactical'; // Secondary: input method hint
   input_method?: 'scan' | 'manual' | null; // Commander's explicit choice (overrides target_type inference)
   distance_m: number;
@@ -156,7 +158,8 @@ export interface SessionWithDetails {
 // ============================================================================
 
 export type TargetType = 'paper' | 'tactical';
-export type PaperType = 'achievement' | 'grouping';
+// 'achievement' is legacy DB value, 'engagement' is new preferred value
+export type PaperType = 'engagement' | 'grouping' | 'achievement';
 export type ParticipantRole = 'sniper' | 'spotter' | 'pistol' | 'observer' | 'instructor';
 
 export interface SessionTarget {

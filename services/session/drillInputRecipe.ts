@@ -1,3 +1,4 @@
+import type { DrillGoal } from '@/types/workspace';
 import { isInfiniteShots } from '@/utils/drillShots';
 import type { SessionDrillConfig } from './types';
 
@@ -9,7 +10,7 @@ export type DrillInputRoute =
         sessionId: string;
         distance: string;
         maxShots?: string;
-        drillGoal?: 'grouping' | 'achievement';
+        drillGoal?: DrillGoal;
         locked?: '1';  // When set, distance/shots are locked to drill values
       };
     }
@@ -18,7 +19,7 @@ export type DrillInputRoute =
       pathname: '/(protected)/addTarget';
       params: {
         sessionId: string;
-        defaultTargetType: 'achievement';
+        defaultTargetType: 'engagement';
         defaultDistance: string;
         defaultInputMethod: 'manual';
         startInManual?: '1';
@@ -137,7 +138,7 @@ export function getDrillInputRoutes(args: {
           sessionId,
           distance: String(defaultDistance),
           ...(maxShots ? { maxShots } : {}),
-          drillGoal: 'achievement',
+          drillGoal: 'engagement',
           locked: '1',
         },
       },
@@ -148,7 +149,7 @@ export function getDrillInputRoutes(args: {
           pathname: '/(protected)/addTarget' as const,
         params: {
           sessionId,
-            defaultTargetType: 'achievement' as const,
+            defaultTargetType: 'engagement' as const,
           defaultDistance: String(defaultDistance),
             defaultInputMethod: 'manual' as const,
             startInManual: '1' as const,
@@ -185,7 +186,7 @@ export function getDrillInputRoutes(args: {
       pathname: '/(protected)/addTarget',
       params: {
         sessionId,
-        defaultTargetType: 'achievement',
+        defaultTargetType: 'engagement',
         defaultDistance: String(defaultDistance),
         defaultInputMethod: 'manual',
         startInManual: '1',

@@ -34,8 +34,19 @@ import {
 // TYPES
 // ============================================================================
 
+/** Initial state for editing - context can be partial */
+export interface SessionCreationInitialState {
+  step?: CreationStep;
+  purpose?: SessionPurpose | null;
+  drillSource?: DrillSource | null;
+  selectedDrillId?: string | null;
+  context?: Partial<SessionContextState>;
+}
+
 export interface UseSessionCreationOptions {
   onSubmit?: (config: BaseSessionConfig) => Promise<void>;
+  /** Pre-fill state when coming back from SessionPrepView to edit */
+  initialState?: SessionCreationInitialState;
 }
 
 export interface UseSessionCreationReturn {
@@ -96,10 +107,28 @@ function getStepIndex(step: CreationStep): number {
 export function useSessionCreation(
   options: UseSessionCreationOptions = {}
 ): UseSessionCreationReturn {
-  const { onSubmit } = options;
+  const { onSubmit, initialState } = options;
   
-  const [state, setState] = useState<SessionCreationState>(DEFAULT_CREATION_STATE);
-  const [isLoadingWeapon, setIsLoadingWeapon] = useState(true);
+  // Merge initial state with defaults
+  const [state, setState] = useState<SessionCreationState>(() => {
+    if (initialState) {
+      return {
+        ...DEFAULT_CREATION_STATE,
+        step: initialState.step || DEFAULT_CREATION_STATE.step,
+        purpose: initialState.purpose ?? DEFAULT_CREATION_STATE.purpose,
+        drillSource: initialState.drillSource ?? DEFAULT_CREATION_STATE.drillSource,
+        selectedDrillId: initialState.selectedDrillId ?? DEFAULT_CREATION_STATE.selectedDrillId,
+        context: {
+          ...DEFAULT_CREATION_STATE.context,
+          ...(initialState.context || {}),
+        },
+      };
+    }
+    return DEFAULT_CREATION_STATE;
+  });
+  
+  // Skip weapon loading if initial state already has a weapon
+  const [isLoadingWeapon, setIsLoadingWeapon] = useState(!initialState?.context?.weaponId);
   const isWatchConnected = useIsGarminConnected();
   
   // ─────────────────────────────────────────────────────────────────────────
@@ -108,6 +137,12 @@ export function useSessionCreation(
   // ─────────────────────────────────────────────────────────────────────────
   
   useEffect(() => {
+    // Skip if we already have a weapon from initialState
+    if (initialState?.context?.weaponId) {
+      setIsLoadingWeapon(false);
+      return;
+    }
+    
     let cancelled = false;
     
     async function loadDefaultWeapon() {
@@ -355,10 +390,6 @@ export function useSessionCreation(
       // Note: We can't import getDrillById here to avoid circular deps,
       // but the name is stored in context when drill is selected
       drillName = `Drill: ${context.distance}m`;
-    } else if (purpose === 'zeroing') {
-      drillName = `Zeroing ${context.distance}m`;
-    } else if (purpose === 'physical') {
-      drillName = 'Physical Drill';
     } else if (purpose === 'grouping') {
       drillName = `Grouping ${context.distance}m`;
     } else {
@@ -369,7 +400,7 @@ export function useSessionCreation(
     // Note: input_method is not set - user chooses scan vs manual during session
     const drillConfig: DrillConfig = {
       name: drillName,
-      drill_goal: purposeToDrillGoal(purpose || 'custom'),
+      drill_goal: purposeToDrillGoal(purpose || 'engagement'),
       target_type: context.targetType === 'paper' ? 'paper' : 'tactical',
       distance_m: context.distance,
       rounds_per_shooter: context.shotsPlanned,

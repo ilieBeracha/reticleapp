@@ -51,7 +51,7 @@ export default function AddTargetSheet() {
   } = useDetectionStore();
 
   const initialStep: Step =
-    startInManual === '1' && defaultTargetType === 'achievement' && defaultInputMethod === 'manual'
+    startInManual === '1' && (defaultTargetType === 'achievement' || defaultTargetType === 'engagement') && defaultInputMethod === 'manual'
       ? 'manual_entry'
       : 'form';
   const [step, setStep] = useState<Step>(initialStep);

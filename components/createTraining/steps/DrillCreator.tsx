@@ -8,7 +8,7 @@
 
 import { useColors } from '@/hooks/ui/useColors';
 import { getCategoryLabel, WEAPON_CATEGORIES } from '@/services/weaponService';
-import type { Drill, WeaponCategory } from '@/types/workspace';
+import type { Drill, DrillGoal, WeaponCategory } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
@@ -57,7 +57,7 @@ interface DrillCreatorProps {
 
 interface DrillSaveData {
   name: string;
-  drill_goal: 'grouping' | 'achievement';
+  drill_goal: DrillGoal;
   target_type: 'paper' | 'tactical';
   distance_m: number;
   rounds_per_shooter: number;
@@ -66,15 +66,14 @@ interface DrillSaveData {
 }
 
 type CreatorStep = 'select' | 'configure';
-type DrillGoal = 'grouping' | 'achievement';
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
-const GOAL_COLORS = {
+const GOAL_COLORS: Record<string, string> = {
   grouping: '#10B981',
-  achievement: '#F59E0B',
+  engagement: '#F59E0B',
 };
 
 const DISTANCE_PRESETS = [25, 50, 100, 200, 300];
@@ -166,9 +165,10 @@ export function DrillCreator({
     setStep('configure');
   };
 
-  // Filter drills
+  // Filter drills (handle both 'engagement' filter and legacy 'achievement' DB values)
   const filteredDrills = teamDrills.filter(drill => {
-    if (activeFilter !== 'all' && drill.drill_goal !== activeFilter) return false;
+    if (activeFilter === 'engagement' && drill.drill_goal !== 'engagement') return false;
+    if (activeFilter === 'grouping' && drill.drill_goal !== 'grouping') return false;
     if (searchQuery) {
       return drill.name.toLowerCase().includes(searchQuery.toLowerCase());
     }
@@ -178,8 +178,8 @@ export function DrillCreator({
   const counts = {
     all: teamDrills.length,
     grouping: teamDrills.filter(d => d.drill_goal === 'grouping').length,
-    achievement: teamDrills.filter(d => d.drill_goal === 'achievement').length,
-  };
+    engagement: teamDrills.filter(d => d.drill_goal === 'engagement').length,
+  };  
 
   // Handle add/save
   const handleConfirm = useCallback(async () => {
@@ -214,7 +214,7 @@ export function DrillCreator({
       // Just add to training without saving to library
       const drill: TrainingDrillItem = {
         id: Date.now().toString(),
-        drill_id: baseDrill?.id || null,
+        drill_id: baseDrill?.id || '',
         name: name.trim() || baseDrill?.name || 'Quick Drill',
         drill_goal: drillGoal,
         target_type: targetType,
@@ -224,7 +224,7 @@ export function DrillCreator({
         rounds_per_shooter: shots,
         time_limit_seconds: timeLimit || undefined,
         strings_count: strings,
-        weapon_category: weaponCategory,
+        weapon_category: weaponCategory || undefined,
       };
       
       onAddToTraining(drill);
@@ -343,7 +343,7 @@ function SelectStep({
   colors,
 }: {
   drills: Drill[];
-  counts: { all: number; grouping: number; achievement: number };
+  counts: { all: number; grouping: number; engagement: number };
   searchQuery: string;
   activeFilter: 'all' | DrillGoal;
   onSearchChange: (q: string) => void;
@@ -401,10 +401,10 @@ function SelectStep({
 
       {/* Filters */}
       <View style={styles.filters}>
-        {(['all', 'grouping', 'achievement'] as const).map(filter => {
+        {(['all', 'grouping', 'engagement'] as const).map(filter => {
           const isActive = activeFilter === filter;
           const color = filter === 'grouping' ? GOAL_COLORS.grouping 
-            : filter === 'achievement' ? GOAL_COLORS.achievement 
+            : filter === 'engagement' ? GOAL_COLORS.engagement 
             : colors.text;
           
           return (
@@ -596,8 +596,8 @@ function ConfigureStep({
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Goal</Text>
           <View style={styles.goalRow}>
-            {(['grouping', 'achievement'] as DrillGoal[]).map(goal => {
-              const isSelected = drillGoal === goal;
+            {(['grouping', 'engagement'] as DrillGoal[]).map(goal => {
+              const isSelected = drillGoal === goal || (goal === 'engagement' && drillGoal === 'engagement');
               const color = GOAL_COLORS[goal];
               return (
                 <TouchableOpacity
@@ -629,8 +629,8 @@ function ConfigureStep({
           </View>
         </View>
 
-        {/* Target Type (only for achievement) */}
-        {drillGoal === 'achievement' && (
+        {/* Target Type (only for engagement) */}
+        {(drillGoal === 'engagement') && (
           <View style={styles.section}>
             <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Target Type</Text>
             <View style={styles.chipRow}>

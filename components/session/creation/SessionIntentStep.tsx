@@ -9,11 +9,9 @@ import * as Haptics from 'expo-haptics';
 import {
   ArrowRight,
   Crosshair,
-  Focus,
-  HeartPulse,
   LayoutTemplate,
   Target,
-  type LucideIcon,
+  type LucideIcon
 } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -29,10 +27,10 @@ const PURPOSE_OPTIONS: {
   description: string;
   icon: LucideIcon;
 }[] = [
-  { id: 'grouping', label: 'Grouping', description: 'Measure shot dispersion', icon: Crosshair },
-  { id: 'achievement', label: 'Target Hits', description: 'Count hits on target', icon: Target },
-  { id: 'zeroing', label: 'Zeroing', description: 'Dial in your optic', icon: Focus },
-  { id: 'physical', label: 'Stress Drill', description: 'Shoot under pressure', icon: HeartPulse },
+  { id: 'grouping', label: 'Grouping', description: 'Build consistent shots', icon: Crosshair },
+  { id: 'engagement', label: 'Engagement', description: 'Hit or miss inside a defined area', icon: Target },
+  // { id: 'zeroing', label: 'Zeroing', description: 'Dial in your optic', icon: Focus },
+  // { id: 'physical', label: 'Stress Drill', description: 'Shoot under pressure', icon: HeartPulse },
 ];
 
 // ============================================================================

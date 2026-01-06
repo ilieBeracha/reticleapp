@@ -15,10 +15,11 @@ import type { DrillGoal, InputMethod } from './useSessionForm';
 // COLORS
 // ============================================================================
 
-export const GOAL_COLORS = {
+export const GOAL_COLORS: Record<string, string> = {
   grouping: '#10B981',
-  achievement: '#3B82F6',
-} as const;
+  achievement: '#3B82F6', // legacy
+  engagement: '#3B82F6',
+};
 
 // ============================================================================
 // COMPACT NUMBER INPUT WITH PRESETS

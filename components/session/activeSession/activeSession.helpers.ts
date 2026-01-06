@@ -336,7 +336,7 @@ export function buildWatchSessionPayload(
       case 'grouping': return 'grouping';
       case 'zeroing': return 'zeroing';
       case 'qualification': return 'qualification';
-      case 'achievement':
+      case 'engagement':
       case 'physical':
       default:
         return 'timed'; // Default for tactical/achievement drills

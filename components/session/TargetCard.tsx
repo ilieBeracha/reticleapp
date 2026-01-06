@@ -24,7 +24,7 @@ export const TargetCard = React.memo(function TargetCard({
   
   // Determine target purpose: grouping (consistency) vs achievement (accuracy)
   const isGroupingTarget = isPaper && target.paper_result?.paper_type === 'grouping';
-  const isAchievementTarget = isPaper && target.paper_result?.paper_type === 'achievement';
+  const isEngagementTarget = isPaper && (target.paper_result?.paper_type === 'achievement' || target.paper_result?.paper_type === 'engagement');
 
   // Check if this was scanned (AI detection) vs manual entry
   const isScanned = isPaper && !!target.paper_result?.scanned_image_url;

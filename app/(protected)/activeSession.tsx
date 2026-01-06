@@ -245,7 +245,7 @@ export default function ActiveSessionScreen() {
     drillLimitReached,
     score,
     isGroupingDrill,
-    isAchievementDrill,
+    isEngagementDrill,
     isTacticalDrill,
     watchState,
     handleRefresh,
@@ -313,6 +313,20 @@ export default function ActiveSessionScreen() {
         insets={insets}
         onSessionActivated={(activated) => {
           handleRefresh();
+        }}
+        onBack={() => {
+          // Navigate back to session creation with current settings
+          router.replace({
+            pathname: '/(protected)/createSession',
+            params: {
+              editSessionId: session.id,
+              weaponId: session.weapon_id || '',
+              weaponName: session.weapon_name || '',
+              purpose: session.drill_config?.drill_goal || 'grouping',
+              distance: String(session.drill_config?.distance_m || 25),
+              shots: String(session.drill_config?.rounds_per_shooter || 5),
+            },
+          });
         }}
         onClose={handleClose}
       />

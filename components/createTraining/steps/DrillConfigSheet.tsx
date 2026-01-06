@@ -9,22 +9,22 @@ import { getCategoryLabel, WEAPON_CATEGORIES } from '@/services/weaponService';
 import type { WeaponCategory } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import {
-    Check,
-    Clock,
-    Crosshair,
-    MapPin,
-    Target,
-    X,
+  Check,
+  Clock,
+  Crosshair,
+  MapPin,
+  Target,
+  X,
 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -47,9 +47,10 @@ const SHOTS_PRESETS = [3, 5, 10, 15, 20];
 const TIME_PRESETS = [null, 30, 60, 90, 120, 180];
 const STRINGS_PRESETS = [1, 2, 3, 5];
 
-const GOAL_COLORS = {
+const GOAL_COLORS: Record<string, string> = {
   grouping: '#10B981',
   achievement: '#F59E0B',
+  engagement: '#F59E0B',
 };
 
 // ============================================================================

@@ -1,4 +1,5 @@
 import type { SessionWithDetails } from '@/services/session/types';
+import type { DrillGoal } from '@/types/workspace';
 
 // ============================================================================
 // FILTER TYPES
@@ -24,7 +25,7 @@ export interface SessionFilters {
   sessionMode: ('solo' | 'group')[];
   
   // Drill/weapon
-  drillGoal: ('grouping' | 'achievement')[];
+  drillGoal: DrillGoal[];
   weaponIds: string[];
   distanceRange: { min: number | null; max: number | null };
   

@@ -22,10 +22,7 @@
  */
 export type SessionPurpose = 
   | 'grouping'      // Measure shot dispersion / consistency
-  | 'achievement'   // Hit targets / zone-based scoring
-  | 'zeroing'       // Confirm or adjust rifle zero
-  | 'physical'      // Physical/stress/pulse drills
-  | 'custom';       // Mixed or user-defined
+  | 'engagement'    // Hit targets / zone-based scoring
 
 export interface PurposeOption {
   id: SessionPurpose;
@@ -68,6 +65,7 @@ export interface SessionContextState {
   
   // Optional (advanced)
   timeLimit: number | null;
+  stressDrill: boolean;
   ammoType: string | null;
   windCondition: string | null;
   timeOfDay: TimeOfDay;
@@ -123,6 +121,7 @@ export const DEFAULT_CONTEXT: SessionContextState = {
   targetType: 'paper',
   shotsPlanned: 5,
   timeLimit: null,
+  stressDrill: false,
   ammoType: null,
   windCondition: null,
   timeOfDay: 'day',

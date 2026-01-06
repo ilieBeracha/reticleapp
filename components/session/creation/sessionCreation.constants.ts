@@ -4,6 +4,7 @@
  * Purpose options, presets, and UI configuration
  */
 
+import type { DrillGoal } from '@/types/workspace';
 import type { Position, PurposeOption, SessionPurpose } from './sessionCreation.types';
 
 // ============================================================================
@@ -25,7 +26,7 @@ export const PURPOSE_OPTIONS: PurposeOption[] = [
     },
   },
   {
-    id: 'achievement',
+    id: 'engagement',
     label: 'Hitting Targets',
     description: 'Zone-based scoring & hit tracking',
     icon: 'trophy',
@@ -37,41 +38,7 @@ export const PURPOSE_OPTIONS: PurposeOption[] = [
       position: 'standing',
     },
   },
-  {
-    id: 'zeroing',
-    label: 'Zeroing',
-    description: 'Confirm or adjust rifle zero',
-    icon: 'focus',
-    color: '#10B981', // Green
-    defaults: {
-      targetType: 'paper',
-      distance: 100,
-      shotsPlanned: 3,
-      position: 'prone',
-    },
-  },
-  {
-    id: 'physical',
-    label: 'Physical Drill',
-    description: 'Stress & pulse-based training',
-    icon: 'heart-pulse',
-    color: '#EF4444', // Red
-    defaults: {
-      targetType: 'tactical',
-      distance: 15,
-      shotsPlanned: 10,
-      position: 'standing',
-      timeLimit: 60,
-    },
-  },
-  {
-    id: 'custom',
-    label: 'Custom',
-    description: 'Configure everything manually',
-    icon: 'settings-2',
-    color: '#8B5CF6', // Purple
-    defaults: {},
-  },
+  
 ];
 
 // ============================================================================
@@ -80,10 +47,7 @@ export const PURPOSE_OPTIONS: PurposeOption[] = [
 
 export const DISTANCE_PRESETS: Record<SessionPurpose, number[]> = {
   grouping: [25, 50, 100, 200, 300],
-  achievement: [7, 15, 25, 50, 100],
-  zeroing: [25, 50, 100, 200, 300],
-  physical: [5, 7, 15, 25],
-  custom: [7, 15, 25, 50, 100, 200],
+  engagement: [7, 15, 25, 50, 100],
 };
 
 // ============================================================================
@@ -92,10 +56,7 @@ export const DISTANCE_PRESETS: Record<SessionPurpose, number[]> = {
 
 export const SHOTS_PRESETS: Record<SessionPurpose, number[]> = {
   grouping: [3, 5, 10, 20],
-  achievement: [5, 10, 20, 30],
-  zeroing: [1, 3, 5],
-  physical: [6, 10, 15, 20],
-  custom: [3, 5, 10, 20, 30],
+  engagement: [5, 10, 20, 30],
 };
 
 // ============================================================================
@@ -103,19 +64,17 @@ export const SHOTS_PRESETS: Record<SessionPurpose, number[]> = {
 // ============================================================================
 
 export const POSITION_OPTIONS: { value: Position; label: string }[] = [
-  { value: 'any', label: 'Any Position' },
   { value: 'standing', label: 'Standing' },
   { value: 'kneeling', label: 'Kneeling' },
   { value: 'prone', label: 'Prone' },
   { value: 'seated', label: 'Seated' },
-  { value: 'supported', label: 'Supported' },
 ];
 
 // ============================================================================
 // TIME LIMIT PRESETS (seconds)
 // ============================================================================
 
-export const TIME_PRESETS: (number | null)[] = [null, 30, 60, 120];
+export const TIME_PRESETS: number[] = [30, 60, 90, 120];
 
 // ============================================================================
 // UI COPY - Human-friendly questions (from mental model)
@@ -155,16 +114,13 @@ export const DRILL_SOURCE_LABELS = {
 // PURPOSE TO DRILL_GOAL MAPPING
 // ============================================================================
 
-export function purposeToDrillGoal(purpose: SessionPurpose): 'grouping' | 'achievement' {
+export function purposeToDrillGoal(purpose: SessionPurpose): DrillGoal {
   switch (purpose) {
     case 'grouping':
-    case 'zeroing':
       return 'grouping';
-    case 'achievement':
-    case 'physical':
-    case 'custom':
+    case 'engagement':
     default:
-      return 'achievement';
+      return 'engagement';
   }
 }
 

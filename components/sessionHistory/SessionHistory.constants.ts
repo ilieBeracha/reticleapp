@@ -53,7 +53,7 @@ export const STATUS_OPTIONS = [
 
 export const DRILL_GOAL_OPTIONS = [
   { value: 'grouping', label: 'Grouping', icon: 'ellipse-outline' },
-  { value: 'achievement', label: 'Achievement', icon: 'trophy-outline' },
+  { value: 'engagement', label: 'Engagement', icon: 'trophy-outline' },
 ] as const;
 
 export const DISTANCE_PRESETS = [25, 50, 100, 200, 300, 500, 800, 1000];

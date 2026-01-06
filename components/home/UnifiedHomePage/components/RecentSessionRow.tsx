@@ -2,9 +2,10 @@
  * RecentSessionRow Component
  * 
  * Clean session row with key metrics.
+ * Shows different stats for grouping vs engagement sessions.
  */
 
-import { ChevronRight, Crosshair, Heart, Users } from 'lucide-react-native';
+import { ChevronRight, Crosshair, Heart, Target, Users } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { formatTimeAgo } from '../UnifiedHomePage.helpers';
 import type { RecentSessionRowProps } from '../UnifiedHomePage.types';
@@ -12,6 +13,7 @@ import type { RecentSessionRowProps } from '../UnifiedHomePage.types';
 export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowProps) {
   const isTeam = session.origin === 'team';
   const hasWatchData = session.sourceSession?.watch_controlled ?? false;
+  const isGrouping = session.drillGoal === 'grouping';
   
   const timeAgo = session.endedAt
     ? formatTimeAgo(session.endedAt)
@@ -19,8 +21,10 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
     ? formatTimeAgo(session.startedAt)
     : '';
 
-  const accuracy = session.stats?.accuracy;
   const shots = session.stats?.shots || 0;
+  const hits = session.stats?.hits || 0;
+  const accuracy = session.stats?.accuracy;
+  const bestDispersion = session.stats?.bestDispersion;
 
   return (
     <TouchableOpacity 
@@ -28,10 +32,12 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
       onPress={onPress}
       activeOpacity={0.6}
     >
-      {/* Icon */}
-      <View style={[s.icon, { backgroundColor: isTeam ? `${colors.blue}12` : `${colors.indigo}12` }]}>
+      {/* Icon - different for grouping vs engagement */}
+      <View style={[s.icon, { backgroundColor: isTeam ? `${colors.blue}12` : isGrouping ? `${colors.orange}12` : `${colors.indigo}12` }]}>
         {isTeam ? (
           <Users size={16} color={colors.blue} />
+        ) : isGrouping ? (
+          <Target size={16} color={colors.orange} />
         ) : (
           <Crosshair size={16} color={colors.indigo} />
         )}
@@ -48,19 +54,41 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
           )}
         </View>
         
-        {/* Stats row */}
+        {/* Stats row - different for grouping vs engagement */}
         <View style={s.statsRow}>
-          {shots > 0 && (
-            <Text style={[s.stat, { color: colors.textMuted }]}>
-              {shots} shots
-            </Text>
-          )}
-          {accuracy !== undefined && accuracy > 0 && (
+          {isGrouping ? (
+            // GROUPING: Show shots + group size (cm)
             <>
-              <View style={[s.dot, { backgroundColor: colors.textMuted }]} />
-              <Text style={[s.stat, { color: accuracy >= 70 ? colors.green : colors.textMuted }]}>
-                {accuracy}%
-              </Text>
+              {shots > 0 && (
+                <Text style={[s.stat, { color: colors.textMuted }]}>
+                  {shots} shots
+                </Text>
+              )}
+              {bestDispersion !== undefined && bestDispersion > 0 && (
+                <>
+                  <View style={[s.dot, { backgroundColor: colors.textMuted }]} />
+                  <Text style={[s.stat, { color: colors.orange }]}>
+                    {bestDispersion.toFixed(1)}cm
+                  </Text>
+                </>
+              )}
+            </>
+          ) : (
+            // ENGAGEMENT: Show hits/shots + accuracy
+            <>
+              {shots > 0 && (
+                <Text style={[s.stat, { color: colors.textMuted }]}>
+                  {hits}/{shots} hits
+                </Text>
+              )}
+              {accuracy !== undefined && accuracy > 0 && (
+                <>
+                  <View style={[s.dot, { backgroundColor: colors.textMuted }]} />
+                  <Text style={[s.stat, { color: accuracy >= 70 ? colors.green : colors.textMuted }]}>
+                    {accuracy}%
+                  </Text>
+                </>
+              )}
             </>
           )}
         </View>

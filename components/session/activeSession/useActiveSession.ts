@@ -173,7 +173,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
 
   // Drill type flags
   const isGroupingDrill = drill?.drill_goal === 'grouping';
-  const isAchievementDrill = drill?.drill_goal === 'achievement';
+  const isEngagementDrill = drill?.drill_goal === 'engagement';
   const isPaperDrill = isGroupingDrill || drill?.target_type === 'paper';
   const isTacticalDrill = drill?.target_type === 'tactical';
 
@@ -380,6 +380,8 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
           heartRateMin: data.heartRate?.min ? String(data.heartRate.min) : '',
           drillName: session?.drill_name || drill?.name || '',
           weaponName: session?.weapon_name || '',
+          // Drill goal (grouping vs engagement) - determines input type
+          drillGoal: drill?.drill_goal || 'engagement',
           // Performance analytics (JSON stringified)
           performance: data.performance ? JSON.stringify(data.performance) : '',
           // Full biometrics data (JSON stringified)
@@ -505,9 +507,10 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
         ...(hasDrill && nextTargetPlan?.nextBullets
           ? { bullets: String(nextTargetPlan.nextBullets) }
           : {}),
+        ...(isGroupingDrill ? { isGrouping: '1' } : {}),
       },
     });
-  }, [sessionId, defaultDistance, hasDrill, drill, nextTargetPlan]);
+  }, [sessionId, defaultDistance, hasDrill, drill, nextTargetPlan, isGroupingDrill]);
 
   const handleManualRoute = useCallback(() => {
     if (!canAddTarget) return;
@@ -521,9 +524,10 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
         ...(hasDrill && nextTargetPlan?.nextBullets
           ? { bullets: String(nextTargetPlan.nextBullets) }
           : {}),
+        ...(isGroupingDrill ? { isGrouping: '1' } : {}),
       },
     });
-  }, [canAddTarget, sessionId, defaultDistance, hasDrill, nextTargetPlan]);
+  }, [canAddTarget, sessionId, defaultDistance, hasDrill, nextTargetPlan, isGroupingDrill]);
 
   const handleScanRoute = useCallback(() => {
     if (!canAddTarget) return;
@@ -537,7 +541,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
         sessionId,
         distance: String(defaultDistance),
         ...(maxShots ? { maxShots } : {}),
-        drillGoal: isGroupingDrill ? 'grouping' : 'achievement',
+        drillGoal: isGroupingDrill ? 'grouping' : 'engagement',
         ...(hasDrill ? { locked: '1' } : {}),
       },
     });
@@ -837,7 +841,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
 
     // Drill type flags
     isGroupingDrill,
-    isAchievementDrill,
+    isEngagementDrill,
     isPaperDrill,
     isTacticalDrill,
 

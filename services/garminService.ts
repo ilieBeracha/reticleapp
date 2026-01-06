@@ -11,11 +11,7 @@
  */
 
 import Constants from 'expo-constants';
-import {
-  DeviceEventEmitter,
-  NativeEventEmitter,
-  Platform
-} from 'react-native';
+import { DeviceEventEmitter, NativeEventEmitter, Platform } from 'react-native';
 import {
   connectDevice,
   destroy,
@@ -24,7 +20,7 @@ import {
   initialize as sdkInitialize,
   sendMessage as sdkSendMessage,
   showDevicesList,
-  Status
+  Status,
 } from 'react-native-garmin-connect';
 
 // Import timeline assembler
@@ -43,7 +39,7 @@ import {
   logError,
   logInboundMessage,
   logOutboundMessage,
-  stopHeartbeat
+  stopHeartbeat,
 } from './garmin/garmin.diagnostics';
 
 // ============================================================================
@@ -138,17 +134,19 @@ function resetTimelineTimeout(sessionId: string) {
   if (existing) {
     clearTimeout(existing);
   }
-  
+
   // Set new timeout
   const timeout = setTimeout(() => {
     const pending = timelineAssembler.getPendingInfo(sessionId);
     if (pending) {
-      console.warn(`[GarminService] ⚠️ Timeline sync timed out for ${sessionId.slice(0, 8)}... (received ${pending.received}/${pending.expected} chunks)`);
+      console.warn(
+        `[GarminService] ⚠️ Timeline sync timed out for ${sessionId.slice(0, 8)}... (received ${pending.received}/${pending.expected} chunks)`
+      );
       timelineAssembler.clearSession(sessionId);
       timelineTimeouts.delete(sessionId);
     }
   }, TIMELINE_CHUNK_TIMEOUT_MS);
-  
+
   timelineTimeouts.set(sessionId, timeout);
 }
 
@@ -165,20 +163,20 @@ function clearTimelineTimeout(sessionId: string) {
 // ============================================================================
 
 function emit(event: GarminServiceEvent) {
-listeners.forEach((listener) => {
-  try {
-    listener(event);
-  } catch (err) {
-    console.error('[GarminService] Listener error:', err);
-  }
-});
+  listeners.forEach((listener) => {
+    try {
+      listener(event);
+    } catch (err) {
+      console.error('[GarminService] Listener error:', err);
+    }
+  });
 }
 
 function getEmitter() {
-if (Platform.OS === 'ios') {
-  return new NativeEventEmitter(GarminConnect as any);
-}
-return DeviceEventEmitter;
+  if (Platform.OS === 'ios') {
+    return new NativeEventEmitter(GarminConnect as any);
+  }
+  return DeviceEventEmitter;
 }
 
 // ============================================================================
@@ -186,224 +184,204 @@ return DeviceEventEmitter;
 // ============================================================================
 
 /**
-* Subscribe to service events.
-* Returns an unsubscribe function.
-*/
+ * Subscribe to service events.
+ * Returns an unsubscribe function.
+ */
 export function subscribe(listener: GarminServiceListener): () => void {
-listeners.add(listener);
-return () => listeners.delete(listener);
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }
 
 /**
-* Initialize the Garmin SDK with your app configuration.
-* Call once at app root (e.g., in _layout.tsx useEffect).
-* Returns a cleanup function.
-*
-* @param customConfig - Optional custom config (defaults to GARMIN_DEFAULT_CONFIG)
-*/
+ * Initialize the Garmin SDK with your app configuration.
+ * Call once at app root (e.g., in _layout.tsx useEffect).
+ * Returns a cleanup function.
+ *
+ * @param customConfig - Optional custom config (defaults to GARMIN_DEFAULT_CONFIG)
+ */
 export function initialize(customConfig?: Partial<GarminConfig>): () => void {
-if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
-  console.log('[GarminService] Not a mobile platform, skipping init');
-  return () => {};
-}
+  if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
+    console.log('[GarminService] Not a mobile platform, skipping init');
+    return () => {};
+  }
 
-// Merge with defaults
-const urlScheme = customConfig?.urlScheme ?? GARMIN_DEFAULT_CONFIG.urlScheme;
-const appId = customConfig?.appId ?? GARMIN_DEFAULT_CONFIG.appId;
+  // Merge with defaults
+  const urlScheme = customConfig?.urlScheme ?? GARMIN_DEFAULT_CONFIG.urlScheme;
+  const appId = customConfig?.appId ?? GARMIN_DEFAULT_CONFIG.appId;
 
-if (isInitialized) {
-  console.log('[GarminService] Already initialized');
-  return () => {};
-}
+  if (isInitialized) {
+    console.log('[GarminService] Already initialized');
+    return () => {};
+  }
 
-console.log('[GarminService] Initializing SDK...');
-console.log(`[GarminService] URL Scheme: ${urlScheme}`);
-console.log(`[GarminService] App ID: ${appId}`);
+  console.log('[GarminService] Initializing SDK...');
+  console.log(`[GarminService] URL Scheme: ${urlScheme}`);
+  console.log(`[GarminService] App ID: ${appId}`);
 
-config = { urlScheme, appId };
-isInitialized = true;
+  config = { urlScheme, appId };
+  isInitialized = true;
 
-const emitter = getEmitter();
+  const emitter = getEmitter();
 
-// SDK Ready
-const sdkSub = emitter.addListener('onSdkReady', () => {
-  console.log('[GarminService] ✅ SDK Ready');
-  isReady = true;
-  emit({ event: 'sdk_ready' });
+  // SDK Ready
+  const sdkSub = emitter.addListener('onSdkReady', () => {
+    console.log('[GarminService] ✅ SDK Ready');
+    isReady = true;
+    emit({ event: 'sdk_ready' });
 
-  // Auto-fetch devices on ready
-  refreshDevices().catch(console.error);
-});
+    // Auto-fetch devices on ready
+    refreshDevices().catch(console.error);
+  });
 
-// Device Status Changes
-const statusSub = emitter.addListener('onDeviceStatusChanged', (event: any) => {
-  const status = event.status as GarminConnectionStatus;
-  const reason = event.reason || '';
-  console.log(`[GarminService] 📱 Status: ${status}${reason ? ` (${reason})` : ''}`);
+  // Device Status Changes
+  const statusSub = emitter.addListener('onDeviceStatusChanged', (event: any) => {
+    const status = event.status as GarminConnectionStatus;
+    const reason = event.reason || '';
+    console.log(`[GarminService] 📱 Status: ${status}${reason ? ` (${reason})` : ''}`);
 
-  // Heartbeat disabled - session completion now detected via TIMELINE_COMPLETE
-  // The heartbeat added overhead without much benefit for our use case.
-  // Keep the code in garmin.diagnostics.ts for future debugging if needed.
-  // 
-  // if (status === 'CONNECTED') {
-  //   startHeartbeat(
-  //     () => sendMessage('HEARTBEAT', { timestamp: Date.now() }),
-  //     () => {
-  //       console.warn('[GarminService] 💔 Heartbeat timeout - connection may be stale');
-  //       emit({ event: 'error', error: new Error('Heartbeat timeout - connection stale') });
-  //     }
-  //   );
-  // } else {
-  //   stopHeartbeat();
-  // }
+    currentStatus = status;
+    emit({ event: 'status_changed', status, reason });
+  });
 
-  currentStatus = status;
-  emit({ event: 'status_changed', status, reason });
-});
+  // Incoming Messages from Watch
+  const msgSub = emitter.addListener('onMessage', (raw: any) => {
+    console.log('[GarminService] 📩 ========================================');
+    console.log('[GarminService] 📩 MESSAGE RECEIVED FROM NATIVE');
+    console.log('[GarminService] 📩 Raw:', JSON.stringify(raw, null, 2));
+    console.log('[GarminService] 📩 ========================================');
 
-// Incoming Messages from Watch
-const msgSub = emitter.addListener('onMessage', (raw: any) => {
-  console.log('[GarminService] 📩 ========================================');
-  console.log('[GarminService] 📩 MESSAGE RECEIVED FROM NATIVE');
-  console.log('[GarminService] 📩 Raw:', JSON.stringify(raw, null, 2));
-  console.log('[GarminService] 📩 ========================================');
-
-  // Parse payload if it's a JSON string
-  let parsedPayload = raw?.payload;
-  if (typeof parsedPayload === 'string') {
-    try {
-      parsedPayload = JSON.parse(parsedPayload);
-      console.log('[GarminService] 📩 Parsed payload:', parsedPayload);
-    } catch {
-      // Keep as string if not valid JSON
-      console.log('[GarminService] 📩 Payload is plain string');
+    // Parse payload if it's a JSON string
+    let parsedPayload = raw?.payload;
+    if (typeof parsedPayload === 'string') {
+      try {
+        parsedPayload = JSON.parse(parsedPayload);
+        console.log('[GarminService] 📩 Parsed payload:', parsedPayload);
+      } catch {
+        // Keep as string if not valid JSON
+        console.log('[GarminService] 📩 Payload is plain string');
+      }
     }
-  }
 
-  const message: GarminInboundMessage = {
-    type: raw?.type || 'unknown',
-    payload: parsedPayload,
-    // Extract sessionData from parsed payload if present
-    sessionData: parsedPayload?.sessionData || parsedPayload,
-    timestamp: Date.now(),
+    const message: GarminInboundMessage = {
+      type: raw?.type || 'unknown',
+      payload: parsedPayload,
+      // Extract sessionData from parsed payload if present
+      sessionData: parsedPayload?.sessionData || parsedPayload,
+      timestamp: Date.now(),
+    };
+
+    // Log inbound message for diagnostics
+    logInboundMessage(message.type, parsedPayload);
+
+    console.log('[GarminService] 📩 Emitting message_received:', message.type);
+    emit({ event: 'message_received', message });
+
+    // Create handler context with service internals
+    const handlerContext: MessageHandlerContext = {
+      emit,
+      sendMessage,
+      timelineAssembler,
+      resetTimelineTimeout,
+      clearTimelineTimeout,
+    };
+
+    // Route message to appropriate handler
+    routeMessage(message, parsedPayload, handlerContext, handleAckReceived);
+  });
+
+  // Errors
+  const errSub = emitter.addListener('onError', (error: any) => {
+    console.error('[GarminService] ❌ Error:', error);
+    logError('NativeSDK', error);
+    emit({ event: 'error', error: new Error(String(error)) });
+  });
+
+  // Initialize the native SDK with both urlScheme and appId
+  sdkInitialize(urlScheme);
+
+  // Cleanup function
+  return () => {
+    console.log('[GarminService] Cleaning up...');
+    stopHeartbeat();
+    sdkSub.remove();
+    statusSub.remove();
+    msgSub.remove();
+    errSub.remove();
+    destroy();
+
+    config = null;
+    isInitialized = false;
+    isReady = false;
+    currentStatus = 'UNKNOWN';
+    pairedDevices = [];
   };
-
-  // Log inbound message for diagnostics
-  logInboundMessage(message.type, parsedPayload);
-
-  console.log('[GarminService] 📩 Emitting message_received:', message.type);
-  emit({ event: 'message_received', message });
-
-  // Create handler context with service internals
-  const handlerContext: MessageHandlerContext = {
-    emit,
-    sendMessage,
-    timelineAssembler,
-    resetTimelineTimeout,
-    clearTimelineTimeout,
-  };
-
-  // Route message to appropriate handler
-  routeMessage(message, parsedPayload, handlerContext, handleAckReceived);
-});
-
-// Errors
-const errSub = emitter.addListener('onError', (error: any) => {
-  console.error('[GarminService] ❌ Error:', error);
-  logError('NativeSDK', error);
-  emit({ event: 'error', error: new Error(String(error)) });
-});
-
-// Initialize the native SDK with both urlScheme and appId
-sdkInitialize(urlScheme);
-
-// Cleanup function
-return () => {
-  console.log('[GarminService] Cleaning up...');
-  stopHeartbeat();
-  sdkSub.remove();
-  statusSub.remove();
-  msgSub.remove();
-  errSub.remove();
-  destroy();
-
-  config = null;
-  isInitialized = false;
-  isReady = false;
-  currentStatus = 'UNKNOWN';
-  pairedDevices = [];
-};
 }
 
 /**
-* Fetch paired devices and auto-connect to the first one.
-*/
+ * Fetch paired devices and auto-connect to the first one.
+ */
 export async function refreshDevices(): Promise<GarminDevice[]> {
-if (!isReady) {
-  console.log('[GarminService] SDK not ready, cannot refresh devices');
-  return [];
-}
-
-try {
-  const devices = await getDevicesList();
-  console.log('[GarminService] Devices:', devices);
-
-  pairedDevices = devices as GarminDevice[];
-  emit({ event: 'devices_updated', devices: pairedDevices });
-
-  // Auto-connect to first device if available
-  if (devices.length > 0) {
-    const d = devices[0] as GarminDevice;
-    console.log(
-      '[GarminService] Connecting to:',
-      d.name,
-      d.needsRepairing ? '(stale session)' : ''
-    );
-    connectDevice(d.id, d.model, d.name);
+  if (!isReady) {
+    console.log('[GarminService] SDK not ready, cannot refresh devices');
+    return [];
   }
 
-  return devices;
-} catch (error) {
-  console.error('[GarminService] Error fetching devices:', error);
-  emit({ event: 'error', error: error as Error });
-  return [];
-}
+  try {
+    const devices = await getDevicesList();
+    console.log('[GarminService] Devices:', devices);
+
+    pairedDevices = devices as GarminDevice[];
+    emit({ event: 'devices_updated', devices: pairedDevices });
+
+    // Auto-connect to first device if available
+    if (devices.length > 0) {
+      const d = devices[0] as GarminDevice;
+      console.log('[GarminService] Connecting to:', d.name, d.needsRepairing ? '(stale session)' : '');
+      connectDevice(d.id, d.model, d.name);
+    }
+
+    return devices;
+  } catch (error) {
+    console.error('[GarminService] Error fetching devices:', error);
+    emit({ event: 'error', error: error as Error });
+    return [];
+  }
 }
 
 /**
-* Opens Garmin Connect Mobile for device selection.
-*/
+ * Opens Garmin Connect Mobile for device selection.
+ */
 export function openDeviceSelection(): void {
-if (!isReady) {
-  console.log('[GarminService] SDK not ready');
-  return;
-}
-showDevicesList();
+  if (!isReady) {
+    console.log('[GarminService] SDK not ready');
+    return;
+  }
+  showDevicesList();
 }
 
 /**
-* Send a message to the connected watch app.
-*/
+ * Send a message to the connected watch app.
+ */
 export function sendMessage(type: GarminOutboundMessageType | string, payload?: unknown): boolean {
-if (currentStatus !== 'CONNECTED') {
-  console.log('[GarminService] Cannot send - status:', currentStatus);
-  logOutboundMessage(type, payload, false, 'Not connected');
-  return false;
-}
+  if (currentStatus !== 'CONNECTED') {
+    console.log('[GarminService] Cannot send - status:', currentStatus);
+    logOutboundMessage(type, payload, false, 'Not connected');
+    return false;
+  }
 
-const message = JSON.stringify({ type, payload });
-console.log('[GarminService] 📤 Sending:', message);
+  const message = JSON.stringify({ type, payload });
+  console.log('[GarminService] 📤 Sending:', message);
 
-try {
-  sdkSendMessage(message);
-  logOutboundMessage(type, payload, true);
-  return true;
-} catch (err) {
-  const errorMsg = err instanceof Error ? err.message : String(err);
-  logOutboundMessage(type, payload, false, errorMsg);
-  logError('sendMessage', err instanceof Error ? err : new Error(errorMsg));
-  return false;
-}
+  try {
+    sdkSendMessage(message);
+    logOutboundMessage(type, payload, true);
+    return true;
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    logOutboundMessage(type, payload, false, errorMsg);
+    logError('sendMessage', err instanceof Error ? err : new Error(errorMsg));
+    return false;
+  }
 }
 
 // ============================================================================
@@ -440,11 +418,7 @@ function handleAckReceived(ackPayload: { status?: string } | null): void {
 /**
  * Send a message and wait for ACK with timeout.
  */
-function sendAndWaitForAck(
-  type: string,
-  payload: Record<string, unknown>,
-  timeoutMs: number
-): Promise<boolean> {
+function sendAndWaitForAck(type: string, payload: Record<string, unknown>, timeoutMs: number): Promise<boolean> {
   return new Promise((resolve) => {
     // Clear any existing pending ACK
     if (pendingAck) {
@@ -479,7 +453,7 @@ function sendAndWaitForAck(
 /**
  * Send a message with retry and ACK confirmation.
  * Returns true if message was acknowledged by watch, false otherwise.
- * 
+ *
  * @param type - Message type (e.g., 'SESSION_START')
  * @param payload - Message payload
  * @param options - Retry options (maxRetries, timeoutMs)
@@ -522,13 +496,10 @@ export async function sendMessageWithRetry(
  * For full drill-aware sessions, use the payload version.
  * For simple sessions, use the string version (legacy).
  */
-export function startWatchSession(
-  sessionIdOrPayload: string | StartWatchSessionPayload,
-  drillName?: string
-): boolean {
+export function startWatchSession(sessionIdOrPayload: string | StartWatchSessionPayload, drillName?: string): boolean {
   // If payload object, send full config
   if (typeof sessionIdOrPayload === 'object') {
-    return sendMessage('SESSION_START', sessionIdOrPayload);  // Watch expects SESSION_START
+    return sendMessage('SESSION_START', sessionIdOrPayload); // Watch expects SESSION_START
   }
 
   // Legacy: simple session start (minimal payload)
@@ -547,22 +518,22 @@ export function startWatchSession(
 }
 
 /**
-* Tell the watch to end the session and send back data.
-*/
+ * Tell the watch to end the session and send back data.
+ */
 export function endWatchSession(sessionId: string): boolean {
-return sendMessage('SESSION_END', { sessionId });  // Watch expects SESSION_END
+  return sendMessage('SESSION_END', { sessionId }); // Watch expects SESSION_END
 }
 
 /**
-* Sync drill config to the watch (for display/timing).
-*/
+ * Sync drill config to the watch (for display/timing).
+ */
 export function syncDrillToWatch(drill: {
-name: string;
-rounds: number;
-distance?: number;
-timeLimit?: number;
+  name: string;
+  rounds: number;
+  distance?: number;
+  timeLimit?: number;
 }): boolean {
-return sendMessage('SYNC_DRILL', drill);
+  return sendMessage('SYNC_DRILL', drill);
 }
 
 // ============================================================================
@@ -572,7 +543,7 @@ return sendMessage('SYNC_DRILL', drill);
 /**
  * Simulate receiving session data from a watch.
  * Useful for testing the flow without a real Garmin device.
- * 
+ *
  * Usage: mockWatchSessionResult('session-id-here', 5, 45);
  */
 export function mockWatchSessionResult(
@@ -583,7 +554,7 @@ export function mockWatchSessionResult(
   completed: boolean = true
 ): void {
   console.log('[GarminService] 🧪 MOCK: Simulating watch session result');
-  
+
   const mockPayload = {
     sessionId,
     shotsFired,
@@ -591,7 +562,7 @@ export function mockWatchSessionResult(
     distance,
     completed,
   };
-  
+
   // Simulate the same flow as a real watch message
   const sessionData: GarminSessionData = {
     sessionId: mockPayload.sessionId,
@@ -600,7 +571,7 @@ export function mockWatchSessionResult(
     distance: mockPayload.distance,
     completed: mockPayload.completed,
   };
-  
+
   console.log('[GarminService] 🧪 MOCK: Emitting session_data:', sessionData);
   emit({ event: 'session_data', data: sessionData });
 }
@@ -610,31 +581,27 @@ export function mockWatchSessionResult(
 // ============================================================================
 
 export function getConfig(): GarminConfig | null {
-return config;
+  return config;
 }
 
 export function getIsReady(): boolean {
-return isReady;
+  return isReady;
 }
 
 export function getCurrentStatus(): GarminConnectionStatus {
-return currentStatus;
+  return currentStatus;
 }
 
 export function getPairedDevices(): GarminDevice[] {
-return pairedDevices;
+  return pairedDevices;
 }
 
 export function isConnected(): boolean {
-return currentStatus === 'CONNECTED';
+  return currentStatus === 'CONNECTED';
 }
 
 // ============================================================================
 // DIAGNOSTICS (connection health, message logs, export)
 // ============================================================================
 
-export {
-  clearDiagnostics, exportDiagnostics,
-  exportDiagnosticsAsText, getConnectionHealth,
-  getHeartbeatState
-};
+export { clearDiagnostics, exportDiagnostics, exportDiagnosticsAsText, getConnectionHealth, getHeartbeatState };

@@ -10,7 +10,7 @@
  */
 
 import type { SessionWithDetails } from '@/services/session/types';
-import type { TrainingWithDetails } from '@/types/workspace';
+import type { DrillGoal, TrainingWithDetails } from '@/types/workspace';
 
 /** Session origin - solo practice or team scheduled */
 export type SessionOrigin = 'solo' | 'team';
@@ -50,7 +50,7 @@ export interface HomeSession {
   
   // Drill info (if available)
   drillName?: string;
-  drillGoal?: 'grouping' | 'achievement';
+  drillGoal?: DrillGoal;
   
   // Stats (for completed sessions)
   stats?: {
