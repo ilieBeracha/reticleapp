@@ -119,8 +119,9 @@ export function transformSummaryPayload(payload: WatchSummaryPayload): Transform
       manualOverrides: payload.detection.overrides,
     }),
 
-    // Weather conditions (decode from compact format)
-    weather: decodeWeather(payload.weather),
+    // Weather conditions - DISABLED (causing crashes)
+    // weather: decodeWeather(payload.weather),
+    weather: null,
 
     // Sync status
     isSummaryOnly: true,

@@ -63,65 +63,76 @@ export const WIND_THRESHOLDS = {
  */
 export function decodeWeather(weather: WatchWeatherPayload | null | undefined): DecodedWeather | null {
   if (!weather) return null;
-
-  // Handle both compact (t) and verbose (temp) formats
-  // Compact format: t is Celsius × 10, Verbose format: temp is raw Celsius
-  let temperatureC: number | null = null;
-  if (weather.temp != null) {
-    // Verbose format: raw Celsius
-    temperatureC = weather.temp;
-  } else if (weather.t != null) {
-    // Compact format: Celsius × 10
-    temperatureC = weather.t / 10;
+  
+  // Safety check - weather must be an object
+  if (typeof weather !== 'object') {
+    console.warn('[WeatherDecoder] Invalid weather payload (not an object):', typeof weather);
+    return null;
   }
-  const temperatureF = temperatureC != null ? (temperatureC * 9) / 5 + 32 : null;
 
-  // Handle both compact (ws) and verbose (wind) formats
-  // Compact format: ws is m/s × 10, Verbose format: wind is raw m/s
-  let windSpeedMps: number | null = null;
-  if (weather.wind != null) {
-    // Verbose format: raw m/s
-    windSpeedMps = weather.wind;
-  } else if (weather.ws != null) {
-    // Compact format: m/s × 10
-    windSpeedMps = weather.ws / 10;
+  try {
+    // Handle both compact (t) and verbose (temp) formats
+    // Compact format: t is Celsius × 10, Verbose format: temp is raw Celsius
+    let temperatureC: number | null = null;
+    if (weather.temp != null) {
+      // Verbose format: raw Celsius
+      temperatureC = weather.temp;
+    } else if (weather.t != null) {
+      // Compact format: Celsius × 10
+      temperatureC = weather.t / 10;
+    }
+    const temperatureF = temperatureC != null ? (temperatureC * 9) / 5 + 32 : null;
+
+    // Handle both compact (ws) and verbose (wind) formats
+    // Compact format: ws is m/s × 10, Verbose format: wind is raw m/s
+    let windSpeedMps: number | null = null;
+    if (weather.wind != null) {
+      // Verbose format: raw m/s
+      windSpeedMps = weather.wind;
+    } else if (weather.ws != null) {
+      // Compact format: m/s × 10
+      windSpeedMps = weather.ws / 10;
+    }
+    const windSpeedMph = windSpeedMps != null ? windSpeedMps * 2.237 : null;
+    const windSpeedKph = windSpeedMps != null ? windSpeedMps * 3.6 : null;
+
+    // Humidity: both formats use direct value
+    const humidity = weather.hum ?? weather.h ?? null;
+    
+    // Wind direction: both formats
+    const windDirection = weather.windDir ?? weather.wd ?? null;
+    
+    // Wind bearing: only compact format
+    const windBearing = weather.wb ?? null;
+    
+    // Pressure: both formats use direct hPa value
+    const pressureHpa = weather.press ?? weather.p ?? null;
+    
+    // Condition: both formats
+    const condition = weather.cond ?? weather.c ?? null;
+
+    // Calculate assessments
+    const windImpact = getWindImpact(windSpeedMps);
+    const conditionSeverity = getConditionSeverity(condition);
+
+    return {
+      temperatureC,
+      temperatureF,
+      humidity,
+      windSpeedMps,
+      windSpeedMph,
+      windSpeedKph,
+      windDirection,
+      windBearing,
+      pressureHpa,
+      condition,
+      windImpact,
+      conditionSeverity,
+    };
+  } catch (error) {
+    console.error('[WeatherDecoder] Error decoding weather:', error);
+    return null;
   }
-  const windSpeedMph = windSpeedMps != null ? windSpeedMps * 2.237 : null;
-  const windSpeedKph = windSpeedMps != null ? windSpeedMps * 3.6 : null;
-
-  // Humidity: both formats use direct value
-  const humidity = weather.hum ?? weather.h ?? null;
-  
-  // Wind direction: both formats
-  const windDirection = weather.windDir ?? weather.wd ?? null;
-  
-  // Wind bearing: only compact format
-  const windBearing = weather.wb ?? null;
-  
-  // Pressure: both formats use direct hPa value
-  const pressureHpa = weather.press ?? weather.p ?? null;
-  
-  // Condition: both formats
-  const condition = weather.cond ?? weather.c ?? null;
-
-  // Calculate assessments
-  const windImpact = getWindImpact(windSpeedMps);
-  const conditionSeverity = getConditionSeverity(condition);
-
-  return {
-    temperatureC,
-    temperatureF,
-    humidity,
-    windSpeedMps,
-    windSpeedMph,
-    windSpeedKph,
-    windDirection,
-    windBearing,
-    pressureHpa,
-    condition,
-    windImpact,
-    conditionSeverity,
-  };
 }
 
 /**

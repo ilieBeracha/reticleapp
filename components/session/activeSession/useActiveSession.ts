@@ -388,8 +388,8 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
           biometrics: data.biometrics ? JSON.stringify(data.biometrics) : '',
           // Steadiness data (JSON stringified)
           steadiness: data.steadiness ? JSON.stringify(data.steadiness) : '',
-          // Weather conditions (JSON stringified)
-          weather: data.weather ? JSON.stringify(data.weather) : '',
+          // Weather conditions - DISABLED
+          weather: '',
         },
       });
     };

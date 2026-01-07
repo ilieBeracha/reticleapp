@@ -1,6 +1,6 @@
 /**
  * Session Detail Sheet
- * 
+ *
  * Shows session summary, stats, and image previews.
  * Opens as a formSheet modal above tabs.
  */
@@ -42,15 +42,7 @@ import {
   Zap,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Dimensions,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -66,10 +58,14 @@ export default function SessionDetailScreen() {
   const [stats, setStats] = useState<SessionStats | null>(null);
   const [targets, setTargets] = useState<SessionTargetWithResults[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Load timeline data from DB (saved independently by garminStore)
-  const { timeline, hasTimeline, loading: timelineLoading } = useSessionTimeline({ 
-    sessionId: sessionId ?? '' 
+  const {
+    timeline,
+    hasTimeline,
+    loading: timelineLoading,
+  } = useSessionTimeline({
+    sessionId: sessionId ?? '',
   });
 
   // Load session data
@@ -116,10 +112,10 @@ export default function SessionDetailScreen() {
   // Check if any scanned targets are missing actual shots declaration
   const hasScannedWithoutDeclaration = useMemo(() => {
     return targets.some(
-      (t) => 
-        t.target_type === 'paper' && 
+      (t) =>
+        t.target_type === 'paper' &&
         (t.paper_result?.paper_type === 'achievement' || t.paper_result?.paper_type === 'engagement') &&
-        !!t.paper_result?.scanned_image_url && 
+        !!t.paper_result?.scanned_image_url &&
         !t.paper_result?.actual_shots_declared
     );
   }, [targets]);
@@ -129,7 +125,10 @@ export default function SessionDetailScreen() {
     let scanned = 0;
     let manual = 0;
     targets.forEach((t) => {
-      if (t.target_type === 'paper' && (t.paper_result?.paper_type === 'achievement' || t.paper_result?.paper_type === 'engagement')) {
+      if (
+        t.target_type === 'paper' &&
+        (t.paper_result?.paper_type === 'achievement' || t.paper_result?.paper_type === 'engagement')
+      ) {
         if (t.paper_result?.scanned_image_url) scanned++;
         else manual++;
       }
@@ -139,27 +138,29 @@ export default function SessionDetailScreen() {
 
   // Extract watch/biometrics data from targets
   const watchData = useMemo(() => {
-    const watchTarget = targets.find(
-      (t) => t.target_data && (t.target_data as any).source === 'garmin_watch'
-    );
+    const watchTarget = targets.find((t) => t.target_data && (t.target_data as any).source === 'garmin_watch');
     if (!watchTarget) return null;
-    
+
     const data = watchTarget.target_data as any;
     return {
       heartRate: data.heart_rate as { avg?: number; max?: number; min?: number } | undefined,
       avgBreathRate: data.avg_breath_rate as number | undefined,
-      biometrics: data.biometrics as {
-        summary?: any;
-        hr_timeline?: [number, number, number][];
-        breath_timeline?: [number, number, number][];
-        shot_biometrics?: any[];
-      } | undefined,
-      steadiness: data.steadiness as {
-        avg_score?: number;
-        shot_count?: number;
-        trend?: string;
-        shots?: any[];
-      } | undefined,
+      biometrics: data.biometrics as
+        | {
+            summary?: any;
+            hr_timeline?: [number, number, number][];
+            breath_timeline?: [number, number, number][];
+            shot_biometrics?: any[];
+          }
+        | undefined,
+      steadiness: data.steadiness as
+        | {
+            avg_score?: number;
+            shot_count?: number;
+            trend?: string;
+            shots?: any[];
+          }
+        | undefined,
       splits: data.splits as number[] | undefined,
       avgSplitMs: data.avg_split_ms as number | undefined,
       fastestSplitMs: data.fastest_split_ms as number | undefined,
@@ -176,43 +177,40 @@ export default function SessionDetailScreen() {
     if (!timeline || !timeline.shotDetails || timeline.shotDetails.length < 2) {
       return null;
     }
-    
+
     const shots = timeline.shotDetails;
     const steadinessSum = shots.reduce((sum, s) => sum + (s.steadiness || 0), 0);
     const hasRealSteadiness = steadinessSum > 0;
-    
+
     // Performance scores (use steadiness or inverted stress as calmness)
-    const scores = hasRealSteadiness 
-      ? shots.map(s => s.steadiness)
-      : shots.map(s => Math.max(0, 100 - s.stress));
-    
+    const scores = hasRealSteadiness ? shots.map((s) => s.steadiness) : shots.map((s) => Math.max(0, 100 - s.stress));
+
     const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-    
+
     // Trend analysis (compare first half vs second half)
     const half = Math.floor(scores.length / 2);
     const firstHalf = scores.slice(0, half).reduce((a, b) => a + b, 0) / half;
     const secondHalf = scores.slice(half).reduce((a, b) => a + b, 0) / (scores.length - half);
-    const trend: 'improving' | 'declining' | 'stable' = 
-      secondHalf - firstHalf > 5 ? 'improving' : 
-      secondHalf - firstHalf < -5 ? 'declining' : 'stable';
-    
+    const trend: 'improving' | 'declining' | 'stable' =
+      secondHalf - firstHalf > 5 ? 'improving' : secondHalf - firstHalf < -5 ? 'declining' : 'stable';
+
     // Breath quality
-    const pauseCount = shots.filter(s => s.breathPhase === 'pause').length;
-    const exhaleCount = shots.filter(s => s.breathPhase === 'exhale').length;
-    const inhaleCount = shots.filter(s => s.breathPhase === 'inhale').length;
+    const pauseCount = shots.filter((s) => s.breathPhase === 'pause').length;
+    const exhaleCount = shots.filter((s) => s.breathPhase === 'exhale').length;
+    const inhaleCount = shots.filter((s) => s.breathPhase === 'inhale').length;
     const pausePct = Math.round((pauseCount / shots.length) * 100);
     const exhalePct = Math.round((exhaleCount / shots.length) * 100);
     const inhalePct = Math.round((inhaleCount / shots.length) * 100);
-    
+
     // Best/worst shots
     const maxScore = Math.max(...scores);
     const minScore = Math.min(...scores);
     const bestIdx = scores.indexOf(maxScore);
     const worstIdx = scores.indexOf(minScore);
-    
+
     // Flinch count
-    const flinchCount = shots.filter(s => s.flinch).length;
-    
+    const flinchCount = shots.filter((s) => s.flinch).length;
+
     return {
       scores,
       avgScore,
@@ -258,14 +256,13 @@ export default function SessionDetailScreen() {
     return (
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingTop: 24}]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: 24 }]}
         showsVerticalScrollIndicator={false}
-      > 
+      >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading session...</Text>
         </View>
-
       </ScrollView>
     );
   }
@@ -292,872 +289,920 @@ export default function SessionDetailScreen() {
   const sessionDate = format(new Date(session.started_at), 'MMM d, yyyy');
   const sessionTime = format(new Date(session.started_at), 'HH:mm');
   const isCompleted = session.status === 'completed';
-  
+
   // Determine if this is a grouping or engagement session
   const isGroupingSession = session.drill_config?.drill_goal === 'grouping';
 
   return (
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingTop: 24}]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerTop}>
-            <View
-              style={[
-                styles.sourceTag,
-                { backgroundColor: session.team_id ? `${colors.green}22` : `${colors.indigo}22` },
-              ]}
-            >
-              {session.team_id ? (
-                <Users size={12} color={colors.green} />
-              ) : (
-                <Target size={12} color={colors.indigo} />
-              )}
-              <Text style={[styles.sourceText, { color: session.team_id ? colors.green : colors.indigo }]}>
-                {source}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.statusBadge,
-                { backgroundColor: isCompleted ? `${colors.green}22` : `${colors.orange}22` },
-              ]}
-            >
-              <Text style={[styles.statusText, { color: isCompleted ? colors.green : colors.orange }]}>
-                {isCompleted ? 'Completed' : 'In Progress'}
-              </Text>
-            </View>
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={[styles.scrollContent, { paddingTop: 24 }]}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <View
+            style={[
+              styles.sourceTag,
+              { backgroundColor: session.team_id ? `${colors.green}22` : `${colors.indigo}22` },
+            ]}
+          >
+            {session.team_id ? <Users size={12} color={colors.green} /> : <Target size={12} color={colors.indigo} />}
+            <Text style={[styles.sourceText, { color: session.team_id ? colors.green : colors.indigo }]}>{source}</Text>
           </View>
-          <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-          <View style={styles.metaRow}>
-            <View style={styles.metaItem}>
-              <Calendar size={14} color={colors.textMuted} />
-              <Text style={[styles.metaText, { color: colors.textMuted }]}>{sessionDate}</Text>
-            </View>
-            <View style={styles.metaItem}>
-              <Clock size={14} color={colors.textMuted} />
-              <Text style={[styles.metaText, { color: colors.textMuted }]}>{sessionTime}</Text>
-            </View>
-            {getDuration() && (
-              <View style={styles.metaItem}>
-                <Zap size={14} color={colors.textMuted} />
-                <Text style={[styles.metaText, { color: colors.textMuted }]}>{getDuration()}</Text>
-              </View>
-            )}
+          <View
+            style={[styles.statusBadge, { backgroundColor: isCompleted ? `${colors.green}22` : `${colors.orange}22` }]}
+          >
+            <Text style={[styles.statusText, { color: isCompleted ? colors.green : colors.orange }]}>
+              {isCompleted ? 'Completed' : 'In Progress'}
+            </Text>
           </View>
         </View>
-
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* SESSION CONTEXT - What was being done */}
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        <Animated.View entering={FadeIn.duration(250)} style={styles.contextSection}>
-          <View style={[styles.contextCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {/* Row 1: Weapon & Position */}
-            <View style={styles.contextRow}>
-              {session.weapon_name && (
-                <View style={styles.contextItem}>
-                  <View style={[styles.contextIconBg, { backgroundColor: `${colors.orange}15` }]}>
-                    <AimIcon size={14} color={colors.orange} />
-                  </View>
-                  <View style={styles.contextItemContent}>
-                    <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Weapon</Text>
-                    <Text style={[styles.contextValue, { color: colors.text }]} numberOfLines={1}>
-                      {session.weapon_name}
-                    </Text>
-                  </View>
-                </View>
-              )}
-              
-              {session.drill_config?.position && (
-                <View style={styles.contextItem}>
-                  <View style={[styles.contextIconBg, { backgroundColor: `${colors.blue}15` }]}>
-                    <Focus size={14} color={colors.blue} />
-                  </View>
-                  <View style={styles.contextItemContent}>
-                    <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Position</Text>
-                    <Text style={[styles.contextValue, { color: colors.text }]} numberOfLines={1}>
-                      {session.drill_config.position.charAt(0).toUpperCase() + session.drill_config.position.slice(1)}
-                    </Text>
-                  </View>
-                </View>
-              )}
+        <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+        <View style={styles.metaRow}>
+          <View style={styles.metaItem}>
+            <Calendar size={14} color={colors.textMuted} />
+            <Text style={[styles.metaText, { color: colors.textMuted }]}>{sessionDate}</Text>
+          </View>
+          <View style={styles.metaItem}>
+            <Clock size={14} color={colors.textMuted} />
+            <Text style={[styles.metaText, { color: colors.textMuted }]}>{sessionTime}</Text>
+          </View>
+          {getDuration() && (
+            <View style={styles.metaItem}>
+              <Zap size={14} color={colors.textMuted} />
+              <Text style={[styles.metaText, { color: colors.textMuted }]}>{getDuration()}</Text>
             </View>
+          )}
+        </View>
+      </View>
 
-            {/* Row 2: Distance & Drill Goal */}
-            <View style={styles.contextRow}>
-              {session.drill_config?.distance_m && (
-                <View style={styles.contextItem}>
-                  <View style={[styles.contextIconBg, { backgroundColor: `${colors.indigo}15` }]}>
-                    <Ruler size={14} color={colors.indigo} />
-                  </View>
-                  <View style={styles.contextItemContent}>
-                    <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Distance</Text>
-                    <Text style={[styles.contextValue, { color: colors.text }]}>
-                      {session.drill_config.distance_m}m
-                    </Text>
-                  </View>
-                </View>
-              )}
-              
-              {session.drill_config?.drill_goal && (
-                <View style={styles.contextItem}>
-                  <View style={[styles.contextIconBg, { 
-                    backgroundColor: isGroupingSession ? `${colors.green}15` : `${colors.primary}15`
-                  }]}>
-                    <Target size={14} color={isGroupingSession ? colors.green : colors.primary} />
-                  </View>
-                  <View style={styles.contextItemContent}>
-                    <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Type</Text>
-                    <Text style={[styles.contextValue, { color: colors.text }]}>
-                      {isGroupingSession ? 'Grouping' : 'Engagement'}
-                    </Text>
-                  </View>
-                </View>
-              )}
-            </View> 
-
-            {/* Row 3: Measurement Method & Time Limit */}
-            <View style={styles.contextRow}>
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* SESSION CONTEXT - What was being done */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      <Animated.View entering={FadeIn.duration(250)} style={styles.contextSection}>
+        <View style={[styles.contextCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          {/* Row 1: Weapon & Position */}
+          <View style={styles.contextRow}>
+            {session.weapon_name && (
               <View style={styles.contextItem}>
-                <View style={[styles.contextIconBg, { 
-                  backgroundColor: session.watch_controlled ? `${colors.green}15` : `${colors.textMuted}15`
-                }]}>
-                  {session.watch_controlled ? (
-                    <Watch size={14} color={colors.green} />
-                  ) : (
-                    <Scan size={14} color={colors.textMuted} />
-                  )}
+                <View style={[styles.contextIconBg, { backgroundColor: `${colors.orange}15` }]}>
+                  <AimIcon size={14} color={colors.orange} />
                 </View>
                 <View style={styles.contextItemContent}>
-                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Measured</Text>
-                  <Text style={[styles.contextValue, { color: colors.text }]}>
-                    {session.watch_controlled ? 'Watch-assisted' : 'Manual entry'}
+                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Weapon</Text>
+                  <Text style={[styles.contextValue, { color: colors.text }]} numberOfLines={1}>
+                    {session.weapon_name}
                   </Text>
-                </View>
-              </View>
-              
-              {session.drill_config?.time_limit_seconds && (
-                <View style={styles.contextItem}>
-                  <View style={[styles.contextIconBg, { backgroundColor: `${colors.red}15` }]}>
-                    <Timer size={14} color={colors.red} />
-                  </View>
-                  <View style={styles.contextItemContent}>
-                    <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Time Limit</Text>
-                    <Text style={[styles.contextValue, { color: colors.text }]}>
-                      {session.drill_config.time_limit_seconds >= 60 
-                        ? `${Math.floor(session.drill_config.time_limit_seconds / 60)}m ${session.drill_config.time_limit_seconds % 60 > 0 ? `${session.drill_config.time_limit_seconds % 60}s` : ''}`
-                        : `${session.drill_config.time_limit_seconds}s`
-                      }
-                    </Text>
-                  </View>
-                </View>
-              )}
-            </View>
-
-            {/* Rounds per shooter (if set) */}
-            {session.drill_config?.rounds_per_shooter && session.drill_config.rounds_per_shooter > 0 && (
-              <View style={styles.contextRow}>
-                <View style={styles.contextItem}>
-                  <View style={[styles.contextIconBg, { backgroundColor: `${colors.textMuted}15` }]}>
-                    <Target size={14} color={colors.textMuted} />
-                  </View>
-                  <View style={styles.contextItemContent}>
-                    <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Rounds</Text>
-                    <Text style={[styles.contextValue, { color: colors.text }]}>
-                      {session.drill_config.rounds_per_shooter} per shooter
-                    </Text>
-                  </View>
                 </View>
               </View>
             )}
 
-            {/* Input Method Preference (if set) */}
-            {session.drill_config?.input_method && (
-              <View style={[styles.inputMethodBadge, { 
-                backgroundColor: session.drill_config.input_method === 'scan' ? `${colors.primary}12` : `${colors.blue}12`
-              }]}>
-                <Settings2 size={12} color={session.drill_config.input_method === 'scan' ? colors.primary : colors.blue} />
-                <Text style={[styles.inputMethodText, { 
-                  color: session.drill_config.input_method === 'scan' ? colors.primary : colors.blue
-                }]}>
-                  {session.drill_config.input_method === 'scan' ? 'AI Scan preferred' : 'Manual entry preferred'}
+            {session.drill_config?.position && (
+              <View style={styles.contextItem}>
+                <View style={[styles.contextIconBg, { backgroundColor: `${colors.blue}15` }]}>
+                  <Focus size={14} color={colors.blue} />
+                </View>
+                <View style={styles.contextItemContent}>
+                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Position</Text>
+                  <Text style={[styles.contextValue, { color: colors.text }]} numberOfLines={1}>
+                    {session.drill_config.position.charAt(0).toUpperCase() + session.drill_config.position.slice(1)}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* Row 2: Distance & Drill Goal */}
+          <View style={styles.contextRow}>
+            {session.drill_config?.distance_m && (
+              <View style={styles.contextItem}>
+                <View style={[styles.contextIconBg, { backgroundColor: `${colors.indigo}15` }]}>
+                  <Ruler size={14} color={colors.indigo} />
+                </View>
+                <View style={styles.contextItemContent}>
+                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Distance</Text>
+                  <Text style={[styles.contextValue, { color: colors.text }]}>{session.drill_config.distance_m}m</Text>
+                </View>
+              </View>
+            )}
+
+            {session.drill_config?.drill_goal && (
+              <View style={styles.contextItem}>
+                <View
+                  style={[
+                    styles.contextIconBg,
+                    {
+                      backgroundColor: isGroupingSession ? `${colors.green}15` : `${colors.primary}15`,
+                    },
+                  ]}
+                >
+                  <Target size={14} color={isGroupingSession ? colors.green : colors.primary} />
+                </View>
+                <View style={styles.contextItemContent}>
+                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Type</Text>
+                  <Text style={[styles.contextValue, { color: colors.text }]}>
+                    {isGroupingSession ? 'Grouping' : 'Engagement'}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* Row 3: Measurement Method & Time Limit */}
+          <View style={styles.contextRow}>
+            <View style={styles.contextItem}>
+              <View
+                style={[
+                  styles.contextIconBg,
+                  {
+                    backgroundColor: session.watch_controlled ? `${colors.green}15` : `${colors.textMuted}15`,
+                  },
+                ]}
+              >
+                {session.watch_controlled ? (
+                  <Watch size={14} color={colors.green} />
+                ) : (
+                  <Scan size={14} color={colors.textMuted} />
+                )}
+              </View>
+              <View style={styles.contextItemContent}>
+                <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Measured</Text>
+                <Text style={[styles.contextValue, { color: colors.text }]}>
+                  {session.watch_controlled ? 'Watch-assisted' : 'Manual entry'}
                 </Text>
               </View>
-            )}
+            </View>
 
-            {/* Training Context (if part of a training) */}
-            {session.training_id && session.training_title && (
-              <TouchableOpacity 
-                style={[styles.trainingContextBadge, { backgroundColor: `${colors.green}10`, borderColor: `${colors.green}30` }]}
-                onPress={() => router.push(`/(protected)/trainingDetail?id=${session.training_id}`)}
-                activeOpacity={0.7}
-              >
-                <Users size={14} color={colors.green} />
-                <View style={styles.trainingContextContent}>
-                  <Text style={[styles.trainingContextLabel, { color: colors.green }]}>Part of Team Training</Text>
-                  <Text style={[styles.trainingContextTitle, { color: colors.text }]} numberOfLines={1}>
-                    {session.training_title}
+            {session.drill_config?.time_limit_seconds && (
+              <View style={styles.contextItem}>
+                <View style={[styles.contextIconBg, { backgroundColor: `${colors.red}15` }]}>
+                  <Timer size={14} color={colors.red} />
+                </View>
+                <View style={styles.contextItemContent}>
+                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Time Limit</Text>
+                  <Text style={[styles.contextValue, { color: colors.text }]}>
+                    {session.drill_config.time_limit_seconds >= 60
+                      ? `${Math.floor(session.drill_config.time_limit_seconds / 60)}m ${session.drill_config.time_limit_seconds % 60 > 0 ? `${session.drill_config.time_limit_seconds % 60}s` : ''}`
+                      : `${session.drill_config.time_limit_seconds}s`}
                   </Text>
                 </View>
-                <ChevronRight size={14} color={colors.green} />
-              </TouchableOpacity>
-            )}
-          </View>
-        </Animated.View>
-
-        {/* Stats Grid */}
-        {stats && stats.targetCount > 0 ? (
-          <Animated.View entering={FadeIn.duration(300)} style={styles.statsSection}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Performance</Text>
-            
-            {/* Entry breakdown indicator */}
-            {(entryBreakdown.scanned > 0 || entryBreakdown.manual > 0) && (
-              <View style={[styles.entryBreakdown, { backgroundColor: colors.card }]}>
-                {entryBreakdown.scanned > 0 && (
-                  <View style={styles.entryBreakdownItem}>
-                    <View style={[styles.entryBreakdownDot, { backgroundColor: '#A78BFA' }]} />
-                    <Text style={[styles.entryBreakdownText, { color: colors.textMuted }]}>
-                      {entryBreakdown.scanned} scanned
-                    </Text>
-                  </View>
-                )}
-                {entryBreakdown.manual > 0 && (
-                  <View style={styles.entryBreakdownItem}>
-                    <View style={[styles.entryBreakdownDot, { backgroundColor: '#60A5FA' }]} />
-                    <Text style={[styles.entryBreakdownText, { color: colors.textMuted }]}>
-                      {entryBreakdown.manual} manual
-                    </Text>
-                  </View>
-                )}
               </View>
             )}
-            
-            <View style={styles.statsGrid}>
-              {isGroupingSession ? (
-                // GROUPING: Show shots + group size - NO accuracy or hits
-                <>
-                  {/* Shots Fired */}
-                  <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <View style={[styles.statIconBg, { backgroundColor: `${colors.indigo}22` }]}>
-                      <Target size={18} color={colors.indigo} />
-                    </View>
-                    <Text style={[styles.statValue, { color: colors.text }]}>{stats.totalShotsFired}</Text>
-                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>Shots</Text>
-                  </View>
-                  
-                  {/* Best Group Size */}
-                  <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <View style={[styles.statIconBg, { backgroundColor: `${colors.orange}22` }]}>
-                      <Ruler size={18} color={colors.orange} />
-                    </View>
-                    <Text style={[styles.statValue, { color: stats.bestDispersionCm !== null ? colors.orange : colors.textMuted }]}>
-                      {stats.bestDispersionCm !== null ? `${stats.bestDispersionCm}cm` : '—'}
-                    </Text>
-                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>Best Group</Text>
-                  </View>
-                  
-                  {/* Targets */}
-                  <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <View style={[styles.statIconBg, { backgroundColor: `${colors.green}22` }]}>
-                      <Award size={18} color={colors.green} />
-                    </View>
-                    <Text style={[styles.statValue, { color: colors.text }]}>{stats.targetCount}</Text>
-                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>Targets</Text>
-                  </View>
-                </>
-              ) : (
-                // ENGAGEMENT: Show hits, shots, accuracy
-                <>
-                  {/* Accuracy - only show if we have meaningful data */}
-                  {stats.accuracyPct > 0 ? (
-                    <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                      <View style={[styles.statIconBg, { backgroundColor: `${colors.indigo}22` }]}>
-                        <Crosshair size={18} color={colors.indigo} />
-                      </View>
-                      <Text style={[styles.statValue, { color: colors.text }]}>{stats.accuracyPct}%</Text>
-                      <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-                        Accuracy{hasScannedWithoutDeclaration ? '*' : ''}
-                      </Text>
-                    </View>
-                  ) : hasScannedWithoutDeclaration ? (
-                    <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                      <View style={[styles.statIconBg, { backgroundColor: `${colors.orange}22` }]}>
-                        <Crosshair size={18} color={colors.orange} />
-                      </View>
-                      <Text style={[styles.statValue, { color: colors.orange }]}>—</Text>
-                      <Text style={[styles.statLabel, { color: colors.textMuted }]}>No shot count</Text>
-                    </View>
-                  ) : null}
-                  
-                  {/* Hits */}
-                  <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <View style={[styles.statIconBg, { backgroundColor: `${colors.green}22` }]}>
-                      <Target size={18} color={colors.green} />
-                    </View>
-                    <Text style={[styles.statValue, { color: colors.text }]}>
-                      {stats.totalHits}/{stats.totalShotsFired}
-                    </Text>
-                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-                      {hasScannedWithoutDeclaration ? 'Holes detected' : 'Hits'}
-                    </Text>
-                  </View>
-                  
-                  {/* Targets */}
-                  <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <View style={[styles.statIconBg, { backgroundColor: `${colors.orange}22` }]}>
-                      <Award size={18} color={colors.orange} />
-                    </View>
-                    <Text style={[styles.statValue, { color: colors.text }]}>{stats.targetCount}</Text>
-                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>Targets</Text>
-                  </View>
-                </>
+          </View>
+
+          {/* Rounds per shooter (if set) */}
+          {session.drill_config?.rounds_per_shooter && session.drill_config.rounds_per_shooter > 0 && (
+            <View style={styles.contextRow}>
+              <View style={styles.contextItem}>
+                <View style={[styles.contextIconBg, { backgroundColor: `${colors.textMuted}15` }]}>
+                  <Target size={14} color={colors.textMuted} />
+                </View>
+                <View style={styles.contextItemContent}>
+                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Rounds</Text>
+                  <Text style={[styles.contextValue, { color: colors.text }]}>
+                    {session.drill_config.rounds_per_shooter} per shooter
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Input Method Preference (if set) */}
+          {session.drill_config?.input_method && (
+            <View
+              style={[
+                styles.inputMethodBadge,
+                {
+                  backgroundColor:
+                    session.drill_config.input_method === 'scan' ? `${colors.primary}12` : `${colors.blue}12`,
+                },
+              ]}
+            >
+              <Settings2
+                size={12}
+                color={session.drill_config.input_method === 'scan' ? colors.primary : colors.blue}
+              />
+              <Text
+                style={[
+                  styles.inputMethodText,
+                  {
+                    color: session.drill_config.input_method === 'scan' ? colors.primary : colors.blue,
+                  },
+                ]}
+              >
+                {session.drill_config.input_method === 'scan' ? 'AI Scan preferred' : 'Manual entry preferred'}
+              </Text>
+            </View>
+          )}
+
+          {/* Training Context (if part of a training) */}
+          {session.training_id && session.training_title && (
+            <TouchableOpacity
+              style={[
+                styles.trainingContextBadge,
+                { backgroundColor: `${colors.green}10`, borderColor: `${colors.green}30` },
+              ]}
+              onPress={() => router.push(`/(protected)/trainingDetail?id=${session.training_id}`)}
+              activeOpacity={0.7}
+            >
+              <Users size={14} color={colors.green} />
+              <View style={styles.trainingContextContent}>
+                <Text style={[styles.trainingContextLabel, { color: colors.green }]}>Part of Team Training</Text>
+                <Text style={[styles.trainingContextTitle, { color: colors.text }]} numberOfLines={1}>
+                  {session.training_title}
+                </Text>
+              </View>
+              <ChevronRight size={14} color={colors.green} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </Animated.View>
+
+      {/* Stats Grid */}
+      {stats && stats.targetCount > 0 ? (
+        <Animated.View entering={FadeIn.duration(300)} style={styles.statsSection}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Performance</Text>
+
+          {/* Entry breakdown indicator */}
+          {(entryBreakdown.scanned > 0 || entryBreakdown.manual > 0) && (
+            <View style={[styles.entryBreakdown, { backgroundColor: colors.card }]}>
+              {entryBreakdown.scanned > 0 && (
+                <View style={styles.entryBreakdownItem}>
+                  <View style={[styles.entryBreakdownDot, { backgroundColor: '#A78BFA' }]} />
+                  <Text style={[styles.entryBreakdownText, { color: colors.textMuted }]}>
+                    {entryBreakdown.scanned} scanned
+                  </Text>
+                </View>
+              )}
+              {entryBreakdown.manual > 0 && (
+                <View style={styles.entryBreakdownItem}>
+                  <View style={[styles.entryBreakdownDot, { backgroundColor: '#60A5FA' }]} />
+                  <Text style={[styles.entryBreakdownText, { color: colors.textMuted }]}>
+                    {entryBreakdown.manual} manual
+                  </Text>
+                </View>
               )}
             </View>
-            
-            {/* Accuracy note if scanned without declaration - only for engagement */}
-            {!isGroupingSession && hasScannedWithoutDeclaration && stats.accuracyPct > 0 && (
-              <Text style={[styles.accuracyNote, { color: colors.textMuted }]}>
-                * Accuracy excludes scanned targets without declared shots
-              </Text>
+          )}
+
+          <View style={styles.statsGrid}>
+            {isGroupingSession ? (
+              // GROUPING: Show shots + group size - NO accuracy or hits
+              <>
+                {/* Shots Fired */}
+                <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={[styles.statIconBg, { backgroundColor: `${colors.indigo}22` }]}>
+                    <Target size={18} color={colors.indigo} />
+                  </View>
+                  <Text style={[styles.statValue, { color: colors.text }]}>{stats.totalShotsFired}</Text>
+                  <Text style={[styles.statLabel, { color: colors.textMuted }]}>Shots</Text>
+                </View>
+
+                {/* Best Group Size */}
+                <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={[styles.statIconBg, { backgroundColor: `${colors.orange}22` }]}>
+                    <Ruler size={18} color={colors.orange} />
+                  </View>
+                  <Text
+                    style={[
+                      styles.statValue,
+                      { color: stats.bestDispersionCm !== null ? colors.orange : colors.textMuted },
+                    ]}
+                  >
+                    {stats.bestDispersionCm !== null ? `${stats.bestDispersionCm}cm` : '—'}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: colors.textMuted }]}>Best Group</Text>
+                </View>
+
+                {/* Targets */}
+                <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={[styles.statIconBg, { backgroundColor: `${colors.green}22` }]}>
+                    <Award size={18} color={colors.green} />
+                  </View>
+                  <Text style={[styles.statValue, { color: colors.text }]}>{stats.targetCount}</Text>
+                  <Text style={[styles.statLabel, { color: colors.textMuted }]}>Targets</Text>
+                </View>
+              </>
+            ) : (
+              // ENGAGEMENT: Show hits, shots, accuracy
+              <>
+                {/* Accuracy - only show if we have meaningful data */}
+                {stats.accuracyPct > 0 ? (
+                  <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <View style={[styles.statIconBg, { backgroundColor: `${colors.indigo}22` }]}>
+                      <Crosshair size={18} color={colors.indigo} />
+                    </View>
+                    <Text style={[styles.statValue, { color: colors.text }]}>{stats.accuracyPct}%</Text>
+                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                      Accuracy{hasScannedWithoutDeclaration ? '*' : ''}
+                    </Text>
+                  </View>
+                ) : hasScannedWithoutDeclaration ? (
+                  <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <View style={[styles.statIconBg, { backgroundColor: `${colors.orange}22` }]}>
+                      <Crosshair size={18} color={colors.orange} />
+                    </View>
+                    <Text style={[styles.statValue, { color: colors.orange }]}>—</Text>
+                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>No shot count</Text>
+                  </View>
+                ) : null}
+
+                {/* Hits */}
+                <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={[styles.statIconBg, { backgroundColor: `${colors.green}22` }]}>
+                    <Target size={18} color={colors.green} />
+                  </View>
+                  <Text style={[styles.statValue, { color: colors.text }]}>
+                    {stats.totalHits}/{stats.totalShotsFired}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                    {hasScannedWithoutDeclaration ? 'Holes detected' : 'Hits'}
+                  </Text>
+                </View>
+
+                {/* Targets */}
+                <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={[styles.statIconBg, { backgroundColor: `${colors.orange}22` }]}>
+                    <Award size={18} color={colors.orange} />
+                  </View>
+                  <Text style={[styles.statValue, { color: colors.text }]}>{stats.targetCount}</Text>
+                  <Text style={[styles.statLabel, { color: colors.textMuted }]}>Targets</Text>
+                </View>
+              </>
             )}
-          </Animated.View>
-        ) : stats?.targetCount === 0 ? (
-          <View style={[styles.emptyStats, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Target size={32} color={colors.textMuted} />
-            <Text style={[styles.emptyStatsText, { color: colors.textMuted }]}>No targets recorded</Text>
           </View>
-        ) : null}
 
-        {/* Watch Data / Biometrics Section */}
-        {watchData && (watchData.heartRate || watchData.steadiness || watchData.splits) && (
-          <Animated.View entering={FadeInDown.delay(150).duration(300)} style={styles.biometricsSection}>
-            <View style={styles.biometricsHeader}>
-              <Watch size={14} color={colors.green} />
-              <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Watch Data</Text>
+          {/* Accuracy note if scanned without declaration - only for engagement */}
+          {!isGroupingSession && hasScannedWithoutDeclaration && stats.accuracyPct > 0 && (
+            <Text style={[styles.accuracyNote, { color: colors.textMuted }]}>
+              * Accuracy excludes scanned targets without declared shots
+            </Text>
+          )}
+        </Animated.View>
+      ) : stats?.targetCount === 0 ? (
+        <View style={[styles.emptyStats, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Target size={32} color={colors.textMuted} />
+          <Text style={[styles.emptyStatsText, { color: colors.textMuted }]}>No targets recorded</Text>
+        </View>
+      ) : null}
+
+      {/* Watch Data / Biometrics Section */}
+      {watchData && (watchData.heartRate || watchData.steadiness || watchData.splits) && (
+        <Animated.View entering={FadeInDown.delay(150).duration(300)} style={styles.biometricsSection}>
+          <View style={styles.biometricsHeader}>
+            <Watch size={14} color={colors.green} />
+            <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Watch Data</Text>
+          </View>
+
+          {/* Heart Rate & Breathing Row */}
+          {(watchData.heartRate?.avg != null || watchData.avgBreathRate != null) && (
+            <View style={styles.bioRow}>
+              {watchData.heartRate?.avg && (
+                <View style={[styles.bioCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={[styles.bioIconBg, { backgroundColor: `${colors.red}22` }]}>
+                    <Heart size={18} color={colors.red} />
+                  </View>
+                  <View style={styles.bioContent}>
+                    <Text style={[styles.bioLabel, { color: colors.textMuted }]}>Heart Rate</Text>
+                    <View style={styles.bioValues}>
+                      <Text style={[styles.bioValue, { color: colors.text }]}>{watchData.heartRate.avg}</Text>
+                      <Text style={[styles.bioUnit, { color: colors.textMuted }]}>avg</Text>
+                      {watchData.heartRate.max != null && (
+                        <>
+                          <Text style={[styles.bioValue, { color: colors.orange }]}>{watchData.heartRate.max}</Text>
+                          <Text style={[styles.bioUnit, { color: colors.textMuted }]}>max</Text>
+                        </>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {watchData.avgBreathRate != null && (
+                <View style={[styles.bioCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={[styles.bioIconBg, { backgroundColor: `${colors.blue}22` }]}>
+                    <Wind size={18} color={colors.blue} />
+                  </View>
+                  <View style={styles.bioContent}>
+                    <Text style={[styles.bioLabel, { color: colors.textMuted }]}>Breathing</Text>
+                    <View style={styles.bioValues}>
+                      <Text style={[styles.bioValue, { color: colors.text }]}>{watchData.avgBreathRate}</Text>
+                      <Text style={[styles.bioUnit, { color: colors.textMuted }]}>breaths/min</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
             </View>
-            
-            {/* Heart Rate & Breathing Row */}
-            {(watchData.heartRate?.avg != null || watchData.avgBreathRate != null) && (
-              <View style={styles.bioRow}>
-                {watchData.heartRate?.avg && (
-                  <View style={[styles.bioCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <View style={[styles.bioIconBg, { backgroundColor: `${colors.red}22` }]}>
-                      <Heart size={18} color={colors.red} />
-                    </View>
-                    <View style={styles.bioContent}>
-                      <Text style={[styles.bioLabel, { color: colors.textMuted }]}>Heart Rate</Text>
-                      <View style={styles.bioValues}>
-                        <Text style={[styles.bioValue, { color: colors.text }]}>{watchData.heartRate.avg}</Text>
-                        <Text style={[styles.bioUnit, { color: colors.textMuted }]}>avg</Text>
-                        {watchData.heartRate.max != null && (
-                          <>
-                            <Text style={[styles.bioValue, { color: colors.orange }]}>{watchData.heartRate.max}</Text>
-                            <Text style={[styles.bioUnit, { color: colors.textMuted }]}>max</Text>
-                          </>
-                        )}
-                      </View>
-                    </View>
-                  </View>
-                )}
-                
-                {watchData.avgBreathRate != null && (
-                  <View style={[styles.bioCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <View style={[styles.bioIconBg, { backgroundColor: `${colors.blue}22` }]}>
-                      <Wind size={18} color={colors.blue} />
-                    </View>
-                    <View style={styles.bioContent}>
-                      <Text style={[styles.bioLabel, { color: colors.textMuted }]}>Breathing</Text>
-                      <View style={styles.bioValues}>
-                        <Text style={[styles.bioValue, { color: colors.text }]}>{watchData.avgBreathRate}</Text>
-                        <Text style={[styles.bioUnit, { color: colors.textMuted }]}>breaths/min</Text>
-                      </View>
-                    </View>
-                  </View>
-                )}
-              </View>
-            )}
-            
-            {/* Steadiness */}
-            {watchData.steadiness?.avg_score !== undefined && (
-              <View style={[styles.steadinessCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={[styles.bioIconBg, { 
-                  backgroundColor: watchData.steadiness.avg_score >= 70 ? `${colors.green}22` : `${colors.orange}22` 
-                }]}>
-                  <Activity size={18} color={watchData.steadiness.avg_score >= 70 ? colors.green : colors.orange} />
-                </View>
-                <View style={styles.steadinessContent}>
-                  <Text style={[styles.bioLabel, { color: colors.textMuted }]}>Steadiness</Text>
-                  <Text style={[styles.steadinessValue, { 
-                    color: watchData.steadiness.avg_score >= 70 ? colors.green : colors.orange 
-                  }]}>
-                    {watchData.steadiness.avg_score.toFixed(0)}%
-                  </Text>
-                </View>
-                {!!watchData.steadiness.trend && (
-                  <View style={[styles.trendBadge, { backgroundColor: `${colors.text}10` }]}>
-                    <Text style={[styles.trendText, { color: colors.textMuted }]}>
-                      {watchData.steadiness.trend}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            )}
-            
-            {/* Split Times */}
-            {watchData.splits && watchData.splits.length > 0 && (
-              <View style={styles.splitsSection}>
-                <View style={styles.splitsHeader}>
-                  <Timer size={14} color={colors.primary} />
-                  <Text style={[styles.splitsTitle, { color: colors.text }]}>Split Times</Text>
-                </View>
-                <View style={styles.splitsRow}>
-                  {watchData.fastestSplitMs != null && (
-                    <View style={[styles.splitCard, { backgroundColor: `${colors.green}15` }]}>
-                      <Text style={[styles.splitValue, { color: colors.green }]}>
-                        {watchData.fastestSplitMs < 1000 
-                          ? `${watchData.fastestSplitMs}ms` 
-                          : `${(watchData.fastestSplitMs / 1000).toFixed(2)}s`}
-                      </Text>
-                      <Text style={[styles.splitLabel, { color: colors.green }]}>fastest</Text>
-                    </View>
-                  )}
-                  {watchData.avgSplitMs != null && (
-                    <View style={[styles.splitCard, { backgroundColor: `${colors.primary}15` }]}>
-                      <Text style={[styles.splitValue, { color: colors.primary }]}>
-                        {watchData.avgSplitMs < 1000 
-                          ? `${watchData.avgSplitMs}ms` 
-                          : `${(watchData.avgSplitMs / 1000).toFixed(2)}s`}
-                      </Text>
-                      <Text style={[styles.splitLabel, { color: colors.primary }]}>average</Text>
-                    </View>
-                  )}
-                  {watchData.slowestSplitMs != null && (
-                    <View style={[styles.splitCard, { backgroundColor: `${colors.orange}15` }]}>
-                      <Text style={[styles.splitValue, { color: colors.orange }]}>
-                        {watchData.slowestSplitMs < 1000 
-                          ? `${watchData.slowestSplitMs}ms` 
-                          : `${(watchData.slowestSplitMs / 1000).toFixed(2)}s`}
-                      </Text>
-                      <Text style={[styles.splitLabel, { color: colors.orange }]}>slowest</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            )}
-            
-            {/* Per-Shot Biometrics Preview */}
-            {watchData.biometrics?.shot_biometrics && watchData.biometrics.shot_biometrics.length > 0 && (
-              <View style={styles.shotBioSection}>
-                <Text style={[styles.shotBioTitle, { color: colors.textMuted }]}>Per-Shot Data</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shotBioScroll}>
-                  {watchData.biometrics.shot_biometrics.slice(0, 10).map((sb: any, idx: number) => {
-                    const shotNum = sb.shot ?? idx + 1;
-                    const hrValue = sb.hr ?? null;
-                    const phase = sb.breathPhase ?? null;
-                    const phaseColor = phase === 'pause' ? colors.green 
-                      : phase === 'exhale' ? colors.blue 
-                      : colors.orange;
-                    
-                    return (
-                      <View 
-                        key={idx} 
-                        style={[styles.shotBioChip, { backgroundColor: colors.card, borderColor: colors.border }]}
-                      >
-                        <Text style={[styles.shotBioNum, { color: colors.text }]}>#{shotNum}</Text>
-                        {hrValue !== null && (
-                          <View style={styles.shotBioStat}>
-                            <Heart size={10} color={colors.red} />
-                            <Text style={[styles.shotBioValue, { color: colors.text }]}>{hrValue}</Text>
-                          </View>
-                        )}
-                        {phase !== null && (
-                          <View style={[styles.phaseDot, { backgroundColor: phaseColor }]} />
-                        )}
-                      </View>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            )}
-          </Animated.View>
-        )}
+          )}
 
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* PERFORMANCE INSIGHTS (from saved timeline data) */}
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {hasTimeline && timelineInsights && (
-          <Animated.View entering={FadeInDown.delay(175).duration(300)} style={styles.insightsSection}>
-            <View style={styles.insightsHeader}>
-              <Activity size={14} color={colors.primary} />
-              <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Performance Insights</Text>
+          {/* Steadiness */}
+          {watchData.steadiness?.avg_score !== undefined && (
+            <View style={[styles.steadinessCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View
+                style={[
+                  styles.bioIconBg,
+                  {
+                    backgroundColor: watchData.steadiness.avg_score >= 70 ? `${colors.green}22` : `${colors.orange}22`,
+                  },
+                ]}
+              >
+                <Activity size={18} color={watchData.steadiness.avg_score >= 70 ? colors.green : colors.orange} />
+              </View>
+              <View style={styles.steadinessContent}>
+                <Text style={[styles.bioLabel, { color: colors.textMuted }]}>Steadiness</Text>
+                <Text
+                  style={[
+                    styles.steadinessValue,
+                    {
+                      color: watchData.steadiness.avg_score >= 70 ? colors.green : colors.orange,
+                    },
+                  ]}
+                >
+                  {watchData.steadiness.avg_score.toFixed(0)}%
+                </Text>
+              </View>
+              {!!watchData.steadiness.trend && (
+                <View style={[styles.trendBadge, { backgroundColor: `${colors.text}10` }]}>
+                  <Text style={[styles.trendText, { color: colors.textMuted }]}>{watchData.steadiness.trend}</Text>
+                </View>
+              )}
             </View>
-            
-            {/* Main Metrics Row */}
-            <View style={[styles.insightsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.insightsRow}>
-                {/* Calmness/Steadiness Score */}
-                <View style={styles.insightMetric}>
-                  <Text style={[styles.insightValue, { 
-                    color: timelineInsights.avgScore >= 50 ? colors.green : timelineInsights.avgScore >= 30 ? colors.orange : colors.red 
-                  }]}>
-                    {timelineInsights.avgScore}%
-                  </Text>
-                  <Text style={[styles.insightLabel, { color: colors.textMuted }]}>
-                    {timelineInsights.usingStress ? 'Calmness' : 'Steadiness'}
-                  </Text>
-                </View>
+          )}
 
-                {/* Trend */}
-                {timelineInsights.trend !== 'stable' && (
-                  <View style={[styles.insightTrendBadge, { 
-                    backgroundColor: timelineInsights.trend === 'improving' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)' 
-                  }]}>
-                    {timelineInsights.trend === 'improving' ? (
-                      <TrendingUp size={14} color={colors.green} />
-                    ) : (
-                      <TrendingDown size={14} color={colors.red} />
-                    )}
-                    <Text style={[styles.insightTrendText, { 
-                      color: timelineInsights.trend === 'improving' ? colors.green : colors.red 
-                    }]}>
-                      {timelineInsights.trend === 'improving' ? 'Improving' : 'Declining'}
+          {/* Split Times */}
+          {watchData.splits && watchData.splits.length > 0 && (
+            <View style={styles.splitsSection}>
+              <View style={styles.splitsHeader}>
+                <Timer size={14} color={colors.primary} />
+                <Text style={[styles.splitsTitle, { color: colors.text }]}>Split Times</Text>
+              </View>
+              <View style={styles.splitsRow}>
+                {watchData.fastestSplitMs != null && (
+                  <View style={[styles.splitCard, { backgroundColor: `${colors.green}15` }]}>
+                    <Text style={[styles.splitValue, { color: colors.green }]}>
+                      {watchData.fastestSplitMs < 1000
+                        ? `${watchData.fastestSplitMs}ms`
+                        : `${(watchData.fastestSplitMs / 1000).toFixed(2)}s`}
                     </Text>
+                    <Text style={[styles.splitLabel, { color: colors.green }]}>fastest</Text>
                   </View>
                 )}
-
-                {/* Breath Pause % */}
-                <View style={styles.insightMetric}>
-                  <Text style={[styles.insightValue, { 
-                    color: timelineInsights.pausePct >= 50 ? colors.green : colors.orange 
-                  }]}>
-                    {timelineInsights.pausePct}%
-                  </Text>
-                  <Text style={[styles.insightLabel, { color: colors.textMuted }]}>Breath Pause</Text>
-                </View>
-
-                {/* Flinch Count */}
-                {timelineInsights.flinchCount > 0 && (
-                  <View style={styles.insightMetric}>
-                    <Text style={[styles.insightValue, { color: colors.red }]}>
-                      {timelineInsights.flinchCount}
+                {watchData.avgSplitMs != null && (
+                  <View style={[styles.splitCard, { backgroundColor: `${colors.primary}15` }]}>
+                    <Text style={[styles.splitValue, { color: colors.primary }]}>
+                      {watchData.avgSplitMs < 1000
+                        ? `${watchData.avgSplitMs}ms`
+                        : `${(watchData.avgSplitMs / 1000).toFixed(2)}s`}
                     </Text>
-                    <Text style={[styles.insightLabel, { color: colors.textMuted }]}>Flinches</Text>
+                    <Text style={[styles.splitLabel, { color: colors.primary }]}>average</Text>
+                  </View>
+                )}
+                {watchData.slowestSplitMs != null && (
+                  <View style={[styles.splitCard, { backgroundColor: `${colors.orange}15` }]}>
+                    <Text style={[styles.splitValue, { color: colors.orange }]}>
+                      {watchData.slowestSplitMs < 1000
+                        ? `${watchData.slowestSplitMs}ms`
+                        : `${(watchData.slowestSplitMs / 1000).toFixed(2)}s`}
+                    </Text>
+                    <Text style={[styles.splitLabel, { color: colors.orange }]}>slowest</Text>
                   </View>
                 )}
               </View>
             </View>
+          )}
 
-            {/* Shot-by-Shot Performance Bars */}
-            <View style={[styles.shotBarsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.shotBarsTitle, { color: colors.textMuted }]}>Shot-by-Shot Performance</Text>
-              <View style={styles.shotBarsContainer}>
-                {timelineInsights.shots.slice(0, 25).map((shot, idx) => {
-                  const score = timelineInsights.scores[idx];
-                  const barHeight = Math.max(6, (score / 100) * 48);
-                  const barColor = score >= 50 ? colors.green : score >= 30 ? colors.orange : colors.red;
-                  const breathColor = shot.breathPhase === 'pause' ? colors.green : 
-                                     shot.breathPhase === 'exhale' ? colors.orange : colors.red;
+          {/* Per-Shot Biometrics Preview */}
+          {watchData.biometrics?.shot_biometrics && watchData.biometrics.shot_biometrics.length > 0 && (
+            <View style={styles.shotBioSection}>
+              <Text style={[styles.shotBioTitle, { color: colors.textMuted }]}>Per-Shot Data</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.shotBioScroll}
+              >
+                {watchData.biometrics.shot_biometrics.slice(0, 10).map((sb: any, idx: number) => {
+                  const shotNum = sb.shot ?? idx + 1;
+                  const hrValue = sb.hr ?? null;
+                  const phase = sb.breathPhase ?? null;
+                  const phaseColor =
+                    phase === 'pause' ? colors.green : phase === 'exhale' ? colors.blue : colors.orange;
+
                   return (
-                    <View key={shot.shotNumber} style={styles.shotBarColumn}>
-                      <View style={[styles.shotBarFill, { height: barHeight, backgroundColor: barColor }]} />
-                      <View style={[styles.breathDot, { backgroundColor: breathColor }]} />
-                      <Text style={[styles.shotBarLabel, { color: colors.textMuted }]}>{shot.shotNumber}</Text>
+                    <View
+                      key={idx}
+                      style={[styles.shotBioChip, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    >
+                      <Text style={[styles.shotBioNum, { color: colors.text }]}>#{shotNum}</Text>
+                      {hrValue !== null && (
+                        <View style={styles.shotBioStat}>
+                          <Heart size={10} color={colors.red} />
+                          <Text style={[styles.shotBioValue, { color: colors.text }]}>{hrValue}</Text>
+                        </View>
+                      )}
+                      {phase !== null && <View style={[styles.phaseDot, { backgroundColor: phaseColor }]} />}
                     </View>
                   );
                 })}
-              </View>
-              {timelineInsights.shots.length > 25 && (
-                <Text style={[styles.shotBarsMore, { color: colors.textMuted }]}>
-                  +{timelineInsights.shots.length - 25} more shots
-                </Text>
-              )}
-              
-              {/* Legend */}
-              <View style={styles.barsLegend}>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: colors.green }]} />
-                  <Text style={[styles.legendText, { color: colors.textMuted }]}>Pause</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: colors.orange }]} />
-                  <Text style={[styles.legendText, { color: colors.textMuted }]}>Exhale</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: colors.red }]} />
-                  <Text style={[styles.legendText, { color: colors.textMuted }]}>Inhale</Text>
-                </View>
-              </View>
+              </ScrollView>
             </View>
+          )}
+        </Animated.View>
+      )}
 
-            {/* Best/Worst Shots */}
-            {timelineInsights.bestScore !== timelineInsights.worstScore && (
-              <View style={styles.bestWorstRow}>
-                <View style={[styles.bestWorstCard, { backgroundColor: 'rgba(16,185,129,0.1)', borderColor: 'rgba(16,185,129,0.3)' }]}>
-                  <ArrowUp size={14} color={colors.green} />
-                  <View>
-                    <Text style={[styles.bestWorstValue, { color: colors.green }]}>
-                      Shot #{timelineInsights.bestShot}
-                    </Text>
-                    <Text style={[styles.bestWorstScore, { color: colors.green }]}>
-                      {timelineInsights.bestScore}% {timelineInsights.usingStress ? 'calm' : 'steady'}
-                    </Text>
-                  </View>
-                </View>
-                <View style={[styles.bestWorstCard, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)' }]}>
-                  <ArrowDown size={14} color={colors.red} />
-                  <View>
-                    <Text style={[styles.bestWorstValue, { color: colors.red }]}>
-                      Shot #{timelineInsights.worstShot}
-                    </Text>
-                    <Text style={[styles.bestWorstScore, { color: colors.red }]}>
-                      {timelineInsights.worstScore}% {timelineInsights.usingStress ? 'calm' : 'steady'}
-                    </Text>
-                  </View>
-                </View>
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* PERFORMANCE INSIGHTS (from saved timeline data) */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {hasTimeline && timelineInsights && (
+        <Animated.View entering={FadeInDown.delay(175).duration(300)} style={styles.insightsSection}>
+          <View style={styles.insightsHeader}>
+            <Activity size={14} color={colors.primary} />
+            <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Performance Insights</Text>
+          </View>
+
+          {/* Main Metrics Row */}
+          <View style={[styles.insightsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.insightsRow}>
+              {/* Calmness/Steadiness Score */}
+              <View style={styles.insightMetric}>
+                <Text
+                  style={[
+                    styles.insightValue,
+                    {
+                      color:
+                        timelineInsights.avgScore >= 50
+                          ? colors.green
+                          : timelineInsights.avgScore >= 30
+                            ? colors.orange
+                            : colors.red,
+                    },
+                  ]}
+                >
+                  {timelineInsights.avgScore}%
+                </Text>
+                <Text style={[styles.insightLabel, { color: colors.textMuted }]}>
+                  {timelineInsights.usingStress ? 'Calmness' : 'Steadiness'}
+                </Text>
               </View>
+
+              {/* Trend */}
+              {timelineInsights.trend !== 'stable' && (
+                <View
+                  style={[
+                    styles.insightTrendBadge,
+                    {
+                      backgroundColor:
+                        timelineInsights.trend === 'improving' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+                    },
+                  ]}
+                >
+                  {timelineInsights.trend === 'improving' ? (
+                    <TrendingUp size={14} color={colors.green} />
+                  ) : (
+                    <TrendingDown size={14} color={colors.red} />
+                  )}
+                  <Text
+                    style={[
+                      styles.insightTrendText,
+                      {
+                        color: timelineInsights.trend === 'improving' ? colors.green : colors.red,
+                      },
+                    ]}
+                  >
+                    {timelineInsights.trend === 'improving' ? 'Improving' : 'Declining'}
+                  </Text>
+                </View>
+              )}
+
+              {/* Breath Pause % */}
+              <View style={styles.insightMetric}>
+                <Text
+                  style={[
+                    styles.insightValue,
+                    {
+                      color: timelineInsights.pausePct >= 50 ? colors.green : colors.orange,
+                    },
+                  ]}
+                >
+                  {timelineInsights.pausePct}%
+                </Text>
+                <Text style={[styles.insightLabel, { color: colors.textMuted }]}>Breath Pause</Text>
+              </View>
+
+              {/* Flinch Count */}
+              {timelineInsights.flinchCount > 0 && (
+                <View style={styles.insightMetric}>
+                  <Text style={[styles.insightValue, { color: colors.red }]}>{timelineInsights.flinchCount}</Text>
+                  <Text style={[styles.insightLabel, { color: colors.textMuted }]}>Flinches</Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Shot-by-Shot Performance Bars */}
+          <View style={[styles.shotBarsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.shotBarsTitle, { color: colors.textMuted }]}>Shot-by-Shot Performance</Text>
+            <View style={styles.shotBarsContainer}>
+              {timelineInsights.shots.slice(0, 25).map((shot, idx) => {
+                const score = timelineInsights.scores[idx];
+                const barHeight = Math.max(6, (score / 100) * 48);
+                const barColor = score >= 50 ? colors.green : score >= 30 ? colors.orange : colors.red;
+                const breathColor =
+                  shot.breathPhase === 'pause'
+                    ? colors.green
+                    : shot.breathPhase === 'exhale'
+                      ? colors.orange
+                      : colors.red;
+                return (
+                  <View key={shot.shotNumber} style={styles.shotBarColumn}>
+                    <View style={[styles.shotBarFill, { height: barHeight, backgroundColor: barColor }]} />
+                    <View style={[styles.breathDot, { backgroundColor: breathColor }]} />
+                    <Text style={[styles.shotBarLabel, { color: colors.textMuted }]}>{shot.shotNumber}</Text>
+                  </View>
+                );
+              })}
+            </View>
+            {timelineInsights.shots.length > 25 && (
+              <Text style={[styles.shotBarsMore, { color: colors.textMuted }]}>
+                +{timelineInsights.shots.length - 25} more shots
+              </Text>
             )}
 
-            {/* Breath Discipline Breakdown */}
-            <View style={[styles.breathBreakdownCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.breathBreakdownTitle, { color: colors.text }]}>Breath Discipline</Text>
-              <View style={styles.breathBar}>
-                {timelineInsights.pausePct > 0 && (
-                  <View style={[styles.breathSegment, { flex: timelineInsights.pausePct, backgroundColor: colors.green }]}>
-                    {timelineInsights.pausePct >= 15 && (
-                      <Text style={styles.breathSegmentText}>{timelineInsights.pausePct}%</Text>
-                    )}
-                  </View>
-                )}
-                {timelineInsights.exhalePct > 0 && (
-                  <View style={[styles.breathSegment, { flex: timelineInsights.exhalePct, backgroundColor: colors.orange }]}>
-                    {timelineInsights.exhalePct >= 15 && (
-                      <Text style={styles.breathSegmentText}>{timelineInsights.exhalePct}%</Text>
-                    )}
-                  </View>
-                )}
-                {timelineInsights.inhalePct > 0 && (
-                  <View style={[styles.breathSegment, { flex: timelineInsights.inhalePct, backgroundColor: colors.red }]}>
-                    {timelineInsights.inhalePct >= 15 && (
-                      <Text style={styles.breathSegmentText}>{timelineInsights.inhalePct}%</Text>
-                    )}
-                  </View>
-                )}
+            {/* Legend */}
+            <View style={styles.barsLegend}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: colors.green }]} />
+                <Text style={[styles.legendText, { color: colors.textMuted }]}>Pause</Text>
               </View>
-              <View style={styles.breathBreakdownLegend}>
-                <View style={styles.breathLegendItem}>
-                  <View style={[styles.breathLegendDot, { backgroundColor: colors.green }]} />
-                  <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>Pause (optimal)</Text>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: colors.orange }]} />
+                <Text style={[styles.legendText, { color: colors.textMuted }]}>Exhale</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: colors.red }]} />
+                <Text style={[styles.legendText, { color: colors.textMuted }]}>Inhale</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Best/Worst Shots */}
+          {timelineInsights.bestScore !== timelineInsights.worstScore && (
+            <View style={styles.bestWorstRow}>
+              <View
+                style={[
+                  styles.bestWorstCard,
+                  { backgroundColor: 'rgba(16,185,129,0.1)', borderColor: 'rgba(16,185,129,0.3)' },
+                ]}
+              >
+                <ArrowUp size={14} color={colors.green} />
+                <View>
+                  <Text style={[styles.bestWorstValue, { color: colors.green }]}>
+                    Shot #{timelineInsights.bestShot}
+                  </Text>
+                  <Text style={[styles.bestWorstScore, { color: colors.green }]}>
+                    {timelineInsights.bestScore}% {timelineInsights.usingStress ? 'calm' : 'steady'}
+                  </Text>
                 </View>
-                <View style={styles.breathLegendItem}>
-                  <View style={[styles.breathLegendDot, { backgroundColor: colors.orange }]} />
-                  <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>Exhale</Text>
-                </View>
-                <View style={styles.breathLegendItem}>
-                  <View style={[styles.breathLegendDot, { backgroundColor: colors.red }]} />
-                  <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>Inhale</Text>
+              </View>
+              <View
+                style={[
+                  styles.bestWorstCard,
+                  { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)' },
+                ]}
+              >
+                <ArrowDown size={14} color={colors.red} />
+                <View>
+                  <Text style={[styles.bestWorstValue, { color: colors.red }]}>Shot #{timelineInsights.worstShot}</Text>
+                  <Text style={[styles.bestWorstScore, { color: colors.red }]}>
+                    {timelineInsights.worstScore}% {timelineInsights.usingStress ? 'calm' : 'steady'}
+                  </Text>
                 </View>
               </View>
             </View>
-          </Animated.View>
-        )}
+          )}
 
-        {/* Timeline data loading indicator */}
-        {session?.watch_controlled && !hasTimeline && timelineLoading && (
-          <Animated.View entering={FadeIn.duration(200)} style={styles.insightsSection}>
-            <View style={[styles.insightsCard, { backgroundColor: colors.card, borderColor: colors.border, alignItems: 'center', paddingVertical: 20 }]}>
-              <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={[styles.loadingInsightsText, { color: colors.textMuted }]}>Loading biometric insights...</Text>
-            </View>
-          </Animated.View>
-        )}
-
-        {/* Image Gallery */}
-        {targetImages.length > 0 && (
-          <Animated.View entering={FadeInDown.delay(100).duration(300)} style={styles.imagesSection}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Target Scans</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.imagesScroll}
-            >
-              {targetImages.map((img, index) => (
-                <TouchableOpacity
-                  key={img.id}
-                  style={[styles.imageCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-                  activeOpacity={0.8}
+          {/* Breath Discipline Breakdown */}
+          <View style={[styles.breathBreakdownCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.breathBreakdownTitle, { color: colors.text }]}>Breath Discipline</Text>
+            <View style={styles.breathBar}>
+              {timelineInsights.pausePct > 0 && (
+                <View
+                  style={[styles.breathSegment, { flex: timelineInsights.pausePct, backgroundColor: colors.green }]}
                 >
-                  <View style={styles.imageOverlay}>
-                    <Text style={styles.imageLabel}>#{img.sequence || index + 1}</Text>
-                    <Text style={styles.imageHits}>
-                      {img.isGrouping 
-                        ? (img.dispersion != null ? `${img.dispersion.toFixed(1)}cm` : `${img.shots} shots`)
-                        : img.actualShotsDeclared 
-                          ? `${img.hits}/${img.actualShotsDeclared} (${Math.round((img.hits / img.actualShotsDeclared) * 100)}%)`
-                          : `${img.hits} detected`
-                      }
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </Animated.View>
-        )}
+                  {timelineInsights.pausePct >= 15 && (
+                    <Text style={styles.breathSegmentText}>{timelineInsights.pausePct}%</Text>
+                  )}
+                </View>
+              )}
+              {timelineInsights.exhalePct > 0 && (
+                <View
+                  style={[styles.breathSegment, { flex: timelineInsights.exhalePct, backgroundColor: colors.orange }]}
+                >
+                  {timelineInsights.exhalePct >= 15 && (
+                    <Text style={styles.breathSegmentText}>{timelineInsights.exhalePct}%</Text>
+                  )}
+                </View>
+              )}
+              {timelineInsights.inhalePct > 0 && (
+                <View style={[styles.breathSegment, { flex: timelineInsights.inhalePct, backgroundColor: colors.red }]}>
+                  {timelineInsights.inhalePct >= 15 && (
+                    <Text style={styles.breathSegmentText}>{timelineInsights.inhalePct}%</Text>
+                  )}
+                </View>
+              )}
+            </View>
+            <View style={styles.breathBreakdownLegend}>
+              <View style={styles.breathLegendItem}>
+                <View style={[styles.breathLegendDot, { backgroundColor: colors.green }]} />
+                <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>Pause (optimal)</Text>
+              </View>
+              <View style={styles.breathLegendItem}>
+                <View style={[styles.breathLegendDot, { backgroundColor: colors.orange }]} />
+                <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>Exhale</Text>
+              </View>
+              <View style={styles.breathLegendItem}>
+                <View style={[styles.breathLegendDot, { backgroundColor: colors.red }]} />
+                <Text style={[styles.breathLegendText, { color: colors.textMuted }]}>Inhale</Text>
+              </View>
+            </View>
+          </View>
+        </Animated.View>
+      )}
 
-        {/* Timeline */}
-        {targets.length > 0 && (
-          <Animated.View entering={FadeInDown.delay(200).duration(300)} style={styles.timelineSection}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Session Timeline</Text>
-            <View style={styles.timeline}>
-              {targets.map((target, index) => {
-                const isPaper = target.target_type === 'paper';
-                const result = isPaper ? target.paper_result : target.tactical_result;
-                const shots = result?.bullets_fired ?? 0;
-                const hits = isPaper ? (target.paper_result?.hits_total ?? 0) : (target.tactical_result?.hits ?? 0);
-                
-                // Determine if this is a grouping or achievement target
-                const isGroupingTarget = isPaper && target.paper_result?.paper_type === 'grouping';
-                const dispersion = target.paper_result?.dispersion_cm;
-                
-                // Check if scanned (AI detection) vs manual
-                const isScanned = isPaper && !!target.paper_result?.scanned_image_url;
-                const actualShotsDeclared = target.paper_result?.actual_shots_declared ?? null;
-                
-                // Calculate accuracy only when meaningful:
-                // - Manual entries: always meaningful
-                // - Scanned entries: only if user declared actual shots
-                // - Tactical: always meaningful (manual)
-                const canShowAccuracy = !isPaper || !isScanned || actualShotsDeclared != null;
-                const effectiveShots = isScanned && actualShotsDeclared ? actualShotsDeclared : shots;
-                const accuracy = !isGroupingTarget && canShowAccuracy && effectiveShots > 0 
-                  ? Math.round((hits / effectiveShots) * 100) 
+      {/* Timeline data loading indicator */}
+      {session?.watch_controlled && !hasTimeline && timelineLoading && (
+        <Animated.View entering={FadeIn.duration(200)} style={styles.insightsSection}>
+          <View
+            style={[
+              styles.insightsCard,
+              { backgroundColor: colors.card, borderColor: colors.border, alignItems: 'center', paddingVertical: 20 },
+            ]}
+          >
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={[styles.loadingInsightsText, { color: colors.textMuted }]}>Loading biometric insights...</Text>
+          </View>
+        </Animated.View>
+      )}
+
+      {/* Image Gallery */}
+      {targetImages.length > 0 && (
+        <Animated.View entering={FadeInDown.delay(100).duration(300)} style={styles.imagesSection}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Target Scans</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.imagesScroll}>
+            {targetImages.map((img, index) => (
+              <TouchableOpacity
+                key={img.id}
+                style={[styles.imageCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                activeOpacity={0.8}
+              >
+                <View style={styles.imageOverlay}>
+                  <Text style={styles.imageLabel}>#{img.sequence || index + 1}</Text>
+                  <Text style={styles.imageHits}>
+                    {img.isGrouping
+                      ? img.dispersion != null
+                        ? `${img.dispersion.toFixed(1)}cm`
+                        : `${img.shots} shots`
+                      : img.actualShotsDeclared
+                        ? `${img.hits}/${img.actualShotsDeclared} (${Math.round((img.hits / img.actualShotsDeclared) * 100)}%)`
+                        : `${img.hits} detected`}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </Animated.View>
+      )}
+
+      {/* Timeline */}
+      {targets.length > 0 && (
+        <Animated.View entering={FadeInDown.delay(200).duration(300)} style={styles.timelineSection}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Session Timeline</Text>
+          <View style={styles.timeline}>
+            {targets.map((target, index) => {
+              const isPaper = target.target_type === 'paper';
+              const result = isPaper ? target.paper_result : target.tactical_result;
+              const shots = result?.bullets_fired ?? 0;
+              const hits = isPaper ? (target.paper_result?.hits_total ?? 0) : (target.tactical_result?.hits ?? 0);
+
+              // Determine if this is a grouping or achievement target
+              const isGroupingTarget = isPaper && target.paper_result?.paper_type === 'grouping';
+              const dispersion = target.paper_result?.dispersion_cm;
+
+              // Check if scanned (AI detection) vs manual
+              const isScanned = isPaper && !!target.paper_result?.scanned_image_url;
+              const actualShotsDeclared = target.paper_result?.actual_shots_declared ?? null;
+
+              // Calculate accuracy only when meaningful:
+              // - Manual entries: always meaningful
+              // - Scanned entries: only if user declared actual shots
+              // - Tactical: always meaningful (manual)
+              const canShowAccuracy = !isPaper || !isScanned || actualShotsDeclared != null;
+              const effectiveShots = isScanned && actualShotsDeclared ? actualShotsDeclared : shots;
+              const accuracy =
+                !isGroupingTarget && canShowAccuracy && effectiveShots > 0
+                  ? Math.round((hits / effectiveShots) * 100)
                   : null;
 
-                return (
-                  <View key={target.id} style={styles.timelineItem}>
-                    {/* Connector line */}
-                    {index < targets.length - 1 && (
-                      <View style={[styles.timelineLine, { backgroundColor: colors.border }]} />
-                    )}
+              return (
+                <View key={target.id} style={styles.timelineItem}>
+                  {/* Connector line */}
+                  {index < targets.length - 1 && (
+                    <View style={[styles.timelineLine, { backgroundColor: colors.border }]} />
+                  )}
 
-                    {/* Dot */}
-                    <View style={[styles.timelineDot, { backgroundColor: isGroupingTarget ? colors.green : colors.indigo }]}>
-                      <Text style={styles.timelineDotText}>{index + 1}</Text>
-                    </View>
+                  {/* Dot */}
+                  <View
+                    style={[styles.timelineDot, { backgroundColor: isGroupingTarget ? colors.green : colors.indigo }]}
+                  >
+                    <Text style={styles.timelineDotText}>{index + 1}</Text>
+                  </View>
 
-                    {/* Content */}
-                    <View
-                      style={[styles.timelineContent, { backgroundColor: colors.card, borderColor: colors.border }]}
-                    >
-                      <View style={styles.timelineHeader}>
-                        <View style={styles.timelineBadges}>
-                          <View
+                  {/* Content */}
+                  <View style={[styles.timelineContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <View style={styles.timelineHeader}>
+                      <View style={styles.timelineBadges}>
+                        <View
+                          style={[
+                            styles.targetTypeBadge,
+                            {
+                              backgroundColor: isGroupingTarget
+                                ? `${colors.green}22`
+                                : isPaper
+                                  ? `${colors.indigo}22`
+                                  : `${colors.orange}22`,
+                            },
+                          ]}
+                        >
+                          <Text
                             style={[
-                              styles.targetTypeBadge,
-                              { backgroundColor: isGroupingTarget ? `${colors.green}22` : (isPaper ? `${colors.indigo}22` : `${colors.orange}22`) },
+                              styles.targetTypeText,
+                              { color: isGroupingTarget ? colors.green : isPaper ? colors.indigo : colors.orange },
                             ]}
                           >
-                            <Text
-                              style={[styles.targetTypeText, { color: isGroupingTarget ? colors.green : (isPaper ? colors.indigo : colors.orange) }]}
-                            >
-                              {isGroupingTarget ? 'Grouping' : (isPaper ? 'Achievement' : 'Tactical')}
+                            {isGroupingTarget ? 'Grouping' : isPaper ? 'Achievement' : 'Tactical'}
+                          </Text>
+                        </View>
+                        {/* Entry method badge for paper targets */}
+                        {isPaper && !isGroupingTarget && (
+                          <View
+                            style={[
+                              styles.entryMethodBadge,
+                              { backgroundColor: isScanned ? '#8B5CF622' : '#3B82F622' },
+                            ]}
+                          >
+                            <Text style={[styles.entryMethodText, { color: isScanned ? '#A78BFA' : '#60A5FA' }]}>
+                              {isScanned ? 'Scan' : 'Manual'}
                             </Text>
                           </View>
-                          {/* Entry method badge for paper targets */}
-                          {isPaper && !isGroupingTarget && (
-                            <View
-                              style={[
-                                styles.entryMethodBadge,
-                                { backgroundColor: isScanned ? '#8B5CF622' : '#3B82F622' },
-                              ]}
-                            >
-                              <Text
-                                style={[styles.entryMethodText, { color: isScanned ? '#A78BFA' : '#60A5FA' }]}
-                              >
-                                {isScanned ? 'Scan' : 'Manual'}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                        {target.distance_m && (
-                          <Text style={[styles.distanceText, { color: colors.textMuted }]}>
-                            {target.distance_m}m
-                          </Text>
                         )}
                       </View>
+                      {target.distance_m && (
+                        <Text style={[styles.distanceText, { color: colors.textMuted }]}>{target.distance_m}m</Text>
+                      )}
+                    </View>
 
-                      {result && (
-                        <View style={styles.timelineStats}>
-                          {/* Different display based on target type and entry method */}
-                          {isGroupingTarget ? (
-                            // GROUPING: Dispersion + shot count
-                            <>
-                              {dispersion != null && (
+                    {result && (
+                      <View style={styles.timelineStats}>
+                        {/* Different display based on target type and entry method */}
+                        {isGroupingTarget ? (
+                          // GROUPING: Dispersion + shot count
+                          <>
+                            {dispersion != null && (
+                              <View style={styles.timelineStat}>
+                                <Text style={[styles.timelineStatValue, { color: colors.green }]}>
+                                  {dispersion.toFixed(1)}cm
+                                </Text>
+                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>group</Text>
+                              </View>
+                            )}
+                            <View style={styles.timelineStat}>
+                              <Text style={[styles.timelineStatValue, { color: colors.text }]}>{shots}</Text>
+                              <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>shots</Text>
+                            </View>
+                          </>
+                        ) : isScanned ? (
+                          // SCANNED ACHIEVEMENT: Holes detected + optional accuracy
+                          <>
+                            <View style={styles.timelineStat}>
+                              <Text style={[styles.timelineStatValue, { color: colors.indigo }]}>{hits}</Text>
+                              <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>holes</Text>
+                            </View>
+                            {actualShotsDeclared && (
+                              <>
                                 <View style={styles.timelineStat}>
-                                  <Text style={[styles.timelineStatValue, { color: colors.green }]}>
-                                    {dispersion.toFixed(1)}cm
+                                  <Text style={[styles.timelineStatValue, { color: colors.text }]}>
+                                    {actualShotsDeclared}
                                   </Text>
-                                  <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>group</Text>
+                                  <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>fired</Text>
                                 </View>
-                              )}
-                              <View style={styles.timelineStat}>
-                                <Text style={[styles.timelineStatValue, { color: colors.text }]}>{shots}</Text>
-                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>shots</Text>
-                              </View>
-                            </>
-                          ) : isScanned ? (
-                            // SCANNED ACHIEVEMENT: Holes detected + optional accuracy
-                            <>
-                              <View style={styles.timelineStat}>
-                                <Text style={[styles.timelineStatValue, { color: colors.indigo }]}>{hits}</Text>
-                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>holes</Text>
-                              </View>
-                              {actualShotsDeclared && (
-                                <>
-                                  <View style={styles.timelineStat}>
-                                    <Text style={[styles.timelineStatValue, { color: colors.text }]}>
-                                      {actualShotsDeclared}
-                                    </Text>
-                                    <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>fired</Text>
-                                  </View>
-                                  <View style={styles.timelineStat}>
-                                    <Text
-                                      style={[
-                                        styles.timelineStatValue,
-                                        {
-                                          color:
-                                            accuracy! >= 70 ? colors.green : accuracy! >= 50 ? colors.orange : colors.red,
-                                        },
-                                      ]}
-                                    >
-                                      {accuracy}%
-                                    </Text>
-                                    <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>acc</Text>
-                                  </View>
-                                </>
-                              )}
-                            </>
-                          ) : (
-                            // MANUAL ENTRY: Shots + hits + accuracy
-                            <>
-                              <View style={styles.timelineStat}>
-                                <Text style={[styles.timelineStatValue, { color: colors.text }]}>{shots}</Text>
-                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>shots</Text>
-                              </View>
-                              <View style={styles.timelineStat}>
-                                <Text style={[styles.timelineStatValue, { color: colors.text }]}>{hits}</Text>
-                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>hits</Text>
-                              </View>
-                              {accuracy !== null && (
                                 <View style={styles.timelineStat}>
                                   <Text
                                     style={[
                                       styles.timelineStatValue,
                                       {
                                         color:
-                                          accuracy >= 70 ? colors.green : accuracy >= 50 ? colors.orange : colors.red,
+                                          accuracy! >= 70 ? colors.green : accuracy! >= 50 ? colors.orange : colors.red,
                                       },
                                     ]}
                                   >
@@ -1165,37 +1210,64 @@ export default function SessionDetailScreen() {
                                   </Text>
                                   <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>acc</Text>
                                 </View>
-                              )}
-                            </>
-                          )}
-                        </View>
-                      )}
+                              </>
+                            )}
+                          </>
+                        ) : (
+                          // MANUAL ENTRY: Shots + hits + accuracy
+                          <>
+                            <View style={styles.timelineStat}>
+                              <Text style={[styles.timelineStatValue, { color: colors.text }]}>{shots}</Text>
+                              <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>shots</Text>
+                            </View>
+                            <View style={styles.timelineStat}>
+                              <Text style={[styles.timelineStatValue, { color: colors.text }]}>{hits}</Text>
+                              <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>hits</Text>
+                            </View>
+                            {accuracy !== null && (
+                              <View style={styles.timelineStat}>
+                                <Text
+                                  style={[
+                                    styles.timelineStatValue,
+                                    {
+                                      color:
+                                        accuracy >= 70 ? colors.green : accuracy >= 50 ? colors.orange : colors.red,
+                                    },
+                                  ]}
+                                >
+                                  {accuracy}%
+                                </Text>
+                                <Text style={[styles.timelineStatLabel, { color: colors.textMuted }]}>acc</Text>
+                              </View>
+                            )}
+                          </>
+                        )}
+                      </View>
+                    )}
 
-                      {target.notes && (
-                        <Text style={[styles.targetNotes, { color: colors.textMuted }]} numberOfLines={2}>
-                          {target.notes}
-                        </Text>
-                      )}
-                    </View>
+                    {target.notes && (
+                      <Text style={[styles.targetNotes, { color: colors.textMuted }]} numberOfLines={2}>
+                        {target.notes}
+                      </Text>
+                    )}
                   </View>
-                );
-              })}
-            </View>
-          </Animated.View>
-        )}
+                </View>
+              );
+            })}
+          </View>
+        </Animated.View>
+      )}
 
-        
-          <LinearGradient
-            style={[styles.viewFullButton, { backgroundColor: colors.indigo }]}
-            colors={[colors.ring, colors.teal]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          >
-            <Text style={styles.viewFullButtonText}>Analyze Session</Text>
-            <ChevronRight size={18} color="#fff" />
-          </LinearGradient>
-      </ScrollView>
-
+      <LinearGradient
+        style={[styles.viewFullButton, { backgroundColor: colors.indigo }]}
+        colors={[colors.ring, colors.teal]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+      >
+        <Text style={styles.viewFullButtonText}>Analyze Session</Text>
+        <ChevronRight size={18} color="#fff" />
+      </LinearGradient>
+    </ScrollView>
   );
 }
 

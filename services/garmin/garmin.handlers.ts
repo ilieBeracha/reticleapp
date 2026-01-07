@@ -270,19 +270,8 @@ export function handleSessionSummaryMessage(
         hasWeather: transformedData.weather != null,
     });
 
-    // Log weather data if available (important for analytics)
-    if (transformedData.weather) {
-        const w = transformedData.weather;
-        console.log('[GarminHandlers] 🌦️ Weather conditions:', {
-            temperature: w.temperatureC != null ? `${w.temperatureC.toFixed(1)}°C` : 'N/A',
-            humidity: w.humidity != null ? `${w.humidity}%` : 'N/A',
-            wind: w.windSpeedMps != null 
-                ? `${w.windSpeedMps.toFixed(1)} m/s ${w.windDirection || ''} (${w.windImpact})`
-                : 'N/A',
-            condition: w.condition || 'N/A',
-            severity: w.conditionSeverity,
-        });
-    }
+    // Weather logging disabled
+    // if (transformedData.weather) { ... }
 
     // Convert to GarminSessionData for backwards compatibility with existing store/UI
     const summaryData: GarminSessionData = {
@@ -328,10 +317,10 @@ export function handleSessionSummaryMessage(
                 flinchCount: transformedData.steadiness.flinchCount,
             }
         }),
-        // Weather conditions
-        ...(transformedData.weather && {
-            weather: transformedData.weather,
-        }),
+        // Weather conditions - DISABLED
+        // ...(transformedData.weather && {
+        //     weather: transformedData.weather,
+        // }),
         // Mark as summary-only (details coming later)
         isSummaryOnly: true,
     };

@@ -615,7 +615,7 @@ export default function WatchSessionResultPage() {
                 borderWidth: hitsInput.trim() ? 0 : 1,
                 borderColor: colors.border,
               }]}
-              onPress={handleConfirmHits}
+              onPress={handleConfirmInput}
               disabled={!hitsInput.trim()}
               activeOpacity={0.8}
             >
@@ -628,7 +628,7 @@ export default function WatchSessionResultPage() {
 
             <TouchableOpacity
               style={styles.skipBtn}
-              onPress={handleSkipHits}
+              onPress={handleSkipInput}
               activeOpacity={0.7}
             >
               <Text style={[styles.skipBtnText, { color: colors.textMuted }]}>
@@ -762,6 +762,35 @@ export default function WatchSessionResultPage() {
           </View>
         </Animated.View>
 
+        {/* Heart Rate Summary */}
+        {biometrics?.summary?.avgHR && (
+          <Animated.View entering={FadeInDown.delay(180).duration(400)} style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Heart Rate</Text>
+            <View style={[styles.breathCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.breathIconBg, { backgroundColor: `${colors.red}22` }]}>
+                <Activity size={24} color={colors.red} />
+              </View>
+              <View style={styles.breathStats}>
+                <Text style={[styles.breathValue, { color: colors.text }]}>
+                  {biometrics.summary.avgHR} <Text style={styles.breathUnit}>bpm avg</Text>
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
+                  {biometrics.summary.minHR && (
+                    <Text style={[styles.breathLabel, { color: colors.textMuted }]}>
+                      Min: {biometrics.summary.minHR}
+                    </Text>
+                  )}
+                  {biometrics.summary.maxHR && (
+                    <Text style={[styles.breathLabel, { color: colors.textMuted }]}>
+                      Max: {biometrics.summary.maxHR}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            </View>
+          </Animated.View>
+        )}
+
         {/* Breathing Summary */}
         {biometrics?.summary?.avgBreathRate && (
           <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.section}>
@@ -807,6 +836,12 @@ export default function WatchSessionResultPage() {
                     </View>
                   </View>
                   <View style={styles.shotBioStats}>
+                    {sb.hr !== undefined && sb.hr !== null && (
+                      <View style={styles.shotBioStat}>
+                        <Activity size={12} color={colors.red} />
+                        <Text style={[styles.shotBioValue, { color: colors.text }]}>{sb.hr}</Text>
+                      </View>
+                    )}
                     {sb.br !== undefined && sb.br !== null && (
                       <View style={styles.shotBioStat}>
                         <Wind size={12} color={colors.blue} />

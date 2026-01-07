@@ -292,7 +292,7 @@ export function buildWatchSessionPayload(
       sensitivity: manualSensitivity,
       minThreshold: manualSensitivity * 0.5,
       maxThreshold: manualSensitivity * 3.0,
-      cooldownMs: 80,
+      cooldownMs: 300,  // Safe minimum - recoil settles in ~200ms
       profile: 'rifle',
       description: 'Manual',
     };
@@ -311,7 +311,7 @@ export function buildWatchSessionPayload(
       sensitivity: clampedSensitivity,
       minThreshold: clampedSensitivity * 0.5, // 50% (matches watch's derivation)
       maxThreshold: clampedSensitivity * 3.0,
-      cooldownMs: profile === 'handgun' ? 60 : profile === 'shotgun' ? 120 : 80,
+      cooldownMs: profile === 'handgun' ? 250 : profile === 'shotgun' ? 400 : 300,
       profile,
       description: 'Custom calibrated',
     };

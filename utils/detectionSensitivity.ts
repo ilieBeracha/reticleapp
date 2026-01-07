@@ -207,11 +207,17 @@ const CATEGORY_PROFILE: Record<WeaponCategory, DetectionConfig['profile']> = {
 /**
  * Cooldown (ms) by profile - minimum time between detected shots.
  * Prevents recoil oscillations from counting as multiple shots.
+ * 
+ * IMPORTANT: These values must be long enough for recoil to settle!
+ * A single gunshot recoil oscillates for 100-200ms on the accelerometer.
+ * Previous values (60-120ms) caused double/triple detection.
+ * 
+ * Even the fastest competition shooters have ~200ms+ splits.
  */
 const PROFILE_COOLDOWN: Record<DetectionConfig['profile'], number> = {
-  handgun: 60,  // Fast splits possible with pistol
-  rifle: 80,    // Semi-auto rifle splits
-  shotgun: 120, // Pump/semi shotgun has longer recoil cycle
+  handgun: 250,  // Fastest double-taps are ~200ms - safe margin
+  rifle: 300,    // Semi-auto + bolt action need more time
+  shotgun: 400,  // Pump/semi shotgun has longer recoil cycle
 };
 
 // ============================================================================
