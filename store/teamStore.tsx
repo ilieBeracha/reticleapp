@@ -482,13 +482,19 @@ export function useIsTeamMode(): boolean {
  * Uses shallow comparison to prevent infinite re-renders
  */
 export function useTeamRoleFlags() {
-  const role = useTeamStore(state => {
-    const team = state.teams.find(t => t.id === state.activeTeamId);
-    return team?.my_role || null;
-  });
+  const { role, squadId } = useTeamStore(
+    useShallow(state => {
+      const team = state.teams.find(t => t.id === state.activeTeamId);
+      return {
+        role: team?.my_role || null,
+        squadId: team?.my_squad_id || null,
+      };
+    })
+  );
   
   return {
     role,
+    squadId,
     isOwner: role === 'owner',
     isCommander: role === 'commander',
     isSquadCommander: role === 'squad_commander',

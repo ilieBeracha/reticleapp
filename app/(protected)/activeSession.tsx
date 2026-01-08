@@ -14,6 +14,7 @@ import {
   useActiveSession,
 } from '@/components/session/activeSession';
 import { useColors } from '@/hooks/ui/useColors';
+import { isGroupingSession } from '@/utils/drillGoal';
 import { formatMaxShots } from '@/utils/drillShots';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -244,8 +245,6 @@ export default function ActiveSessionScreen() {
     drillProgress,
     drillLimitReached,
     score,
-    isGroupingDrill,
-    isEngagementDrill,
     isTacticalDrill,
     watchState,
     handleRefresh,
@@ -435,9 +434,9 @@ export default function ActiveSessionScreen() {
           drill={drill}
           drillProgress={drillProgress}
           targets={targets}
-          isGroupingDrill={isGroupingDrill}
-          isTacticalDrill={isTacticalDrill}
-          weaponName={session.weapon_name}
+          isGroupingDrill={isGroupingSession(session)}
+          isTacticalDrill={!isGroupingSession(session)}
+            weaponName={session.weapon_name}
         />
       )}
 

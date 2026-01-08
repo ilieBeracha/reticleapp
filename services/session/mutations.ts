@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { markWeaponUsed } from '@/services/weaponService';
+import { isGroupingGoal } from '@/utils/drillGoal';
 import { getDrillRequirements } from './drillContract';
 import { mapSession } from './mappers';
 import {
@@ -883,30 +884,40 @@ export async function saveWatchSessionData(
   
   console.log('[SessionService] Target data keys:', Object.keys(targetData));
   
+  // Check if this is a grouping session
+  // For grouping: shots come from paper scan, not watch - don't create tactical result
+  const isGrouping = isGroupingGoal(drill?.drill_goal);
+  
   // Create a tactical target entry with watch data
   // This allows the data to be picked up by normal stats calculation
   const target = await addSessionTarget({
     session_id: data.sessionId,
     target_type: 'tactical',
     distance_m: distance,
-    notes: 'Recorded via Garmin watch',
+    notes: isGrouping ? 'Watch telemetry (grouping - shots from scan)' : 'Recorded via Garmin watch',
     target_data: targetData,
   });
   
-  // Calculate time in seconds from milliseconds
-  const timeSeconds = data.durationMs ? data.durationMs / 1000 : null;
-  
-  // Save the tactical result
-  // Use user-provided hits if available, otherwise assume all shots are hits
-  const hits = data.hitsRecorded ?? data.shotsRecorded;
-  await saveTacticalTargetResult({
-    session_target_id: target.id,
-    bullets_fired: data.shotsRecorded,
-    hits: hits,
-    is_stage_cleared: data.completed ?? false,
-    time_seconds: timeSeconds,
-    notes: 'Watch session data',
-  });
+  // For grouping sessions, DON'T create tactical result - shots/hits come from paper scan
+  // This prevents double-counting: watch shots + scan detected holes
+  if (!isGrouping) {
+    // Calculate time in seconds from milliseconds
+    const timeSeconds = data.durationMs ? data.durationMs / 1000 : null;
+    
+    // Save the tactical result
+    // Use user-provided hits if available, otherwise assume all shots are hits
+    const hits = data.hitsRecorded ?? data.shotsRecorded;
+    await saveTacticalTargetResult({
+      session_target_id: target.id,
+      bullets_fired: data.shotsRecorded,
+      hits: hits,
+      is_stage_cleared: data.completed ?? false,
+      time_seconds: timeSeconds,
+      notes: 'Watch session data',
+    });
+  } else {
+    console.log('[SessionService] Grouping session - skipping tactical result, shots will come from scan');
+  }
   
   console.log('[SessionService] Watch data saved as tactical target:', target.id);
   

@@ -1,5 +1,6 @@
 import { useColors } from '@/hooks/ui/useColors';
 import type { SessionWithDetails } from '@/services/session/types';
+import { isGroupingSession } from '@/utils/drillGoal';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -21,7 +22,7 @@ export function SessionCard({ session, onPress, compact = false }: SessionCardPr
   const colors = useColors();
   
   // Determine if this is a grouping session
-  const isGrouping = session.drill_config?.drill_goal === 'grouping';
+  const isGrouping = isGroupingSession(session);
   
   // Calculate stats
   const accuracy = calculateAccuracy(session);

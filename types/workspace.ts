@@ -22,6 +22,8 @@ export type TeamType = "field" | "back_office";
 // Team with user's role in it
 export interface TeamWithRole extends Team {
   my_role: TeamRole;
+  my_squad_id?: string | null;
+  my_user_id?: string;
   member_count?: number;
 }
 

@@ -89,8 +89,8 @@ export interface UseActiveSessionReturn {
   score: SessionScore | null;
   
   // Drill type flags
-  isGroupingDrill: boolean;
-  isEngagementDrill: boolean;
+  isGrouping: boolean;
+  isEngagement: boolean;
   isPaperDrill: boolean;
   isTacticalDrill: boolean;
   

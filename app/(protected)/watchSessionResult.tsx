@@ -15,6 +15,7 @@ import type { DecodedWeather } from '@/services/session/watchTypes';
 import { decodeWeather } from '@/services/session/weatherDecoder';
 import { endSession, saveWatchSessionData, updateSessionHits } from '@/services/sessionService';
 import { useSessionStore } from '@/store/sessionStore';
+import { isGroupingGoal } from '@/utils/drillGoal';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -146,7 +147,7 @@ export default function WatchSessionResultPage() {
     weather: weatherJson,
   } = params;
   
-  const isGroupingDrill = drillGoal === 'grouping';
+  const isGroupingDrill = isGroupingGoal(drillGoal);
   
   const isAutoSaved = autoSaved === '1';
 

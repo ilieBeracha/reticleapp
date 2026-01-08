@@ -1,3 +1,4 @@
+import { isGroupingSession } from '@/utils/drillGoal';
 import { StyleSheet, Text, View } from 'react-native';
 import type { SessionWithDetails, ThemeColors } from './types';
 
@@ -16,7 +17,7 @@ export function SessionCard({ session, colors }: SessionCardProps) {
   const status = STATUS_COLORS[session.status] || STATUS_COLORS.completed;
   
   // Determine if grouping or engagement
-  const isGrouping = session.drill_config?.drill_goal === 'grouping';
+  const isGrouping = isGroupingSession(session);
   const shots = session.stats?.shots_fired || 0;
   const hits = session.stats?.hits_total || 0;
   const bestDispersion = session.stats?.best_dispersion_cm;

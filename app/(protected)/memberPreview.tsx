@@ -1,7 +1,8 @@
 import { BaseAvatar } from "@/components/BaseAvatar";
 import { useColors } from "@/hooks/ui/useColors";
+import { usePermissions } from "@/hooks/usePermissions";
 import { removeTeamMember, updateTeamMemberRole } from "@/services/teamService";
-import { useCanManageTeam, useMyTeamRole, useTeamStore } from "@/store/teamStore";
+import { useMyTeamRole, useTeamRoleFlags, useTeamStore } from "@/store/teamStore";
 import type { TeamRole } from "@/types/workspace";
 import { Ionicons } from "@expo/vector-icons";
 import { formatDistanceToNow } from "date-fns";
@@ -36,6 +37,7 @@ const ROLE_CONFIG: Record<string, { color: string; bg: string; label: string; ic
  * 
  * Permission Matrix:
  * - Team Owner/Commander: Can change team role, remove from team
+ * - Squad Commander: Can manage soldiers in their OWN squad only
  * - Everyone: Can view basic info and activity
  */
 export default function MemberPreviewSheet() {
@@ -43,7 +45,8 @@ export default function MemberPreviewSheet() {
   const params = useLocalSearchParams<{ id?: string }>();
   const { activeTeamId, activeTeam, members, loadMembers } = useTeamStore();
   const myRole = useMyTeamRole();
-  const canManage = useCanManageTeam();
+  const { squadId: mySquadId, isSquadCommander, canManage: canManageTeam } = useTeamRoleFlags();
+  const permissions = usePermissions();
   const [loading, setLoading] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [squadPickerVisible, setSquadPickerVisible] = useState(false);
@@ -68,14 +71,34 @@ export default function MemberPreviewSheet() {
   }, [params.id, members]);
 
   // Get role config
-  const memberRole = member?.role?.role || 'soldier';
+  const memberRole = (member?.role?.role || 'soldier') as TeamRole;
+  const memberSquadId = member?.role?.squad_id || member?.details?.squad_id || null;
   const roleConfig = ROLE_CONFIG[memberRole] || ROLE_CONFIG.soldier;
 
-  // Permission checks
+  // Permission checks using the unified permission system
   const isTargetOwner = memberRole === 'owner';
   const isTargetSelf = member?.user_id === currentUserId;
-  const canManageTeamRole = canManage && !isTargetOwner && !isTargetSelf;
-  const canRemoveFromTeam = canManage && !isTargetOwner && !isTargetSelf;
+  
+  // Check if current user can manage this specific member
+  const canManageThisMember = useMemo(() => {
+    if (!member || isTargetOwner || isTargetSelf) return false;
+    return permissions.canManageMember(member.user_id, memberRole, memberSquadId);
+  }, [member, isTargetOwner, isTargetSelf, memberRole, memberSquadId, permissions]);
+  
+  // Squad commander specific: Can only manage soldiers in their squad
+  const isSquadCommanderManagingSquadMember = isSquadCommander && 
+    memberRole === 'soldier' && 
+    mySquadId && 
+    memberSquadId === mySquadId;
+  
+  // Team role change: Only owners/commanders can change roles (not squad commanders)
+  const canManageTeamRole = canManageTeam && !isTargetOwner && !isTargetSelf;
+  
+  // Squad assignment: Owners, commanders, and squad commanders (for their squad)
+  const canAssignSquad = canManageThisMember && (canManageTeam || isSquadCommanderManagingSquadMember);
+  
+  // Remove from team: Owners, commanders, and squad commanders (for their squad members)
+  const canRemoveFromTeam = canManageThisMember;
 
   // Team role options (excluding owner)
   const teamRoleOptions: TeamRole[] = ['commander', 'squad_commander', 'soldier'];
@@ -357,11 +380,30 @@ export default function MemberPreviewSheet() {
           </TouchableOpacity>
         )}
 
-        {/* Assign to Squad - Managers only */}
-        {canManage && teamSquads.length > 0 && (
+        {/* Assign to Squad - Managers and Squad Commanders (for their squad) */}
+        {canAssignSquad && (
           <TouchableOpacity
             style={[styles.actionRow, { borderBottomColor: colors.border }]}
-            onPress={handleAssignSquad}
+            onPress={() => {
+              if (teamSquads.length === 0) {
+                Alert.alert(
+                  'No Squads',
+                  'Create squads first in Team Settings → Squads.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { 
+                      text: 'Go to Settings', 
+                      onPress: () => {
+                        router.back();
+                        router.push(`/(protected)/teamSquads?teamId=${activeTeamId}` as any);
+                      }
+                    },
+                  ]
+                );
+                return;
+              }
+              handleAssignSquad();
+            }}
             activeOpacity={0.7}
           >
             <View style={styles.actionLeft}>
@@ -371,7 +413,7 @@ export default function MemberPreviewSheet() {
               <View>
                 <Text style={[styles.actionText, { color: colors.text }]}>Assign Squad</Text>
                 <Text style={[styles.actionSubtext, { color: colors.textMuted }]}>
-                  {member?.role?.squad_id || member?.details?.squad_id || 'Not assigned'}
+                  {memberSquadId || 'Not assigned'}
                 </Text>
               </View>
             </View>
@@ -414,6 +456,24 @@ export default function MemberPreviewSheet() {
           </Text>
         </View>
       )}
+      {/* Squad commander managing member in their squad */}
+      {isSquadCommanderManagingSquadMember && !isTargetSelf && (
+        <View style={[styles.noteCard, { backgroundColor: '#F59E0B15' }]}>
+          <Ionicons name="shield" size={16} color="#F59E0B" />
+          <Text style={[styles.noteText, { color: '#F59E0B' }]}>
+            You can manage this soldier as their Squad Commander
+          </Text>
+        </View>
+      )}
+      {/* Squad commander viewing member outside their squad */}
+      {isSquadCommander && !canManageTeam && !isSquadCommanderManagingSquadMember && !isTargetSelf && memberRole === 'soldier' && (
+        <View style={[styles.noteCard, { backgroundColor: colors.secondary }]}>
+          <Ionicons name="information-circle" size={16} color={colors.textMuted} />
+          <Text style={[styles.noteText, { color: colors.textMuted }]}>
+            This soldier is not in your squad
+          </Text>
+        </View>
+      )}
 
       <View style={{ height: 40 }} />
 
@@ -443,41 +503,59 @@ export default function MemberPreviewSheet() {
 
           <ScrollView style={styles.modalContent}>
             {/* Current squad indicator */}
-            {(member?.role?.squad_id || member?.details?.squad_id) && !pendingRole && (
+            {memberSquadId && !pendingRole && (
               <View style={[styles.currentSquadBadge, { backgroundColor: colors.primary + '15' }]}>
                 <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
                 <Text style={[styles.currentSquadText, { color: colors.primary }]}>
-                  Currently in: {member?.role?.squad_id || member?.details?.squad_id}
+                  Currently in: {memberSquadId}
+                </Text>
+              </View>
+            )}
+            
+            {/* Squad commander restriction note */}
+            {isSquadCommander && !canManageTeam && (
+              <View style={[styles.squadNote, { backgroundColor: '#F59E0B15', marginBottom: 16 }]}>
+                <Ionicons name="information-circle" size={16} color="#F59E0B" />
+                <Text style={[styles.squadNoteText, { color: '#F59E0B' }]}>
+                  As Squad Commander, you can only assign members to your squad ({mySquadId}).
                 </Text>
               </View>
             )}
 
-            {/* Squad options */}
-            {teamSquads.map((squad) => {
-              const isCurrentSquad = squad === (member?.role?.squad_id || member?.details?.squad_id);
-              return (
-                <TouchableOpacity
-                  key={squad}
-                  style={[
-                    styles.squadOption,
-                    { backgroundColor: colors.card, borderColor: isCurrentSquad ? colors.primary : colors.border }
-                  ]}
-                  onPress={() => handleSquadSelect(squad)}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.squadOptionIcon, { backgroundColor: '#3B82F620' }]}>
-                    <Ionicons name="git-branch" size={18} color="#3B82F6" />
-                  </View>
-                  <Text style={[styles.squadOptionText, { color: colors.text }]}>{squad}</Text>
-                  {isCurrentSquad && (
-                    <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                  )}
-                </TouchableOpacity>
-              );
-            })}
+            {/* Squad options - filter for squad commanders */}
+            {teamSquads
+              .filter(squad => {
+                // Squad commanders can only assign to their own squad
+                if (isSquadCommander && !canManageTeam) {
+                  return squad === mySquadId;
+                }
+                return true;
+              })
+              .map((squad) => {
+                const isCurrentSquad = squad === memberSquadId;
+                return (
+                  <TouchableOpacity
+                    key={squad}
+                    style={[
+                      styles.squadOption,
+                      { backgroundColor: colors.card, borderColor: isCurrentSquad ? colors.primary : colors.border }
+                    ]}
+                    onPress={() => handleSquadSelect(squad)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.squadOptionIcon, { backgroundColor: '#3B82F620' }]}>
+                      <Ionicons name="git-branch" size={18} color="#3B82F6" />
+                    </View>
+                    <Text style={[styles.squadOptionText, { color: colors.text }]}>{squad}</Text>
+                    {isCurrentSquad && (
+                      <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
 
-            {/* Remove from squad option */}
-            {!pendingRole && (member?.role?.squad_id || member?.details?.squad_id) && (
+            {/* Remove from squad option - only for full managers, not squad commanders */}
+            {!pendingRole && memberSquadId && canManageTeam && (
               <TouchableOpacity
                 style={[styles.squadOption, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 16 }]}
                 onPress={() => handleSquadSelect(null)}
@@ -490,7 +568,7 @@ export default function MemberPreviewSheet() {
               </TouchableOpacity>
             )}
 
-            {/* Note for squad commander */}
+            {/* Note for squad commander role assignment */}
             {pendingRole === 'squad_commander' && (
               <View style={[styles.squadNote, { backgroundColor: colors.secondary }]}>
                 <Ionicons name="information-circle" size={16} color={colors.textMuted} />

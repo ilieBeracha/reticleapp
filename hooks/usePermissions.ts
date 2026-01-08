@@ -3,13 +3,22 @@
  * 
  * Single source for all permission checks.
  * Replaces: useWorkspacePermissions, useTeamPermissions, useRolePermissions
+ * 
+ * SQUAD COMMANDER SCOPE:
+ *   - Can manage soldiers in their own squad
+ *   - Can view progress of their squad members
+ *   - Cannot manage members outside their squad
  */
 
-import { useTeamRoleFlags } from '@/store/teamStore';
+import { useTeamRoleFlags, useTeamStore } from '@/store/teamStore';
+import { useMemo } from 'react';
+import type { TeamRole } from '@/services/roleService';
+import { canManageMember, canViewMemberProgress, type TeamMemberInfo } from '@/services/roleService';
 
 export interface Permissions {
   // Role
   role: string | null;
+  squadId: string | null;
   isOwner: boolean;
   isCommander: boolean;
   isSquadCommander: boolean;
@@ -21,6 +30,10 @@ export interface Permissions {
   canRemoveMembers: boolean;
   canDeleteTeam: boolean;
   
+  // Squad management (for squad commanders)
+  canManageSquadMembers: boolean;
+  canViewSquadProgress: boolean;
+  
   // Training
   canCreateTraining: boolean;
   canManageTraining: boolean;
@@ -29,35 +42,86 @@ export interface Permissions {
   // Sessions
   canCreateSession: boolean;
   canViewAllSessions: boolean;
+  
+  // Member-specific checks (functions)
+  canManageMember: (targetUserId: string, targetRole: TeamRole, targetSquadId?: string | null) => boolean;
+  canViewMemberProgress: (targetUserId: string, targetRole: TeamRole, targetSquadId?: string | null) => boolean;
 }
 
 /**
  * Get all permissions for the current user in the active team
  */
 export function usePermissions(): Permissions {
-  const { role, isOwner, isCommander, isSquadCommander, isSoldier, canManage } = useTeamRoleFlags();
+  const { role, isOwner, isCommander, isSquadCommander, isSoldier, canManage, squadId } = useTeamRoleFlags();
+  const { activeTeamId } = useTeamStore();
+  const userId = useTeamStore(state => {
+    const team = state.teams.find(t => t.id === activeTeamId);
+    return team?.my_user_id;
+  });
+  
+  // Build actor info for permission checks
+  const actorInfo: TeamMemberInfo | null = useMemo(() => {
+    if (!userId || !role) return null;
+    return {
+      user_id: userId,
+      role: role as TeamRole,
+      squad_id: squadId,
+    };
+  }, [userId, role, squadId]);
+  
+  // Member-specific permission check functions
+  const checkCanManageMember = useMemo(() => {
+    return (targetUserId: string, targetRole: TeamRole, targetSquadId?: string | null): boolean => {
+      if (!actorInfo) return false;
+      return canManageMember(actorInfo, {
+        user_id: targetUserId,
+        role: targetRole,
+        squad_id: targetSquadId,
+      });
+    };
+  }, [actorInfo]);
+  
+  const checkCanViewMemberProgress = useMemo(() => {
+    return (targetUserId: string, targetRole: TeamRole, targetSquadId?: string | null): boolean => {
+      if (!actorInfo) return false;
+      return canViewMemberProgress(actorInfo, {
+        user_id: targetUserId,
+        role: targetRole,
+        squad_id: targetSquadId,
+      });
+    };
+  }, [actorInfo]);
   
   return {
     // Role info
     role,
+    squadId,
     isOwner,
     isCommander,
     isSquadCommander,
     isSoldier,
     
-    // Team management - owner and commander
+    // Team management - owner and commander only
     canManageTeam: canManage,
-    canInviteMembers: canManage,
+    canInviteMembers: canManage || isSquadCommander, // Squad cmdr can invite to their squad
     canRemoveMembers: canManage,
     canDeleteTeam: isOwner,
+    
+    // Squad management - squad commanders can manage their squad
+    canManageSquadMembers: isSquadCommander && !!squadId,
+    canViewSquadProgress: isSquadCommander && !!squadId,
     
     // Training - owner and commander
     canCreateTraining: canManage,
     canManageTraining: canManage,
     canViewAllProgress: canManage,
     
-    // Sessions - everyone can create, only leads can view all
+    // Sessions - everyone can create, leaders can view all
     canCreateSession: true,
-    canViewAllSessions: canManage,
+    canViewAllSessions: canManage || isSquadCommander,
+    
+    // Member-specific check functions
+    canManageMember: checkCanManageMember,
+    canViewMemberProgress: checkCanViewMemberProgress,
   };
 }

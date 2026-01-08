@@ -109,6 +109,8 @@ export async function getMyTeams(): Promise<TeamWithRole[]> {
     created_at: t.created_at,
     updated_at: t.created_at, // RPC doesn't return updated_at
     my_role: t.my_role,
+    my_squad_id: t.my_squad_id || null,
+    my_user_id: t.my_user_id,
     member_count: t.member_count,
   }));
 }
@@ -299,6 +301,7 @@ export async function removeTeamMember(teamId: string, userId: string): Promise<
 
 /**
  * Update team member role
+ * @param details - Optional details object. If it contains `squad_id`, it will be set on the column directly.
  */
 export async function updateTeamMemberRole(
   teamId: string,
@@ -307,7 +310,17 @@ export async function updateTeamMemberRole(
   details?: Record<string, any>
 ): Promise<TeamMember> {
   const updates: any = { role };
-  if (details !== undefined) updates.details = details;
+  
+  if (details !== undefined) {
+    // Extract squad_id to update the column directly (not just in JSONB)
+    if ('squad_id' in details) {
+      updates.squad_id = details.squad_id;
+      // Also keep it in details for backwards compatibility
+      updates.details = { ...details };
+    } else {
+      updates.details = details;
+    }
+  }
 
   const { data, error } = await supabase
     .from('team_members')
@@ -335,6 +348,7 @@ export async function getTeamMembers(teamId: string): Promise<TeamMemberWithProf
       team_id,
       user_id,
       role,
+      squad_id,
       joined_at,
       details,
       profile:profiles!user_id(id, email, full_name, avatar_url)
@@ -355,7 +369,7 @@ export async function getTeamMembers(teamId: string): Promise<TeamMemberWithProf
     details: m.details,
     role: {
       role: m.role, // DB stores as text, type expects { role: TeamRole }
-      squad_id: m.details?.squad_id,
+      squad_id: m.squad_id || m.details?.squad_id, // Prefer column, fallback to details
     },
     profile: m.profile || {},
   }));

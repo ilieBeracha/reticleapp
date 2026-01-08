@@ -14,6 +14,7 @@ import {
   type SessionTargetWithResults,
   type SessionWithDetails,
 } from '@/services/sessionService';
+import { isGroupingSession } from '@/utils/drillGoal';
 import { format, intervalToDuration } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -291,7 +292,7 @@ export default function SessionDetailScreen() {
   const isCompleted = session.status === 'completed';
 
   // Determine if this is a grouping or engagement session
-  const isGroupingSession = session.drill_config?.drill_goal === 'grouping';
+  const isGroupingDrill = isGroupingSession(session);
 
   return (
     <ScrollView
@@ -394,16 +395,16 @@ export default function SessionDetailScreen() {
                   style={[
                     styles.contextIconBg,
                     {
-                      backgroundColor: isGroupingSession ? `${colors.green}15` : `${colors.primary}15`,
+                      backgroundColor: isGroupingDrill ? `${colors.green}15` : `${colors.primary}15`,
                     },
                   ]}
                 >
-                  <Target size={14} color={isGroupingSession ? colors.green : colors.primary} />
+                  <Target size={14} color={isGroupingDrill ? colors.green : colors.primary} />
                 </View>
                 <View style={styles.contextItemContent}>
                   <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Type</Text>
                   <Text style={[styles.contextValue, { color: colors.text }]}>
-                    {isGroupingSession ? 'Grouping' : 'Engagement'}
+                    {isGroupingDrill ? 'Grouping' : 'Engagement'}
                   </Text>
                 </View>
               </View>
@@ -548,7 +549,7 @@ export default function SessionDetailScreen() {
           )}
 
           <View style={styles.statsGrid}>
-            {isGroupingSession ? (
+            {isGroupingDrill ? (
               // GROUPING: Show shots + group size - NO accuracy or hits
               <>
                 {/* Shots Fired */}
@@ -635,7 +636,7 @@ export default function SessionDetailScreen() {
           </View>
 
           {/* Accuracy note if scanned without declaration - only for engagement */}
-          {!isGroupingSession && hasScannedWithoutDeclaration && stats.accuracyPct > 0 && (
+          {!isGroupingDrill && hasScannedWithoutDeclaration && stats.accuracyPct > 0 && (
             <Text style={[styles.accuracyNote, { color: colors.textMuted }]}>
               * Accuracy excludes scanned targets without declared shots
             </Text>

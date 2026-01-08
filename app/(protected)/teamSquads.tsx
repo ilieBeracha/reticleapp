@@ -2,19 +2,23 @@
  * Team Squads Management
  * 
  * Manage squad sub-groups within a team
+ * - Create/edit/delete squads
+ * - Assign soldiers to squads
  */
+import { BaseAvatar } from '@/components/BaseAvatar';
 import { useColors } from '@/hooks/ui/useColors';
-import { getTeamMembers, updateTeam } from '@/services/teamService';
+import { getTeamMembers, updateTeam, updateTeamMemberRole } from '@/services/teamService';
 import { useTeamStore } from '@/store/teamStore';
-import type { TeamMemberWithProfile } from '@/types/workspace';
+import type { TeamMemberWithProfile, TeamRole } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -39,16 +43,53 @@ export default function TeamSquadsScreen() {
   const [newSquadName, setNewSquadName] = useState('');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
+  
+  // Member assignment modal state
+  const [assignModalVisible, setAssignModalVisible] = useState(false);
+  const [selectedSquad, setSelectedSquad] = useState<string | null>(null);
+  const [assigningMemberId, setAssigningMemberId] = useState<string | null>(null);
 
   // Load members to show squad counts
-  useEffect(() => {
+  const loadMembers = useCallback(async () => {
     if (teamId) {
-      getTeamMembers(teamId)
-        .then(setMembers)
-        .catch(console.error)
-        .finally(() => setLoading(false));
+      try {
+        const data = await getTeamMembers(teamId);
+        setMembers(data);
+      } catch (error) {
+        console.error('Failed to load members:', error);
+      } finally {
+        setLoading(false);
+      }
     }
   }, [teamId]);
+
+  useEffect(() => {
+    loadMembers();
+  }, [loadMembers]);
+  
+  // Get soldiers that can be assigned (soldiers only, not commanders)
+  const assignableSoldiers = useMemo(() => {
+    return members.filter(m => {
+      const role = m.role?.role || 'soldier';
+      return role === 'soldier';
+    });
+  }, [members]);
+  
+  // Get soldiers in a specific squad
+  const getSoldiersInSquad = useCallback((squadName: string) => {
+    return members.filter(m => {
+      const memberSquad = m.role?.squad_id || m.details?.squad_id;
+      return memberSquad === squadName;
+    });
+  }, [members]);
+  
+  // Get unassigned soldiers (not in any squad)
+  const unassignedSoldiers = useMemo(() => {
+    return assignableSoldiers.filter(m => {
+      const memberSquad = m.role?.squad_id || m.details?.squad_id;
+      return !memberSquad;
+    });
+  }, [assignableSoldiers]);
 
   // Get member count for a squad
   const getSquadMemberCount = useCallback((squadName: string) => {
@@ -152,6 +193,49 @@ export default function TeamSquadsScreen() {
     saveSquads(newSquads);
     Haptics.selectionAsync();
   };
+  
+  // Open member assignment modal for a squad
+  const handleOpenAssignModal = (squadName: string) => {
+    setSelectedSquad(squadName);
+    setAssignModalVisible(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+  
+  // Assign a member to a squad
+  const handleAssignMember = async (memberId: string, targetSquad: string | null) => {
+    if (!teamId) return;
+    
+    setAssigningMemberId(memberId);
+    try {
+      const member = members.find(m => m.user_id === memberId);
+      const currentRole = (member?.role?.role || 'soldier') as TeamRole;
+      
+      await updateTeamMemberRole(teamId, memberId, currentRole, { squad_id: targetSquad });
+      await loadMembers();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      console.error('Failed to assign member:', error);
+      Alert.alert('Error', 'Failed to assign member to squad.');
+    } finally {
+      setAssigningMemberId(null);
+    }
+  };
+  
+  // Remove member from squad
+  const handleRemoveFromSquad = async (memberId: string) => {
+    Alert.alert(
+      'Remove from Squad',
+      'Remove this soldier from the squad?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => handleAssignMember(memberId, null),
+        },
+      ]
+    );
+  };
 
   if (loading) {
     return (
@@ -225,91 +309,150 @@ export default function TeamSquadsScreen() {
               {squads.length} SQUAD{squads.length !== 1 ? 'S' : ''}
             </Text>
             {squads.map((squad, index) => {
-              const memberCount = getSquadMemberCount(squad);
+              const squadSoldiers = getSoldiersInSquad(squad);
+              const memberCount = squadSoldiers.length;
               const isEditing = editingIndex === index;
 
               return (
                 <View
                   key={`${squad}-${index}`}
-                  style={[styles.squadRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  style={[styles.squadCard, { backgroundColor: colors.card, borderColor: colors.border }]}
                 >
-                  {/* Reorder buttons */}
-                  <View style={styles.reorderBtns}>
-                    <TouchableOpacity
-                      onPress={() => handleMoveSquad(index, 'up')}
-                      disabled={index === 0}
-                      style={styles.reorderBtn}
-                    >
-                      <Ionicons
-                        name="chevron-up"
-                        size={16}
-                        color={index === 0 ? colors.border : colors.textMuted}
-                      />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => handleMoveSquad(index, 'down')}
-                      disabled={index === squads.length - 1}
-                      style={styles.reorderBtn}
-                    >
-                      <Ionicons
-                        name="chevron-down"
-                        size={16}
-                        color={index === squads.length - 1 ? colors.border : colors.textMuted}
-                      />
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Squad info */}
-                  <View style={styles.squadInfo}>
-                    {isEditing ? (
-                      <TextInput
-                        style={[styles.editInput, { color: colors.text, borderColor: colors.primary }]}
-                        value={editingName}
-                        onChangeText={setEditingName}
-                        onBlur={handleSaveEdit}
-                        onSubmitEditing={handleSaveEdit}
-                        autoFocus
-                        selectTextOnFocus
-                      />
-                    ) : (
-                      <TouchableOpacity onPress={() => handleStartEdit(index)}>
-                        <Text style={[styles.squadName, { color: colors.text }]}>{squad}</Text>
-                      </TouchableOpacity>
-                    )}
-                    <Text style={[styles.squadMeta, { color: colors.textMuted }]}>
-                      {memberCount} member{memberCount !== 1 ? 's' : ''}
-                    </Text>
-                  </View>
-
-                  {/* Actions */}
-                  <View style={styles.squadActions}>
-                    {isEditing ? (
+                  {/* Squad Header */}
+                  <View style={styles.squadHeader}>
+                    {/* Reorder buttons */}
+                    <View style={styles.reorderBtns}>
                       <TouchableOpacity
-                        style={[styles.actionBtn, { backgroundColor: colors.primary + '15' }]}
-                        onPress={handleSaveEdit}
+                        onPress={() => handleMoveSquad(index, 'up')}
+                        disabled={index === 0}
+                        style={styles.reorderBtn}
                       >
-                        <Ionicons name="checkmark" size={18} color={colors.primary} />
+                        <Ionicons
+                          name="chevron-up"
+                          size={16}
+                          color={index === 0 ? colors.border : colors.textMuted}
+                        />
                       </TouchableOpacity>
-                    ) : (
-                      <>
-                        <TouchableOpacity
-                          style={[styles.actionBtn, { backgroundColor: colors.secondary }]}
-                          onPress={() => handleStartEdit(index)}
-                        >
-                          <Ionicons name="pencil" size={16} color={colors.textMuted} />
+                      <TouchableOpacity
+                        onPress={() => handleMoveSquad(index, 'down')}
+                        disabled={index === squads.length - 1}
+                        style={styles.reorderBtn}
+                      >
+                        <Ionicons
+                          name="chevron-down"
+                          size={16}
+                          color={index === squads.length - 1 ? colors.border : colors.textMuted}
+                        />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Squad info */}
+                    <View style={styles.squadInfo}>
+                      {isEditing ? (
+                        <TextInput
+                          style={[styles.editInput, { color: colors.text, borderColor: colors.primary }]}
+                          value={editingName}
+                          onChangeText={setEditingName}
+                          onBlur={handleSaveEdit}
+                          onSubmitEditing={handleSaveEdit}
+                          autoFocus
+                          selectTextOnFocus
+                        />
+                      ) : (
+                        <TouchableOpacity onPress={() => handleStartEdit(index)}>
+                          <Text style={[styles.squadName, { color: colors.text }]}>{squad}</Text>
                         </TouchableOpacity>
+                      )}
+                      <Text style={[styles.squadMeta, { color: colors.textMuted }]}>
+                        {memberCount} soldier{memberCount !== 1 ? 's' : ''}
+                      </Text>
+                    </View>
+
+                    {/* Actions */}
+                    <View style={styles.squadActions}>
+                      {isEditing ? (
                         <TouchableOpacity
-                          style={[styles.actionBtn, { backgroundColor: '#EF444415' }]}
-                          onPress={() => handleRemoveSquad(index)}
+                          style={[styles.actionBtn, { backgroundColor: colors.primary + '15' }]}
+                          onPress={handleSaveEdit}
                         >
-                          <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                          <Ionicons name="checkmark" size={18} color={colors.primary} />
                         </TouchableOpacity>
-                      </>
-                    )}
+                      ) : (
+                        <>
+                          <TouchableOpacity
+                            style={[styles.actionBtn, { backgroundColor: colors.secondary }]}
+                            onPress={() => handleStartEdit(index)}
+                          >
+                            <Ionicons name="pencil" size={16} color={colors.textMuted} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.actionBtn, { backgroundColor: '#EF444415' }]}
+                            onPress={() => handleRemoveSquad(index)}
+                          >
+                            <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                          </TouchableOpacity>
+                        </>
+                      )}
+                    </View>
                   </View>
+                  
+                  {/* Squad Members */}
+                  {squadSoldiers.length > 0 && (
+                    <View style={[styles.squadMembers, { borderTopColor: colors.border }]}>
+                      {squadSoldiers.map((soldier) => (
+                        <View key={soldier.user_id} style={styles.memberRow}>
+                          <BaseAvatar
+                            source={soldier.profile?.avatar_url ? { uri: soldier.profile.avatar_url } : undefined}
+                            fallbackText={soldier.profile?.full_name || 'S'}
+                            size="sm"
+                          />
+                          <Text style={[styles.memberName, { color: colors.text }]} numberOfLines={1}>
+                            {soldier.profile?.full_name || 'Unknown'}
+                          </Text>
+                          <TouchableOpacity
+                            style={[styles.removeMemberBtn, { backgroundColor: '#EF444410' }]}
+                            onPress={() => handleRemoveFromSquad(soldier.user_id)}
+                          >
+                            <Ionicons name="close" size={14} color="#EF4444" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                  
+                  {/* Assign Button */}
+                  <TouchableOpacity
+                    style={[styles.assignBtn, { borderTopColor: colors.border }]}
+                    onPress={() => handleOpenAssignModal(squad)}
+                  >
+                    <Ionicons name="person-add-outline" size={16} color={colors.primary} />
+                    <Text style={[styles.assignBtnText, { color: colors.primary }]}>
+                      Assign Soldiers
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               );
             })}
+          </View>
+        )}
+
+        {/* Unassigned Soldiers */}
+        {unassignedSoldiers.length > 0 && (
+          <View style={[styles.unassignedSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.unassignedHeader}>
+              <Ionicons name="people-outline" size={18} color={colors.textMuted} />
+              <Text style={[styles.unassignedTitle, { color: colors.text }]}>
+                Unassigned Soldiers
+              </Text>
+              <View style={[styles.unassignedCount, { backgroundColor: colors.secondary }]}>
+                <Text style={[styles.unassignedCountText, { color: colors.text }]}>
+                  {unassignedSoldiers.length}
+                </Text>
+              </View>
+            </View>
+            <Text style={[styles.unassignedHint, { color: colors.textMuted }]}>
+              Tap "Assign Soldiers" on a squad to add these soldiers
+            </Text>
           </View>
         )}
 
@@ -317,10 +460,157 @@ export default function TeamSquadsScreen() {
         <View style={styles.helpSection}>
           <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
           <Text style={[styles.helpText, { color: colors.textMuted }]}>
-            Assign members to squads from the Members screen. Squad commanders can manage their own squad.
+            Assign soldiers to squads using the button on each squad card. Squad commanders can manage their own squad members.
           </Text>
         </View>
       </ScrollView>
+      
+      {/* Member Assignment Modal */}
+      <Modal
+        visible={assignModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setAssignModalVisible(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={() => setAssignModalVisible(false)}>
+              <Text style={[styles.modalCancel, { color: colors.textMuted }]}>Close</Text>
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              Assign to {selectedSquad}
+            </Text>
+            <View style={{ width: 50 }} />
+          </View>
+          
+          <ScrollView style={styles.modalContent}>
+            {/* Current Squad Members */}
+            {selectedSquad && getSoldiersInSquad(selectedSquad).length > 0 && (
+              <View style={styles.modalSection}>
+                <Text style={[styles.modalSectionTitle, { color: colors.textMuted }]}>
+                  IN THIS SQUAD
+                </Text>
+                {getSoldiersInSquad(selectedSquad).map((soldier) => (
+                  <View 
+                    key={soldier.user_id} 
+                    style={[styles.modalMemberRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  >
+                    <BaseAvatar
+                      source={soldier.profile?.avatar_url ? { uri: soldier.profile.avatar_url } : undefined}
+                      fallbackText={soldier.profile?.full_name || 'S'}
+                      size="sm"
+                    />
+                    <Text style={[styles.modalMemberName, { color: colors.text }]} numberOfLines={1}>
+                      {soldier.profile?.full_name || 'Unknown'}
+                    </Text>
+                    <TouchableOpacity
+                      style={[styles.modalRemoveBtn, { backgroundColor: '#EF444415' }]}
+                      onPress={() => handleAssignMember(soldier.user_id, null)}
+                      disabled={assigningMemberId === soldier.user_id}
+                    >
+                      {assigningMemberId === soldier.user_id ? (
+                        <ActivityIndicator size="small" color="#EF4444" />
+                      ) : (
+                        <Ionicons name="remove-circle" size={18} color="#EF4444" />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+            
+            {/* Available Soldiers */}
+            <View style={styles.modalSection}>
+              <Text style={[styles.modalSectionTitle, { color: colors.textMuted }]}>
+                AVAILABLE TO ASSIGN
+              </Text>
+              {unassignedSoldiers.length === 0 ? (
+                <View style={[styles.modalEmptyState, { backgroundColor: colors.card }]}>
+                  <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                  <Text style={[styles.modalEmptyText, { color: colors.textMuted }]}>
+                    All soldiers are assigned to squads
+                  </Text>
+                </View>
+              ) : (
+                unassignedSoldiers.map((soldier) => (
+                  <TouchableOpacity
+                    key={soldier.user_id}
+                    style={[styles.modalMemberRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={() => selectedSquad && handleAssignMember(soldier.user_id, selectedSquad)}
+                    disabled={assigningMemberId === soldier.user_id}
+                    activeOpacity={0.7}
+                  >
+                    <BaseAvatar
+                      source={soldier.profile?.avatar_url ? { uri: soldier.profile.avatar_url } : undefined}
+                      fallbackText={soldier.profile?.full_name || 'S'}
+                      size="sm"
+                    />
+                    <Text style={[styles.modalMemberName, { color: colors.text }]} numberOfLines={1}>
+                      {soldier.profile?.full_name || 'Unknown'}
+                    </Text>
+                    {assigningMemberId === soldier.user_id ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <View style={[styles.modalAddBtn, { backgroundColor: colors.primary + '15' }]}>
+                        <Ionicons name="add" size={18} color={colors.primary} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))
+              )}
+            </View>
+            
+            {/* Other Squads */}
+            {selectedSquad && squads.filter(s => s !== selectedSquad).length > 0 && (
+              <View style={styles.modalSection}>
+                <Text style={[styles.modalSectionTitle, { color: colors.textMuted }]}>
+                  FROM OTHER SQUADS
+                </Text>
+                {squads
+                  .filter(s => s !== selectedSquad)
+                  .flatMap(squadName => 
+                    getSoldiersInSquad(squadName).map(soldier => ({
+                      ...soldier,
+                      currentSquad: squadName,
+                    }))
+                  )
+                  .map((soldier) => (
+                    <TouchableOpacity
+                      key={soldier.user_id}
+                      style={[styles.modalMemberRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+                      onPress={() => selectedSquad && handleAssignMember(soldier.user_id, selectedSquad)}
+                      disabled={assigningMemberId === soldier.user_id}
+                      activeOpacity={0.7}
+                    >
+                      <BaseAvatar
+                        source={soldier.profile?.avatar_url ? { uri: soldier.profile.avatar_url } : undefined}
+                        fallbackText={soldier.profile?.full_name || 'S'}
+                        size="sm"
+                      />
+                      <View style={styles.modalMemberInfo}>
+                        <Text style={[styles.modalMemberName, { color: colors.text }]} numberOfLines={1}>
+                          {soldier.profile?.full_name || 'Unknown'}
+                        </Text>
+                        <Text style={[styles.modalMemberSquad, { color: colors.textMuted }]}>
+                          Currently in: {soldier.currentSquad}
+                        </Text>
+                      </View>
+                      {assigningMemberId === soldier.user_id ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : (
+                        <View style={[styles.modalAddBtn, { backgroundColor: colors.primary + '15' }]}>
+                          <Ionicons name="arrow-forward" size={16} color={colors.primary} />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+              </View>
+            )}
+            
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -362,16 +652,19 @@ const styles = StyleSheet.create({
   },
 
   // Squads List
-  squadsList: { gap: 10 },
+  squadsList: { gap: 12 },
   sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8, marginLeft: 4 },
 
-  // Squad Row
-  squadRow: {
+  // Squad Card
+  squadCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  squadHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
     gap: 12,
   },
   reorderBtns: {
@@ -411,6 +704,78 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  
+  // Squad Members
+  squadMembers: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    gap: 6,
+  },
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  memberName: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  removeMemberBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  
+  // Assign Button
+  assignBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+  },
+  assignBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  
+  // Unassigned Section
+  unassignedSection: {
+    marginTop: 20,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 6,
+  },
+  unassignedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  unassignedTitle: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  unassignedCount: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  unassignedCountText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  unassignedHint: {
+    fontSize: 12,
+    marginTop: 2,
+  },
 
   // Empty State
   emptyState: {
@@ -442,6 +807,69 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     lineHeight: 18,
+  },
+  
+  // Modal
+  modalContainer: { flex: 1 },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+  },
+  modalCancel: { fontSize: 16 },
+  modalTitle: { fontSize: 17, fontWeight: '600' },
+  modalContent: { flex: 1, padding: 20 },
+  modalSection: { marginBottom: 24 },
+  modalSectionTitle: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5, marginBottom: 10 },
+  modalMemberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 12,
+    marginBottom: 8,
+  },
+  modalMemberInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  modalMemberName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  modalMemberSquad: {
+    fontSize: 12,
+  },
+  modalAddBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalRemoveBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalEmptyState: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 16,
+    borderRadius: 10,
+  },
+  modalEmptyText: {
+    flex: 1,
+    fontSize: 14,
   },
 });
 

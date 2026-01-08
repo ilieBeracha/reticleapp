@@ -3,6 +3,13 @@
  *
  * Team-first role hierarchy and permissions system.
  * Roles are stored in `team_members` table.
+ * 
+ * HIERARCHY:
+ *   owner > commander > squad_commander > soldier
+ * 
+ * SQUAD SCOPE:
+ *   - Squad commanders can manage soldiers in their OWN squad only
+ *   - Commanders/owners can manage anyone in the team
  */
 
 // =====================================================
@@ -26,6 +33,89 @@ export const TEAM_ROLE_HIERARCHY: Record<TeamRole, number> = {
   squad_commander: 2, // Leads a specific squad
   soldier: 1,         // Regular team member
 };
+
+// =====================================================
+// SQUAD SCOPE UTILITIES
+// =====================================================
+
+export interface TeamMemberInfo {
+  user_id: string;
+  role: TeamRole;
+  squad_id?: string | null;
+}
+
+/**
+ * Check if actor can manage target member.
+ * Considers both role hierarchy AND squad scope for squad commanders.
+ */
+export function canManageMember(
+  actor: TeamMemberInfo,
+  target: TeamMemberInfo
+): boolean {
+  // Cannot manage yourself
+  if (actor.user_id === target.user_id) return false;
+  
+  const actorLevel = TEAM_ROLE_HIERARCHY[actor.role];
+  const targetLevel = TEAM_ROLE_HIERARCHY[target.role];
+  
+  // Owner/Commander: can manage anyone below them
+  if (actorLevel >= TEAM_ROLE_HIERARCHY.commander) {
+    return targetLevel < actorLevel;
+  }
+  
+  // Squad Commander: can only manage soldiers in THEIR squad
+  if (actor.role === 'squad_commander') {
+    if (target.role !== 'soldier') return false;
+    if (!actor.squad_id) return false;
+    return actor.squad_id === target.squad_id;
+  }
+  
+  // Soldiers cannot manage anyone
+  return false;
+}
+
+/**
+ * Check if actor can view target member's details/progress.
+ */
+export function canViewMemberProgress(
+  actor: TeamMemberInfo,
+  target: TeamMemberInfo
+): boolean {
+  // Can always view own progress
+  if (actor.user_id === target.user_id) return true;
+  
+  const actorLevel = TEAM_ROLE_HIERARCHY[actor.role];
+  
+  // Owner/Commander: can view anyone
+  if (actorLevel >= TEAM_ROLE_HIERARCHY.commander) return true;
+  
+  // Squad Commander: can view their squad members
+  if (actor.role === 'squad_commander' && actor.squad_id) {
+    return actor.squad_id === target.squad_id;
+  }
+  
+  // Soldiers cannot view others' progress
+  return false;
+}
+
+/**
+ * Get list of user IDs that actor can manage.
+ * Used for filtering member lists.
+ */
+export function getManageableMembers(
+  actor: TeamMemberInfo,
+  allMembers: TeamMemberInfo[]
+): TeamMemberInfo[] {
+  return allMembers.filter(member => canManageMember(actor, member));
+}
+
+/**
+ * Check if actor is in the same squad as target
+ */
+export function isSameSquad(actor: TeamMemberInfo, target: TeamMemberInfo): boolean {
+  if (!actor.squad_id || !target.squad_id) return false;
+  return actor.squad_id === target.squad_id;
+}
 
 
 

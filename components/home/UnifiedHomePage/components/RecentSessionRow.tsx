@@ -5,6 +5,7 @@
  * Shows different stats for grouping vs engagement sessions.
  */
 
+import { isGroupingGoal } from '@/utils/drillGoal';
 import { ChevronRight, Crosshair, Heart, Target, Users } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { formatTimeAgo } from '../UnifiedHomePage.helpers';
@@ -13,7 +14,7 @@ import type { RecentSessionRowProps } from '../UnifiedHomePage.types';
 export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowProps) {
   const isTeam = session.origin === 'team';
   const hasWatchData = session.sourceSession?.watch_controlled ?? false;
-  const isGrouping = session.drillGoal === 'grouping';
+  const isGrouping = isGroupingGoal(session.drillGoal);
   
   const timeAgo = session.endedAt
     ? formatTimeAgo(session.endedAt)

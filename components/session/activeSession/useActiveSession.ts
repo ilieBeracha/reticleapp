@@ -27,6 +27,7 @@ import {
 } from '@/services/sessionService';
 import { useGarminStore, useIsGarminConnected, useSessionStartStatus } from '@/store/garminStore';
 import { useSessionStore } from '@/store/sessionStore';
+import { isGroupingDrill } from '@/utils/drillGoal';
 import { isInfiniteShots } from '@/utils/drillShots';
 
 import { deriveDetectionConfig } from '@/utils/detectionSensitivity';
@@ -171,10 +172,10 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
 
   const drillLimitReached = isDrillLimitReached(drill, nextTargetPlan);
 
-  // Drill type flags
-  const isGroupingDrill = drill?.drill_goal === 'grouping';
-  const isEngagementDrill = drill?.drill_goal === 'engagement';
-  const isPaperDrill = isGroupingDrill || drill?.target_type === 'paper';
+  // Drill type flags - use centralized utility
+  const isGrouping = isGroupingDrill(drill);
+  const isEngagement = !isGrouping && drill != null;
+  const isPaperDrill = isGrouping || drill?.target_type === 'paper';
   const isTacticalDrill = drill?.target_type === 'tactical';
 
   // Watch state
@@ -507,10 +508,10 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
         ...(hasDrill && nextTargetPlan?.nextBullets
           ? { bullets: String(nextTargetPlan.nextBullets) }
           : {}),
-        ...(isGroupingDrill ? { isGrouping: '1' } : {}),
+        ...(isGrouping ? { isGrouping: '1' } : {}),
       },
     });
-  }, [sessionId, defaultDistance, hasDrill, drill, nextTargetPlan, isGroupingDrill]);
+  }, [sessionId, defaultDistance, hasDrill, drill, nextTargetPlan, isGrouping]);
 
   const handleManualRoute = useCallback(() => {
     if (!canAddTarget) return;
@@ -524,10 +525,10 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
         ...(hasDrill && nextTargetPlan?.nextBullets
           ? { bullets: String(nextTargetPlan.nextBullets) }
           : {}),
-        ...(isGroupingDrill ? { isGrouping: '1' } : {}),
+        ...(isGrouping ? { isGrouping: '1' } : {}),
       },
     });
-  }, [canAddTarget, sessionId, defaultDistance, hasDrill, nextTargetPlan, isGroupingDrill]);
+  }, [canAddTarget, sessionId, defaultDistance, hasDrill, nextTargetPlan, isGrouping]);
 
   const handleScanRoute = useCallback(() => {
     if (!canAddTarget) return;
@@ -541,11 +542,11 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
         sessionId,
         distance: String(defaultDistance),
         ...(maxShots ? { maxShots } : {}),
-        drillGoal: isGroupingDrill ? 'grouping' : 'engagement',
+        drillGoal: isGrouping ? 'grouping' : 'engagement',
         ...(hasDrill ? { locked: '1' } : {}),
       },
     });
-  }, [canAddTarget, sessionId, defaultDistance, hasDrill, drill, isGroupingDrill]);
+  }, [canAddTarget, sessionId, defaultDistance, hasDrill, drill, isGrouping]);
 
   const handleTargetPress = useCallback((target: SessionTargetWithResults) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -840,8 +841,8 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     score,
 
     // Drill type flags
-    isGroupingDrill,
-    isEngagementDrill,
+    isGrouping,
+    isEngagement,
     isPaperDrill,
     isTacticalDrill,
 

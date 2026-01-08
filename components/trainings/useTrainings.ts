@@ -105,8 +105,8 @@ export function useTrainings(): UseTrainingsReturn {
   // Team stats (this week)
   const teamStats = useMemo(() => calculateTeamStats(activeTeamTrainings), [activeTeamTrainings]);
 
-  // UI computed values
-  const showSwitcher = teamState === 'multiple_teams';
+  // UI computed values - show switcher when user has any teams (allows switching/viewing team options)
+  const showSwitcher = teamState !== 'no_teams';
   const roleConfig = activeTeam ? getRoleConfig(activeTeam.my_role) : null;
 
   // ============================================================================

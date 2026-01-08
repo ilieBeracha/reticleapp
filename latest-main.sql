@@ -859,7 +859,7 @@ $$;
 ALTER FUNCTION "public"."get_my_team_ids"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."get_my_teams"() RETURNS TABLE("id" "uuid", "name" "text", "description" "text", "squads" "text"[], "team_type" "text", "created_by" "uuid", "created_at" timestamp with time zone, "my_role" "text", "member_count" bigint)
+CREATE OR REPLACE FUNCTION "public"."get_my_teams"() RETURNS TABLE("id" "uuid", "name" "text", "description" "text", "squads" "text"[], "team_type" "text", "created_by" "uuid", "created_at" timestamp with time zone, "my_role" "text", "my_squad_id" "text", "my_user_id" "uuid", "member_count" bigint)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
@@ -874,6 +874,8 @@ BEGIN
         t.created_by,
         t.created_at,
         tm.role,
+        tm.squad_id,
+        tm.user_id,
         (SELECT COUNT(*) FROM public.team_members WHERE team_id = t.id)
     FROM public.teams t
     JOIN public.team_members tm ON t.id = tm.team_id
