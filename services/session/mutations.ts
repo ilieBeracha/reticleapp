@@ -481,7 +481,37 @@ export async function endSession(sessionId: string) {
     }
   }
 
+  // =========================================================================
+  // RUN INSIGHT PIPELINE (non-blocking)
+  // =========================================================================
+  runInsightPipelineAsync(sessionId);
+
   return updatedSession;
+}
+
+/**
+ * Run insight pipeline asynchronously (fire-and-forget).
+ * Non-blocking - session end always succeeds regardless of insight generation.
+ */
+async function runInsightPipelineAsync(sessionId: string): Promise<void> {
+  try {
+    const { runInsightPipeline } = await import('@/services/insights');
+    const result = await runInsightPipeline(sessionId);
+    
+    if (result.error) {
+      console.warn('[SessionService] Insight pipeline warning:', result.error);
+    } else {
+      console.log('[SessionService] Insight pipeline complete:', {
+        sessionId,
+        insights: result.insights_generated,
+        features: result.features_computed,
+        baseline: result.baseline_refreshed,
+      });
+    }
+  } catch (err) {
+    // Non-blocking - don't fail anything if insights fail
+    console.error('[SessionService] Insight pipeline error (non-blocking):', err);
+  }
 }
 
 /**
@@ -991,6 +1021,9 @@ export async function saveWatchSessionData(
       }
     }
     
+    // Run insight pipeline (non-blocking)
+    runInsightPipelineAsync(data.sessionId);
+    
     return updatedSession;
   }
   
@@ -1261,6 +1294,9 @@ export async function saveTransformedWatchData(
         console.log('[SessionService] Watch session: Drill marked completed');
       }
     }
+    
+    // Run insight pipeline (non-blocking)
+    runInsightPipelineAsync(data.sessionId);
     
     return updatedSession;
   }

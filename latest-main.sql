@@ -535,6 +535,269 @@ $$;
 
 ALTER FUNCTION "public"."check_training_completion"("p_training_id" "uuid") OWNER TO "postgres";
 
+SET default_tablespace = '';
+
+SET default_table_access_method = "heap";
+
+
+CREATE TABLE IF NOT EXISTS "public"."session_features" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "session_id" "uuid" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "team_id" "uuid",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "shots" integer DEFAULT 0 NOT NULL,
+    "hits" integer DEFAULT 0 NOT NULL,
+    "accuracy_pct" numeric,
+    "grouping_cm" numeric,
+    "best_grouping_cm" numeric,
+    "dispersion_cm" numeric,
+    "offset_right_cm" numeric,
+    "offset_up_cm" numeric,
+    "stages_cleared" integer DEFAULT 0,
+    "avg_time_between_shots_sec" numeric,
+    "engagement_time_sec" numeric,
+    "fastest_engagement_sec" numeric,
+    "session_duration_sec" integer,
+    "distance_m" integer,
+    "position" "text",
+    "weapon_id" "uuid",
+    "weapon_category" "text",
+    "drill_goal" "text",
+    "target_type" "text",
+    "has_biometrics" boolean DEFAULT false,
+    "stress_avg" numeric,
+    "stress_trend" "text",
+    "hr_avg" numeric,
+    "hr_min" numeric,
+    "hr_max" numeric,
+    "flinch_count" integer DEFAULT 0,
+    "optimal_shot_pct" numeric
+);
+
+
+ALTER TABLE "public"."session_features" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."compute_session_features"("p_session_id" "uuid") RETURNS "public"."session_features"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+DECLARE
+  v_session RECORD;
+  v_stats RECORD;
+  v_paper RECORD;
+  v_tactical RECORD;
+  v_timeline RECORD;
+  v_result public.session_features;
+BEGIN
+  -- 1. Get session base info
+  SELECT 
+    s.id,
+    s.user_id,
+    s.team_id,
+    s.weapon_id,
+    s.started_at,
+    s.ended_at,
+    COALESCE(
+      d.drill_goal,
+      s.custom_drill_config->>'drill_goal',
+      'achievement'
+    ) as drill_goal,
+    uw.category as weapon_category
+  INTO v_session
+  FROM sessions s
+  LEFT JOIN drill_templates d ON d.id = s.drill_template_id
+  LEFT JOIN user_weapons uw ON uw.id = s.weapon_id
+  WHERE s.id = p_session_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Session not found: %', p_session_id;
+  END IF;
+
+  -- 2. Aggregate from session_targets + paper_target_results
+  SELECT
+    COALESCE(SUM(ptr.bullets_fired), 0) as total_shots,
+    COALESCE(SUM(ptr.hits_total), 0) as total_hits,
+    AVG(ptr.dispersion_cm) as avg_dispersion,
+    MIN(ptr.dispersion_cm) as best_dispersion,
+    AVG(ptr.offset_right_cm) as avg_offset_right,
+    AVG(ptr.offset_up_cm) as avg_offset_up,
+    MAX(st.distance_m) as distance_m,
+    MODE() WITHIN GROUP (ORDER BY st.target_type) as target_type
+  INTO v_paper
+  FROM session_targets st
+  LEFT JOIN paper_target_results ptr ON ptr.session_target_id = st.id
+  WHERE st.session_id = p_session_id AND st.target_type = 'paper';
+
+  -- 3. Aggregate from session_targets + tactical_target_results
+  SELECT
+    COALESCE(SUM(ttr.bullets_fired), 0) as total_shots,
+    COALESCE(SUM(ttr.hits), 0) as total_hits,
+    COUNT(*) FILTER (WHERE ttr.is_stage_cleared) as stages_cleared,
+    AVG(ttr.time_seconds) as avg_engagement_time,
+    MIN(ttr.time_seconds) as fastest_engagement,
+    MAX(st.distance_m) as distance_m
+  INTO v_tactical
+  FROM session_targets st
+  LEFT JOIN tactical_target_results ttr ON ttr.session_target_id = st.id
+  WHERE st.session_id = p_session_id AND st.target_type = 'tactical';
+
+  -- 4. Get biometrics from session_timelines (if exists)
+  SELECT
+    TRUE as has_data,
+    (summary->>'stressAvg')::numeric as stress_avg,
+    (summary->>'hrAvg')::numeric as hr_avg,
+    (summary->>'hrMin')::numeric as hr_min,
+    (summary->>'hrMax')::numeric as hr_max,
+    (SELECT COUNT(*) FROM jsonb_array_elements(shot_details) sd WHERE (sd->>'flinch')::boolean) as flinch_count,
+    (SELECT COUNT(*) FROM jsonb_array_elements(shot_details)) as total_shots_biometric,
+    (SELECT COUNT(*) FROM jsonb_array_elements(shot_details) sd 
+      WHERE (sd->>'breathPhase') = 'pause' 
+      AND (sd->>'stress')::numeric < 50 
+      AND (sd->>'steadiness')::numeric >= 70
+    ) as optimal_shots
+  INTO v_timeline
+  FROM session_timelines
+  WHERE session_id = p_session_id;
+
+  -- 5. Calculate derived values
+  DECLARE
+    v_total_shots integer;
+    v_total_hits integer;
+    v_accuracy numeric;
+    v_session_duration integer;
+    v_position text;
+    v_optimal_pct numeric;
+    v_stress_trend text;
+  BEGIN
+    v_total_shots := COALESCE(v_paper.total_shots, 0) + COALESCE(v_tactical.total_shots, 0);
+    v_total_hits := COALESCE(v_paper.total_hits, 0) + COALESCE(v_tactical.total_hits, 0);
+    v_accuracy := CASE WHEN v_total_shots > 0 THEN ROUND((v_total_hits::numeric / v_total_shots) * 100, 2) ELSE NULL END;
+    
+    -- Session duration in seconds
+    IF v_session.ended_at IS NOT NULL AND v_session.started_at IS NOT NULL THEN
+      v_session_duration := EXTRACT(EPOCH FROM (v_session.ended_at - v_session.started_at))::integer;
+    END IF;
+
+    -- Get position from session_stats if available
+    SELECT ss.position INTO v_position
+    FROM session_stats ss
+    WHERE ss.session_id = p_session_id
+    LIMIT 1;
+
+    -- Calculate optimal shot percentage
+    IF v_timeline.has_data AND v_timeline.total_shots_biometric > 0 THEN
+      v_optimal_pct := ROUND((v_timeline.optimal_shots::numeric / v_timeline.total_shots_biometric) * 100, 1);
+    END IF;
+
+    -- Stress trend (simplified - compare first vs last quarter of timeline)
+    -- For now, default to 'stable' - can be computed from timeline points in TypeScript
+    v_stress_trend := 'stable';
+
+    -- 6. Upsert into session_features
+    INSERT INTO session_features (
+      session_id,
+      user_id,
+      team_id,
+      shots,
+      hits,
+      accuracy_pct,
+      grouping_cm,
+      best_grouping_cm,
+      dispersion_cm,
+      offset_right_cm,
+      offset_up_cm,
+      stages_cleared,
+      engagement_time_sec,
+      fastest_engagement_sec,
+      session_duration_sec,
+      distance_m,
+      position,
+      weapon_id,
+      weapon_category,
+      drill_goal,
+      target_type,
+      has_biometrics,
+      stress_avg,
+      stress_trend,
+      hr_avg,
+      hr_min,
+      hr_max,
+      flinch_count,
+      optimal_shot_pct
+    ) VALUES (
+      p_session_id,
+      v_session.user_id,
+      v_session.team_id,
+      v_total_shots,
+      v_total_hits,
+      v_accuracy,
+      v_paper.avg_dispersion,
+      v_paper.best_dispersion,
+      v_paper.avg_dispersion,
+      v_paper.avg_offset_right,
+      v_paper.avg_offset_up,
+      COALESCE(v_tactical.stages_cleared, 0),
+      v_tactical.avg_engagement_time,
+      v_tactical.fastest_engagement,
+      v_session_duration,
+      COALESCE(v_paper.distance_m, v_tactical.distance_m),
+      v_position,
+      v_session.weapon_id,
+      v_session.weapon_category,
+      v_session.drill_goal,
+      COALESCE(v_paper.target_type, 'tactical'),
+      COALESCE(v_timeline.has_data, false),
+      v_timeline.stress_avg,
+      v_stress_trend,
+      v_timeline.hr_avg,
+      v_timeline.hr_min,
+      v_timeline.hr_max,
+      COALESCE(v_timeline.flinch_count, 0),
+      v_optimal_pct
+    )
+    ON CONFLICT (session_id) DO UPDATE SET
+      shots = EXCLUDED.shots,
+      hits = EXCLUDED.hits,
+      accuracy_pct = EXCLUDED.accuracy_pct,
+      grouping_cm = EXCLUDED.grouping_cm,
+      best_grouping_cm = EXCLUDED.best_grouping_cm,
+      dispersion_cm = EXCLUDED.dispersion_cm,
+      offset_right_cm = EXCLUDED.offset_right_cm,
+      offset_up_cm = EXCLUDED.offset_up_cm,
+      stages_cleared = EXCLUDED.stages_cleared,
+      engagement_time_sec = EXCLUDED.engagement_time_sec,
+      fastest_engagement_sec = EXCLUDED.fastest_engagement_sec,
+      session_duration_sec = EXCLUDED.session_duration_sec,
+      distance_m = EXCLUDED.distance_m,
+      position = EXCLUDED.position,
+      weapon_id = EXCLUDED.weapon_id,
+      weapon_category = EXCLUDED.weapon_category,
+      drill_goal = EXCLUDED.drill_goal,
+      target_type = EXCLUDED.target_type,
+      has_biometrics = EXCLUDED.has_biometrics,
+      stress_avg = EXCLUDED.stress_avg,
+      stress_trend = EXCLUDED.stress_trend,
+      hr_avg = EXCLUDED.hr_avg,
+      hr_min = EXCLUDED.hr_min,
+      hr_max = EXCLUDED.hr_max,
+      flinch_count = EXCLUDED.flinch_count,
+      optimal_shot_pct = EXCLUDED.optimal_shot_pct
+    RETURNING * INTO v_result;
+
+    RETURN v_result;
+  END;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."compute_session_features"("p_session_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."compute_session_features"("p_session_id" "uuid") IS 'Computes and stores derived features for a session. Call after session completion. Idempotent (upserts).';
+
+
 
 CREATE OR REPLACE FUNCTION "public"."create_org_workspace"("p_name" "text", "p_description" "text" DEFAULT NULL::"text") RETURNS TABLE("id" "uuid", "name" "text", "description" "text", "workspace_slug" "text", "created_by" "uuid", "created_at" timestamp with time zone)
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -571,10 +834,6 @@ END;$$;
 
 
 ALTER FUNCTION "public"."create_org_workspace"("p_name" "text", "p_description" "text") OWNER TO "postgres";
-
-SET default_tablespace = '';
-
-SET default_table_access_method = "heap";
 
 
 CREATE TABLE IF NOT EXISTS "public"."sessions" (
@@ -942,6 +1201,42 @@ $$;
 
 
 ALTER FUNCTION "public"."get_org_workspace_members"("p_org_workspace_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."get_session_baseline"("p_session_id" "uuid") RETURNS TABLE("condition_key" "text", "n" integer, "avg_accuracy" numeric, "std_accuracy" numeric, "avg_grouping" numeric, "std_grouping" numeric)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+DECLARE
+  v_user_id uuid;
+  v_key text;
+BEGIN
+  -- Get session features
+  SELECT sf.user_id, make_condition_key(sf.drill_goal, sf.position, sf.distance_m, sf.weapon_category)
+  INTO v_user_id, v_key
+  FROM session_features sf
+  WHERE sf.session_id = p_session_id;
+
+  IF NOT FOUND THEN
+    RETURN;
+  END IF;
+
+  -- Return baseline if exists
+  RETURN QUERY
+  SELECT 
+    ub.condition_key,
+    ub.n,
+    ub.avg_accuracy,
+    ub.std_accuracy,
+    ub.avg_grouping,
+    ub.std_grouping
+  FROM user_baselines ub
+  WHERE ub.user_id = v_user_id AND ub.condition_key = v_key;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_session_baseline"("p_session_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."get_sniper_best_performance"("p_user_id" "uuid", "p_org_workspace_id" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("best_paper_accuracy" numeric, "best_tactical_accuracy" numeric, "best_overall_accuracy" numeric, "tightest_grouping_cm" numeric, "fastest_engagement_sec" numeric, "most_targets_cleared" integer, "longest_session_minutes" integer, "total_sessions" bigint)
@@ -1501,6 +1796,39 @@ $$;
 ALTER FUNCTION "public"."is_workspace_admin"("p_workspace_id" "uuid", "p_user_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."make_condition_key"("p_drill_goal" "text", "p_position" "text", "p_distance_m" integer, "p_weapon_category" "text") RETURNS "text"
+    LANGUAGE "plpgsql" IMMUTABLE
+    AS $$
+DECLARE
+  v_distance_bucket text;
+BEGIN
+  -- Distance buckets: 0-50, 51-100, 101-200, 201-300, 301-500, 500+
+  v_distance_bucket := CASE
+    WHEN p_distance_m IS NULL THEN 'unknown'
+    WHEN p_distance_m <= 50 THEN '0-50'
+    WHEN p_distance_m <= 100 THEN '51-100'
+    WHEN p_distance_m <= 200 THEN '101-200'
+    WHEN p_distance_m <= 300 THEN '201-300'
+    WHEN p_distance_m <= 500 THEN '301-500'
+    ELSE '500+'
+  END;
+
+  RETURN 
+    COALESCE(p_drill_goal, 'unknown') || '|' ||
+    COALESCE(p_position, 'unknown') || '|' ||
+    v_distance_bucket || '|' ||
+    COALESCE(p_weapon_category, 'unknown');
+END;
+$$;
+
+
+ALTER FUNCTION "public"."make_condition_key"("p_drill_goal" "text", "p_position" "text", "p_distance_m" integer, "p_weapon_category" "text") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."make_condition_key"("p_drill_goal" "text", "p_position" "text", "p_distance_m" integer, "p_weapon_category" "text") IS 'Generates baseline lookup key from session context. Format: drill_goal|position|distance_bucket|weapon_category';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."notify_team_on_training_created"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -1590,6 +1918,85 @@ $$;
 
 
 ALTER FUNCTION "public"."notify_team_on_training_started"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."refresh_user_baseline"("p_user_id" "uuid", "p_condition_key" "text", "p_limit" integer DEFAULT 30) RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+DECLARE
+  v_stats RECORD;
+BEGIN
+  -- Aggregate from recent session_features matching condition
+  WITH matching_sessions AS (
+    SELECT
+      sf.accuracy_pct,
+      sf.grouping_cm,
+      sf.stress_avg,
+      sf.optimal_shot_pct
+    FROM session_features sf
+    WHERE sf.user_id = p_user_id
+      AND make_condition_key(sf.drill_goal, sf.position, sf.distance_m, sf.weapon_category) = p_condition_key
+      AND sf.accuracy_pct IS NOT NULL
+      AND sf.shots >= 5  -- Minimum shots for meaningful data
+    ORDER BY sf.created_at DESC
+    LIMIT p_limit
+  )
+  SELECT
+    COUNT(*)::integer as n,
+    AVG(accuracy_pct) as avg_accuracy,
+    STDDEV_SAMP(accuracy_pct) as std_accuracy,
+    AVG(grouping_cm) as avg_grouping,
+    STDDEV_SAMP(grouping_cm) as std_grouping,
+    AVG(stress_avg) as avg_stress,
+    AVG(optimal_shot_pct) as avg_optimal_pct
+  INTO v_stats
+  FROM matching_sessions;
+
+  -- Only store if we have enough data
+  IF v_stats.n >= 3 THEN
+    INSERT INTO user_baselines (
+      user_id,
+      condition_key,
+      n,
+      avg_accuracy,
+      std_accuracy,
+      avg_grouping,
+      std_grouping,
+      avg_stress,
+      avg_optimal_shot_pct,
+      updated_at
+    ) VALUES (
+      p_user_id,
+      p_condition_key,
+      v_stats.n,
+      v_stats.avg_accuracy,
+      v_stats.std_accuracy,
+      v_stats.avg_grouping,
+      v_stats.std_grouping,
+      v_stats.avg_stress,
+      v_stats.avg_optimal_pct,
+      now()
+    )
+    ON CONFLICT (user_id, condition_key) DO UPDATE SET
+      n = EXCLUDED.n,
+      avg_accuracy = EXCLUDED.avg_accuracy,
+      std_accuracy = EXCLUDED.std_accuracy,
+      avg_grouping = EXCLUDED.avg_grouping,
+      std_grouping = EXCLUDED.std_grouping,
+      avg_stress = EXCLUDED.avg_stress,
+      avg_optimal_shot_pct = EXCLUDED.avg_optimal_shot_pct,
+      updated_at = now();
+  END IF;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."refresh_user_baseline"("p_user_id" "uuid", "p_condition_key" "text", "p_limit" integer) OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."refresh_user_baseline"("p_user_id" "uuid", "p_condition_key" "text", "p_limit" integer) IS 'Refreshes user baseline for a condition key from last N matching sessions. Minimum 3 sessions required.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."remove_team_member"("p_team_id" "uuid", "p_user_id" "uuid") RETURNS boolean
@@ -2107,6 +2514,26 @@ CREATE TABLE IF NOT EXISTS "public"."push_tokens" (
 ALTER TABLE "public"."push_tokens" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."session_insights" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "session_id" "uuid" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "title" "text" NOT NULL,
+    "summary" "text" NOT NULL,
+    "primary_factor" "text",
+    "secondary_factor" "text",
+    "score" numeric DEFAULT 0 NOT NULL,
+    "tags" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
+    "insight_type" "text",
+    "evidence" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    CONSTRAINT "session_insights_score_check" CHECK ((("score" >= (0)::numeric) AND ("score" <= (100)::numeric)))
+);
+
+
+ALTER TABLE "public"."session_insights" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."session_participants" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "session_id" "uuid" NOT NULL,
@@ -2411,6 +2838,24 @@ COMMENT ON COLUMN "public"."trainings"."ended_at" IS 'When the training was fini
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."user_baselines" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "condition_key" "text" NOT NULL,
+    "n" integer DEFAULT 0 NOT NULL,
+    "avg_accuracy" numeric,
+    "std_accuracy" numeric,
+    "avg_grouping" numeric,
+    "std_grouping" numeric,
+    "avg_stress" numeric,
+    "avg_optimal_shot_pct" numeric,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."user_baselines" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."user_drill_completions" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -2550,6 +2995,26 @@ ALTER TABLE ONLY "public"."push_tokens"
 
 
 
+ALTER TABLE ONLY "public"."session_features"
+    ADD CONSTRAINT "session_features_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."session_features"
+    ADD CONSTRAINT "session_features_session_id_key" UNIQUE ("session_id");
+
+
+
+ALTER TABLE ONLY "public"."session_insights"
+    ADD CONSTRAINT "session_insights_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."session_insights"
+    ADD CONSTRAINT "session_insights_unique" UNIQUE ("session_id", "user_id", "title");
+
+
+
 ALTER TABLE ONLY "public"."session_participants"
     ADD CONSTRAINT "session_participants_pkey" PRIMARY KEY ("id");
 
@@ -2625,6 +3090,16 @@ ALTER TABLE ONLY "public"."trainings"
 
 
 
+ALTER TABLE ONLY "public"."user_baselines"
+    ADD CONSTRAINT "user_baselines_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."user_baselines"
+    ADD CONSTRAINT "user_baselines_user_condition_unique" UNIQUE ("user_id", "condition_key");
+
+
+
 ALTER TABLE ONLY "public"."user_drill_completions"
     ADD CONSTRAINT "user_drill_completions_pkey" PRIMARY KEY ("id");
 
@@ -2676,6 +3151,30 @@ CREATE INDEX "idx_drill_templates_team_id" ON "public"."drill_templates" USING "
 
 
 CREATE INDEX "idx_push_tokens_user_id" ON "public"."push_tokens" USING "btree" ("user_id");
+
+
+
+CREATE INDEX "idx_session_features_drill_goal" ON "public"."session_features" USING "btree" ("drill_goal") WHERE ("drill_goal" IS NOT NULL);
+
+
+
+CREATE INDEX "idx_session_features_team" ON "public"."session_features" USING "btree" ("team_id") WHERE ("team_id" IS NOT NULL);
+
+
+
+CREATE INDEX "idx_session_features_user_created" ON "public"."session_features" USING "btree" ("user_id", "created_at" DESC);
+
+
+
+CREATE INDEX "idx_session_insights_score" ON "public"."session_insights" USING "btree" ("session_id", "score" DESC);
+
+
+
+CREATE INDEX "idx_session_insights_session" ON "public"."session_insights" USING "btree" ("session_id");
+
+
+
+CREATE INDEX "idx_session_insights_user_created" ON "public"."session_insights" USING "btree" ("user_id", "created_at" DESC);
 
 
 
@@ -2799,6 +3298,14 @@ CREATE INDEX "idx_trainings_team" ON "public"."trainings" USING "btree" ("team_i
 
 
 
+CREATE INDEX "idx_user_baselines_updated" ON "public"."user_baselines" USING "btree" ("updated_at" DESC);
+
+
+
+CREATE INDEX "idx_user_baselines_user" ON "public"."user_baselines" USING "btree" ("user_id");
+
+
+
 CREATE INDEX "idx_user_weapons_last_used" ON "public"."user_weapons" USING "btree" ("user_id", "last_used_at" DESC NULLS LAST);
 
 
@@ -2910,6 +3417,36 @@ ALTER TABLE ONLY "public"."profiles"
 
 ALTER TABLE ONLY "public"."push_tokens"
     ADD CONSTRAINT "push_tokens_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."session_features"
+    ADD CONSTRAINT "session_features_session_id_fkey" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."session_features"
+    ADD CONSTRAINT "session_features_team_id_fkey" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."session_features"
+    ADD CONSTRAINT "session_features_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."session_features"
+    ADD CONSTRAINT "session_features_weapon_id_fkey" FOREIGN KEY ("weapon_id") REFERENCES "public"."user_weapons"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."session_insights"
+    ADD CONSTRAINT "session_insights_session_id_fkey" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."session_insights"
+    ADD CONSTRAINT "session_insights_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
 
 
@@ -3045,6 +3582,11 @@ ALTER TABLE ONLY "public"."trainings"
 
 ALTER TABLE ONLY "public"."trainings"
     ADD CONSTRAINT "trainings_team_id_fkey" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id");
+
+
+
+ALTER TABLE ONLY "public"."user_baselines"
+    ADD CONSTRAINT "user_baselines_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
 
 
@@ -3294,11 +3836,19 @@ CREATE POLICY "Users can create teams" ON "public"."teams" FOR INSERT WITH CHECK
 
 
 
+CREATE POLICY "Users can delete own insights" ON "public"."session_insights" FOR DELETE USING (("user_id" = "auth"."uid"()));
+
+
+
 CREATE POLICY "Users can delete own notifications" ON "public"."notifications" FOR DELETE USING (("auth"."uid"() = "user_id"));
 
 
 
 CREATE POLICY "Users can delete own push tokens" ON "public"."push_tokens" FOR DELETE USING (("auth"."uid"() = "user_id"));
+
+
+
+CREATE POLICY "Users can delete own session features" ON "public"."session_features" FOR DELETE USING (("user_id" = "auth"."uid"()));
 
 
 
@@ -3324,7 +3874,15 @@ CREATE POLICY "Users can insert own drill completions" ON "public"."user_drill_c
 
 
 
+CREATE POLICY "Users can insert own insights" ON "public"."session_insights" FOR INSERT WITH CHECK (("user_id" = "auth"."uid"()));
+
+
+
 CREATE POLICY "Users can insert own push tokens" ON "public"."push_tokens" FOR INSERT WITH CHECK (("auth"."uid"() = "user_id"));
+
+
+
+CREATE POLICY "Users can insert own session features" ON "public"."session_features" FOR INSERT WITH CHECK (("user_id" = "auth"."uid"()));
 
 
 
@@ -3366,7 +3924,15 @@ CREATE POLICY "Users can insert timelines for own sessions" ON "public"."session
 
 
 
+CREATE POLICY "Users can manage own baselines" ON "public"."user_baselines" USING (("user_id" = "auth"."uid"()));
+
+
+
 CREATE POLICY "Users can read own weapons" ON "public"."user_weapons" FOR SELECT USING (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can update own insights" ON "public"."session_insights" FOR UPDATE USING (("user_id" = "auth"."uid"()));
 
 
 
@@ -3379,6 +3945,10 @@ CREATE POLICY "Users can update own profile" ON "public"."profiles" FOR UPDATE U
 
 
 CREATE POLICY "Users can update own push tokens" ON "public"."push_tokens" FOR UPDATE USING (("auth"."uid"() = "user_id"));
+
+
+
+CREATE POLICY "Users can update own session features" ON "public"."session_features" FOR UPDATE USING (("user_id" = "auth"."uid"()));
 
 
 
@@ -3436,11 +4006,23 @@ CREATE POLICY "Users can view own and team sessions" ON "public"."sessions" FOR 
 
 
 
+CREATE POLICY "Users can view own baselines" ON "public"."user_baselines" FOR SELECT USING (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can view own insights" ON "public"."session_insights" FOR SELECT USING (("user_id" = "auth"."uid"()));
+
+
+
 CREATE POLICY "Users can view own notifications" ON "public"."notifications" FOR SELECT USING (("auth"."uid"() = "user_id"));
 
 
 
 CREATE POLICY "Users can view own push tokens" ON "public"."push_tokens" FOR SELECT USING (("auth"."uid"() = "user_id"));
+
+
+
+CREATE POLICY "Users can view own session features" ON "public"."session_features" FOR SELECT USING (("user_id" = "auth"."uid"()));
 
 
 
@@ -3525,6 +4107,12 @@ CREATE POLICY "profiles_update_self" ON "public"."profiles" FOR UPDATE USING (("
 ALTER TABLE "public"."push_tokens" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."session_features" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."session_insights" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."session_participants" ENABLE ROW LEVEL SECURITY;
 
 
@@ -3559,6 +4147,9 @@ ALTER TABLE "public"."training_drills" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."trainings" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."user_baselines" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."user_drill_completions" ENABLE ROW LEVEL SECURITY;
@@ -3625,6 +4216,18 @@ GRANT ALL ON FUNCTION "public"."check_training_completion"("p_training_id" "uuid
 
 
 
+GRANT ALL ON TABLE "public"."session_features" TO "anon";
+GRANT ALL ON TABLE "public"."session_features" TO "authenticated";
+GRANT ALL ON TABLE "public"."session_features" TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."compute_session_features"("p_session_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."compute_session_features"("p_session_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."compute_session_features"("p_session_id" "uuid") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."create_org_workspace"("p_name" "text", "p_description" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."create_org_workspace"("p_name" "text", "p_description" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."create_org_workspace"("p_name" "text", "p_description" "text") TO "service_role";
@@ -3688,6 +4291,12 @@ GRANT ALL ON FUNCTION "public"."get_my_teams"() TO "service_role";
 GRANT ALL ON FUNCTION "public"."get_org_workspace_members"("p_org_workspace_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_org_workspace_members"("p_org_workspace_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_org_workspace_members"("p_org_workspace_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."get_session_baseline"("p_session_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_session_baseline"("p_session_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_session_baseline"("p_session_id" "uuid") TO "service_role";
 
 
 
@@ -3787,6 +4396,12 @@ GRANT ALL ON FUNCTION "public"."is_workspace_admin"("p_workspace_id" "uuid", "p_
 
 
 
+GRANT ALL ON FUNCTION "public"."make_condition_key"("p_drill_goal" "text", "p_position" "text", "p_distance_m" integer, "p_weapon_category" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."make_condition_key"("p_drill_goal" "text", "p_position" "text", "p_distance_m" integer, "p_weapon_category" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."make_condition_key"("p_drill_goal" "text", "p_position" "text", "p_distance_m" integer, "p_weapon_category" "text") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."notify_team_on_training_created"() TO "anon";
 GRANT ALL ON FUNCTION "public"."notify_team_on_training_created"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."notify_team_on_training_created"() TO "service_role";
@@ -3796,6 +4411,12 @@ GRANT ALL ON FUNCTION "public"."notify_team_on_training_created"() TO "service_r
 GRANT ALL ON FUNCTION "public"."notify_team_on_training_started"() TO "anon";
 GRANT ALL ON FUNCTION "public"."notify_team_on_training_started"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."notify_team_on_training_started"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."refresh_user_baseline"("p_user_id" "uuid", "p_condition_key" "text", "p_limit" integer) TO "anon";
+GRANT ALL ON FUNCTION "public"."refresh_user_baseline"("p_user_id" "uuid", "p_condition_key" "text", "p_limit" integer) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."refresh_user_baseline"("p_user_id" "uuid", "p_condition_key" "text", "p_limit" integer) TO "service_role";
 
 
 
@@ -3856,6 +4477,12 @@ GRANT ALL ON TABLE "public"."profiles" TO "service_role";
 GRANT ALL ON TABLE "public"."push_tokens" TO "anon";
 GRANT ALL ON TABLE "public"."push_tokens" TO "authenticated";
 GRANT ALL ON TABLE "public"."push_tokens" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."session_insights" TO "anon";
+GRANT ALL ON TABLE "public"."session_insights" TO "authenticated";
+GRANT ALL ON TABLE "public"."session_insights" TO "service_role";
 
 
 
@@ -3922,6 +4549,12 @@ GRANT ALL ON TABLE "public"."training_drills" TO "service_role";
 GRANT ALL ON TABLE "public"."trainings" TO "anon";
 GRANT ALL ON TABLE "public"."trainings" TO "authenticated";
 GRANT ALL ON TABLE "public"."trainings" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."user_baselines" TO "anon";
+GRANT ALL ON TABLE "public"."user_baselines" TO "authenticated";
+GRANT ALL ON TABLE "public"."user_baselines" TO "service_role";
 
 
 

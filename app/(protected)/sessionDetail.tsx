@@ -6,6 +6,7 @@
  */
 import { useSessionTimeline } from '@/components/session/timeline/useSessionTimeline';
 import { useColors } from '@/hooks/ui/useColors';
+import { getSessionInsights, runInsightPipeline, type SessionInsight } from '@/services/insights';
 import {
   calculateSessionStats,
   getSessionById,
@@ -21,15 +22,18 @@ import { router, useLocalSearchParams } from 'expo-router';
 import {
   Activity,
   Crosshair as AimIcon,
+  AlertTriangle,
   ArrowDown,
   ArrowUp,
   Award,
   Calendar,
+  CheckCircle,
   ChevronRight,
   Clock,
   Crosshair,
   Focus,
   Heart,
+  Lightbulb,
   Ruler,
   Scan,
   Settings2,
@@ -59,6 +63,8 @@ export default function SessionDetailScreen() {
   const [stats, setStats] = useState<SessionStats | null>(null);
   const [targets, setTargets] = useState<SessionTargetWithResults[]>([]);
   const [loading, setLoading] = useState(true);
+  const [insights, setInsights] = useState<SessionInsight[]>([]);
+  const [insightsLoading, setInsightsLoading] = useState(false);
 
   // Load timeline data from DB (saved independently by garminStore)
   const {
@@ -93,6 +99,40 @@ export default function SessionDetailScreen() {
 
     loadData();
   }, [sessionId]);
+
+  // Load insights (separate call - generates on-demand if none exist)
+  useEffect(() => {
+    if (!sessionId || !session || session.status !== 'completed') return;
+
+    const loadInsights = async () => {
+      setInsightsLoading(true);
+      try {
+        // First try to get existing insights
+        let sessionInsights = await getSessionInsights(sessionId);
+        console.log('[SessionDetail] Existing insights:', sessionInsights.length);
+
+        // If no insights exist, generate them on-demand
+        if (sessionInsights.length === 0) {
+          console.log('[SessionDetail] No insights found, generating...');
+          const result = await runInsightPipeline(sessionId);
+          console.log('[SessionDetail] Pipeline result:', result);
+
+          if (result.insights_generated > 0) {
+            // Reload insights after generation
+            sessionInsights = await getSessionInsights(sessionId);
+          }
+        }
+
+        setInsights(sessionInsights);
+      } catch (error) {
+        console.error('[SessionDetail] Failed to load/generate insights:', error);
+      } finally {
+        setInsightsLoading(false);
+      }
+    };
+
+    loadInsights();
+  }, [sessionId, session?.status]);
 
   // Get images from targets
   const targetImages = useMemo(() => {
@@ -801,6 +841,114 @@ export default function SessionDetailScreen() {
               </ScrollView>
             </View>
           )}
+        </Animated.View>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* SESSION INSIGHTS (from insight pipeline) */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {insights.length > 0 && (
+        <Animated.View entering={FadeInDown.delay(150).duration(300)} style={styles.insightsSection}>
+          <View style={styles.insightsHeader}>
+            <Lightbulb size={14} color={colors.primary} />
+            <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Session Insights</Text>
+          </View>
+
+          <View style={{ gap: 10 }}>
+            {insights
+              .filter((i) => {
+                // Show non-summary insights first, but if none exist, show summary
+                const nonSummaryInsights = insights.filter((x) => x.insight_type !== 'summary');
+                return nonSummaryInsights.length > 0 ? i.insight_type !== 'summary' : true;
+              })
+              .slice(0, 3)
+              .map((insight) => {
+                // Determine icon and colors based on insight type
+                const isPositive =
+                  insight.insight_type === 'achievement' || insight.tags.includes('improvement');
+                const isWarning =
+                  insight.insight_type === 'baseline_deviation' ||
+                  insight.insight_type === 'fatigue_correlation' ||
+                  insight.insight_type === 'biometric_pattern';
+
+                const iconColor = isPositive ? colors.green : isWarning ? colors.orange : colors.primary;
+                const bgColor = isPositive
+                  ? 'rgba(16,185,129,0.08)'
+                  : isWarning
+                    ? 'rgba(245,158,11,0.08)'
+                    : 'rgba(99,102,241,0.08)';
+
+                return (
+                  <View
+                    key={insight.id}
+                    style={[
+                      styles.insightsCard,
+                      {
+                        backgroundColor: colors.card,
+                        borderColor: colors.border,
+                        flexDirection: 'row',
+                        gap: 12,
+                        alignItems: 'flex-start',
+                      },
+                    ]}
+                  >
+                    <View
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        backgroundColor: bgColor,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {isPositive ? (
+                        <CheckCircle size={16} color={iconColor} />
+                      ) : isWarning ? (
+                        <AlertTriangle size={16} color={iconColor} />
+                      ) : (
+                        <Lightbulb size={16} color={iconColor} />
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.insightCardTitle, { color: colors.text }]}>{insight.title}</Text>
+                      <Text style={[styles.insightCardSummary, { color: colors.textMuted }]}>{insight.summary}</Text>
+                      {insight.primary_factor && (
+                        <View style={styles.insightTagsRow}>
+                          <View style={[styles.insightTag, { backgroundColor: bgColor }]}>
+                            <Text style={[styles.insightTagText, { color: iconColor }]}>
+                              {insight.primary_factor}
+                            </Text>
+                          </View>
+                          {insight.secondary_factor && (
+                            <View style={[styles.insightTag, { backgroundColor: 'rgba(107,114,128,0.1)' }]}>
+                              <Text style={[styles.insightTagText, { color: colors.textMuted }]}>
+                                {insight.secondary_factor}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+          </View>
+        </Animated.View>
+      )}
+
+      {/* Insights loading state */}
+      {session?.status === 'completed' && insightsLoading && insights.length === 0 && (
+        <Animated.View entering={FadeIn.duration(200)} style={styles.insightsSection}>
+          <View
+            style={[
+              styles.insightsCard,
+              { backgroundColor: colors.card, borderColor: colors.border, alignItems: 'center', paddingVertical: 20 },
+            ]}
+          >
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={[styles.loadingInsightsText, { color: colors.textMuted }]}>Analyzing session...</Text>
+          </View>
         </Animated.View>
       )}
 
@@ -1861,6 +2009,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     marginTop: 8,
+  },
+
+  // Insight Cards (from pipeline)
+  insightCardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  insightCardSummary: {
+    fontSize: 12,
+    fontWeight: '400',
+    lineHeight: 18,
+  },
+  insightTagsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 8,
+  },
+  insightTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  insightTagText: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'capitalize',
   },
 
   // Shot Bars
