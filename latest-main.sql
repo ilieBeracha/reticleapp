@@ -106,18 +106,18 @@ Returns JSON with success flag and workspace details or error message.';
 CREATE OR REPLACE FUNCTION "public"."accept_team_invitation"("p_invite_code" "text") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
-    AS $$DECLARE
+    AS $$
+DECLARE
     v_user_id uuid;
     v_invitation RECORD;
     v_result jsonb;
+    v_squad_id text;
 BEGIN
-    -- Get current user
     v_user_id := auth.uid();
     IF v_user_id IS NULL THEN
         RAISE EXCEPTION 'Not authenticated';
     END IF;
     
-    -- Find invitation
     SELECT * INTO v_invitation
     FROM public.team_invitations
     WHERE invite_code = p_invite_code
@@ -129,7 +129,6 @@ BEGIN
         RAISE EXCEPTION 'Invalid or expired invitation';
     END IF;
     
-    -- Check if already a member
     IF EXISTS (
         SELECT 1 FROM public.team_members
         WHERE team_id = v_invitation.team_id AND user_id = v_user_id
@@ -137,17 +136,17 @@ BEGIN
         RAISE EXCEPTION 'Already a member of this team';
     END IF;
     
-    -- In accept_team_invitation, change the INSERT to:
+    v_squad_id := v_invitation.details->>'squad_id';
+    
     INSERT INTO public.team_members (team_id, user_id, role, squad_id, details)
     VALUES (
         v_invitation.team_id,
         v_user_id,
         COALESCE(v_invitation.team_role, 'soldier'),
-        v_invitation.details->>'squad_id',  -- Extract to column
+        v_squad_id,
         COALESCE(v_invitation.details, '{}'::jsonb)
     );
     
-    -- Update invitation
     UPDATE public.team_invitations
     SET status = 'accepted',
         accepted_by = v_user_id,
@@ -155,7 +154,6 @@ BEGIN
         updated_at = now()
     WHERE id = v_invitation.id;
     
-    -- Return result
     SELECT jsonb_build_object(
         'success', true,
         'team_id', v_invitation.team_id,
@@ -166,7 +164,8 @@ BEGIN
     WHERE t.id = v_invitation.team_id;
     
     RETURN v_result;
-END;$$;
+END;
+$$;
 
 
 ALTER FUNCTION "public"."accept_team_invitation"("p_invite_code" "text") OWNER TO "postgres";
@@ -343,7 +342,7 @@ CREATE OR REPLACE FUNCTION "public"."check_commander_constraints"() RETURNS "tri
 DECLARE
   existing_commander_count integer;
   existing_squad_commander_count integer;
-  squad_id text;
+  v_squad_id text;  -- Renamed from squad_id to avoid ambiguity
 BEGIN
   -- Check team commander uniqueness
   IF NEW.role = 'commander' THEN
@@ -360,21 +359,21 @@ BEGIN
 
   -- Check squad commander uniqueness
   IF NEW.role = 'squad_commander' THEN
-    squad_id := NEW.details->>'squad_id';
+    v_squad_id := NEW.squad_id;  -- Use the column directly
     
-    IF squad_id IS NULL OR squad_id = '' THEN
-      RAISE EXCEPTION 'Squad commander must be assigned to a squad. Please specify squad_id in details.';
+    IF v_squad_id IS NULL OR v_squad_id = '' THEN
+      RAISE EXCEPTION 'Squad commander must be assigned to a squad. Please specify squad_id.';
     END IF;
     
     SELECT COUNT(*) INTO existing_squad_commander_count
     FROM team_members
     WHERE team_id = NEW.team_id 
       AND role = 'squad_commander'
-      AND details->>'squad_id' = squad_id
+      AND squad_id = v_squad_id
       AND user_id != NEW.user_id;
     
     IF existing_squad_commander_count > 0 THEN
-      RAISE EXCEPTION 'Squad "%" already has a commander. Only one squad commander per squad is allowed.', squad_id;
+      RAISE EXCEPTION 'Squad "%" already has a commander. Only one squad commander per squad is allowed.', v_squad_id;
     END IF;
   END IF;
 
@@ -859,7 +858,7 @@ $$;
 ALTER FUNCTION "public"."get_my_team_ids"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."get_my_teams"() RETURNS TABLE("id" "uuid", "name" "text", "description" "text", "squads" "text"[], "team_type" "text", "created_by" "uuid", "created_at" timestamp with time zone, "my_role" "text", "my_squad_id" "text", "my_user_id" "uuid", "member_count" bigint)
+CREATE OR REPLACE FUNCTION "public"."get_my_teams"() RETURNS TABLE("id" "uuid", "name" "text", "description" "text", "squads" "text"[], "team_type" "text", "created_by" "uuid", "created_at" timestamp with time zone, "my_role" "text", "member_count" bigint)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
@@ -874,8 +873,6 @@ BEGIN
         t.created_by,
         t.created_at,
         tm.role,
-        tm.squad_id,
-        tm.user_id,
         (SELECT COUNT(*) FROM public.team_members WHERE team_id = t.id)
     FROM public.teams t
     JOIN public.team_members tm ON t.id = tm.team_id
