@@ -1,8 +1,7 @@
 /**
  * Loadout Screen - User's Arsenal
  *
- * Centralized view of all user weapons (personal + team)
- * with rich statistics for tracking maintenance and performance.
+ * Clean card-based design with two-row weapon cards
  */
 
 import { CreateWeaponFlow, WeaponPicker } from '@/components/weapons';
@@ -10,168 +9,56 @@ import { getCategoryConfig } from '@/constants/weaponCategories';
 import { useColors } from '@/hooks/ui/useColors';
 import { getMyTeams } from '@/services/teamService';
 import {
-    createUserWeapon,
-    getDefaultWeaponId,
-    getUserWeapons,
-    getWeaponStats,
-    setDefaultWeaponId,
-    toggleUserWeaponFavorite,
-    type GlobalWeapon,
-    type UserWeapon,
-    type WeaponStats,
+  createUserWeapon,
+  getDefaultWeaponId,
+  getUserWeapons,
+  getWeaponStats,
+  setDefaultWeaponId,
+  type GlobalWeapon,
+  type UserWeapon,
+  type WeaponStats,
 } from '@/services/weaponService';
 import type { WeaponCategory } from '@/types/workspace';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import {
-    Activity,
-    Calendar,
-    ChevronRight,
-    Crosshair,
-    Heart,
-    Plus,
-    Star,
-    Target,
-    Users,
+  ChevronRight,
+  Plus,
+  Star,
+  Users,
 } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    Modal,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Modal,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
-
-// ============================================================================
-// WEAPON SILHOUETTES
-// ============================================================================
-
-function RifleSilhouette({ color, size = 60 }: { color: string; size?: number }) {
-  return (
-    <Svg width={size} height={size * 0.35} viewBox="0 0 120 42">
-      <Defs>
-        <LinearGradient id="rifleGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <Stop offset="0%" stopColor={color} stopOpacity="1" />
-          <Stop offset="100%" stopColor={color} stopOpacity="0.6" />
-        </LinearGradient>
-      </Defs>
-      <Path
-        d="M2 21 L8 21 L8 18 L15 18 L15 16 L25 16 L25 14 L85 14 L85 12 L95 12 L95 14 L105 14 L108 14 L108 18 L118 18 L118 22 L108 22 L108 26 L95 26 L95 28 L85 28 L85 26 L35 26 L35 30 L30 34 L25 34 L25 30 L20 30 L20 26 L15 26 L15 24 L8 24 L8 21 Z"
-        fill="url(#rifleGrad)"
-      />
-      <Path d="M45 10 L75 10 L75 14 L45 14 Z" fill={color} opacity="0.8" />
-    </Svg>
-  );
-}
-
-function PistolSilhouette({ color, size = 40 }: { color: string; size?: number }) {
-  return (
-    <Svg width={size} height={size * 0.8} viewBox="0 0 60 48">
-      <Defs>
-        <LinearGradient id="pistolGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <Stop offset="0%" stopColor={color} stopOpacity="1" />
-          <Stop offset="100%" stopColor={color} stopOpacity="0.6" />
-        </LinearGradient>
-      </Defs>
-      <Path
-        d="M5 12 L10 12 L10 10 L45 10 L48 10 L48 8 L55 8 L55 14 L48 14 L48 18 L45 18 L45 20 L40 20 L40 24 L38 24 L38 44 L28 44 L28 46 L22 46 L22 44 L20 44 L20 24 L18 24 L18 20 L10 20 L10 16 L5 16 Z"
-        fill="url(#pistolGrad)"
-      />
-    </Svg>
-  );
-}
-
-function ShotgunSilhouette({ color, size = 60 }: { color: string; size?: number }) {
-  return (
-    <Svg width={size} height={size * 0.3} viewBox="0 0 120 36">
-      <Defs>
-        <LinearGradient id="shotgunGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <Stop offset="0%" stopColor={color} stopOpacity="1" />
-          <Stop offset="100%" stopColor={color} stopOpacity="0.6" />
-        </LinearGradient>
-      </Defs>
-      <Path
-        d="M2 18 L8 18 L8 14 L20 14 L20 12 L95 12 L95 10 L115 10 L118 12 L118 16 L115 18 L115 22 L118 24 L118 28 L115 30 L95 30 L95 28 L35 28 L35 32 L30 34 L25 34 L25 30 L20 30 L20 28 L8 28 L8 24 L2 24 Z"
-        fill="url(#shotgunGrad)"
-      />
-    </Svg>
-  );
-}
-
-function CarbineSilhouette({ color, size = 50 }: { color: string; size?: number }) {
-  return (
-    <Svg width={size} height={size * 0.4} viewBox="0 0 100 40">
-      <Defs>
-        <LinearGradient id="carbineGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <Stop offset="0%" stopColor={color} stopOpacity="1" />
-          <Stop offset="100%" stopColor={color} stopOpacity="0.6" />
-        </LinearGradient>
-      </Defs>
-      <Path
-        d="M2 20 L8 20 L8 16 L15 16 L15 14 L70 14 L70 12 L85 12 L88 12 L88 10 L95 10 L98 12 L98 18 L95 18 L95 22 L98 22 L98 28 L95 30 L88 30 L88 28 L85 28 L85 26 L30 26 L30 30 L28 32 L22 32 L22 30 L18 30 L18 26 L15 26 L15 24 L8 24 L8 20 Z"
-        fill="url(#carbineGrad)"
-      />
-      <Path d="M35 26 L42 26 L42 38 L35 38 Z" fill={color} opacity="0.7" />
-    </Svg>
-  );
-}
-
-function GenericWeaponSilhouette({ color, size = 50 }: { color: string; size?: number }) {
-  return (
-    <Svg width={size} height={size * 0.4} viewBox="0 0 100 40">
-      <Defs>
-        <LinearGradient id="genericGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <Stop offset="0%" stopColor={color} stopOpacity="1" />
-          <Stop offset="100%" stopColor={color} stopOpacity="0.6" />
-        </LinearGradient>
-      </Defs>
-      <Path
-        d="M5 18 L10 18 L10 14 L80 14 L80 12 L95 14 L95 20 L95 26 L80 28 L80 26 L30 26 L30 30 L25 32 L20 32 L20 28 L10 28 L10 24 L5 24 Z"
-        fill="url(#genericGrad)"
-      />
-    </Svg>
-  );
-}
 
 // ============================================================================
 // HELPERS
 // ============================================================================
 
-function getWeaponSilhouette(category: WeaponCategory | null) {
+function getCategoryAbbrev(category: WeaponCategory | null): string {
   switch (category) {
-    case 'precision_rifle':
-    case 'rifle':
-      return RifleSilhouette;
-    case 'carbine':
-      return CarbineSilhouette;
-    case 'pistol':
-      return PistolSilhouette;
-    case 'shotgun':
-      return ShotgunSilhouette;
-    default:
-      return GenericWeaponSilhouette;
+    case 'precision_rifle': return 'PR';
+    case 'rifle': return 'RF';
+    case 'carbine': return 'CB';
+    case 'pistol': return 'PT';
+    case 'shotgun': return 'SG';
+    default: return 'WP';
   }
 }
 
-function formatLastUsed(date: string | null): string {
-  if (!date) return 'Never used';
-  const d = new Date(date);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays} days ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-  if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
-  return `${Math.floor(diffDays / 365)} years ago`;
+function formatNumber(num: number): string {
+  if (num >= 10000) return `${(num / 1000).toFixed(0)}k`;
+  if (num >= 1000) return `${(num / 1000).toFixed(1)}k`;
+  return num.toString();
 }
 
 // ============================================================================
@@ -183,142 +70,84 @@ interface WeaponCardProps {
   stats: WeaponStats | undefined;
   isDefault: boolean;
   onPress: () => void;
-  onFavorite: () => void;
   onSetDefault: () => void;
+  colors: ReturnType<typeof useColors>;
 }
 
-function WeaponCard({ weapon, stats, isDefault, onPress, onFavorite, onSetDefault }: WeaponCardProps) {
-  const colors = useColors();
+function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }: WeaponCardProps) {
   const categoryConfig = weapon.category ? getCategoryConfig(weapon.category) : null;
-  const Silhouette = getWeaponSilhouette(weapon.category);
-
-  const handleFavorite = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onFavorite();
-  }, [onFavorite]);
-
-  const handleSetDefault = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    onSetDefault();
-  }, [onSetDefault]);
+  const abbrev = getCategoryAbbrev(weapon.category);
 
   return (
     <TouchableOpacity
-      style={[styles.weaponCard, { backgroundColor: colors.card }]}
+      style={[styles.card, { backgroundColor: colors.card }]}
       onPress={onPress}
-      activeOpacity={0.8}
+      activeOpacity={0.7}
     >
-      {/* Top section with silhouette */}
-      <View style={styles.cardTop}>
-        <View style={[styles.silhouetteBox, { backgroundColor: colors.background }]}>
-          <Silhouette color={colors.text} size={56} />
+      {/* Row 1: Badge + Name + Default */}
+      <View style={styles.cardRow1}>
+        <View style={[styles.badge, { backgroundColor: `${colors.text}08` }]}>
+          <Text style={[styles.badgeText, { color: colors.text }]}>{abbrev}</Text>
+        </View>
+        
+        <View style={styles.cardTitleArea}>
+          <Text style={[styles.cardName, { color: colors.text }]} numberOfLines={1}>
+            {weapon.name}
+          </Text>
+          <Text style={[styles.cardMeta, { color: colors.textMuted }]} numberOfLines={1}>
+            {categoryConfig?.label || 'Weapon'}{weapon.caliber ? ` · ${weapon.caliber}` : ''}
+          </Text>
         </View>
 
-        {/* Action buttons */}
-        <View style={styles.cardActions}>
-          {/* Default indicator / button */}
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleSetDefault}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Star
-              size={18}
-              color={isDefault ? '#f59e0b' : colors.textMuted}
-              fill={isDefault ? '#f59e0b' : 'none'}
-            />
-          </TouchableOpacity>
-          
-          {/* Favorite button */}
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleFavorite}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Heart
-              size={18}
-              color={weapon.is_favorite ? '#ef4444' : colors.textMuted}
-              fill={weapon.is_favorite ? '#ef4444' : 'none'}
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
-      
-      {/* Default badge */}
-      {isDefault && (
-        <View style={[styles.defaultBadge, { backgroundColor: '#f59e0b20' }]}>
-          <Star size={10} color="#f59e0b" fill="#f59e0b" />
-          <Text style={styles.defaultBadgeText}>Default for new sessions</Text>
-        </View>
-      )}
-
-      {/* Weapon info */}
-      <View style={styles.cardInfo}>
-        <Text style={[styles.weaponName, { color: colors.text }]} numberOfLines={1}>
-          {weapon.name}
-        </Text>
-        <View style={styles.metaRow}>
-          {categoryConfig && (
-            <View style={[styles.categoryBadge, { backgroundColor: colors.background }]}>
-              <Text style={[styles.categoryText, { color: colors.textMuted }]}>
-                {categoryConfig.label}
-              </Text>
-            </View>
-          )}
-          {weapon.caliber && (
-            <Text style={[styles.caliber, { color: colors.textMuted }]}>
-              {weapon.caliber}
-            </Text>
-          )}
-        </View>
+        <TouchableOpacity
+          style={[
+            styles.defaultBtn,
+            { 
+              backgroundColor: isDefault ? '#f59e0b12' : 'transparent',
+              borderColor: isDefault ? '#f59e0b40' : `${colors.text}12`,
+            }
+          ]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onSetDefault();
+          }}
+        >
+          <Star
+            size={16}
+            color={isDefault ? '#f59e0b' : colors.textMuted}
+            fill={isDefault ? '#f59e0b' : 'none'}
+          />
+        </TouchableOpacity>
       </View>
 
-      {/* Stats grid */}
-      <View style={[styles.statsGrid, { borderTopColor: colors.border }]}>
-        <View style={styles.statItem}>
-          <View style={styles.statIcon}>
-            <Target size={14} color={colors.textMuted} />
-          </View>
+      {/* Row 2: Stats */}
+      <View style={[styles.cardRow2, { borderTopColor: `${colors.text}06` }]}>
+        <View style={styles.stat}>
           <Text style={[styles.statValue, { color: colors.text }]}>
             {stats?.total_sessions ?? 0}
           </Text>
           <Text style={[styles.statLabel, { color: colors.textMuted }]}>Sessions</Text>
         </View>
-
-        <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
-
-        <View style={styles.statItem}>
-          <View style={styles.statIcon}>
-            <Crosshair size={14} color={colors.textMuted} />
-          </View>
+        
+        <View style={[styles.statDivider, { backgroundColor: `${colors.text}08` }]} />
+        
+        <View style={styles.stat}>
           <Text style={[styles.statValue, { color: colors.text }]}>
-            {stats?.total_rounds_fired ?? 0}
+            {formatNumber(stats?.total_rounds_fired ?? 0)}
           </Text>
           <Text style={[styles.statLabel, { color: colors.textMuted }]}>Bullets</Text>
         </View>
-
-        <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
-
-        <View style={styles.statItem}>
-          <View style={styles.statIcon}>
-            <Activity size={14} color={colors.textMuted} />
-          </View>
+        
+        <View style={[styles.statDivider, { backgroundColor: `${colors.text}08` }]} />
+        
+        <View style={styles.stat}>
           <Text style={[styles.statValue, { color: colors.text }]}>
-            {stats?.avg_accuracy_pct != null ? `${stats.avg_accuracy_pct}%` : '-'}
+            {stats?.avg_accuracy_pct != null ? `${stats.avg_accuracy_pct}%` : '—'}
           </Text>
           <Text style={[styles.statLabel, { color: colors.textMuted }]}>Accuracy</Text>
         </View>
-      </View>
 
-      {/* Last used footer */}
-      <View style={styles.cardFooter}>
-        <View style={styles.lastUsedRow}>
-          <Calendar size={12} color={colors.textMuted} />
-          <Text style={[styles.lastUsedText, { color: colors.textMuted }]}>
-            {formatLastUsed(stats?.last_used_at ?? weapon.last_used_at)}
-          </Text>
-        </View>
-        <ChevronRight size={16} color={colors.textMuted} />
+        <ChevronRight size={18} color={colors.textMuted} style={styles.chevron} />
       </View>
     </TouchableOpacity>
   );
@@ -328,7 +157,7 @@ function WeaponCard({ weapon, stats, isDefault, onPress, onFavorite, onSetDefaul
 // MAIN COMPONENT
 // ============================================================================
 
-export default function EquipmentScreen() {
+export default function LoadoutScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
 
@@ -341,7 +170,6 @@ export default function EquipmentScreen() {
   const [showWeaponPicker, setShowWeaponPicker] = useState(false);
   const [defaultWeaponId, setDefaultWeaponIdState] = useState<string | null>(null);
 
-  // Load data
   const loadData = useCallback(async () => {
     try {
       const [weaponsData, statsData, teamsData, storedDefaultId] = await Promise.all([
@@ -356,7 +184,7 @@ export default function EquipmentScreen() {
       setHasTeams(teamsData.length > 0);
       setDefaultWeaponIdState(storedDefaultId);
     } catch (error) {
-      console.error('[EquipmentScreen] Failed to load data:', error);
+      console.error('[LoadoutScreen] Failed to load data:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -374,14 +202,7 @@ export default function EquipmentScreen() {
     loadData();
   }, [loadData]);
 
-  // Split weapons by favorite
-  const { favoriteWeapons, otherWeapons } = useMemo(() => {
-    const favorites = weapons.filter((w) => w.is_favorite);
-    const others = weapons.filter((w) => !w.is_favorite);
-    return { favoriteWeapons: favorites, otherWeapons: others };
-  }, [weapons]);
-
-  // Total stats
+  // Aggregate stats
   const totalStats = useMemo(() => {
     let sessions = 0;
     let rounds = 0;
@@ -393,25 +214,12 @@ export default function EquipmentScreen() {
   }, [weaponStats]);
 
   const handleWeaponPress = useCallback((weapon: UserWeapon) => {
-    // TODO: Navigate to weapon detail screen
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     console.log('Weapon pressed:', weapon.id);
   }, []);
 
-  const handleToggleFavorite = useCallback(async (weaponId: string) => {
-    try {
-      await toggleUserWeaponFavorite(weaponId);
-      setWeapons((prev) =>
-        prev.map((w) => (w.id === weaponId ? { ...w, is_favorite: !w.is_favorite } : w))
-      );
-    } catch (error) {
-      console.error('Failed to toggle favorite:', error);
-    }
-  }, []);
-
   const handleSetDefault = useCallback(async (weaponId: string) => {
     try {
-      // Toggle: if already default, remove it; otherwise set it
       const newDefaultId = defaultWeaponId === weaponId ? null : weaponId;
       await setDefaultWeaponId(newDefaultId);
       setDefaultWeaponIdState(newDefaultId);
@@ -462,13 +270,13 @@ export default function EquipmentScreen() {
   );
 
   // ─────────────────────────────────────────────────────────────────────────
-  // LOADING STATE
+  // LOADING
   // ─────────────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator color={colors.text} size="large" />
+        <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
   }
@@ -481,149 +289,72 @@ export default function EquipmentScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[
-          styles.scrollContent,
-          {  paddingBottom: insets.bottom + 100 },
-        ]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.text} />
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
         }
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Equipment</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Loadout</Text>
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            Your arsenal & statistics
+            {weapons.length} weapon{weapons.length !== 1 ? 's' : ''} · {formatNumber(totalStats.rounds)} bullets fired
           </Text>
         </View>
 
-        {/* Stats overview */}
-        <View style={[styles.overviewCard, { backgroundColor: colors.card }]}>
-          <View style={styles.overviewRow}>
-            <View style={styles.overviewItem}>
-              <Text style={[styles.overviewValue, { color: colors.text }]}>
-                {weapons.length}
-              </Text>
-              <Text style={[styles.overviewLabel, { color: colors.textMuted }]}>
-                Weapons
-              </Text>
-            </View>
-            <View style={[styles.overviewDivider, { backgroundColor: colors.border }]} />
-            <View style={styles.overviewItem}>
-              <Text style={[styles.overviewValue, { color: colors.text }]}>
-                {totalStats.sessions}
-              </Text>
-              <Text style={[styles.overviewLabel, { color: colors.textMuted }]}>
-                Sessions
-              </Text>
-            </View>
-            <View style={[styles.overviewDivider, { backgroundColor: colors.border }]} />
-            <View style={styles.overviewItem}>
-              <Text style={[styles.overviewValue, { color: colors.text }]}>
-                {totalStats.rounds.toLocaleString()}
-              </Text>
-              <Text style={[styles.overviewLabel, { color: colors.textMuted }]}>
-                Bullets
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Team weapons hint */}
+        {/* Team Link */}
         {hasTeams && (
           <TouchableOpacity
-            style={[styles.teamHint, { backgroundColor: colors.card }]}
+            style={[styles.teamLink, { backgroundColor: colors.card }]}
             activeOpacity={0.7}
           >
-            <View style={[styles.teamIconBox, { backgroundColor: colors.background }]}>
-              <Users size={18} color={colors.text} />
-            </View>
-            <View style={styles.teamHintContent}>
-              <Text style={[styles.teamHintTitle, { color: colors.text }]}>
-                Team Weapons
-              </Text>
-              <Text style={[styles.teamHintSubtitle, { color: colors.textMuted }]}>
-                View weapons assigned by your team
-              </Text>
-            </View>
-            <ChevronRight size={20} color={colors.textMuted} />
+            <Users size={18} color={colors.textMuted} />
+            <Text style={[styles.teamLinkText, { color: colors.text }]}>Team Weapons</Text>
+            <ChevronRight size={18} color={colors.textMuted} />
           </TouchableOpacity>
         )}
 
-        {/* Favorites section */}
-        {favoriteWeapons.length > 0 && (
-          <>
-            <View style={styles.sectionHeader}>
-              <Heart size={16} color="#ef4444" fill="#ef4444" />
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Favorites</Text>
-            </View>
-            {favoriteWeapons.map((weapon) => (
+        {/* Weapons */}
+        {weapons.length > 0 ? (
+          <View style={styles.cardList}>
+            {weapons.map((weapon) => (
               <WeaponCard
                 key={weapon.id}
                 weapon={weapon}
                 stats={weaponStats.get(weapon.id)}
                 isDefault={defaultWeaponId === weapon.id}
                 onPress={() => handleWeaponPress(weapon)}
-                onFavorite={() => handleToggleFavorite(weapon.id)}
                 onSetDefault={() => handleSetDefault(weapon.id)}
+                colors={colors}
               />
             ))}
-          </>
-        )}
-
-        {/* All weapons section */}
-        <View style={styles.sectionHeader}>
-          <Target size={16} color={colors.text} />
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            {favoriteWeapons.length > 0 ? 'All Weapons' : 'My Weapons'}
-          </Text>
-          <Text style={[styles.sectionCount, { color: colors.textMuted }]}>
-            {otherWeapons.length}
-          </Text>
-        </View>
-
-        {otherWeapons.length > 0 ? (
-          otherWeapons.map((weapon) => (
-            <WeaponCard
-              key={weapon.id}
-              weapon={weapon}
-              stats={weaponStats.get(weapon.id)}
-              isDefault={defaultWeaponId === weapon.id}
-              onPress={() => handleWeaponPress(weapon)}
-              onFavorite={() => handleToggleFavorite(weapon.id)}
-              onSetDefault={() => handleSetDefault(weapon.id)}
-            />
-          ))
-        ) : weapons.length === 0 ? (
+          </View>
+        ) : (
           <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
-            <GenericWeaponSilhouette color={colors.textMuted} size={80} />
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No weapons yet</Text>
             <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
               Add your first weapon to start tracking
             </Text>
             <TouchableOpacity
-              style={[styles.emptyButton, { backgroundColor: colors.text }]}
+              style={[styles.emptyButton, { backgroundColor: colors.primary }]}
               onPress={handleAddWeapon}
-              activeOpacity={0.8}
             >
-              <Plus size={18} color={colors.background} />
-              <Text style={[styles.emptyButtonText, { color: colors.background }]}>
-                Add Weapon
-              </Text>
+              <Plus size={18} color="#fff" />
+              <Text style={styles.emptyButtonText}>Add Weapon</Text>
             </TouchableOpacity>
           </View>
-        ) : null}
+        )}
       </ScrollView>
 
-      {/* Floating add button */}
+      {/* FAB */}
       {weapons.length > 0 && (
         <TouchableOpacity
-          style={[styles.fab, { backgroundColor: colors.text }]}
+          style={[styles.fab, { backgroundColor: colors.primary }]}
           onPress={handleAddWeapon}
-          activeOpacity={0.85}
+          activeOpacity={0.9}
         >
-          <Plus size={24} color={colors.background} strokeWidth={2.5} />
+          <Plus size={24} color="#fff" strokeWidth={2.5} />
         </TouchableOpacity>
       )}
 
@@ -687,253 +418,139 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
-    fontWeight: '800',
+    fontWeight: '700',
     letterSpacing: -0.5,
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '500',
   },
 
-  // Overview card
-  overviewCard: {
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  overviewRow: {
+  // Team Link
+  teamLink: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  overviewItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  overviewValue: {
-    fontSize: 28,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-    marginBottom: 4,
-  },
-  overviewLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  overviewDivider: {
-    width: 1,
-    height: 40,
-    marginHorizontal: 12,
-  },
-
-  // Team hint
-  teamHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 24,
     gap: 12,
+    padding: 16,
+    borderRadius: 14,
+    marginBottom: 20,
   },
-  teamIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  teamHintContent: {
+  teamLinkText: {
     flex: 1,
-  },
-  teamHintTitle: {
     fontSize: 15,
     fontWeight: '600',
-    marginBottom: 2,
-  },
-  teamHintSubtitle: {
-    fontSize: 13,
   },
 
-  // Section header
-  sectionHeader: {
+  // Card List
+  cardList: {
+    gap: 12,
+  },
+
+  // Card
+  card: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  cardRow1: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-    marginTop: 8,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
-  sectionCount: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 'auto',
-  },
-
-  // Weapon card
-  weaponCard: {
-    borderRadius: 20,
-    marginBottom: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  cardTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
     padding: 16,
-    paddingBottom: 12,
+    gap: 14,
   },
-  silhouetteBox: {
-    width: 72,
+  badge: {
+    width: 44,
     height: 44,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cardActions: {
-    flexDirection: 'row',
-    marginLeft: 'auto',
-    gap: 8,
-  },
-  actionButton: {
-    padding: 6,
-  },
-  defaultBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    marginHorizontal: 16,
-    marginBottom: 8,
-  },
-  defaultBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#f59e0b',
-  },
-  cardInfo: {
-    paddingHorizontal: 16,
-    paddingBottom: 14,
-  },
-  weaponName: {
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-    marginBottom: 6,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  categoryBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  categoryText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  caliber: {
+  badgeText: {
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  cardTitleArea: {
+    flex: 1,
+    gap: 2,
+  },
+  cardName: {
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+  },
+  cardMeta: {
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  defaultBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
-  // Stats grid
-  statsGrid: {
+  // Stats Row
+  cardRow2: {
     flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderTopWidth: 1,
   },
-  statItem: {
+  stat: {
     flex: 1,
     alignItems: 'center',
-    gap: 2,
-  },
-  statIcon: {
-    marginBottom: 4,
   },
   statValue: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     letterSpacing: -0.3,
   },
   statLabel: {
     fontSize: 11,
     fontWeight: '500',
+    marginTop: 2,
   },
   statDivider: {
     width: 1,
-    marginHorizontal: 8,
+    height: 28,
+  },
+  chevron: {
+    marginLeft: 8,
   },
 
-  // Card footer
-  cardFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 0,
-  },
-  lastUsedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  lastUsedText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-
-  // Empty state
+  // Empty State
   emptyState: {
     alignItems: 'center',
-    padding: 40,
-    borderRadius: 24,
-    gap: 12,
+    paddingVertical: 48,
+    paddingHorizontal: 32,
+    borderRadius: 16,
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    marginTop: 8,
+    fontWeight: '600',
+    marginBottom: 6,
   },
   emptySubtitle: {
     fontSize: 14,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 24,
   },
   emptyButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
     borderRadius: 12,
-    marginTop: 8,
   },
   emptyButtonText: {
     fontSize: 15,
     fontWeight: '600',
+    color: '#fff',
   },
 
   // FAB
@@ -943,13 +560,13 @@ const styles = StyleSheet.create({
     right: 20,
     width: 56,
     height: 56,
-    borderRadius: 28,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
   },
 });
