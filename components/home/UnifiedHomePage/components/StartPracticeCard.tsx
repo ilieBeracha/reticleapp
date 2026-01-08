@@ -1,11 +1,10 @@
 /**
  * StartPracticeCard Component
  * 
- * Call-to-action card to start a new shooting session.
- * Dark, sleek design for prominence.
+ * Clean, elegant call-to-action to start a new session.
  */
 
-import { ChevronRight, Crosshair } from 'lucide-react-native';
+import { ChevronRight, Target } from 'lucide-react-native';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getStartPracticeSubtitle } from '../UnifiedHomePage.helpers';
 import type { StartPracticeCardProps } from '../UnifiedHomePage.types';
@@ -20,69 +19,53 @@ export function StartPracticeCard({
 
   return (
     <TouchableOpacity
-      style={[
-        localStyles.card, 
-        { 
-          backgroundColor: colors.card,
-          borderColor: colors.border,
-        }
-      ]}
+      style={[cardStyles.container, { backgroundColor: colors.card }]}
       onPress={onPress}
-      activeOpacity={0.8}
+      activeOpacity={0.85}
       disabled={starting}
     >
-      <View style={[localStyles.iconContainer, { backgroundColor: colors.primary }]}>
-        <Crosshair size={22} color="#fff" strokeWidth={2.5} />
+      <View style={[cardStyles.icon, { backgroundColor: colors.secondary }]}>
+        <Target size={20} color={colors.text} />
       </View>
-      <View style={localStyles.content}>
-        <Text style={[localStyles.title, { color: colors.text }]}>Start Session</Text>
-        <Text style={[localStyles.subtitle, { color: colors.textMuted }]}>{subtitle}</Text>
+      
+      <View style={cardStyles.text}>
+        <Text style={[cardStyles.title, { color: colors.text }]}>Start Session</Text>
+        <Text style={[cardStyles.hint, { color: colors.textMuted }]}>{subtitle}</Text>
       </View>
+
       {starting ? (
-        <ActivityIndicator size="small" color={colors.primary} />
+        <ActivityIndicator size="small" color={colors.textMuted} />
       ) : (
-        <View style={[localStyles.arrow, { backgroundColor: colors.primary }]}>
-          <ChevronRight size={18} color="#fff" />
-        </View>
+        <ChevronRight size={20} color={colors.textMuted} />
       )}
     </TouchableOpacity>
   );
 }
 
-const localStyles = StyleSheet.create({
-  card: {
+const cardStyles = StyleSheet.create({
+  container: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: 14,
     borderRadius: 14,
-    borderWidth: 1,
-    gap: 14,
+    gap: 12,
   },
-  iconContainer: {
-    width: 48,
-    height: 48,
+  icon: {
+    width: 44,
+    height: 44,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  content: {
+  text: {
     flex: 1,
   },
   title: {
-    fontSize: 17,
-    fontWeight: '700',
-    marginBottom: 2,
-    letterSpacing: -0.2,
+    fontSize: 16,
+    fontWeight: '600',
   },
-  subtitle: {
+  hint: {
     fontSize: 13,
-    fontWeight: '500',
-  },
-  arrow: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginTop: 2,
   },
 });

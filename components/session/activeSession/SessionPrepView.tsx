@@ -9,6 +9,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
+import { useOpenWeather } from '@/hooks/useOpenWeather';
 import type { SessionWithDetails } from '@/services/session/types';
 import { activateSession, updateSession } from '@/services/sessionService';
 import { getUserWeapon, type UserWeapon } from '@/services/weaponService';
@@ -51,6 +52,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
+import { WeatherStrip } from '../WeatherDisplay';
 
 interface SessionPrepViewProps {
   session: SessionWithDetails;
@@ -105,6 +107,7 @@ export function SessionPrepView({
   const colors = useColors();
   const isWatchConnected = useIsGarminConnected();
   const { refreshDevices } = useGarminStore();
+  const { weather, loading: weatherLoading, refetch: refetchWeather } = useOpenWeather();
   
   const [activating, setActivating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -119,6 +122,7 @@ export function SessionPrepView({
 
   // Load full weapon info (for caliber, etc)
   useEffect(() => {
+    refetchWeather();
     console.log('[SessionPrepView] Session weapon data:', {
       weapon_id: session.weapon_id,
       weapon_name: session.weapon_name,
@@ -223,6 +227,12 @@ export function SessionPrepView({
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+         {/* Weather Conditions */}
+         {weather && (
+          <Animated.View entering={FadeInDown.delay(175).duration(400)}>
+            <WeatherStrip weather={weather} />
+          </Animated.View>
+        )}
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity
@@ -325,6 +335,8 @@ export function SessionPrepView({
             </View>
           )}
         </Animated.View>
+
+     
 
         {/* Watch Status */}
         <Animated.View 

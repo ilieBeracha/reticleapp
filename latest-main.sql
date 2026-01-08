@@ -597,8 +597,16 @@ DECLARE
   v_paper RECORD;
   v_tactical RECORD;
   v_timeline RECORD;
-  v_weather RECORD;
   v_result public.session_features;
+  -- Weather variables (declared separately for null safety)
+  v_has_weather boolean := false;
+  v_weather_temp_c numeric;
+  v_weather_humidity integer;
+  v_weather_wind_speed_mps numeric;
+  v_weather_wind_bearing integer;
+  v_weather_condition text;
+  v_weather_wind_impact text;
+  v_weather_condition_severity text;
 BEGIN
   -- 1. Get session base info (including weather)
   SELECT 
@@ -608,7 +616,7 @@ BEGIN
     s.weapon_id,
     s.started_at,
     s.ended_at,
-    s.weather,  -- Include weather JSON
+    s.weather,
     COALESCE(
       d.drill_goal,
       s.custom_drill_config->>'drill_goal',
@@ -625,21 +633,39 @@ BEGIN
     RAISE EXCEPTION 'Session not found: %', p_session_id;
   END IF;
 
-  -- Extract weather data from JSONB
-  IF v_session.weather IS NOT NULL THEN
-    SELECT
-      TRUE as has_weather,
-      COALESCE((v_session.weather->>'temperature_c')::numeric, (v_session.weather->>'temperatureC')::numeric) as temp_c,
-      COALESCE((v_session.weather->>'humidity')::integer, (v_session.weather->>'humidity')::integer) as humidity,
-      COALESCE((v_session.weather->>'wind_speed_mps')::numeric, (v_session.weather->>'windSpeedMps')::numeric) as wind_speed_mps,
-      COALESCE((v_session.weather->>'wind_bearing')::integer, (v_session.weather->>'windBearing')::integer) as wind_bearing,
-      COALESCE(v_session.weather->>'condition', v_session.weather->>'condition') as condition,
-      COALESCE(v_session.weather->>'wind_impact', v_session.weather->>'windImpact') as wind_impact,
-      COALESCE(v_session.weather->>'condition_severity', v_session.weather->>'conditionSeverity') as condition_severity
-    INTO v_weather;
-  ELSE
-    SELECT FALSE as has_weather, NULL::numeric, NULL::integer, NULL::numeric, NULL::integer, NULL::text, NULL::text, NULL::text
-    INTO v_weather;
+  -- Extract weather data safely (each field individually)
+  IF v_session.weather IS NOT NULL AND jsonb_typeof(v_session.weather) = 'object' THEN
+    -- Check if weather has any useful data
+    v_weather_temp_c := COALESCE(
+      (v_session.weather->>'temperature_c')::numeric,
+      (v_session.weather->>'temperatureC')::numeric,
+      (v_session.weather->>'temp_c')::numeric
+    );
+    v_weather_humidity := COALESCE(
+      (v_session.weather->>'humidity')::integer
+    );
+    v_weather_wind_speed_mps := COALESCE(
+      (v_session.weather->>'wind_speed_mps')::numeric,
+      (v_session.weather->>'windSpeedMps')::numeric
+    );
+    v_weather_wind_bearing := COALESCE(
+      (v_session.weather->>'wind_bearing')::integer,
+      (v_session.weather->>'windBearing')::integer
+    );
+    v_weather_condition := COALESCE(
+      v_session.weather->>'condition'
+    );
+    v_weather_wind_impact := COALESCE(
+      v_session.weather->>'wind_impact',
+      v_session.weather->>'windImpact'
+    );
+    v_weather_condition_severity := COALESCE(
+      v_session.weather->>'condition_severity',
+      v_session.weather->>'conditionSeverity'
+    );
+    
+    -- Mark as has_weather only if we have at least temp or condition
+    v_has_weather := (v_weather_temp_c IS NOT NULL OR v_weather_condition IS NOT NULL);
   END IF;
 
   -- 2. Aggregate from session_targets + paper_target_results
@@ -718,8 +744,7 @@ BEGIN
       v_optimal_pct := ROUND((v_timeline.optimal_shots::numeric / v_timeline.total_shots_biometric) * 100, 1);
     END IF;
 
-    -- Stress trend (simplified - compare first vs last quarter of timeline)
-    -- For now, default to 'stable' - can be computed from timeline points in TypeScript
+    -- Stress trend default
     v_stress_trend := 'stable';
 
     -- 6. Upsert into session_features (WITH WEATHER)
@@ -792,15 +817,15 @@ BEGIN
       v_timeline.hr_max,
       COALESCE(v_timeline.flinch_count, 0),
       v_optimal_pct,
-      -- Weather values
-      COALESCE(v_weather.has_weather, false),
-      v_weather.temp_c,
-      v_weather.humidity,
-      v_weather.wind_speed_mps,
-      v_weather.wind_bearing,
-      v_weather.condition,
-      v_weather.wind_impact,
-      v_weather.condition_severity
+      -- Weather values (now safely extracted)
+      v_has_weather,
+      v_weather_temp_c,
+      v_weather_humidity,
+      v_weather_wind_speed_mps,
+      v_weather_wind_bearing,
+      v_weather_condition,
+      v_weather_wind_impact,
+      v_weather_condition_severity
     )
     ON CONFLICT (session_id) DO UPDATE SET
       shots = EXCLUDED.shots,
@@ -849,7 +874,7 @@ $$;
 ALTER FUNCTION "public"."compute_session_features"("p_session_id" "uuid") OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."compute_session_features"("p_session_id" "uuid") IS 'Computes and stores derived features for a session including weather. Call after session completion. Idempotent (upserts).';
+COMMENT ON FUNCTION "public"."compute_session_features"("p_session_id" "uuid") IS 'Computes and stores derived features for a session including weather. Handles missing weather fields gracefully. Idempotent (upserts).';
 
 
 

@@ -6,6 +6,7 @@
  */
 
 import { TargetCard } from '@/components/session/TargetCard';
+import { WeatherStrip } from '@/components/session/WeatherDisplay';
 import {
   COLORS,
   formatTime,
@@ -14,6 +15,7 @@ import {
   useActiveSession,
 } from '@/components/session/activeSession';
 import { useColors } from '@/hooks/ui/useColors';
+import { useOpenWeather } from '@/hooks/useOpenWeather';
 import { isGroupingSession } from '@/utils/drillGoal';
 import { formatMaxShots } from '@/utils/drillShots';
 import { Ionicons } from '@expo/vector-icons';
@@ -258,6 +260,8 @@ export default function ActiveSessionScreen() {
     canAddTarget,
   } = useActiveSession({ sessionId });
 
+  const { weather, loading: weatherLoading, error: weatherError } = useOpenWeather();
+
   const renderEmpty = useCallback(
     () => (
       <View style={styles.emptyContainer}>
@@ -427,6 +431,23 @@ export default function ActiveSessionScreen() {
           <View style={{ width: 36 }} />
         )}
       </View>
+
+      {(weather || weatherLoading || weatherError) && (
+        <View style={localStyles.weatherContainer}>
+          {weatherLoading ? (
+            <View style={[localStyles.weatherLoading, { backgroundColor: colors.card }]}>
+              <ActivityIndicator size="small" color={colors.textMuted} />
+              <Text style={[localStyles.weatherLoadingText, { color: colors.textMuted }]}>Loading weather...</Text>
+            </View>
+          ) : weatherError ? (
+            <View style={[localStyles.weatherLoading, { backgroundColor: colors.card }]}>
+              <Text style={[localStyles.weatherLoadingText, { color: colors.textMuted }]}>{weatherError}</Text>
+            </View>
+          ) : weather ? (
+            <WeatherStrip weather={weather} />
+          ) : null}
+        </View>
+      )}
 
       {hasDrill && drill && (
         <DrillBanner
@@ -859,6 +880,21 @@ function DrillBanner({ colors, drill, drillProgress, targets, isGroupingDrill, i
 }
 
 const localStyles = StyleSheet.create({
+  weatherContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  weatherLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  weatherLoadingText: {
+    fontSize: 13,
+  },
   weaponBar: {
     flexDirection: 'row',
     alignItems: 'center',
