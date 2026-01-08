@@ -1,5 +1,5 @@
 /**
- * Equipment Screen - User's Arsenal
+ * Loadout Screen - User's Arsenal
  *
  * Centralized view of all user weapons (personal + team)
  * with rich statistics for tracking maintenance and performance.

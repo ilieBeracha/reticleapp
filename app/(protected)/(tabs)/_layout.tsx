@@ -49,9 +49,9 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen
-        name="equipment"
+        name="loadout"
         options={{
-          title: 'Equipment',
+          title: 'Loadout',
           tabBarIcon: ({ focused }) => getTabIcon('scope', focused ? 'aperture' : 'aperture-outline'),
         }}
       />
