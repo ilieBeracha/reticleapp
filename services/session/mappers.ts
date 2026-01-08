@@ -1,4 +1,4 @@
-import type { SessionDrillConfig, SessionWithDetails } from './types';
+import type { SessionDrillConfig, SessionWeatherData, SessionWithDetails } from './types';
 
 export function mapSession(row: any): SessionWithDetails {
   if (!row) {
@@ -116,6 +116,7 @@ export function mapSession(row: any): SessionWithDetails {
     ended_at: row.ended_at ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at ?? row.created_at,
+    weather: row.weather as SessionWeatherData | null ?? null,
   };
 }
 

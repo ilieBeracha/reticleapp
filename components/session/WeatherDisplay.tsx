@@ -218,6 +218,88 @@ export const WeatherInline = memo(function WeatherInline({
 });
 
 // ============================================================================
+// WEATHER STRIP (Compact horizontal - for session detail header)
+// ============================================================================
+
+interface WeatherStripProps {
+  weather: DecodedWeather | null;
+  units?: 'metric' | 'imperial';
+}
+
+export const WeatherStrip = memo(function WeatherStrip({
+  weather,
+  units = 'metric',
+}: WeatherStripProps) {
+  const colors = useColors();
+
+  if (!weather) return null;
+
+  const windInfo = getWindIndicator(weather.windImpact);
+  const badgeColor = getWeatherBadgeColor(weather.conditionSeverity);
+
+  const temp = units === 'imperial' ? weather.temperatureF : weather.temperatureC;
+  const tempUnit = units === 'imperial' ? '°F' : '°C';
+  const windSpeed = units === 'imperial' ? weather.windSpeedMph : weather.windSpeedMps;
+  const windUnit = units === 'imperial' ? 'mph' : 'm/s';
+
+  return (
+    <View style={[styles.strip, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      {/* Condition */}
+      <View style={styles.stripItem}>
+        {getConditionIcon(weather.condition, 14)}
+        <Text style={[styles.stripValue, { color: colors.text }]}>
+          {weather.condition ? formatConditionName(weather.condition) : '—'}
+        </Text>
+      </View>
+
+      {/* Temperature */}
+      {temp != null && (
+        <View style={styles.stripItem}>
+          <Thermometer size={14} color={colors.orange} />
+          <Text style={[styles.stripValue, { color: colors.text }]}>
+            {Math.round(temp)}{tempUnit}
+          </Text>
+        </View>
+      )}
+
+      {/* Wind */}
+      {windSpeed != null && windSpeed > 0 && (
+        <View style={styles.stripItem}>
+          <Wind size={14} color={windInfo.color} />
+          <Text style={[styles.stripValue, { color: colors.text }]}>
+            {windSpeed.toFixed(0)} {windUnit}
+          </Text>
+          {weather.windDirection && (
+            <Text style={[styles.stripLabel, { color: colors.textMuted }]}>
+              {weather.windDirection}
+            </Text>
+          )}
+        </View>
+      )}
+
+      {/* Humidity */}
+      {weather.humidity != null && (
+        <View style={styles.stripItem}>
+          <Droplets size={14} color={colors.blue} />
+          <Text style={[styles.stripValue, { color: colors.text }]}>
+            {weather.humidity}%
+          </Text>
+        </View>
+      )}
+
+      {/* Wind impact indicator (if notable) */}
+      {(weather.windImpact === 'moderate' || weather.windImpact === 'strong') && (
+        <View style={[styles.stripWindBadge, { backgroundColor: `${windInfo.color}20` }]}>
+          <Text style={[styles.stripWindText, { color: windInfo.color }]}>
+            {windInfo.label}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+});
+
+// ============================================================================
 // HELPER COMPONENTS
 // ============================================================================
 
@@ -406,6 +488,42 @@ const styles = StyleSheet.create({
   },
   inlineText: {
     fontSize: 11,
+  },
+
+  // Strip (compact horizontal)
+  strip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 14,
+    flexWrap: 'wrap',
+  },
+  stripItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  stripValue: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  stripLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  stripWindBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginLeft: 'auto',
+  },
+  stripWindText: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'capitalize',
   },
 });
 

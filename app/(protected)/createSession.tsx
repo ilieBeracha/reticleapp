@@ -18,9 +18,11 @@ import type { Position, SessionPurpose } from '@/components/session/creation/ses
 import { CreateWeaponFlow, WeaponPicker } from '@/components/weapons';
 import { getCategoryConfig } from '@/constants/weaponCategories';
 import { useColors } from '@/hooks/ui/useColors';
+import { useOpenWeather } from '@/hooks/useOpenWeather';
 import type { DrillPreset } from '@/services/presetService';
 import type { BaseSessionConfig } from '@/services/session/types';
 import { createSession, deleteSession, getMyActiveSession } from '@/services/sessionService';
+import { toSessionWeatherData } from '@/services/weather';
 import type { UserWeapon } from '@/services/weaponService';
 import { useSessionStore } from '@/store/sessionStore';
 import { Ionicons } from '@expo/vector-icons';
@@ -50,6 +52,9 @@ export default function CreateSessionScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { loadSessions } = useSessionStore();
+  
+  // Fetch weather in background (non-blocking)
+  const { weather: openWeather } = useOpenWeather({ autoFetch: true });
   
   // Edit mode params (coming back from SessionPrepView)
   const params = useLocalSearchParams<{
@@ -146,11 +151,28 @@ export default function CreateSessionScreen() {
   async function handleSubmit(config: BaseSessionConfig) {
     try {
       console.log('[CreateSession] Submitting with weapon_id:', config.weapon_id);
-      const session = await createSession(config);
+      
+      // Attach weather data if available (non-blocking - session creates even without weather)
+      const sessionWeather = toSessionWeatherData(openWeather, 'openweathermap');
+      const configWithWeather: BaseSessionConfig = {
+        ...config,
+        weather: sessionWeather,
+      };
+      
+      if (sessionWeather) {
+        console.log('[CreateSession] Weather attached:', {
+          temp: sessionWeather.temperature_c,
+          condition: sessionWeather.condition,
+          wind: sessionWeather.wind_speed_mps,
+        });
+      }
+      
+      const session = await createSession(configWithWeather);
       console.log('[CreateSession] Created session:', {
         id: session.id,
         weapon_id: session.weapon_id,
         weapon_name: session.weapon_name,
+        has_weather: !!session.weather,
       });
       await loadSessions();
       

@@ -51,6 +51,16 @@ export interface SessionFeatures {
   hr_max: number | null;
   flinch_count: number;
   optimal_shot_pct: number | null;
+
+  // Weather
+  has_weather: boolean;
+  weather_temp_c: number | null;
+  weather_humidity: number | null;
+  weather_wind_speed_mps: number | null;
+  weather_wind_bearing: number | null;
+  weather_condition: string | null;
+  weather_wind_impact: 'negligible' | 'minor' | 'moderate' | 'significant' | 'severe' | null;
+  weather_condition_severity: 'ideal' | 'good' | 'moderate' | 'poor' | 'severe' | null;
 }
 
 /**
@@ -88,6 +98,7 @@ export type InsightType =
 export type InsightFactor =
   | 'execution'
   | 'wind'
+  | 'weather'
   | 'fatigue'
   | 'stress'
   | 'stance'
@@ -96,6 +107,8 @@ export type InsightFactor =
   | 'pacing'
   | 'conditions'
   | 'consistency'
+  | 'temperature'
+  | 'humidity'
   | 'unknown';
 
 /**

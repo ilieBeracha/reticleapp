@@ -26,6 +26,7 @@ import type {
   PaperType,
   SessionStats,
   SessionTargetWithResults,
+  SessionWeatherData,
   SessionWithDetails,
   TargetType,
 } from './types';
@@ -209,6 +210,7 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
       watch_controlled: config.watch_controlled,
       status,
       started_at: startedAt,
+      weather: config.weather ?? null, // Weather at session start
     })
     .select(SESSION_SELECT_AFTER_CREATE)
     .single();
@@ -328,6 +330,8 @@ export async function updateSession(
     watch_controlled?: boolean;
     /** Update custom drill config (e.g., to save detection_sensitivity) */
     custom_drill_config?: Record<string, any>;
+    /** Weather conditions (can be updated after session start) */
+    weather?: SessionWeatherData | null;
   }
 ) {
   const updatePayload: Record<string, any> = {
@@ -352,6 +356,10 @@ export async function updateSession(
 
   if (typeof updates.custom_drill_config !== 'undefined') {
     updatePayload.custom_drill_config = updates.custom_drill_config;
+  }
+
+  if (typeof updates.weather !== 'undefined') {
+    updatePayload.weather = updates.weather;
   }
 
   // Return a fully-hydrated session payload so callers don't lose drill context after updates.

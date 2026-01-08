@@ -92,4 +92,3 @@ const localStyles = StyleSheet.create({
   joinTeamTitle: { fontSize: 14, fontWeight: '600' },
   joinTeamText: { fontSize: 12 },
 });
-

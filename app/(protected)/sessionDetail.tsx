@@ -4,9 +4,11 @@
  * Shows session summary, stats, and image previews.
  * Opens as a formSheet modal above tabs.
  */
+import { WeatherStrip } from '@/components/session/WeatherDisplay';
 import { useSessionTimeline } from '@/components/session/timeline/useSessionTimeline';
 import { useColors } from '@/hooks/ui/useColors';
 import { getSessionInsights, runInsightPipeline, type SessionInsight } from '@/services/insights';
+import type { DecodedWeather } from '@/services/session/watchTypes';
 import {
   calculateSessionStats,
   getSessionById,
@@ -211,6 +213,35 @@ export default function SessionDetailScreen() {
     };
   }, [targets]);
 
+  // Decode weather from session (OpenWeatherMap or stored data)
+  const weather: DecodedWeather | null = useMemo(() => {
+    if (!session?.weather) return null;
+    
+    const sessionWeather = session.weather as any;
+    // If it's SessionWeatherData format (snake_case), convert to DecodedWeather
+    if (sessionWeather.temperature_c !== undefined) {
+      return {
+        temperatureC: sessionWeather.temperature_c,
+        temperatureF: sessionWeather.temperature_f,
+        humidity: sessionWeather.humidity,
+        windSpeedMps: sessionWeather.wind_speed_mps,
+        windSpeedMph: sessionWeather.wind_speed_mph,
+        windSpeedKph: sessionWeather.wind_speed_kph,
+        windDirection: sessionWeather.wind_direction,
+        windBearing: sessionWeather.wind_bearing,
+        pressureHpa: sessionWeather.pressure_hpa,
+        condition: sessionWeather.condition,
+        windImpact: sessionWeather.wind_impact,
+        conditionSeverity: sessionWeather.condition_severity,
+      } as DecodedWeather;
+    }
+    // If already in DecodedWeather format (camelCase)
+    if (sessionWeather.temperatureC !== undefined) {
+      return sessionWeather as DecodedWeather;
+    }
+    return null;
+  }, [session?.weather]);
+
   // ============================================================================
   // TIMELINE INSIGHTS (from saved timeline data)
   // ============================================================================
@@ -378,6 +409,13 @@ export default function SessionDetailScreen() {
           )}
         </View>
       </View>
+
+      {/* Weather Conditions Strip (compact, top of page) */}
+      {weather && (
+        <Animated.View entering={FadeIn.duration(200)} style={styles.weatherStripSection}>
+          <WeatherStrip weather={weather} />
+        </Animated.View>
+      )}
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* SESSION CONTEXT - What was being done */}
@@ -1478,6 +1516,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
+  },
+
+  // Weather Strip
+  weatherStripSection: {
+    marginBottom: 16,
   },
 
   // Session Context

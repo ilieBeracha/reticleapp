@@ -197,9 +197,35 @@ export default function SessionResultsScreen() {
   const drill = session?.drill_config;
   const drillName = session?.drill_name || drill?.name || 'Practice Session';
   
-  // Decode weather from watch data (if available)
+  // Decode weather from session or watch data (if available)
   const weather: DecodedWeather | null = useMemo(() => {
-    // watchData may have weather in different locations depending on format
+    // 1. First check session.weather (from OpenWeatherMap or stored data)
+    if (session?.weather) {
+      const sessionWeather = session.weather as any;
+      // If it's SessionWeatherData format, convert to DecodedWeather
+      if (sessionWeather.temperature_c !== undefined) {
+        return {
+          temperatureC: sessionWeather.temperature_c,
+          temperatureF: sessionWeather.temperature_f,
+          humidity: sessionWeather.humidity,
+          windSpeedMps: sessionWeather.wind_speed_mps,
+          windSpeedMph: sessionWeather.wind_speed_mph,
+          windSpeedKph: sessionWeather.wind_speed_kph,
+          windDirection: sessionWeather.wind_direction,
+          windBearing: sessionWeather.wind_bearing,
+          pressureHpa: sessionWeather.pressure_hpa,
+          condition: sessionWeather.condition,
+          windImpact: sessionWeather.wind_impact,
+          conditionSeverity: sessionWeather.condition_severity,
+        } as DecodedWeather;
+      }
+      // If already in DecodedWeather format
+      if (sessionWeather.temperatureC !== undefined) {
+        return sessionWeather as DecodedWeather;
+      }
+    }
+    
+    // 2. Fall back to watchData weather
     const rawWeather = (watchData as any)?.weather;
     if (rawWeather) {
       // If already decoded (has temperatureC), use as-is
@@ -210,7 +236,7 @@ export default function SessionResultsScreen() {
       return decodeWeather(rawWeather);
     }
     return null;
-  }, [watchData]);
+  }, [session?.weather, watchData]);
   
   // Calculate splits from timestamps
   const shotTimestamps = watchData?.shotTimestamps || [];

@@ -1,6 +1,45 @@
 import type { DrillGoal } from '@/types/workspace';
 
 // ============================================================================
+// WEATHER DATA - Stored with session
+// ============================================================================
+
+/**
+ * Weather data stored with a session.
+ * Can come from OpenWeatherMap API or Garmin watch.
+ */
+export interface SessionWeatherData {
+  /** Temperature in Celsius */
+  temperature_c: number | null;
+  /** Temperature in Fahrenheit */
+  temperature_f?: number | null;
+  /** Humidity percentage (0-100) */
+  humidity: number | null;
+  /** Wind speed in meters per second */
+  wind_speed_mps: number | null;
+  /** Wind speed in mph (computed) */
+  wind_speed_mph?: number | null;
+  /** Wind speed in kph (computed) */
+  wind_speed_kph?: number | null;
+  /** Wind direction cardinal (N, NE, E, etc.) */
+  wind_direction: string | null;
+  /** Wind bearing in degrees (0-360) */
+  wind_bearing?: number | null;
+  /** Atmospheric pressure in hPa */
+  pressure_hpa: number | null;
+  /** Weather condition string */
+  condition: string | null;
+  /** Wind impact assessment: calm | light | moderate | strong */
+  wind_impact?: 'calm' | 'light' | 'moderate' | 'strong';
+  /** Condition severity: ideal | good | challenging | difficult | extreme */
+  condition_severity?: 'ideal' | 'good' | 'challenging' | 'difficult' | 'extreme';
+  /** Data source */
+  source?: 'openweathermap' | 'garmin_watch' | 'manual';
+  /** When the weather was fetched */
+  fetched_at?: string;
+}
+
+// ============================================================================
 // BASE SESSION CONFIG - Unified structure for ALL session creation
 // ============================================================================
 
@@ -57,6 +96,9 @@ export interface BaseSessionConfig {
   
   // Optional metadata
   notes?: string;
+  
+  // Weather conditions at session start (from OpenWeatherMap or manual)
+  weather?: SessionWeatherData | null;
   
   // Start as pending (for watch selection flow)
   // When true, session is created as 'pending' and user must call activateSession()
@@ -149,6 +191,8 @@ export interface SessionWithDetails {
   ended_at: string | null;
   created_at: string;
   updated_at?: string;
+  // Weather conditions at session start
+  weather?: SessionWeatherData | null;
   // Optional aggregated stats (populated when requested)
   stats?: SessionAggregatedStats;
 }

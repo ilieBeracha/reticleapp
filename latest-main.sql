@@ -572,7 +572,15 @@ CREATE TABLE IF NOT EXISTS "public"."session_features" (
     "hr_min" numeric,
     "hr_max" numeric,
     "flinch_count" integer DEFAULT 0,
-    "optimal_shot_pct" numeric
+    "optimal_shot_pct" numeric,
+    "has_weather" boolean DEFAULT false,
+    "weather_temp_c" numeric,
+    "weather_humidity" integer,
+    "weather_wind_speed_mps" numeric,
+    "weather_wind_bearing" integer,
+    "weather_condition" "text",
+    "weather_wind_impact" "text",
+    "weather_condition_severity" "text"
 );
 
 
@@ -589,9 +597,10 @@ DECLARE
   v_paper RECORD;
   v_tactical RECORD;
   v_timeline RECORD;
+  v_weather RECORD;
   v_result public.session_features;
 BEGIN
-  -- 1. Get session base info
+  -- 1. Get session base info (including weather)
   SELECT 
     s.id,
     s.user_id,
@@ -599,6 +608,7 @@ BEGIN
     s.weapon_id,
     s.started_at,
     s.ended_at,
+    s.weather,  -- Include weather JSON
     COALESCE(
       d.drill_goal,
       s.custom_drill_config->>'drill_goal',
@@ -613,6 +623,23 @@ BEGIN
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Session not found: %', p_session_id;
+  END IF;
+
+  -- Extract weather data from JSONB
+  IF v_session.weather IS NOT NULL THEN
+    SELECT
+      TRUE as has_weather,
+      COALESCE((v_session.weather->>'temperature_c')::numeric, (v_session.weather->>'temperatureC')::numeric) as temp_c,
+      COALESCE((v_session.weather->>'humidity')::integer, (v_session.weather->>'humidity')::integer) as humidity,
+      COALESCE((v_session.weather->>'wind_speed_mps')::numeric, (v_session.weather->>'windSpeedMps')::numeric) as wind_speed_mps,
+      COALESCE((v_session.weather->>'wind_bearing')::integer, (v_session.weather->>'windBearing')::integer) as wind_bearing,
+      COALESCE(v_session.weather->>'condition', v_session.weather->>'condition') as condition,
+      COALESCE(v_session.weather->>'wind_impact', v_session.weather->>'windImpact') as wind_impact,
+      COALESCE(v_session.weather->>'condition_severity', v_session.weather->>'conditionSeverity') as condition_severity
+    INTO v_weather;
+  ELSE
+    SELECT FALSE as has_weather, NULL::numeric, NULL::integer, NULL::numeric, NULL::integer, NULL::text, NULL::text, NULL::text
+    INTO v_weather;
   END IF;
 
   -- 2. Aggregate from session_targets + paper_target_results
@@ -695,7 +722,7 @@ BEGIN
     -- For now, default to 'stable' - can be computed from timeline points in TypeScript
     v_stress_trend := 'stable';
 
-    -- 6. Upsert into session_features
+    -- 6. Upsert into session_features (WITH WEATHER)
     INSERT INTO session_features (
       session_id,
       user_id,
@@ -725,7 +752,16 @@ BEGIN
       hr_min,
       hr_max,
       flinch_count,
-      optimal_shot_pct
+      optimal_shot_pct,
+      -- Weather fields
+      has_weather,
+      weather_temp_c,
+      weather_humidity,
+      weather_wind_speed_mps,
+      weather_wind_bearing,
+      weather_condition,
+      weather_wind_impact,
+      weather_condition_severity
     ) VALUES (
       p_session_id,
       v_session.user_id,
@@ -755,7 +791,16 @@ BEGIN
       v_timeline.hr_min,
       v_timeline.hr_max,
       COALESCE(v_timeline.flinch_count, 0),
-      v_optimal_pct
+      v_optimal_pct,
+      -- Weather values
+      COALESCE(v_weather.has_weather, false),
+      v_weather.temp_c,
+      v_weather.humidity,
+      v_weather.wind_speed_mps,
+      v_weather.wind_bearing,
+      v_weather.condition,
+      v_weather.wind_impact,
+      v_weather.condition_severity
     )
     ON CONFLICT (session_id) DO UPDATE SET
       shots = EXCLUDED.shots,
@@ -783,7 +828,16 @@ BEGIN
       hr_min = EXCLUDED.hr_min,
       hr_max = EXCLUDED.hr_max,
       flinch_count = EXCLUDED.flinch_count,
-      optimal_shot_pct = EXCLUDED.optimal_shot_pct
+      optimal_shot_pct = EXCLUDED.optimal_shot_pct,
+      -- Weather updates
+      has_weather = EXCLUDED.has_weather,
+      weather_temp_c = EXCLUDED.weather_temp_c,
+      weather_humidity = EXCLUDED.weather_humidity,
+      weather_wind_speed_mps = EXCLUDED.weather_wind_speed_mps,
+      weather_wind_bearing = EXCLUDED.weather_wind_bearing,
+      weather_condition = EXCLUDED.weather_condition,
+      weather_wind_impact = EXCLUDED.weather_wind_impact,
+      weather_condition_severity = EXCLUDED.weather_condition_severity
     RETURNING * INTO v_result;
 
     RETURN v_result;
@@ -795,7 +849,7 @@ $$;
 ALTER FUNCTION "public"."compute_session_features"("p_session_id" "uuid") OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."compute_session_features"("p_session_id" "uuid") IS 'Computes and stores derived features for a session. Call after session completion. Idempotent (upserts).';
+COMMENT ON FUNCTION "public"."compute_session_features"("p_session_id" "uuid") IS 'Computes and stores derived features for a session including weather. Call after session completion. Idempotent (upserts).';
 
 
 
@@ -852,6 +906,7 @@ CREATE TABLE IF NOT EXISTS "public"."sessions" (
     "custom_drill_config" "jsonb",
     "watch_controlled" boolean DEFAULT false,
     "weapon_id" "uuid",
+    "weather" "jsonb",
     CONSTRAINT "sessions_session_mode_check" CHECK (("session_mode" = ANY (ARRAY['solo'::"text", 'group'::"text"]))),
     CONSTRAINT "sessions_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'active'::"text", 'completed'::"text", 'cancelled'::"text"])))
 );
@@ -3163,6 +3218,14 @@ CREATE INDEX "idx_session_features_team" ON "public"."session_features" USING "b
 
 
 CREATE INDEX "idx_session_features_user_created" ON "public"."session_features" USING "btree" ("user_id", "created_at" DESC);
+
+
+
+CREATE INDEX "idx_session_features_weather_condition" ON "public"."session_features" USING "btree" ("weather_condition") WHERE ("has_weather" = true);
+
+
+
+CREATE INDEX "idx_session_features_weather_wind" ON "public"."session_features" USING "btree" ("weather_wind_impact") WHERE ("has_weather" = true);
 
 
 

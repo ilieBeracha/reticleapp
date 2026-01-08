@@ -74,4 +74,3 @@ const localStyles = StyleSheet.create({
   emptyTitle: { fontSize: 14, fontWeight: '600' },
   emptyText: { fontSize: 12 },
 });
-

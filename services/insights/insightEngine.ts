@@ -5,11 +5,11 @@
 // Start with rules - add ML later when patterns are validated.
 
 import type {
-    GeneratedInsight,
-    InsightFactor,
-    InsightGenerationInput,
-    SessionFeatures,
-    UserBaseline,
+  GeneratedInsight,
+  InsightFactor,
+  InsightGenerationInput,
+  SessionFeatures,
+  UserBaseline,
 } from './types';
 
 // ============================================================================
@@ -323,6 +323,122 @@ function checkFatigueCorrelation(
 }
 
 /**
+ * Rule: Weather impact detection.
+ * Triggers when challenging weather conditions may have affected performance.
+ */
+function checkWeatherImpact(
+  features: SessionFeatures,
+  baseline: UserBaseline | null
+): GeneratedInsight | null {
+  // Need weather data
+  if (!features.has_weather) return null;
+
+  const insights: { factor: InsightFactor; severity: number; text: string }[] = [];
+
+  // Check wind impact
+  if (features.weather_wind_impact === 'significant' || features.weather_wind_impact === 'severe') {
+    const windSpeed = features.weather_wind_speed_mps ?? 0;
+    insights.push({
+      factor: 'wind',
+      severity: features.weather_wind_impact === 'severe' ? 30 : 20,
+      text: `${features.weather_wind_impact} wind (${windSpeed.toFixed(1)} m/s)`,
+    });
+  }
+
+  // Check extreme temperature
+  if (features.weather_temp_c !== null) {
+    if (features.weather_temp_c <= 5) {
+      insights.push({
+        factor: 'temperature',
+        severity: 15,
+        text: `cold conditions (${Math.round(features.weather_temp_c)}°C)`,
+      });
+    } else if (features.weather_temp_c >= 35) {
+      insights.push({
+        factor: 'temperature',
+        severity: 15,
+        text: `heat (${Math.round(features.weather_temp_c)}°C)`,
+      });
+    }
+  }
+
+  // Check challenging conditions
+  if (features.weather_condition_severity === 'poor' || features.weather_condition_severity === 'severe') {
+    insights.push({
+      factor: 'weather',
+      severity: features.weather_condition_severity === 'severe' ? 25 : 15,
+      text: `${features.weather_condition?.toLowerCase() ?? 'challenging'} conditions`,
+    });
+  }
+
+  // Check high humidity
+  if (features.weather_humidity !== null && features.weather_humidity >= 85) {
+    insights.push({
+      factor: 'humidity',
+      severity: 10,
+      text: `high humidity (${features.weather_humidity}%)`,
+    });
+  }
+
+  if (insights.length === 0) return null;
+
+  // Check if accuracy/grouping is below baseline (weather might be a factor)
+  const isPerformanceDown =
+    baseline &&
+    ((features.accuracy_pct !== null &&
+      baseline.avg_accuracy !== null &&
+      features.accuracy_pct < baseline.avg_accuracy - 5) ||
+      (features.dispersion_cm !== null &&
+        baseline.avg_grouping !== null &&
+        features.dispersion_cm > baseline.avg_grouping + 1));
+
+  // Sort by severity
+  insights.sort((a, b) => b.severity - a.severity);
+  const primary = insights[0];
+  const secondary = insights.length > 1 ? insights[1] : null;
+
+  const conditionsList = insights.map((i) => i.text).join(', ');
+  const totalSeverity = insights.reduce((sum, i) => sum + i.severity, 0);
+
+  if (isPerformanceDown) {
+    return {
+      title: 'Weather may have impacted results',
+      summary: `Conditions: ${conditionsList}. Performance below your baseline - weather likely a factor.`,
+      primary_factor: primary.factor,
+      secondary_factor: secondary?.factor ?? null,
+      score: Math.min(70, 40 + totalSeverity),
+      tags: ['weather', 'conditions', 'environment'],
+      insight_type: 'baseline_deviation',
+      evidence: {
+        weather_condition: features.weather_condition,
+        weather_wind_impact: features.weather_wind_impact,
+        weather_temp_c: features.weather_temp_c,
+        weather_humidity: features.weather_humidity,
+        accuracy_pct: features.accuracy_pct,
+        baseline_accuracy: baseline?.avg_accuracy,
+      },
+    };
+  }
+
+  // Good performance despite challenging weather
+  return {
+    title: 'Performed well in challenging conditions',
+    summary: `Despite ${conditionsList}, you maintained good performance. Solid environmental adaptation.`,
+    primary_factor: 'conditions',
+    secondary_factor: primary.factor,
+    score: Math.min(50, 30 + totalSeverity / 2),
+    tags: ['weather', 'conditions', 'positive'],
+    insight_type: 'achievement',
+    evidence: {
+      weather_condition: features.weather_condition,
+      weather_wind_impact: features.weather_wind_impact,
+      weather_temp_c: features.weather_temp_c,
+      weather_humidity: features.weather_humidity,
+    },
+  };
+}
+
+/**
  * Rule: Flinch pattern detection.
  * Triggers when multiple flinches are detected.
  */
@@ -520,6 +636,9 @@ export function generateInsights(input: InsightGenerationInput): GeneratedInsigh
 
   const flinchInsight = checkFlinchPattern(features);
   if (flinchInsight) insights.push(flinchInsight);
+
+  const weatherInsight = checkWeatherImpact(features, baseline);
+  if (weatherInsight) insights.push(weatherInsight);
 
   // Building baseline insight (shows progress toward personalized insights)
   const buildingBaselineInsight = checkBuildingBaseline(features, baseline);

@@ -67,6 +67,8 @@ export default ({ config }) => {
         'android.permission.RECORD_AUDIO',
         'android.permission.USE_BIOMETRIC',
         'android.permission.USE_FINGERPRINT',
+        'android.permission.ACCESS_FINE_LOCATION',
+        'android.permission.ACCESS_COARSE_LOCATION',
       ],
     },
     plugins: [
