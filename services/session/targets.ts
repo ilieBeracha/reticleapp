@@ -276,6 +276,128 @@ export async function updateSessionHits(sessionId: string, hits: number): Promis
 }
 
 /**
+ * Update group size (dispersion) for a session's paper target
+ * If no paper target exists, creates one first
+ * Returns true if updated/created, false on error
+ */
+export async function updateSessionGroupSize(
+  sessionId: string, 
+  groupSizeCm: number,
+  shotsCount?: number,
+  distanceM?: number
+): Promise<boolean> {
+  console.log('[Targets] updateSessionGroupSize called:', { sessionId, groupSizeCm, shotsCount, distanceM });
+  
+  // First find the paper target for this session
+  const { data: targets, error: targetsError } = await supabase
+    .from('session_targets')
+    .select('id')
+    .eq('session_id', sessionId)
+    .eq('target_type', 'paper');
+
+  console.log('[Targets] Paper targets found:', targets?.length ?? 0, targets);
+
+  if (targetsError) {
+    console.error('[Targets] Error finding paper target:', targetsError);
+    return false;
+  }
+
+  let targetId: string;
+
+  if (!targets || targets.length === 0) {
+    // No paper target exists - need to create one
+    console.log('[Targets] No paper target found, creating one for session:', sessionId);
+    
+    // Get session info for distance
+    const { data: session } = await supabase
+      .from('sessions')
+      .select('drill_config')
+      .eq('id', sessionId)
+      .single();
+    
+    const distance = distanceM ?? (session?.drill_config as any)?.distance_m ?? 0;
+    
+    // Create paper target
+    const newTarget = await addSessionTarget({
+      session_id: sessionId,
+      target_type: 'paper',
+      distance_m: distance,
+      notes: 'Created for group size entry',
+    });
+    
+    targetId = newTarget.id;
+    
+    // Create paper target result with group size and shots
+    const { error: insertError } = await supabase
+      .from('paper_target_results')
+      .insert({
+        session_target_id: targetId,
+        paper_type: 'grouping',
+        bullets_fired: shotsCount ?? 0,
+        hits_total: shotsCount ?? 0, // For grouping, all shots hit
+        dispersion_cm: groupSizeCm,
+      });
+    
+    if (insertError) {
+      console.error('[Targets] Failed to create paper result:', insertError);
+      throw insertError;
+    }
+    
+    console.log('[Targets] Created paper target with group size:', groupSizeCm, 'cm');
+    return true;
+  }
+
+  // Paper target exists - update the result
+  targetId = targets[0].id;
+  console.log('[Targets] Found paper target:', targetId);
+  
+  // Check if paper_target_result exists
+  const { data: existingResult, error: existingError } = await supabase
+    .from('paper_target_results')
+    .select('id, dispersion_cm')
+    .eq('session_target_id', targetId)
+    .single();
+  
+  console.log('[Targets] Existing paper result:', existingResult, 'error:', existingError?.code);
+  
+  if (existingResult) {
+    // Update existing result
+    console.log('[Targets] Updating existing result with dispersion_cm:', groupSizeCm);
+    const { error: updateError, data: updatedData } = await supabase
+      .from('paper_target_results')
+      .update({ dispersion_cm: groupSizeCm })
+      .eq('session_target_id', targetId)
+      .select('id, dispersion_cm')
+      .single();
+
+    if (updateError) {
+      console.error('[Targets] Failed to update group size:', updateError);
+      throw updateError;
+    }
+    console.log('[Targets] Update result:', updatedData);
+  } else {
+    // Create new result
+    const { error: insertError } = await supabase
+      .from('paper_target_results')
+      .insert({
+        session_target_id: targetId,
+        paper_type: 'grouping',
+        bullets_fired: shotsCount ?? 0,
+        hits_total: shotsCount ?? 0,
+        dispersion_cm: groupSizeCm,
+      });
+    
+    if (insertError) {
+      console.error('[Targets] Failed to create paper result:', insertError);
+      throw insertError;
+    }
+  }
+
+  console.log('[Targets] Updated group size for session:', sessionId, 'to', groupSizeCm, 'cm');
+  return true;
+}
+
+/**
  * Get tactical target result by target ID
  */
 export async function getTacticalTargetResult(sessionTargetId: string): Promise<TacticalTargetResult | null> {

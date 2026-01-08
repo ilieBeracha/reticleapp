@@ -2,6 +2,7 @@
  * WeeklyStatsCard Component
  * 
  * Displays weekly shooting statistics in a compact, visually appealing card.
+ * Shows placeholder when no sessions this week.
  */
 
 import { Clock, Crosshair, Flame, Target, TrendingUp } from 'lucide-react-native';
@@ -12,7 +13,35 @@ import { formatDuration } from '../UnifiedHomePage.helpers';
 import type { WeeklyStatsCardProps } from '../UnifiedHomePage.types';
 
 export function WeeklyStatsCard({ stats, streak, colors }: WeeklyStatsCardProps) {
-  if (stats.sessions === 0) return null;
+  // Empty state - no sessions this week
+  if (stats.sessions === 0) {
+    return (
+      <View style={[localStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={localStyles.emptyHeader}>
+          <Text style={[localStyles.title, { color: colors.text }]}>This Week</Text>
+        </View>
+        <View style={localStyles.emptyContent}>
+          <View style={localStyles.emptyStatsRow}>
+            <View style={[localStyles.emptyStat, { backgroundColor: colors.secondary }]}>
+              <Target size={16} color={colors.textMuted} />
+              <Text style={[localStyles.emptyStatText, { color: colors.textMuted }]}>--</Text>
+            </View>
+            <View style={[localStyles.emptyStat, { backgroundColor: colors.secondary }]}>
+              <TrendingUp size={16} color={colors.textMuted} />
+              <Text style={[localStyles.emptyStatText, { color: colors.textMuted }]}>--</Text>
+            </View>
+            <View style={[localStyles.emptyStat, { backgroundColor: colors.secondary }]}>
+              <Clock size={16} color={colors.textMuted} />
+              <Text style={[localStyles.emptyStatText, { color: colors.textMuted }]}>--</Text>
+            </View>
+          </View>
+          <Text style={[localStyles.emptyMessage, { color: colors.textMuted }]}>
+            No practice sessions yet this week
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[localStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -156,5 +185,33 @@ const localStyles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     letterSpacing: -0.3,
+  },
+  // Empty state
+  emptyHeader: {
+    marginBottom: 12,
+  },
+  emptyContent: {
+    gap: 12,
+  },
+  emptyStatsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  emptyStat: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  emptyStatText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emptyMessage: {
+    fontSize: 12,
+    textAlign: 'center',
   },
 });

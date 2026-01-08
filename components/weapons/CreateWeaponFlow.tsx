@@ -573,7 +573,7 @@ function FormField({
 
 // Cleaning interval options
 const CLEANING_INTERVALS: { type: CleaningIntervalType; label: string; placeholder: string; hint: string }[] = [
-  { type: 'rounds', label: 'Rounds', placeholder: '500', hint: 'rounds fired' },
+  { type: 'rounds', label: 'Bullets', placeholder: '500', hint: 'bullets fired' },
   { type: 'sessions', label: 'Sessions', placeholder: '10', hint: 'training sessions' },
   { type: 'days', label: 'Days', placeholder: '30', hint: 'days since last clean' },
 ];
@@ -696,7 +696,7 @@ function CleaningRoutineSection({
           <View style={[styles.cleaningHint, { backgroundColor: colors.background }]}>
             <Sparkles size={14} color={colors.textMuted} />
             <Text style={[styles.cleaningHintText, { color: colors.textMuted }]}>
-              {intervalType === 'rounds' && 'We\'ll track rounds automatically from sessions'}
+              {intervalType === 'rounds' && 'We\'ll track bullets automatically from sessions'}
               {intervalType === 'sessions' && 'We\'ll count each completed session'}
               {intervalType === 'days' && 'Calendar-based reminder from last cleaning'}
             </Text>

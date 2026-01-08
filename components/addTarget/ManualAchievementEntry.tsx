@@ -284,7 +284,7 @@ export const ManualAchievementEntry = React.memo(function ManualAchievementEntry
           min={1}
           max={maxBullets}
           onChange={(v) => handleBulletsChange(v)}
-          label="Rounds Fired"
+          label="Bullets Fired"
         />
         {/* Quick select for bullets */}
         <View style={styles.bulletsQuickRow}>
@@ -323,7 +323,7 @@ export const ManualAchievementEntry = React.memo(function ManualAchievementEntry
           max={bulletsFired}
           onChange={handleHitsChange}
           label="Hits on Target"
-          sublabel={`Out of ${bulletsFired} rounds fired`}
+          sublabel={`Out of ${bulletsFired} bullets fired`}
           showPercentage
           percentageOf={bulletsFired}
         />
@@ -338,7 +338,7 @@ export const ManualAchievementEntry = React.memo(function ManualAchievementEntry
           </View>
           <View style={[styles.summaryDivider, { backgroundColor: `${colors.primary}30` }]} />
           <View style={styles.summaryItem}>
-            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Rounds</Text>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Bullets</Text>
             <Text style={[styles.summaryValue, { color: colors.text }]}>{bulletsFired}</Text>
           </View>
           <View style={[styles.summaryDivider, { backgroundColor: `${colors.primary}30` }]} />

@@ -242,7 +242,7 @@ export const TargetForm = React.memo(function TargetForm({
               <Text style={[styles.infoDesc, { color: colors.textMuted }]}>
                 {inputMethod === "scan" 
                   ? "AI will detect bullet holes and calculate your hit percentage automatically."
-                  : "Manually enter the number of rounds fired and hits to track your accuracy."
+                  : "Manually enter the number of bullets fired and hits to track your accuracy."
                 }
               </Text>
               <View style={styles.infoFeatures}>

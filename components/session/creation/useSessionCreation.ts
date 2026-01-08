@@ -1,10 +1,11 @@
 /**
  * useSessionCreation - Hook for step-based session creation
  *
- * Implements the 3-step pre-shooting flow:
- * 1. Intent - What am I going to do?
- * 2. Weapon - Which weapon?
- * 3. Context - Session details (distance, rounds, drill, etc.)
+ * Implements a 2-step pre-shooting flow:
+ * 1. Intent - What am I going to do? (grouping/engagement)
+ * 2. Details - Session configuration (weapon, distance, bullets, etc.)
+ *
+ * Weapon selection is a sheet within the Details step, not a separate step.
  *
  * Then hands off to:
  * - SessionPrepView for watch/phone selection
@@ -91,10 +92,10 @@ export interface UseSessionCreationReturn {
 }
 
 // ============================================================================
-// STEP ORDER (3 user-facing steps)
+// STEP ORDER (2 user-facing steps - weapon is a sheet within details)
 // ============================================================================
 
-const STEP_ORDER: CreationStep[] = ['intent', 'weapon', 'context', 'ready'];
+const STEP_ORDER: CreationStep[] = ['intent', 'context', 'ready'];
 
 function getStepIndex(step: CreationStep): number {
   return STEP_ORDER.indexOf(step);
@@ -184,10 +185,9 @@ export function useSessionCreation(
     switch (state.step) {
       case 'intent':
         return state.purpose !== null;
-      case 'weapon':
-        return state.context.weaponId !== null;
       case 'context':
-        return state.context.distance > 0 && state.context.shotsPlanned > 0;
+        // Weapon is required, distance and shots must be valid
+        return state.context.weaponId !== null && state.context.distance > 0 && state.context.shotsPlanned > 0;
       case 'ready':
         return false; // This is the final step
       default:
@@ -195,8 +195,8 @@ export function useSessionCreation(
     }
   }, [state.step, state.purpose, state.context]);
   
-  // Progress: 3 user-facing steps (intent, weapon, context)
-  const progressPercent = ((stepIndex + 1) / 3) * 100;
+  // Progress: 2 user-facing steps (intent, details)
+  const progressPercent = ((stepIndex + 1) / 2) * 100;
   
   // ─────────────────────────────────────────────────────────────────────────
   // STEP 1: INTENT
@@ -321,14 +321,7 @@ export function useSessionCreation(
     setState((s) => {
       const currentIndex = STEP_ORDER.indexOf(s.step);
       if (currentIndex <= 0) return s;
-      
-      let prevStep = STEP_ORDER[currentIndex - 1];
-      
-      // Skip weapon step if going back from context AND weapon was auto-selected
-      if (s.step === 'context' && prevStep === 'weapon' && s.context.weaponId !== null) {
-        prevStep = 'intent';
-      }
-      
+      const prevStep = STEP_ORDER[currentIndex - 1];
       return { ...s, step: prevStep };
     });
   }, []);
@@ -344,25 +337,16 @@ export function useSessionCreation(
         case 'intent':
           canAdvance = s.purpose !== null;
           break;
-        case 'weapon':
-          canAdvance = s.context.weaponId !== null;
-          break;
         case 'context':
-          canAdvance = s.context.distance > 0 && s.context.shotsPlanned > 0;
+          // Weapon is required to continue
+          canAdvance = s.context.weaponId !== null && s.context.distance > 0 && s.context.shotsPlanned > 0;
           break;
         default:
           canAdvance = false;
       }
 
       if (!canAdvance) return s;
-      
-      let nextStep = STEP_ORDER[currentIndex + 1];
-      
-      // Skip weapon step if coming from intent AND weapon is already selected
-      if (s.step === 'intent' && s.context.weaponId !== null) {
-        nextStep = 'context';
-      }
-      
+      const nextStep = STEP_ORDER[currentIndex + 1];
       return { ...s, step: nextStep };
     });
   }, []);

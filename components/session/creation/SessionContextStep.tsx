@@ -1,7 +1,8 @@
 /**
- * SessionContextStep - Configure session details (distance, rounds, drill)
+ * SessionContextStep - Configure session details (distance, bullets, drill)
  *
- * Step 3 in the 3-step flow. Weapon is already selected in step 2.
+ * Step 2 in the 2-step flow. Contains distance, bullets, position, and drill settings.
+ * Weapon selection is handled externally as a sheet.
  */
 
 import { PresetForm } from '@/components/drills';
@@ -43,6 +44,8 @@ interface SessionContextStepProps {
   weaponCategory?: string | null;
   selectedDrillId?: string | null;
   onDrillChange?: (drillId: string | null) => void;
+  /** Hide weapon section - when weapon is shown externally (e.g., in parent component) */
+  hideWeaponSection?: boolean;
 }
 
 // ============================================================================

@@ -658,7 +658,8 @@ export async function addTargetWithTacticalResult(params: {
 export interface WatchSessionData {
   sessionId: string;
   shotsRecorded: number;
-  hitsRecorded?: number; // User-entered hits count
+  hitsRecorded?: number; // User-entered hits count (for engagement)
+  groupSizeCm?: number;  // User-entered group size in cm (for grouping)
   durationMs?: number;
   distance?: number;
   completed?: boolean;
@@ -885,41 +886,56 @@ export async function saveWatchSessionData(
   console.log('[SessionService] Target data keys:', Object.keys(targetData));
   
   // Check if this is a grouping session
-  // For grouping: shots come from paper scan, not watch - don't create tactical result
   const isGrouping = isGroupingGoal(drill?.drill_goal);
   
-  // Create a tactical target entry with watch data
-  // This allows the data to be picked up by normal stats calculation
-  const target = await addSessionTarget({
+  // Create a tactical target entry with watch telemetry data (biometrics, splits, etc.)
+  // This stores all the watch sensor data for later analysis
+  const telemetryTarget = await addSessionTarget({
     session_id: data.sessionId,
     target_type: 'tactical',
     distance_m: distance,
-    notes: isGrouping ? 'Watch telemetry (grouping - shots from scan)' : 'Recorded via Garmin watch',
+    notes: isGrouping ? 'Watch telemetry (grouping session)' : 'Recorded via Garmin watch',
     target_data: targetData,
   });
   
-  // For grouping sessions, DON'T create tactical result - shots/hits come from paper scan
-  // This prevents double-counting: watch shots + scan detected holes
-  if (!isGrouping) {
-    // Calculate time in seconds from milliseconds
-    const timeSeconds = data.durationMs ? data.durationMs / 1000 : null;
+  if (isGrouping) {
+    // GROUPING SESSION: Create paper target with shots and group size
+    // User enters group size manually after scanning
+    console.log('[SessionService] Grouping session - creating paper target for shots/group size');
     
-    // Save the tactical result
-    // Use user-provided hits if available, otherwise assume all shots are hits
+    const paperTarget = await addSessionTarget({
+      session_id: data.sessionId,
+      target_type: 'paper',
+      distance_m: distance,
+      notes: 'Grouping from watch session',
+    });
+    
+    // Save paper target result with shots and optional group size
+    await savePaperTargetResult({
+      session_target_id: paperTarget.id,
+      paper_type: 'grouping', // Paper type for grouping
+      bullets_fired: data.shotsRecorded,
+      hits_total: data.shotsRecorded, // For grouping, all shots are on target
+      dispersion_cm: data.groupSizeCm ?? null, // User-entered group size
+    });
+    
+    console.log('[SessionService] Paper target saved with shots:', data.shotsRecorded, 'groupSize:', data.groupSizeCm ?? 'not set');
+  } else {
+    // ENGAGEMENT SESSION: Create tactical result with shots/hits
+    const timeSeconds = data.durationMs ? data.durationMs / 1000 : null;
     const hits = data.hitsRecorded ?? data.shotsRecorded;
+    
     await saveTacticalTargetResult({
-      session_target_id: target.id,
+      session_target_id: telemetryTarget.id,
       bullets_fired: data.shotsRecorded,
       hits: hits,
       is_stage_cleared: data.completed ?? false,
       time_seconds: timeSeconds,
       notes: 'Watch session data',
     });
-  } else {
-    console.log('[SessionService] Grouping session - skipping tactical result, shots will come from scan');
   }
   
-  console.log('[SessionService] Watch data saved as tactical target:', target.id);
+  console.log('[SessionService] Watch data saved, telemetry target:', telemetryTarget.id);
   
   // End the session if requested
   if (shouldEnd) {

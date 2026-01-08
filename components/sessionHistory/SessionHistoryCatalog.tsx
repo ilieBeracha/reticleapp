@@ -60,13 +60,13 @@ export function SessionHistoryCatalog({
     closeFilterSheet,
   } = useSessionHistory(initialFilters);
 
-  // Handle session press
+  // Handle session press - opens the same bottom sheet as recent activity
   const handleSessionPress = useCallback((session: SessionWithDetails) => {
     if (onSessionSelect) {
       onSessionSelect(session);
     } else {
-      // Default: navigate to session detail
-      router.push(`/session/${session.id}`);
+      // Navigate to session detail sheet (same as recent activity)
+      router.push(`/(protected)/sessionDetail?sessionId=${session.id}`);
     }
   }, [onSessionSelect, router]);
 

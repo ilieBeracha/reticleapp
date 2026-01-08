@@ -44,6 +44,8 @@ interface DrillPresetPickerProps {
   onSelect: (preset: DrillPreset) => void;
   onCreateNew: () => void;
   onClose: () => void;
+  /** Filter presets by session purpose: 'grouping' shows only grouping, 'engagement' shows all others */
+  filterByPurpose?: 'grouping' | 'engagement' | null;
 }
 
 // ============================================================================
@@ -54,10 +56,11 @@ function getGoalIcon(goal: DrillGoal, color: string) {
   switch (goal) {
     case 'grouping':
       return <Target size={18} color={color} />;
+    case 'engagement':
     case 'achievement':
       return <Crosshair size={18} color={color} />;
     case 'zeroing':
-      return <Crosshair size={18} color={color} />;
+      return <Zap size={18} color={color} />;
     case 'physical':
       return <Heart size={18} color={color} />;
     default:
@@ -69,6 +72,8 @@ function getGoalLabel(goal: DrillGoal): string {
   switch (goal) {
     case 'grouping':
       return 'Grouping';
+    case 'engagement':
+      return 'Engagement';
     case 'achievement':
       return 'Achievement';
     case 'zeroing':
@@ -88,6 +93,7 @@ export function DrillPresetPicker({
   onSelect,
   onCreateNew,
   onClose,
+  filterByPurpose,
 }: DrillPresetPickerProps) {
   const colors = useColors();
   
@@ -113,6 +119,26 @@ export function DrillPresetPicker({
     }
   };
 
+  // Filter presets based on selected purpose
+  const filteredPresets = presets.filter((preset) => {
+    if (!filterByPurpose) return true; // No filter, show all
+    
+    if (filterByPurpose === 'grouping') {
+      // Only show grouping drills
+      return preset.drill_goal === 'grouping';
+    } else {
+      // Engagement: show everything except grouping (achievement, zeroing, physical, engagement)
+      return preset.drill_goal !== 'grouping';
+    }
+  });
+
+  // Get the title based on filter
+  const getHeaderTitle = () => {
+    if (filterByPurpose === 'grouping') return 'Grouping Drills';
+    if (filterByPurpose === 'engagement') return 'Engagement Drills';
+    return 'My Saved Drills';
+  };
+
   const handleSelect = useCallback((preset: DrillPreset) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onSelect(preset);
@@ -122,11 +148,33 @@ export function DrillPresetPicker({
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────
 
+  // Get empty state message based on filter
+  const getEmptyMessage = () => {
+    if (filterByPurpose === 'grouping') {
+      return {
+        title: 'No grouping drills yet',
+        subtitle: 'Create a preset for your grouping practice sessions',
+      };
+    }
+    if (filterByPurpose === 'engagement') {
+      return {
+        title: 'No engagement drills yet',
+        subtitle: 'Create a preset for your target engagement sessions',
+      };
+    }
+    return {
+      title: 'No saved drills yet',
+      subtitle: 'Create presets to quickly start your favorite drills',
+    };
+  };
+
+  const emptyMessage = getEmptyMessage();
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>My Saved Drills</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{getHeaderTitle()}</Text>
         <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
           <X size={20} color={colors.textMuted} />
         </TouchableOpacity>
@@ -159,17 +207,17 @@ export function DrillPresetPicker({
             <Text style={[styles.retryText, { color: colors.text }]}>Retry</Text>
           </TouchableOpacity>
         </View>
-      ) : presets.length === 0 ? (
+      ) : filteredPresets.length === 0 ? (
         <View style={styles.emptyState}>
           <Target size={48} color={colors.textMuted} strokeWidth={1} />
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>No saved drills yet</Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>{emptyMessage.title}</Text>
           <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-            Create presets to quickly start your favorite drills
+            {emptyMessage.subtitle}
           </Text>
         </View>
       ) : (
         <FlatList
-          data={presets}
+          data={filteredPresets}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <PresetRow

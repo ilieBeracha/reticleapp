@@ -142,28 +142,26 @@ export function UnifiedHomePage() {
         {/* ─────────────────────────────────────────────────────────────────── */}
         {/* VIEW ALL SESSIONS LINK */}
         {/* ─────────────────────────────────────────────────────────────────── */}
-        {recentSessions.length > 0 && (
-          <TouchableOpacity
-            style={[localStyles.viewAllLink, { borderColor: colors.border }]}
-            onPress={() => router.push('/sessionHistory')}
-            activeOpacity={0.7}
-          >
-            <View style={localStyles.viewAllContent}>
-              <View style={[localStyles.viewAllIcon, { backgroundColor: `${colors.primary}12` }]}>
-                <Ionicons name="time-outline" size={18} color={colors.primary} />
-              </View>
-              <View>
-                <Text style={[localStyles.viewAllTitle, { color: colors.text }]}>
-                  View All Sessions
-                </Text>
-                <Text style={[localStyles.viewAllSubtitle, { color: colors.textMuted }]}>
-                  Full history with filters
-                </Text>
-              </View>
+        <TouchableOpacity
+          style={[localStyles.viewAllLink, { borderColor: colors.border }]}
+          onPress={() => router.push('/sessionHistory')}
+          activeOpacity={0.7}
+        >
+          <View style={localStyles.viewAllContent}>
+            <View style={[localStyles.viewAllIcon, { backgroundColor: `${colors.primary}12` }]}>
+              <Ionicons name="time-outline" size={18} color={colors.primary} />
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-          </TouchableOpacity>
-        )}
+            <View>
+              <Text style={[localStyles.viewAllTitle, { color: colors.text }]}>
+                {recentSessions.length > 0 ? 'View All Sessions' : 'Session History'}
+              </Text>
+              <Text style={[localStyles.viewAllSubtitle, { color: colors.textMuted }]}>
+                {recentSessions.length > 0 ? 'Full history with filters' : 'Your training log'}
+              </Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </TouchableOpacity>
 
         {/* Bottom spacing */}
         <View style={{ height: 100 }} />

@@ -453,7 +453,7 @@ export default function SessionDetailScreen() {
             )}
           </View>
 
-          {/* Rounds per shooter (if set) */}
+          {/* Bullets per shooter (if set) */}
           {session.drill_config?.rounds_per_shooter && session.drill_config.rounds_per_shooter > 0 && (
             <View style={styles.contextRow}>
               <View style={styles.contextItem}>
@@ -461,7 +461,7 @@ export default function SessionDetailScreen() {
                   <Target size={14} color={colors.textMuted} />
                 </View>
                 <View style={styles.contextItemContent}>
-                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Rounds</Text>
+                  <Text style={[styles.contextLabel, { color: colors.textMuted }]}>Bullets</Text>
                   <Text style={[styles.contextValue, { color: colors.text }]}>
                     {session.drill_config.rounds_per_shooter} per shooter
                   </Text>
@@ -577,14 +577,6 @@ export default function SessionDetailScreen() {
                   <Text style={[styles.statLabel, { color: colors.textMuted }]}>Best Group</Text>
                 </View>
 
-                {/* Targets */}
-                <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <View style={[styles.statIconBg, { backgroundColor: `${colors.green}22` }]}>
-                    <Award size={18} color={colors.green} />
-                  </View>
-                  <Text style={[styles.statValue, { color: colors.text }]}>{stats.targetCount}</Text>
-                  <Text style={[styles.statLabel, { color: colors.textMuted }]}>Targets</Text>
-                </View>
               </>
             ) : (
               // ENGAGEMENT: Show hits, shots, accuracy

@@ -294,7 +294,7 @@ function WeaponCard({ weapon, stats, isDefault, onPress, onFavorite, onSetDefaul
           <Text style={[styles.statValue, { color: colors.text }]}>
             {stats?.total_rounds_fired ?? 0}
           </Text>
-          <Text style={[styles.statLabel, { color: colors.textMuted }]}>Rounds</Text>
+          <Text style={[styles.statLabel, { color: colors.textMuted }]}>Bullets</Text>
         </View>
 
         <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
@@ -524,7 +524,7 @@ export default function EquipmentScreen() {
                 {totalStats.rounds.toLocaleString()}
               </Text>
               <Text style={[styles.overviewLabel, { color: colors.textMuted }]}>
-                Rounds
+                Bullets
               </Text>
             </View>
           </View>

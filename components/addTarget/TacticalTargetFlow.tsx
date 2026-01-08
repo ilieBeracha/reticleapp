@@ -204,7 +204,7 @@ const HitsStepper = React.memo(function HitsStepper({
   return (
     <View style={hitsStyles.container}>
       <Text style={hitsStyles.label}>HITS ON TARGET</Text>
-      <Text style={hitsStyles.sublabel}>Out of {max} rounds fired</Text>
+      <Text style={hitsStyles.sublabel}>Out of {max} bullets fired</Text>
 
       <View style={hitsStyles.row}>
         <TouchableOpacity
@@ -393,7 +393,7 @@ export function TacticalTargetFlow({
     }
     if (bullets <= 0) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert("Invalid Rounds", "Please enter a valid number of rounds.");
+      Alert.alert("Invalid Bullets", "Please enter a valid number of bullets.");
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -408,7 +408,7 @@ export function TacticalTargetFlow({
 
     if (!isGrouping && hits > bullets) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert("Invalid Hits", "Hits cannot exceed rounds fired.");
+      Alert.alert("Invalid Hits", "Hits cannot exceed bullets fired.");
       return;
     }
 
@@ -531,15 +531,15 @@ export function TacticalTargetFlow({
           ))}
         </View>
 
-        {/* Rounds Stepper */}
+        {/* Bullets Stepper */}
         <View style={styles.section}>
           <Stepper
-            label={isGrouping ? "Shots in Group" : "Rounds to Fire"}
+            label={isGrouping ? "Shots in Group" : "Bullets to Fire"}
             value={bullets}
             onChange={lockBullets ? () => {} : setBullets}
             min={lockBullets ? bullets : 1}
             max={lockBullets ? bullets : 100}
-            unit={isGrouping ? "shots" : "rds"}
+            unit="bullets"
             disabled={lockBullets}
           />
         </View>
@@ -594,7 +594,7 @@ export function TacticalTargetFlow({
               <Crosshair size={14} color={COLORS.primary} />
             )}
             <Text style={styles.headerSubtitle}>
-              {isGrouping ? 'Grouping' : 'Tactical'} • {distance}m • {bullets} rounds
+              {isGrouping ? 'Grouping' : 'Tactical'} • {distance}m • {bullets} bullets
             </Text>
           </View>
         </View>

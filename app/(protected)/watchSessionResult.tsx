@@ -13,7 +13,7 @@ import { useColors } from '@/hooks/ui/useColors';
 import type { GarminBiometrics, ShotBiometrics } from '@/services/garminService';
 import type { DecodedWeather } from '@/services/session/watchTypes';
 import { decodeWeather } from '@/services/session/weatherDecoder';
-import { endSession, saveWatchSessionData, updateSessionHits } from '@/services/sessionService';
+import { endSession, saveWatchSessionData, updateSessionGroupSize, updateSessionHits } from '@/services/sessionService';
 import { useSessionStore } from '@/store/sessionStore';
 import { isGroupingGoal } from '@/utils/drillGoal';
 import { Ionicons } from '@expo/vector-icons';
@@ -372,9 +372,23 @@ export default function WatchSessionResultPage() {
     try {
       if (isGroupingDrill) {
         // Grouping: save group size in cm
+        console.log('[WatchResult] Grouping session save:', { 
+          isAutoSaved, 
+          inputConfirmed, 
+          groupSizeCm,
+          groupSizeInput,
+          shotsCount,
+          distanceM 
+        });
+        
         if (isAutoSaved) {
           if (inputConfirmed && groupSizeCm) {
-            await updateSessionGroupSize(sessionId, groupSizeCm);
+            console.log('[WatchResult] Calling updateSessionGroupSize with:', { sessionId, groupSizeCm, shotsCount, distanceM });
+            // Pass shotsCount and distance so it can create paper target if needed
+            const success = await updateSessionGroupSize(sessionId, groupSizeCm, shotsCount, distanceM);
+            console.log('[WatchResult] updateSessionGroupSize result:', success);
+          } else {
+            console.log('[WatchResult] Skipping group size update - inputConfirmed:', inputConfirmed, 'groupSizeCm:', groupSizeCm);
           }
           if (shouldEndSession) {
             await endSession(sessionId);
@@ -700,27 +714,51 @@ export default function WatchSessionResultPage() {
           )}
         </Animated.View>
 
-        {/* Accuracy Highlight */}
+        {/* Primary Metric Highlight - Group Size for Grouping, Accuracy for Engagement */}
         <Animated.View entering={FadeInDown.delay(50).duration(400)} style={styles.section}>
-          <View style={[styles.accuracyCard, { 
-            backgroundColor: accuracy >= 80 ? `${colors.green}12` : accuracy >= 50 ? `${colors.orange}12` : `${colors.red}12`,
-            borderColor: accuracy >= 80 ? `${colors.green}30` : accuracy >= 50 ? `${colors.orange}30` : `${colors.red}30`,
-          }]}>
-            <View style={styles.accuracyMain}>
-              <Crosshair size={28} color={accuracy >= 80 ? colors.green : accuracy >= 50 ? colors.orange : colors.red} />
-              <Text style={[styles.accuracyValue, { 
-                color: accuracy >= 80 ? colors.green : accuracy >= 50 ? colors.orange : colors.red 
-              }]}>
-                {accuracy}%
-              </Text>
-              <Text style={[styles.accuracyLabel, { color: colors.textMuted }]}>Accuracy</Text>
+          {isGroupingDrill ? (
+            // Grouping: Show Group Size
+            <View style={[styles.accuracyCard, { 
+              backgroundColor: groupSizeCm && groupSizeCm <= 3 ? `${colors.green}12` : groupSizeCm && groupSizeCm <= 6 ? `${colors.orange}12` : `${colors.primary}12`,
+              borderColor: groupSizeCm && groupSizeCm <= 3 ? `${colors.green}30` : groupSizeCm && groupSizeCm <= 6 ? `${colors.orange}30` : `${colors.primary}30`,
+            }]}>
+              <View style={styles.accuracyMain}>
+                <Target size={28} color={groupSizeCm && groupSizeCm <= 3 ? colors.green : groupSizeCm && groupSizeCm <= 6 ? colors.orange : colors.primary} />
+                <Text style={[styles.accuracyValue, { 
+                  color: groupSizeCm && groupSizeCm <= 3 ? colors.green : groupSizeCm && groupSizeCm <= 6 ? colors.orange : colors.primary 
+                }]}>
+                  {groupSizeCm ? `${groupSizeCm}cm` : '--'}
+                </Text>
+                <Text style={[styles.accuracyLabel, { color: colors.textMuted }]}>Group Size</Text>
+              </View>
+              <View style={styles.accuracyDetails}>
+                <Text style={[styles.accuracyDetailText, { color: colors.text }]}>
+                  {shotsCount} shots • {distanceM}m
+                </Text>
+              </View>
             </View>
-            <View style={styles.accuracyDetails}>
-              <Text style={[styles.accuracyDetailText, { color: colors.text }]}>
-                {hitsCount} hits / {shotsCount} shots
-              </Text>
+          ) : (
+            // Engagement: Show Accuracy
+            <View style={[styles.accuracyCard, { 
+              backgroundColor: accuracy >= 80 ? `${colors.green}12` : accuracy >= 50 ? `${colors.orange}12` : `${colors.red}12`,
+              borderColor: accuracy >= 80 ? `${colors.green}30` : accuracy >= 50 ? `${colors.orange}30` : `${colors.red}30`,
+            }]}>
+              <View style={styles.accuracyMain}>
+                <Crosshair size={28} color={accuracy >= 80 ? colors.green : accuracy >= 50 ? colors.orange : colors.red} />
+                <Text style={[styles.accuracyValue, { 
+                  color: accuracy >= 80 ? colors.green : accuracy >= 50 ? colors.orange : colors.red 
+                }]}>
+                  {accuracy}%
+                </Text>
+                <Text style={[styles.accuracyLabel, { color: colors.textMuted }]}>Accuracy</Text>
+              </View>
+              <View style={styles.accuracyDetails}>
+                <Text style={[styles.accuracyDetailText, { color: colors.text }]}>
+                  {hitsCount} hits / {shotsCount} shots
+                </Text>
+              </View>
             </View>
-          </View>
+          )}
         </Animated.View>
 
         {/* Primary Stats Grid */}
@@ -1045,6 +1083,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -2,
     opacity: 0.4,
+  },
+  inputUnit: {
+    fontSize: 28,
+    fontWeight: '600',
+    marginLeft: 8,
+    opacity: 0.6,
   },
   accuracyPreview: {
     marginTop: 20,

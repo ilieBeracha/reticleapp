@@ -245,7 +245,7 @@ const stepperStyles = StyleSheet.create({
 
 interface TacticalResultsEntryProps {
   distance: number;
-  plannedRounds: number;
+  plannedBullets: number;
   hits: string;
   setHits: (val: string) => void;
   time: string;
@@ -261,7 +261,7 @@ interface TacticalResultsEntryProps {
 
 export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
   distance,
-  plannedRounds,
+  plannedBullets,
   hits,
   setHits,
   time,
@@ -298,7 +298,7 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
           <View style={styles.headerMeta}>
             <Crosshair size={14} color={colors.primary} />
             <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
-              Tactical • {distance}m • {plannedRounds} rounds
+              Tactical • {distance}m • {plannedBullets} bullets
             </Text>
           </View>
         </View>
@@ -309,10 +309,10 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
       <View style={styles.hitsSection}>
         <CircularStepper
           value={hitsNum}
-          max={plannedRounds}
+          max={plannedBullets}
           onChange={handleHitsChange}
           label="Hits on Target"
-          sublabel={`Out of ${plannedRounds} rounds fired`}
+          sublabel={`Out of ${plannedBullets} bullets fired`}
         />
       </View>
 
