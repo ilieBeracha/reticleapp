@@ -4,6 +4,7 @@
 // Rule-based insight generator. Produces explainable, user-relative insights.
 // Start with rules - add ML later when patterns are validated.
 
+import { isGroupingGoal, DRILL_GOAL } from '@/constants/drill';
 import type {
   GeneratedInsight,
   InsightFactor,
@@ -54,7 +55,7 @@ function checkAccuracyBaseline(
   baseline: UserBaseline | null
 ): GeneratedInsight | null {
   // Only for achievement/engagement sessions
-  if (features.drill_goal === 'grouping' || features.drill_goal === 'zeroing') {
+  if (isGroupingGoal(features.drill_goal) || features.drill_goal === 'zeroing') {
     return null;
   }
 
@@ -518,7 +519,7 @@ function checkBuildingBaseline(
   features: SessionFeatures,
   baseline: UserBaseline | null
 ): GeneratedInsight | null {
-  const isGrouping = features.drill_goal === 'grouping';
+  const isGrouping = isGroupingGoal(features.drill_goal);
   const metricName = isGrouping ? 'grouping' : 'accuracy';
 
   // Check if we have the required data for this session type
@@ -556,7 +557,7 @@ function checkBuildingBaseline(
 function generateSessionSummary(features: SessionFeatures): GeneratedInsight | null {
   if (features.shots < 5) return null;
 
-  const isGrouping = features.drill_goal === 'grouping';
+  const isGrouping = isGroupingGoal(features.drill_goal);
   let summary = `${features.shots} shots fired`;
 
   if (isGrouping) {

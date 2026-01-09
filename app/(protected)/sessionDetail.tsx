@@ -4,10 +4,11 @@
  * Shows session summary, stats, and image previews.
  * Opens as a formSheet modal above tabs.
  */
+import { isPaperTarget, isGroupingPaper, isEngagementPaper, PAPER_TYPE, TARGET_TYPE } from '@/constants';
 import { WeatherStrip } from '@/components/session/WeatherDisplay';
 import { useSessionTimeline } from '@/components/session/timeline/useSessionTimeline';
 import { useColors } from '@/hooks/ui/useColors';
-import { getSessionInsights, runInsightPipeline, type SessionInsight } from '@/services/insights';
+import { getSessionInsights, triggerInsightGeneration, type SessionInsight } from '@/services/insights';
 import type { DecodedWeather } from '@/services/session/watchTypes';
 import {
   calculateSessionStats,
@@ -113,14 +114,15 @@ export default function SessionDetailScreen() {
         let sessionInsights = await getSessionInsights(sessionId);
         console.log('[SessionDetail] Existing insights:', sessionInsights.length);
 
-        // If no insights exist, generate them on-demand
+        // If no insights exist, trigger Edge Function to generate them
         if (sessionInsights.length === 0) {
-          console.log('[SessionDetail] No insights found, generating...');
-          const result = await runInsightPipeline(sessionId);
-          console.log('[SessionDetail] Pipeline result:', result);
+          console.log('[SessionDetail] No insights found, triggering Edge Function...');
+          const result = await triggerInsightGeneration(sessionId);
+          console.log('[SessionDetail] Edge Function result:', result);
 
-          if (result.insights_generated > 0) {
-            // Reload insights after generation
+          if (result.success) {
+            // Wait briefly for DB to sync, then reload insights
+            await new Promise((resolve) => setTimeout(resolve, 500));
             sessionInsights = await getSessionInsights(sessionId);
           }
         }
@@ -146,7 +148,7 @@ export default function SessionDetailScreen() {
         sequence: t.sequence_in_session,
         hits: t.paper_result?.hits_total ?? 0,
         shots: t.paper_result?.bullets_fired ?? 0,
-        isGrouping: t.paper_result?.paper_type === 'grouping',
+        isGrouping: isGroupingPaper(t.paper_result?.paper_type),
         dispersion: t.paper_result?.dispersion_cm,
         actualShotsDeclared: t.paper_result?.actual_shots_declared ?? null,
       }));
@@ -156,8 +158,8 @@ export default function SessionDetailScreen() {
   const hasScannedWithoutDeclaration = useMemo(() => {
     return targets.some(
       (t) =>
-        t.target_type === 'paper' &&
-        (t.paper_result?.paper_type === 'achievement' || t.paper_result?.paper_type === 'engagement') &&
+        isPaperTarget(t.target_type) &&
+        isEngagementPaper(t.paper_result?.paper_type) &&
         !!t.paper_result?.scanned_image_url &&
         !t.paper_result?.actual_shots_declared
     );
@@ -168,10 +170,7 @@ export default function SessionDetailScreen() {
     let scanned = 0;
     let manual = 0;
     targets.forEach((t) => {
-      if (
-        t.target_type === 'paper' &&
-        (t.paper_result?.paper_type === 'achievement' || t.paper_result?.paper_type === 'engagement')
-      ) {
+      if (isPaperTarget(t.target_type) && isEngagementPaper(t.paper_result?.paper_type)) {
         if (t.paper_result?.scanned_image_url) scanned++;
         else manual++;
       }
@@ -1259,13 +1258,13 @@ export default function SessionDetailScreen() {
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Session Timeline</Text>
           <View style={styles.timeline}>
             {targets.map((target, index) => {
-              const isPaper = target.target_type === 'paper';
+              const isPaper = isPaperTarget(target.target_type);
               const result = isPaper ? target.paper_result : target.tactical_result;
               const shots = result?.bullets_fired ?? 0;
               const hits = isPaper ? (target.paper_result?.hits_total ?? 0) : (target.tactical_result?.hits ?? 0);
 
               // Determine if this is a grouping or achievement target
-              const isGroupingTarget = isPaper && target.paper_result?.paper_type === 'grouping';
+              const isGroupingTarget = isPaper && isGroupingPaper(target.paper_result?.paper_type);
               const dispersion = target.paper_result?.dispersion_cm;
 
               // Check if scanned (AI detection) vs manual

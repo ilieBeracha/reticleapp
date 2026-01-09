@@ -1141,6 +1141,57 @@ $$;
 ALTER FUNCTION "public"."generate_invite_code"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."generate_session_insights"("p_session_id" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public', 'net'
+    AS $$
+DECLARE
+  v_url text;
+  v_service_role_key text;
+  v_response_id bigint;
+BEGIN
+  -- Ensure session_features exist
+  IF NOT EXISTS (SELECT 1 FROM session_features WHERE session_id = p_session_id) THEN
+    -- Compute features first
+    PERFORM compute_session_features(p_session_id);
+  END IF;
+  
+  -- Get Edge Function URL
+  v_url := current_setting('app.settings.supabase_url', true) || '/functions/v1/generate-insights';
+  v_service_role_key := current_setting('app.settings.service_role_key', true);
+  
+  IF v_url IS NULL OR v_service_role_key IS NULL THEN
+    RETURN jsonb_build_object('error', 'Webhook not configured');
+  END IF;
+  
+  -- Call Edge Function
+  SELECT net.http_post(
+    url := v_url,
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || v_service_role_key
+    ),
+    body := jsonb_build_object('session_id', p_session_id)
+  ) INTO v_response_id;
+  
+  RETURN jsonb_build_object(
+    'success', true,
+    'request_id', v_response_id,
+    'message', 'Insight generation triggered'
+  );
+EXCEPTION WHEN OTHERS THEN
+  RETURN jsonb_build_object('error', SQLERRM);
+END;
+$$;
+
+
+ALTER FUNCTION "public"."generate_session_insights"("p_session_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."generate_session_insights"("p_session_id" "uuid") IS 'Manually trigger insight generation for a session. Computes features if needed, then calls Edge Function.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."get_my_sessions"("p_limit" integer DEFAULT 50, "p_offset" integer DEFAULT 0) RETURNS TABLE("id" "uuid", "workspace_type" "text", "workspace_owner_id" "uuid", "org_workspace_id" "uuid", "workspace_name" "text", "user_id" "uuid", "team_id" "uuid", "team_name" "text", "session_mode" "text", "status" "text", "started_at" timestamp with time zone, "ended_at" timestamp with time zone, "session_data" "jsonb", "created_at" timestamp with time zone, "updated_at" timestamp with time zone)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -1906,6 +1957,54 @@ ALTER FUNCTION "public"."make_condition_key"("p_drill_goal" "text", "p_position"
 
 
 COMMENT ON FUNCTION "public"."make_condition_key"("p_drill_goal" "text", "p_position" "text", "p_distance_m" integer, "p_weapon_category" "text") IS 'Generates baseline lookup key from session context. Format: drill_goal|position|distance_bucket|weapon_category';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."notify_insight_generation"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public', 'net'
+    AS $$
+DECLARE
+  v_url text;
+  v_service_role_key text;
+BEGIN
+  -- Get the Edge Function URL from environment
+  -- Format: https://<project-ref>.supabase.co/functions/v1/generate-insights
+  v_url := current_setting('app.settings.supabase_url', true) || '/functions/v1/generate-insights';
+  
+  -- Get service role key for authentication
+  v_service_role_key := current_setting('app.settings.service_role_key', true);
+  
+  -- If settings not configured, skip silently
+  IF v_url IS NULL OR v_service_role_key IS NULL THEN
+    RAISE NOTICE 'Insight webhook not configured, skipping';
+    RETURN NEW;
+  END IF;
+  
+  -- Make async HTTP POST to Edge Function
+  -- Using pg_net extension for non-blocking requests
+  PERFORM net.http_post(
+    url := v_url,
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || v_service_role_key
+    ),
+    body := jsonb_build_object('session_id', NEW.session_id)
+  );
+  
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+  -- Log error but don't fail the transaction
+  RAISE WARNING 'Failed to call insight webhook: %', SQLERRM;
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."notify_insight_generation"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."notify_insight_generation"() IS 'Trigger function that calls generate-insights Edge Function via pg_net when session_features are inserted.';
 
 
 
@@ -3458,6 +3557,14 @@ CREATE OR REPLACE TRIGGER "on_training_started" AFTER UPDATE ON "public"."traini
 
 
 
+CREATE OR REPLACE TRIGGER "trigger_insight_generation" AFTER INSERT ON "public"."session_features" FOR EACH ROW EXECUTE FUNCTION "public"."notify_insight_generation"();
+
+
+
+COMMENT ON TRIGGER "trigger_insight_generation" ON "public"."session_features" IS 'Automatically generates insights when session_features are computed.';
+
+
+
 CREATE OR REPLACE TRIGGER "update_profiles_updated_at" BEFORE UPDATE ON "public"."profiles" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
 
@@ -4358,6 +4465,12 @@ GRANT ALL ON FUNCTION "public"."generate_invite_code"() TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."generate_session_insights"("p_session_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."generate_session_insights"("p_session_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."generate_session_insights"("p_session_id" "uuid") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."get_my_sessions"("p_limit" integer, "p_offset" integer) TO "anon";
 GRANT ALL ON FUNCTION "public"."get_my_sessions"("p_limit" integer, "p_offset" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_my_sessions"("p_limit" integer, "p_offset" integer) TO "service_role";
@@ -4487,6 +4600,12 @@ GRANT ALL ON FUNCTION "public"."is_workspace_admin"("p_workspace_id" "uuid", "p_
 GRANT ALL ON FUNCTION "public"."make_condition_key"("p_drill_goal" "text", "p_position" "text", "p_distance_m" integer, "p_weapon_category" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."make_condition_key"("p_drill_goal" "text", "p_position" "text", "p_distance_m" integer, "p_weapon_category" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."make_condition_key"("p_drill_goal" "text", "p_position" "text", "p_distance_m" integer, "p_weapon_category" "text") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."notify_insight_generation"() TO "anon";
+GRANT ALL ON FUNCTION "public"."notify_insight_generation"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."notify_insight_generation"() TO "service_role";
 
 
 

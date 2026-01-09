@@ -7,14 +7,9 @@
 
 import type { DrillGoal } from '@/types/workspace';
 
-// ============================================================================
-// CONSTANTS
-// ============================================================================
-
-export const DRILL_GOAL = {
-  GROUPING: 'grouping' as const,
-  ENGAGEMENT: 'engagement' as const,
-} as const;
+// Import and re-export constants from centralized location
+import { DRILL_GOAL } from '@/constants/drill';
+export { DRILL_GOAL };
 
 // ============================================================================
 // TYPE GUARDS

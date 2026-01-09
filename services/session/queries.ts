@@ -1,3 +1,4 @@
+import { SESSION_STATUS } from '@/constants';
 import { supabase } from '@/lib/supabase';
 import { withQueryTiming } from '@/services/_shared/instrumentation';
 import { mapSession } from './mappers';
@@ -27,7 +28,7 @@ export async function getMyActiveSessionForTraining(trainingId: string): Promise
     
     .eq('training_id', trainingId)
     .eq('user_id', user.id)
-    .eq('status', 'active')
+    .eq('status', SESSION_STATUS.ACTIVE)
     .maybeSingle();
 
   if (error || !data) {
@@ -53,7 +54,7 @@ export async function getMyActiveSession(): Promise<SessionWithDetails | null> {
     .from('sessions')
     .select(SESSION_SELECT_WITH_WEAPON)
     .eq('user_id', user.id)
-    .eq('status', 'active')
+    .eq('status', SESSION_STATUS.ACTIVE)
     .order('started_at', { ascending: false })
     .limit(1);
 
@@ -83,7 +84,7 @@ export async function getMyActivePersonalSession(): Promise<SessionWithDetails |
     .from('sessions')
     .select(SESSION_SELECT_WITH_WEAPON)
     .eq('user_id', user.id)
-    .eq('status', 'active')
+    .eq('status', SESSION_STATUS.ACTIVE)
     .is('team_id', null) // Personal sessions have no team
     .order('started_at', { ascending: false })
     .limit(1);
@@ -119,7 +120,7 @@ export async function getMyActiveSessionsAll(): Promise<SessionWithDetails[]> {
     .from('sessions')
     .select(SESSION_SELECT_WITH_WEAPON)
     .eq('user_id', user.id)
-    .eq('status', 'active')
+    .eq('status', SESSION_STATUS.ACTIVE)
     .order('started_at', { ascending: false });
 
   if (error || !data) {

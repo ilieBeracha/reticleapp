@@ -1,3 +1,4 @@
+import { PAPER_TYPE } from "@/constants";
 import { addTargetWithPaperResult, addTargetWithTacticalResult } from "@/services/sessionService";
 import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from "@/theme/colors";
 import * as Haptics from "expo-haptics";
@@ -428,7 +429,7 @@ export function TacticalTargetFlow({
           distance_m: distance,
           lane_number: null,
           planned_shots: bullets,
-          paper_type: 'grouping',
+          paper_type: PAPER_TYPE.GROUPING,
           bullets_fired: bullets,
           dispersion_cm: parseFloat(groupSizeCm),
           result_notes: notes || null,

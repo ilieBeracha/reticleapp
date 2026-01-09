@@ -5,6 +5,8 @@
  * Inline action buttons instead of FAB.
  */
 
+import { PAPER_TYPE, TARGET_TYPE } from '@/constants';
+import { isPaperTarget, isGroupingPaper } from '@/constants/drill';
 import { TargetCard } from '@/components/session/TargetCard';
 import { WeatherStrip } from '@/components/session/WeatherDisplay';
 import {
@@ -57,14 +59,14 @@ function HeroTarget({
   onPress: () => void;
   colors: ReturnType<typeof useColors>;
 }) {
-  const isPaper = target.target_type === 'paper';
+  const isPaper = isPaperTarget(target.target_type);
   const paperResult = target.paper_result;
   
   const imageUrl = paperResult?.scanned_image_url;
   const hasImage = !!imageUrl;
   
   const isScanned = isPaper && !!paperResult?.scanned_image_url;
-  const isGrouping = isPaper && paperResult?.paper_type === 'grouping';
+  const isGrouping = isPaper && isGroupingPaper(paperResult?.paper_type);
   
   const distance = target.distance_m;
   const dispersion = paperResult?.dispersion_cm;
@@ -131,11 +133,11 @@ function CompactStats({
   let manualCount = 0;
 
   for (const t of targets) {
-    const isPaper = t.target_type === 'paper';
+    const isPaper = isPaperTarget(t.target_type);
     const paperResult = t.paper_result;
     const tacticalResult = t.tactical_result;
     const isScanned = isPaper && !!paperResult?.scanned_image_url;
-    const isGrouping = isPaper && paperResult?.paper_type === 'grouping';
+    const isGrouping = isPaper && isGroupingPaper(paperResult?.paper_type);
 
     if (isGrouping) {
       groupingCount++;
@@ -325,7 +327,7 @@ export default function ActiveSessionScreen() {
               editSessionId: session.id,
               weaponId: session.weapon_id || '',
               weaponName: session.weapon_name || '',
-              purpose: session.drill_config?.drill_goal || 'grouping',
+              purpose: session.drill_config?.drill_goal || PAPER_TYPE.GROUPING,
               distance: String(session.drill_config?.distance_m || 25),
               shots: String(session.drill_config?.rounds_per_shooter || 5),
             },

@@ -1,3 +1,4 @@
+import { isGroupingGoal } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
 import type { SessionWithDetails } from '@/services/session/types';
 import { activateSession, updateSession } from '@/services/sessionService';
@@ -104,7 +105,7 @@ export function SessionPrepView({
   
   const drill = session.drill_config;
   const drillName = session.drill_name || drill?.name || 'Practice Session';
-  const isGrouping = drill?.drill_goal === 'grouping';
+  const isGrouping = isGroupingGoal(drill?.drill_goal);
   const isTeamSession = !!session.team_id;
 
   // Load full weapon info (for caliber, etc)

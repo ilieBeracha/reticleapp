@@ -1,34 +1,33 @@
+import { SESSION_STATUS, TARGET_TYPE } from '@/constants';
 import { supabase } from '@/lib/supabase';
 import { markWeaponUsed } from '@/services/weaponService';
-import { isGroupingGoal } from '@/utils/drillGoal';
 import { getDrillRequirements } from './drillContract';
 import { mapSession } from './mappers';
 import {
-  getMyActiveSessionForTraining,
-  getMyActiveSessionsAll,
-  getSessionById,
-  shouldAutoCancelSession,
+    getMyActiveSessionForTraining,
+    getMyActiveSessionsAll,
+    getSessionById,
+    shouldAutoCancelSession,
 } from './queries';
 import {
-  SESSION_SELECT_AFTER_CREATE,
-  SESSION_SELECT_AFTER_UPDATE,
+    SESSION_SELECT_AFTER_CREATE,
+    SESSION_SELECT_AFTER_UPDATE,
 } from './selectClauses';
 import { calculateSessionStats } from './stats';
 import {
-  addSessionTarget,
-  getSessionTargets,
-  savePaperTargetResult,
-  saveTacticalTargetResult,
+    addSessionTarget,
+    getSessionTargets,
+    savePaperTargetResult,
+    saveTacticalTargetResult,
 } from './targets';
 import type {
-  BaseSessionConfig,
-  CreateSessionParams,
-  PaperType,
-  SessionStats,
-  SessionTargetWithResults,
-  SessionWeatherData,
-  SessionWithDetails,
-  TargetType,
+    BaseSessionConfig,
+    CreateSessionParams,
+    PaperType,
+    SessionStats,
+    SessionTargetWithResults,
+    SessionWithDetails,
+    TargetType,
 } from './types';
 import { buildDetailsMergePayload, buildTargetData } from './watchDataTransformer';
 import type { TransformedWatchData, WatchDetailsPayload } from './watchTypes';
@@ -104,7 +103,7 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
         await supabase
           .from('sessions')
           .update({ 
-            status: 'cancelled', 
+            status: SESSION_STATUS.CANCELLED, 
             ended_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
@@ -115,7 +114,7 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
         await supabase
           .from('sessions')
           .update({ 
-            status: 'completed', 
+            status: SESSION_STATUS.COMPLETED, 
             ended_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
@@ -191,7 +190,7 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
 
   // Check if we should start as pending (for watch selection flow)
   const startAsPending = (config as any).start_as_pending === true;
-  const status = startAsPending ? 'pending' : 'active';
+  const status = startAsPending ? SESSION_STATUS.PENDING : SESSION_STATUS.ACTIVE;
   // Always set started_at - database requires it. Status indicates pending vs active.
   const startedAt = new Date().toISOString();
 
@@ -210,7 +209,7 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
       watch_controlled: config.watch_controlled,
       status,
       started_at: startedAt,
-      weather: config.weather ?? null, // Weather at session start
+      weather: config.weather ?? null, // Weather data from OpenWeatherMap
     })
     .select(SESSION_SELECT_AFTER_CREATE)
     .single();
@@ -330,8 +329,6 @@ export async function updateSession(
     watch_controlled?: boolean;
     /** Update custom drill config (e.g., to save detection_sensitivity) */
     custom_drill_config?: Record<string, any>;
-    /** Weather conditions (can be updated after session start) */
-    weather?: SessionWeatherData | null;
   }
 ) {
   const updatePayload: Record<string, any> = {
@@ -356,10 +353,6 @@ export async function updateSession(
 
   if (typeof updates.custom_drill_config !== 'undefined') {
     updatePayload.custom_drill_config = updates.custom_drill_config;
-  }
-
-  if (typeof updates.weather !== 'undefined') {
-    updatePayload.weather = updates.weather;
   }
 
   // Return a fully-hydrated session payload so callers don't lose drill context after updates.
@@ -405,12 +398,12 @@ export async function activateSession(
     throw new Error('Session not found');
   }
   
-  if (session.status !== 'pending') {
-    throw new Error(`Cannot activate session with status '${session.status}'. Expected 'pending'.`);
+  if (session.status !== SESSION_STATUS.PENDING) {
+    throw new Error(`Cannot activate session with status '${session.status}'. Expected '${SESSION_STATUS.PENDING}'.`);
   }
   
   return updateSession(sessionId, {
-    status: 'active',
+    status: SESSION_STATUS.ACTIVE,
     started_at: new Date().toISOString(),
     watch_controlled: watchControlled,
   });
@@ -430,7 +423,7 @@ export async function endSession(sessionId: string) {
 
   // Update the session status
   const updatedSession = await updateSession(sessionId, {
-    status: 'completed',
+    status: SESSION_STATUS.COMPLETED,
     ended_at: new Date().toISOString(),
   });
 
@@ -490,35 +483,46 @@ export async function endSession(sessionId: string) {
   }
 
   // =========================================================================
-  // RUN INSIGHT PIPELINE (non-blocking)
+  // COMPUTE FEATURES & GENERATE INSIGHTS (via Edge Function)
   // =========================================================================
-  runInsightPipelineAsync(sessionId);
+  // Non-blocking - don't fail session end if insight generation fails
+  computeSessionFeaturesAndInsights(sessionId).catch((err) => {
+    console.error('[SessionService] Failed to generate insights:', err);
+  });
 
   return updatedSession;
 }
 
 /**
- * Run insight pipeline asynchronously (fire-and-forget).
- * Non-blocking - session end always succeeds regardless of insight generation.
+ * Compute session features and trigger insight generation.
+ * Called after session ends. Non-blocking.
  */
-async function runInsightPipelineAsync(sessionId: string): Promise<void> {
+async function computeSessionFeaturesAndInsights(sessionId: string): Promise<void> {
   try {
-    const { runInsightPipeline } = await import('@/services/insights');
-    const result = await runInsightPipeline(sessionId);
-    
-    if (result.error) {
-      console.warn('[SessionService] Insight pipeline warning:', result.error);
-    } else {
-      console.log('[SessionService] Insight pipeline complete:', {
-        sessionId,
-        insights: result.insights_generated,
-        features: result.features_computed,
-        baseline: result.baseline_refreshed,
-      });
+    // 1. Compute session features (SQL function)
+    const { error: featuresError } = await supabase.rpc('compute_session_features', {
+      p_session_id: sessionId,
+    });
+
+    if (featuresError) {
+      console.error('[SessionService] Failed to compute session features:', featuresError);
+      return;
     }
+    console.log('[SessionService] Session features computed for:', sessionId);
+
+    // 2. Trigger insight generation via Edge Function
+    // The Edge Function handles Pinecone embedding + similarity search + insight generation
+    const { error: insightError } = await supabase.functions.invoke('generate-insights', {
+      body: { session_id: sessionId },
+    });
+
+    if (insightError) {
+      console.error('[SessionService] Edge function error:', insightError);
+      return;
+    }
+    console.log('[SessionService] Insights generated for:', sessionId);
   } catch (err) {
-    // Non-blocking - don't fail anything if insights fail
-    console.error('[SessionService] Insight pipeline error (non-blocking):', err);
+    console.error('[SessionService] computeSessionFeaturesAndInsights error:', err);
   }
 }
 
@@ -599,14 +603,14 @@ export async function addTargetWithPaperResult(params: {
 
   await enforceDrillLimitsForNewTarget({
     sessionId: params.session_id,
-    targetType: 'paper',
+    targetType: TARGET_TYPE.PAPER,
     bulletsFired: params.bullets_fired,
   });
 
   // First create the target
   const target = await addSessionTarget({
     session_id: params.session_id,
-    target_type: 'paper',
+    target_type: TARGET_TYPE.PAPER,
     distance_m: params.distance_m,
     lane_number: params.lane_number,
     planned_shots: params.planned_shots ?? params.bullets_fired,
@@ -657,14 +661,14 @@ export async function addTargetWithTacticalResult(params: {
 }): Promise<SessionTargetWithResults> {
   await enforceDrillLimitsForNewTarget({
     sessionId: params.session_id,
-    targetType: 'tactical',
+    targetType: TARGET_TYPE.TACTICAL,
     bulletsFired: params.bullets_fired,
   });
 
   // First create the target
   const target = await addSessionTarget({
     session_id: params.session_id,
-    target_type: 'tactical',
+    target_type: TARGET_TYPE.TACTICAL,
     distance_m: params.distance_m,
     lane_number: params.lane_number,
     planned_shots: params.planned_shots ?? params.bullets_fired,
@@ -696,8 +700,7 @@ export async function addTargetWithTacticalResult(params: {
 export interface WatchSessionData {
   sessionId: string;
   shotsRecorded: number;
-  hitsRecorded?: number; // User-entered hits count (for engagement)
-  groupSizeCm?: number;  // User-entered group size in cm (for grouping)
+  hitsRecorded?: number; // User-entered hits count
   durationMs?: number;
   distance?: number;
   completed?: boolean;
@@ -923,57 +926,32 @@ export async function saveWatchSessionData(
   
   console.log('[SessionService] Target data keys:', Object.keys(targetData));
   
-  // Check if this is a grouping session
-  const isGrouping = isGroupingGoal(drill?.drill_goal);
-  
-  // Create a tactical target entry with watch telemetry data (biometrics, splits, etc.)
-  // This stores all the watch sensor data for later analysis
-  const telemetryTarget = await addSessionTarget({
+  // Create a tactical target entry with watch data
+  // This allows the data to be picked up by normal stats calculation
+  const target = await addSessionTarget({
     session_id: data.sessionId,
-    target_type: 'tactical',
+    target_type: TARGET_TYPE.TACTICAL,
     distance_m: distance,
-    notes: isGrouping ? 'Watch telemetry (grouping session)' : 'Recorded via Garmin watch',
+    notes: 'Recorded via Garmin watch',
     target_data: targetData,
   });
   
-  if (isGrouping) {
-    // GROUPING SESSION: Create paper target with shots and group size
-    // User enters group size manually after scanning
-    console.log('[SessionService] Grouping session - creating paper target for shots/group size');
-    
-    const paperTarget = await addSessionTarget({
-      session_id: data.sessionId,
-      target_type: 'paper',
-      distance_m: distance,
-      notes: 'Grouping from watch session',
-    });
-    
-    // Save paper target result with shots and optional group size
-    await savePaperTargetResult({
-      session_target_id: paperTarget.id,
-      paper_type: 'grouping', // Paper type for grouping
-      bullets_fired: data.shotsRecorded,
-      hits_total: data.shotsRecorded, // For grouping, all shots are on target
-      dispersion_cm: data.groupSizeCm ?? null, // User-entered group size
-    });
-    
-    console.log('[SessionService] Paper target saved with shots:', data.shotsRecorded, 'groupSize:', data.groupSizeCm ?? 'not set');
-  } else {
-    // ENGAGEMENT SESSION: Create tactical result with shots/hits
-    const timeSeconds = data.durationMs ? data.durationMs / 1000 : null;
-    const hits = data.hitsRecorded ?? data.shotsRecorded;
-    
-    await saveTacticalTargetResult({
-      session_target_id: telemetryTarget.id,
-      bullets_fired: data.shotsRecorded,
-      hits: hits,
-      is_stage_cleared: data.completed ?? false,
-      time_seconds: timeSeconds,
-      notes: 'Watch session data',
-    });
-  }
+  // Calculate time in seconds from milliseconds
+  const timeSeconds = data.durationMs ? data.durationMs / 1000 : null;
   
-  console.log('[SessionService] Watch data saved, telemetry target:', telemetryTarget.id);
+  // Save the tactical result
+  // Use user-provided hits if available, otherwise assume all shots are hits
+  const hits = data.hitsRecorded ?? data.shotsRecorded;
+  await saveTacticalTargetResult({
+    session_target_id: target.id,
+    bullets_fired: data.shotsRecorded,
+    hits: hits,
+    is_stage_cleared: data.completed ?? false,
+    time_seconds: timeSeconds,
+    notes: 'Watch session data',
+  });
+  
+  console.log('[SessionService] Watch data saved as tactical target:', target.id);
   
   // End the session if requested
   if (shouldEnd) {
@@ -999,7 +977,7 @@ export async function saveWatchSessionData(
     
     // Update session with calculated ended_at
     const updatedSession = await updateSession(data.sessionId, {
-      status: 'completed',
+      status: SESSION_STATUS.COMPLETED,
       ended_at: calculatedEndedAt,
     });
     
@@ -1028,9 +1006,11 @@ export async function saveWatchSessionData(
         console.log('[SessionService] Watch session: Drill marked completed');
       }
     }
-    
-    // Run insight pipeline (non-blocking)
-    runInsightPipelineAsync(data.sessionId);
+
+    // Generate insights for watch session (non-blocking)
+    computeSessionFeaturesAndInsights(data.sessionId).catch((err) => {
+      console.error('[SessionService] Watch session: Failed to generate insights:', err);
+    });
     
     return updatedSession;
   }
@@ -1238,7 +1218,7 @@ export async function saveTransformedWatchData(
   // Create a tactical target entry with watch data
   const target = await addSessionTarget({
     session_id: data.sessionId,
-    target_type: 'tactical',
+    target_type: TARGET_TYPE.TACTICAL,
     distance_m: distance,
     notes: 'Recorded via Garmin watch',
     target_data: targetData,
@@ -1273,7 +1253,7 @@ export async function saveTransformedWatchData(
     }
     
     const updatedSession = await updateSession(data.sessionId, {
-      status: 'completed',
+      status: SESSION_STATUS.COMPLETED,
       ended_at: calculatedEndedAt,
     });
     
@@ -1302,9 +1282,11 @@ export async function saveTransformedWatchData(
         console.log('[SessionService] Watch session: Drill marked completed');
       }
     }
-    
-    // Run insight pipeline (non-blocking)
-    runInsightPipelineAsync(data.sessionId);
+
+    // Generate insights (non-blocking)
+    computeSessionFeaturesAndInsights(data.sessionId).catch((err) => {
+      console.error('[SessionService] Failed to generate insights:', err);
+    });
     
     return updatedSession;
   }

@@ -281,6 +281,7 @@ export default function CreateTrainingScreen() {
             teamDrills={teamDrills}
             hasTeam={!!selectedTeamId}
             canCreateDrills={canCreateDrills}
+            onBack={handleBackStep}
             onSelectDrill={handleDrillSelect}
             onRemoveDrill={handleRemoveDrill}
             onMoveDrill={handleMoveDrill}
