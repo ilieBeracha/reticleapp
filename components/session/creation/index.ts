@@ -20,7 +20,7 @@ export * from './sessionCreation.constants';
 
 // Hook
 export { useSessionCreation } from './useSessionCreation';
-export type { UseSessionCreationOptions, UseSessionCreationReturn } from './useSessionCreation';
+export type { UseSessionCreationOptions, UseSessionCreationReturn, TrainingContext } from './useSessionCreation';
 
 // Components (2 steps)
 export { SessionContextStep } from './SessionContextStep';

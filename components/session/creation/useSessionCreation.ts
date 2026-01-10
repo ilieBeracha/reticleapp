@@ -44,10 +44,20 @@ export interface SessionCreationInitialState {
   context?: Partial<SessionContextState>;
 }
 
+/** Training context when coming from trainingDetail */
+export interface TrainingContext {
+  trainingId: string;
+  drillId: string;
+  teamId: string | null;
+  drillName: string;
+}
+
 export interface UseSessionCreationOptions {
   onSubmit?: (config: BaseSessionConfig) => Promise<void>;
   /** Pre-fill state when coming back from SessionPrepView to edit */
   initialState?: SessionCreationInitialState;
+  /** Training context when starting a drill from training */
+  trainingContext?: TrainingContext;
 }
 
 export interface UseSessionCreationReturn {
@@ -108,7 +118,7 @@ function getStepIndex(step: CreationStep): number {
 export function useSessionCreation(
   options: UseSessionCreationOptions = {}
 ): UseSessionCreationReturn {
-  const { onSubmit, initialState } = options;
+  const { onSubmit, initialState, trainingContext } = options;
   
   // Merge initial state with defaults
   const [state, setState] = useState<SessionCreationState>(() => {
@@ -361,18 +371,19 @@ export function useSessionCreation(
   
   const buildConfig = useCallback((): BaseSessionConfig => {
     const { purpose, context, selectedDrillId, isDrillLocked } = state;
-    console.log('[useSessionCreation] buildConfig - context:', { shotsPlanned: context.shotsPlanned, distance: context.distance });
+    console.log('[useSessionCreation] buildConfig - context:', { 
+      shotsPlanned: context.shotsPlanned, 
+      distance: context.distance,
+      trainingContext: !!trainingContext,
+    });
     
-    // For solo sessions, always use inline drill_config
-    // Presets update context values, so we build config from context
-    // (drill_id is only for training_drills in team context)
-    
-    // Determine drill name based on selection
+    // Determine drill name based on context
     let drillName: string;
-    if (isDrillLocked && selectedDrillId) {
+    if (trainingContext) {
+      // Use training drill name when in training context
+      drillName = trainingContext.drillName;
+    } else if (isDrillLocked && selectedDrillId) {
       // When following a category drill, use its name
-      // Note: We can't import getDrillById here to avoid circular deps,
-      // but the name is stored in context when drill is selected
       drillName = `Drill: ${context.distance}m`;
     } else if (purpose === 'grouping') {
       drillName = `Grouping ${context.distance}m`;
@@ -395,18 +406,19 @@ export function useSessionCreation(
       category_drill_id: isDrillLocked ? selectedDrillId : undefined,
     };
     
+    // Build config - include training context if present
     return {
-      team_id: null,
-      training_id: null,
+      team_id: trainingContext?.teamId || null,
+      training_id: trainingContext?.trainingId || null,
       weapon_id: context.weaponId, // Weapon is required
-      drill_id: null, // Only used for training_drills (team context)
+      drill_id: trainingContext?.drillId || null, // Only for training_drills
       drill_config: drillConfig,
       session_mode: 'solo',
       watch_controlled: false, // Set in SessionPrepView after form
       notes: context.notes || undefined,
       start_as_pending: true,
     };
-  }, [state]);
+  }, [state, trainingContext]);
   
   // ─────────────────────────────────────────────────────────────────────────
   // SUBMIT

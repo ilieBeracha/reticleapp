@@ -7,9 +7,9 @@
 import { useSessionTimeline } from '@/components/session';
 import { WeatherStrip } from '@/components/session/WeatherDisplay';
 import { isEngagementPaper, isGroupingPaper, isPaperTarget } from '@/constants';
-import type { ShotDetail } from '@/services/session/timelineService';
 import { useColors } from '@/hooks/ui/useColors';
 import { getSessionInsights, triggerInsightGeneration, type SessionInsight } from '@/services/insights';
+import type { ShotDetail } from '@/services/session/timelineService';
 import type { DecodedWeather } from '@/services/session/watchTypes';
 import {
   calculateSessionStats,

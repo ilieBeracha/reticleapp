@@ -1,14 +1,9 @@
-import { supabase } from '@/lib/supabase';
-import type { BaseSessionConfig } from '@/services/session/types';
-import { createSession } from '@/services/sessionService';
 import {
   cancelTraining,
   DrillInstanceOverrides,
   finishTraining,
   startTrainingWithConfig
 } from '@/services/trainingService';
-import { getAssignedWeapons, getOrCreatePersonalProfile } from '@/services/weaponService';
-import { useIsGarminConnected } from '@/store/garminStore';
 import { useTrainingStore } from '@/store/trainingStore';
 import type { TrainingDrill, TrainingWithDetails } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
@@ -32,10 +27,6 @@ interface UseTrainingActionsReturn {
   handleFinishTraining: () => void;
   handleCancelTraining: () => void;
   handleStartDrill: (drill: TrainingDrill) => void;
-  // Watch control prompt
-  showWatchPrompt: boolean;
-  pendingDrillName: string | null;
-  handleWatchControlSelect: (watchControlled: boolean) => void;
 }
 
 /**
@@ -77,12 +68,6 @@ export function useTrainingActions({
   const [actionLoading, setActionLoading] = useState(false);
   const [startingDrillId, setStartingDrillId] = useState<string | null>(null);
   const [showStartModal, setShowStartModal] = useState(false);
-  
-  // Watch control prompt state
-  const [showWatchPrompt, setShowWatchPrompt] = useState(false);
-  const [pendingSessionConfig, setPendingSessionConfig] = useState<BaseSessionConfig | null>(null);
-  const [pendingDrillName, setPendingDrillName] = useState<string | null>(null);
-  const isWatchConnected = useIsGarminConnected();
   
   // Get store refresh function
   const loadMyUpcomingTrainings = useTrainingStore((s) => s.loadMyUpcomingTrainings);
@@ -138,10 +123,10 @@ export function useTrainingActions({
 
     console.log('[TrainingActions] Showing finish confirmation for:', training.id);
 
-    Alert.alert('Finish Training', 'Mark this training as completed?', [
+    Alert.alert('Finish Training', 'Mark this training as completed? You\'ll be taken to the debrief report.', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Finish',
+        text: 'Complete Training',
         onPress: async () => {
           console.log('[TrainingActions] User confirmed finish for:', training.id);
           setActionLoading(true);
@@ -166,6 +151,16 @@ export function useTrainingActions({
             loadMyUpcomingTrainings().catch(() => {});
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             console.log('[TrainingActions] Finish complete');
+            
+            // =========================================================================
+            // NAVIGATION: Training Complete → Debrief Report
+            // After finishing training, navigate to the Training Report for debrief
+            // User can then "Return to Training" or "Exit to Home" from there
+            // =========================================================================
+            router.replace({
+              pathname: '/(protected)/trainingReport',
+              params: { trainingId: training.id },
+            });
           } catch (error: any) {
             console.error('[TrainingActions] Finish failed:', error);
             Alert.alert('Error', error.message || 'Failed to finish training');
@@ -209,114 +204,44 @@ export function useTrainingActions({
     );
   }, [training, setTraining, onTrainingUpdated, loadMyUpcomingTrainings]);
 
-  // Actually create the drill session
-  const doCreateDrillSession = useCallback(
-    async (config: BaseSessionConfig) => {
-      try {
-        const session = await createSession(config);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.push(`/(protected)/activeSession?sessionId=${session.id}` as any);
-      } catch (error: any) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert('Error', error.message || 'Failed to start drill session');
-      } finally {
-        setStartingDrillId(null);
-      }
-    },
-    []
-  );
-
-  // Handle watch control selection
-  const handleWatchControlSelect = useCallback(
-    (watchControlled: boolean) => {
-      setShowWatchPrompt(false);
-      
-      if (pendingSessionConfig) {
-        const configWithWatch: BaseSessionConfig = {
-          ...pendingSessionConfig,
-          watch_controlled: watchControlled,
-        };
-        doCreateDrillSession(configWithWatch);
-        setPendingSessionConfig(null);
-        setPendingDrillName(null);
-      }
-    },
-    [pendingSessionConfig, doCreateDrillSession]
-  );
-
+  /**
+   * handleStartDrill - Navigate to createSession with drill params prefilled
+   * Uses the proper session creation flow instead of direct creation
+   */
   const handleStartDrill = useCallback(
-    async (drill: TrainingDrill) => {
+    (drill: TrainingDrill) => {
       if (!training) return;
 
       setStartingDrillId(drill.id);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      // For team trainings, check if soldier has an assigned weapon
-      if (training.team_id) {
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) {
-            setStartingDrillId(null);
-            Alert.alert('Error', 'You must be logged in to start a session');
-            return;
-          }
+      // Navigate to createSession with training/drill context
+      // The createSession flow will handle weapon selection and session creation
+      router.push({
+        pathname: '/(protected)/createSession',
+        params: {
+          // Training context
+          trainingId: training.id,
+          drillId: drill.id,
+          teamId: training.team_id || '',
+          // Drill parameters (prefill)
+          purpose: drill.drill_goal,
+          distance: String(drill.distance_m),
+          shots: String(drill.rounds_per_shooter),
+          timeLimit: drill.time_limit_seconds ? String(drill.time_limit_seconds) : '',
+          position: drill.position || '',
+          targetType: drill.target_type || 'paper',
+          drillName: drill.name,
+          // Return destination
+          returnTo: 'trainingDetail',
+          returnId: training.id,
+        },
+      } as any);
 
-          // Check for assigned weapon
-          const assignedWeapons = await getAssignedWeapons(training.team_id, user.id);
-          
-          if (assignedWeapons.length === 0) {
-            setStartingDrillId(null);
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-            Alert.alert(
-              'No Weapon Assigned',
-              'You need a weapon assigned to participate in team training. Contact your commander.',
-              [{ text: 'OK' }]
-            );
-            return;
-          }
-
-          // Use the first assigned weapon (should only be one per the rule)
-          const assignedTeamWeapon = assignedWeapons[0];
-
-          // Get or create personal profile for this team weapon
-          // This links the team weapon to the user's personal weapon profiles
-          const personalProfile = await getOrCreatePersonalProfile(assignedTeamWeapon.id);
-
-          // Create session with the personal weapon profile
-          const config: BaseSessionConfig = {
-            team_id: training.team_id,
-            training_id: training.id,
-            drill_id: drill.id,
-            drill_config: null,
-            session_mode: 'solo',
-            watch_controlled: false,
-            start_as_pending: true,
-            weapon_id: personalProfile.id, // Use personal profile linked to team weapon
-          };
-
-          doCreateDrillSession(config);
-        } catch (error: any) {
-          setStartingDrillId(null);
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          Alert.alert('Error', error.message || 'Failed to check weapon assignment');
-        }
-      } else {
-        // Solo session - no weapon requirement (or handle differently)
-        const config: BaseSessionConfig = {
-          team_id: null,
-          training_id: training.id,
-          drill_id: drill.id,
-          drill_config: null,
-          session_mode: 'solo',
-          watch_controlled: false,
-          start_as_pending: true,
-          weapon_id: null,  
-        };
-
-        doCreateDrillSession(config);
-      }
+      // Clear starting state after navigation
+      setTimeout(() => setStartingDrillId(null), 300);
     },
-    [training, doCreateDrillSession]
+    [training]
   );
 
   return {
@@ -329,9 +254,5 @@ export function useTrainingActions({
     handleFinishTraining,
     handleCancelTraining,
     handleStartDrill,
-    // Watch control prompt
-    showWatchPrompt,
-    pendingDrillName,
-    handleWatchControlSelect,
   };
 }

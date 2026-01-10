@@ -5,9 +5,17 @@
  * Shows what changed and why, with optional chat to ask questions.
  */
 
+import {
+  MIN_BASELINE_SESSIONS,
+  RECENT_SESSION_COUNT,
+  detectAccuracyChange,
+  detectGroupingChange,
+  getConfidence,
+  type ConfidenceLevel,
+} from '@/components/insights/changeRules';
 import { useColors } from '@/hooks/ui/useColors';
-import { getRecentSessionsWithStats, type SessionWithDetails } from '@/services/sessionService';
 import { supabase } from '@/lib/supabase';
+import { getRecentSessionsWithStats, type SessionWithDetails } from '@/services/sessionService';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -20,14 +28,6 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  RECENT_SESSION_COUNT,
-  MIN_BASELINE_SESSIONS,
-  detectAccuracyChange,
-  detectGroupingChange,
-  getConfidence,
-  type ConfidenceLevel,
-} from '@/components/insights/changeRules';
 
 // ============================================================================
 // TYPES

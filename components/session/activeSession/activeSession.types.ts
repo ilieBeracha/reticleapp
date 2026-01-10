@@ -32,6 +32,16 @@ export interface NextTargetPlan {
 }
 
 // ============================================================================
+// SESSION MODE
+// ============================================================================
+/**
+ * Session mode determines what the user can modify during the session.
+ * - 'solo': Full control - user can edit drill config, change distance per target
+ * - 'training': Locked - drill config is immutable, set by team training
+ */
+export type SessionMode = 'solo' | 'training';
+
+// ============================================================================
 // WATCH STATE
 // ============================================================================
 export interface WatchState {
@@ -96,6 +106,14 @@ export interface UseActiveSessionReturn {
   
   // Watch state
   watchState: WatchState;
+  
+  // Team training state (for hiding back button)
+  isTeamTraining: boolean;
+  
+  // Session mode - controls what user can modify
+  sessionMode: SessionMode;
+  canEditDrill: boolean;
+  lockedConfig: SessionWithDetails['drill_config'] | null;
   
   // Completion modal
   showCompletionModal: boolean;

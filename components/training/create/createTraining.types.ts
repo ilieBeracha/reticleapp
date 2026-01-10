@@ -2,7 +2,7 @@
  * Type definitions for Create Training Screen
  */
 
-import type { CreateTrainingDrillInput, Drill, DrillInstanceConfig, DrillGoal, TargetType, WeaponCategory } from '@/types/workspace';
+import type { CreateTrainingDrillInput, Drill, DrillGoal, DrillInstanceConfig, TargetType, WeaponCategory } from '@/types/workspace';
 
 // ============================================================================
 // DRILL FORM DATA (inlined from UnifiedDrillModal)
@@ -40,7 +40,13 @@ export interface NewDrillInstanceConfig {
 // ============================================================================
 // WIZARD STEP
 // ============================================================================
-export type WizardStep = 1 | 2;
+/**
+ * 3-Step Training Creation Flow:
+ * 1. Training Details - Team, name, schedule
+ * 2. Quick Selection - Recent drills, team drills, templates
+ * 3. Custom/Library - Build custom drill or browse full library
+ */
+export type WizardStep = 1 | 2 | 3;
 
 // ============================================================================
 // DRILL MODAL MODE
@@ -91,6 +97,11 @@ export interface UseCreateTrainingReturn {
   drillModalMode: DrillModalMode;
   savingDrill: boolean;
   
+  // Step 2 - Quick Selection state
+  lastTrainingDrills: any[]; // TrainingDrill[]
+  adjustingDrill: TrainingDrillItem | null;
+  adjustModalVisible: boolean;
+  
   // Validation
   step1Complete: boolean;
   step2Complete: boolean;
@@ -109,5 +120,11 @@ export interface UseCreateTrainingReturn {
   handleNextStep: () => void;
   handleBackStep: () => void;
   handleCreate: () => Promise<void>;
+  
+  // Step 2 - Quick Selection actions
+  handleAdjustDrill: (drill: TrainingDrillItem) => void;
+  handleCloseAdjustModal: () => void;
+  handleUpdateDrill: (updated: TrainingDrillItem) => void;
+  handleGoToCustom: () => void;
 }
 

@@ -47,7 +47,7 @@ import {
   getDefaultDistance,
   isDrillLimitReached,
 } from './activeSession.helpers';
-import type { UseActiveSessionParams, UseActiveSessionReturn } from './activeSession.types';
+import type { SessionMode, UseActiveSessionParams, UseActiveSessionReturn } from './activeSession.types';
 
 export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActiveSessionReturn {
   const { loadPersonalSessions, loadTeamSessions } = useSessionStore();
@@ -112,6 +112,26 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
         calculateSessionStats(sessionId),
       ]);
 
+      // Auto-activate team training sessions that are pending
+      // Team sessions skip the prep view and go directly to active
+      // We do this BEFORE setting the session to avoid UI flash
+      const isTeamSession = !!sessionData?.training_id && !!sessionData?.team_id;
+      if (isTeamSession && sessionData?.status === 'pending') {
+        console.log('[Session] Auto-activating team training session...');
+        try {
+          const { activateSession } = await import('@/services/sessionService');
+          const activated = await activateSession(sessionId, false); // false = phone mode
+          // Set the activated session instead of the pending one
+          setSession(activated);
+          setTargets(targetsData);
+          setStats(statsData);
+          return; // Exit early - don't set the pending session
+        } catch (activateError) {
+          console.error('[Session] Failed to auto-activate team session:', activateError);
+          // Fall through to set the original session data
+        }
+      }
+      
       setSession(sessionData);
       setTargets(targetsData);
       setStats(statsData);
@@ -193,6 +213,16 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     // True when watch is reachable but app not open - user needs to open manually
     watchAppNotOpen,
   };
+
+  // Team training state - used to hide back button
+  const isTeamTraining = !!session?.training_id && !!session?.team_id;
+
+  // Session mode - determines what user can modify
+  // 'training' mode locks drill config (distance, shots, etc.) to what was set by team training
+  // 'solo' mode allows full control over drill configuration
+  const sessionMode: SessionMode = isTeamTraining ? 'training' : 'solo';
+  const canEditDrill = sessionMode === 'solo';
+  const lockedConfig = sessionMode === 'training' ? drill : null;
 
   // Score
   const score = useMemo(() => {
@@ -471,19 +501,26 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       }
     }
 
+    // For training mode, use locked config values strictly
+    // For solo mode, use defaults but allow user to change
+    const distance = lockedConfig?.distance_m ?? defaultDistance;
+    const maxShots = lockedConfig?.rounds_per_shooter && !isInfiniteShots(lockedConfig.rounds_per_shooter)
+      ? String(lockedConfig.rounds_per_shooter)
+      : drill?.rounds_per_shooter && !isInfiniteShots(drill.rounds_per_shooter)
+        ? String(drill.rounds_per_shooter)
+        : undefined;
+
     router.push({
       pathname: '/(protected)/scanTarget',
       params: {
         sessionId,
-        distance: defaultDistance.toString(),
-        ...(hasDrill ? { locked: '1' } : {}),
-        ...(hasDrill && drill && !isInfiniteShots(drill.rounds_per_shooter)
-          ? { maxShots: String(drill.rounds_per_shooter) }
-          : {}),
+        distance: distance.toString(),
+        ...(lockedConfig ? { locked: '1' } : {}),
+        ...(maxShots ? { maxShots } : {}),
         ...(drill?.drill_goal ? { drillGoal: drill.drill_goal } : {}),
       },
     });
-  }, [sessionId, defaultDistance, hasDrill, drill, nextTargetPlan]);
+  }, [sessionId, defaultDistance, hasDrill, drill, nextTargetPlan, lockedConfig]);
 
   const handleLogTactical = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -499,54 +536,67 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       }
     }
 
+    // For training mode, use locked config values strictly
+    const distance = lockedConfig?.distance_m ?? defaultDistance;
+
     router.push({
       pathname: '/(protected)/tacticalTarget',
       params: {
         sessionId,
-        distance: defaultDistance.toString(),
-        ...(hasDrill ? { locked: '1' } : {}),
+        distance: distance.toString(),
+        ...(lockedConfig ? { locked: '1' } : {}),
         ...(hasDrill && nextTargetPlan?.nextBullets
           ? { bullets: String(nextTargetPlan.nextBullets) }
           : {}),
         ...(isGrouping ? { isGrouping: '1' } : {}),
       },
     });
-  }, [sessionId, defaultDistance, hasDrill, drill, nextTargetPlan, isGrouping]);
+  }, [sessionId, defaultDistance, hasDrill, drill, nextTargetPlan, isGrouping, lockedConfig]);
 
   const handleManualRoute = useCallback(() => {
     if (!canAddTarget) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    // For training mode, use locked config values strictly
+    const distance = lockedConfig?.distance_m ?? defaultDistance;
+    
     router.push({
       pathname: '/(protected)/tacticalTarget',
       params: {
         sessionId,
-        distance: defaultDistance.toString(),
-        ...(hasDrill ? { locked: '1' } : {}),
+        distance: distance.toString(),
+        ...(lockedConfig ? { locked: '1' } : {}),
         ...(hasDrill && nextTargetPlan?.nextBullets
           ? { bullets: String(nextTargetPlan.nextBullets) }
           : {}),
         ...(isGrouping ? { isGrouping: '1' } : {}),
       },
     });
-  }, [canAddTarget, sessionId, defaultDistance, hasDrill, nextTargetPlan, isGrouping]);
+  }, [canAddTarget, sessionId, defaultDistance, hasDrill, nextTargetPlan, isGrouping, lockedConfig]);
 
   const handleScanRoute = useCallback(() => {
     if (!canAddTarget) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const maxShots = hasDrill && drill?.rounds_per_shooter && !isInfiniteShots(drill.rounds_per_shooter)
-      ? String(drill.rounds_per_shooter)
-      : undefined;
+    
+    // For training mode, use locked config values strictly
+    const distance = lockedConfig?.distance_m ?? defaultDistance;
+    const maxShots = lockedConfig?.rounds_per_shooter && !isInfiniteShots(lockedConfig.rounds_per_shooter)
+      ? String(lockedConfig.rounds_per_shooter)
+      : drill?.rounds_per_shooter && !isInfiniteShots(drill.rounds_per_shooter)
+        ? String(drill.rounds_per_shooter)
+        : undefined;
+    
     router.push({
       pathname: '/(protected)/scanTarget',
       params: {
         sessionId,
-        distance: String(defaultDistance),
+        distance: String(distance),
         ...(maxShots ? { maxShots } : {}),
         drillGoal: isGrouping ? 'grouping' : 'engagement',
-        ...(hasDrill ? { locked: '1' } : {}),
+        ...(lockedConfig ? { locked: '1' } : {}),
       },
     });
-  }, [canAddTarget, sessionId, defaultDistance, hasDrill, drill, isGrouping]);
+  }, [canAddTarget, sessionId, defaultDistance, hasDrill, drill, isGrouping, lockedConfig]);
 
   const handleTargetPress = useCallback((target: SessionTargetWithResults) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -565,28 +615,30 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
         await loadPersonalSessions();
       }
       
-      // Smart navigation: Only show results recap if watch data exists
-      if (lastSessionData) {
-        // Has watch data → show results page with charts
-        const resultsParams: Record<string, string> = { 
-          sessionId: sessionId!,
-          watchData: JSON.stringify(lastSessionData),
-        };
-        if (session?.training_id) {
-          resultsParams.trainingId = session.training_id;
-        }
-        router.replace({
-          pathname: '/(protected)/sessionResults',
-          params: resultsParams,
-        });
-      } else if (session?.training_id) {
-        // Team training, no watch data → back to training
+      // =========================================================================
+      // NAVIGATION HIERARCHY: Training is the authority
+      // Team training sessions ALWAYS return to Training (the owner)
+      // Solo sessions can show results or go home
+      // =========================================================================
+      
+      if (session?.training_id) {
+        // Team training session → ALWAYS return to Training Detail
+        // This is the canonical flow: Training owns the session lifecycle
         router.replace({
           pathname: '/(protected)/trainingDetail',
           params: { id: session.training_id },
         });
+      } else if (lastSessionData) {
+        // Solo session with watch data → show results page
+        router.replace({
+          pathname: '/(protected)/sessionResults',
+          params: { 
+            sessionId: sessionId!,
+            watchData: JSON.stringify(lastSessionData),
+          },
+        });
       } else {
-        // Solo, no watch data → back to home
+        // Solo session, no watch data → back to home
         router.replace('/(protected)/(tabs)');
       }
       
@@ -617,10 +669,18 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       elapsedTime
     );
 
+    // Use command language for team sessions
+    const isTraining = !!session?.training_id;
+    const confirmText = hasDrill && !meetsRequirements 
+      ? 'End Anyway' 
+      : isTraining 
+        ? 'End Execution' 
+        : 'End Session';
+    
     Alert.alert(title, message, [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: hasDrill && !meetsRequirements ? 'End Anyway' : 'End Session',
+        text: confirmText,
         style: 'destructive',
         onPress: async () => {
           setEnding(true);
@@ -644,28 +704,30 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
               await loadPersonalSessions();
             }
 
-            // Smart navigation: Only show results recap if watch data exists
-            if (lastSessionData) {
-              // Has watch data → show results page with charts
-              const resultsParams: Record<string, string> = { 
-                sessionId: sessionId!,
-                watchData: JSON.stringify(lastSessionData),
-              };
-              if (session?.training_id) {
-                resultsParams.trainingId = session.training_id;
-              }
-              router.replace({
-                pathname: '/(protected)/sessionResults',
-                params: resultsParams,
-              });
-            } else if (session?.training_id) {
-              // Team training, no watch data → back to training
+            // =========================================================================
+            // NAVIGATION HIERARCHY: Training is the authority
+            // Team training sessions ALWAYS return to Training (the owner)
+            // Solo sessions can show results or go home
+            // =========================================================================
+            
+            if (session?.training_id) {
+              // Team training session → ALWAYS return to Training Detail
+              // This is the canonical flow: Training owns the session lifecycle
               router.replace({
                 pathname: '/(protected)/trainingDetail',
                 params: { id: session.training_id },
               });
+            } else if (lastSessionData) {
+              // Solo session with watch data → show results page
+              router.replace({
+                pathname: '/(protected)/sessionResults',
+                params: { 
+                  sessionId: sessionId!,
+                  watchData: JSON.stringify(lastSessionData),
+                },
+              });
             } else {
-              // Solo, no watch data → back to home
+              // Solo session, no watch data → back to home
               router.replace('/(protected)/(tabs)');
             }
             
@@ -693,6 +755,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     accuracy,
     garminStatus,
     sendToGarmin,
+    lastSessionData,
   ]);
 
   const handleClose = useCallback(() => {
@@ -708,7 +771,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
         [
           { text: 'Stay', style: 'cancel' },
           {
-            text: 'End & Save',
+            text: session?.training_id ? 'Complete & Return' : 'End & Save',
             style: 'destructive',
             onPress: async () => {
               setEnding(true);
@@ -720,18 +783,26 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
                   await loadPersonalSessions();
                 }
                 
-                // Navigate to results page
-                const resultsParams: Record<string, string> = { sessionId: sessionId! };
-                if (lastSessionData) {
-                  resultsParams.watchData = JSON.stringify(lastSessionData);
-                }
+                // NAVIGATION: Training owns session lifecycle
                 if (session?.training_id) {
-                  resultsParams.trainingId = session.training_id;
+                  // Team training → return to Training Detail (the authority)
+                  router.replace({
+                    pathname: '/(protected)/trainingDetail',
+                    params: { id: session.training_id },
+                  });
+                } else if (lastSessionData) {
+                  // Solo with watch data → results page
+                  router.replace({
+                    pathname: '/(protected)/sessionResults',
+                    params: { 
+                      sessionId: sessionId!,
+                      watchData: JSON.stringify(lastSessionData),
+                    },
+                  });
+                } else {
+                  // Solo without watch data → home
+                  router.replace('/(protected)/(tabs)');
                 }
-                router.replace({
-                  pathname: '/(protected)/sessionResults',
-                  params: resultsParams,
-                });
                 
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               } catch (error: any) {
@@ -848,6 +919,14 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
 
     // Watch state
     watchState,
+    
+    // Team training state (for hiding back button)
+    isTeamTraining,
+
+    // Session mode - controls what user can modify
+    sessionMode,
+    canEditDrill,
+    lockedConfig,
 
     // Completion modal
     showCompletionModal,

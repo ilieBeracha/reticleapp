@@ -2,6 +2,7 @@
 export { DrillCard } from './DrillCard';
 export { DrillsSection } from './DrillsSection';
 export { InfoCards } from './InfoCards';
+export { ParticipantInsights } from './ParticipantInsights';
 export { SessionCard } from './SessionCard';
 export { SessionsSection } from './SessionsSection';
 export { TrainingActions } from './TrainingActions';

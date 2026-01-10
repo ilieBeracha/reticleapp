@@ -15,14 +15,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const DEFAULT_WEAPON_KEY = '@reticle:default_weapon_id';
 
 // Re-export for convenience - SINGLE SOURCE OF TRUTH for weapon categories
-export type { WeaponCategory } from '@/types/workspace';
-export { 
-  WEAPON_CATEGORIES, 
-  getCategoryLabel,
-  getCategoryConfig,
-  getCategoryDistances,
-  CATEGORY_CONFIGS,
+export {
+  CATEGORY_CONFIGS, getCategoryConfig,
+  getCategoryDistances, getCategoryLabel, WEAPON_CATEGORIES
 } from '@/constants/weaponCategories';
+export type { WeaponCategory } from '@/types/workspace';
 
 // ============================================================================
 // TYPES

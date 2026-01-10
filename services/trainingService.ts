@@ -1003,3 +1003,56 @@ export async function getMyDrillProgress(trainingId: string): Promise<DrillProgr
   }));
 }
 
+// =====================================================
+// RECENT TRAINING DATA
+// =====================================================
+
+/**
+ * Get the most recent completed/ongoing training for a team
+ * Returns the training with its drills (for "repeat last training" feature)
+ */
+export async function getLastTeamTraining(teamId: string): Promise<TrainingWithDetails | null> {
+  const { data, error } = await supabase
+    .from('trainings')
+    .select(`
+      *,
+      team:teams(id, name, team_type),
+      creator:profiles!trainings_created_by_fkey(id, full_name, avatar_url),
+      training_drills(*)
+    `)
+    .eq('team_id', teamId)
+    .in('status', ['finished', 'ongoing'])
+    .order('scheduled_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Failed to fetch last team training:', error);
+    return null;
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return {
+    ...data,
+    drills: data.training_drills || [],
+    drill_count: data.training_drills?.length || 0,
+    training_drills: undefined,
+  } as TrainingWithDetails;
+}
+
+/**
+ * Get drills from the last training for quick re-use
+ */
+export async function getLastTrainingDrills(teamId: string): Promise<TrainingDrill[]> {
+  const lastTraining = await getLastTeamTraining(teamId);
+  
+  if (!lastTraining || !lastTraining.drills) {
+    return [];
+  }
+
+  return lastTraining.drills;
+}
+

@@ -6,6 +6,9 @@
  *
  * Weapon selection is a sheet within the Details step, not a separate step.
  * If user has no weapons, they can create one from the weapon picker.
+ * 
+ * Supports training context - when coming from trainingDetail with drillId,
+ * the flow is simplified and prefilled with drill parameters.
  */
 
 import { DrillPresetPicker, PresetForm } from '@/components/shared/drills';
@@ -14,23 +17,24 @@ import {
     SessionIntentStep,
     useSessionCreation,
 } from '@/components/session/creation';
-import type { Position, SessionPurpose } from '@/components/session/creation/sessionCreation.types';
+import type { Position, SessionPurpose, TargetType } from '@/components/session/creation/sessionCreation.types';
 import { CreateWeaponFlow, WeaponPicker } from '@/components/weapons';
 import { getCategoryConfig } from '@/constants/weaponCategories';
 import { useColors } from '@/hooks/ui/useColors';
 import { useOpenWeather } from '@/hooks/useOpenWeather';
+import { supabase } from '@/lib/supabase';
 import type { DrillPreset } from '@/services/presetService';
 import type { BaseSessionConfig } from '@/services/session/types';
 import { createSession, deleteSession, getMyActiveSession } from '@/services/sessionService';
-import type { UserWeapon } from '@/services/weaponService';
+import { getAssignedWeapons, getOrCreatePersonalProfile, type UserWeapon } from '@/services/weaponService';
 import { toSessionWeatherData } from '@/services/weather';
 import { useSessionStore } from '@/store/sessionStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, ChevronRight, CornerDownRight, Crosshair, Plus, Target } from 'lucide-react-native';
-import { useCallback, useState } from 'react';
+import { ChevronLeft, ChevronRight, CornerDownRight, Crosshair, Plus, Target, Users } from 'lucide-react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -41,7 +45,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ============================================================================
@@ -56,17 +60,32 @@ export default function CreateSessionScreen() {
   // Fetch weather in background (non-blocking)
   const { weather: openWeather } = useOpenWeather({ autoFetch: true });
   
-  // Edit mode params (coming back from SessionPrepView)
+  // Parse all params - supports edit mode AND training context
   const params = useLocalSearchParams<{
+    // Edit mode params
     editSessionId?: string;
     weaponId?: string;
     weaponName?: string;
+    // Training context params (from trainingDetail)
+    trainingId?: string;
+    drillId?: string;
+    teamId?: string;
+    drillName?: string;
+    // Shared params
     purpose?: string;
     distance?: string;
     shots?: string;
+    timeLimit?: string;
+    position?: string;
+    targetType?: string;
+    // Return navigation
+    returnTo?: string;
+    returnId?: string;
   }>();
   
   const isEditMode = !!params.editSessionId;
+  const isTrainingContext = !!params.trainingId && !!params.drillId;
+  const hasReturnDestination = !!params.returnTo;
   
   const [checkingSession, setCheckingSession] = useState(true);
   const [showPresetPicker, setShowPresetPicker] = useState(false);
@@ -74,21 +93,128 @@ export default function CreateSessionScreen() {
   const [showWeaponPicker, setShowWeaponPicker] = useState(false);
   const [showCreateWeapon, setShowCreateWeapon] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<DrillPreset | null>(null);
+  const [loadingTeamWeapon, setLoadingTeamWeapon] = useState(isTrainingContext);
+
+  // Build initial state from params
+  const initialState = useMemo(() => {
+    if (isEditMode) {
+      return {
+        step: 'context' as const,
+        purpose: (params.purpose as SessionPurpose) || 'grouping',
+        context: {
+          weaponId: params.weaponId || null,
+          weaponName: params.weaponName || null,
+          distance: params.distance ? parseInt(params.distance, 10) : 25,
+          shotsPlanned: params.shots ? parseInt(params.shots, 10) : 5,
+        },
+      };
+    }
+    
+    if (isTrainingContext) {
+      // Coming from training - skip intent, go straight to context with prefilled values
+      return {
+        step: 'context' as const,
+        purpose: (params.purpose as SessionPurpose) || 'grouping',
+        context: {
+          weaponId: null, // Will be loaded from team assignment
+          weaponName: null,
+          distance: params.distance ? parseInt(params.distance, 10) : 25,
+          shotsPlanned: params.shots ? parseInt(params.shots, 10) : 5,
+          timeLimit: params.timeLimit ? parseInt(params.timeLimit, 10) : null,
+          position: (params.position as Position) || 'any',
+          targetType: (params.targetType as TargetType) || 'paper',
+        },
+      };
+    }
+    
+    return undefined;
+  }, [isEditMode, isTrainingContext, params]);
 
   const creation = useSessionCreation({
     onSubmit: handleSubmit,
-    // Pre-fill from edit params
-    initialState: isEditMode ? {
-      step: 'context' as const,
-      purpose: (params.purpose as SessionPurpose) || 'grouping',
-      context: {
-        weaponId: params.weaponId || null,
-        weaponName: params.weaponName || null,
-        distance: params.distance ? parseInt(params.distance, 10) : 25,
-        shotsPlanned: params.shots ? parseInt(params.shots, 10) : 5,
-      },
+    initialState,
+    // Pass training context for session creation
+    trainingContext: isTrainingContext ? {
+      trainingId: params.trainingId!,
+      drillId: params.drillId!,
+      teamId: params.teamId || null,
+      drillName: params.drillName || 'Training Drill',
     } : undefined,
   });
+
+  // Auto-load assigned weapon for team training
+  useEffect(() => {
+    if (!isTrainingContext || !params.teamId) {
+      setLoadingTeamWeapon(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadTeamWeapon() {
+      try {
+        // Get current user
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || cancelled) {
+          setLoadingTeamWeapon(false);
+          return;
+        }
+
+        const assignedWeapons = await getAssignedWeapons(params.teamId!, user.id);
+        if (cancelled) return;
+
+        if (assignedWeapons.length > 0) {
+          const personalProfile = await getOrCreatePersonalProfile(assignedWeapons[0].id);
+          if (cancelled) return;
+
+          creation.updateContext({
+            weaponId: personalProfile.id,
+            weaponName: personalProfile.name,
+          });
+          console.log('[CreateSession] Auto-selected team weapon:', personalProfile.name);
+        }
+      } catch (error) {
+        console.error('[CreateSession] Failed to load team weapon:', error);
+      } finally {
+        if (!cancelled) setLoadingTeamWeapon(false);
+      }
+    }
+
+    loadTeamWeapon();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isTrainingContext, params.teamId]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // AUTO-START FOR TEAM TRAINING
+  // When coming from a team training and weapon is loaded, auto-submit
+  // ─────────────────────────────────────────────────────────────────────────
+  
+  const [autoStartTriggered, setAutoStartTriggered] = useState(false);
+  
+  useEffect(() => {
+    // Only auto-start for team training context
+    if (!isTrainingContext) return;
+    // Don't auto-start twice
+    if (autoStartTriggered) return;
+    // Wait for weapon to load
+    if (loadingTeamWeapon) return;
+    // Wait for active session check to complete
+    if (checkingSession) return;
+    // Must have a weapon
+    const hasWeapon = creation.state.context.weaponId !== null;
+    if (!hasWeapon) return;
+    // Don't auto-start if already submitting
+    if (creation.state.isSubmitting) return;
+    
+    console.log('[CreateSession] Auto-starting team training drill...');
+    setAutoStartTriggered(true);
+    
+    // Submit immediately - no delay needed since we show loading state
+    creation.submit();
+  }, [isTrainingContext, loadingTeamWeapon, checkingSession, creation.state.context.weaponId, creation.state.isSubmitting, autoStartTriggered, creation]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // CHECK FOR ACTIVE SESSION
@@ -154,10 +280,26 @@ export default function CreateSessionScreen() {
       
       // Attach weather data if available (non-blocking - session creates even without weather)
       const sessionWeather = toSessionWeatherData(openWeather, 'openweathermap');
-      const configWithWeather: BaseSessionConfig = {
+      
+      // Build final config with training context if applicable
+      const finalConfig: BaseSessionConfig = {
         ...config,
         weather: sessionWeather,
+        // Add training context if coming from training
+        ...(isTrainingContext && {
+          team_id: params.teamId || null,
+          training_id: params.trainingId,
+          drill_id: params.drillId,
+        }),
       };
+
+      // Update drill_config name if we have a drill name from training
+      if (isTrainingContext && params.drillName && finalConfig.drill_config) {
+        finalConfig.drill_config = {
+          ...finalConfig.drill_config,
+          name: params.drillName,
+        };
+      }
       
       if (sessionWeather) {
         console.log('[CreateSession] Weather attached:', {
@@ -167,18 +309,28 @@ export default function CreateSessionScreen() {
         });
       }
       
-      const session = await createSession(configWithWeather);
+      const session = await createSession(finalConfig);
       console.log('[CreateSession] Created session:', {
         id: session.id,
         weapon_id: session.weapon_id,
         weapon_name: session.weapon_name,
         has_weather: !!session.weather,
+        training_id: session.training_id,
+        drill_id: session.drill_id,
       });
       await loadSessions();
       
+      // Navigate to activeSession with return info
       router.replace({
         pathname: '/(protected)/activeSession',
-        params: { sessionId: session.id },
+        params: {
+          sessionId: session.id,
+          // Pass return destination so session end can navigate back
+          ...(hasReturnDestination && {
+            returnTo: params.returnTo,
+            returnId: params.returnId,
+          }),
+        },
       });
     } catch (error: any) {
       console.error('[CreateSession] Failed:', error);
@@ -285,10 +437,26 @@ export default function CreateSessionScreen() {
   // LOADING STATE
   // ─────────────────────────────────────────────────────────────────────────
 
-  if (checkingSession) {
+  // For team training: stay in loading until we're done auto-starting
+  // The key insight is: once loadingTeamWeapon is false AND we have a weapon,
+  // we WILL auto-start, so we should stay in loading state
+  const hasWeaponForAutoStart = creation.state.context.weaponId !== null;
+  const willAutoStart = isTrainingContext && !loadingTeamWeapon && !checkingSession && hasWeaponForAutoStart;
+  const isAutoStarting = isTrainingContext && (
+    loadingTeamWeapon ||  // Still loading weapon
+    autoStartTriggered || // Already triggered auto-start
+    willAutoStart         // About to trigger auto-start (covers the gap!)
+  );
+  
+  if (checkingSession || isAutoStarting) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background, paddingTop: insets.top }]}>
         <ActivityIndicator color={colors.textMuted} size="large" />
+        {isAutoStarting && (
+          <Text style={[styles.loadingText, { color: colors.textMuted, marginTop: 16 }]}>
+            Starting drill...
+          </Text>
+        )}
       </View>
     );
   }
@@ -319,8 +487,10 @@ export default function CreateSessionScreen() {
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────
 
-  const stepNumber = creation.state.step === 'intent' ? 1 : 2;
-  const stepLabels = ['Goal', 'Details'];
+  // For training context, we skip the intent step
+  const effectiveStep = isTrainingContext ? 2 : (creation.state.step === 'intent' ? 1 : 2);
+  const stepLabels = isTrainingContext ? ['Training', 'Configure'] : ['Goal', 'Details'];
+  const headerTitle = isTrainingContext ? 'Start Drill' : 'New Session';
 
   return (
     <ScrollView
@@ -333,54 +503,71 @@ export default function CreateSessionScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           style={[styles.headerButton, { backgroundColor: colors.card }]}
-          onPress={stepNumber > 1 ? creation.goBack : () => router.back()}
+          onPress={effectiveStep > 1 && !isTrainingContext ? creation.goBack : () => router.back()}
           activeOpacity={0.7}
         >
-          {stepNumber > 1 ? (
+          {effectiveStep > 1 && !isTrainingContext ? (
             <ChevronLeft size={20} color={colors.text} />
           ) : (
             <Ionicons name="close" size={20} color={colors.text} />
           )}
         </TouchableOpacity>
 
-        <Text style={[styles.headerTitle, { color: colors.text }]}>New Session</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{headerTitle}</Text>
 
         <View style={styles.headerButtonPlaceholder} />
       </View>
 
-      {/* Step Progress Bar */}
-      <View style={styles.progressBar}>
-        <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
-          <View 
-            style={[
-              styles.progressFill, 
-              { 
-                backgroundColor: colors.primary,
-                width: `${(stepNumber / 2) * 100}%`,
-              }
-            ]} 
-          />
-        </View>
-        <View style={styles.progressLabels}>
-          {stepLabels.map((label, idx) => (
-            <Text
-              key={label}
-              style={[
-                styles.progressLabel,
-                { 
-                  color: stepNumber > idx ? colors.text : colors.textMuted,
-                  fontWeight: stepNumber === idx + 1 ? '600' : '400',
-                },
-              ]}
-            >
-              {label}
+      {/* Training Context Banner */}
+      {isTrainingContext && params.drillName && (
+        <Animated.View entering={FadeInDown.duration(200)} style={[styles.trainingBanner, { backgroundColor: colors.card }]}>
+          <View style={[styles.trainingIconWrap, { backgroundColor: colors.primary + '15' }]}>
+            <Users size={18} color={colors.primary} />
+          </View>
+          <View style={styles.trainingInfo}>
+            <Text style={[styles.trainingLabel, { color: colors.textMuted }]}>Training Drill</Text>
+            <Text style={[styles.trainingName, { color: colors.text }]} numberOfLines={1}>
+              {params.drillName}
             </Text>
-          ))}
+          </View>
+        </Animated.View>
+      )}
+
+      {/* Step Progress Bar - only show for non-training context */}
+      {!isTrainingContext && (
+        <View style={styles.progressBar}>
+          <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
+            <View 
+              style={[
+                styles.progressFill, 
+                { 
+                  backgroundColor: colors.primary,
+                  width: `${(effectiveStep / 2) * 100}%`,
+                }
+              ]} 
+            />
+          </View>
+          <View style={styles.progressLabels}>
+            {stepLabels.map((label, idx) => (
+              <Text
+                key={label}
+                style={[
+                  styles.progressLabel,
+                  { 
+                    color: effectiveStep > idx ? colors.text : colors.textMuted,
+                    fontWeight: effectiveStep === idx + 1 ? '600' : '400',
+                  },
+                ]}
+              >
+                {label}
+              </Text>
+            ))}
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Step Content */}
-      {creation.state.step === 'intent' && (
+      {creation.state.step === 'intent' && !isTrainingContext && (
         <SessionIntentStep
           selectedPurpose={creation.state.purpose}
           onSelectPurpose={handlePurposeSelect}
@@ -388,7 +575,7 @@ export default function CreateSessionScreen() {
         />
       )}
 
-      {creation.state.step === 'context' && (
+      {(creation.state.step === 'context' || isTrainingContext) && (
         <>
           {/* Step 2 header */}
           <View style={styles.step2Header}>
@@ -469,8 +656,8 @@ export default function CreateSessionScreen() {
       {/* Spacer - pushes button to bottom when content is short */}
       <View style={styles.spacer} />
 
-      {/* Start Button - only show on step 2 since step 1 auto-advances */}
-      {isLastStep && (
+      {/* Start Button - show on step 2 or training context */}
+      {(isLastStep || isTrainingContext) && (
         <View style={styles.buttonContainer}>
           <TouchableOpacity
             style={[
@@ -481,20 +668,22 @@ export default function CreateSessionScreen() {
               },
             ]}
             onPress={handleButtonPress}
-            disabled={!canContinue || creation.state.isSubmitting}
+            disabled={!canContinue || creation.state.isSubmitting || loadingTeamWeapon}
             activeOpacity={0.85}
           >
-            {creation.state.isSubmitting ? (
+            {creation.state.isSubmitting || loadingTeamWeapon ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <>
                 <CornerDownRight size={18} color="#fff" fill="#fff" />
-                <Text style={styles.buttonText}>Preview Session</Text>
+                <Text style={styles.buttonText}>
+                  {isTrainingContext ? 'Start Drill' : 'Preview Session'}
+                </Text>
               </>
             )}
           </TouchableOpacity>
           
-          {!hasWeapon && (
+          {!hasWeapon && !loadingTeamWeapon && (
             <Text style={[styles.weaponRequiredHint, { color: colors.orange }]}>
               Select a weapon to continue
             </Text>
@@ -726,6 +915,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
   
   // Spacer & Button
   spacer: {
@@ -754,5 +947,37 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
     marginTop: 12,
+  },
+  
+  // Training context banner
+  trainingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 14,
+    marginBottom: 20,
+    gap: 12,
+  },
+  trainingIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trainingInfo: {
+    flex: 1,
+  },
+  trainingLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  trainingName: {
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: -0.3,
   },
 });

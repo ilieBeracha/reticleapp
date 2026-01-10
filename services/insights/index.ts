@@ -12,7 +12,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
-import { generateInsights, getTopInsight } from './insightEngine';
+import { generateInsights } from './insightEngine';
 import type {
   GeneratedInsight,
   InsightGenerationInput,
@@ -31,7 +31,7 @@ export type {
   InsightType,
   SessionFeatures,
   SessionInsight,
-  UserBaseline,
+  UserBaseline
 } from './types';
 
 // Re-export engine functions

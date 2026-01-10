@@ -17,7 +17,8 @@ import { useTrainings } from '@/components/training/useTrainings';
 import { useColors } from '@/hooks/ui/useColors';
 import type { TrainingWithDetails } from '@/types/workspace';
 import { format } from 'date-fns';
-import { Activity, BookOpen, Calendar, ChevronRight, Plus, Settings, Target, UserPlus, Users, Zap } from 'lucide-react-native';
+import { Activity, BarChart3, BookOpen, Calendar, ChevronRight, Plus, Settings, Target, UserPlus, Users, Zap } from 'lucide-react-native';
+import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
@@ -450,7 +451,7 @@ export default function TeamScreen() {
             {/* MANAGE TAB (for commanders) */}
             {activeTab === 'manage' && canManage && (
               <ManageTab
-                    colors={colors}
+                colors={colors}
                 activeTeam={activeTeam}
                 activeTeamId={activeTeamId}
                 liveTraining={liveTraining}
@@ -458,6 +459,7 @@ export default function TeamScreen() {
                 teamStats={teamStats}
                 members={members}
                 roleConfig={roleConfig}
+                pastTrainings={groupTrainingsByTimeframe(activeTeamTrainings).past.filter(t => t.status === 'finished')}
                 onTrainingPress={handleTrainingPress}
                 onCreateTraining={handleCreateTraining}
                 onOpenLibrary={handleOpenLibrary}
@@ -487,6 +489,7 @@ interface ManageTabProps {
   teamStats: any;
   members: any[];
   roleConfig: any;
+  pastTrainings: TrainingWithDetails[];
   onTrainingPress: (training: TrainingWithDetails) => void;
   onCreateTraining: () => void;
   onOpenLibrary: () => void;
@@ -503,6 +506,7 @@ function ManageTab({
   teamStats,
   members,
   roleConfig,
+  pastTrainings,
   onTrainingPress,
   onCreateTraining,
   onOpenLibrary,
@@ -511,6 +515,14 @@ function ManageTab({
   onTeamSettings,
 }: ManageTabProps) {
   const progressPct = Math.min(100, (teamStats.totalShots / teamStats.weeklyGoal) * 100);
+  
+  // Navigate to training report
+  const handleViewReport = useCallback((trainingId: string) => {
+    router.push({
+      pathname: '/(protected)/trainingReport',
+      params: { trainingId },
+    });
+  }, []);
 
   return (
     <View style={manageStyles.container}>
@@ -710,6 +722,39 @@ function ManageTab({
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Training Reports Section */}
+      {pastTrainings.length > 0 && (
+        <View style={manageStyles.menuSection}>
+          <Text style={[manageStyles.menuSectionTitle, { color: colors.textMuted }]}>REPORTS</Text>
+          
+          <View style={[manageStyles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {pastTrainings.slice(0, 5).map((training, idx) => (
+              <View key={training.id}>
+                {idx > 0 && <View style={[manageStyles.menuDivider, { backgroundColor: colors.border }]} />}
+                <TouchableOpacity
+                  style={manageStyles.menuItem}
+                  onPress={() => handleViewReport(training.id)}
+                  activeOpacity={0.6}
+                >
+                  <View style={[manageStyles.menuIcon, { backgroundColor: '#10B98112' }]}>
+                    <BarChart3 size={16} color="#10B981" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[manageStyles.menuItemText, { color: colors.text }]} numberOfLines={1}>
+                      {training.title}
+                    </Text>
+                    <Text style={[manageStyles.reportDate, { color: colors.textMuted }]}>
+                      {format(new Date(training.scheduled_at), 'MMM d, yyyy')}
+                    </Text>
+                  </View>
+                  <ChevronRight size={16} color={colors.border} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
 
       {/* Team Identity Footer */}
       {activeTeam && roleConfig && (
@@ -948,6 +993,10 @@ const manageStyles = StyleSheet.create({
   menuDivider: {
     height: StyleSheet.hairlineWidth,
     marginLeft: 58,
+  },
+  reportDate: {
+    fontSize: 12,
+    marginTop: 2,
   },
 
   // Team Footer

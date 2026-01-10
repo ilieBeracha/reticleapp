@@ -67,12 +67,12 @@ export function groupTrainingsByTimeframe(trainings: TrainingWithDetails[]): Gro
     }
     
     // Finished or cancelled trainings always go to past
-    if (t.status === 'finished' || t.status === 'cancelled' || t.status === 'planned' || t.status === 'completed' || t.status === 'cancelled' ) {
+    if (t.status === 'finished' || t.status === 'cancelled' || t.status === 'completed') {
       past.push(t);
       return;
     }
 
-    // For planned/scheduled trainings, group by date
+    // For planned trainings, group by date
     if (date < todayStart) {
       past.push(t);
     } else if (isSameDay(date, todayStart)) {

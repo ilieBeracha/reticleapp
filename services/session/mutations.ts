@@ -4,30 +4,30 @@ import { markWeaponUsed } from '@/services/weaponService';
 import { getDrillRequirements } from './drillContract';
 import { mapSession } from './mappers';
 import {
-    getMyActiveSessionForTraining,
-    getMyActiveSessionsAll,
-    getSessionById,
-    shouldAutoCancelSession,
+  getMyActiveSessionForTraining,
+  getMyActiveSessionsAll,
+  getSessionById,
+  shouldAutoCancelSession,
 } from './queries';
 import {
-    SESSION_SELECT_AFTER_CREATE,
-    SESSION_SELECT_AFTER_UPDATE,
+  SESSION_SELECT_AFTER_CREATE,
+  SESSION_SELECT_AFTER_UPDATE,
 } from './selectClauses';
 import { calculateSessionStats } from './stats';
 import {
-    addSessionTarget,
-    getSessionTargets,
-    savePaperTargetResult,
-    saveTacticalTargetResult,
+  addSessionTarget,
+  getSessionTargets,
+  savePaperTargetResult,
+  saveTacticalTargetResult,
 } from './targets';
 import type {
-    BaseSessionConfig,
-    CreateSessionParams,
-    PaperType,
-    SessionStats,
-    SessionTargetWithResults,
-    SessionWithDetails,
-    TargetType,
+  BaseSessionConfig,
+  CreateSessionParams,
+  PaperType,
+  SessionStats,
+  SessionTargetWithResults,
+  SessionWithDetails,
+  TargetType,
 } from './types';
 import { buildDetailsMergePayload, buildTargetData } from './watchDataTransformer';
 import type { TransformedWatchData, WatchDetailsPayload } from './watchTypes';

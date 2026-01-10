@@ -1,22 +1,24 @@
 /**
- * TrainingDetailsStep - Professional, question-driven training details form
+ * TrainingDetailsStep - Minimal, clean training setup
  * 
- * Step 1 of training creation: Team, name, schedule
+ * Only ask what's necessary:
+ * - Team (if multiple)
+ * - Name
+ * - Schedule (collapsed by default - most trainings start manually)
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
   Calendar,
   Check,
-  ChevronRight,
+  ChevronDown,
   Clock,
-  Hand,
-  Info,
   Users,
 } from 'lucide-react-native';
+import { useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 // ============================================================================
 // TYPES
@@ -60,6 +62,7 @@ export function TrainingDetailsStep({
 }: TrainingDetailsStepProps) {
   const colors = useColors();
   const selectedTeam = teams.find(t => t.id === selectedTeamId);
+  const [showSchedule, setShowSchedule] = useState(!manualStart);
 
   const formatDate = (date: Date) => {
     const today = new Date();
@@ -76,47 +79,56 @@ export function TrainingDetailsStep({
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
   };
 
+  const handleToggleSchedule = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowSchedule(!showSchedule);
+    if (showSchedule) {
+      // Collapsing = switching to manual start
+      onToggleManualStart();
+    }
+  };
+
+  // Auto-select single team
+  const effectiveTeam = teams.length === 1 ? teams[0] : selectedTeam;
+  const showTeamSelector = teams.length > 1 && !isTeamLocked;
+
   return (
     <View style={styles.container}>
-      {/* Question 1: Team */}
-      <View style={styles.section}>
-        <View style={styles.questionHeader}>
-          <View style={[styles.questionIcon, { backgroundColor: colors.card }]}>
-            <Users size={16} color={colors.text} strokeWidth={1.5} />
-          </View>
-          <Text style={[styles.questionText, { color: colors.text }]}>
-            Who is this training for?
-          </Text>
-        </View>
+      {/* Training Name - Primary focus */}
+      <View style={styles.nameSection}>
+        <Text style={[styles.label, { color: colors.textMuted }]}>Training Name</Text>
+        <TextInput
+          style={[
+            styles.nameInput,
+            {
+              backgroundColor: colors.card,
+              borderColor: title.trim() ? colors.text : colors.border,
+              color: colors.text,
+            },
+          ]}
+          placeholder="e.g. Morning Accuracy"
+          placeholderTextColor={colors.textMuted}
+          value={title}
+          onChangeText={onTitleChange}
+          autoCapitalize="words"
+          autoFocus
+        />
+      </View>
 
-        {isTeamLocked && selectedTeam ? (
-          <View style={[styles.lockedTeam, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={[styles.teamIcon, { backgroundColor: colors.text }]}>
-              <Users size={14} color={colors.background} strokeWidth={1.5} />
-            </View>
-            <Text style={[styles.teamName, { color: colors.text }]}>{selectedTeam.name}</Text>
-            <View style={[styles.lockedBadge, { backgroundColor: colors.secondary }]}>
-              <Check size={12} color={colors.text} strokeWidth={2} />
-            </View>
-          </View>
-        ) : teams.length === 1 ? (
-          <View style={[styles.lockedTeam, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={[styles.teamIcon, { backgroundColor: colors.text }]}>
-              <Users size={14} color={colors.background} strokeWidth={1.5} />
-            </View>
-            <Text style={[styles.teamName, { color: colors.text }]}>{teams[0].name}</Text>
-          </View>
-        ) : (
-          <View style={styles.teamOptions}>
+      {/* Team Selection (only if multiple teams) */}
+      {showTeamSelector ? (
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: colors.textMuted }]}>Team</Text>
+          <View style={styles.teamGrid}>
             {teams.map(team => {
               const isSelected = selectedTeamId === team.id;
               return (
                 <TouchableOpacity
                   key={team.id}
                   style={[
-                    styles.teamOption,
+                    styles.teamChip,
                     {
-                      backgroundColor: isSelected ? colors.text : 'transparent',
+                      backgroundColor: isSelected ? colors.text : colors.card,
                       borderColor: isSelected ? colors.text : colors.border,
                     },
                   ]}
@@ -126,9 +138,10 @@ export function TrainingDetailsStep({
                   }}
                   activeOpacity={0.7}
                 >
+                  {isSelected && <Check size={14} color={colors.background} strokeWidth={2.5} />}
                   <Text
                     style={[
-                      styles.teamOptionText,
+                      styles.teamChipText,
                       { color: isSelected ? colors.background : colors.text },
                     ]}
                     numberOfLines={1}
@@ -139,112 +152,69 @@ export function TrainingDetailsStep({
               );
             })}
           </View>
-        )}
-
-        {!selectedTeamId && teams.length > 1 && (
-          <View style={[styles.hint, { backgroundColor: `${colors.orange}15` }]}>
-            <Info size={12} color={colors.orange} />
-            <Text style={[styles.hintText, { color: colors.orange }]}>
-              Select a team to see their drills
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Question 2: Name */}
-      <View style={styles.section}>
-        <View style={styles.questionHeader}>
-          <View style={[styles.questionIcon, { backgroundColor: colors.card }]}>
-            <Ionicons name="text" size={16} color={colors.text} />
-          </View>
-          <Text style={[styles.questionText, { color: colors.text }]}>
-            What is this training called?
+        </View>
+      ) : effectiveTeam ? (
+        <View style={styles.teamBadge}>
+          <Users size={14} color={colors.textMuted} strokeWidth={1.5} />
+          <Text style={[styles.teamBadgeText, { color: colors.textMuted }]}>
+            {effectiveTeam.name}
           </Text>
         </View>
+      ) : null}
 
-        <TextInput
-          style={[
-            styles.textInput,
-            {
-              backgroundColor: colors.card,
-              borderColor: title.trim() ? colors.text : colors.border,
-              color: colors.text,
-            },
-          ]}
-          placeholder="e.g. Morning Accuracy Drill"
-          placeholderTextColor={colors.textMuted}
-          value={title}
-          onChangeText={onTitleChange}
-          autoCapitalize="words"
-        />
-      </View>
-
-      {/* Question 3: Schedule */}
-      <View style={styles.section}>
-        <View style={styles.questionHeader}>
-          <View style={[styles.questionIcon, { backgroundColor: colors.card }]}>
-            <Calendar size={16} color={colors.text} strokeWidth={1.5} />
-          </View>
-          <Text style={[styles.questionText, { color: colors.text }]}>
-            When does it happen?
-          </Text>
-        </View>
-
-        <View style={styles.scheduleRow}>
-          <TouchableOpacity
-            style={[styles.scheduleBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              onOpenDatePicker();
-            }}
-            activeOpacity={0.7}
-          >
-            <Calendar size={16} color={colors.textMuted} strokeWidth={1.5} />
-            <Text style={[styles.scheduleBtnText, { color: colors.text }]}>
-              {formatDate(scheduledDate)}
-            </Text>
-            <ChevronRight size={14} color={colors.textMuted} />
-          </TouchableOpacity>
-
-          {!manualStart && (
-            <TouchableOpacity
-              style={[styles.scheduleBtn, styles.timeBtn, { backgroundColor: colors.card, borderColor: colors.text }]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                onOpenTimePicker();
-              }}
-              activeOpacity={0.7}
-            >
-              <Clock size={16} color={colors.textMuted} strokeWidth={1.5} />
-              <Text style={[styles.scheduleBtnText, { color: colors.text }]}>
-                {formatTime(scheduledDate)}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Manual Start Toggle */}
+      {/* Schedule - Collapsed by default */}
+      <View style={[styles.scheduleSection, { borderColor: colors.border }]}>
         <TouchableOpacity
-          style={[styles.toggle, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            onToggleManualStart();
-          }}
+          style={styles.scheduleHeader}
+          onPress={handleToggleSchedule}
           activeOpacity={0.7}
         >
-          <View style={[styles.toggleIcon, { backgroundColor: manualStart ? colors.text : colors.secondary }]}>
-            <Hand size={14} color={manualStart ? colors.background : colors.textMuted} strokeWidth={1.5} />
-          </View>
-          <View style={styles.toggleContent}>
-            <Text style={[styles.toggleTitle, { color: colors.text }]}>Manual Start</Text>
-            <Text style={[styles.toggleDesc, { color: colors.textMuted }]}>
-              {manualStart ? 'Start when you\'re ready' : 'Starts at scheduled time'}
+          <View style={styles.scheduleHeaderLeft}>
+            <Calendar size={16} color={colors.textMuted} strokeWidth={1.5} />
+            <Text style={[styles.scheduleHeaderText, { color: colors.text }]}>
+              {showSchedule ? `${formatDate(scheduledDate)} at ${formatTime(scheduledDate)}` : 'Start when ready'}
             </Text>
           </View>
-          <View style={[styles.switch, { backgroundColor: manualStart ? colors.text : colors.secondary }]}>
-            <View style={[styles.switchThumb, manualStart && styles.switchThumbActive]} />
-          </View>
+          <ChevronDown 
+            size={18} 
+            color={colors.textMuted} 
+            style={{ transform: [{ rotate: showSchedule ? '180deg' : '0deg' }] }}
+          />
         </TouchableOpacity>
+
+        {showSchedule && (
+          <Animated.View entering={FadeIn.duration(150)} style={styles.scheduleContent}>
+            <View style={styles.scheduleRow}>
+              <TouchableOpacity
+                style={[styles.scheduleBtn, { backgroundColor: colors.secondary }]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  onOpenDatePicker();
+                }}
+                activeOpacity={0.7}
+              >
+                <Calendar size={16} color={colors.text} strokeWidth={1.5} />
+                <Text style={[styles.scheduleBtnText, { color: colors.text }]}>
+                  {formatDate(scheduledDate)}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.scheduleBtn, { backgroundColor: colors.secondary }]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  onOpenTimePicker();
+                }}
+                activeOpacity={0.7}
+              >
+                <Clock size={16} color={colors.text} strokeWidth={1.5} />
+                <Text style={[styles.scheduleBtnText, { color: colors.text }]}>
+                  {formatTime(scheduledDate)}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        )}
       </View>
     </View>
   );
@@ -256,91 +226,86 @@ export function TrainingDetailsStep({
 
 const styles = StyleSheet.create({
   container: {
-    gap: 28,
+    gap: 20,
   },
-  section: {
-    gap: 12,
+
+  // Name
+  nameSection: {
+    gap: 8,
   },
-  questionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  questionIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  questionText: {
-    fontSize: 16,
+  label: {
+    fontSize: 13,
     fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  // Team
-  lockedTeam: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    gap: 12,
-  },
-  teamIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  teamName: {
-    flex: 1,
-    fontSize: 15,
+  nameInput: {
+    height: 52,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    fontSize: 17,
     fontWeight: '500',
   },
-  lockedBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+
+  // Team
+  section: {
+    gap: 10,
   },
-  teamOptions: {
+  teamGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  teamOption: {
+  teamChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    gap: 6,
   },
-  teamOptionText: {
+  teamChipText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
   },
-  hint: {
+  teamBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 6,
   },
-  hintText: {
-    fontSize: 12,
+  teamBadgeText: {
+    fontSize: 13,
     fontWeight: '500',
   },
-  // Name
-  textInput: {
-    height: 48,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    fontSize: 15,
-  },
+
   // Schedule
+  scheduleSection: {
+    borderWidth: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  scheduleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  scheduleHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  scheduleHeaderText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  scheduleContent: {
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+  },
   scheduleRow: {
     flexDirection: 'row',
     gap: 10,
@@ -349,62 +314,13 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    justifyContent: 'center',
     paddingVertical: 12,
     borderRadius: 10,
-    borderWidth: 1,
     gap: 8,
   },
-  timeBtn: {
-    flex: 0,
-    minWidth: 100,
-  },
   scheduleBtnText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  // Toggle
-  toggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    gap: 12,
-  },
-  toggleIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  toggleContent: {
-    flex: 1,
-  },
-  toggleTitle: {
     fontSize: 14,
     fontWeight: '600',
   },
-  toggleDesc: {
-    fontSize: 12,
-    marginTop: 1,
-  },
-  switch: {
-    width: 44,
-    height: 24,
-    borderRadius: 12,
-    padding: 2,
-  },
-  switchThumb: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#fff',
-  },
-  switchThumbActive: {
-    marginLeft: 'auto',
-  },
 });
-

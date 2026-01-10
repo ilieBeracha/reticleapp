@@ -411,14 +411,14 @@ function CommanderActionsSheet({
             </TouchableOpacity>
           </View>
 
-          {/* Finish */}
+          {/* Finish - Command Language */}
           <TouchableOpacity 
             style={[cmdStyles.finishBtn, { backgroundColor: colors.destructive + '12' }]} 
             onPress={() => handleAction(onFinishTraining)}
             activeOpacity={0.7}
           >
             <Square size={16} color={colors.destructive} />
-            <Text style={[cmdStyles.finishText, { color: colors.destructive }]}>Finish Training</Text>
+            <Text style={[cmdStyles.finishText, { color: colors.destructive }]}>Complete Training</Text>
           </TouchableOpacity>
 
           {/* Cancel */}
@@ -537,10 +537,10 @@ function CompletionBanner({
           </View>
           <View style={s.completionText}>
             <Text style={[s.completionTitle, { color: colors.text }]}>
-              All drills completed!
+              Training Complete!
             </Text>
             <Text style={[s.completionSubtitle, { color: colors.textMuted }]}>
-              {canManage ? 'You can now finish the training.' : 'Great job! Wait for commander to finish.'}
+              {canManage ? 'All drills completed. Ready to debrief.' : 'Great work! Wait for commander to complete.'}
             </Text>
           </View>
         </View>
@@ -549,7 +549,7 @@ function CompletionBanner({
             style={[s.completionBtn, { backgroundColor: colors.green }]}
             onPress={onFinish}
           >
-            <Text style={s.completionBtnText}>Finish</Text>
+            <Text style={s.completionBtnText}>Debrief</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -680,44 +680,19 @@ function DrillRow({
 // ═══════════════════════════════════════════════════════════════════════════
 // FINISHED SUMMARY
 // ═══════════════════════════════════════════════════════════════════════════
-interface ParticipantResult {
-  userId: string;
-  userName: string;
-  totalShots: number;
-  totalHits: number;
-  accuracy: number | null; // null for grouping-only users
-  drillsCompleted: number;
-  drillResults: Array<{
-    drillId: string;
-    drillName: string;
-    drillGoal: 'grouping' | 'engagement';
-    accuracy: number | null; // null for grouping drills
-    dispersion: number | null; // for grouping drills
-    shots: number;
-    hits: number;
-    completed: boolean;
-  }>;
-}
-
 function FinishedSummary({
   training,
   drillCount,
   completedCount,
   colors,
-  teamSessions,
-  drills,
   canManageTraining,
 }: {
   training: any;
   drillCount: number;
   completedCount: number;
   colors: ReturnType<typeof useColors>;
-  teamSessions: SessionWithDetails[];
-  drills: any[];
   canManageTraining: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
-
   const duration = useMemo(() => {
     if (!training.started_at || !training.ended_at) return null;
     const start = new Date(training.started_at);
@@ -729,86 +704,12 @@ function FinishedSummary({
     return `${hours}h ${remainingMins}m`;
   }, [training.started_at, training.ended_at]);
 
-  // Calculate participant results
-  const participantResults = useMemo<ParticipantResult[]>(() => {
-    if (!teamSessions.length || !drills.length) return [];
-    
-    const userMap = new Map<string, ParticipantResult>();
-    
-    teamSessions.forEach((session) => {
-      const userId = session.user_id;
-      
-      if (!userMap.has(userId)) {
-        userMap.set(userId, {
-          userId,
-          userName: session.user_full_name || 'Unknown',
-          totalShots: 0,
-          totalHits: 0,
-          accuracy: null,
-          drillsCompleted: 0,
-          drillResults: [],
-        });
-      }
-      
-      const participant = userMap.get(userId)!;
-      
-      // Add session stats
-      const shots = session.stats?.shots_fired ?? 0;
-      const hits = session.stats?.hits_total ?? 0;
-      const dispersion = session.stats?.best_dispersion_cm ?? null;
-      
-      // Find matching drill to check drill type
-      const drill = drills.find(d => d.id === session.drill_id);
-      const drillName = drill?.name || session.drill_name || session.drill_config?.name || 'Unknown Drill';
-      const drillGoal = drill?.drill_goal || session.drill_config?.drill_goal || 'engagement';
-      const isGrouping = drillGoal === 'grouping';
-      
-      // For engagement drills, track hits
-      if (!isGrouping) {
-        participant.totalShots += shots;
-        participant.totalHits += hits;
-      }
-      
-      if (session.status === 'completed') {
-        participant.drillsCompleted++;
-      }
-      
-      // Calculate accuracy only for engagement drills
-      const drillAccuracy = !isGrouping && shots > 0 ? Math.round((hits / shots) * 100) : null;
-      
-      participant.drillResults.push({
-        drillId: session.drill_id || '',
-        drillName,
-        drillGoal: isGrouping ? 'grouping' : 'engagement',
-        accuracy: drillAccuracy,
-        dispersion: isGrouping ? dispersion : null,
-        shots,
-        hits,
-        completed: session.status === 'completed',
-      });
+  const handleViewReport = useCallback(() => {
+    router.push({
+      pathname: '/(protected)/trainingReport',
+      params: { trainingId: training.id },
     });
-    
-    // Calculate overall accuracy (only from engagement drills)
-    userMap.forEach((p) => {
-      if (p.totalShots > 0) {
-        p.accuracy = Math.round((p.totalHits / p.totalShots) * 100);
-      }
-      // Sort by drill order in training
-      p.drillResults.sort((a, b) => {
-        const aIndex = drills.findIndex(d => d.id === a.drillId);
-        const bIndex = drills.findIndex(d => d.id === b.drillId);
-        return aIndex - bIndex;
-      });
-    });
-    
-    // Sort by completed drills, then by accuracy
-    return Array.from(userMap.values()).sort((a, b) => {
-      if (b.drillsCompleted !== a.drillsCompleted) return b.drillsCompleted - a.drillsCompleted;
-      return (b.accuracy ?? 0) - (a.accuracy ?? 0);
-    });
-  }, [teamSessions, drills]);
-
-  const hasParticipants = participantResults.length > 0 && canManageTraining;
+  }, [training.id]);
 
   return (
     <View style={[s.summaryCard, { backgroundColor: colors.card }]}>
@@ -839,103 +740,19 @@ function FinishedSummary({
         )}
       </View>
 
-      {/* Participant Results (expandable) */}
-      {hasParticipants && (
-        <>
-          <TouchableOpacity
-            style={[s.participantsToggle, { borderTopColor: colors.border }]}
-            onPress={() => setExpanded(!expanded)}
-            activeOpacity={0.7}
-          >
-            <Users size={16} color={colors.textMuted} />
-            <Text style={[s.participantsToggleText, { color: colors.text }]}>
-              Participant Results ({participantResults.length})
-            </Text>
-            <ChevronRight
-              size={18}
-              color={colors.textMuted}
-              style={{ transform: [{ rotate: expanded ? '90deg' : '0deg' }] }}
-            />
-          </TouchableOpacity>
-
-          {expanded && (
-            <View style={s.participantsList}>
-              {participantResults.map((p) => (
-                <View key={p.userId} style={[s.participantCard, { backgroundColor: colors.secondary }]}>
-                  {/* Participant header */}
-                  <View style={s.participantHeader}>
-                    <View style={[s.participantAvatar, { backgroundColor: colors.card }]}>
-                      <Text style={[s.participantInitial, { color: colors.text }]}>
-                        {p.userName.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={s.participantInfo}>
-                      <Text style={[s.participantName, { color: colors.text }]} numberOfLines={1}>
-                        {p.userName}
-                      </Text>
-                      <Text style={[s.participantStats, { color: colors.textMuted }]}>
-                        {p.drillsCompleted}/{drillCount} drills
-                      </Text>
-                    </View>
-                    {p.accuracy !== null && (
-                      <View style={s.participantAccuracy}>
-                        <Text style={[s.participantAccuracyValue, { color: colors.text }]}>
-                          {p.accuracy}%
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                  
-                  {/* Drill breakdown */}
-                  <View style={s.drillBreakdown}>
-                    {drills.map((drill, idx) => {
-                      const result = p.drillResults.find(r => r.drillId === drill.id);
-                      const isGrouping = drill.drill_goal === 'grouping';
-                      const goalColor = isGrouping ? colors.green : '#F59E0B';
-                      
-                      // Get result display
-                      let resultText = '—';
-                      if (result?.completed) {
-                        if (isGrouping && result.dispersion !== null) {
-                          resultText = `${result.dispersion.toFixed(1)}cm`;
-                        } else if (!isGrouping && result.accuracy !== null) {
-                          resultText = `${result.accuracy}%`;
-                        } else if (result.shots > 0) {
-                          resultText = `${result.shots} shots`;
-                        }
-                      }
-                      
-                      return (
-                        <View key={drill.id} style={s.drillBreakdownRow}>
-                          <View style={[s.drillBreakdownDot, { backgroundColor: goalColor }]} />
-                          {result ? (
-                            <>
-                              <View style={[s.drillBreakdownStatus, { backgroundColor: result.completed ? colors.green : colors.yellow }]} />
-                              <Text style={[s.drillBreakdownName, { color: colors.text }]} numberOfLines={1}>
-                                {drill.name}
-                              </Text>
-                              <Text style={[s.drillBreakdownAccuracy, { color: colors.textMuted }]}>
-                                {resultText}
-                              </Text>
-                            </>
-                          ) : (
-                            <>
-                              <View style={[s.drillBreakdownStatus, { backgroundColor: colors.border }]} />
-                              <Text style={[s.drillBreakdownName, { color: colors.textMuted }]} numberOfLines={1}>
-                                {drill.name}
-                              </Text>
-                              <Text style={[s.drillBreakdownAccuracy, { color: colors.textMuted }]}>—</Text>
-                            </>
-                          )}
-                        </View>
-                      );
-                    })}
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-        </>
+      {/* View Report Button - Commanders Only */}
+      {canManageTraining && (
+        <TouchableOpacity
+          style={[s.viewReportBtn, { borderTopColor: colors.border }]}
+          onPress={handleViewReport}
+          activeOpacity={0.7}
+        >
+          <Trophy size={16} color={colors.primary} />
+          <Text style={[s.viewReportBtnText, { color: colors.primary }]}>
+            View Training Debrief
+          </Text>
+          <ChevronRight size={18} color={colors.primary} />
+        </TouchableOpacity>
       )}
     </View>
   );
@@ -1395,8 +1212,6 @@ export default function TrainingDetailScreen() {
               drillCount={drills.length}
               completedCount={completedCount}
               colors={colors}
-              teamSessions={teamSessions}
-              drills={drills}
               canManageTraining={canManageTraining}
             />
           </Animated.View>
@@ -1587,7 +1402,7 @@ export default function TrainingDetailScreen() {
         </Text>
       </ScrollView>
 
-      {/* Bottom Action */}
+      {/* Bottom Action - Command Language */}
       {canManageTraining && isPlanned && (
         <View style={[s.bottom, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
           <TouchableOpacity
@@ -1603,14 +1418,14 @@ export default function TrainingDetailScreen() {
             ) : (
               <>
                 <Play size={18} color={colors.background} fill={colors.background} />
-                <Text style={[s.actionBtnText, { color: colors.background }]}>Start Training</Text>
+                <Text style={[s.actionBtnText, { color: colors.background }]}>Begin Training</Text>
               </>
             )}
           </TouchableOpacity>
         </View>
       )}
 
-      {/* Ongoing bottom (only if not all completed) */}
+      {/* Ongoing bottom (only if not all completed) - Command Language */}
       {canManageTraining && isOngoing && !allDrillsCompleted && (
         <View style={[s.bottom, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
           <TouchableOpacity
@@ -1626,7 +1441,7 @@ export default function TrainingDetailScreen() {
             ) : (
               <>
                 <Square size={16} color={colors.text} />
-                <Text style={[s.actionBtnText, { color: colors.text }]}>Finish Training</Text>
+                <Text style={[s.actionBtnText, { color: colors.text }]}>Complete Training</Text>
               </>
             )}
           </TouchableOpacity>
@@ -1800,7 +1615,8 @@ const s = StyleSheet.create({
   completionBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
 
   // Summary card
-  summaryCard: { padding: 16, borderRadius: 12, marginBottom: 16 },
+  finishedContainer: { gap: 16, marginBottom: 16 },
+  summaryCard: { padding: 16, borderRadius: 12 },
   summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
   summaryTitle: { fontSize: 15, fontWeight: '600' },
   summaryStats: { flexDirection: 'row', gap: 20 },
@@ -1907,9 +1723,9 @@ const s = StyleSheet.create({
   // Add Drill Button
   addDrillBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginLeft: 'auto' },
 
-  // Participant Results
-  participantsToggle: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 14, marginTop: 14, borderTopWidth: StyleSheet.hairlineWidth },
-  participantsToggleText: { flex: 1, fontSize: 14, fontWeight: '600' },
+  // View Report Button
+  viewReportBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 14, marginTop: 14, borderTopWidth: StyleSheet.hairlineWidth },
+  viewReportBtnText: { flex: 1, fontSize: 14, fontWeight: '600' },
   participantsList: { marginTop: 12, gap: 10 },
   participantCard: { borderRadius: 10, padding: 12 },
   participantHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },

@@ -3,6 +3,11 @@
  *
  * Manages all stateful logic for the Create Training Screen.
  * Handles form state, drill management, and submission.
+ * 
+ * 3-Step Flow:
+ * 1. Training Details - Team, name, schedule
+ * 2. Quick Selection - Recent drills, team drills, templates
+ * 3. Custom/Library - Build custom drill or browse full library
  */
 
 import * as Haptics from 'expo-haptics';
@@ -11,10 +16,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Keyboard } from 'react-native';
 
 import { createDrill, drillToTrainingInput, getTeamDrills } from '@/services/drillService';
-import { createTraining } from '@/services/trainingService';
+import { createTraining, getLastTrainingDrills } from '@/services/trainingService';
 import { useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
-import type { Drill, DrillInstanceConfig } from '@/types/workspace';
+import type { Drill, DrillInstanceConfig, TrainingDrill } from '@/types/workspace';
 
 import {
   createDefaultScheduledDate,
@@ -62,6 +67,11 @@ export function useCreateTraining({ teamIdParam }: UseCreateTrainingParams): Use
   const [drillModalMode, setDrillModalMode] = useState<DrillModalMode>('configure');
   const [savingDrill, setSavingDrill] = useState(false);
 
+  // Step 2 - Quick Selection state
+  const [lastTrainingDrills, setLastTrainingDrills] = useState<TrainingDrill[]>([]);
+  const [adjustingDrill, setAdjustingDrill] = useState<TrainingDrillItem | null>(null);
+  const [adjustModalVisible, setAdjustModalVisible] = useState(false);
+
   // ============================================================================
   // TEAM SYNC
   // ============================================================================
@@ -93,14 +103,19 @@ export function useCreateTraining({ teamIdParam }: UseCreateTrainingParams): Use
   const canCreate = step1Complete && step2Complete && !submitting;
 
   // ============================================================================
-  // LOAD DRILL LIBRARY
+  // LOAD DRILL LIBRARY + LAST TRAINING DRILLS
   // ============================================================================
 
   useEffect(() => {
     if (selectedTeamId) {
+      // Load team's saved drills
       getTeamDrills(selectedTeamId).then(setTeamDrills).catch(console.error);
+      
+      // Load drills from last training (for "repeat" feature)
+      getLastTrainingDrills(selectedTeamId).then(setLastTrainingDrills).catch(console.error);
     } else {
       setTeamDrills([]);
+      setLastTrainingDrills([]);
     }
   }, [selectedTeamId]);
 
@@ -217,21 +232,64 @@ export function useCreateTraining({ teamIdParam }: UseCreateTrainingParams): Use
   }, [selectedTeamId, canCreateDrills, savingDrill]);
 
   const handleNextStep = useCallback(() => {
-    if (!step1Complete) {
-      if (!selectedTeamId) {
-        Alert.alert('Team Required', 'Please select a team first');
-      } else if (!title.trim()) {
-        Alert.alert('Name Required', 'Please enter a training name');
-      }
-      return;
-    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setCurrentStep(2);
-  }, [step1Complete, selectedTeamId, title]);
+    
+    if (currentStep === 1) {
+      // Validate step 1 before moving to step 2
+      if (!step1Complete) {
+        if (!selectedTeamId) {
+          Alert.alert('Team Required', 'Please select a team first');
+        } else if (!title.trim()) {
+          Alert.alert('Name Required', 'Please enter a training name');
+        }
+        return;
+      }
+      setCurrentStep(2);
+    } else if (currentStep === 2) {
+      // From step 2, we can only go to step 3 via "Build Custom" button
+      // This method is for "Continue" which goes straight to create if we have drills
+      if (drills.length > 0) {
+        // Don't auto-advance, user can create from step 2
+        return;
+      }
+      // No drills yet - go to custom builder
+      setCurrentStep(3);
+    }
+  }, [currentStep, step1Complete, selectedTeamId, title, drills.length]);
 
   const handleBackStep = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setCurrentStep(1);
+    if (currentStep === 3) {
+      setCurrentStep(2);
+    } else if (currentStep === 2) {
+      setCurrentStep(1);
+    }
+  }, [currentStep]);
+
+  // Go to Step 3 (Custom/Library)
+  const handleGoToCustom = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setCurrentStep(3);
+  }, []);
+
+  // ============================================================================
+  // STEP 2 HANDLERS - Quick Selection
+  // ============================================================================
+
+  const handleAdjustDrill = useCallback((drill: TrainingDrillItem) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setAdjustingDrill(drill);
+    setAdjustModalVisible(true);
+  }, []);
+
+  const handleCloseAdjustModal = useCallback(() => {
+    setAdjustModalVisible(false);
+    setAdjustingDrill(null);
+  }, []);
+
+  const handleUpdateDrill = useCallback((updated: TrainingDrillItem) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setDrills(prev => prev.map(d => d.id === updated.id ? updated : d));
   }, []);
 
   const handleCreate = useCallback(async () => {
@@ -260,7 +318,14 @@ export function useCreateTraining({ teamIdParam }: UseCreateTrainingParams): Use
         finalDate.setHours(0, 0, 0, 0);
       }
 
-      await createTraining({
+      console.log('[CreateTraining] Creating training:', {
+        team_id: selectedTeamId,
+        title: title.trim(),
+        scheduled_at: finalDate.toISOString(),
+        drills_count: drills.length,
+      });
+
+      const created = await createTraining({
         team_id: selectedTeamId,
         title: title.trim(),
         scheduled_at: finalDate.toISOString(),
@@ -268,14 +333,27 @@ export function useCreateTraining({ teamIdParam }: UseCreateTrainingParams): Use
         drills: drills.map(({ id, ...drill }) => drill),
       });
 
+      console.log('[CreateTraining] Training created successfully:', created.id);
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      loadTeamTrainings(selectedTeamId).catch(() => {});
-      loadMyUpcomingTrainings().catch(() => {});
+
+      // Refresh stores and wait for completion
+      try {
+        await Promise.all([
+          loadTeamTrainings(selectedTeamId),
+          loadMyUpcomingTrainings(),
+        ]);
+        console.log('[CreateTraining] Stores refreshed successfully');
+      } catch (refreshError) {
+        console.error('[CreateTraining] Failed to refresh stores:', refreshError);
+        // Don't fail the whole operation if refresh fails
+      }
 
       if (router.canGoBack()) {
         router.back();
       }
     } catch (error: any) {
+      console.error('[CreateTraining] Failed to create training:', error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Error', error.message || 'Failed to create training');
     } finally {
@@ -320,6 +398,11 @@ export function useCreateTraining({ teamIdParam }: UseCreateTrainingParams): Use
     drillModalMode,
     savingDrill,
 
+    // Step 2 - Quick Selection state
+    lastTrainingDrills,
+    adjustingDrill,
+    adjustModalVisible,
+
     // Validation
     step1Complete,
     step2Complete,
@@ -338,6 +421,12 @@ export function useCreateTraining({ teamIdParam }: UseCreateTrainingParams): Use
     handleNextStep,
     handleBackStep,
     handleCreate,
+
+    // Step 2 - Quick Selection actions
+    handleAdjustDrill,
+    handleCloseAdjustModal,
+    handleUpdateDrill,
+    handleGoToCustom,
   };
 }
 
