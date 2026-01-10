@@ -5,7 +5,7 @@
  * Weapon selection is handled externally as a sheet.
  */
 
-import { PresetForm } from '@/components/drills';
+import { PresetForm } from '@/components/shared/drills';
 import type { DrillType } from '@/constants/categoryDrills';
 import { type CategoryDrill, getDrillById } from '@/constants/categoryDrills';
 import { getCategoryConfig, getCategoryDistances } from '@/constants/weaponCategories';

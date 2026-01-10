@@ -14,8 +14,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // AsyncStorage key for default weapon
 const DEFAULT_WEAPON_KEY = '@reticle:default_weapon_id';
 
-// Re-export for convenience
+// Re-export for convenience - SINGLE SOURCE OF TRUTH for weapon categories
 export type { WeaponCategory } from '@/types/workspace';
+export { 
+  WEAPON_CATEGORIES, 
+  getCategoryLabel,
+  getCategoryConfig,
+  getCategoryDistances,
+  CATEGORY_CONFIGS,
+} from '@/constants/weaponCategories';
 
 // ============================================================================
 // TYPES
@@ -728,23 +735,6 @@ export async function getWeaponPickerData(options: WeaponPickerOptions = {}): Pr
   };
 }
 
-// ============================================================================
-// HELPERS
-// ============================================================================
-
-export const WEAPON_CATEGORIES: { value: WeaponCategory; label: string }[] = [
-  { value: 'precision_rifle', label: 'Precision Rifle' },
-  { value: 'rifle', label: 'Rifle' },
-  { value: 'carbine', label: 'Carbine' },
-  { value: 'pistol', label: 'Pistol' },
-  { value: 'shotgun', label: 'Shotgun' },
-  { value: 'any', label: 'Any' },
-];
-
-export function getCategoryLabel(category: WeaponCategory | null): string {
-  if (!category) return 'Unknown';
-  return WEAPON_CATEGORIES.find(c => c.value === category)?.label || category;
-}
 
 // ============================================================================
 // WEAPON ASSIGNMENT (Commander manages team weapons)

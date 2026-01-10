@@ -15,15 +15,9 @@ export { TargetDetailModal } from './TargetDetailModal';
 export { SaveDrillPrompt } from './SaveDrillPrompt';
 export { useWatchControlPrompt, WatchControlPrompt } from './WatchControlPrompt';
 
-// Watch detection sensitivity
-export { SensitivitySelector } from './SensitivitySelector';
-
 // Category drill picker - shows real drills that sessions MUST follow
 export { CategoryDrillPicker } from './CategoryDrillPicker';
 
-// Form system (unified session creation/editing)
-export * from './form';
-
-// Timeline (biometric data visualization)
-export { SessionTimelineChart, useSessionTimeline } from './timeline';
+// Timeline hook for session detail
+export { useSessionTimeline } from './useSessionTimeline';
 

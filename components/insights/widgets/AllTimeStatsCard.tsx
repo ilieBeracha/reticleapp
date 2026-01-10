@@ -8,7 +8,6 @@ import type { SessionWithDetails } from '@/services/sessionService';
 import { differenceInMinutes } from 'date-fns';
 import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { AIButton } from './AIButton';
 
 interface AllTimeStatsCardProps {
   sessions: SessionWithDetails[];
@@ -23,7 +22,7 @@ function formatDuration(minutes: number): string {
   return `${days}d ${hours % 24}h`;
 }
 
-export function AllTimeStatsCard({ sessions, onAIPress }: AllTimeStatsCardProps) {
+export function AllTimeStatsCard({ sessions }: AllTimeStatsCardProps) {
   const colors = useColors();
 
   const stats = useMemo(() => {

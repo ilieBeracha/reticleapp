@@ -1,4 +1,4 @@
-import { PaperTargetFlow } from "@/components/addTarget";
+import { PaperTargetFlow } from "@/components/targets";
 import type { PaperType } from "@/services/sessionService";
 import { useLocalSearchParams } from "expo-router";
 
@@ -29,7 +29,7 @@ export default function ScanTargetSheet() {
   // - grouping → 'grouping' (dispersion only, no hit %)
   // - achievement → 'achievement' (tracks hit %)
   // - no drill_goal → default to 'grouping' for scan targets
-  const paperType: PaperType = (drillGoal === 'achievement' || drillGoal === 'engagement') ? 'engagement' : 'grouping';
+  const paperType: PaperType = drillGoal === 'achievement' ? 'engagement' : 'grouping';
 
   return (
     <PaperTargetFlow

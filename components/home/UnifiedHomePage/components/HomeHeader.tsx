@@ -4,7 +4,7 @@
  * Clean header with user greeting and status.
  */
 
-import { BaseAvatar } from '@/components/BaseAvatar';
+import { BaseAvatar } from '@/components/shared/Avatar';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 import type { HomeHeaderProps } from '../UnifiedHomePage.types';

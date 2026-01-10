@@ -195,6 +195,8 @@ export interface DecodedWeather {
   /** Overall condition severity for shooting */
   conditionSeverity: 'ideal' | 'good' | 'challenging' | 'difficult' | 'extreme';
 
+}
+
 /**
  * Per-shot data in details payload.
  * Compact format: ~10 bytes per shot.

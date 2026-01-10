@@ -5,31 +5,19 @@
  * There is NO additional "team page" required to see team content.
  */
 
-import { NoTeamsEmptyState } from '@/components/team/NoTeamsEmptyState';
-import { TeamSwitcherPill, TeamSwitcherSheet } from '@/components/team/TeamSwitcherSheet';
+import { NoTeamsEmptyState } from '@/components/teams/NoTeamsEmptyState';
+import { TeamSwitcherPill, TeamSwitcherSheet } from '@/components/teams/TeamSwitcherSheet';
 import {
-  COLORS,
   getStatusConfig,
-  groupTrainingsByTimeframe,
-  PULSE_ANIMATION,
-  styles,
-  useTrainings,
-} from '@/components/trainings';
+} from '@/components/training';
+import { COLORS, PULSE_ANIMATION } from '@/components/training/trainings.constants';
+import { groupTrainingsByTimeframe } from '@/components/training/trainings.helpers';
+import { styles } from '@/components/training/trainings.styles';
+import { useTrainings } from '@/components/training/useTrainings';
 import { useColors } from '@/hooks/ui/useColors';
 import type { TrainingWithDetails } from '@/types/workspace';
 import { format } from 'date-fns';
-import {
-  Activity,
-  BookOpen,
-  Calendar,
-  ChevronRight,
-  Plus,
-  Settings,
-  Target,
-  UserPlus,
-  Users,
-  Zap,
-} from 'lucide-react-native';
+import { Activity, BookOpen, Calendar, ChevronRight, Plus, Settings, Target, UserPlus, Users, Zap } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   ActivityIndicator,

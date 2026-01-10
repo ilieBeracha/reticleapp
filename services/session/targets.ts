@@ -187,7 +187,7 @@ export async function getPaperTargetResult(sessionTargetId: string): Promise<Pap
     if (error.code === 'PGRST116') return null; // Not found
     throw error;
   }
-  return data;
+  return data as PaperTargetResult | null;
 }
 
 // ============================================================================
@@ -563,7 +563,7 @@ export async function getTargetWithResults(targetId: string): Promise<SessionTar
     planned_shots: target.planned_shots,
     notes: target.notes,
     target_data: target.target_data,
-    paper_result: paperResult ?? null,
+    paper_result: paperResult as PaperTargetResult | null,
     tactical_result: tacticalResult ?? null,
   };
 }

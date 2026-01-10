@@ -1,0 +1,28 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": ["app/**/*.{ts,tsx}!", "App.{ts,tsx,js,jsx}"],
+  "project": ["**/*.{ts,tsx,js,jsx}", "!**/*.test.{ts,tsx}", "!**/*.spec.{ts,tsx}", "!**/__tests__/**"],
+  "ignore": [
+    "babel.config.js",
+    "metro.config.js",
+    "app.config.{js,ts}",
+    "tailwind.config.{js,ts}",
+    "nativewind-env.d.ts",
+    "expo-env.d.ts",
+    "global.css",
+    "plugins/**",
+    "supabase/functions/**",
+    "components/ui/**"
+  ],
+  "ignoreDependencies": ["expo-router", "react-native-css-interop", "@gluestack-ui/*"],
+  "paths": {
+    "@/*": ["./*"],
+    "@components/*": ["./components/*"],
+    "@hooks/*": ["./hooks/*"],
+    "@services/*": ["./services/*"],
+    "@store/*": ["./store/*"],
+    "@utils/*": ["./utils/*"],
+    "@constants/*": ["./constants/*"],
+    "@types/*": ["./types/*"]
+  }
+}

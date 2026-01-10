@@ -1,4 +1,4 @@
-import { SessionHistoryCatalog } from '@/components/sessionHistory';
+import { SessionHistoryCatalog } from '@/components/session/history';
 import { useColors } from '@/hooks/ui/useColors';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';

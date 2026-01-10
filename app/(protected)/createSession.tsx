@@ -8,7 +8,7 @@
  * If user has no weapons, they can create one from the weapon picker.
  */
 
-import { DrillPresetPicker, PresetForm } from '@/components/drills';
+import { DrillPresetPicker, PresetForm } from '@/components/shared/drills';
 import {
     SessionContextStep,
     SessionIntentStep,

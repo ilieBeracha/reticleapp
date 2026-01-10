@@ -1,4 +1,4 @@
-import { BaseAvatar } from '@/components/BaseAvatar';
+import { BaseAvatar } from '@/components/shared/Avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from "@/hooks/ui/useColors";
 import { useTeamStore } from '@/store/teamStore';

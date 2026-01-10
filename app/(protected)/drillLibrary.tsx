@@ -10,8 +10,8 @@
  * To add drills to training, go to Create Training and select from team drills.
  */
 
-import { DrillDetailModal } from '@/components/drills/DrillDetailModal';
-import { DrillTypeSection } from '@/components/drills/DrillTypeSection';
+import { DrillDetailModal } from '@/components/shared/drills/DrillDetailModal';
+import { DrillTypeSection } from '@/components/shared/drills/DrillTypeSection';
 import { getTemplatesGroupedByType } from '@/constants/drillLibrary';
 import { useColors } from '@/hooks/ui/useColors';
 import { duplicateTemplateToTeam, getTeamDrills } from '@/services/drillService';
@@ -578,16 +578,17 @@ export default function DrillLibraryScreen() {
           onClose={() => setDetailModalVisible(false)}
           drill={{
             id: selectedTemplate.id,
-            team_id: '',
+            owner_type: 'user',
+            owner_id: '',
             created_by: '',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             name: selectedTemplate.name,
             description: selectedTemplate.description,
             drill_goal:
-              selectedTemplate.drillType === 'grouping' || selectedTemplate.drillType === 'zeroing'
+              selectedTemplate.drillType === 'grouping' || selectedTemplate.drillType === 'qualification'
                 ? 'grouping'
-                : 'achievement',
+                : selectedTemplate.drillType === 'timed' ? 'engagement' : 'grouping',
             target_type: selectedTemplate.drillType === 'timed' ? 'tactical' : 'paper',
             distance_m: (selectedTemplate.defaults.distance as number) || 25,
             rounds_per_shooter: (selectedTemplate.defaults.shots as number) || 5,

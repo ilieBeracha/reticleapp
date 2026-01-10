@@ -65,10 +65,10 @@ export async function createTraining(input: CreateTrainingInput): Promise<Traini
     const drillsToInsert = input.drills.map((drill, index) => ({
       training_id: training.id,
       order_index: index + 1,
-      // NEW: drill_id references core Drill definition
-      drill_id: drill.drill_id ?? null,
+      // NEW: drill_id references core Drill definition (use || to catch empty strings)
+      drill_id: drill.drill_id || null,
       // LEGACY: drill_template_id for backwards compatibility
-      drill_template_id: drill.drill_template_id ?? drill.drill_id ?? null,
+      drill_template_id: drill.drill_template_id || drill.drill_id || null,
       name: drill.name,
       description: drill.description || null,
 

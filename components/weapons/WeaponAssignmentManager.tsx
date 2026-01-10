@@ -14,10 +14,10 @@ import {
     assignTeamWeapon,
     createTeamWeapon,
     getCategoryLabel,
+    getGlobalWeapons,
     getPendingSharedWeapons,
     getTeamWeaponsWithAssignments,
     rejectSharedWeapon,
-    searchGlobalWeapons,
     unassignTeamWeapon,
     WEAPON_CATEGORIES,
     type GlobalWeapon,
@@ -88,8 +88,8 @@ export function WeaponAssignmentManager({
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createStep, setCreateStep] = useState<'choose' | 'catalog' | 'custom'>('choose');
   const [catalogSearch, setCatalogSearch] = useState('');
-  const [catalogResults, setCatalogResults] = useState<GlobalWeapon[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
+  const [allCatalogWeapons, setAllCatalogWeapons] = useState<GlobalWeapon[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
   const [selectedCatalogWeapon, setSelectedCatalogWeapon] = useState<GlobalWeapon | null>(null);
   
   // Create form state
@@ -184,7 +184,6 @@ export function WeaponAssignmentManager({
     setShowCreateModal(false);
     setCreateStep('choose');
     setCatalogSearch('');
-    setCatalogResults([]);
     setSelectedCatalogWeapon(null);
     setNewWeaponName('');
     setNewWeaponCategory('rifle');
@@ -192,22 +191,36 @@ export function WeaponAssignmentManager({
     setNewWeaponSerial('');
   };
 
-  const handleSearchCatalog = useCallback(async (query: string) => {
-    setCatalogSearch(query);
-    if (query.length < 2) {
-      setCatalogResults([]);
-      return;
-    }
+  // Load all catalog weapons when entering catalog step
+  const loadCatalogWeapons = useCallback(async () => {
+    if (allCatalogWeapons.length > 0) return; // Already loaded
     try {
-      setSearchLoading(true);
-      const results = await searchGlobalWeapons(query);
-      setCatalogResults(results);
+      setCatalogLoading(true);
+      const weapons = await getGlobalWeapons();
+      setAllCatalogWeapons(weapons);
     } catch (err) {
-      console.error('Failed to search catalog:', err);
+      console.error('Failed to load catalog:', err);
     } finally {
-      setSearchLoading(false);
+      setCatalogLoading(false);
     }
-  }, []);
+  }, [allCatalogWeapons.length]);
+
+  // Filter catalog weapons locally
+  const filteredCatalogWeapons = allCatalogWeapons.filter(weapon => {
+    if (!catalogSearch.trim()) return true;
+    const query = catalogSearch.toLowerCase();
+    return (
+      weapon.name.toLowerCase().includes(query) ||
+      (weapon.manufacturer?.toLowerCase().includes(query)) ||
+      (weapon.caliber?.toLowerCase().includes(query)) ||
+      weapon.category.toLowerCase().includes(query)
+    );
+  });
+
+  const handleOpenCatalog = useCallback(() => {
+    setCreateStep('catalog');
+    loadCatalogWeapons();
+  }, [loadCatalogWeapons]);
 
   const handleSelectCatalogWeapon = (weapon: GlobalWeapon) => {
     setSelectedCatalogWeapon(weapon);
@@ -522,7 +535,7 @@ export function WeaponAssignmentManager({
             <View style={styles.chooseContainer}>
               <TouchableOpacity
                 style={[styles.chooseOption, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={() => setCreateStep('catalog')}
+                onPress={handleOpenCatalog}
               >
                 <View style={[styles.chooseIcon, { backgroundColor: colors.primary + '15' }]}>
                   <Search size={22} color={colors.primary} />
@@ -530,7 +543,7 @@ export function WeaponAssignmentManager({
                 <View style={styles.chooseContent}>
                   <Text style={[styles.chooseTitle, { color: colors.text }]}>From Catalog</Text>
                   <Text style={[styles.chooseDesc, { color: colors.textMuted }]}>
-                    Search and select from known weapons
+                    Browse and select from {allCatalogWeapons.length > 0 ? allCatalogWeapons.length : ''} known weapons
                   </Text>
                 </View>
                 <ChevronRight size={20} color={colors.textMuted} />
@@ -564,16 +577,20 @@ export function WeaponAssignmentManager({
                   placeholder="Search weapons..."
                   placeholderTextColor={colors.textMuted}
                   value={catalogSearch}
-                  onChangeText={handleSearchCatalog}
-                  autoFocus
+                  onChangeText={setCatalogSearch}
                 />
+                {catalogSearch.length > 0 && (
+                  <TouchableOpacity onPress={() => setCatalogSearch('')}>
+                    <X size={16} color={colors.textMuted} />
+                  </TouchableOpacity>
+                )}
               </View>
 
-              {searchLoading ? (
+              {catalogLoading ? (
                 <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
               ) : (
                 <FlatList
-                  data={catalogResults}
+                  data={filteredCatalogWeapons}
                   keyExtractor={(item) => item.id}
                   renderItem={({ item }) => (
                     <TouchableOpacity
@@ -583,7 +600,7 @@ export function WeaponAssignmentManager({
                       <View style={styles.catalogInfo}>
                         <Text style={[styles.catalogName, { color: colors.text }]}>{item.name}</Text>
                         <Text style={[styles.catalogMeta, { color: colors.textMuted }]}>
-                          {getCategoryLabel(item.category)} {item.caliber && `• ${item.caliber}`}
+                          {item.manufacturer ? `${item.manufacturer} • ` : ''}{getCategoryLabel(item.category)}{item.caliber && ` • ${item.caliber}`}
                         </Text>
                       </View>
                       <ChevronRight size={18} color={colors.textMuted} />
@@ -591,15 +608,15 @@ export function WeaponAssignmentManager({
                   )}
                   contentContainerStyle={styles.catalogList}
                   ListEmptyComponent={
-                    catalogSearch.length >= 2 ? (
+                    catalogSearch.length > 0 ? (
                       <Text style={[styles.noResults, { color: colors.textMuted }]}>
-                        No weapons found
+                        No weapons match "{catalogSearch}"
                       </Text>
-                    ) : (
+                    ) : allCatalogWeapons.length === 0 ? (
                       <Text style={[styles.noResults, { color: colors.textMuted }]}>
-                        Type at least 2 characters to search
+                        No weapons in catalog yet
                       </Text>
-                    )
+                    ) : null
                   }
                 />
               )}

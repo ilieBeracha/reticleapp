@@ -6,13 +6,17 @@
 import {
   useTrainingActions,
   useTrainingDetail,
-} from '@/components/training-detail';
+} from '@/components/training';
+import { WeaponAssignmentManager } from '@/components/weapons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModals } from '@/contexts/ModalContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { usePermissions } from '@/hooks/usePermissions';
+import { getTeamDrills } from '@/services/drillService';
 import { getTrainingSessionsWithStats, SessionWithDetails } from '@/services/sessionService';
-import { updateTraining } from '@/services/trainingService';
+import { getTeamMembers } from '@/services/teamService';
+import { addDrill, updateTraining } from '@/services/trainingService';
+import type { Drill } from '@/types/workspace';
 import { format, formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -25,13 +29,16 @@ import {
   Clock,
   MoreHorizontal,
   Play,
+  Plus,
   RefreshCw,
+  Search,
   Settings,
   Square,
   Target,
   Timer,
   Trophy,
   Users,
+  X,
   XCircle,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -318,6 +325,194 @@ function TrainingSettingsModal({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// COMMANDER ACTIONS SHEET
+// ═══════════════════════════════════════════════════════════════════════════
+function CommanderActionsSheet({
+  visible,
+  onClose,
+  onAddDrill,
+  onAssignWeapon,
+  onFinishTraining,
+  colors,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onAddDrill: () => void;
+  onAssignWeapon: () => void;
+  onFinishTraining: () => void;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const insets = useSafeAreaInsets();
+
+  const handleAction = (action: () => void) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onClose();
+    setTimeout(action, 150);
+  };
+
+  if (!visible) return null;
+
+  return (
+    <Modal 
+      visible={visible} 
+      animationType="slide" 
+      transparent 
+      onRequestClose={onClose}
+    >
+      <View style={cmdStyles.overlay}>
+        {/* Backdrop */}
+        <TouchableOpacity 
+          style={cmdStyles.backdrop} 
+          activeOpacity={1} 
+          onPress={onClose}
+        />
+        
+        {/* Sheet */}
+        <Animated.View 
+          entering={FadeInDown.duration(200)}
+          style={[
+            cmdStyles.sheet, 
+            { 
+              backgroundColor: colors.background,
+              paddingBottom: Math.max(insets.bottom, 16) + 8,
+            }
+          ]}
+        >
+          {/* Handle */}
+          <View style={cmdStyles.handleWrap}>
+            <View style={[cmdStyles.handle, { backgroundColor: colors.textMuted + '40' }]} />
+          </View>
+          
+          {/* Title */}
+          <Text style={[cmdStyles.title, { color: colors.textMuted }]}>Quick Actions</Text>
+          
+          {/* Actions */}
+          <View style={cmdStyles.actionsWrap}>
+            <TouchableOpacity 
+              style={[cmdStyles.actionBtn, { backgroundColor: colors.card }]} 
+              onPress={() => handleAction(onAddDrill)}
+              activeOpacity={0.7}
+            >
+              <View style={[cmdStyles.iconWrap, { backgroundColor: colors.primary + '20' }]}>
+                <Plus size={20} color={colors.primary} strokeWidth={2.5} />
+              </View>
+              <Text style={[cmdStyles.actionLabel, { color: colors.text }]}>Add Drill</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[cmdStyles.actionBtn, { backgroundColor: colors.card }]} 
+              onPress={() => handleAction(onAssignWeapon)}
+              activeOpacity={0.7}
+            >
+              <View style={[cmdStyles.iconWrap, { backgroundColor: colors.yellow + '20' }]}>
+                <Target size={20} color={colors.yellow} />
+              </View>
+              <Text style={[cmdStyles.actionLabel, { color: colors.text }]}>Assign Weapon</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Finish */}
+          <TouchableOpacity 
+            style={[cmdStyles.finishBtn, { backgroundColor: colors.destructive + '12' }]} 
+            onPress={() => handleAction(onFinishTraining)}
+            activeOpacity={0.7}
+          >
+            <Square size={16} color={colors.destructive} />
+            <Text style={[cmdStyles.finishText, { color: colors.destructive }]}>Finish Training</Text>
+          </TouchableOpacity>
+
+          {/* Cancel */}
+          <TouchableOpacity 
+            style={cmdStyles.cancelBtn} 
+            onPress={onClose}
+            activeOpacity={0.6}
+          >
+            <Text style={[cmdStyles.cancelText, { color: colors.textMuted }]}>Cancel</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+const cmdStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  sheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+  },
+  handleWrap: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+  },
+  title: {
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  actionsWrap: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  actionBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 20,
+    borderRadius: 16,
+    gap: 10,
+  },
+  iconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  finishBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  finishText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  cancelBtn: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  cancelText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // COMPLETION BANNER
 // ═══════════════════════════════════════════════════════════════════════════
 function CompletionBanner({ 
@@ -410,6 +605,10 @@ function DrillRow({
   onStart: () => void;
   isStarting: boolean;
 }) {
+  const isGrouping = drill.drill_goal === 'grouping';
+  const goalColor = isGrouping ? colors.green : '#F59E0B';
+  const goalLabel = isGrouping ? 'Grouping' : 'Engagement';
+
   return (
     <TouchableOpacity
       style={[s.drillRow, { backgroundColor: colors.card }]}
@@ -422,6 +621,7 @@ function DrillRow({
       disabled={!canStart || isStarting}
       activeOpacity={canStart ? 0.7 : 1}
     >
+      {/* Index badge with completion state */}
       <View
         style={[
           s.drillIndex,
@@ -437,19 +637,29 @@ function DrillRow({
         )}
       </View>
 
+      {/* Drill info */}
       <View style={s.drillInfo}>
-        <Text
-          style={[s.drillName, { color: isCompleted ? colors.textMuted : colors.text }]}
-          numberOfLines={1}
-        >
-          {drill.name}
-        </Text>
-        <Text style={[s.drillMeta, { color: colors.textMuted }]}>
-          {drill.distance_m}m • {drill.rounds_per_shooter} shots
-          {drill.time_limit_seconds ? ` • ${drill.time_limit_seconds}s` : ''}
-        </Text>
+        <View style={s.drillNameRow}>
+          <Text
+            style={[s.drillName, { color: isCompleted ? colors.textMuted : colors.text }]}
+            numberOfLines={1}
+          >
+            {drill.name}
+          </Text>
+        </View>
+        <View style={s.drillMetaRow}>
+          <View style={[s.drillGoalBadge, { backgroundColor: goalColor + '20' }]}>
+            <View style={[s.drillGoalDotSmall, { backgroundColor: goalColor }]} />
+            <Text style={[s.drillGoalText, { color: goalColor }]}>{goalLabel}</Text>
+          </View>
+          <Text style={[s.drillMeta, { color: colors.textMuted }]}>
+            {drill.distance_m}m • {drill.rounds_per_shooter} shots
+            {drill.time_limit_seconds ? ` • ${drill.time_limit_seconds}s` : ''}
+          </Text>
+        </View>
       </View>
 
+      {/* Action button */}
       {canStart && !isCompleted ? (
         isStarting ? (
           <ActivityIndicator size="small" color={colors.text} />
@@ -458,9 +668,11 @@ function DrillRow({
             <Play size={12} color={colors.background} fill={colors.background} />
           </View>
         )
-      ) : !isCompleted ? (
+      ) : isCompleted ? (
+        <Check size={18} color={colors.green} strokeWidth={2} />
+      ) : (
         <ChevronRight size={16} color={colors.border} />
-      ) : null}
+      )}
     </TouchableOpacity>
   );
 }
@@ -468,17 +680,44 @@ function DrillRow({
 // ═══════════════════════════════════════════════════════════════════════════
 // FINISHED SUMMARY
 // ═══════════════════════════════════════════════════════════════════════════
+interface ParticipantResult {
+  userId: string;
+  userName: string;
+  totalShots: number;
+  totalHits: number;
+  accuracy: number | null; // null for grouping-only users
+  drillsCompleted: number;
+  drillResults: Array<{
+    drillId: string;
+    drillName: string;
+    drillGoal: 'grouping' | 'engagement';
+    accuracy: number | null; // null for grouping drills
+    dispersion: number | null; // for grouping drills
+    shots: number;
+    hits: number;
+    completed: boolean;
+  }>;
+}
+
 function FinishedSummary({
   training,
   drillCount,
   completedCount,
   colors,
+  teamSessions,
+  drills,
+  canManageTraining,
 }: {
   training: any;
   drillCount: number;
   completedCount: number;
   colors: ReturnType<typeof useColors>;
+  teamSessions: SessionWithDetails[];
+  drills: any[];
+  canManageTraining: boolean;
 }) {
+  const [expanded, setExpanded] = useState(false);
+
   const duration = useMemo(() => {
     if (!training.started_at || !training.ended_at) return null;
     const start = new Date(training.started_at);
@@ -489,6 +728,87 @@ function FinishedSummary({
     const remainingMins = mins % 60;
     return `${hours}h ${remainingMins}m`;
   }, [training.started_at, training.ended_at]);
+
+  // Calculate participant results
+  const participantResults = useMemo<ParticipantResult[]>(() => {
+    if (!teamSessions.length || !drills.length) return [];
+    
+    const userMap = new Map<string, ParticipantResult>();
+    
+    teamSessions.forEach((session) => {
+      const userId = session.user_id;
+      
+      if (!userMap.has(userId)) {
+        userMap.set(userId, {
+          userId,
+          userName: session.user_full_name || 'Unknown',
+          totalShots: 0,
+          totalHits: 0,
+          accuracy: null,
+          drillsCompleted: 0,
+          drillResults: [],
+        });
+      }
+      
+      const participant = userMap.get(userId)!;
+      
+      // Add session stats
+      const shots = session.stats?.shots_fired ?? 0;
+      const hits = session.stats?.hits_total ?? 0;
+      const dispersion = session.stats?.best_dispersion_cm ?? null;
+      
+      // Find matching drill to check drill type
+      const drill = drills.find(d => d.id === session.drill_id);
+      const drillName = drill?.name || session.drill_name || session.drill_config?.name || 'Unknown Drill';
+      const drillGoal = drill?.drill_goal || session.drill_config?.drill_goal || 'engagement';
+      const isGrouping = drillGoal === 'grouping';
+      
+      // For engagement drills, track hits
+      if (!isGrouping) {
+        participant.totalShots += shots;
+        participant.totalHits += hits;
+      }
+      
+      if (session.status === 'completed') {
+        participant.drillsCompleted++;
+      }
+      
+      // Calculate accuracy only for engagement drills
+      const drillAccuracy = !isGrouping && shots > 0 ? Math.round((hits / shots) * 100) : null;
+      
+      participant.drillResults.push({
+        drillId: session.drill_id || '',
+        drillName,
+        drillGoal: isGrouping ? 'grouping' : 'engagement',
+        accuracy: drillAccuracy,
+        dispersion: isGrouping ? dispersion : null,
+        shots,
+        hits,
+        completed: session.status === 'completed',
+      });
+    });
+    
+    // Calculate overall accuracy (only from engagement drills)
+    userMap.forEach((p) => {
+      if (p.totalShots > 0) {
+        p.accuracy = Math.round((p.totalHits / p.totalShots) * 100);
+      }
+      // Sort by drill order in training
+      p.drillResults.sort((a, b) => {
+        const aIndex = drills.findIndex(d => d.id === a.drillId);
+        const bIndex = drills.findIndex(d => d.id === b.drillId);
+        return aIndex - bIndex;
+      });
+    });
+    
+    // Sort by completed drills, then by accuracy
+    return Array.from(userMap.values()).sort((a, b) => {
+      if (b.drillsCompleted !== a.drillsCompleted) return b.drillsCompleted - a.drillsCompleted;
+      return (b.accuracy ?? 0) - (a.accuracy ?? 0);
+    });
+  }, [teamSessions, drills]);
+
+  const hasParticipants = participantResults.length > 0 && canManageTraining;
 
   return (
     <View style={[s.summaryCard, { backgroundColor: colors.card }]}>
@@ -518,6 +838,105 @@ function FinishedSummary({
           </View>
         )}
       </View>
+
+      {/* Participant Results (expandable) */}
+      {hasParticipants && (
+        <>
+          <TouchableOpacity
+            style={[s.participantsToggle, { borderTopColor: colors.border }]}
+            onPress={() => setExpanded(!expanded)}
+            activeOpacity={0.7}
+          >
+            <Users size={16} color={colors.textMuted} />
+            <Text style={[s.participantsToggleText, { color: colors.text }]}>
+              Participant Results ({participantResults.length})
+            </Text>
+            <ChevronRight
+              size={18}
+              color={colors.textMuted}
+              style={{ transform: [{ rotate: expanded ? '90deg' : '0deg' }] }}
+            />
+          </TouchableOpacity>
+
+          {expanded && (
+            <View style={s.participantsList}>
+              {participantResults.map((p) => (
+                <View key={p.userId} style={[s.participantCard, { backgroundColor: colors.secondary }]}>
+                  {/* Participant header */}
+                  <View style={s.participantHeader}>
+                    <View style={[s.participantAvatar, { backgroundColor: colors.card }]}>
+                      <Text style={[s.participantInitial, { color: colors.text }]}>
+                        {p.userName.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={s.participantInfo}>
+                      <Text style={[s.participantName, { color: colors.text }]} numberOfLines={1}>
+                        {p.userName}
+                      </Text>
+                      <Text style={[s.participantStats, { color: colors.textMuted }]}>
+                        {p.drillsCompleted}/{drillCount} drills
+                      </Text>
+                    </View>
+                    {p.accuracy !== null && (
+                      <View style={s.participantAccuracy}>
+                        <Text style={[s.participantAccuracyValue, { color: colors.text }]}>
+                          {p.accuracy}%
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  
+                  {/* Drill breakdown */}
+                  <View style={s.drillBreakdown}>
+                    {drills.map((drill, idx) => {
+                      const result = p.drillResults.find(r => r.drillId === drill.id);
+                      const isGrouping = drill.drill_goal === 'grouping';
+                      const goalColor = isGrouping ? colors.green : '#F59E0B';
+                      
+                      // Get result display
+                      let resultText = '—';
+                      if (result?.completed) {
+                        if (isGrouping && result.dispersion !== null) {
+                          resultText = `${result.dispersion.toFixed(1)}cm`;
+                        } else if (!isGrouping && result.accuracy !== null) {
+                          resultText = `${result.accuracy}%`;
+                        } else if (result.shots > 0) {
+                          resultText = `${result.shots} shots`;
+                        }
+                      }
+                      
+                      return (
+                        <View key={drill.id} style={s.drillBreakdownRow}>
+                          <View style={[s.drillBreakdownDot, { backgroundColor: goalColor }]} />
+                          {result ? (
+                            <>
+                              <View style={[s.drillBreakdownStatus, { backgroundColor: result.completed ? colors.green : colors.yellow }]} />
+                              <Text style={[s.drillBreakdownName, { color: colors.text }]} numberOfLines={1}>
+                                {drill.name}
+                              </Text>
+                              <Text style={[s.drillBreakdownAccuracy, { color: colors.textMuted }]}>
+                                {resultText}
+                              </Text>
+                            </>
+                          ) : (
+                            <>
+                              <View style={[s.drillBreakdownStatus, { backgroundColor: colors.border }]} />
+                              <Text style={[s.drillBreakdownName, { color: colors.textMuted }]} numberOfLines={1}>
+                                {drill.name}
+                              </Text>
+                              <Text style={[s.drillBreakdownAccuracy, { color: colors.textMuted }]}>—</Text>
+                            </>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </>
+      )}
     </View>
   );
 }
@@ -535,7 +954,7 @@ function NotFoundState({ colors }: { colors: ReturnType<typeof useColors> }) {
       </Text>
       <TouchableOpacity
         style={[s.notFoundBtn, { backgroundColor: colors.card }]}
-        onPress={() => router.replace('/(protected)/(tabs)/trainings' as any)}
+        onPress={() => router.replace('/(protected)/(tabs)' as any)}
       >
         <Text style={[s.notFoundBtnText, { color: colors.text }]}>Go to Trainings</Text>
       </TouchableOpacity>
@@ -562,6 +981,7 @@ export default function TrainingDetailScreen() {
   const handledAutoStartRef = useRef<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showCommanderActions, setShowCommanderActions] = useState(false);
 
   const isCreator = training?.creator?.id === session?.user?.id;
   const canManageTraining = canManageByRole || isCreator;
@@ -582,7 +1002,21 @@ export default function TrainingDetailScreen() {
   const [teamSessions, setTeamSessions] = useState<SessionWithDetails[]>([]);
   const [loadingTeamProgress, setLoadingTeamProgress] = useState(false);
 
-  const showTeamProgress = !!training?.id && canManageTraining && training?.status === 'ongoing';
+  // Add Drill state
+  const [showAddDrill, setShowAddDrill] = useState(false);
+  const [availableDrills, setAvailableDrills] = useState<Drill[]>([]);
+  const [loadingDrills, setLoadingDrills] = useState(false);
+  const [addingDrill, setAddingDrill] = useState(false);
+  const [drillSearch, setDrillSearch] = useState('');
+
+  // Weapon Assignment state
+  const [showWeaponAssignment, setShowWeaponAssignment] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<{ id: string; full_name: string; avatar_url?: string | null }[]>([]);
+
+  // Show team progress/activity for commanders during ongoing or finished trainings
+  const shouldLoadTeamData = !!training?.id && canManageTraining && 
+    (training?.status === 'ongoing' || training?.status === 'finished');
+  const showTeamProgress = shouldLoadTeamData && training?.status === 'ongoing';
 
   const loadTeamProgress = useCallback(async () => {
     if (!training?.id || !canManageTraining) return;
@@ -598,17 +1032,96 @@ export default function TrainingDetailScreen() {
   }, [training?.id, canManageTraining]);
 
   useEffect(() => {
-    if (showTeamProgress) loadTeamProgress();
-  }, [showTeamProgress, loadTeamProgress]);
+    if (shouldLoadTeamData) loadTeamProgress();
+  }, [shouldLoadTeamData, loadTeamProgress]);
 
   // Manual refresh
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     refetch();
-    if (showTeamProgress) await loadTeamProgress();
+    if (shouldLoadTeamData) await loadTeamProgress();
     setRefreshing(false);
-  }, [refetch, showTeamProgress, loadTeamProgress]);
+  }, [refetch, shouldLoadTeamData, loadTeamProgress]);
+
+  // Load available team drills for adding
+  const loadAvailableDrills = useCallback(async () => {
+    if (!training?.team_id) return;
+    setLoadingDrills(true);
+    try {
+      const drills = await getTeamDrills(training.team_id);
+      setAvailableDrills(drills);
+    } catch (error) {
+      console.error('[TrainingDetail] Failed to load drills:', error);
+    } finally {
+      setLoadingDrills(false);
+    }
+  }, [training?.team_id]);
+
+  // Open add drill modal
+  const handleOpenAddDrill = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowAddDrill(true);
+    loadAvailableDrills();
+  }, [loadAvailableDrills]);
+
+  // Add drill to training
+  const handleAddDrill = useCallback(async (drill: Drill) => {
+    if (!training?.id || addingDrill) return;
+    setAddingDrill(true);
+    try {
+      await addDrill(training.id, {
+        drill_id: drill.id,
+        name: drill.name,
+        description: drill.description ?? undefined,
+        drill_goal: drill.drill_goal,
+        target_type: drill.target_type,
+        distance_m: drill.distance_m,
+        rounds_per_shooter: drill.rounds_per_shooter,
+        time_limit_seconds: drill.time_limit_seconds ?? undefined,
+        strings_count: drill.strings_count ?? undefined,
+        position: drill.position ?? undefined,
+        weapon_category: drill.weapon_category ?? undefined,
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowAddDrill(false);
+      setDrillSearch('');
+      refetch(); // Refresh training to show new drill
+    } catch (error) {
+      console.error('[TrainingDetail] Failed to add drill:', error);
+      Alert.alert('Error', 'Failed to add drill. Please try again.');
+    } finally {
+      setAddingDrill(false);
+    }
+  }, [training?.id, addingDrill, refetch]);
+
+  // Filtered drills for search
+  const filteredDrills = useMemo(() => {
+    if (!drillSearch.trim()) return availableDrills;
+    const query = drillSearch.toLowerCase();
+    return availableDrills.filter(d => 
+      d.name.toLowerCase().includes(query) ||
+      (d.description?.toLowerCase().includes(query))
+    );
+  }, [availableDrills, drillSearch]);
+
+  // Open weapon assignment modal
+  const handleOpenWeaponAssignment = useCallback(async () => {
+    if (!training?.team_id) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      const members = await getTeamMembers(training.team_id);
+      setTeamMembers(members.map(m => ({
+        id: m.user_id,
+        full_name: m.profile?.full_name || 'Unknown',
+        avatar_url: m.profile?.avatar_url,
+      })));
+      setShowWeaponAssignment(true);
+    } catch (error) {
+      console.error('[TrainingDetail] Failed to load team members:', error);
+      Alert.alert('Error', 'Failed to load team members.');
+    }
+  }, [training?.team_id]);
 
   // Auto-close expired handler
   const handleAutoCloseExpired = useCallback(() => {
@@ -622,7 +1135,9 @@ export default function TrainingDetailScreen() {
 
   const groupedTeamProgress = useMemo(() => {
     if (!teamSessions.length) return [];
+    const trainingDrills = training?.drills || [];
     const userMap = new Map<string, any>();
+    
     teamSessions.forEach((s) => {
       const id = s.user_id;
       if (!userMap.has(id)) {
@@ -634,21 +1149,69 @@ export default function TrainingDetailScreen() {
           accuracy: 0,
           isActive: false,
           drillsCompleted: 0,
+          // Activity timeline data
+          currentDrill: null as { name: string; startedAt: string } | null,
+          lastCompleted: null as { name: string; completedAt: string } | null,
+          sessions: [] as Array<{
+            drillId: string | null;
+            drillName: string;
+            status: string;
+            startedAt: string;
+            endedAt: string | null;
+            accuracy: number;
+          }>,
         });
       }
       const e = userMap.get(id)!;
+      
+      // Aggregate stats
       if (s.stats) {
         e.totalShots += s.stats.shots_fired ?? 0;
         e.totalHits += s.stats.hits_total ?? 0;
       }
-      if (s.status === 'active') e.isActive = true;
-      if (s.status === 'completed') e.drillsCompleted++;
+      
+      // Track session status
+      if (s.status === 'active') {
+        e.isActive = true;
+        e.currentDrill = {
+          name: s.drill_name || s.drill_config?.name || 'Current Drill',
+          startedAt: s.started_at,
+        };
+      }
+      
+      if (s.status === 'completed') {
+        e.drillsCompleted++;
+        // Track last completed (most recent)
+        if (!e.lastCompleted || new Date(s.ended_at!) > new Date(e.lastCompleted.completedAt)) {
+          e.lastCompleted = {
+            name: s.drill_name || s.drill_config?.name || 'Drill',
+            completedAt: s.ended_at!,
+          };
+        }
+      }
+      
+      // Store session for detailed view
+      const sessionAccuracy = s.stats?.shots_fired 
+        ? Math.round((s.stats.hits_total / s.stats.shots_fired) * 100) 
+        : 0;
+      e.sessions.push({
+        drillId: s.drill_id,
+        drillName: s.drill_name || s.drill_config?.name || 'Unnamed',
+        status: s.status,
+        startedAt: s.started_at,
+        endedAt: s.ended_at,
+        accuracy: sessionAccuracy,
+      });
     });
+    
     userMap.forEach((e) => {
       if (e.totalShots > 0) e.accuracy = Math.round((e.totalHits / e.totalShots) * 100);
+      // Sort sessions by time
+      e.sessions.sort((a: any, b: any) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
     });
+    
     return Array.from(userMap.values()).sort((a, b) => a.userName.localeCompare(b.userName));
-  }, [teamSessions]);
+  }, [teamSessions, training?.drills]);
 
   useEffect(() => {
     const startDrillId = Array.isArray(params.startDrillId)
@@ -678,7 +1241,7 @@ export default function TrainingDetailScreen() {
         <View style={[s.header, { paddingTop: insets.top + 8 }]}>
           <TouchableOpacity
             style={[s.headerBtn, { backgroundColor: colors.card }]}
-            onPress={() => router.replace('/(protected)/(tabs)/trainings' as any)}
+            onPress={() => router.back()}
           >
             <ArrowLeft size={20} color={colors.text} />
           </TouchableOpacity>
@@ -697,7 +1260,7 @@ export default function TrainingDetailScreen() {
         <View style={[s.header, { paddingTop: insets.top + 8 }]}>
           <TouchableOpacity
             style={[s.headerBtn, { backgroundColor: colors.card }]}
-            onPress={() => router.replace('/(protected)/(tabs)/trainings' as any)}
+            onPress={() => router.back()}
           >
             <ArrowLeft size={20} color={colors.text} />
           </TouchableOpacity>
@@ -730,7 +1293,7 @@ export default function TrainingDetailScreen() {
           style={[s.headerBtn, { backgroundColor: colors.card }]}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.replace('/(protected)/(tabs)/trainings' as any);
+            router.back();
           }}
         >
           <ArrowLeft size={20} color={colors.text} />
@@ -763,7 +1326,21 @@ export default function TrainingDetailScreen() {
           </TouchableOpacity>
         )}
         
-        {canManageTraining && (isPlanned || isOngoing) && (
+        {/* Commander Actions (ongoing) */}
+        {canManageTraining && isOngoing && (
+          <TouchableOpacity
+            style={[s.headerBtn, { backgroundColor: colors.text }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setShowCommanderActions(true);
+            }}
+          >
+            <MoreHorizontal size={20} color={colors.background} />
+          </TouchableOpacity>
+        )}
+        
+        {/* Cancel (planned only) */}
+        {canManageTraining && isPlanned && (
           <TouchableOpacity
             style={[s.headerBtn, { backgroundColor: colors.card }]}
             onPress={() => {
@@ -771,7 +1348,7 @@ export default function TrainingDetailScreen() {
               handleCancelTraining();
             }}
           >
-            <MoreHorizontal size={20} color={colors.textMuted} />
+            <X size={20} color={colors.textMuted} />
           </TouchableOpacity>
         )}
       </View>
@@ -818,6 +1395,9 @@ export default function TrainingDetailScreen() {
               drillCount={drills.length}
               completedCount={completedCount}
               colors={colors}
+              teamSessions={teamSessions}
+              drills={drills}
+              canManageTraining={canManageTraining}
             />
           </Animated.View>
         )}
@@ -865,6 +1445,16 @@ export default function TrainingDetailScreen() {
             <View style={[s.badge, { backgroundColor: colors.secondary }]}>
               <Text style={[s.badgeText, { color: colors.textMuted }]}>{drills.length}</Text>
             </View>
+            {/* Add Drill button - only for commanders during ongoing training */}
+            {canManageTraining && isOngoing && (
+              <TouchableOpacity
+                style={[s.addDrillBtn, { backgroundColor: colors.text }]}
+                onPress={handleOpenAddDrill}
+                activeOpacity={0.7}
+              >
+                <Plus size={14} color={colors.background} strokeWidth={2.5} />
+              </TouchableOpacity>
+            )}
           </View>
 
           {drills.length > 0 ? (
@@ -893,13 +1483,13 @@ export default function TrainingDetailScreen() {
           )}
         </View>
 
-        {/* Team Progress */}
+        {/* Team Activity */}
         {showTeamProgress && (
           <Animated.View entering={FadeIn.delay(100).duration(300)}>
             <View style={s.section}>
               <View style={s.sectionHeader}>
                 <Users size={16} color={colors.textMuted} />
-                <Text style={[s.sectionTitle, { color: colors.text }]}>Team</Text>
+                <Text style={[s.sectionTitle, { color: colors.text }]}>Team Activity</Text>
                 <TouchableOpacity
                   style={[s.refreshBtn, { backgroundColor: colors.secondary }]}
                   onPress={() => {
@@ -923,20 +1513,65 @@ export default function TrainingDetailScreen() {
               ) : (
                 <View style={s.teamList}>
                   {groupedTeamProgress.map((m) => (
-                    <View key={m.userId} style={[s.memberRow, { backgroundColor: colors.card }]}>
-                      <View style={[s.memberAvatar, { backgroundColor: colors.secondary }]}>
-                        <Text style={[s.memberInitial, { color: colors.text }]}>
-                          {m.userName.charAt(0).toUpperCase()}
-                        </Text>
-                        {m.isActive && <View style={s.memberActive} />}
+                    <View key={m.userId} style={[s.memberCard, { backgroundColor: colors.card }]}>
+                      {/* Member header */}
+                      <View style={s.memberHeader}>
+                        <View style={[s.memberAvatar, { backgroundColor: colors.secondary }]}>
+                          <Text style={[s.memberInitial, { color: colors.text }]}>
+                            {m.userName.charAt(0).toUpperCase()}
+                          </Text>
+                          {m.isActive && <View style={s.memberActive} />}
+                        </View>
+                        <View style={s.memberInfo}>
+                          <Text style={[s.memberName, { color: colors.text }]} numberOfLines={1}>
+                            {m.userName}
+                          </Text>
+                          <Text style={[s.memberStats, { color: colors.textMuted }]}>
+                            {m.drillsCompleted}/{drills.length} drills • {m.accuracy}% • {m.totalShots} shots
+                          </Text>
+                        </View>
                       </View>
-                      <View style={s.memberInfo}>
-                        <Text style={[s.memberName, { color: colors.text }]} numberOfLines={1}>
-                          {m.userName}
-                        </Text>
-                        <Text style={[s.memberStats, { color: colors.textMuted }]}>
-                          {m.drillsCompleted}/{drills.length} • {m.accuracy}%
-                        </Text>
+                      
+                      {/* Activity timeline */}
+                      <View style={s.activityTimeline}>
+                        {/* Current drill (if active) */}
+                        {m.currentDrill && (
+                          <View style={s.activityRow}>
+                            <View style={[s.activityDot, { backgroundColor: colors.green }]} />
+                            <Play size={12} color={colors.green} fill={colors.green} />
+                            <Text style={[s.activityText, { color: colors.text }]} numberOfLines={1}>
+                              {m.currentDrill.name}
+                            </Text>
+                            <Text style={[s.activityTime, { color: colors.textMuted }]}>
+                              {formatDistanceToNow(new Date(m.currentDrill.startedAt), { addSuffix: false })}
+                            </Text>
+                          </View>
+                        )}
+                        
+                        {/* Last completed drill */}
+                        {m.lastCompleted && (
+                          <View style={s.activityRow}>
+                            <View style={[s.activityDot, { backgroundColor: colors.textMuted }]} />
+                            <Check size={12} color={colors.textMuted} />
+                            <Text style={[s.activityText, { color: colors.textMuted }]} numberOfLines={1}>
+                              {m.lastCompleted.name}
+                            </Text>
+                            <Text style={[s.activityTime, { color: colors.textMuted }]}>
+                              {formatDistanceToNow(new Date(m.lastCompleted.completedAt), { addSuffix: true })}
+                            </Text>
+                          </View>
+                        )}
+                        
+                        {/* Not started state */}
+                        {!m.currentDrill && !m.lastCompleted && (
+                          <View style={s.activityRow}>
+                            <View style={[s.activityDot, { backgroundColor: colors.border }]} />
+                            <Clock size={12} color={colors.textMuted} />
+                            <Text style={[s.activityText, { color: colors.textMuted }]}>
+                              No drills started yet
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     </View>
                   ))}
@@ -1006,6 +1641,116 @@ export default function TrainingDetailScreen() {
         onUpdate={setTraining}
         colors={colors}
       />
+
+      {/* Commander Actions Sheet */}
+      <CommanderActionsSheet
+        visible={showCommanderActions}
+        onClose={() => setShowCommanderActions(false)}
+        onAddDrill={handleOpenAddDrill}
+        onAssignWeapon={handleOpenWeaponAssignment}
+        onFinishTraining={handleFinishTraining}
+        colors={colors}
+      />
+
+      {/* Weapon Assignment Modal */}
+      <Modal
+        visible={showWeaponAssignment}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowWeaponAssignment(false)}
+      >
+        <View style={[s.modalContainer, { backgroundColor: colors.background }]}>
+          {training?.team_id && (
+            <WeaponAssignmentManager
+              teamId={training.team_id}
+              teamMembers={teamMembers}
+              onClose={() => setShowWeaponAssignment(false)}
+            />
+          )}
+        </View>
+      </Modal>
+
+      {/* Add Drill Modal */}
+      <Modal
+        visible={showAddDrill}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowAddDrill(false)}
+      >
+        <View style={[s.modalContainer, { backgroundColor: colors.background }]}>
+          {/* Modal Header */}
+          <View style={[s.modalHeader, { borderBottomColor: colors.border }]}>
+            <Text style={[s.modalTitle, { color: colors.text }]}>Add Drill</Text>
+            <TouchableOpacity onPress={() => { setShowAddDrill(false); setDrillSearch(''); }}>
+              <X size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Search */}
+          <View style={[s.searchContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Search size={18} color={colors.textMuted} />
+            <TextInput
+              style={[s.searchInput, { color: colors.text }]}
+              placeholder="Search drills..."
+              placeholderTextColor={colors.textMuted}
+              value={drillSearch}
+              onChangeText={setDrillSearch}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {drillSearch.length > 0 && (
+              <TouchableOpacity onPress={() => setDrillSearch('')}>
+                <X size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Drill List */}
+          {loadingDrills ? (
+            <View style={s.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.textMuted} />
+            </View>
+          ) : filteredDrills.length === 0 ? (
+            <View style={s.emptyDrillsContainer}>
+              <Target size={48} color={colors.textMuted} />
+              <Text style={[s.emptyDrillsText, { color: colors.textMuted }]}>
+                {drillSearch ? 'No drills match your search' : 'No team drills available'}
+              </Text>
+            </View>
+          ) : (
+            <ScrollView style={s.drillsListModal} contentContainerStyle={{ paddingBottom: 40 }}>
+              {filteredDrills.map((drill) => {
+                const goalColor = drill.drill_goal === 'grouping' ? colors.green : '#F59E0B';
+                return (
+                  <TouchableOpacity
+                    key={drill.id}
+                    style={[s.drillItemModal, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={() => handleAddDrill(drill)}
+                    disabled={addingDrill}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[s.drillGoalDot, { backgroundColor: goalColor }]} />
+                    <View style={s.drillItemInfo}>
+                      <Text style={[s.drillItemName, { color: colors.text }]} numberOfLines={1}>
+                        {drill.name}
+                      </Text>
+                      <Text style={[s.drillItemMeta, { color: colors.textMuted }]}>
+                        {drill.distance_m}m • {drill.rounds_per_shooter} shots
+                        {drill.time_limit_seconds ? ` • ${drill.time_limit_seconds}s` : ''}
+                      </Text>
+                    </View>
+                    {addingDrill ? (
+                      <ActivityIndicator size="small" color={colors.textMuted} />
+                    ) : (
+                      <Plus size={18} color={colors.textMuted} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1080,14 +1825,19 @@ const s = StyleSheet.create({
   refreshBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
 
   // Drills
-  drillsList: { gap: 6 },
-  drillRow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 10, gap: 12 },
-  drillIndex: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  drillsList: { gap: 8 },
+  drillRow: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 12, gap: 12 },
+  drillIndex: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   drillIndexText: { fontSize: 12, fontWeight: '700', color: '#fff' },
   drillInfo: { flex: 1 },
-  drillName: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
-  drillMeta: { fontSize: 13 },
-  drillPlayBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  drillNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  drillName: { fontSize: 15, fontWeight: '600', flex: 1 },
+  drillMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  drillGoalBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  drillGoalDotSmall: { width: 5, height: 5, borderRadius: 3 },
+  drillGoalText: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase' },
+  drillMeta: { fontSize: 12 },
+  drillPlayBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
 
   // Empty
   empty: { padding: 24, borderRadius: 12, alignItems: 'center' },
@@ -1102,14 +1852,22 @@ const s = StyleSheet.create({
 
   // Team
   teamLoading: { padding: 24, borderRadius: 12, alignItems: 'center' },
-  teamList: { gap: 6 },
+  teamList: { gap: 8 },
+  memberCard: { padding: 14, borderRadius: 12 },
+  memberHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   memberRow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 10, gap: 12 },
   memberAvatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   memberInitial: { fontSize: 14, fontWeight: '600' },
   memberActive: { position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: 5, backgroundColor: '#10B981', borderWidth: 2, borderColor: '#fff' },
   memberInfo: { flex: 1 },
   memberName: { fontSize: 14, fontWeight: '600', marginBottom: 2 },
-  memberStats: { fontSize: 13 },
+  memberStats: { fontSize: 12 },
+  // Activity timeline
+  activityTimeline: { marginTop: 10, marginLeft: 48, gap: 6 },
+  activityRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  activityDot: { width: 6, height: 6, borderRadius: 3 },
+  activityText: { flex: 1, fontSize: 13 },
+  activityTime: { fontSize: 11 },
 
   // Footer
   footer: { fontSize: 12, textAlign: 'center', paddingVertical: 20 },
@@ -1145,4 +1903,39 @@ const s = StyleSheet.create({
   removeBtnText: { fontSize: 14, fontWeight: '600' },
   saveBtn: { height: 50, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   saveBtnText: { fontSize: 16, fontWeight: '600' },
+
+  // Add Drill Button
+  addDrillBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginLeft: 'auto' },
+
+  // Participant Results
+  participantsToggle: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 14, marginTop: 14, borderTopWidth: StyleSheet.hairlineWidth },
+  participantsToggleText: { flex: 1, fontSize: 14, fontWeight: '600' },
+  participantsList: { marginTop: 12, gap: 10 },
+  participantCard: { borderRadius: 10, padding: 12 },
+  participantHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  participantAvatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  participantInitial: { fontSize: 13, fontWeight: '600' },
+  participantInfo: { flex: 1 },
+  participantName: { fontSize: 14, fontWeight: '600', marginBottom: 1 },
+  participantStats: { fontSize: 12 },
+  participantAccuracy: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  participantAccuracyValue: { fontSize: 14, fontWeight: '700' },
+  drillBreakdown: { marginTop: 10, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(128,128,128,0.2)', gap: 6 },
+  drillBreakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  drillBreakdownDot: { width: 4, height: 4, borderRadius: 2 },
+  drillBreakdownStatus: { width: 6, height: 6, borderRadius: 3 },
+  drillBreakdownName: { flex: 1, fontSize: 13 },
+  drillBreakdownAccuracy: { fontSize: 12, fontWeight: '600', minWidth: 48, textAlign: 'right' },
+
+  // Add Drill Modal
+  searchContainer: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginVertical: 12, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, borderWidth: 1, gap: 10 },
+  searchInput: { flex: 1, fontSize: 16, paddingVertical: 0 },
+  emptyDrillsContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  emptyDrillsText: { fontSize: 15 },
+  drillsListModal: { flex: 1, paddingHorizontal: 20 },
+  drillItemModal: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 12, borderWidth: 1, marginBottom: 8, gap: 12 },
+  drillGoalDot: { width: 8, height: 8, borderRadius: 4 },
+  drillItemInfo: { flex: 1 },
+  drillItemName: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
+  drillItemMeta: { fontSize: 13 },
 });

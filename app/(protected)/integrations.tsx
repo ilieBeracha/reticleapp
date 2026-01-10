@@ -2,7 +2,7 @@ import { useColors } from '@/hooks/ui/useColors';
 import { useGarminStore, useWatchEnabled } from '@/store/garminStore';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
-import { Alert, Button, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 
 export default function IntegrationsScreen() {
   const colors = useColors();
@@ -18,10 +18,7 @@ export default function IntegrationsScreen() {
     Alert.alert('Sent', 'PING sent to watch');
   };
 
-  const handleStartWorkout = () => {
-    send('COMMAND', { action: 'start_workout', type: 'shooting' });
-    Alert.alert('Sent', 'Start workout command sent');
-  };
+
 
   const handleToggleWatch = async (enabled: boolean) => {
     await setWatchEnabled(enabled);
@@ -117,9 +114,10 @@ export default function IntegrationsScreen() {
             
             <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.buttons}>
-                <Button title="📡 Ping" onPress={handlePing} color="#007CC3" />
-                <Button title="🏃 Start Workout" onPress={handleStartWorkout} color="#10B981" />
-              </View>
+                <TouchableOpacity onPress={handlePing} style={styles.button}>
+                  <Text style={styles.buttonText}>📡 Ping</Text>
+                </TouchableOpacity>
+              </View> 
             </View>
           </>
         )}
@@ -166,6 +164,8 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 13, marginTop: 2 },
   dot: { width: 10, height: 10, borderRadius: 5 },
   buttons: { flexDirection: 'row', gap: 10, flex: 1, justifyContent: 'center' },
+  button: { padding: 10, borderRadius: 8, backgroundColor: '#007CC3' },
+  buttonText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   message: { fontSize: 12, fontFamily: 'monospace', marginBottom: 4 },
   // Toggle card styles
   toggleCard: {
