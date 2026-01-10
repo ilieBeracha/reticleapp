@@ -6,51 +6,43 @@
  *
  * Weapon selection is a sheet within the Details step, not a separate step.
  * If user has no weapons, they can create one from the weapon picker.
- * 
- * Supports training context - when coming from trainingDetail with drillId,
- * the flow is simplified and prefilled with drill parameters.
  */
 
-import { DrillPresetPicker, PresetForm } from '@/components/shared/drills';
 import {
-    SessionContextStep,
-    SessionIntentStep,
-    useSessionCreation,
+  SessionContextStep,
+  SessionIntentStep,
+  useSessionCreation,
 } from '@/components/session/creation';
 import type { Position, SessionPurpose, TargetType } from '@/components/session/creation/sessionCreation.types';
+import { DrillPresetPicker, PresetForm } from '@/components/shared/drills';
 import { CreateWeaponFlow, WeaponPicker } from '@/components/weapons';
 import { getCategoryConfig } from '@/constants/weaponCategories';
 import { useColors } from '@/hooks/ui/useColors';
 import { useOpenWeather } from '@/hooks/useOpenWeather';
-import { supabase } from '@/lib/supabase';
 import type { DrillPreset } from '@/services/presetService';
 import type { BaseSessionConfig } from '@/services/session/types';
 import { createSession, deleteSession, getMyActiveSession } from '@/services/sessionService';
-import { getAssignedWeapons, getOrCreatePersonalProfile, type UserWeapon } from '@/services/weaponService';
+import { type UserWeapon } from '@/services/weaponService';
 import { toSessionWeatherData } from '@/services/weather';
 import { useSessionStore } from '@/store/sessionStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, ChevronRight, CornerDownRight, Crosshair, Plus, Target, Users } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, CornerDownRight, Crosshair, Plus, Target } from 'lucide-react-native';
+import { useCallback, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
 
 export default function CreateSessionScreen() {
   const colors = useColors();
@@ -60,31 +52,21 @@ export default function CreateSessionScreen() {
   // Fetch weather in background (non-blocking)
   const { weather: openWeather } = useOpenWeather({ autoFetch: true });
   
-  // Parse all params - supports edit mode AND training context
   const params = useLocalSearchParams<{
-    // Edit mode params
     editSessionId?: string;
     weaponId?: string;
     weaponName?: string;
-    // Training context params (from trainingDetail)
-    trainingId?: string;
-    drillId?: string;
-    teamId?: string;
-    drillName?: string;
-    // Shared params
     purpose?: string;
     distance?: string;
     shots?: string;
     timeLimit?: string;
     position?: string;
     targetType?: string;
-    // Return navigation
     returnTo?: string;
     returnId?: string;
   }>();
   
   const isEditMode = !!params.editSessionId;
-  const isTrainingContext = !!params.trainingId && !!params.drillId;
   const hasReturnDestination = !!params.returnTo;
   
   const [checkingSession, setCheckingSession] = useState(true);
@@ -93,7 +75,6 @@ export default function CreateSessionScreen() {
   const [showWeaponPicker, setShowWeaponPicker] = useState(false);
   const [showCreateWeapon, setShowCreateWeapon] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<DrillPreset | null>(null);
-  const [loadingTeamWeapon, setLoadingTeamWeapon] = useState(isTrainingContext);
 
   // Build initial state from params
   const initialState = useMemo(() => {
@@ -109,117 +90,15 @@ export default function CreateSessionScreen() {
         },
       };
     }
-    
-    if (isTrainingContext) {
-      // Coming from training - skip intent, go straight to context with prefilled values
-      return {
-        step: 'context' as const,
-        purpose: (params.purpose as SessionPurpose) || 'grouping',
-        context: {
-          weaponId: null, // Will be loaded from team assignment
-          weaponName: null,
-          distance: params.distance ? parseInt(params.distance, 10) : 25,
-          shotsPlanned: params.shots ? parseInt(params.shots, 10) : 5,
-          timeLimit: params.timeLimit ? parseInt(params.timeLimit, 10) : null,
-          position: (params.position as Position) || 'any',
-          targetType: (params.targetType as TargetType) || 'paper',
-        },
-      };
-    }
-    
     return undefined;
-  }, [isEditMode, isTrainingContext, params]);
+  }, [isEditMode, params]);
 
   const creation = useSessionCreation({
     onSubmit: handleSubmit,
     initialState,
-    // Pass training context for session creation
-    trainingContext: isTrainingContext ? {
-      trainingId: params.trainingId!,
-      drillId: params.drillId!,
-      teamId: params.teamId || null,
-      drillName: params.drillName || 'Training Drill',
-    } : undefined,
   });
 
-  // Auto-load assigned weapon for team training
-  useEffect(() => {
-    if (!isTrainingContext || !params.teamId) {
-      setLoadingTeamWeapon(false);
-      return;
-    }
-
-    let cancelled = false;
-
-    async function loadTeamWeapon() {
-      try {
-        // Get current user
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user || cancelled) {
-          setLoadingTeamWeapon(false);
-          return;
-        }
-
-        const assignedWeapons = await getAssignedWeapons(params.teamId!, user.id);
-        if (cancelled) return;
-
-        if (assignedWeapons.length > 0) {
-          const personalProfile = await getOrCreatePersonalProfile(assignedWeapons[0].id);
-          if (cancelled) return;
-
-          creation.updateContext({
-            weaponId: personalProfile.id,
-            weaponName: personalProfile.name,
-          });
-          console.log('[CreateSession] Auto-selected team weapon:', personalProfile.name);
-        }
-      } catch (error) {
-        console.error('[CreateSession] Failed to load team weapon:', error);
-      } finally {
-        if (!cancelled) setLoadingTeamWeapon(false);
-      }
-    }
-
-    loadTeamWeapon();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isTrainingContext, params.teamId]);
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // AUTO-START FOR TEAM TRAINING
-  // When coming from a team training and weapon is loaded, auto-submit
-  // ─────────────────────────────────────────────────────────────────────────
-  
-  const [autoStartTriggered, setAutoStartTriggered] = useState(false);
-  
-  useEffect(() => {
-    // Only auto-start for team training context
-    if (!isTrainingContext) return;
-    // Don't auto-start twice
-    if (autoStartTriggered) return;
-    // Wait for weapon to load
-    if (loadingTeamWeapon) return;
-    // Wait for active session check to complete
-    if (checkingSession) return;
-    // Must have a weapon
-    const hasWeapon = creation.state.context.weaponId !== null;
-    if (!hasWeapon) return;
-    // Don't auto-start if already submitting
-    if (creation.state.isSubmitting) return;
-    
-    console.log('[CreateSession] Auto-starting team training drill...');
-    setAutoStartTriggered(true);
-    
-    // Submit immediately - no delay needed since we show loading state
-    creation.submit();
-  }, [isTrainingContext, loadingTeamWeapon, checkingSession, creation.state.context.weaponId, creation.state.isSubmitting, autoStartTriggered, creation]);
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // CHECK FOR ACTIVE SESSION
-  // ─────────────────────────────────────────────────────────────────────────
-
+  // Check for active session
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
@@ -270,54 +149,17 @@ export default function CreateSessionScreen() {
     }, [])
   );
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // HANDLERS
-  // ─────────────────────────────────────────────────────────────────────────
-
   async function handleSubmit(config: BaseSessionConfig) {
     try {
-      console.log('[CreateSession] Submitting with weapon_id:', config.weapon_id);
-      
-      // Attach weather data if available (non-blocking - session creates even without weather)
+      // Attach weather data if available
       const sessionWeather = toSessionWeatherData(openWeather, 'openweathermap');
       
-      // Build final config with training context if applicable
       const finalConfig: BaseSessionConfig = {
         ...config,
         weather: sessionWeather,
-        // Add training context if coming from training
-        ...(isTrainingContext && {
-          team_id: params.teamId || null,
-          training_id: params.trainingId,
-          drill_id: params.drillId,
-        }),
       };
-
-      // Update drill_config name if we have a drill name from training
-      if (isTrainingContext && params.drillName && finalConfig.drill_config) {
-        finalConfig.drill_config = {
-          ...finalConfig.drill_config,
-          name: params.drillName,
-        };
-      }
-      
-      if (sessionWeather) {
-        console.log('[CreateSession] Weather attached:', {
-          temp: sessionWeather.temperature_c,
-          condition: sessionWeather.condition,
-          wind: sessionWeather.wind_speed_mps,
-        });
-      }
       
       const session = await createSession(finalConfig);
-      console.log('[CreateSession] Created session:', {
-        id: session.id,
-        weapon_id: session.weapon_id,
-        weapon_name: session.weapon_name,
-        has_weather: !!session.weather,
-        training_id: session.training_id,
-        drill_id: session.drill_id,
-      });
       await loadSessions();
       
       // Navigate to activeSession with return info
@@ -325,7 +167,6 @@ export default function CreateSessionScreen() {
         pathname: '/(protected)/activeSession',
         params: {
           sessionId: session.id,
-          // Pass return destination so session end can navigate back
           ...(hasReturnDestination && {
             returnTo: params.returnTo,
             returnId: params.returnId,
@@ -342,10 +183,8 @@ export default function CreateSessionScreen() {
     setShowPresetPicker(true);
   }, []);
 
-  // Auto-advance to step 2 when purpose is selected
   const handlePurposeSelect = useCallback((purpose: SessionPurpose) => {
     creation.setPurpose(purpose);
-    // Small delay for visual feedback before advancing
     setTimeout(() => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       creation.goForward();
@@ -356,14 +195,12 @@ export default function CreateSessionScreen() {
     setSelectedPreset(preset);
     setShowPresetPicker(false);
     
-    // Map drill_goal to SessionPurpose
     const purposeMap: Record<string, 'grouping' | 'engagement'> = {
       grouping: 'grouping',
       engagement: 'engagement',
     };
     const purpose = purposeMap[preset.drill_goal] || 'engagement';
     
-    // Set purpose and prefill context
     creation.setPurpose(purpose);
     creation.updateContext({
       distance: preset.distance_m,
@@ -371,10 +208,7 @@ export default function CreateSessionScreen() {
       timeLimit: preset.time_limit_seconds || null,
     });
     
-    // Store preset id for reference
     creation.selectPreset(preset.id);
-    
-    // Go to context step
     creation.goForward();
   }, [creation]);
 
@@ -385,11 +219,9 @@ export default function CreateSessionScreen() {
 
   const handlePresetCreated = useCallback((newPreset: DrillPreset) => {
     setShowPresetForm(false);
-    // Optionally auto-select the new preset
     handlePresetSelect(newPreset);
   }, [handlePresetSelect]);
 
-  // Weapon selection handlers
   const handleOpenWeaponPicker = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setShowWeaponPicker(true);
@@ -413,13 +245,11 @@ export default function CreateSessionScreen() {
 
   const handleAddNewWeapon = useCallback(() => {
     setShowWeaponPicker(false);
-    // Open weapon creation modal
     setShowCreateWeapon(true);
   }, []);
 
   const handleWeaponCreatedById = useCallback(async (weaponId: string) => {
     setShowCreateWeapon(false);
-    // Fetch the created weapon and select it
     try {
       const { getUserWeapon } = await import('@/services/weaponService');
       const weapon = await getUserWeapon(weaponId);
@@ -429,41 +259,16 @@ export default function CreateSessionScreen() {
       }
     } catch (error) {
       console.error('[CreateSession] Failed to fetch created weapon:', error);
-      // Still close the modal even if fetch fails
     }
   }, [handleWeaponSelect]);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // LOADING STATE
-  // ─────────────────────────────────────────────────────────────────────────
-
-  // For team training: stay in loading until we're done auto-starting
-  // The key insight is: once loadingTeamWeapon is false AND we have a weapon,
-  // we WILL auto-start, so we should stay in loading state
-  const hasWeaponForAutoStart = creation.state.context.weaponId !== null;
-  const willAutoStart = isTrainingContext && !loadingTeamWeapon && !checkingSession && hasWeaponForAutoStart;
-  const isAutoStarting = isTrainingContext && (
-    loadingTeamWeapon ||  // Still loading weapon
-    autoStartTriggered || // Already triggered auto-start
-    willAutoStart         // About to trigger auto-start (covers the gap!)
-  );
-  
-  if (checkingSession || isAutoStarting) {
+  if (checkingSession) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background, paddingTop: insets.top }]}>
         <ActivityIndicator color={colors.textMuted} size="large" />
-        {isAutoStarting && (
-          <Text style={[styles.loadingText, { color: colors.textMuted, marginTop: 16 }]}>
-            Starting drill...
-          </Text>
-        )}
       </View>
     );
   }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // BUTTON CONFIG
-  // ─────────────────────────────────────────────────────────────────────────
 
   // 2 steps: intent → context → submit
   const isLastStep = creation.state.step === 'context';
@@ -483,14 +288,8 @@ export default function CreateSessionScreen() {
     }
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // RENDER
-  // ─────────────────────────────────────────────────────────────────────────
-
-  // For training context, we skip the intent step
-  const effectiveStep = isTrainingContext ? 2 : (creation.state.step === 'intent' ? 1 : 2);
-  const stepLabels = isTrainingContext ? ['Training', 'Configure'] : ['Goal', 'Details'];
-  const headerTitle = isTrainingContext ? 'Start Drill' : 'New Session';
+  const effectiveStep = creation.state.step === 'intent' ? 1 : 2;
+  const stepLabels = ['Goal', 'Details'];
 
   return (
     <ScrollView
@@ -499,75 +298,55 @@ export default function CreateSessionScreen() {
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
-      {/* Header with back/close + title */}
       <View style={styles.header}>
         <TouchableOpacity
           style={[styles.headerButton, { backgroundColor: colors.card }]}
-          onPress={effectiveStep > 1 && !isTrainingContext ? creation.goBack : () => router.back()}
+          onPress={effectiveStep > 1 ? creation.goBack : () => router.back()}
           activeOpacity={0.7}
         >
-          {effectiveStep > 1 && !isTrainingContext ? (
+          {effectiveStep > 1 ? (
             <ChevronLeft size={20} color={colors.text} />
           ) : (
             <Ionicons name="close" size={20} color={colors.text} />
           )}
         </TouchableOpacity>
 
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{headerTitle}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>New Session</Text>
 
         <View style={styles.headerButtonPlaceholder} />
       </View>
 
-      {/* Training Context Banner */}
-      {isTrainingContext && params.drillName && (
-        <Animated.View entering={FadeInDown.duration(200)} style={[styles.trainingBanner, { backgroundColor: colors.card }]}>
-          <View style={[styles.trainingIconWrap, { backgroundColor: colors.primary + '15' }]}>
-            <Users size={18} color={colors.primary} />
-          </View>
-          <View style={styles.trainingInfo}>
-            <Text style={[styles.trainingLabel, { color: colors.textMuted }]}>Training Drill</Text>
-            <Text style={[styles.trainingName, { color: colors.text }]} numberOfLines={1}>
-              {params.drillName}
-            </Text>
-          </View>
-        </Animated.View>
-      )}
-
-      {/* Step Progress Bar - only show for non-training context */}
-      {!isTrainingContext && (
-        <View style={styles.progressBar}>
-          <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
-            <View 
-              style={[
-                styles.progressFill, 
-                { 
-                  backgroundColor: colors.primary,
-                  width: `${(effectiveStep / 2) * 100}%`,
-                }
-              ]} 
-            />
-          </View>
-          <View style={styles.progressLabels}>
-            {stepLabels.map((label, idx) => (
-              <Text
-                key={label}
-                style={[
-                  styles.progressLabel,
-                  { 
-                    color: effectiveStep > idx ? colors.text : colors.textMuted,
-                    fontWeight: effectiveStep === idx + 1 ? '600' : '400',
-                  },
-                ]}
-              >
-                {label}
-              </Text>
-            ))}
-          </View>
+      <View style={styles.progressBar}>
+        <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
+          <View 
+            style={[
+              styles.progressFill, 
+              { 
+                backgroundColor: colors.primary,
+                width: `${(effectiveStep / 2) * 100}%`,
+              }
+            ]} 
+          />
         </View>
-      )}
+        <View style={styles.progressLabels}>
+          {stepLabels.map((label, idx) => (
+            <Text
+              key={label}
+              style={[
+                styles.progressLabel,
+                { 
+                  color: effectiveStep > idx ? colors.text : colors.textMuted,
+                  fontWeight: effectiveStep === idx + 1 ? '600' : '400',
+                },
+              ]}
+            >
+              {label}
+            </Text>
+          ))}
+        </View>
+      </View>
 
-      {/* Step Content */}
-      {creation.state.step === 'intent' && !isTrainingContext && (
+      {creation.state.step === 'intent' && (
         <SessionIntentStep
           selectedPurpose={creation.state.purpose}
           onSelectPurpose={handlePurposeSelect}
@@ -575,16 +354,14 @@ export default function CreateSessionScreen() {
         />
       )}
 
-      {(creation.state.step === 'context' || isTrainingContext) && (
+      {creation.state.step === 'context' && (
         <>
-          {/* Step 2 header */}
           <View style={styles.step2Header}>
             <Text style={[styles.step2Title, { color: colors.text }]}>
               Session details
             </Text>
           </View>
 
-          {/* Weapon Selector Card */}
           <View style={styles.weaponSection}>
             <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Weapon</Text>
             {creation.isLoadingWeapon ? (
@@ -639,7 +416,6 @@ export default function CreateSessionScreen() {
             )}
           </View>
 
-          {/* Rest of the context form */}
           <SessionContextStep
             purpose={creation.state.purpose!}
             context={creation.state.context}
@@ -648,16 +424,14 @@ export default function CreateSessionScreen() {
             weaponCategory={selectedPreset?.weapon_category as any}
             selectedDrillId={creation.state.selectedDrillId}
             onDrillChange={creation.setDrill}
-            hideWeaponSection // Hide weapon section since we show it above
+            hideWeaponSection
           />
         </>
       )}
 
-      {/* Spacer - pushes button to bottom when content is short */}
       <View style={styles.spacer} />
 
-      {/* Start Button - show on step 2 or training context */}
-      {(isLastStep || isTrainingContext) && (
+      {(isLastStep) && (
         <View style={styles.buttonContainer}>
           <TouchableOpacity
             style={[
@@ -668,22 +442,22 @@ export default function CreateSessionScreen() {
               },
             ]}
             onPress={handleButtonPress}
-            disabled={!canContinue || creation.state.isSubmitting || loadingTeamWeapon}
+            disabled={!canContinue || creation.state.isSubmitting}
             activeOpacity={0.85}
           >
-            {creation.state.isSubmitting || loadingTeamWeapon ? (
+            {creation.state.isSubmitting ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <>
                 <CornerDownRight size={18} color="#fff" fill="#fff" />
                 <Text style={styles.buttonText}>
-                  {isTrainingContext ? 'Start Drill' : 'Preview Session'}
+                  Preview Session
                 </Text>
               </>
             )}
           </TouchableOpacity>
           
-          {!hasWeapon && !loadingTeamWeapon && (
+          {!hasWeapon && (
             <Text style={[styles.weaponRequiredHint, { color: colors.orange }]}>
               Select a weapon to continue
             </Text>
@@ -691,7 +465,6 @@ export default function CreateSessionScreen() {
         </View>
       )}
 
-      {/* Preset Picker Modal */}
       <Modal
         visible={showPresetPicker}
         animationType="slide"
@@ -706,7 +479,6 @@ export default function CreateSessionScreen() {
         />
       </Modal>
 
-      {/* Preset Form Modal */}
       <Modal
         visible={showPresetForm}
         animationType="slide"
@@ -722,7 +494,6 @@ export default function CreateSessionScreen() {
         />
       </Modal>
 
-      {/* Weapon Picker Modal */}
       <Modal
         visible={showWeaponPicker}
         animationType="slide"
@@ -737,7 +508,6 @@ export default function CreateSessionScreen() {
         />
       </Modal>
 
-      {/* Create Weapon Modal */}
       <Modal
         visible={showCreateWeapon}
         animationType="slide"
@@ -748,17 +518,13 @@ export default function CreateSessionScreen() {
           onComplete={handleWeaponCreatedById}
           onCancel={() => {
             setShowCreateWeapon(false);
-            setShowWeaponPicker(true); // Go back to weapon picker
+            setShowWeaponPicker(true);
           }}
         />
       </Modal>
     </ScrollView>
   );
 }
-
-// ============================================================================
-// STYLES
-// ============================================================================
 
 const styles = StyleSheet.create({
   container: {
@@ -947,37 +713,5 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
     marginTop: 12,
-  },
-  
-  // Training context banner
-  trainingBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 14,
-    marginBottom: 20,
-    gap: 12,
-  },
-  trainingIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  trainingInfo: {
-    flex: 1,
-  },
-  trainingLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  trainingName: {
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: -0.3,
   },
 });

@@ -112,25 +112,8 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
         calculateSessionStats(sessionId),
       ]);
 
-      // Auto-activate team training sessions that are pending
-      // Team sessions skip the prep view and go directly to active
-      // We do this BEFORE setting the session to avoid UI flash
-      const isTeamSession = !!sessionData?.training_id && !!sessionData?.team_id;
-      if (isTeamSession && sessionData?.status === 'pending') {
-        console.log('[Session] Auto-activating team training session...');
-        try {
-          const { activateSession } = await import('@/services/sessionService');
-          const activated = await activateSession(sessionId, false); // false = phone mode
-          // Set the activated session instead of the pending one
-          setSession(activated);
-          setTargets(targetsData);
-          setStats(statsData);
-          return; // Exit early - don't set the pending session
-        } catch (activateError) {
-          console.error('[Session] Failed to auto-activate team session:', activateError);
-          // Fall through to set the original session data
-        }
-      }
+      // NOTE: Team sessions now also go through SessionPrepView for watch/caliber configuration
+      // The prep view will handle activation when user is ready to start
       
       setSession(sessionData);
       setTargets(targetsData);

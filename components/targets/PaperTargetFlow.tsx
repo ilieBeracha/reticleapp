@@ -4,9 +4,11 @@ import {
   TrainingDataPayload,
   uploadScannedTargetImage,
 } from "@/services/detectionService";
-import { addTargetWithPaperResult, PaperType } from "@/services/sessionService";
+import { addTargetWithPaperResult, PaperType, endSession } from "@/services/sessionService";
 import { useDetectionStore } from "@/store/detectionStore";
 import { finiteShotsOrNull, INFINITE_SHOTS_SENTINEL } from "@/utils/drillShots";
+import { useOpenWeather } from "@/hooks/useOpenWeather";
+import type { DecodedWeather } from "@/services/session/watchTypes";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
@@ -34,6 +36,7 @@ interface PaperTargetFlowProps {
   defaultMaxShots?: number;
   lockDistance?: boolean;
   paperType?: PaperType;  // grouping (dispersion) or achievement (hit %)
+  autoFinishSession?: boolean;
   onComplete?: () => void;
   onCancel?: () => void;
 }
@@ -44,6 +47,7 @@ export function PaperTargetFlow({
   defaultMaxShots,
   lockDistance = false,
   paperType: propPaperType = 'grouping',
+  autoFinishSession = false,
   onComplete,
   onCancel,
 }: PaperTargetFlowProps) {
@@ -60,6 +64,9 @@ export function PaperTargetFlow({
     reset: resetDetection,
     setError,
   } = useDetectionStore();
+
+  // Weather
+  const { weather: openWeather } = useOpenWeather({ autoFetch: true });
 
   // State
   const [step, setStep] = useState<Step>("camera");
@@ -258,6 +265,15 @@ export function PaperTargetFlow({
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         resetDetection();
         
+        if (autoFinishSession) {
+          try {
+            await endSession(sessionId);
+            console.log("[PaperTargetFlow] Session auto-finished");
+          } catch (e) {
+            console.error("[PaperTargetFlow] Failed to auto-finish session:", e);
+          }
+        }
+
         if (onComplete) {
           onComplete();
         } else {
@@ -284,6 +300,7 @@ export function PaperTargetFlow({
         editedDetections={editedDetections}
         onDetectionsChange={setEditedDetections}
         targetType={paperType as TargetType} // Pass paper_type to show appropriate metrics
+        weather={openWeather}
       />
     );
   }

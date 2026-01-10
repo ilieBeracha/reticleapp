@@ -175,7 +175,7 @@ function LeaderboardItem({
   const rankColor = rankConfig[rank as keyof typeof rankConfig]?.color || colors.textMuted;
   const rankBg = rankConfig[rank as keyof typeof rankConfig]?.bg || colors.secondary;
   
-  const completionRate = Math.round((participant.drillsCompleted / totalDrills) * 100);
+  const completionRate = Math.min(100, Math.round((participant.drillsCompleted / totalDrills) * 100));
   const hasGrouping = participant.drillResults.some(r => r.drillGoal === 'grouping');
   const hasEngagement = participant.drillResults.some(r => r.drillGoal === 'engagement');
   
@@ -416,19 +416,46 @@ export function ParticipantInsights({
   const colors = useColors();
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   
-  // Process participant data
+  // Process participant data - GROUP BY TRAINING DRILL (only drills in this training)
   const participants = useMemo<ParticipantData[]>(() => {
     if (!teamSessions.length || !drills.length) return [];
     
+    // Create a set of valid drill IDs from the training
+    const trainingDrillIds = new Set(drills.map(d => d.id));
+    
     const userMap = new Map<string, ParticipantData>();
+    
+    // First pass: group sessions by user and drill (only for training drills)
+    const userDrillMap = new Map<string, Map<string, SessionWithDetails[]>>();
     
     teamSessions.forEach((session) => {
       const userId = session.user_id;
+      const drillId = session.drill_id;
+      
+      // Only include sessions for drills that are part of this training
+      if (!drillId || !trainingDrillIds.has(drillId)) return;
+      
+      if (!userDrillMap.has(userId)) {
+        userDrillMap.set(userId, new Map());
+      }
+      
+      const userDrills = userDrillMap.get(userId)!;
+      if (!userDrills.has(drillId)) {
+        userDrills.set(drillId, []);
+      }
+      userDrills.get(drillId)!.push(session);
+    });
+    
+    // Second pass: aggregate per user-drill combination
+    userDrillMap.forEach((drillSessions, userId) => {
+      // Get user name from first session
+      const firstSession = Array.from(drillSessions.values())[0]?.[0];
+      const userName = firstSession?.user_full_name || 'Unknown';
       
       if (!userMap.has(userId)) {
         userMap.set(userId, {
           userId,
-          userName: session.user_full_name || 'Unknown',
+          userName,
           totalShots: 0,
           totalHits: 0,
           accuracy: null,
@@ -441,49 +468,79 @@ export function ParticipantInsights({
       }
       
       const participant = userMap.get(userId)!;
+      const completedDrillIds = new Set<string>();
       
-      // Get drill info
-      const drill = drills.find(d => d.id === session.drill_id);
-      const drillName = drill?.name || session.drill_name || session.drill_config?.name || 'Unknown';
-      const drillGoal = (drill?.drill_goal || session.drill_config?.drill_goal || 'engagement') as 'grouping' | 'engagement';
-      const isGrouping = drillGoal === 'grouping';
-      
-      // Calculate stats
-      const shots = session.stats?.shots_fired ?? 0;
-      const hits = session.stats?.hits_total ?? 0;
-      const dispersion = session.stats?.best_dispersion_cm ?? null;
-      const duration = session.started_at && session.ended_at
-        ? Math.round((new Date(session.ended_at).getTime() - new Date(session.started_at).getTime()) / 1000)
-        : null;
-      
-      // For engagement drills, track hits
-      if (!isGrouping) {
-        participant.totalShots += shots;
-        participant.totalHits += hits;
-      }
-      
-      // Track best dispersion for grouping
-      if (isGrouping && dispersion !== null) {
-        if (participant.bestDispersion === null || dispersion < participant.bestDispersion) {
-          participant.bestDispersion = dispersion;
+      // Process each drill (aggregating all sessions for that drill)
+      drillSessions.forEach((sessions, drillId) => {
+        // Get drill info from training drills
+        const drill = drills.find(d => d.id === drillId);
+        if (!drill) return; // Skip if drill not in training
+        
+        const drillName = drill.name;
+        const drillGoal = (drill.drill_goal || 'engagement') as 'grouping' | 'engagement';
+        const isGrouping = drillGoal === 'grouping';
+        
+        // Aggregate stats from all sessions for this drill
+        let totalDrillShots = 0;
+        let totalDrillHits = 0;
+        let bestDrillDispersion: number | null = null;
+        let totalDuration = 0;
+        let hasCompleted = false;
+        
+        sessions.forEach((session) => {
+          const shots = session.stats?.shots_fired ?? 0;
+          const hits = session.stats?.hits_total ?? 0;
+          const dispersion = session.stats?.best_dispersion_cm ?? null;
+          const duration = session.started_at && session.ended_at
+            ? Math.round((new Date(session.ended_at).getTime() - new Date(session.started_at).getTime()) / 1000)
+            : 0;
+          
+          totalDrillShots += shots;
+          totalDrillHits += hits;
+          totalDuration += duration;
+          
+          if (session.status === 'completed') {
+            hasCompleted = true;
+          }
+          
+          if (dispersion !== null) {
+            if (bestDrillDispersion === null || dispersion < bestDrillDispersion) {
+              bestDrillDispersion = dispersion;
+            }
+          }
+        });
+        
+        // Add to participant totals (engagement only for accuracy)
+        if (!isGrouping) {
+          participant.totalShots += totalDrillShots;
+          participant.totalHits += totalDrillHits;
         }
-      }
-      
-      if (session.status === 'completed') {
-        participant.drillsCompleted++;
-      }
-      
-      // Add drill result
-      participant.drillResults.push({
-        drillId: session.drill_id || '',
-        drillName,
-        drillGoal,
-        accuracy: !isGrouping && shots > 0 ? Math.round((hits / shots) * 100) : null,
-        dispersion: isGrouping ? dispersion : null,
-        shots,
-        hits,
-        completed: session.status === 'completed',
-        duration,
+        
+        // Track best dispersion for grouping
+        if (isGrouping && bestDrillDispersion !== null) {
+          if (participant.bestDispersion === null || bestDrillDispersion < participant.bestDispersion) {
+            participant.bestDispersion = bestDrillDispersion;
+          }
+        }
+        
+        // Count completed drills (only once per drill, only training drills)
+        if (hasCompleted && !completedDrillIds.has(drillId)) {
+          completedDrillIds.add(drillId);
+          participant.drillsCompleted++;
+        }
+        
+        // Add ONE drill result (aggregated)
+        participant.drillResults.push({
+          drillId,
+          drillName,
+          drillGoal,
+          accuracy: !isGrouping && totalDrillShots > 0 ? Math.round((totalDrillHits / totalDrillShots) * 100) : null,
+          dispersion: isGrouping ? bestDrillDispersion : null,
+          shots: totalDrillShots,
+          hits: totalDrillHits,
+          completed: hasCompleted,
+          duration: totalDuration > 0 ? totalDuration : null,
+        });
       });
     });
     

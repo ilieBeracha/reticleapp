@@ -657,7 +657,7 @@ export default function WatchSessionResultPage() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Animated.ScrollView
-        entering={SlideInRight.duration(300)}
+        entering={SlideInRight.duration(150)}
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { 
           paddingTop: insets.top + 16,

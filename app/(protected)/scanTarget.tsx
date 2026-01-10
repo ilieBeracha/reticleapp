@@ -11,7 +11,7 @@ import { useLocalSearchParams } from "expo-router";
  * drillGoal determines whether to save as grouping (dispersion only) or achievement (hit %)
  */
 export default function ScanTargetSheet() {
-  const { sessionId, distance, maxShots, bullets, locked, drillGoal } = useLocalSearchParams<{
+  const { sessionId, distance, maxShots, bullets, locked, drillGoal, autoFinish } = useLocalSearchParams<{
     sessionId: string;
     distance?: string;
     maxShots?: string;
@@ -19,6 +19,7 @@ export default function ScanTargetSheet() {
     bullets?: string;
     locked?: string;
     drillGoal?: 'grouping' | 'achievement';
+    autoFinish?: string;
   }>();
 
   if (!sessionId) {
@@ -38,6 +39,7 @@ export default function ScanTargetSheet() {
       defaultMaxShots={maxShots ? parseInt(maxShots) : bullets ? parseInt(bullets) : undefined}
       lockDistance={locked === '1'}
       paperType={paperType}
+      autoFinishSession={autoFinish === '1'}
     />
   );
 }

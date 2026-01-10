@@ -137,9 +137,8 @@ export function useTrainingActions({
             console.log('[TrainingActions] finishTraining result:', result);
             
             if (!result) {
-              console.log('[TrainingActions] Training not found or update blocked by RLS');
-              Alert.alert('Info', 'Training was already finished or not found');
-              // Don't update local state if API failed
+              console.log('[TrainingActions] Training not found');
+              Alert.alert('Not Found', 'Training was not found. It may have been deleted.');
               setActionLoading(false);
               return;
             }
@@ -163,7 +162,11 @@ export function useTrainingActions({
             });
           } catch (error: any) {
             console.error('[TrainingActions] Finish failed:', error);
-            Alert.alert('Error', error.message || 'Failed to finish training');
+            // Show user-friendly error for permission issues
+            const message = error.message?.includes('permission') 
+              ? 'Only the training creator or team commanders can complete this training.'
+              : error.message || 'Failed to finish training';
+            Alert.alert('Cannot Complete', message);
           } finally {
             setActionLoading(false);
           }

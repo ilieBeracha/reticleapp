@@ -1,7 +1,9 @@
 import { useColors } from "@/hooks/ui/useColors";
 import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from "@/theme/colors";
 import type { AnalyzeDocumentResponse, AnalyzeResponse } from "@/types/api";
+import type { DecodedWeather } from "@/services/session/watchTypes";
 import { Ionicons } from "@expo/vector-icons";
+import { Cloud, Droplets, Thermometer, Wind } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useMemo, useRef, useState } from "react";
@@ -46,6 +48,8 @@ interface ResultCardProps {
   onDetectionsChange: (detections: EditableDetection[]) => void;
   /** Target type determines what metrics to show */
   targetType?: TargetType;
+  /** Current weather conditions */
+  weather?: DecodedWeather | null;
 }
 
 export const ResultCard = React.memo(function ResultCard({
@@ -56,6 +60,7 @@ export const ResultCard = React.memo(function ResultCard({
   editedDetections,
   onDetectionsChange,
   targetType = "grouping",
+  weather,
 }: ResultCardProps) {
   const colors = useColors();
   const [editMode, setEditMode] = useState<EditMode>("add");
@@ -234,6 +239,44 @@ export const ResultCard = React.memo(function ResultCard({
             ? "Measuring shot consistency" 
             : "AI detected bullet holes"}
         </Text>
+
+        {/* Weather Conditions */}
+        {weather && (
+          <View style={styles.weatherRow}>
+            {weather.temperatureC != null && (
+              <View style={[styles.weatherChip, { backgroundColor: colors.blue + '15' }]}>
+                <Thermometer size={12} color={colors.blue} />
+                <Text style={[styles.weatherText, { color: colors.blue }]}>
+                  {Math.round(weather.temperatureC)}°C
+                </Text>
+              </View>
+            )}
+            {weather.humidity != null && (
+              <View style={[styles.weatherChip, { backgroundColor: colors.primary + '15' }]}>
+                <Droplets size={12} color={colors.primary} />
+                <Text style={[styles.weatherText, { color: colors.primary }]}>
+                  {weather.humidity}%
+                </Text>
+              </View>
+            )}
+            {weather.windSpeedMps != null && (
+              <View style={[styles.weatherChip, { backgroundColor: colors.green + '15' }]}>
+                <Wind size={12} color={colors.green} />
+                <Text style={[styles.weatherText, { color: colors.green }]}>
+                  {weather.windSpeedMps.toFixed(1)} m/s
+                </Text>
+              </View>
+            )}
+            {weather.condition && (
+              <View style={[styles.weatherChip, { backgroundColor: colors.secondary }]}>
+                <Cloud size={12} color={colors.textMuted} />
+                <Text style={[styles.weatherText, { color: colors.textMuted }]}>
+                  {weather.condition}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
       </View>
 
       {/* View-Only Preview */}
@@ -567,6 +610,26 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: COLORS.textMuted,
+  },
+  
+  // Weather
+  weatherRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12,
+  },
+  weatherChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  weatherText: {
+    fontSize: 12,
+    fontWeight: "600",
   },
   
   // Edit Toggle
