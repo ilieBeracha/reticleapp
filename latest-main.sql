@@ -336,6 +336,44 @@ Call this periodically via pg_cron or an edge function.';
 
 
 
+CREATE OR REPLACE FUNCTION "public"."backfill_insight_triggers"() RETURNS TABLE("users_processed" integer, "triggers_created" integer)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+DECLARE
+  v_users_processed INT := 0;
+  v_triggers_created INT := 0;
+BEGIN
+  -- Insert triggers for all users with session features who don't have one yet
+  INSERT INTO user_insight_triggers (user_id, sessions_since_last, bullets_since_last)
+  SELECT 
+    sf.user_id,
+    COUNT(*)::INT,
+    COALESCE(SUM(sf.shots), 0)::INT
+  FROM session_features sf
+  WHERE NOT EXISTS (
+    SELECT 1 FROM user_insight_triggers t WHERE t.user_id = sf.user_id
+  )
+  GROUP BY sf.user_id
+  ON CONFLICT (user_id) DO NOTHING;
+  
+  GET DIAGNOSTICS v_triggers_created = ROW_COUNT;
+  
+  -- Count total users with session features
+  SELECT COUNT(DISTINCT user_id) INTO v_users_processed FROM session_features;
+  
+  RETURN QUERY SELECT v_users_processed, v_triggers_created;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."backfill_insight_triggers"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."backfill_insight_triggers"() IS 'Backfills insight triggers for existing users. Run once after migration.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."check_commander_constraints"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     AS $$
@@ -1192,6 +1230,36 @@ COMMENT ON FUNCTION "public"."generate_session_insights"("p_session_id" "uuid") 
 
 
 
+CREATE OR REPLACE FUNCTION "public"."get_insight_trigger_status"("p_user_id" "uuid") RETURNS TABLE("sessions_since_last" integer, "bullets_since_last" integer, "session_threshold" integer, "sessions_until_next" integer, "last_insight_at" timestamp with time zone)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    COALESCE(t.sessions_since_last, 0),
+    COALESCE(t.bullets_since_last, 0),
+    COALESCE(t.session_threshold, 5),
+    GREATEST(0, COALESCE(t.session_threshold, 5) - COALESCE(t.sessions_since_last, 0)),
+    t.last_insight_at
+  FROM user_insight_triggers t
+  WHERE t.user_id = p_user_id;
+  
+  -- If no record exists, return defaults
+  IF NOT FOUND THEN
+    RETURN QUERY SELECT 0, 0, 5, 5, NULL::TIMESTAMPTZ;
+  END IF;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_insight_trigger_status"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."get_insight_trigger_status"("p_user_id" "uuid") IS 'Returns insight trigger status for UI display (sessions until next insight).';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."get_my_sessions"("p_limit" integer DEFAULT 50, "p_offset" integer DEFAULT 0) RETURNS TABLE("id" "uuid", "workspace_type" "text", "workspace_owner_id" "uuid", "org_workspace_id" "uuid", "workspace_name" "text", "user_id" "uuid", "team_id" "uuid", "team_name" "text", "session_mode" "text", "status" "text", "started_at" timestamp with time zone, "ended_at" timestamp with time zone, "session_data" "jsonb", "created_at" timestamp with time zone, "updated_at" timestamp with time zone)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -1368,6 +1436,36 @@ $$;
 
 
 ALTER FUNCTION "public"."get_session_baseline"("p_session_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."get_sessions_since_last_insight"("p_user_id" "uuid") RETURNS SETOF "public"."session_features"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+DECLARE
+  v_last_insight_at TIMESTAMPTZ;
+BEGIN
+  -- Get last insight timestamp
+  SELECT last_insight_at INTO v_last_insight_at
+  FROM user_insight_triggers
+  WHERE user_id = p_user_id;
+  
+  -- Return all session features since last insight (or all if no previous insight)
+  RETURN QUERY
+  SELECT sf.*
+  FROM session_features sf
+  WHERE sf.user_id = p_user_id
+    AND (v_last_insight_at IS NULL OR sf.created_at > v_last_insight_at)
+  ORDER BY sf.created_at DESC;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_sessions_since_last_insight"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."get_sessions_since_last_insight"("p_user_id" "uuid") IS 'Returns session features since last aggregate insight generation.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."get_sniper_best_performance"("p_user_id" "uuid", "p_org_workspace_id" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("best_paper_accuracy" numeric, "best_tactical_accuracy" numeric, "best_overall_accuracy" numeric, "tightest_grouping_cm" numeric, "fastest_engagement_sec" numeric, "most_targets_cleared" integer, "longest_session_minutes" integer, "total_sessions" bigint)
@@ -2250,6 +2348,30 @@ COMMENT ON FUNCTION "public"."remove_team_member"("p_team_id" "uuid", "p_user_id
 
 
 
+CREATE OR REPLACE FUNCTION "public"."reset_insight_triggers"("p_user_id" "uuid", "p_session_id" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+BEGIN
+  UPDATE user_insight_triggers
+  SET 
+    sessions_since_last = 0,
+    bullets_since_last = 0,
+    last_insight_at = now(),
+    last_insight_session_id = p_session_id,
+    updated_at = now()
+  WHERE user_id = p_user_id;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."reset_insight_triggers"("p_user_id" "uuid", "p_session_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."reset_insight_triggers"("p_user_id" "uuid", "p_session_id" "uuid") IS 'Resets insight trigger counters after generating aggregate insights.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."shares_team_with"("p_other_user_id" "uuid") RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -2265,6 +2387,47 @@ $$;
 
 
 ALTER FUNCTION "public"."shares_team_with"("p_other_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."update_insight_triggers"("p_user_id" "uuid", "p_session_id" "uuid", "p_shots" integer) RETURNS TABLE("sessions_count" integer, "threshold_reached" boolean, "session_threshold" integer)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+DECLARE
+  v_trigger RECORD;
+BEGIN
+  -- Upsert trigger record and increment counters
+  INSERT INTO user_insight_triggers (
+    user_id,
+    sessions_since_last,
+    bullets_since_last,
+    updated_at
+  ) VALUES (
+    p_user_id,
+    1,
+    COALESCE(p_shots, 0),
+    now()
+  )
+  ON CONFLICT (user_id) DO UPDATE SET
+    sessions_since_last = user_insight_triggers.sessions_since_last + 1,
+    bullets_since_last = user_insight_triggers.bullets_since_last + COALESCE(p_shots, 0),
+    updated_at = now()
+  RETURNING * INTO v_trigger;
+
+  -- Return current state
+  RETURN QUERY SELECT 
+    v_trigger.sessions_since_last,
+    (v_trigger.sessions_since_last >= v_trigger.session_threshold),
+    v_trigger.session_threshold;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."update_insight_triggers"("p_user_id" "uuid", "p_session_id" "uuid", "p_shots" integer) OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."update_insight_triggers"("p_user_id" "uuid", "p_session_id" "uuid", "p_shots" integer) IS 'Increments insight trigger counters after each session. Returns whether threshold is reached.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."update_team_member_role"("p_team_id" "uuid", "p_user_id" "uuid", "p_role" "text", "p_details" "jsonb" DEFAULT NULL::"jsonb") RETURNS "jsonb"
@@ -2706,6 +2869,8 @@ CREATE TABLE IF NOT EXISTS "public"."session_insights" (
     "tags" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
     "insight_type" "text",
     "evidence" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "is_aggregate" boolean DEFAULT false NOT NULL,
+    "sessions_analyzed" "uuid"[] DEFAULT '{}'::"uuid"[],
     CONSTRAINT "session_insights_score_check" CHECK ((("score" >= (0)::numeric) AND ("score" <= (100)::numeric)))
 );
 
@@ -3056,6 +3221,21 @@ COMMENT ON TABLE "public"."user_drill_completions" IS 'Tracks which drills each 
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."user_insight_triggers" (
+    "user_id" "uuid" NOT NULL,
+    "sessions_since_last" integer DEFAULT 0 NOT NULL,
+    "bullets_since_last" integer DEFAULT 0 NOT NULL,
+    "last_insight_at" timestamp with time zone,
+    "last_insight_session_id" "uuid",
+    "session_threshold" integer DEFAULT 5 NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."user_insight_triggers" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."user_weapons" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -3289,6 +3469,11 @@ ALTER TABLE ONLY "public"."user_drill_completions"
 
 
 
+ALTER TABLE ONLY "public"."user_insight_triggers"
+    ADD CONSTRAINT "user_insight_triggers_pkey" PRIMARY KEY ("user_id");
+
+
+
 ALTER TABLE ONLY "public"."user_weapons"
     ADD CONSTRAINT "user_weapons_pkey" PRIMARY KEY ("id");
 
@@ -3350,6 +3535,10 @@ CREATE INDEX "idx_session_features_weather_condition" ON "public"."session_featu
 
 
 CREATE INDEX "idx_session_features_weather_wind" ON "public"."session_features" USING "btree" ("weather_wind_impact") WHERE ("has_weather" = true);
+
+
+
+CREATE INDEX "idx_session_insights_aggregate" ON "public"."session_insights" USING "btree" ("user_id", "is_aggregate", "created_at" DESC) WHERE ("is_aggregate" = true);
 
 
 
@@ -3490,6 +3679,10 @@ CREATE INDEX "idx_user_baselines_updated" ON "public"."user_baselines" USING "bt
 
 
 CREATE INDEX "idx_user_baselines_user" ON "public"."user_baselines" USING "btree" ("user_id");
+
+
+
+CREATE INDEX "idx_user_insight_triggers_updated" ON "public"."user_insight_triggers" USING "btree" ("updated_at" DESC);
 
 
 
@@ -3802,6 +3995,16 @@ ALTER TABLE ONLY "public"."user_drill_completions"
 
 ALTER TABLE ONLY "public"."user_drill_completions"
     ADD CONSTRAINT "user_drill_completions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."user_insight_triggers"
+    ADD CONSTRAINT "user_insight_triggers_last_insight_session_id_fkey" FOREIGN KEY ("last_insight_session_id") REFERENCES "public"."sessions"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."user_insight_triggers"
+    ADD CONSTRAINT "user_insight_triggers_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
 
 
@@ -4123,6 +4326,10 @@ CREATE POLICY "Users can manage own baselines" ON "public"."user_baselines" USIN
 
 
 
+CREATE POLICY "Users can manage own insight triggers" ON "public"."user_insight_triggers" USING (("user_id" = "auth"."uid"()));
+
+
+
 CREATE POLICY "Users can read own weapons" ON "public"."user_weapons" FOR SELECT USING (("user_id" = "auth"."uid"()));
 
 
@@ -4202,6 +4409,10 @@ CREATE POLICY "Users can view own and team sessions" ON "public"."sessions" FOR 
 
 
 CREATE POLICY "Users can view own baselines" ON "public"."user_baselines" FOR SELECT USING (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can view own insight triggers" ON "public"."user_insight_triggers" FOR SELECT USING (("user_id" = "auth"."uid"()));
 
 
 
@@ -4350,6 +4561,9 @@ ALTER TABLE "public"."user_baselines" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."user_drill_completions" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."user_insight_triggers" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."user_weapons" ENABLE ROW LEVEL SECURITY;
 
 
@@ -4390,6 +4604,12 @@ GRANT ALL ON FUNCTION "public"."auto_close_training_if_complete"("p_training_id"
 GRANT ALL ON FUNCTION "public"."auto_start_trainings"() TO "anon";
 GRANT ALL ON FUNCTION "public"."auto_start_trainings"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."auto_start_trainings"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."backfill_insight_triggers"() TO "anon";
+GRANT ALL ON FUNCTION "public"."backfill_insight_triggers"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."backfill_insight_triggers"() TO "service_role";
 
 
 
@@ -4471,6 +4691,12 @@ GRANT ALL ON FUNCTION "public"."generate_session_insights"("p_session_id" "uuid"
 
 
 
+GRANT ALL ON FUNCTION "public"."get_insight_trigger_status"("p_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_insight_trigger_status"("p_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_insight_trigger_status"("p_user_id" "uuid") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."get_my_sessions"("p_limit" integer, "p_offset" integer) TO "anon";
 GRANT ALL ON FUNCTION "public"."get_my_sessions"("p_limit" integer, "p_offset" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_my_sessions"("p_limit" integer, "p_offset" integer) TO "service_role";
@@ -4498,6 +4724,12 @@ GRANT ALL ON FUNCTION "public"."get_org_workspace_members"("p_org_workspace_id" 
 GRANT ALL ON FUNCTION "public"."get_session_baseline"("p_session_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_session_baseline"("p_session_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_session_baseline"("p_session_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."get_sessions_since_last_insight"("p_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_sessions_since_last_insight"("p_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_sessions_since_last_insight"("p_user_id" "uuid") TO "service_role";
 
 
 
@@ -4633,9 +4865,21 @@ GRANT ALL ON FUNCTION "public"."remove_team_member"("p_team_id" "uuid", "p_user_
 
 
 
+GRANT ALL ON FUNCTION "public"."reset_insight_triggers"("p_user_id" "uuid", "p_session_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."reset_insight_triggers"("p_user_id" "uuid", "p_session_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."reset_insight_triggers"("p_user_id" "uuid", "p_session_id" "uuid") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."shares_team_with"("p_other_user_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."shares_team_with"("p_other_user_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."shares_team_with"("p_other_user_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."update_insight_triggers"("p_user_id" "uuid", "p_session_id" "uuid", "p_shots" integer) TO "anon";
+GRANT ALL ON FUNCTION "public"."update_insight_triggers"("p_user_id" "uuid", "p_session_id" "uuid", "p_shots" integer) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_insight_triggers"("p_user_id" "uuid", "p_session_id" "uuid", "p_shots" integer) TO "service_role";
 
 
 
@@ -4768,6 +5012,12 @@ GRANT ALL ON TABLE "public"."user_baselines" TO "service_role";
 GRANT ALL ON TABLE "public"."user_drill_completions" TO "anon";
 GRANT ALL ON TABLE "public"."user_drill_completions" TO "authenticated";
 GRANT ALL ON TABLE "public"."user_drill_completions" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."user_insight_triggers" TO "anon";
+GRANT ALL ON TABLE "public"."user_insight_triggers" TO "authenticated";
+GRANT ALL ON TABLE "public"."user_insight_triggers" TO "service_role";
 
 
 

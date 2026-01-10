@@ -8,6 +8,7 @@ import type { SessionWithDetails } from '@/services/sessionService';
 import { differenceInMinutes } from 'date-fns';
 import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { AIButton } from './AIButton';
 
 interface AllTimeStatsCardProps {
   sessions: SessionWithDetails[];
@@ -22,7 +23,7 @@ function formatDuration(minutes: number): string {
   return `${days}d ${hours % 24}h`;
 }
 
-export function AllTimeStatsCard({ sessions }: AllTimeStatsCardProps) {
+export function AllTimeStatsCard({ sessions, onAIPress }: AllTimeStatsCardProps) {
   const colors = useColors();
 
   const stats = useMemo(() => {
@@ -76,6 +77,9 @@ export function AllTimeStatsCard({ sessions }: AllTimeStatsCardProps) {
 
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={styles.header}>
+        <Text style={[styles.title, { color: colors.textMuted }]}>ALL-TIME STATS</Text>
+      </View>
       <View style={styles.grid}>
         {items.map((item, index) => (
           <View
@@ -101,6 +105,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 12,
     marginBottom: 12,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  title: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
   },
   grid: {
     flexDirection: 'row',

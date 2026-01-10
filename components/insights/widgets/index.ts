@@ -5,14 +5,17 @@
  * Focus: Historical data, trends, all-time stats
  */
 
-// Historical comparison widgets
+// Stats widgets
 export { AllTimeStatsCard } from './AllTimeStatsCard';
 export { MonthlyComparisonCard } from './MonthlyComparisonCard';
 export { ShotGoalCard } from './ShotGoalCard';
 
-// Breakdown/Analysis widgets
+// Breakdown widgets
 export { DistanceBreakdownCard } from './DistanceBreakdownCard';
 export { SessionTypeCard } from './SessionTypeCard';
+
+// Training patterns
+export { TrainingConsistencyCard } from './TrainingConsistencyCard';
 
 
 

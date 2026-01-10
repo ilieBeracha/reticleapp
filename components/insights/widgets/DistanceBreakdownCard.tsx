@@ -1,7 +1,7 @@
 /**
- * Distance Breakdown Card (Compact)
+ * Distance Breakdown Card
  * 
- * Accuracy by distance range - minimal bars
+ * Simple accuracy breakdown by distance range.
  */
 import { useColors } from '@/hooks/ui/useColors';
 import type { SessionWithDetails } from '@/services/sessionService';
@@ -34,7 +34,7 @@ export function DistanceBreakdownCard({ sessions }: DistanceBreakdownCardProps) 
       const distance = session.stats.avg_distance_m;
       let range: string;
 
-      if (distance <= 10) range = 'close';
+      if (distance <= 15) range = 'close';
       else if (distance <= 25) range = 'medium';
       else range = 'long';
 
@@ -43,8 +43,8 @@ export function DistanceBreakdownCard({ sessions }: DistanceBreakdownCardProps) 
     });
 
     const result: DistanceStats[] = [
-      { label: '0-10m', accuracy: ranges.close.shots > 0 ? Math.round((ranges.close.hits / ranges.close.shots) * 100) : 0, shots: ranges.close.shots },
-      { label: '10-25m', accuracy: ranges.medium.shots > 0 ? Math.round((ranges.medium.hits / ranges.medium.shots) * 100) : 0, shots: ranges.medium.shots },
+      { label: '≤15m', accuracy: ranges.close.shots > 0 ? Math.round((ranges.close.hits / ranges.close.shots) * 100) : 0, shots: ranges.close.shots },
+      { label: '15-25m', accuracy: ranges.medium.shots > 0 ? Math.round((ranges.medium.hits / ranges.medium.shots) * 100) : 0, shots: ranges.medium.shots },
       { label: '25m+', accuracy: ranges.long.shots > 0 ? Math.round((ranges.long.hits / ranges.long.shots) * 100) : 0, shots: ranges.long.shots },
     ];
 
@@ -127,14 +127,3 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
 });
-
-
-
-
-
-
-
-
-
-
-

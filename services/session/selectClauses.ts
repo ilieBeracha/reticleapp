@@ -18,6 +18,7 @@
  * Used for: getMyActiveSession, getSessions, getTeamSessions, etc.
  *
  * Includes: basic session fields + related names only (not full objects)
+ * Note: Includes position for analytics/insights
  */
 export const SESSION_SELECT_WITH_WEAPON = `
   id,
@@ -39,14 +40,15 @@ export const SESSION_SELECT_WITH_WEAPON = `
   profiles:user_id(full_name),
   teams:team_id(name),
   trainings:training_id(title),
-  training_drills:drill_id(name),
-  drill_templates:drill_template_id(name),
+  training_drills:drill_id(id, name, drill_goal, target_type, distance_m, rounds_per_shooter, position),
+  drill_templates:drill_template_id(id, name, drill_goal, target_type, distance_m, rounds_per_shooter, position),
   user_weapons:weapon_id(name, caliber, category)
 `;
 
 /**
  * Minimal session select without weapon.
  * Used for: paginated queries, list views where weapon isn't needed.
+ * Note: Includes position for analytics/insights
  */
 export const SESSION_SELECT_MINIMAL = `
   id,
@@ -67,8 +69,8 @@ export const SESSION_SELECT_MINIMAL = `
   profiles:user_id(full_name),
   teams:team_id(name),
   trainings:training_id(title),
-  training_drills:drill_id(name),
-  drill_templates:drill_template_id(name)
+  training_drills:drill_id(id, name, drill_goal, target_type, distance_m, rounds_per_shooter, position),
+  drill_templates:drill_template_id(id, name, drill_goal, target_type, distance_m, rounds_per_shooter, position)
 `;
 
 /**

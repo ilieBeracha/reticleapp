@@ -332,6 +332,20 @@ export default function ProtectedLayout() {
           }}
         />
 
+        <Stack.Screen
+          name="analysis"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.75, 1],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+          }}
+        />
+
       </Stack>
     </ThemeProvider>
   );

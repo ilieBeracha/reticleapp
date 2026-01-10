@@ -90,7 +90,17 @@ export type InsightType =
   | 'grouping_regression'
   | 'biometric_pattern'
   | 'achievement'
-  | 'summary';
+  | 'summary'
+  // Anomaly types (immediate insights for exceptional sessions)
+  | 'anomaly_high'
+  | 'anomaly_low'
+  // LLM-generated insights
+  | 'llm_insight'
+  // Contextual comparisons
+  | 'contextual_comparison'
+  | 'pattern_detection'
+  // Widget-specific AI insights (on-demand)
+  | 'widget_insight';
 
 /**
  * Attribution factors for insights.

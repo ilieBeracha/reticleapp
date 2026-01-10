@@ -406,7 +406,7 @@ Referenced in:
 // garminService.ts
 export const GARMIN_DEFAULT_CONFIG: GarminConfig = {
   urlScheme: 'retic',
-  appId: '467f4bb7-cd3c-45c4-a39b-9bb78260c9ed',
+  appId: '5af8baf3-c28a-4998-9353-8c75aa77a0c8'
 } as const;
 ```
 
@@ -420,9 +420,14 @@ initialize({ urlScheme: 'myapp', appId: 'my-uuid' }); // Full override
 
 ### Patch File Constants
 
-The patch contains default values that are overwritten at runtime:
-- `AppConstants.swift`: `APP_ID` - set by `initGarminSDK()`
-- `GarminDeviceStorage.swift`: `urlScheme`, `appId` - set at runtime
+The patch contains the App ID values that are compiled into the native code:
+- `AppConstants.swift`: `APP_ID` - the watch app UUID
+- `GarminDeviceStorage.swift`: `urlScheme`, `appId`
+
+**To change the App ID**:
+1. Edit `patches/react-native-garmin-connect+0.3.0.patch`
+2. Update the `APP_ID` value (appears twice - in AppConstants.swift and GarminDeviceStorage.swift)
+3. Rebuild the app: `rm -rf node_modules && npm install && npx expo prebuild --clean`
 
 ---
 
@@ -430,11 +435,11 @@ The patch contains default values that are overwritten at runtime:
 
 ### Making the Library Truly Generic
 
-Currently, `urlScheme` and `appId` are passed to `initialize()` but there's some hardcoding. To make it fully configurable:
+Currently, `urlScheme` and `appId` are hardcoded in the patch. To make it fully configurable at runtime:
 
-1. Remove hardcoded defaults from patch (use empty strings)
-2. Ensure `initGarminSDK(urlScheme:appId:)` sets all values before any SDK calls
-3. Consider environment variables for different build flavors
+1. Add a native bridge method `setAppId(appId: String)` that sets `AppConstants.APP_ID`
+2. Ensure this is called BEFORE `sdkInitialize()`
+3. The `watchAppUuid` computed property will read the updated value
 
 ### Forking the Library
 

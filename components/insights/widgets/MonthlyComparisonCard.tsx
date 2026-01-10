@@ -81,7 +81,9 @@ export function MonthlyComparisonCard({ sessions }: MonthlyComparisonCardProps) 
 
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <Text style={[styles.title, { color: colors.textMuted }]}>{monthName.toUpperCase()}</Text>
+      <View style={styles.header}>
+        <Text style={[styles.title, { color: colors.textMuted }]}>{monthName.toUpperCase()}</Text>
+      </View>
       
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
@@ -113,11 +115,16 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 12,
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   title: {
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1,
-    marginBottom: 12,
   },
   statsRow: {
     flexDirection: 'row',

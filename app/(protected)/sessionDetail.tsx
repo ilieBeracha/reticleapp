@@ -4,9 +4,9 @@
  * Shows session summary, stats, and image previews.
  * Opens as a formSheet modal above tabs.
  */
-import { isPaperTarget, isGroupingPaper, isEngagementPaper, PAPER_TYPE, TARGET_TYPE } from '@/constants';
 import { WeatherStrip } from '@/components/session/WeatherDisplay';
 import { useSessionTimeline } from '@/components/session/timeline/useSessionTimeline';
+import { isEngagementPaper, isGroupingPaper, isPaperTarget } from '@/constants';
 import { useColors } from '@/hooks/ui/useColors';
 import { getSessionInsights, triggerInsightGeneration, type SessionInsight } from '@/services/insights';
 import type { DecodedWeather } from '@/services/session/watchTypes';
@@ -882,31 +882,50 @@ export default function SessionDetailScreen() {
       )}
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* SESSION INSIGHTS (from insight pipeline) */}
+      {/* SESSION INSIGHTS (only show notable insights - anomalies & high-score) */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      {insights.length > 0 && (
-        <Animated.View entering={FadeInDown.delay(150).duration(300)} style={styles.insightsSection}>
-          <View style={styles.insightsHeader}>
-            <Lightbulb size={14} color={colors.primary} />
-            <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Session Insights</Text>
-          </View>
+      {(() => {
+        // Filter to only show notable insights:
+        // - Anomalies (anomaly_high, anomaly_low) - immediate insights for exceptional sessions
+        // - High-score LLM insights (score > 70)
+        // - Achievement insights that are genuinely notable
+        // Exclude: summary, building baseline, routine insights
+        const notableInsights = insights.filter((i) => {
+          // Always show anomaly insights
+          if (i.insight_type === 'anomaly_high' || i.insight_type === 'anomaly_low') {
+            return true;
+          }
+          // Show LLM insights with high score
+          if (i.insight_type === 'llm_insight' && i.score > 70) {
+            return true;
+          }
+          // Show achievements with high score
+          if (i.insight_type === 'achievement' && i.score > 70) {
+            return true;
+          }
+          // Skip summary, building baseline, and low-score insights
+          return false;
+        });
 
-          <View style={{ gap: 10 }}>
-            {insights
-              .filter((i) => {
-                // Show non-summary insights first, but if none exist, show summary
-                const nonSummaryInsights = insights.filter((x) => x.insight_type !== 'summary');
-                return nonSummaryInsights.length > 0 ? i.insight_type !== 'summary' : true;
-              })
-              .slice(0, 3)
-              .map((insight) => {
+        if (notableInsights.length === 0) return null;
+
+        return (
+          <Animated.View entering={FadeInDown.delay(150).duration(300)} style={styles.insightsSection}>
+            <View style={styles.insightsHeader}>
+              <Lightbulb size={14} color={colors.primary} />
+              <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Session Insight</Text>
+            </View>
+
+            <View style={{ gap: 10 }}>
+              {notableInsights.slice(0, 2).map((insight) => {
                 // Determine icon and colors based on insight type
                 const isPositive =
-                  insight.insight_type === 'achievement' || insight.tags.includes('improvement');
+                  insight.insight_type === 'anomaly_high' ||
+                  insight.insight_type === 'achievement' ||
+                  insight.tags?.includes('positive');
                 const isWarning =
-                  insight.insight_type === 'baseline_deviation' ||
-                  insight.insight_type === 'fatigue_correlation' ||
-                  insight.insight_type === 'biometric_pattern';
+                  insight.insight_type === 'anomaly_low' ||
+                  insight.tags?.includes('negative');
 
                 const iconColor = isPositive ? colors.green : isWarning ? colors.orange : colors.primary;
                 const bgColor = isPositive
@@ -970,24 +989,12 @@ export default function SessionDetailScreen() {
                   </View>
                 );
               })}
-          </View>
-        </Animated.View>
-      )}
+            </View>
+          </Animated.View>
+        );
+      })()}
 
-      {/* Insights loading state */}
-      {session?.status === 'completed' && insightsLoading && insights.length === 0 && (
-        <Animated.View entering={FadeIn.duration(200)} style={styles.insightsSection}>
-          <View
-            style={[
-              styles.insightsCard,
-              { backgroundColor: colors.card, borderColor: colors.border, alignItems: 'center', paddingVertical: 20 },
-            ]}
-          >
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={[styles.loadingInsightsText, { color: colors.textMuted }]}>Analyzing session...</Text>
-          </View>
-        </Animated.View>
-      )}
+      {/* Note: No loading state for insights - routine sessions don't need insight analysis */}
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* PERFORMANCE INSIGHTS (from saved timeline data) */}

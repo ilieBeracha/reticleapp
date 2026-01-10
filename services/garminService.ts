@@ -101,7 +101,7 @@ const APP_SCHEME = Constants.expoConfig?.scheme || 'retic';
 /** Default Garmin configuration for this app */
 export const GARMIN_DEFAULT_CONFIG: GarminConfig = {
   urlScheme: APP_SCHEME as string,
-  appId: '467f4bb7-cd3c-45c4-a39b-9bb78260c9ed',
+  appId: '5af8baf3-c28a-4998-9353-8c75aa77a0c8',
 } as const;
 // ============================================================================
 // SERVICE STATE (module-level singleton)
@@ -296,7 +296,8 @@ export function initialize(customConfig?: Partial<GarminConfig>): () => void {
     emit({ event: 'error', error: new Error(String(error)) });
   });
 
-  // Initialize the native SDK with both urlScheme and appId
+  // Initialize the native SDK with urlScheme
+  // Note: App ID is hardcoded in the patch file - change it there and rebuild
   sdkInitialize(urlScheme);
 
   // Cleanup function

@@ -9,8 +9,8 @@ index 2e67eb2..de23617 100644
 -    static let APP_ID = "467f4bb7-cd3c-45c4-a39b-9bb78260c9ed"
 +    // This can be set at runtime via GarminDeviceStorage.appId
 +    // Default is empty - set your ConnectIQ watch app UUID
-+    static var APP_ID: String = "467f4bb7-cd3c-45c4-a39b-9bb78260c9ed"
- 
++    static var APP_ID: String = "5af8baf3-c28a-4998-9353-8c75aa77a0c8" 
+
      static let STATUS_ONLINE = "ONLINE"
      static let STATUS_OFFLINE = "OFFLINE"
 diff --git a/node_modules/react-native-garmin-connect/ios/GarminConnect.h b/node_modules/react-native-garmin-connect/ios/GarminConnect.h

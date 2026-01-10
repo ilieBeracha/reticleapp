@@ -185,6 +185,8 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
         rounds_per_shooter: config.drill_config!.rounds_per_shooter,
         time_limit_seconds: config.drill_config!.time_limit_seconds ?? null,
         strings_count: config.drill_config!.strings_count ?? null,
+        position: config.drill_config!.position ?? null,
+        category_drill_id: config.drill_config!.category_drill_id ?? null,
       }
     : null;
 

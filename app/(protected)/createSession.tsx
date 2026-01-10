@@ -10,9 +10,9 @@
 
 import { DrillPresetPicker, PresetForm } from '@/components/drills';
 import {
-  SessionContextStep,
-  SessionIntentStep,
-  useSessionCreation,
+    SessionContextStep,
+    SessionIntentStep,
+    useSessionCreation,
 } from '@/components/session/creation';
 import type { Position, SessionPurpose } from '@/components/session/creation/sessionCreation.types';
 import { CreateWeaponFlow, WeaponPicker } from '@/components/weapons';
@@ -22,8 +22,8 @@ import { useOpenWeather } from '@/hooks/useOpenWeather';
 import type { DrillPreset } from '@/services/presetService';
 import type { BaseSessionConfig } from '@/services/session/types';
 import { createSession, deleteSession, getMyActiveSession } from '@/services/sessionService';
-import { toSessionWeatherData } from '@/services/weather';
 import type { UserWeapon } from '@/services/weaponService';
+import { toSessionWeatherData } from '@/services/weather';
 import { useSessionStore } from '@/store/sessionStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -32,14 +32,14 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, ChevronRight, CornerDownRight, Crosshair, Plus, Target } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

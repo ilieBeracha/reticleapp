@@ -56,6 +56,8 @@ export interface DrillConfig {
   rounds_per_shooter: number;
   time_limit_seconds?: number | null;
   strings_count?: number | null; // Number of entries allowed (null = unlimited)
+  /** Shooting position: prone, standing, kneeling, sitting */
+  position?: string | null;
   /** When following a category drill, this is the drill ID from categoryDrills.ts */
   category_drill_id?: string | null;
 }

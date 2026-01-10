@@ -390,6 +390,7 @@ export function useSessionCreation(
       rounds_per_shooter: context.shotsPlanned,
       time_limit_seconds: context.timeLimit,
       strings_count: 1,
+      position: context.position !== 'any' ? context.position : null,
       // Include category drill reference when locked
       category_drill_id: isDrillLocked ? selectedDrillId : undefined,
     };
