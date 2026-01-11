@@ -118,8 +118,8 @@ export const TargetCard = React.memo(function TargetCard({
         {/* Meta line */}
         <View style={styles.meta}>
           {/* Target type badge */}
-          <Text style={[styles.typeTag, isGroupingTarget ? styles.typeTagGrouping : (isAchievementTarget ? styles.typeTagAchievement : styles.typeTagTactical)]}>
-            {isGroupingTarget ? 'Grouping' : (isPaper ? 'Achievement' : 'Tactical')}
+          <Text style={[styles.typeTag, isGroupingTarget ? styles.typeTagGrouping : (isEngagementTarget ? styles.typeTagEngagement : styles.typeTagTactical)]}>
+            {isGroupingTarget ? 'Grouping' : (isPaper ? 'Engagement' : 'Tactical')}
           </Text>
           {/* Entry method for achievement/tactical */}
           {!isGroupingTarget && isPaper && (
@@ -277,9 +277,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(16, 185, 129, 0.2)',
     color: '#34D399',
   },
-  typeTagAchievement: {
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
-    color: '#60A5FA',
+  typeTagEngagement: {
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    color: '#F59E0B',
   },
   typeTagTactical: {
     backgroundColor: 'rgba(245, 158, 11, 0.2)',

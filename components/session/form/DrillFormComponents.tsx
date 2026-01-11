@@ -1,327 +1,38 @@
 /**
- * DrillFormComponents - Shared UI primitives for drill/session forms
- *
- * Used by:
- * - SessionFormSheet (solo practice)
- * - UnifiedDrillModal (quick drill, template, configure)
- *
- * Design: Tactical, monochromatic with indigo accents for selections
+ * Drill Form Components
+ * 
+ * Shared form components for drill configuration.
+ * Used by UnifiedDrillModal and other drill-related forms.
+ * 
+ * TODO: Implement full form components when needed.
  */
-
 import { useColors } from '@/hooks/ui/useColors';
-import * as Haptics from 'expo-haptics';
-import {
-  Camera,
-  Circle,
-  Crosshair,
-  Hand,
-  Trophy,
-  type LucideIcon,
-} from 'lucide-react-native';
-import { useEffect, useState } from 'react';
-import {
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import React from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // ============================================================================
-// TYPES
+// PRESETS
 // ============================================================================
 
-export type { DrillGoal } from '@/types/workspace';
-export type InputMethod = 'scan' | 'manual';
-
-export interface OptionCardProps {
-  icon: React.ReactNode;
-  Icon?: LucideIcon;
-  label: string;
-  description: string;
-  active: boolean;
-  onPress: () => void;
-}
-
-// ============================================================================
-// OPTION CARD - Selection card with icon, label, description, radio
-// ============================================================================
-
-export function OptionCard({
-  icon,
-  Icon,
-  label,
-  description,
-  active,
-  onPress,
-}: OptionCardProps) {
-  const colors = useColors();
-  // Accent color for selection highlights (blue-grayish)
-  const accent = colors.indigo;
-
-  // Determine which icon to render
-  const renderIcon = () => {
-    if (Icon) {
-      return <Icon size={18} color={active ? accent : colors.text} strokeWidth={1.5} />;
-    }
-    if (active && icon) {
-      // Clone icon with accent color when active
-      // Handle known icon types
-      const iconType = (icon as any)?.type;
-      if (iconType === Crosshair) return <Crosshair size={18} color={accent} strokeWidth={1.5} />;
-      if (iconType === Trophy) return <Trophy size={18} color={accent} strokeWidth={1.5} />;
-      if (iconType === Camera) return <Camera size={18} color={accent} strokeWidth={1.5} />;
-      if (iconType === Hand) return <Hand size={18} color={accent} strokeWidth={1.5} />;
-    }
-    return icon;
-  };
-
-  return (
-    <TouchableOpacity
-      style={[
-        styles.optionCard,
-        {
-          backgroundColor: active ? `${accent}15` : colors.card,
-          borderColor: active ? accent : colors.border,
-        },
-      ]}
-      onPress={() => {
-        Haptics.selectionAsync();
-        onPress();
-      }}
-      activeOpacity={0.8}
-    >
-      <View
-        style={[
-          styles.optionIconWrap,
-          { backgroundColor: active ? `${accent}20` : colors.secondary },
-        ]}
-      >
-        {renderIcon()}
-      </View>
-      <View style={styles.optionContent}>
-        <Text style={[styles.optionLabel, { color: active ? accent : colors.text }]}>
-          {label}
-        </Text>
-        <Text style={[styles.optionDesc, { color: colors.textMuted }]}>
-          {description}
-        </Text>
-      </View>
-      <View
-        style={[
-          styles.optionRadio,
-          {
-            borderColor: active ? accent : colors.border,
-            backgroundColor: active ? accent : 'transparent',
-          },
-        ]}
-      >
-        {active && <Circle size={8} color="#fff" fill="#fff" />}
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-// ============================================================================
-// CONFIG ROW - Inline number input with presets
-// ============================================================================
-
-export interface ConfigRowProps {
-  label: string;
-  unit: string;
-  value: number;
-  onChange: (v: number) => void;
-  presets: number[];
-  isLast?: boolean;
-}
-
-export function ConfigRow({
-  label,
-  unit,
-  value,
-  onChange,
-  presets,
-  isLast = false,
-}: ConfigRowProps) {
-  const colors = useColors();
-  const [text, setText] = useState(String(value));
-
-  useEffect(() => {
-    setText(String(value));
-  }, [value]);
-
-  const handleBlur = () => {
-    const n = parseInt(text, 10);
-    if (isNaN(n) || n < 1) {
-      onChange(1);
-      setText('1');
-    } else {
-      onChange(n);
-    }
-  };
-
-  return (
-    <View
-      style={[
-        styles.configRow,
-        !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-      ]}
-    >
-      <View style={styles.configLeft}>
-        <Text style={[styles.configLabel, { color: colors.text }]}>{label}</Text>
-        <Text style={[styles.configUnit, { color: colors.textMuted }]}>{unit}</Text>
-      </View>
-      <View style={styles.configRight}>
-        <View style={[styles.inputBox, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-          <TextInput
-            style={[styles.inputText, { color: colors.text }]}
-            value={text}
-            onChangeText={setText}
-            onBlur={handleBlur}
-            keyboardType="number-pad"
-            selectTextOnFocus
-          />
-        </View>
-        {presets.slice(0, 4).map((p) => (
-          <TouchableOpacity
-            key={p}
-            style={[
-              styles.presetPill,
-              { backgroundColor: value === p ? colors.primary : colors.secondary },
-            ]}
-            onPress={() => {
-              Haptics.selectionAsync();
-              onChange(p);
-            }}
-          >
-            <Text style={[styles.presetText, { color: value === p ? '#fff' : colors.textMuted }]}>
-              {p}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-// ============================================================================
-// TIME ROW - Time limit with None toggle
-// ============================================================================
-
-export interface TimeRowProps {
-  value: number | null;
-  onChange: (v: number | null) => void;
-  presets: (number | null)[];
-  isLast?: boolean;
-}
-
-export function TimeRow({ value, onChange, presets, isLast = false }: TimeRowProps) {
-  const colors = useColors();
-  const [text, setText] = useState(value ? String(value) : '');
-  const hasValue = value !== null;
-
-  useEffect(() => {
-    setText(value ? String(value) : '');
-  }, [value]);
-
-  const handleTextChange = (t: string) => {
-    setText(t);
-    if (t === '') {
-      onChange(null);
-    } else {
-      const n = parseInt(t, 10);
-      if (!isNaN(n) && n > 0) onChange(n);
-    }
-  };
-
-  const handleBlur = () => {
-    if (text === '' || text === '0') {
-      onChange(null);
-      setText('');
-    }
-  };
-
-  const numberPresets = presets.filter((p): p is number => p !== null);
-
-  return (
-    <View
-      style={[
-        styles.configRow,
-        !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-      ]}
-    >
-      <View style={styles.configLeft}>
-        <Text style={[styles.configLabel, { color: colors.text }]}>Time Limit</Text>
-        <Text style={[styles.configUnit, { color: colors.textMuted }]}>seconds</Text>
-      </View>
-      <View style={styles.configRight}>
-        {/* None toggle */}
-        <TouchableOpacity
-          style={[
-            styles.presetPill,
-            { backgroundColor: !hasValue ? colors.primary : colors.secondary },
-          ]}
-          onPress={() => {
-            Haptics.selectionAsync();
-            onChange(null);
-            setText('');
-          }}
-        >
-          <Text style={[styles.presetText, { color: !hasValue ? '#fff' : colors.textMuted }]}>
-            Off
-          </Text>
-        </TouchableOpacity>
-
-        {/* Input box */}
-        <View
-          style={[
-            styles.inputBox,
-            { backgroundColor: colors.secondary, borderColor: hasValue ? colors.primary : colors.border },
-          ]}
-        >
-          <TextInput
-            style={[styles.inputText, { color: colors.text }]}
-            value={text}
-            onChangeText={handleTextChange}
-            onBlur={handleBlur}
-            keyboardType="number-pad"
-            placeholder="—"
-            placeholderTextColor={colors.textMuted}
-            selectTextOnFocus
-          />
-        </View>
-
-        {/* Quick presets */}
-        {numberPresets.slice(0, 3).map((p) => (
-          <TouchableOpacity
-            key={p}
-            style={[
-              styles.presetPill,
-              { backgroundColor: value === p ? colors.primary : colors.secondary },
-            ]}
-            onPress={() => {
-              Haptics.selectionAsync();
-              onChange(p);
-            }}
-          >
-            <Text style={[styles.presetText, { color: value === p ? '#fff' : colors.textMuted }]}>
-              {p}s
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-}
+export const DISTANCE_PRESETS = [7, 10, 15, 25, 50, 100, 200, 300];
+export const SHOTS_PRESETS = [5, 10, 15, 20, 25, 30, 50];
+export const ROUNDS_PRESETS = [1, 2, 3, 5, 10];
+export const TIME_PRESETS = [30, 60, 90, 120, 180, 300];
 
 // ============================================================================
 // SECTION LABEL
 // ============================================================================
 
-export function SectionLabel({ children }: { children: string }) {
+interface SectionLabelProps {
+  children: React.ReactNode;
+}
+
+export function SectionLabel({ children }: SectionLabelProps) {
   const colors = useColors();
   return (
-    <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{children}</Text>
+    <Text style={[styles.sectionLabel, { color: colors.secondary }]}>
+      {children}
+    </Text>
   );
 }
 
@@ -329,165 +40,245 @@ export function SectionLabel({ children }: { children: string }) {
 // HINT BOX
 // ============================================================================
 
-export function HintBox({
-  icon,
-  children,
-}: {
-  icon?: React.ReactNode;
-  children: string;
-}) {
+interface HintBoxProps {
+  children: React.ReactNode;
+}
+
+export function HintBox({ children }: HintBoxProps) {
   const colors = useColors();
   return (
-    <View style={[styles.hintBox, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-      {icon || <Camera size={14} color={colors.textMuted} strokeWidth={1.5} />}
-      <Text style={[styles.hintText, { color: colors.textMuted }]}>{children}</Text>
+    <View style={[styles.hintBox, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
+      <Text style={[styles.hintText, { color: colors.secondary }]}>
+        {children}
+      </Text>
     </View>
   );
 }
 
 // ============================================================================
-// CONFIG CARD WRAPPER
+// CONFIG CARD
 // ============================================================================
 
-export function ConfigCard({ children }: { children: React.ReactNode }) {
+interface ConfigCardProps {
+  children: React.ReactNode;
+  style?: any;
+}
+
+export function ConfigCard({ children, style }: ConfigCardProps) {
   const colors = useColors();
   return (
-    <View style={[styles.configCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <View style={[styles.configCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }, style]}>
       {children}
     </View>
   );
 }
 
 // ============================================================================
-// PRESETS
+// CONFIG ROW
 // ============================================================================
 
-export const DISTANCE_PRESETS = [7, 15, 25, 50, 100, 200];
-export const SHOTS_PRESETS = [3, 5, 10, 15, 20];
-export const ROUNDS_PRESETS = [1, 2, 3, 5];
-export const TIME_PRESETS: (number | null)[] = [null, 30, 60, 90];
+interface ConfigRowProps {
+  label: string;
+  children: React.ReactNode;
+  hint?: string;
+  unit?: string;
+  value?: number;
+  onChange?: (value: number) => void;
+  presets?: number[];
+}
+
+export function ConfigRow({ label, children, hint, unit }: ConfigRowProps) {
+  const colors = useColors();
+  return (
+    <View style={styles.configRow}>
+      <View style={styles.configRowHeader}>
+        <Text style={[styles.configRowLabel, { color: colors.text }]}>{label}</Text>
+        {hint && <Text style={[styles.configRowHint, { color: colors.secondary }]}>{hint}</Text>}
+      </View>
+      <View style={styles.configRowContent}>{children}</View>
+    </View>
+  );
+}
+
+// ============================================================================
+// OPTION CARD
+// ============================================================================
+
+interface OptionCardProps {
+  label: string;
+  selected?: boolean;
+  active?: boolean; // Alias for selected
+  onPress?: () => void;
+  icon?: React.ReactNode;
+  description?: string;
+}
+
+export function OptionCard({ label, selected, active, onPress, icon, description }: OptionCardProps) {
+  const isSelected = selected ?? active ?? false;
+  const colors = useColors();
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[
+        styles.optionCard,
+        { 
+          backgroundColor: isSelected ? colors.accent + '20' : colors.cardBackground,
+          borderColor: isSelected ? colors.accent : colors.border,
+        },
+      ]}
+      activeOpacity={0.7}
+    >
+      {icon && <View style={styles.optionIcon}>{icon}</View>}
+      <Text style={[styles.optionLabel, { color: isSelected ? colors.accent : colors.text }]}>
+        {label}
+      </Text>
+      {description && (
+        <Text style={[styles.optionDescription, { color: colors.secondary }]}>
+          {description}
+        </Text>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+// ============================================================================
+// TIME ROW
+// ============================================================================
+
+interface TimeRowProps {
+  value: number;
+  onChange: (value: number) => void;
+  presets?: number[];
+  label?: string;
+}
+
+export function TimeRow({ value, onChange, presets = TIME_PRESETS, label }: TimeRowProps) {
+  const colors = useColors();
+  
+  const formatTime = (seconds: number) => {
+    if (seconds < 60) return `${seconds}s`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+  };
+
+  return (
+    <View style={styles.timeRow}>
+      {label && <Text style={[styles.timeLabel, { color: colors.text }]}>{label}</Text>}
+      <View style={styles.timePresets}>
+        {presets.map((preset) => (
+          <TouchableOpacity
+            key={preset}
+            onPress={() => onChange(preset)}
+            style={[
+              styles.timePreset,
+              {
+                backgroundColor: value === preset ? colors.accent : colors.cardBackground,
+                borderColor: value === preset ? colors.accent : colors.border,
+              },
+            ]}
+          >
+            <Text style={[styles.timePresetText, { color: value === preset ? '#fff' : colors.text }]}>
+              {formatTime(preset)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+}
 
 // ============================================================================
 // STYLES
 // ============================================================================
 
 const styles = StyleSheet.create({
-  // Option Card
-  optionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 12,
-  },
-  optionIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  optionContent: {
-    flex: 1,
-  },
-  optionLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  optionDesc: {
-    fontSize: 12,
-  },
-  optionRadio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Config Row
-  configRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-  },
-  configLeft: {
-    flexDirection: 'column',
-    gap: 2,
-  },
-  configLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  configUnit: {
-    fontSize: 11,
-  },
-  configRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  inputBox: {
-    width: 44,
-    height: 32,
-    borderRadius: 8,
-    borderWidth: 1,
-    justifyContent: 'center',
-  },
-  inputText: {
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-    padding: 0,
-  },
-  presetPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  presetText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-
-  // Section Label
   sectionLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
-    letterSpacing: 0.8,
-    marginBottom: 10,
-    marginLeft: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+    marginTop: 16,
   },
-
-  // Hint Box
   hintBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 10,
+    padding: 12,
+    borderRadius: 8,
     borderWidth: 1,
-    marginBottom: 20,
+    marginVertical: 8,
   },
   hintText: {
-    fontSize: 12,
-    fontWeight: '500',
-    flex: 1,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 18,
   },
-
-  // Config Card
   configCard: {
     borderRadius: 12,
     borderWidth: 1,
-    overflow: 'hidden',
+    padding: 16,
+    marginVertical: 8,
+  },
+  configRow: {
+    marginBottom: 16,
+  },
+  configRowHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  configRowLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  configRowHint: {
+    fontSize: 12,
+  },
+  configRowContent: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  optionCard: {
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  optionIcon: {
+    marginBottom: 4,
+  },
+  optionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  optionDescription: {
+    fontSize: 11,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  timeRow: {
+    gap: 8,
+  },
+  timeLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  timePresets: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  timePreset: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  timePresetText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
 });
-

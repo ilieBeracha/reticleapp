@@ -482,6 +482,31 @@ export const CATEGORY_CONFIGS: Record<WeaponCategory, CategoryConfig> = {
 };
 
 // ============================================================================
+// SIMPLE CATEGORY LIST (derived from CATEGORY_CONFIGS)
+// ============================================================================
+
+/**
+ * Simple weapon category list for pickers/selects.
+ * This is the SINGLE SOURCE OF TRUTH for weapon category options.
+ * 
+ * Derived from CATEGORY_CONFIGS to ensure consistency.
+ */
+export const WEAPON_CATEGORIES: { value: WeaponCategory; label: string }[] = (
+  Object.entries(CATEGORY_CONFIGS) as [WeaponCategory, CategoryConfig][]
+).map(([value, config]) => ({
+  value,
+  label: config.label,
+}));
+
+/**
+ * Get category label by value
+ */
+export function getCategoryLabel(category: WeaponCategory | null | undefined): string {
+  if (!category) return 'Unknown';
+  return CATEGORY_CONFIGS[category]?.label || category;
+}
+
+// ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 

@@ -5,7 +5,7 @@
  * - Create/edit/delete squads
  * - Assign soldiers to squads
  */
-import { BaseAvatar } from '@/components/BaseAvatar';
+import { BaseAvatar } from '@/components/shared/Avatar';
 import { useColors } from '@/hooks/ui/useColors';
 import { getTeamMembers, updateTeam, updateTeamMemberRole } from '@/services/teamService';
 import { useTeamStore } from '@/store/teamStore';

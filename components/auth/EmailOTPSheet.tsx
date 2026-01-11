@@ -14,7 +14,7 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
-import { InputField } from "../ui/input";
+import { InputField } from "../shared/ui/input";
 
 interface EmailOTPSheetProps {
   visible: boolean;

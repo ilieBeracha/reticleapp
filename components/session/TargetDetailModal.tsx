@@ -4,18 +4,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    Dimensions,
-    Image,
-    Modal,
-    PanResponder,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Image,
+  Modal,
+  PanResponder,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -150,13 +150,13 @@ export const TargetDetailModal = React.memo(function TargetDetailModal({
   
   // Determine target purpose
   const isGroupingTarget = isPaper && paperResult?.paper_type === 'grouping';
-  const isEngagementTarget = isPaper && (paperResult?.paper_type === 'achievement' || paperResult?.paper_type === 'engagement');
+  const isEngagementTarget = isPaper && paperResult?.paper_type === 'engagement';
   
   // Get display label for target type
   const targetTypeLabel = isGroupingTarget 
     ? 'Grouping' 
-    : isAchievementTarget 
-      ? 'Achievement' 
+    : isEngagementTarget 
+        ? 'Engagement' 
       : (isPaper ? 'Paper' : 'Tactical');
 
   // Calculate stats

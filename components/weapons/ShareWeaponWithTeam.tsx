@@ -159,18 +159,18 @@ export function ShareWeaponWithTeam({
     return (
       <View style={[styles.sharedCard, { 
         backgroundColor: colors.card, 
-        borderColor: isApproved ? colors.success : colors.warning 
+        borderColor: isApproved ? colors.green : colors.yellow 
       }]}>
         <View style={styles.statusBadge}>
           {isPending ? (
             <>
-              <Clock size={14} color={colors.warning} />
-              <Text style={[styles.statusText, { color: colors.warning }]}>Pending</Text>
+              <Clock size={14} color={colors.yellow} />
+              <Text style={[styles.statusText, { color: colors.yellow }]}>Pending</Text>
             </>
           ) : (
             <>
-              <Check size={14} color={colors.success} />
-              <Text style={[styles.statusText, { color: colors.success }]}>Approved</Text>
+              <Check size={14} color={colors.green} />
+              <Text style={[styles.statusText, { color: colors.green }]}>Approved</Text>
             </>
           )}
         </View>
@@ -184,7 +184,7 @@ export function ShareWeaponWithTeam({
         
         {isPending && !isLoading && (
           <TouchableOpacity
-            style={[styles.withdrawBtn, { backgroundColor: colors.backgroundSecondary }]}
+            style={[styles.withdrawBtn, { backgroundColor: colors.red }]}
             onPress={() => handleWithdraw(item.id)}
           >
             <X size={16} color={colors.destructive} />
@@ -225,22 +225,22 @@ export function ShareWeaponWithTeam({
             ...myWeapons.map(w => ({ type: 'weapon', data: w })),
           ]}
           keyExtractor={(item, index) => 
-            item.type === 'header' ? `header-${index}` : (item.data as UserWeapon).id
+            item.type === 'header' ? `header-${index}` : (item as { data: UserWeapon }).data.id
           }
           renderItem={({ item }) => {
             if (item.type === 'header') {
               return (
                 <View style={styles.sectionHeader}>
                   <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-                    {item.title}
+                    {(item as { title: string }).title}
                   </Text>
                 </View>
               );
             }
             if (item.type === 'shared') {
-              return renderSharedItem({ item: item.data as UserWeapon });
+                  return renderSharedItem({ item: (item as { data: UserWeapon }).data });
             }
-            return renderWeaponItem({ item: item.data as UserWeapon });
+            return renderWeaponItem({ item: (item as { data: UserWeapon }).data });
           }}
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={

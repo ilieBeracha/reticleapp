@@ -1,4 +1,4 @@
-import { Text } from "@/components/ui/text";
+import { Text } from "@/components/shared/ui/text";
 import { useColors } from "@/hooks/ui/useColors";
 import { createInvitation } from "@/services/invitationService";
 import { updateTeam } from "@/services/teamService";

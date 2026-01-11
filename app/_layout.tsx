@@ -1,5 +1,5 @@
-import { LoadingScreen } from '@/components/LoadingScreen';
-import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
+import { LoadingScreen } from '@/components/shared/LoadingScreen';
+import { GluestackUIProvider } from '@/components/shared/ui/gluestack-ui-provider';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ModalProvider } from '@/contexts/ModalContext';
 import { useColorScheme } from '@/hooks/ui/useColorScheme';
@@ -68,7 +68,7 @@ function RootLayoutInner() {
     <GluestackUIProvider mode={'dark' as 'dark' | 'light' | 'system'}>
       <ModalProvider>
         <AuthProvider>
-          <LayoutWithLoadingOverlay colorScheme={colorScheme} />
+          <LayoutWithLoadingOverlay colorScheme={mode} />
         </AuthProvider>
       </ModalProvider>
     </GluestackUIProvider>

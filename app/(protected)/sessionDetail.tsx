@@ -4,11 +4,12 @@
  * Shows session summary, stats, and image previews.
  * Opens as a formSheet modal above tabs.
  */
+import { useSessionTimeline } from '@/components/session';
 import { WeatherStrip } from '@/components/session/WeatherDisplay';
-import { useSessionTimeline } from '@/components/session/timeline/useSessionTimeline';
 import { isEngagementPaper, isGroupingPaper, isPaperTarget } from '@/constants';
 import { useColors } from '@/hooks/ui/useColors';
 import { getSessionInsights, triggerInsightGeneration, type SessionInsight } from '@/services/insights';
+import type { ShotDetail } from '@/services/session/timelineService';
 import type { DecodedWeather } from '@/services/session/watchTypes';
 import {
   calculateSessionStats,
@@ -250,25 +251,27 @@ export default function SessionDetailScreen() {
     }
 
     const shots = timeline.shotDetails;
-    const steadinessSum = shots.reduce((sum, s) => sum + (s.steadiness || 0), 0);
+    const steadinessSum = shots.reduce((sum: number, s: ShotDetail) => sum + (s.steadiness || 0), 0);
     const hasRealSteadiness = steadinessSum > 0;
 
     // Performance scores (use steadiness or inverted stress as calmness)
-    const scores = hasRealSteadiness ? shots.map((s) => s.steadiness) : shots.map((s) => Math.max(0, 100 - s.stress));
+    const scores = hasRealSteadiness 
+      ? shots.map((s: ShotDetail) => s.steadiness) 
+      : shots.map((s: ShotDetail) => Math.max(0, 100 - s.stress));
 
-    const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+    const avgScore = Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length);
 
     // Trend analysis (compare first half vs second half)
     const half = Math.floor(scores.length / 2);
-    const firstHalf = scores.slice(0, half).reduce((a, b) => a + b, 0) / half;
-    const secondHalf = scores.slice(half).reduce((a, b) => a + b, 0) / (scores.length - half);
+    const firstHalf = scores.slice(0, half).reduce((a: number, b: number) => a + b, 0) / half;
+    const secondHalf = scores.slice(half).reduce((a: number, b: number) => a + b, 0) / (scores.length - half);
     const trend: 'improving' | 'declining' | 'stable' =
       secondHalf - firstHalf > 5 ? 'improving' : secondHalf - firstHalf < -5 ? 'declining' : 'stable';
 
     // Breath quality
-    const pauseCount = shots.filter((s) => s.breathPhase === 'pause').length;
-    const exhaleCount = shots.filter((s) => s.breathPhase === 'exhale').length;
-    const inhaleCount = shots.filter((s) => s.breathPhase === 'inhale').length;
+    const pauseCount = shots.filter((s: ShotDetail) => s.breathPhase === 'pause').length;
+    const exhaleCount = shots.filter((s: ShotDetail) => s.breathPhase === 'exhale').length;
+    const inhaleCount = shots.filter((s: ShotDetail) => s.breathPhase === 'inhale').length;
     const pausePct = Math.round((pauseCount / shots.length) * 100);
     const exhalePct = Math.round((exhaleCount / shots.length) * 100);
     const inhalePct = Math.round((inhaleCount / shots.length) * 100);
@@ -280,7 +283,7 @@ export default function SessionDetailScreen() {
     const worstIdx = scores.indexOf(minScore);
 
     // Flinch count
-    const flinchCount = shots.filter((s) => s.flinch).length;
+    const flinchCount = shots.filter((s: ShotDetail) => s.flinch).length;
 
     return {
       scores,
@@ -1089,8 +1092,8 @@ export default function SessionDetailScreen() {
           <View style={[styles.shotBarsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.shotBarsTitle, { color: colors.textMuted }]}>Shot-by-Shot Performance</Text>
             <View style={styles.shotBarsContainer}>
-              {timelineInsights.shots.slice(0, 25).map((shot, idx) => {
-                const score = timelineInsights.scores[idx];
+              {timelineInsights.shots.slice(0, 25).map((shot: any, idx: number) => {
+                const score = timelineInsights.scores[idx] as number;
                 const barHeight = Math.max(6, (score / 100) * 48);
                 const barColor = score >= 50 ? colors.green : score >= 30 ? colors.orange : colors.red;
                 const breathColor =

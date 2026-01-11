@@ -1,6 +1,6 @@
 import { UnifiedHomePage } from '@/components/home/UnifiedHomePage';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import { ThemedText } from '@/components/shared/ThemedText';
+import { ThemedView } from '@/components/shared/ThemedView';
 import { useColors } from '@/hooks/ui/useColors';
 import * as Sentry from '@sentry/react-native';
 import { Stack } from 'expo-router';

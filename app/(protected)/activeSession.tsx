@@ -28,10 +28,12 @@ import {
   Clock,
   Crosshair,
   Focus,
+  Lock,
   MapPin,
   Square,
   Target,
   Trophy,
+  Users,
   Watch,
   X,
   Zap,
@@ -251,6 +253,8 @@ export default function ActiveSessionScreen() {
     score,
     isTacticalDrill,
     watchState,
+    isTeamTraining,
+    sessionMode,
     handleRefresh,
     handleManualRoute,
     handleScanRoute,
@@ -289,6 +293,8 @@ export default function ActiveSessionScreen() {
 
   if (!session || (session.status !== 'active' && session.status !== 'pending')) {
     const isCompleted = session?.status === 'completed';
+    const hasTraining = !!session?.training_id;
+    
     return (
       <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
         <View style={[styles.statusIcon, { backgroundColor: colors.secondary }]}>
@@ -301,16 +307,46 @@ export default function ActiveSessionScreen() {
         <Text style={[styles.statusTitle, { color: colors.text }]}>
           {isCompleted ? 'Session Completed' : 'Session not found'}
         </Text>
-        <TouchableOpacity
-          style={[styles.statusButton, { backgroundColor: colors.secondary }]}
-          onPress={() => router.back()}
-        >
-          <Text style={[styles.statusButtonText, { color: colors.text }]}>Go Back</Text>
-        </TouchableOpacity>
+        
+        {/* Clear exit buttons based on context */}
+        <View style={localStyles.exitButtonsWrap}>
+          {hasTraining && session?.training_id ? (
+            <>
+              <TouchableOpacity
+                style={[localStyles.exitPrimaryBtn, { backgroundColor: colors.text }]}
+                onPress={() => router.replace({
+                  pathname: '/(protected)/trainingDetail',
+                  params: { id: session.training_id },
+                })}
+              >
+                <Text style={[localStyles.exitPrimaryText, { color: colors.background }]}>
+                  Return to Training
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={localStyles.exitSecondaryBtn}
+                onPress={() => router.replace('/(protected)/(tabs)')}
+              >
+                <Text style={[localStyles.exitSecondaryText, { color: colors.textMuted }]}>
+                  Exit to Home
+                </Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity
+              style={[styles.statusButton, { backgroundColor: colors.secondary }]}
+              onPress={() => router.replace('/(protected)/(tabs)')}
+            >
+              <Text style={[styles.statusButtonText, { color: colors.text }]}>Go Home</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     );
   }
 
+  // Show prep view for ALL sessions (both solo and team)
+  // Team sessions just won't have the "back to edit" option since drill is locked
   if (session.status === 'pending') {
     return (
       <SessionPrepView
@@ -319,8 +355,8 @@ export default function ActiveSessionScreen() {
         onSessionActivated={(activated) => {
           handleRefresh();
         }}
-        onBack={() => {
-          // Navigate back to session creation with current settings
+        onBack={isTeamTraining ? undefined : () => {
+          // Only solo sessions can go back to edit
           router.replace({
             pathname: '/(protected)/createSession',
             params: {
@@ -352,12 +388,13 @@ export default function ActiveSessionScreen() {
           onClose={handleClose}
           onRetry={handleRetryWatchConnection}
           onContinueWithoutWatch={handleContinueWithoutWatch}
+          isTeamTraining={isTeamTraining}
         />
       );
     }
 
     if (watchState.watchStarting) {
-      return <WatchStartingView colors={colors} insets={insets} drillName={drillName} onClose={handleClose} />;
+      return <WatchStartingView colors={colors} insets={insets} drillName={drillName} onClose={handleClose} isTeamTraining={isTeamTraining} />;
     }
 
     if (watchState.watchAppNotOpen) {
@@ -373,6 +410,7 @@ export default function ActiveSessionScreen() {
           onClose={handleClose}
           onContinueWithoutWatch={handleContinueWithoutWatch}
           weaponName={session.weapon_name}
+          isTeamTraining={isTeamTraining}
         />
       );
     }
@@ -390,6 +428,7 @@ export default function ActiveSessionScreen() {
           onClose={handleClose}
           onContinueWithoutWatch={handleContinueWithoutWatch}
           weaponName={session.weapon_name}
+          isTeamTraining={isTeamTraining}
         />
       );
     }
@@ -405,10 +444,182 @@ export default function ActiveSessionScreen() {
         ending={ending}
         onClose={handleClose}
         onEndSession={handleEndSession}
+        isTeamTraining={isTeamTraining}
       />
     );
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TEAM TRAINING: Focused execution mode (no clutter, no distractions)
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (isTeamTraining) {
+    const isGrouping = isGroupingSession(session);
+    const drillComplete = drillProgress?.isComplete && drillProgress?.meetsAccuracy;
+    
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        {/* Minimal header - no close button */}
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+          <View style={{ width: 36 }} />
+          <View style={styles.headerCenter}>
+            <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+              {session.drill_name || 'Drill'}
+            </Text>
+          </View>
+          {drill?.time_limit_seconds ? (
+            <View style={styles.timerContainer}>
+              <View style={[styles.liveDot, drillProgress?.overTime && { backgroundColor: COLORS.error }]} />
+              <Text style={[styles.timerText, { color: drillProgress?.overTime ? COLORS.error : colors.text }]}>
+                {formatTime(elapsedTime)}
+              </Text>
+            </View>
+          ) : (
+            <View style={{ width: 36 }} />
+          )}
+        </View>
+
+        {/* Focused drill info card */}
+        <View style={localStyles.trainingFocusCard}>
+          <View style={[localStyles.trainingFocusInner, { backgroundColor: colors.card }]}>
+            {/* Status row */}
+            <View style={localStyles.trainingStatusRow}>
+              <View style={[localStyles.trainingModeBadge, { backgroundColor: colors.primary + '15' }]}>
+                <Lock size={12} color={colors.primary} />
+                <Text style={[localStyles.trainingModeText, { color: colors.primary }]}>LOCKED</Text>
+              </View>
+              {drillComplete && (
+                <View style={[localStyles.trainingModeBadge, { backgroundColor: '#10B98120' }]}>
+                  <Check size={12} color="#10B981" />
+                  <Text style={[localStyles.trainingModeText, { color: '#10B981' }]}>COMPLETE</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Drill params - tight horizontal layout */}
+            <View style={localStyles.trainingParamsRow}>
+              {session.weapon_name && (
+                <View style={localStyles.trainingParam}>
+                  <Target size={14} color={colors.primary} />
+                  <Text style={[localStyles.trainingParamText, { color: colors.text }]}>{session.weapon_name}</Text>
+                </View>
+              )}
+              <View style={localStyles.trainingParam}>
+                <MapPin size={14} color={colors.textMuted} />
+                <Text style={[localStyles.trainingParamText, { color: colors.text }]}>{drill?.distance_m || 25}m</Text>
+              </View>
+              <View style={localStyles.trainingParam}>
+                <Zap size={14} color={colors.textMuted} />
+                <Text style={[localStyles.trainingParamText, { color: colors.text }]}>{drill?.rounds_per_shooter || 5} shots</Text>
+              </View>
+            </View>
+
+            {/* Progress bar */}
+            <View style={localStyles.trainingProgressWrap}>
+              <View style={[localStyles.trainingProgressBg, { backgroundColor: colors.secondary }]}>
+                <View
+                  style={[
+                    localStyles.trainingProgressFill,
+                    {
+                      width: `${drillProgress?.targetsProgress || 0}%`,
+                      backgroundColor: drillComplete ? '#10B981' : colors.text,
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={[localStyles.trainingProgressText, { color: colors.textMuted }]}>
+                {targets.length}/{drillProgress?.requiredTargets ?? 1} targets
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Latest target (if any) */}
+        {targets.length > 0 && (
+          <Animated.View entering={FadeIn.duration(200)} style={localStyles.heroContainer}>
+            <HeroTarget target={targets[0]} onPress={() => handleTargetPress(targets[0])} colors={colors} />
+          </Animated.View>
+        )}
+
+        {/* Single focused action - based on drill type */}
+        {canAddTarget && !drillComplete && (
+          <Animated.View entering={FadeInDown.duration(200)} style={localStyles.trainingActionWrap}>
+            <TouchableOpacity
+              style={[localStyles.trainingActionBtn, { backgroundColor: colors.text }]}
+              onPress={isGrouping ? handleScanRoute : handleManualRoute}
+            >
+              {isGrouping ? (
+                <>
+                  <Camera size={20} color={colors.background} />
+                  <Text style={[localStyles.trainingActionText, { color: colors.background }]}>Scan Target</Text>
+                </>
+              ) : (
+                <>
+                  <Crosshair size={20} color={colors.background} />
+                  <Text style={[localStyles.trainingActionText, { color: colors.background }]}>Log Result</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            {/* Alternative option (small, subtle) */}
+            <TouchableOpacity
+              style={localStyles.trainingAltAction}
+              onPress={isGrouping ? handleManualRoute : handleScanRoute}
+            >
+              <Text style={[localStyles.trainingAltText, { color: colors.textMuted }]}>
+                {isGrouping ? 'or enter manually' : 'or scan paper'}
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+
+        {/* Previous targets list */}
+        {targets.length > 1 && (
+          <View style={localStyles.trainingPrevList}>
+            <Text style={[localStyles.trainingPrevLabel, { color: colors.textMuted }]}>
+              PREVIOUS ({targets.length - 1})
+            </Text>
+            <FlatList
+              data={targets.slice(1)}
+              renderItem={({ item, index }) => (
+                <TargetCard target={item} index={targets.length - 1 - index} onPress={() => handleTargetPress(item)} />
+              )}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+              showsVerticalScrollIndicator={false}
+            />
+          </View>
+        )}
+
+        {/* Bottom action - End Execution */}
+        <View style={[localStyles.bottomBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
+          <TouchableOpacity
+            style={[
+              localStyles.endBtn,
+              drillComplete
+                ? { backgroundColor: '#10B981' }
+                : { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+            ]}
+            onPress={handleEndSession}
+            disabled={ending}
+          >
+            {ending ? (
+              <ActivityIndicator size="small" color={drillComplete ? '#fff' : colors.text} />
+            ) : (
+              <>
+                {drillComplete ? <Check size={18} color="#fff" /> : <Square size={16} color={colors.text} />}
+                <Text style={[localStyles.endBtnText, { color: drillComplete ? '#fff' : colors.text }]}>
+                  {drillComplete ? 'Complete & Return' : 'End Execution'}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SOLO SESSION: Full featured UI with all options
+  // ═══════════════════════════════════════════════════════════════════════════
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
@@ -459,7 +670,8 @@ export default function ActiveSessionScreen() {
           targets={targets}
           isGroupingDrill={isGroupingSession(session)}
           isTacticalDrill={!isGroupingSession(session)}
-            weaponName={session.weapon_name}
+          weaponName={session.weapon_name}
+          isLocked={false}
         />
       )}
 
@@ -566,13 +778,18 @@ function WatchFailedView({
   onClose,
   onRetry,
   onContinueWithoutWatch,
+  isTeamTraining,
 }: any) {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.secondary }]} onPress={onClose}>
-          <X size={18} color={colors.textMuted} />
-        </TouchableOpacity>
+        {isTeamTraining ? (
+          <View style={{ width: 36 }} />
+        ) : (
+          <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.secondary }]} onPress={onClose}>
+            <X size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
             {drillName}
@@ -617,13 +834,17 @@ function WatchFailedView({
   );
 }
 
-function WatchStartingView({ colors, insets, drillName, onClose }: any) {
+function WatchStartingView({ colors, insets, drillName, onClose, isTeamTraining }: any) {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.secondary }]} onPress={onClose}>
-          <X size={18} color={colors.textMuted} />
-        </TouchableOpacity>
+        {isTeamTraining ? (
+          <View style={{ width: 36 }} />
+        ) : (
+          <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.secondary }]} onPress={onClose}>
+            <X size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
             {drillName}
@@ -657,13 +878,18 @@ function WatchPreviewQueuedView({
   onClose,
   onContinueWithoutWatch,
   weaponName,
+  isTeamTraining,
 }: any) {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.secondary }]} onPress={onClose}>
-          <X size={18} color={colors.textMuted} />
-        </TouchableOpacity>
+        {isTeamTraining ? (
+          <View style={{ width: 36 }} />
+        ) : (
+          <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.secondary }]} onPress={onClose}>
+            <X size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
             {drillName}
@@ -736,13 +962,18 @@ function WatchWaitingView({
   ending,
   onClose,
   onEndSession,
+  isTeamTraining,
 }: any) {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.secondary }]} onPress={onClose}>
-          <X size={18} color={colors.textMuted} />
-        </TouchableOpacity>
+        {isTeamTraining ? (
+          <View style={{ width: 36 }} />
+        ) : (
+          <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.secondary }]} onPress={onClose}>
+            <X size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
             {drillName}
@@ -798,13 +1029,19 @@ function WatchWaitingView({
   );
 }
 
-function DrillBanner({ colors, drill, drillProgress, targets, isGroupingDrill, isTacticalDrill, weaponName }: any) {
+function DrillBanner({ colors, drill, drillProgress, targets, isGroupingDrill, isTacticalDrill, weaponName, isLocked }: any) {
   return (
     <View style={styles.drillBanner}>
       <View style={[styles.drillBannerInner, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.drillInfoRow}>
-          <View style={[styles.drillTypeIcon, { backgroundColor: colors.secondary }]}>
-            {isGroupingDrill ? <Focus size={16} color={colors.text} /> : <Trophy size={16} color={colors.text} />}
+          <View style={[styles.drillTypeIcon, { backgroundColor: isLocked ? colors.primary + '20' : colors.secondary }]}>
+            {isLocked ? (
+              <Lock size={16} color={colors.primary} />
+            ) : isGroupingDrill ? (
+              <Focus size={16} color={colors.text} />
+            ) : (
+              <Trophy size={16} color={colors.text} />
+            )}
           </View>
           <View style={styles.drillInfoText}>
             <View style={styles.drillRequirements}>
@@ -1057,4 +1294,150 @@ const localStyles = StyleSheet.create({
     borderRadius: 12,
   },
   primaryBtnText: { fontSize: 16, fontWeight: '600' },
+  
+  // Training mode badge (for solo sessions showing training context)
+  trainingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginBottom: 4,
+  },
+  trainingBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TEAM TRAINING FOCUSED UI STYLES
+  // Clean, tight, no distractions - execution mode
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  trainingFocusCard: {
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  trainingFocusInner: {
+    borderRadius: 14,
+    padding: 16,
+    gap: 14,
+  },
+  trainingStatusRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  trainingModeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  trainingModeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  trainingParamsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  trainingParam: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  trainingParamText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  trainingProgressWrap: {
+    gap: 6,
+  },
+  trainingProgressBg: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  trainingProgressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  trainingProgressText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  
+  // Training single action button
+  trainingActionWrap: {
+    paddingHorizontal: 16,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  trainingActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    width: '100%',
+    height: 54,
+    borderRadius: 14,
+  },
+  trainingActionText: {
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  trainingAltAction: {
+    marginTop: 10,
+    paddingVertical: 6,
+  },
+  trainingAltText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  
+  // Training previous targets list
+  trainingPrevList: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  trainingPrevLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginBottom: 10,
+  },
+  
+  // Exit buttons for completed/not found sessions
+  exitButtonsWrap: {
+    marginTop: 24,
+    width: '100%',
+    paddingHorizontal: 32,
+    gap: 12,
+  },
+  exitPrimaryBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 50,
+    borderRadius: 12,
+  },
+  exitPrimaryText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  exitSecondaryBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  exitSecondaryText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
 });

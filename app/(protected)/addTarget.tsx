@@ -25,7 +25,7 @@ import {
   Step,
   TargetForm,
   TargetType,
-} from "@/components/addTarget";
+} from "@/components/targets";
 
 export default function AddTargetSheet() {
   const { sessionId, defaultTargetType, defaultDistance, defaultInputMethod, startInManual, locked, maxShots } = useLocalSearchParams<{
@@ -113,7 +113,7 @@ export default function AddTargetSheet() {
 
     if (targetType === "grouping") {
       await handleStartCamera();
-    } else if (targetType === "achievement") {
+    } else if (targetType === "engagement") {
       if (inputMethod === "scan") {
         await handleStartCamera();
       } else {

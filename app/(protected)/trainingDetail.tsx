@@ -1,570 +1,462 @@
 /**
- * Training Detail
- * 
- * Clean, refined design with proper state handling and auto-close support.
+ * Training Detail - Story Mode
+ *
+ * A narrative journey through training with phases:
+ * Execution → Debrief
+ *
+ * Each phase is a chapter in the training story, connected by a vertical timeline.
  */
 import {
   useTrainingActions,
   useTrainingDetail,
-} from '@/components/training-detail';
+} from '@/components/training';
+import {
+  AddDrillModal,
+  CommanderActionsSheet,
+  DebriefPhaseContent,
+  ExecutionPhaseContent,
+  getPhaseNarrativeText,
+  getPhaseStatus,
+  PhaseSection,
+  SquadStatusContent,
+  StartTrainingSheet,
+  TrainingHero,
+  TrainingSettingsModal,
+} from '@/components/training/detail';
+import { StartDrillSheet } from '@/components/training/StartDrillSheet';
+import { WeaponAssignmentManager } from '@/components/weapons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModals } from '@/contexts/ModalContext';
 import { useColors } from '@/hooks/ui/useColors';
+import { useOpenWeather } from '@/hooks/useOpenWeather';
 import { usePermissions } from '@/hooks/usePermissions';
-import { getTrainingSessionsWithStats, SessionWithDetails } from '@/services/sessionService';
-import { updateTraining } from '@/services/trainingService';
+import { getTeamDrills } from '@/services/drillService';
+import type { BaseSessionConfig } from '@/services/session/types';
+import {
+  createSession,
+  getTrainingSessionsWithStats,
+  SessionWithDetails,
+} from '@/services/sessionService';
+import { getTeamMembers } from '@/services/teamService';
+import { addDrill } from '@/services/trainingService';
+import {
+  getAssignedWeapons,
+  getOrCreatePersonalProfile,
+  type UserWeapon,
+} from '@/services/weaponService';
+import { toSessionWeatherData } from '@/services/weather';
+import { useSessionStore } from '@/store/sessionStore';
+import { useTeamStore } from '@/store/teamStore';
+import { useGarminDevice, useIsGarminConnected } from '@/store/garminStore';
+import type { Drill } from '@/types/workspace';
 import { format, formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   AlertCircle,
   ArrowLeft,
-  Check,
   CheckCircle2,
-  ChevronRight,
-  Clock,
   MoreHorizontal,
   Play,
-  RefreshCw,
-  Settings,
-  Square,
+  Smartphone,
   Target,
-  Timer,
-  Trophy,
   Users,
-  XCircle,
+  Watch,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Modal,
-  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import Animated, {
-  FadeIn,
-  FadeInDown,
+  interpolate,
+  useAnimatedRef,
   useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withTiming,
+  useScrollViewOffset,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// ═══════════════════════════════════════════════════════════════════════════
-// LIVE DOT
-// ═══════════════════════════════════════════════════════════════════════════
-function LiveDot({ size = 6 }: { size?: number }) {
-  const opacity = useSharedValue(1);
-
-  useEffect(() => {
-    opacity.value = withRepeat(withTiming(0.4, { duration: 800 }), -1, true);
-  }, [opacity]);
-
-  const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
-
-  return (
-    <View style={{ width: size, height: size }}>
-      <View style={[s.liveDotBase, { width: size, height: size, borderRadius: size / 2 }]} />
-      <Animated.View
-        style={[s.liveDotPulse, { width: size, height: size, borderRadius: size / 2 }, style]}
-      />
-    </View>
-  );
-}
+const HEADER_HEIGHT = 180;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// AUTO-CLOSE COUNTDOWN
+// PARALLAX SCROLL CONTENT
 // ═══════════════════════════════════════════════════════════════════════════
-function AutoCloseCountdown({
-  autoCloseAt,
-  colors,
-  onExpired,
-}: {
-  autoCloseAt: string;
-  colors: ReturnType<typeof useColors>;
-  onExpired: () => void;
-}) {
-  const [timeLeft, setTimeLeft] = useState('');
-  const [isExpired, setIsExpired] = useState(false);
 
-  useEffect(() => {
-    const updateCountdown = () => {
-      const now = new Date();
-      const end = new Date(autoCloseAt);
-      const diff = end.getTime() - now.getTime();
+type TabType = 'drills' | 'squad';
 
-      if (diff <= 0) {
-        setTimeLeft('Closing...');
-        setIsExpired(true);
-        onExpired();
-        return;
-      }
-
-      const hours = Math.floor(diff / 3600000);
-      const mins = Math.floor((diff % 3600000) / 60000);
-      const secs = Math.floor((diff % 60000) / 1000);
-
-      if (hours > 0) {
-        setTimeLeft(`${hours}h ${mins}m`);
-      } else if (mins > 0) {
-        setTimeLeft(`${mins}m ${secs}s`);
-      } else {
-        setTimeLeft(`${secs}s`);
-      }
-    };
-
-    updateCountdown();
-    const interval = setInterval(updateCountdown, 1000);
-    return () => clearInterval(interval);
-  }, [autoCloseAt, onExpired]);
-
-  if (isExpired) return null;
-
-  return (
-    <View style={[s.autoCloseCard, { backgroundColor: colors.orange + '15' }]}>
-      <Timer size={16} color={colors.orange} />
-      <View style={s.autoCloseContent}>
-        <Text style={[s.autoCloseLabel, { color: colors.textMuted }]}>Auto-closes in</Text>
-        <Text style={[s.autoCloseTime, { color: colors.orange }]}>{timeLeft}</Text>
-      </View>
-    </View>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// SETTINGS MODAL
-// ═══════════════════════════════════════════════════════════════════════════
-function TrainingSettingsModal({
-  visible,
-  onClose,
+function ParallaxScrollContent({
   training,
-  onUpdate,
   colors,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  training: any;
-  onUpdate: (data: any) => void;
-  colors: ReturnType<typeof useColors>;
-}) {
-  const insets = useSafeAreaInsets();
-  const [saving, setSaving] = useState(false);
-  const [autoCloseEnabled, setAutoCloseEnabled] = useState(!!training?.auto_close_at);
-  const [hours, setHours] = useState('2');
-  const [mins, setMins] = useState('0');
+  insets,
+  onAutoCloseExpired,
+  openWeather,
+  userWeapon,
+  canManageTraining,
+  onAssignWeapon,
+  phaseStatus,
+  completedCount,
+  drills,
+  isPlanned,
+  isOngoing,
+  isFinished,
+  drillProgress,
+  teamSessions,
+  sessionsByDrill,
+  quickStartingDrillId,
+  startingDrillId,
+  onStartDrill,
+  onAddDrill,
+  onBack,
+  onShowCommanderActions,
+  // Watch preference props
+  isWatchConnected,
+  trainingWatchPreference,
+  onChangeWatchPreference,
+}: any) {
+  const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  const scrollOffset = useScrollViewOffset(scrollRef);
+  const [activeTab, setActiveTab] = useState<TabType>('drills');
 
-  useEffect(() => {
-    if (training?.auto_close_at) {
-      const now = new Date();
-      const end = new Date(training.auto_close_at);
-      const diff = Math.max(0, end.getTime() - now.getTime());
-      const h = Math.floor(diff / 3600000);
-      const m = Math.floor((diff % 3600000) / 60000);
-      setHours(String(h));
-      setMins(String(m));
-      setAutoCloseEnabled(true);
-    } else {
-      setAutoCloseEnabled(false);
-      setHours('2');
-      setMins('0');
-    }
-  }, [training?.auto_close_at, visible]);
+  // Show tabs only for commanders during ongoing/finished training
+  const showTabs = canManageTraining && (isOngoing || isFinished);
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      let autoCloseAt: string | null = null;
-      if (autoCloseEnabled) {
-        const h = parseInt(hours, 10) || 0;
-        const m = parseInt(mins, 10) || 0;
-        if (h > 0 || m > 0) {
-          const closeTime = new Date();
-          closeTime.setHours(closeTime.getHours() + h);
-          closeTime.setMinutes(closeTime.getMinutes() + m);
-          autoCloseAt = closeTime.toISOString();
-        }
-      }
-
-      await updateTraining(training.id, { auto_close_at: autoCloseAt });
-      onUpdate({ ...training, auto_close_at: autoCloseAt });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      onClose();
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update settings');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleRemoveAutoClose = async () => {
-    setSaving(true);
-    try {
-      await updateTraining(training.id, { auto_close_at: null });
-      onUpdate({ ...training, auto_close_at: null });
-      setAutoCloseEnabled(false);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      onClose();
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to remove auto-close');
-    } finally {
-      setSaving(false);
-    }
-  };
+  const headerAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        {
+          translateY: interpolate(
+            scrollOffset.value,
+            [-HEADER_HEIGHT, 0, HEADER_HEIGHT],
+            [-HEADER_HEIGHT / 2, 0, HEADER_HEIGHT * 0.75]
+          ),
+        },
+        {
+          scale: interpolate(
+            scrollOffset.value,
+            [-HEADER_HEIGHT, 0, HEADER_HEIGHT],
+            [1.5, 1, 1]
+          ),
+        },
+      ],
+      opacity: interpolate(
+        scrollOffset.value,
+        [0, HEADER_HEIGHT * 0.8],
+        [1, 0]
+      ),
+    };
+  });
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={[s.modalContainer, { backgroundColor: colors.background, paddingTop: insets.top }]}>
-        <View style={s.modalHeader}>
-          <Text style={[s.modalTitle, { color: colors.text }]}>Training Settings</Text>
-          <TouchableOpacity onPress={onClose}>
-            <XCircle size={24} color={colors.textMuted} />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView style={s.modalContent} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
-          {/* Auto-close section */}
-          <View style={[s.settingsSection, { backgroundColor: colors.card }]}>
-            <View style={s.settingRow}>
-              <View style={s.settingInfo}>
-                <Timer size={20} color={colors.text} />
-                <View style={s.settingTextWrap}>
-                  <Text style={[s.settingTitle, { color: colors.text }]}>Auto-close</Text>
-                  <Text style={[s.settingDesc, { color: colors.textMuted }]}>
-                    Automatically finish training after time
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={[
-                  s.settingToggle,
-                  { backgroundColor: autoCloseEnabled ? colors.green : colors.secondary },
-                ]}
-                onPress={() => setAutoCloseEnabled(!autoCloseEnabled)}
-              >
-                <View
-                  style={[
-                    s.settingToggleKnob,
-                    { 
-                      backgroundColor: colors.background,
-                      transform: [{ translateX: autoCloseEnabled ? 18 : 2 }],
-                    },
-                  ]}
-                />
-              </TouchableOpacity>
-            </View>
-
-            {autoCloseEnabled && (
-              <View style={s.timeInputRow}>
-                <Text style={[s.timeInputLabel, { color: colors.textMuted }]}>Close in:</Text>
-                <View style={s.timeInputs}>
-                  <View style={[s.timeInputWrap, { backgroundColor: colors.secondary }]}>
-                    <TextInput
-                      style={[s.timeInput, { color: colors.text }]}
-                      value={hours}
-                      onChangeText={setHours}
-                      keyboardType="number-pad"
-                      maxLength={2}
-                    />
-                    <Text style={[s.timeInputUnit, { color: colors.textMuted }]}>h</Text>
-                  </View>
-                  <View style={[s.timeInputWrap, { backgroundColor: colors.secondary }]}>
-                    <TextInput
-                      style={[s.timeInput, { color: colors.text }]}
-                      value={mins}
-                      onChangeText={setMins}
-                      keyboardType="number-pad"
-                      maxLength={2}
-                    />
-                    <Text style={[s.timeInputUnit, { color: colors.textMuted }]}>m</Text>
-                  </View>
-                </View>
-              </View>
-            )}
-
-            {training?.auto_close_at && (
-              <TouchableOpacity
-                style={[s.removeBtn, { borderColor: colors.red }]}
-                onPress={handleRemoveAutoClose}
-                disabled={saving}
-              >
-                <Text style={[s.removeBtnText, { color: colors.red }]}>Remove auto-close</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </ScrollView>
-
-        <View style={[s.modalFooter, { paddingBottom: insets.bottom + 16 }]}>
-          <TouchableOpacity
-            style={[s.saveBtn, { backgroundColor: colors.text }]}
-            onPress={handleSave}
-            disabled={saving}
-          >
-            {saving ? (
-              <ActivityIndicator color={colors.background} />
-            ) : (
-              <Text style={[s.saveBtnText, { color: colors.background }]}>Save Changes</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// COMPLETION BANNER
-// ═══════════════════════════════════════════════════════════════════════════
-function CompletionBanner({ 
-  colors, 
-  allDrillsCompleted,
-  onFinish,
-  canManage,
-}: { 
-  colors: ReturnType<typeof useColors>;
-  allDrillsCompleted: boolean;
-  onFinish: () => void;
-  canManage: boolean;
-}) {
-  if (!allDrillsCompleted) return null;
-
-  return (
-    <Animated.View entering={FadeIn.duration(400)}>
-      <View style={[s.completionBanner, { backgroundColor: colors.green + '15' }]}>
-        <View style={s.completionContent}>
-          <View style={[s.completionIconWrap, { backgroundColor: colors.green }]}>
-            <Trophy size={20} color="#fff" />
-          </View>
-          <View style={s.completionText}>
-            <Text style={[s.completionTitle, { color: colors.text }]}>
-              All drills completed!
-            </Text>
-            <Text style={[s.completionSubtitle, { color: colors.textMuted }]}>
-              {canManage ? 'You can now finish the training.' : 'Great job! Wait for commander to finish.'}
-            </Text>
-          </View>
-        </View>
-        {canManage && (
-          <TouchableOpacity
-            style={[s.completionBtn, { backgroundColor: colors.green }]}
-            onPress={onFinish}
-          >
-            <Text style={s.completionBtnText}>Finish</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </Animated.View>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// STATUS BADGE
-// ═══════════════════════════════════════════════════════════════════════════
-function StatusBadge({
-  status,
-  colors,
-}: {
-  status: 'planned' | 'ongoing' | 'finished' | 'cancelled';
-  colors: ReturnType<typeof useColors>;
-}) {
-  const config = {
-    planned: { label: 'Scheduled', color: colors.textMuted, icon: Clock },
-    ongoing: { label: 'Live', color: colors.green, icon: null },
-    finished: { label: 'Completed', color: colors.green, icon: CheckCircle2 },
-    cancelled: { label: 'Cancelled', color: colors.red, icon: XCircle },
-  };
-
-  const { label, color, icon: Icon } = config[status] || config.planned;
-
-  return (
-    <View style={s.statusRow}>
-      {status === 'ongoing' && <LiveDot />}
-      {Icon && <Icon size={14} color={color} />}
-      <Text style={[s.statusText, { color }]}>{label}</Text>
-    </View>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// DRILL ROW
-// ═══════════════════════════════════════════════════════════════════════════
-function DrillRow({
-  drill,
-  index,
-  colors,
-  isCompleted,
-  canStart,
-  onStart,
-  isStarting,
-}: {
-  drill: any;
-  index: number;
-  colors: ReturnType<typeof useColors>;
-  isCompleted: boolean;
-  canStart: boolean;
-  onStart: () => void;
-  isStarting: boolean;
-}) {
-  return (
-    <TouchableOpacity
-      style={[s.drillRow, { backgroundColor: colors.card }]}
-      onPress={() => {
-        if (canStart) {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          onStart();
-        }
-      }}
-      disabled={!canStart || isStarting}
-      activeOpacity={canStart ? 0.7 : 1}
+    <Animated.ScrollView
+      ref={scrollRef}
+      style={styles.scroll}
+      contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]}
+      showsVerticalScrollIndicator={false}
+      scrollEventThrottle={16}
     >
-      <View
+      {/* Parallax Header with Nav */}
+      <Animated.View
         style={[
-          s.drillIndex,
-          {
-            backgroundColor: isCompleted ? colors.green : canStart ? colors.text : colors.secondary,
-          },
+          styles.heroCard,
+          { backgroundColor: colors.card, paddingTop: insets.top + 12 },
+          headerAnimatedStyle,
         ]}
       >
-        {isCompleted ? (
-          <Check size={12} color="#fff" strokeWidth={3} />
-        ) : (
-          <Text style={s.drillIndexText}>{index + 1}</Text>
-        )}
-      </View>
+        {/* Nav Row */}
+        <View style={styles.navRow}>
+          <TouchableOpacity
+            style={[styles.navBtn, { backgroundColor: colors.secondary }]}
+            onPress={onBack}
+          >
+            <ArrowLeft size={20} color={colors.text} />
+          </TouchableOpacity>
 
-      <View style={s.drillInfo}>
-        <Text
-          style={[s.drillName, { color: isCompleted ? colors.textMuted : colors.text }]}
-          numberOfLines={1}
-        >
-          {drill.name}
-        </Text>
-        <Text style={[s.drillMeta, { color: colors.textMuted }]}>
-          {drill.distance_m}m • {drill.rounds_per_shooter} shots
-          {drill.time_limit_seconds ? ` • ${drill.time_limit_seconds}s` : ''}
-        </Text>
-      </View>
+          <View style={{ flex: 1 }} />
 
-      {canStart && !isCompleted ? (
-        isStarting ? (
-          <ActivityIndicator size="small" color={colors.text} />
-        ) : (
-          <View style={[s.drillPlayBtn, { backgroundColor: colors.text }]}>
-            <Play size={12} color={colors.background} fill={colors.background} />
-          </View>
-        )
-      ) : !isCompleted ? (
-        <ChevronRight size={16} color={colors.border} />
-      ) : null}
-    </TouchableOpacity>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// FINISHED SUMMARY
-// ═══════════════════════════════════════════════════════════════════════════
-function FinishedSummary({
-  training,
-  drillCount,
-  completedCount,
-  colors,
-}: {
-  training: any;
-  drillCount: number;
-  completedCount: number;
-  colors: ReturnType<typeof useColors>;
-}) {
-  const duration = useMemo(() => {
-    if (!training.started_at || !training.ended_at) return null;
-    const start = new Date(training.started_at);
-    const end = new Date(training.ended_at);
-    const mins = Math.round((end.getTime() - start.getTime()) / 60000);
-    if (mins < 60) return `${mins}m`;
-    const hours = Math.floor(mins / 60);
-    const remainingMins = mins % 60;
-    return `${hours}h ${remainingMins}m`;
-  }, [training.started_at, training.ended_at]);
-
-  return (
-    <View style={[s.summaryCard, { backgroundColor: colors.card }]}>
-      <View style={s.summaryHeader}>
-        <CheckCircle2 size={18} color={colors.green} />
-        <Text style={[s.summaryTitle, { color: colors.text }]}>Training Complete</Text>
-      </View>
-      <View style={s.summaryStats}>
-        <View style={s.summaryStat}>
-          <Text style={[s.summaryStatValue, { color: colors.text }]}>
-            {completedCount}/{drillCount}
-          </Text>
-          <Text style={[s.summaryStatLabel, { color: colors.textMuted }]}>Drills</Text>
+          {canManageTraining && (
+            <TouchableOpacity
+              style={[styles.navBtn, { backgroundColor: colors.text }]}
+              onPress={onShowCommanderActions}
+            >
+              <MoreHorizontal size={20} color={colors.background} />
+            </TouchableOpacity>
+          )}
         </View>
-        {duration && (
-          <View style={s.summaryStat}>
-            <Text style={[s.summaryStatValue, { color: colors.text }]}>{duration}</Text>
-            <Text style={[s.summaryStatLabel, { color: colors.textMuted }]}>Duration</Text>
-          </View>
-        )}
-        {training.ended_at && (
-          <View style={s.summaryStat}>
-            <Text style={[s.summaryStatValue, { color: colors.text }]}>
-              {format(new Date(training.ended_at), 'HH:mm')}
+
+        {/* Title + Status */}
+        <TrainingHero
+          training={training}
+          colors={colors}
+          onAutoCloseExpired={onAutoCloseExpired}
+        />
+
+        {/* Quick Stats - Colored Chips */}
+        <View style={styles.chipsRow}>
+          <View style={[styles.chip, { backgroundColor: colors.primary + '15' }]}>
+            <Text style={[styles.chipText, { color: colors.primary }]}>
+              {completedCount}/{drills.length} drills
             </Text>
-            <Text style={[s.summaryStatLabel, { color: colors.textMuted }]}>Ended</Text>
           </View>
-        )}
-      </View>
-    </View>
-  );
-}
 
-// ═══════════════════════════════════════════════════════════════════════════
-// NOT FOUND STATE
-// ═══════════════════════════════════════════════════════════════════════════
-function NotFoundState({ colors }: { colors: ReturnType<typeof useColors> }) {
-  return (
-    <View style={s.notFoundContainer}>
-      <AlertCircle size={48} color={colors.textMuted} />
-      <Text style={[s.notFoundTitle, { color: colors.text }]}>Training Not Found</Text>
-      <Text style={[s.notFoundText, { color: colors.textMuted }]}>
-        This training may have been deleted or you don't have access.
+          <TouchableOpacity
+            style={[
+              styles.chip,
+              { backgroundColor: userWeapon ? colors.green + '15' : colors.orange + '15' },
+            ]}
+            onPress={!userWeapon && canManageTraining ? onAssignWeapon : undefined}
+            disabled={!!userWeapon || !canManageTraining}
+          >
+            <Text
+              style={[styles.chipText, { color: userWeapon ? colors.green : colors.orange }]}
+              numberOfLines={1}
+            >
+              {userWeapon ? userWeapon.name : 'No weapon'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Watch/Phone mode chip - only show when ongoing and preference is set */}
+          {isOngoing && isWatchConnected && trainingWatchPreference !== null && (
+            <TouchableOpacity
+              style={[
+                styles.chip,
+                styles.chipWithIcon,
+                { backgroundColor: trainingWatchPreference ? colors.green + '15' : colors.secondary },
+              ]}
+              onPress={onChangeWatchPreference}
+              activeOpacity={0.7}
+            >
+              {trainingWatchPreference ? (
+                <Watch size={12} color={colors.green} />
+              ) : (
+                <Smartphone size={12} color={colors.textMuted} />
+              )}
+              <Text
+                style={[
+                  styles.chipText,
+                  { color: trainingWatchPreference ? colors.green : colors.textMuted },
+                ]}
+              >
+                {trainingWatchPreference ? 'Watch' : 'Phone'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {openWeather?.temperatureC != null && (
+            <View style={[styles.chip, { backgroundColor: colors.blue + '15' }]}>
+              <Text style={[styles.chipText, { color: colors.blue }]}>
+                {Math.round(openWeather.temperatureC)}°C
+              </Text>
+            </View>
+          )}
+
+          {training.team && (
+            <View style={[styles.chip, { backgroundColor: colors.secondary }]}>
+              <Text style={[styles.chipText, { color: colors.textMuted }]}>
+                {training.team.name}
+              </Text>
+            </View>
+          )}
+
+          <View style={[styles.chip, { backgroundColor: colors.secondary }]}>
+            <Text style={[styles.chipText, { color: colors.textMuted }]}>
+              {format(new Date(training.scheduled_at), 'MMM d')}
+            </Text>
+          </View>
+        </View>
+      </Animated.View>
+
+      {/* Tab Bar - Commander only, ongoing/finished */}
+      {showTabs && (
+        <View style={[styles.tabBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <TouchableOpacity
+            style={[
+              styles.tab,
+              activeTab === 'drills' && [styles.tabActive, { backgroundColor: colors.primary + '15' }],
+            ]}
+            onPress={() => setActiveTab('drills')}
+            activeOpacity={0.7}
+          >
+            <Target size={16} color={activeTab === 'drills' ? colors.primary : colors.textMuted} />
+            <Text
+              style={[
+                styles.tabText,
+                { color: activeTab === 'drills' ? colors.primary : colors.textMuted },
+              ]}
+            >
+              Drills
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.tab,
+              activeTab === 'squad' && [styles.tabActive, { backgroundColor: colors.primary + '15' }],
+            ]}
+            onPress={() => setActiveTab('squad')}
+            activeOpacity={0.7}
+          >
+            <Users size={16} color={activeTab === 'squad' ? colors.primary : colors.textMuted} />
+            <Text
+              style={[
+                styles.tabText,
+                { color: activeTab === 'squad' ? colors.primary : colors.textMuted },
+              ]}
+            >
+              Squad
+            </Text>
+            {teamSessions.length > 0 && (
+              <View style={[styles.tabBadge, { backgroundColor: colors.green }]}>
+                <Text style={styles.tabBadgeText}>
+                  {new Set(teamSessions.map((s: any) => s.user_id)).size}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Content based on active tab */}
+      {activeTab === 'drills' ? (
+        <View style={styles.phasesContainer}>
+          {/* PHASE 1: EXECUTION */}
+          <PhaseSection
+            phase="execution"
+            title="The Range"
+            subtitle={getPhaseNarrativeText('execution', phaseStatus.execution, {
+              completedDrills: completedCount,
+              totalDrills: drills.length,
+              isPlanned,
+            })}
+            status={phaseStatus.execution}
+            colors={colors}
+            defaultExpanded={isOngoing}
+          >
+            <ExecutionPhaseContent
+              training={training}
+              drillProgress={drillProgress}
+              teamSessions={teamSessions}
+              sessionsByDrill={sessionsByDrill}
+              colors={colors}
+              canManageTraining={canManageTraining}
+              startingDrillId={quickStartingDrillId || startingDrillId}
+              onStartDrill={onStartDrill}
+              onAddDrill={onAddDrill}
+            />
+          </PhaseSection>
+
+          {/* PHASE 2: DEBRIEF */}
+          <PhaseSection
+            phase="debrief"
+            title="After Action"
+            subtitle={getPhaseNarrativeText('debrief', phaseStatus.debrief)}
+            status={phaseStatus.debrief}
+            isLast
+            colors={colors}
+            defaultExpanded={isFinished}
+          >
+            <DebriefPhaseContent
+              training={training}
+              drillProgress={drillProgress}
+              colors={colors}
+              canManageTraining={canManageTraining}
+            />
+          </PhaseSection>
+        </View>
+      ) : (
+        <View style={styles.squadContainer}>
+          <SquadStatusContent
+            teamSessions={teamSessions}
+            drills={drills}
+            drillProgress={drillProgress}
+            colors={colors}
+          />
+        </View>
+      )}
+
+      {/* Footer */}
+      <Text style={[styles.footer, { color: colors.textMuted }]}>
+        Created {formatDistanceToNow(new Date(training.created_at), { addSuffix: true })}
       </Text>
-      <TouchableOpacity
-        style={[s.notFoundBtn, { backgroundColor: colors.card }]}
-        onPress={() => router.replace('/(protected)/(tabs)/trainings' as any)}
-      >
-        <Text style={[s.notFoundBtnText, { color: colors.text }]}>Go to Trainings</Text>
-      </TouchableOpacity>
-    </View>
+    </Animated.ScrollView>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MAIN
+// MAIN SCREEN
 // ═══════════════════════════════════════════════════════════════════════════
+
 export default function TrainingDetailScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
   const { canManageTraining: canManageByRole } = usePermissions();
+  const activeTeamId = useTeamStore((s) => s.activeTeamId);
   const params = useLocalSearchParams<{ id?: string; startDrillId?: string }>();
   const { selectedTraining: contextTraining, getOnTrainingUpdated } = useModals();
+  const { weather: openWeather } = useOpenWeather({ autoFetch: true });
+  const { loadSessions } = useSessionStore();
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // STATE
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const [quickStartingDrillId, setQuickStartingDrillId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showCommanderActions, setShowCommanderActions] = useState(false);
+  const [showStartSheet, setShowStartSheet] = useState(false);
+  const [selectedDrillToStart, setSelectedDrillToStart] = useState<any>(null);
+
+  const [teamSessions, setTeamSessions] = useState<SessionWithDetails[]>([]);
+  const [loadingTeamProgress, setLoadingTeamProgress] = useState(false);
+  const [userWeapon, setUserWeapon] = useState<UserWeapon | null>(null);
+
+  // Add Drill state
+  const [showAddDrill, setShowAddDrill] = useState(false);
+  const [availableDrills, setAvailableDrills] = useState<Drill[]>([]);
+  const [loadingDrills, setLoadingDrills] = useState(false);
+  const [addingDrill, setAddingDrill] = useState(false);
+  const [drillSearch, setDrillSearch] = useState('');
+
+  // Weapon Assignment state
+  const [showWeaponAssignment, setShowWeaponAssignment] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<
+    { id: string; full_name: string; avatar_url?: string | null }[]
+  >([]);
+
+  // Watch preference for this training (asked once, remembered for all drills)
+  // null = not asked yet, true = use watch, false = phone only
+  const [trainingWatchPreference, setTrainingWatchPreference] = useState<boolean | null>(null);
+  const [showWatchPrompt, setShowWatchPrompt] = useState(false);
+  const [pendingDrillForWatch, setPendingDrillForWatch] = useState<any>(null);
+  
+  // Garmin connection status
+  const isWatchConnected = useIsGarminConnected();
+  const watchDevice = useGarminDevice();
+
+  const handledAutoStartRef = useRef<string | null>(null);
+  const autoFinishTriggeredRef = useRef(false);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TRAINING DATA
+  // ═══════════════════════════════════════════════════════════════════════════
 
   const trainingId = params.id || contextTraining?.id;
   const { training, drillProgress, loading, setTraining, refetch } = useTrainingDetail(
     trainingId,
     contextTraining
   );
-  const handledAutoStartRef = useRef<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
 
   const isCreator = training?.creator?.id === session?.user?.id;
-  const canManageTraining = canManageByRole || isCreator;
+  // canManageByRole is based on activeTeamId, but we need to check against training's team
+  // For now, only allow creator OR if activeTeam matches training team and user has manage role
+  const activeTeamMatchesTraining = !training?.team_id || training?.team_id === activeTeamId;
+  const canManageTraining = isCreator || (canManageByRole && activeTeamMatchesTraining);
 
   const {
     actionLoading,
@@ -572,17 +464,122 @@ export default function TrainingDetailScreen() {
     handleStartTraining,
     handleFinishTraining,
     handleCancelTraining,
-    handleStartDrill,
   } = useTrainingActions({
     training,
     setTraining,
     onTrainingUpdated: getOnTrainingUpdated() ?? undefined,
   });
 
-  const [teamSessions, setTeamSessions] = useState<SessionWithDetails[]>([]);
-  const [loadingTeamProgress, setLoadingTeamProgress] = useState(false);
+  // Computed values
+  const drills = training?.drills || [];
+  const completedCount = drillProgress.filter((p) => p.completed).length;
+  const allDrillsCompleted =
+    drills.length > 0 && completedCount === drills.length && training?.status === 'ongoing';
+  const isOngoing = training?.status === 'ongoing';
+  const isPlanned = training?.status === 'planned';
+  const isFinished = training?.status === 'finished';
 
-  const showTeamProgress = !!training?.id && canManageTraining && training?.status === 'ongoing';
+  // Phase status calculation
+  const phaseStatus = useMemo(() => {
+    return training ? getPhaseStatus(training.status) : getPhaseStatus('planned');
+  }, [training?.status]);
+
+  // Group Sessions by Drill
+  const sessionsByDrill = useMemo(() => {
+    const map = new Map<string, SessionWithDetails[]>();
+    teamSessions.forEach((s) => {
+      if (s.drill_id) {
+        if (!map.has(s.drill_id)) map.set(s.drill_id, []);
+        map.get(s.drill_id)?.push(s);
+      }
+    });
+    return map;
+  }, [teamSessions]);
+
+  // Filtered drills for add drill modal
+  const filteredDrills = useMemo(() => {
+    if (!drillSearch.trim()) return availableDrills;
+    const query = drillSearch.toLowerCase();
+    return availableDrills.filter(
+      (d) =>
+        d.name.toLowerCase().includes(query) || d.description?.toLowerCase().includes(query)
+    );
+  }, [availableDrills, drillSearch]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // AUTO-FINISH WHEN ALL DRILLS COMPLETED
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  useEffect(() => {
+    if (
+      allDrillsCompleted &&
+      canManageTraining &&
+      !autoFinishTriggeredRef.current &&
+      !actionLoading
+    ) {
+      autoFinishTriggeredRef.current = true;
+      
+      // Show a brief confirmation before auto-finishing
+      Alert.alert(
+        'All Drills Completed! 🎯',
+        'Great work! Would you like to complete this training now?',
+        [
+          {
+            text: 'Stay Open',
+            style: 'cancel',
+            onPress: () => {
+              autoFinishTriggeredRef.current = false;
+            },
+          },
+          {
+            text: 'Complete Training',
+            onPress: () => {
+              handleFinishTraining();
+            },
+          },
+        ]
+      );
+    }
+  }, [allDrillsCompleted, canManageTraining, actionLoading, handleFinishTraining]);
+
+  // Reset auto-finish flag when training changes
+  useEffect(() => {
+    if (training?.status !== 'ongoing') {
+      autoFinishTriggeredRef.current = false;
+    }
+  }, [training?.status]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // DATA LOADING
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Load user's assigned weapon for this training's team
+  useEffect(() => {
+    if (!training?.team_id || !session?.user?.id) return;
+
+    let cancelled = false;
+    async function loadWeapon() {
+      try {
+        const assigned = await getAssignedWeapons(training!.team_id!, session!.user!.id);
+        if (!cancelled && assigned.length > 0) {
+          const profile = await getOrCreatePersonalProfile(assigned[0].id);
+          if (!cancelled) setUserWeapon(profile);
+        }
+      } catch (e) {
+        console.error('Failed to load assigned weapon', e);
+      }
+    }
+    loadWeapon();
+    return () => {
+      cancelled = true;
+    };
+  }, [training?.team_id, session?.user?.id]);
+
+  // Load Team Data if needed
+  const shouldLoadTeamData =
+    !!training?.id &&
+    canManageTraining &&
+    (training?.status === 'ongoing' || training?.status === 'finished');
 
   const loadTeamProgress = useCallback(async () => {
     if (!training?.id || !canManageTraining) return;
@@ -598,58 +595,192 @@ export default function TrainingDetailScreen() {
   }, [training?.id, canManageTraining]);
 
   useEffect(() => {
-    if (showTeamProgress) loadTeamProgress();
-  }, [showTeamProgress, loadTeamProgress]);
+    if (shouldLoadTeamData) loadTeamProgress();
+  }, [shouldLoadTeamData, loadTeamProgress]);
 
-  // Manual refresh
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HANDLERS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Internal function to actually start the drill with a given watch preference
+  // skipPrepView: explicitly passed to handle first-drill case (state hasn't updated yet)
+  const startDrillWithPreference = useCallback(
+    async (drill: any, useWatch: boolean, skipPrepView: boolean = false) => {
+      if (!userWeapon) {
+        setSelectedDrillToStart(drill);
+        return;
+      }
+
+      setQuickStartingDrillId(drill.id);
+      try {
+        const sessionWeather = toSessionWeatherData(openWeather, 'openweathermap');
+
+        // For team training: skip SessionPrepView when preference is set
+        // Use explicit skipPrepView param (handles first drill when state hasn't updated)
+        const shouldSkipPrepView = skipPrepView || (!!training?.team_id && trainingWatchPreference !== null);
+
+        const config: BaseSessionConfig = {
+          weapon_id: userWeapon.id,
+          weather: sessionWeather,
+          team_id: training?.team_id || null,
+          training_id: training?.id || null,
+          drill_id: drill.id,
+          drill_config: {
+            name: drill.name,
+            drill_goal: drill.drill_goal || 'engagement',
+            target_type: drill.target_type || 'paper',
+            distance_m: drill.distance_m,
+            rounds_per_shooter: drill.rounds_per_shooter,
+            time_limit_seconds: drill.time_limit_seconds,
+          },
+          session_mode: 'solo',
+          watch_controlled: useWatch,
+          // Skip SessionPrepView for team sessions with watch preference set
+          start_as_pending: !shouldSkipPrepView,
+        };
+
+        const newSession = await createSession(config);
+        await loadSessions();
+
+        // Navigate to activeSession
+        router.push({
+          pathname: '/(protected)/activeSession',
+          params: {
+            sessionId: newSession.id,
+            returnTo: 'trainingDetail',
+            returnId: training?.id,
+          },
+        });
+      } catch (error: any) {
+        Alert.alert('Error', error.message || 'Failed to start session');
+      } finally {
+        setQuickStartingDrillId(null);
+      }
+    },
+    [userWeapon, training?.team_id, training?.id, openWeather, loadSessions, trainingWatchPreference]
+  );
+
+  const handleStartDrill = useCallback(
+    async (drill: any) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      // If no weapon assigned, fallback to sheet
+      if (!userWeapon) {
+        setSelectedDrillToStart(drill);
+        return;
+      }
+
+      // If watch is connected and we haven't asked yet for this training, ask once
+      if (isWatchConnected && trainingWatchPreference === null) {
+        setPendingDrillForWatch(drill);
+        setShowWatchPrompt(true);
+        return;
+      }
+
+      // Use the stored preference (or false if no watch connected)
+      const useWatch = isWatchConnected && trainingWatchPreference === true;
+      await startDrillWithPreference(drill, useWatch);
+    },
+    [userWeapon, isWatchConnected, trainingWatchPreference, startDrillWithPreference]
+  );
+
+  // Handle watch prompt response
+  const handleWatchPromptSelect = useCallback(
+    async (useWatch: boolean) => {
+      setShowWatchPrompt(false);
+      // Save preference for this training (remembered for all drills)
+      setTrainingWatchPreference(useWatch);
+
+      // Start the pending drill with the selected preference
+      // Pass skipPrepView=true since we just set the preference (first drill)
+      if (pendingDrillForWatch) {
+        await startDrillWithPreference(pendingDrillForWatch, useWatch, true);
+        setPendingDrillForWatch(null);
+      }
+    },
+    [pendingDrillForWatch, startDrillWithPreference]
+  );
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     refetch();
-    if (showTeamProgress) await loadTeamProgress();
+    if (shouldLoadTeamData) await loadTeamProgress();
     setRefreshing(false);
-  }, [refetch, showTeamProgress, loadTeamProgress]);
+  }, [refetch, shouldLoadTeamData, loadTeamProgress]);
 
-  // Auto-close expired handler
+  const loadAvailableDrills = useCallback(async () => {
+    if (!training?.team_id) return;
+    setLoadingDrills(true);
+    try {
+      const teamDrills = await getTeamDrills(training.team_id);
+      setAvailableDrills(teamDrills);
+    } catch (error) {
+      console.error('[TrainingDetail] Failed to load drills:', error);
+    } finally {
+      setLoadingDrills(false);
+    }
+  }, [training?.team_id]);
+
+  const handleOpenAddDrill = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowAddDrill(true);
+    loadAvailableDrills();
+  }, [loadAvailableDrills]);
+
+  const handleAddDrill = useCallback(
+    async (drill: Drill) => {
+      if (!training?.id || addingDrill) return;
+      setAddingDrill(true);
+      try {
+        await addDrill(training.id, {
+          drill_id: drill.id,
+          name: drill.name,
+          drill_goal: drill.drill_goal,
+          target_type: drill.target_type,
+          distance_m: drill.distance_m,
+          rounds_per_shooter: drill.rounds_per_shooter,
+        });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setShowAddDrill(false);
+        setDrillSearch('');
+        refetch();
+      } catch (error) {
+        Alert.alert('Error', 'Failed to add drill.');
+      } finally {
+        setAddingDrill(false);
+      }
+    },
+    [training?.id, addingDrill, refetch]
+  );
+
+  const handleOpenWeaponAssignment = useCallback(async () => {
+    if (!training?.team_id) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      const members = await getTeamMembers(training.team_id);
+      setTeamMembers(
+        members.map((m) => ({
+          id: m.user_id,
+          full_name: m.profile?.full_name || 'Unknown',
+          avatar_url: m.profile?.avatar_url,
+        }))
+      );
+      setShowWeaponAssignment(true);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to load team members.');
+    }
+  }, [training?.team_id]);
+
   const handleAutoCloseExpired = useCallback(() => {
     if (canManageTraining) {
       handleFinishTraining();
     } else {
-      // For non-commanders, just refresh to see updated status
       setTimeout(() => refetch(), 2000);
     }
   }, [canManageTraining, handleFinishTraining, refetch]);
 
-  const groupedTeamProgress = useMemo(() => {
-    if (!teamSessions.length) return [];
-    const userMap = new Map<string, any>();
-    teamSessions.forEach((s) => {
-      const id = s.user_id;
-      if (!userMap.has(id)) {
-        userMap.set(id, {
-          userId: id,
-          userName: s.user_full_name || 'Unknown',
-          totalShots: 0,
-          totalHits: 0,
-          accuracy: 0,
-          isActive: false,
-          drillsCompleted: 0,
-        });
-      }
-      const e = userMap.get(id)!;
-      if (s.stats) {
-        e.totalShots += s.stats.shots_fired ?? 0;
-        e.totalHits += s.stats.hits_total ?? 0;
-      }
-      if (s.status === 'active') e.isActive = true;
-      if (s.status === 'completed') e.drillsCompleted++;
-    });
-    userMap.forEach((e) => {
-      if (e.totalShots > 0) e.accuracy = Math.round((e.totalHits / e.totalShots) * 100);
-    });
-    return Array.from(userMap.values()).sort((a, b) => a.userName.localeCompare(b.userName));
-  }, [teamSessions]);
-
+  // Auto-start drill handling
   useEffect(() => {
     const startDrillId = Array.isArray(params.startDrillId)
       ? params.startDrillId[0]
@@ -659,346 +790,154 @@ export default function TrainingDetailScreen() {
     handledAutoStartRef.current = startDrillId;
 
     const drill = (training.drills || []).find((d) => d.id === startDrillId);
-    if (!drill) {
-      router.replace(`/(protected)/trainingDetail?id=${training.id}`);
-      return;
-    }
-    if (training.status !== 'ongoing') {
-      Alert.alert('Training not started', 'Start the training first.');
+    if (!drill || training.status !== 'ongoing') {
       router.replace(`/(protected)/trainingDetail?id=${training.id}`);
       return;
     }
     handleStartDrill(drill);
   }, [params.startDrillId, training, handleStartDrill]);
 
-  // Loading state
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RENDER: LOADING STATE
+  // ═══════════════════════════════════════════════════════════════════════════
+
   if (loading) {
     return (
-      <View style={[s.container, { backgroundColor: colors.background }]}>
-        <View style={[s.header, { paddingTop: insets.top + 8 }]}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
           <TouchableOpacity
-            style={[s.headerBtn, { backgroundColor: colors.card }]}
-            onPress={() => router.replace('/(protected)/(tabs)/trainings' as any)}
+            onPress={() => router.back()}
+            style={[styles.headerBtn, { backgroundColor: colors.card }]}
           >
             <ArrowLeft size={20} color={colors.text} />
           </TouchableOpacity>
         </View>
-        <View style={s.loadingContainer}>
+        <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.textMuted} />
         </View>
       </View>
     );
   }
 
-  // Not found state
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RENDER: NOT FOUND STATE
+  // ═══════════════════════════════════════════════════════════════════════════
+
   if (!training) {
     return (
-      <View style={[s.container, { backgroundColor: colors.background }]}>
-        <View style={[s.header, { paddingTop: insets.top + 8 }]}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
           <TouchableOpacity
-            style={[s.headerBtn, { backgroundColor: colors.card }]}
-            onPress={() => router.replace('/(protected)/(tabs)/trainings' as any)}
+            onPress={() => router.back()}
+            style={[styles.headerBtn, { backgroundColor: colors.card }]}
           >
             <ArrowLeft size={20} color={colors.text} />
           </TouchableOpacity>
         </View>
-        <NotFoundState colors={colors} />
+        <View style={styles.notFoundContainer}>
+          <AlertCircle size={48} color={colors.textMuted} />
+          <Text style={[styles.notFoundTitle, { color: colors.text }]}>Training Not Found</Text>
+          <Text style={[styles.notFoundText, { color: colors.textMuted }]}>
+            This training may have been deleted or you don't have access.
+          </Text>
+        </View>
       </View>
     );
   }
 
-  const drills = training.drills || [];
-  const completedCount = drillProgress.filter((p) => p.completed).length;
-  // Only count progress for ongoing trainings (for planned, progress is 0)
-  const effectiveCompletedCount = training.status === 'planned' ? 0 : completedCount;
-  const progressPercent = drills.length > 0 ? (effectiveCompletedCount / drills.length) * 100 : 0;
-  const allDrillsCompleted = drills.length > 0 && completedCount === drills.length && training.status === 'ongoing';
-  
-  const isOngoing = training.status === 'ongoing';
-  const isPlanned = training.status === 'planned';
-  const isFinished = training.status === 'finished';
-  const isCancelled = training.status === 'cancelled';
-
-  const dateStr = format(new Date(training.scheduled_at), 'EEE, MMM d');
-  const timeStr = training.manual_start ? 'Manual' : format(new Date(training.scheduled_at), 'HH:mm');
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RENDER: MAIN CONTENT
+  // ═══════════════════════════════════════════════════════════════════════════
 
   return (
-    <View style={[s.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity
-          style={[s.headerBtn, { backgroundColor: colors.card }]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.replace('/(protected)/(tabs)/trainings' as any);
-          }}
-        >
-          <ArrowLeft size={20} color={colors.text} />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }} />
-        
-        {/* Refresh button */}
-        <TouchableOpacity
-          style={[s.headerBtn, { backgroundColor: colors.card }]}
-          onPress={handleRefresh}
-          disabled={refreshing}
-        >
-          {refreshing ? (
-            <ActivityIndicator size="small" color={colors.textMuted} />
-          ) : (
-            <RefreshCw size={18} color={colors.textMuted} />
-          )}
-        </TouchableOpacity>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ParallaxScrollContent
+        training={training}
+        colors={colors}
+        insets={insets}
+        onAutoCloseExpired={handleAutoCloseExpired}
+        openWeather={openWeather}
+        userWeapon={userWeapon}
+        canManageTraining={canManageTraining}
+        onAssignWeapon={() => setShowWeaponAssignment(true)}
+        phaseStatus={phaseStatus}
+        completedCount={completedCount}
+        drills={drills}
+        isPlanned={isPlanned}
+        isOngoing={isOngoing}
+        isFinished={isFinished}
+        drillProgress={drillProgress}
+        teamSessions={teamSessions}
+        sessionsByDrill={sessionsByDrill}
+        quickStartingDrillId={quickStartingDrillId}
+        startingDrillId={startingDrillId}
+        onStartDrill={handleStartDrill}
+        onAddDrill={handleOpenAddDrill}
+        onBack={() => router.back()}
+        onShowCommanderActions={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setShowCommanderActions(true);
+        }}
+        // Watch preference props
+        isWatchConnected={isWatchConnected}
+        trainingWatchPreference={trainingWatchPreference}
+        onChangeWatchPreference={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setShowWatchPrompt(true);
+        }}
+      />
 
-        {/* Settings button (commander only, ongoing only) */}
-        {canManageTraining && isOngoing && (
-          <TouchableOpacity
-            style={[s.headerBtn, { backgroundColor: colors.card }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setShowSettings(true);
-            }}
-          >
-            <Settings size={18} color={colors.textMuted} />
-          </TouchableOpacity>
-        )}
-        
-        {canManageTraining && (isPlanned || isOngoing) && (
-          <TouchableOpacity
-            style={[s.headerBtn, { backgroundColor: colors.card }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              handleCancelTraining();
-            }}
-          >
-            <MoreHorizontal size={20} color={colors.textMuted} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <ScrollView
-        style={s.scroll}
-        contentContainerStyle={[s.scrollContent, { paddingBottom: insets.bottom + 100 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Hero */}
-        <Animated.View entering={FadeInDown.duration(300)} style={s.hero}>
-          <StatusBadge status={training.status} colors={colors} />
-          <Text style={[s.title, { color: colors.text }]}>{training.title}</Text>
-          <Text style={[s.meta, { color: colors.textMuted }]}>
-            {dateStr} • {timeStr}
-            {training.team && ` • ${training.team.name}`}
-          </Text>
-        </Animated.View>
-
-        {/* Auto-close countdown */}
-        {isOngoing && training.auto_close_at && (
-          <AutoCloseCountdown
-            autoCloseAt={training.auto_close_at}
-            colors={colors}
-            onExpired={handleAutoCloseExpired}
-          />
-        )}
-
-        {/* Cancelled message */}
-        {isCancelled && (
-          <View style={[s.cancelledCard, { backgroundColor: colors.red + '15' }]}>
-            <XCircle size={18} color={colors.red} />
-            <Text style={[s.cancelledText, { color: colors.text }]}>
-              This training was cancelled
-            </Text>
-          </View>
-        )}
-
-        {/* Finished Summary */}
-        {isFinished && (
-          <Animated.View entering={FadeIn.delay(50).duration(300)}>
-            <FinishedSummary
-              training={training}
-              drillCount={drills.length}
-              completedCount={completedCount}
-              colors={colors}
-            />
-          </Animated.View>
-        )}
-
-        {/* Completion Banner (when ongoing and all done) */}
-        {isOngoing && (
-          <CompletionBanner
-            colors={colors}
-            allDrillsCompleted={allDrillsCompleted}
-            onFinish={handleFinishTraining}
-            canManage={canManageTraining}
-          />
-        )}
-
-        {/* Progress Bar (only for ongoing) */}
-        {drills.length > 0 && isOngoing && (
-          <Animated.View entering={FadeIn.delay(50).duration(300)}>
-            <View style={[s.progressCard, { backgroundColor: colors.card }]}>
-              <View style={s.progressHeader}>
-                <Text style={[s.progressLabel, { color: colors.textMuted }]}>Your Progress</Text>
-                <Text style={[s.progressValue, { color: colors.text }]}>
-                  {effectiveCompletedCount}/{drills.length}
-                </Text>
-              </View>
-              <View style={[s.progressBar, { backgroundColor: colors.secondary }]}>
-                <View
-                  style={[
-                    s.progressFill,
-                    {
-                      width: `${progressPercent}%`,
-                      backgroundColor: progressPercent >= 100 ? colors.green : colors.text,
-                    },
-                  ]}
-                />
-              </View>
-            </View>
-          </Animated.View>
-        )}
-
-        {/* Drills */}
-        <View style={s.section}>
-          <View style={s.sectionHeader}>
-            <Target size={16} color={colors.textMuted} />
-            <Text style={[s.sectionTitle, { color: colors.text }]}>Drills</Text>
-            <View style={[s.badge, { backgroundColor: colors.secondary }]}>
-              <Text style={[s.badgeText, { color: colors.textMuted }]}>{drills.length}</Text>
-            </View>
-          </View>
-
-          {drills.length > 0 ? (
-            <View style={s.drillsList}>
-              {drills.map((drill, index) => {
-                const progress = drillProgress.find((p) => p.drillId === drill.id);
-                const isCompleted = isOngoing ? (progress?.completed || false) : false;
-                return (
-                  <DrillRow
-                    key={drill.id}
-                    drill={drill}
-                    index={index}
-                    colors={colors}
-                    isCompleted={isCompleted}
-                    canStart={isOngoing && !isCompleted}
-                    onStart={() => handleStartDrill(drill)}
-                    isStarting={startingDrillId === drill.id}
-                  />
-                );
-              })}
-            </View>
-          ) : (
-            <View style={[s.empty, { backgroundColor: colors.card }]}>
-              <Text style={[s.emptyText, { color: colors.textMuted }]}>No drills</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Team Progress */}
-        {showTeamProgress && (
-          <Animated.View entering={FadeIn.delay(100).duration(300)}>
-            <View style={s.section}>
-              <View style={s.sectionHeader}>
-                <Users size={16} color={colors.textMuted} />
-                <Text style={[s.sectionTitle, { color: colors.text }]}>Team</Text>
-                <TouchableOpacity
-                  style={[s.refreshBtn, { backgroundColor: colors.secondary }]}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    loadTeamProgress();
-                  }}
-                  disabled={loadingTeamProgress}
-                >
-                  <RefreshCw size={12} color={colors.textMuted} />
-                </TouchableOpacity>
-              </View>
-
-              {loadingTeamProgress ? (
-                <View style={[s.teamLoading, { backgroundColor: colors.card }]}>
-                  <ActivityIndicator size="small" color={colors.textMuted} />
-                </View>
-              ) : groupedTeamProgress.length === 0 ? (
-                <View style={[s.empty, { backgroundColor: colors.card }]}>
-                  <Text style={[s.emptyText, { color: colors.textMuted }]}>No one started yet</Text>
-                </View>
+      {/* Bottom Actions - Only show when action is needed */}
+      {((isPlanned && canManageTraining) ||
+        (isOngoing && canManageTraining && allDrillsCompleted)) && (
+        <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={[styles.bottomGradient, { backgroundColor: colors.background }]} />
+          {isPlanned && canManageTraining && (
+            <TouchableOpacity
+              style={[styles.mainActionBtn, { backgroundColor: colors.text }]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                setShowStartSheet(true);
+              }}
+              disabled={actionLoading}
+              activeOpacity={0.8}
+            >
+              {actionLoading ? (
+                <ActivityIndicator color={colors.background} />
               ) : (
-                <View style={s.teamList}>
-                  {groupedTeamProgress.map((m) => (
-                    <View key={m.userId} style={[s.memberRow, { backgroundColor: colors.card }]}>
-                      <View style={[s.memberAvatar, { backgroundColor: colors.secondary }]}>
-                        <Text style={[s.memberInitial, { color: colors.text }]}>
-                          {m.userName.charAt(0).toUpperCase()}
-                        </Text>
-                        {m.isActive && <View style={s.memberActive} />}
-                      </View>
-                      <View style={s.memberInfo}>
-                        <Text style={[s.memberName, { color: colors.text }]} numberOfLines={1}>
-                          {m.userName}
-                        </Text>
-                        <Text style={[s.memberStats, { color: colors.textMuted }]}>
-                          {m.drillsCompleted}/{drills.length} • {m.accuracy}%
-                        </Text>
-                      </View>
-                    </View>
-                  ))}
-                </View>
+                <>
+                  <Play size={18} fill={colors.background} color={colors.background} />
+                  <Text style={[styles.mainActionBtnText, { color: colors.background }]}>
+                    Begin Training
+                  </Text>
+                </>
               )}
-            </View>
-          </Animated.View>
-        )}
+            </TouchableOpacity>
+          )}
 
-        {/* Footer */}
-        <Text style={[s.footer, { color: colors.textMuted }]}>
-          Created {formatDistanceToNow(new Date(training.created_at), { addSuffix: true })}
-        </Text>
-      </ScrollView>
-
-      {/* Bottom Action */}
-      {canManageTraining && isPlanned && (
-        <View style={[s.bottom, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
-          <TouchableOpacity
-            style={[s.actionBtn, { backgroundColor: colors.text }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              handleStartTraining();
-            }}
-            disabled={actionLoading}
-          >
-            {actionLoading ? (
-              <ActivityIndicator size="small" color={colors.background} />
-            ) : (
-              <>
-                <Play size={18} color={colors.background} fill={colors.background} />
-                <Text style={[s.actionBtnText, { color: colors.background }]}>Start Training</Text>
-              </>
-            )}
-          </TouchableOpacity>
+          {isOngoing && canManageTraining && allDrillsCompleted && (
+            <TouchableOpacity
+              style={[styles.mainActionBtn, { backgroundColor: colors.green }]}
+              onPress={() => handleFinishTraining()}
+              disabled={actionLoading}
+              activeOpacity={0.8}
+            >
+              {actionLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <CheckCircle2 size={18} color="#fff" />
+                  <Text style={[styles.mainActionBtnText, { color: '#fff' }]}>
+                    Complete Training
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
-      {/* Ongoing bottom (only if not all completed) */}
-      {canManageTraining && isOngoing && !allDrillsCompleted && (
-        <View style={[s.bottom, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
-          <TouchableOpacity
-            style={[s.actionBtn, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-              handleFinishTraining();
-            }}
-            disabled={actionLoading}
-          >
-            {actionLoading ? (
-              <ActivityIndicator size="small" color={colors.text} />
-            ) : (
-              <>
-                <Square size={16} color={colors.text} />
-                <Text style={[s.actionBtnText, { color: colors.text }]}>Finish Training</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Settings Modal */}
+      {/* Modals */}
       <TrainingSettingsModal
         visible={showSettings}
         onClose={() => setShowSettings(false)}
@@ -1006,6 +945,127 @@ export default function TrainingDetailScreen() {
         onUpdate={setTraining}
         colors={colors}
       />
+
+      <CommanderActionsSheet
+        visible={showCommanderActions}
+        onClose={() => setShowCommanderActions(false)}
+        onAddDrill={handleOpenAddDrill}
+        onAssignWeapon={handleOpenWeaponAssignment}
+        onFinishTraining={handleFinishTraining}
+        onSettings={() => setShowSettings(true)}
+        onCancel={handleCancelTraining}
+        trainingStatus={training.status}
+        colors={colors}
+      />
+
+      <StartTrainingSheet
+        visible={showStartSheet}
+        onClose={() => setShowStartSheet(false)}
+        onStart={handleStartTraining}
+        colors={colors}
+      />
+
+      <StartDrillSheet
+        visible={!!selectedDrillToStart}
+        onClose={() => setSelectedDrillToStart(null)}
+        drill={selectedDrillToStart}
+        trainingId={training?.id}
+        teamId={training?.team_id}
+        initialWeapon={userWeapon}
+      />
+
+      <Modal
+        visible={showWeaponAssignment}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowWeaponAssignment(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          {training?.team_id && (
+            <WeaponAssignmentManager
+              teamId={training.team_id}
+              teamMembers={teamMembers}
+              onClose={() => setShowWeaponAssignment(false)}
+            />
+          )}
+        </View>
+      </Modal>
+
+      <AddDrillModal
+        visible={showAddDrill}
+        onClose={() => setShowAddDrill(false)}
+        drills={availableDrills}
+        filteredDrills={filteredDrills}
+        searchQuery={drillSearch}
+        onSearchChange={setDrillSearch}
+        onAddDrill={handleAddDrill}
+        loading={loadingDrills}
+        adding={addingDrill}
+        colors={colors}
+      />
+
+      {/* Watch Control Prompt - Asked once per training */}
+      <Modal
+        visible={showWatchPrompt}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setShowWatchPrompt(false);
+          setPendingDrillForWatch(null);
+        }}
+      >
+        <View style={styles.watchPromptOverlay}>
+          <View style={[styles.watchPromptCard, { backgroundColor: colors.card }]}>
+            {/* Header */}
+            <View style={styles.watchPromptHeader}>
+              <View style={[styles.watchPromptIcon, { backgroundColor: colors.green + '20' }]}>
+                <Watch size={28} color={colors.green} />
+              </View>
+              <Text style={[styles.watchPromptTitle, { color: colors.text }]}>
+                Watch Connected
+              </Text>
+              <Text style={[styles.watchPromptSubtitle, { color: colors.textMuted }]}>
+                {watchDevice?.name || 'Garmin Watch'}
+              </Text>
+            </View>
+
+            {/* Description */}
+            <View style={styles.watchPromptBody}>
+              <Text style={[styles.watchPromptDescription, { color: colors.text }]}>
+                How do you want to track sessions during this training?
+              </Text>
+              <Text style={[styles.watchPromptNote, { color: colors.textMuted }]}>
+                This choice will apply to all drills in this training.
+              </Text>
+            </View>
+
+            {/* Buttons */}
+            <View style={styles.watchPromptButtons}>
+              <TouchableOpacity
+                style={[styles.watchPromptBtn, { backgroundColor: colors.secondary }]}
+                onPress={() => handleWatchPromptSelect(false)}
+                activeOpacity={0.7}
+              >
+                <Smartphone size={20} color={colors.textMuted} />
+                <Text style={[styles.watchPromptBtnText, { color: colors.text }]}>
+                  Phone Only
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.watchPromptBtn, { backgroundColor: colors.green + '20' }]}
+                onPress={() => handleWatchPromptSelect(true)}
+                activeOpacity={0.7}
+              >
+                <Watch size={20} color={colors.green} />
+                <Text style={[styles.watchPromptBtnText, { color: colors.green, fontWeight: '600' }]}>
+                  Use Watch
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1013,136 +1073,240 @@ export default function TrainingDetailScreen() {
 // ═══════════════════════════════════════════════════════════════════════════
 // STYLES
 // ═══════════════════════════════════════════════════════════════════════════
-const s = StyleSheet.create({
-  container: { flex: 1 },
-  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20 },
 
-  // Header
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 8, gap: 12 },
-  headerBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-
-  // Hero
-  hero: { marginBottom: 20 },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  statusText: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  title: { fontSize: 24, fontWeight: '700', letterSpacing: -0.3, marginBottom: 4 },
-  meta: { fontSize: 14 },
-
-  // Live dot
-  liveDotBase: { backgroundColor: '#10B981' },
-  liveDotPulse: { position: 'absolute', backgroundColor: '#10B981' },
-
-  // Auto-close
-  autoCloseCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12, marginBottom: 16 },
-  autoCloseContent: { flex: 1 },
-  autoCloseLabel: { fontSize: 12, marginBottom: 2 },
-  autoCloseTime: { fontSize: 18, fontWeight: '700' },
-
-  // Cancelled
-  cancelledCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 12, marginBottom: 16 },
-  cancelledText: { fontSize: 14, fontWeight: '500' },
-
-  // Completion banner
-  completionBanner: { padding: 16, borderRadius: 12, marginBottom: 16 },
-  completionContent: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  completionIconWrap: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  completionText: { flex: 1 },
-  completionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 2 },
-  completionSubtitle: { fontSize: 13 },
-  completionBtn: { marginTop: 12, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8, alignSelf: 'flex-start' },
-  completionBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-
-  // Summary card
-  summaryCard: { padding: 16, borderRadius: 12, marginBottom: 16 },
-  summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
-  summaryTitle: { fontSize: 15, fontWeight: '600' },
-  summaryStats: { flexDirection: 'row', gap: 20 },
-  summaryStat: { alignItems: 'center' },
-  summaryStatValue: { fontSize: 18, fontWeight: '700', marginBottom: 2 },
-  summaryStatLabel: { fontSize: 12 },
-
-  // Progress
-  progressCard: { padding: 14, borderRadius: 12, marginBottom: 20 },
-  progressHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  progressLabel: { fontSize: 12, fontWeight: '500', textTransform: 'uppercase' },
-  progressValue: { fontSize: 13, fontWeight: '700' },
-  progressBar: { height: 4, borderRadius: 2, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 2 },
-
-  // Section
-  section: { marginBottom: 24 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  sectionTitle: { fontSize: 15, fontWeight: '600', flex: 1 },
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  badgeText: { fontSize: 12, fontWeight: '600' },
-  refreshBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-
-  // Drills
-  drillsList: { gap: 6 },
-  drillRow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 10, gap: 12 },
-  drillIndex: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  drillIndexText: { fontSize: 12, fontWeight: '700', color: '#fff' },
-  drillInfo: { flex: 1 },
-  drillName: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
-  drillMeta: { fontSize: 13 },
-  drillPlayBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-
-  // Empty
-  empty: { padding: 24, borderRadius: 12, alignItems: 'center' },
-  emptyText: { fontSize: 14 },
-
-  // Not found
-  notFoundContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-  notFoundTitle: { fontSize: 18, fontWeight: '600', marginTop: 16, marginBottom: 8 },
-  notFoundText: { fontSize: 14, textAlign: 'center', marginBottom: 24 },
-  notFoundBtn: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 10 },
-  notFoundBtnText: { fontSize: 15, fontWeight: '600' },
-
-  // Team
-  teamLoading: { padding: 24, borderRadius: 12, alignItems: 'center' },
-  teamList: { gap: 6 },
-  memberRow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 10, gap: 12 },
-  memberAvatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  memberInitial: { fontSize: 14, fontWeight: '600' },
-  memberActive: { position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: 5, backgroundColor: '#10B981', borderWidth: 2, borderColor: '#fff' },
-  memberInfo: { flex: 1 },
-  memberName: { fontSize: 14, fontWeight: '600', marginBottom: 2 },
-  memberStats: { fontSize: 13 },
-
-  // Footer
-  footer: { fontSize: 12, textAlign: 'center', paddingVertical: 20 },
-
-  // Bottom
-  bottom: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingTop: 12 },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, height: 50, borderRadius: 12 },
-  actionBtnText: { fontSize: 16, fontWeight: '600' },
-
-  // Modal
-  modalContainer: { flex: 1 },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(128,128,128,0.2)' },
-  modalTitle: { fontSize: 18, fontWeight: '700' },
-  modalContent: { flex: 1, padding: 20 },
-  modalFooter: { paddingHorizontal: 20, paddingTop: 12 },
-
-  // Settings
-  settingsSection: { borderRadius: 12, padding: 16, marginBottom: 16 },
-  settingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  settingInfo: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  settingTextWrap: { flex: 1 },
-  settingTitle: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
-  settingDesc: { fontSize: 13 },
-  settingToggle: { width: 44, height: 26, borderRadius: 13, justifyContent: 'center' },
-  settingToggleKnob: { width: 22, height: 22, borderRadius: 11 },
-  timeInputRow: { flexDirection: 'row', alignItems: 'center', marginTop: 16, gap: 12 },
-  timeInputLabel: { fontSize: 14 },
-  timeInputs: { flexDirection: 'row', gap: 8 },
-  timeInputWrap: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, gap: 4 },
-  timeInput: { fontSize: 16, fontWeight: '600', width: 32, textAlign: 'center' },
-  timeInputUnit: { fontSize: 14 },
-  removeBtn: { marginTop: 16, paddingVertical: 10, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
-  removeBtnText: { fontSize: 14, fontWeight: '600' },
-  saveBtn: { height: 50, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  saveBtnText: { fontSize: 16, fontWeight: '600' },
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    gap: 12,
+  },
+  headerBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+  },
+  heroCard: {
+    minHeight: HEADER_HEIGHT,
+    marginBottom: 24,
+    marginHorizontal: -16,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  navBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  chipWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  phasesContainer: {
+    marginHorizontal: -6,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 4,
+    gap: 4,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  tabActive: {
+    // background set dynamically
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  tabBadge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  tabBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  squadContainer: {
+    // Same horizontal spacing as phases
+    marginHorizontal: -6,
+    paddingHorizontal: 6,
+  },
+  footer: {
+    fontSize: 12,
+    textAlign: 'center',
+    paddingVertical: 32,
+    opacity: 0.5,
+  },
+  bottomContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+  },
+  bottomGradient: {
+    position: 'absolute',
+    top: -20,
+    left: 0,
+    right: 0,
+    height: 20,
+  },
+  mainActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    height: 52,
+    borderRadius: 14,
+  },
+  mainActionBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalContainer: {
+    flex: 1,
+  },
+  notFoundContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    paddingBottom: 100,
+  },
+  notFoundTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  notFoundText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  // Watch Prompt Modal
+  watchPromptOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  watchPromptCard: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  watchPromptHeader: {
+    alignItems: 'center',
+    paddingTop: 28,
+    paddingHorizontal: 24,
+  },
+  watchPromptIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  watchPromptTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  watchPromptSubtitle: {
+    fontSize: 14,
+  },
+  watchPromptBody: {
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  watchPromptDescription: {
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 8,
+  },
+  watchPromptNote: {
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  watchPromptButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+  },
+  watchPromptBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  watchPromptBtnText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
 });

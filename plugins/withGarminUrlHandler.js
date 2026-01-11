@@ -83,6 +83,18 @@ const withGarminUrlHandler = (config) => {
       config.modResults.NSBluetoothAlwaysUsageDescription ||
       'This app needs Bluetooth to communicate with your Garmin device';
     
+    // Required for Local Network access (iOS 14+) - ConnectIQ uses Bonjour for discovery
+    config.modResults.NSLocalNetworkUsageDescription = 
+      config.modResults.NSLocalNetworkUsageDescription ||
+      'This app needs local network access to communicate with Garmin Connect and your watch';
+    
+    // Bonjour services used by ConnectIQ SDK
+    config.modResults.NSBonjourServices = [
+      ...(config.modResults.NSBonjourServices || []),
+      '_garmin._tcp',
+      '_ciq-comm._tcp',
+    ];
+    
     return config;
   });
 

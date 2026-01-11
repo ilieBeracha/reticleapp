@@ -1,7 +1,7 @@
-import { useColorScheme as useRNColorScheme } from "react-native";
-
-export function useColorScheme() {
-  const colorScheme = useRNColorScheme();
-  // Return device color scheme, defaulting to 'dark' if null
-  return colorScheme ?? "dark";
-}
+/**
+ * useColorScheme hook
+ * 
+ * Re-exports React Native's useColorScheme for consistent import paths.
+ * Can be extended later with custom theme logic if needed.
+ */
+export { useColorScheme } from 'react-native';

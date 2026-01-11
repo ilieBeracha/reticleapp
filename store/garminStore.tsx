@@ -521,47 +521,6 @@ export function useGarminInitialize() {
             }
             break;
 
-          // =========================================================================
-          // HEARTBEAT STATE (Watch state from HEARTBEAT_ACK)
-          // =========================================================================
-          case 'heartbeat_state': {
-            const prevState = store.watchState;
-            const newState = event.state as 'idle' | 'preview' | 'active' | 'syncing' | 'unknown';
-            const sessionId = event.sessionId as string;
-            const shotCount = event.shotCount as number;
-            const syncPhase = event.syncPhase as number;
-
-            // Update watch state
-            useGarminStore.setState({
-              watchState: {
-                state: newState,
-                sessionId,
-                shotCount,
-                syncPhase,
-                lastUpdate: Date.now(),
-              },
-            });
-
-            // Detect session completion:
-            // - active/syncing → idle means shooting done AND sync complete
-            // - We also check if session ID matches to avoid false triggers on new sessions
-            const wasActive = prevState.state === 'active' || prevState.state === 'preview' || prevState.state === 'syncing';
-            const isNowIdle = newState === 'idle';
-            const sameSession = prevState.sessionId === sessionId || (prevState.sessionId && sessionId === '');
-
-            if (wasActive && isNowIdle && sameSession) {
-              const finalSessionId = prevState.sessionId || sessionId;
-              console.log('[GarminStore] 🏁 Watch session complete detected! (state: active/syncing → idle)');
-              console.log(`[GarminStore] 🏁 Session: ${finalSessionId}, Shots: ${shotCount}`);
-
-              // Call registered callback
-              if (store.onWatchSessionComplete && finalSessionId) {
-                store.onWatchSessionComplete(finalSessionId, shotCount);
-              }
-            }
-            break;
-          }
-
           case 'error':
             console.error('[GarminStore] Service error:', event.error);
             break;

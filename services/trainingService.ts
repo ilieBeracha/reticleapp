@@ -65,10 +65,10 @@ export async function createTraining(input: CreateTrainingInput): Promise<Traini
     const drillsToInsert = input.drills.map((drill, index) => ({
       training_id: training.id,
       order_index: index + 1,
-      // NEW: drill_id references core Drill definition
-      drill_id: drill.drill_id ?? null,
+      // NEW: drill_id references core Drill definition (use || to catch empty strings)
+      drill_id: drill.drill_id || null,
       // LEGACY: drill_template_id for backwards compatibility
-      drill_template_id: drill.drill_template_id ?? drill.drill_id ?? null,
+      drill_template_id: drill.drill_template_id || drill.drill_id || null,
       name: drill.name,
       description: drill.description || null,
 
@@ -527,6 +527,21 @@ export async function finishTraining(trainingId: string): Promise<Training | nul
   }
 
   console.log('[TrainingService] Updating training to finished...');
+  console.log('[TrainingService] User role check - training team:', existing.team_id, 'created_by:', existing.created_by);
+  
+  // Check if user is the creator
+  const isCreator = existing.created_by === user.id;
+  // Check if user is commander/owner in training's team
+  const teamMembership = memberships?.find(m => m.team_id === existing.team_id);
+  const isTeamManager = teamMembership?.role === 'owner' || teamMembership?.role === 'commander';
+  
+  console.log('[TrainingService] Permission check - isCreator:', isCreator, 'isTeamManager:', isTeamManager, 'userRole:', teamMembership?.role);
+  
+  if (!isCreator && !isTeamManager) {
+    console.log('[TrainingService] User lacks permission to finish this training');
+    throw new Error('Only the training creator or team commanders can finish this training');
+  }
+  
   const { data, error } = await supabase
     .from('trainings')
     .update({
@@ -543,6 +558,12 @@ export async function finishTraining(trainingId: string): Promise<Training | nul
   if (error) {
     console.error('Failed to finish training:', error);
     throw new Error(error.message || 'Failed to finish training');
+  }
+  
+  // If update returned null but no error, RLS blocked it
+  if (!data) {
+    console.log('[TrainingService] Training update returned no data:', trainingId);
+    throw new Error('Unable to finish training - you may not have permission');
   }
 
   return data as Training;
@@ -1001,5 +1022,58 @@ export async function getMyDrillProgress(trainingId: string): Promise<DrillProgr
     completed: completedDrills.has(drill.id),
     sessionId: completedDrills.get(drill.id),
   }));
+}
+
+// =====================================================
+// RECENT TRAINING DATA
+// =====================================================
+
+/**
+ * Get the most recent completed/ongoing training for a team
+ * Returns the training with its drills (for "repeat last training" feature)
+ */
+export async function getLastTeamTraining(teamId: string): Promise<TrainingWithDetails | null> {
+  const { data, error } = await supabase
+    .from('trainings')
+    .select(`
+      *,
+      team:teams(id, name, team_type),
+      creator:profiles!trainings_created_by_fkey(id, full_name, avatar_url),
+      training_drills(*)
+    `)
+    .eq('team_id', teamId)
+    .in('status', ['finished', 'ongoing'])
+    .order('scheduled_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Failed to fetch last team training:', error);
+    return null;
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return {
+    ...data,
+    drills: data.training_drills || [],
+    drill_count: data.training_drills?.length || 0,
+    training_drills: undefined,
+  } as TrainingWithDetails;
+}
+
+/**
+ * Get drills from the last training for quick re-use
+ */
+export async function getLastTrainingDrills(teamId: string): Promise<TrainingDrill[]> {
+  const lastTraining = await getLastTeamTraining(teamId);
+  
+  if (!lastTraining || !lastTraining.drills) {
+    return [];
+  }
+
+  return lastTraining.drills;
 }
 

@@ -1,7 +1,19 @@
-import { formatShortTime } from '@/utils/formatters';
 import { Ionicons } from '@expo/vector-icons';
+import { format, parseISO } from 'date-fns';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+function formatShortTime(dateString: string): string {
+  try {
+    const date = parseISO(dateString);
+    return format(date, 'h:mm a');
+  } catch {
+    return '';
+  }
+}
 
 // ============================================================================
 // TYPES

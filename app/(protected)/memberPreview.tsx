@@ -1,4 +1,4 @@
-import { BaseAvatar } from "@/components/BaseAvatar";
+import { BaseAvatar } from "@/components/shared/Avatar";
 import { useColors } from "@/hooks/ui/useColors";
 import { usePermissions } from "@/hooks/usePermissions";
 import { removeTeamMember, updateTeamMemberRole } from "@/services/teamService";

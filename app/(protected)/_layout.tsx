@@ -1,4 +1,4 @@
-import { Header } from '@/components/Header';
+import { Header } from '@/components/shared/Header';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { useOrphanedSessionCheck } from '@/hooks/useOrphanedSessionCheck';
@@ -343,6 +343,16 @@ export default function ProtectedLayout() {
             sheetAllowedDetents: [0.75, 1],
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
+          }}
+        />
+
+        <Stack.Screen
+          name="trainingReport"
+          options={{
+            headerShown: false,
+            presentation: "card",
+            gestureEnabled: true,
+            contentStyle: { backgroundColor: colors.background },
           }}
         />
 

@@ -3,7 +3,7 @@
  * 
  * View and manage team members - native form sheet
  */
-import { BaseAvatar } from '@/components/BaseAvatar';
+import { BaseAvatar } from '@/components/shared/Avatar';
 import { useColors } from '@/hooks/ui/useColors';
 import { usePermissions } from '@/hooks/usePermissions';
 import { getTeamMembers, updateTeamMemberRole } from '@/services/teamService';

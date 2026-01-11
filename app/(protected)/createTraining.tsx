@@ -1,30 +1,28 @@
 /**
- * CREATE TRAINING - 2-Step Flow
+ * CREATE TRAINING - 3-Step Flow
  *
  * 1. Details - Team, name, schedule
- * 2. Drills - Build training timeline
+ * 2. Quick Selection - Recent drills, team drills, templates (tap to add)
+ * 3. Custom/Library - Build custom drill or browse full library
  *
  * Training is a team entity that groups multiple drill sessions.
  */
 
 import {
   useCreateTraining
-} from '@/components/createTraining';
-import type { NewDrillInstanceConfig, TrainingDrillItem } from '@/components/createTraining/createTraining.types';
+} from '@/components/training/create';
 import {
-  DrillConfigSheet,
-  DrillCreator,
+  DrillAdjustModal,
+  DrillSelectionStep,
+  DrillsBuilder,
   TrainingDetailsStep,
-  TrainingDrillsStep,
-} from '@/components/createTraining/steps';
+} from '@/components/training/create/steps';
 import { useColors } from '@/hooks/ui/useColors';
-import { createDrill } from '@/services/drillService';
-import type { Drill } from '@/types/workspace';
+import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowRight, Check, ChevronLeft, Play, Users } from 'lucide-react-native';
-import { useState } from 'react';
+import { ArrowRight, ChevronLeft, Play, Sparkles, Users } from 'lucide-react-native';
 import {
   ActivityIndicator,
   Modal,
@@ -46,10 +44,6 @@ export default function CreateTrainingScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { teamId: teamIdParam } = useLocalSearchParams<{ teamId?: string }>();
-
-  // Config sheet state
-  const [configDrill, setConfigDrill] = useState<Drill | null>(null);
-  const [showDrillCreator, setShowDrillCreator] = useState(false);
 
   const {
     teams,
@@ -74,6 +68,11 @@ export default function CreateTrainingScreen() {
     step1Complete,
     step2Complete,
     canCreate,
+    // Step 2 - Quick Selection state
+    lastTrainingDrills,
+    adjustingDrill,
+    adjustModalVisible,
+    // Actions
     handleSelectTeam,
     handleRemoveDrill,
     handleMoveDrill,
@@ -81,73 +80,12 @@ export default function CreateTrainingScreen() {
     handleNextStep,
     handleBackStep,
     handleCreate,
+    // Step 2 - Quick Selection actions
+    handleAdjustDrill,
+    handleCloseAdjustModal,
+    handleUpdateDrill,
+    handleGoToCustom,
   } = useCreateTraining({ teamIdParam });
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // DRILL HANDLERS
-  // ─────────────────────────────────────────────────────────────────────────
-
-  const handleDrillSelect = (drill: Drill) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setConfigDrill(drill);
-  };
-
-  const handleNewConfigConfirm = (config: NewDrillInstanceConfig) => {
-    if (!configDrill) return;
-    
-    addDrill({
-      id: Date.now().toString(),
-      drill_id: configDrill.id,
-      name: configDrill.name,
-      drill_goal: configDrill.drill_goal,
-      target_type: configDrill.target_type,
-      description: configDrill.description || undefined,
-      input_method: config.input_method,
-      distance_m: config.distance_m,
-      rounds_per_shooter: config.rounds_per_shooter,
-      time_limit_seconds: config.time_limit_seconds ?? undefined,
-      strings_count: config.strings_count,
-      weapon_category: config.weapon_category ?? undefined,
-    });
-    
-    setConfigDrill(null);
-  };
-
-  const handleDrillCreatorAdd = (drill: TrainingDrillItem) => {
-    addDrill(drill);
-  };
-
-  const handleDrillCreatorSaveAndAdd = async (
-    drillData: { name: string; drill_goal: 'grouping' | 'achievement'; target_type: 'paper' | 'tactical'; distance_m: number; rounds_per_shooter: number; time_limit_seconds?: number; strings_count?: number },
-    config: NewDrillInstanceConfig
-  ) => {
-    if (!selectedTeamId) return;
-    
-    const created = await createDrill(selectedTeamId, {
-      name: drillData.name,
-      drill_goal: drillData.drill_goal,
-      target_type: drillData.target_type,
-      distance_m: drillData.distance_m,
-      rounds_per_shooter: drillData.rounds_per_shooter,
-      time_limit_seconds: drillData.time_limit_seconds,
-      strings_count: drillData.strings_count,
-    });
-
-    addDrill({
-      id: Date.now().toString(),
-      drill_id: created.id,
-      name: created.name,
-      drill_goal: created.drill_goal,
-      target_type: created.target_type,
-      description: created.description || undefined,
-      input_method: config.input_method,
-      distance_m: config.distance_m,
-      rounds_per_shooter: config.rounds_per_shooter,
-      time_limit_seconds: config.time_limit_seconds ?? undefined,
-      strings_count: config.strings_count,
-      weapon_category: config.weapon_category ?? undefined,
-    });
-  };
 
   // ─────────────────────────────────────────────────────────────────────────
   // NO TEAMS STATE
@@ -187,20 +125,28 @@ export default function CreateTrainingScreen() {
   // MAIN RENDER
   // ─────────────────────────────────────────────────────────────────────────
 
+  const stepLabels = ['Details', 'Select', 'Custom'];
+  const totalSteps = 3;
+
+  // Calculate progress - if we're on step 2 with drills, show as "almost done"
+  const progressPercent = currentStep === 2 && drills.length > 0 
+    ? 85 
+    : (currentStep / totalSteps) * 100;
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top - 20 }]}
+      contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
-      {/* Header with back + step indicator */}
+      {/* Header - Clean style like createSession */}
       <View style={styles.header}>
         <TouchableOpacity
-          style={[styles.backButton, { backgroundColor: colors.card }]}
+          style={[styles.headerButton, { backgroundColor: colors.card }]}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            if (currentStep === 2) {
+            if (currentStep > 1) {
               handleBackStep();
             } else {
               router.back();
@@ -208,54 +154,54 @@ export default function CreateTrainingScreen() {
           }}
           activeOpacity={0.7}
         >
-          <ChevronLeft size={20} color={colors.text} strokeWidth={1.5} />
+          {currentStep > 1 ? (
+            <ChevronLeft size={20} color={colors.text} />
+          ) : (
+            <Ionicons name="close" size={20} color={colors.text} />
+          )}
         </TouchableOpacity>
 
-        {/* Step Progress */}
-        <View style={styles.progressContainer}>
-          {[1, 2].map((step, idx) => {
-            const isComplete = step === 1 ? step1Complete : step2Complete;
-            const isActive = currentStep === step;
-            const labels = ['Details', 'Program'];
-            
-            return (
-              <View key={step} style={styles.progressItem}>
-                <View
-                  style={[
-                    styles.progressDot,
-                    {
-                      backgroundColor: isComplete ? colors.text : isActive ? colors.text : colors.border,
-                      transform: [{ scale: isActive ? 1.2 : 1 }],
-                    },
-                  ]}
-                >
-                  {isComplete && <Check size={10} color={colors.background} strokeWidth={3} />}
-                </View>
-                <Text
-                  style={[
-                    styles.progressLabel,
-                    { color: currentStep >= step ? colors.text : colors.textMuted },
-                  ]}
-                >
-                  {labels[idx]}
-                </Text>
-                {idx < 1 && (
-                  <View
-                    style={[
-                      styles.progressLine,
-                      { backgroundColor: isComplete ? colors.text : colors.border },
-                    ]}
-                  />
-                )}
-              </View>
-            );
-          })}
-        </View>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          {currentStep === 1 && 'New Training'}
+          {currentStep === 2 && 'Add Drills'}
+          {currentStep === 3 && 'Build Custom'}
+        </Text>
 
-        <View style={styles.backButtonPlaceholder} />
+        <View style={styles.headerButtonPlaceholder} />
       </View>
 
-      {/* Step Content */}
+      {/* Progress Bar - Linear style like createSession */}
+      <View style={styles.progressBar}>
+        <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
+          <View 
+            style={[
+              styles.progressFill, 
+              { 
+                backgroundColor: colors.text,
+                width: `${progressPercent}%` as `${number}%`,
+              }
+            ]} 
+          />
+        </View>
+        <View style={styles.progressLabels}>
+          {stepLabels.map((label, idx) => (
+            <Text
+              key={label}
+              style={[
+                styles.progressLabel,
+                { 
+                  color: currentStep > idx ? colors.text : colors.textMuted,
+                  fontWeight: currentStep === idx + 1 ? '600' : '400',
+                },
+              ]}
+            >
+              {label}
+            </Text>
+          ))}
+        </View>
+      </View>
+
+      {/* Step 1: Training Details */}
       {currentStep === 1 && (
         <Animated.View entering={FadeInDown.duration(300)}>
           <TrainingDetailsStep
@@ -274,18 +220,46 @@ export default function CreateTrainingScreen() {
         </Animated.View>
       )}
 
+      {/* Step 2: Quick Selection */}
       {currentStep === 2 && (
-        <Animated.View entering={FadeInDown.duration(300)}>
-          <TrainingDrillsStep
+        <Animated.View entering={FadeInDown.duration(300)} style={styles.step2Container}>
+          {/* Step 2 Header */}
+          <View style={styles.stepHeader}>
+            <View style={[styles.stepIconWrap, { backgroundColor: colors.card }]}>
+              <Sparkles size={20} color={colors.text} />
+            </View>
+            <View style={styles.stepHeaderText}>
+              <Text style={[styles.stepQuestion, { color: colors.text }]}>
+                What drills will you train?
+              </Text>
+              <Text style={[styles.stepHint, { color: colors.textMuted }]}>
+                Tap to add · Tap added drill to adjust
+              </Text>
+            </View>
+          </View>
+
+          <DrillSelectionStep
             drills={drills}
             teamDrills={teamDrills}
-            hasTeam={!!selectedTeamId}
-            canCreateDrills={canCreateDrills}
-            onBack={handleBackStep}
-            onSelectDrill={handleDrillSelect}
+            lastTrainingDrills={lastTrainingDrills}
+            onAddDrill={addDrill}
+            onRemoveDrill={handleRemoveDrill}
+            onAdjustDrill={handleAdjustDrill}
+            onBuildCustom={handleGoToCustom}
+          />
+        </Animated.View>
+      )}
+
+      {/* Step 3: Custom/Library */}
+      {currentStep === 3 && (
+        <Animated.View entering={FadeInDown.duration(300)}>
+          <DrillsBuilder
+            drills={drills}
+            teamDrills={teamDrills}
+            onAddDrill={addDrill}
             onRemoveDrill={handleRemoveDrill}
             onMoveDrill={handleMoveDrill}
-            onCreateNew={() => setShowDrillCreator(true)}
+            onDrillIssued={handleBackStep}
           />
         </Animated.View>
       )}
@@ -293,8 +267,8 @@ export default function CreateTrainingScreen() {
       {/* Spacer - pushes button to bottom when content is short */}
       <View style={styles.spacer} />
 
-      {/* Action Button */}
-      {currentStep === 1 ? (
+      {/* Action Buttons */}
+      {currentStep === 1 && (
         <TouchableOpacity
           style={[
             styles.actionButton,
@@ -312,7 +286,9 @@ export default function CreateTrainingScreen() {
           </Text>
           <ArrowRight size={18} color={step1Complete ? colors.background : colors.textMuted} strokeWidth={2} />
         </TouchableOpacity>
-      ) : (
+      )}
+
+      {currentStep === 2 && (
         <TouchableOpacity
           style={[
             styles.actionButton,
@@ -330,13 +306,17 @@ export default function CreateTrainingScreen() {
           ) : (
             <>
               <Text style={[styles.actionText, { color: canCreate ? colors.background : colors.textMuted }]}>
-                Create Training
+                {drills.length === 0 ? 'Add at least one drill' : 'Create Training'}
               </Text>
-              <Play size={16} color={canCreate ? colors.background : colors.textMuted} fill={canCreate ? colors.background : colors.textMuted} />
+              {drills.length > 0 && (
+                <Play size={16} color={colors.background} fill={colors.background} />
+              )}
             </>
           )}
         </TouchableOpacity>
       )}
+
+      {/* Step 3 has no action button - drill creation auto-returns to Step 2 */}
 
       {currentStep === 2 && drills.length > 0 && (
         <Text style={[styles.footerHint, { color: colors.textMuted }]}>
@@ -344,29 +324,16 @@ export default function CreateTrainingScreen() {
         </Text>
       )}
 
-      {/* Bottom padding for scroll */}
-      <View style={{ height: insets.bottom + 20 }} />
-
       {/* ═══════════════════════════════════════════════════════════════════
           MODALS
       ═══════════════════════════════════════════════════════════════════ */}
 
-      {/* Drill Config Sheet */}
-      <DrillConfigSheet
-        visible={configDrill !== null}
-        drill={configDrill}
-        onConfirm={handleNewConfigConfirm}
-        onClose={() => setConfigDrill(null)}
-      />
-
-      {/* Drill Creator */}
-      <DrillCreator
-        visible={showDrillCreator}
-        teamDrills={teamDrills}
-        canSaveToLibrary={canCreateDrills}
-        onAddToTraining={handleDrillCreatorAdd}
-        onSaveAndAdd={handleDrillCreatorSaveAndAdd}
-        onClose={() => setShowDrillCreator(false)}
+      {/* Drill Adjust Modal */}
+      <DrillAdjustModal
+        visible={adjustModalVisible}
+        drill={adjustingDrill}
+        onClose={handleCloseAdjustModal}
+        onSave={handleUpdateDrill}
       />
 
       {/* Date Picker */}
@@ -438,74 +405,110 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 20,
+    paddingTop: 12,
   },
-  // Header
+  
+  // Header - Clean style
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
-  backButton: {
+  headerButton: {
     width: 40,
     height: 40,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backButtonPlaceholder: {
+  headerButtonPlaceholder: {
     width: 40,
   },
-  // Progress
-  progressContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: -0.3,
   },
-  progressItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  
+  // Progress Bar - Linear style
+  progressBar: {
+    marginBottom: 24,
   },
-  progressDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
+  progressTrack: {
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  progressLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
   },
   progressLabel: {
     fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 6,
-  },
-  progressLine: {
-    width: 32,
-    height: 2,
-    marginHorizontal: 8,
+    letterSpacing: 0.2,
   },
   // Spacer
   spacer: {
     flex: 1,
     minHeight: 32,
   },
-  // Action Button
+  // Step Container
+  step2Container: {
+    flex: 1,
+  },
+  // Step Header
+  stepHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+    marginBottom: 20,
+  },
+  stepIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepHeaderText: {
+    flex: 1,
+    paddingTop: 2,
+  },
+  stepQuestion: {
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    marginBottom: 4,
+  },
+  stepHint: {
+    fontSize: 14,
+  },
+  // Action Button - Larger like createSession
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    height: 52,
-    borderRadius: 14,
+    gap: 10,
+    height: 56,
+    borderRadius: 16,
     marginTop: 16,
   },
   actionText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
   footerHint: {
-    fontSize: 12,
+    fontSize: 13,
+    fontWeight: '500',
     textAlign: 'center',
     marginTop: 12,
   },
