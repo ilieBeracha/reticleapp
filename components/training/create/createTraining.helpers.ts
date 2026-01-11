@@ -4,18 +4,21 @@
  */
 
 import type { TrainingDrillItem } from './createTraining.types';
-import { DEFAULT_HOURS_AHEAD } from './createTraining.constants';
 
 // ============================================================================
 // DATE HELPERS
 // ============================================================================
 
 /**
- * Creates a default scheduled date (now + DEFAULT_HOURS_AHEAD hours, rounded)
+ * Creates a default scheduled date (today, current time rounded to next 15 min)
+ * This ensures training can be started immediately without "scheduled for tomorrow" errors
  */
 export function createDefaultScheduledDate(): Date {
   const date = new Date();
-  date.setHours(date.getHours() + DEFAULT_HOURS_AHEAD, 0, 0, 0);
+  // Round up to next 15 minutes for cleaner display
+  const minutes = date.getMinutes();
+  const roundedMinutes = Math.ceil(minutes / 15) * 15;
+  date.setMinutes(roundedMinutes, 0, 0);
   return date;
 }
 

@@ -47,6 +47,7 @@ import {
 import { toSessionWeatherData } from '@/services/weather';
 import { useSessionStore } from '@/store/sessionStore';
 import { useTeamStore } from '@/store/teamStore';
+import { useGarminDevice, useIsGarminConnected } from '@/store/garminStore';
 import type { Drill } from '@/types/workspace';
 import { format, formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
@@ -57,8 +58,10 @@ import {
   CheckCircle2,
   MoreHorizontal,
   Play,
+  Smartphone,
   Target,
   Users,
+  Watch,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -110,6 +113,10 @@ function ParallaxScrollContent({
   onAddDrill,
   onBack,
   onShowCommanderActions,
+  // Watch preference props
+  isWatchConnected,
+  trainingWatchPreference,
+  onChangeWatchPreference,
 }: any) {
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scrollOffset = useScrollViewOffset(scrollRef);
@@ -211,6 +218,33 @@ function ParallaxScrollContent({
               {userWeapon ? userWeapon.name : 'No weapon'}
             </Text>
           </TouchableOpacity>
+
+          {/* Watch/Phone mode chip - only show when ongoing and preference is set */}
+          {isOngoing && isWatchConnected && trainingWatchPreference !== null && (
+            <TouchableOpacity
+              style={[
+                styles.chip,
+                styles.chipWithIcon,
+                { backgroundColor: trainingWatchPreference ? colors.green + '15' : colors.secondary },
+              ]}
+              onPress={onChangeWatchPreference}
+              activeOpacity={0.7}
+            >
+              {trainingWatchPreference ? (
+                <Watch size={12} color={colors.green} />
+              ) : (
+                <Smartphone size={12} color={colors.textMuted} />
+              )}
+              <Text
+                style={[
+                  styles.chipText,
+                  { color: trainingWatchPreference ? colors.green : colors.textMuted },
+                ]}
+              >
+                {trainingWatchPreference ? 'Watch' : 'Phone'}
+              </Text>
+            </TouchableOpacity>
+          )}
 
           {openWeather?.temperatureC != null && (
             <View style={[styles.chip, { backgroundColor: colors.blue + '15' }]}>
@@ -395,6 +429,16 @@ export default function TrainingDetailScreen() {
     { id: string; full_name: string; avatar_url?: string | null }[]
   >([]);
 
+  // Watch preference for this training (asked once, remembered for all drills)
+  // null = not asked yet, true = use watch, false = phone only
+  const [trainingWatchPreference, setTrainingWatchPreference] = useState<boolean | null>(null);
+  const [showWatchPrompt, setShowWatchPrompt] = useState(false);
+  const [pendingDrillForWatch, setPendingDrillForWatch] = useState<any>(null);
+  
+  // Garmin connection status
+  const isWatchConnected = useIsGarminConnected();
+  const watchDevice = useGarminDevice();
+
   const handledAutoStartRef = useRef<string | null>(null);
   const autoFinishTriggeredRef = useRef(false);
 
@@ -558,59 +602,103 @@ export default function TrainingDetailScreen() {
   // HANDLERS
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // Internal function to actually start the drill with a given watch preference
+  // skipPrepView: explicitly passed to handle first-drill case (state hasn't updated yet)
+  const startDrillWithPreference = useCallback(
+    async (drill: any, useWatch: boolean, skipPrepView: boolean = false) => {
+      if (!userWeapon) {
+        setSelectedDrillToStart(drill);
+        return;
+      }
+
+      setQuickStartingDrillId(drill.id);
+      try {
+        const sessionWeather = toSessionWeatherData(openWeather, 'openweathermap');
+
+        // For team training: skip SessionPrepView when preference is set
+        // Use explicit skipPrepView param (handles first drill when state hasn't updated)
+        const shouldSkipPrepView = skipPrepView || (!!training?.team_id && trainingWatchPreference !== null);
+
+        const config: BaseSessionConfig = {
+          weapon_id: userWeapon.id,
+          weather: sessionWeather,
+          team_id: training?.team_id || null,
+          training_id: training?.id || null,
+          drill_id: drill.id,
+          drill_config: {
+            name: drill.name,
+            drill_goal: drill.drill_goal || 'engagement',
+            target_type: drill.target_type || 'paper',
+            distance_m: drill.distance_m,
+            rounds_per_shooter: drill.rounds_per_shooter,
+            time_limit_seconds: drill.time_limit_seconds,
+          },
+          session_mode: 'solo',
+          watch_controlled: useWatch,
+          // Skip SessionPrepView for team sessions with watch preference set
+          start_as_pending: !shouldSkipPrepView,
+        };
+
+        const newSession = await createSession(config);
+        await loadSessions();
+
+        // Navigate to activeSession
+        router.push({
+          pathname: '/(protected)/activeSession',
+          params: {
+            sessionId: newSession.id,
+            returnTo: 'trainingDetail',
+            returnId: training?.id,
+          },
+        });
+      } catch (error: any) {
+        Alert.alert('Error', error.message || 'Failed to start session');
+      } finally {
+        setQuickStartingDrillId(null);
+      }
+    },
+    [userWeapon, training?.team_id, training?.id, openWeather, loadSessions, trainingWatchPreference]
+  );
+
   const handleStartDrill = useCallback(
     async (drill: any) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      // Quick Start if weapon is assigned
-      if (userWeapon) {
-        setQuickStartingDrillId(drill.id);
-        try {
-          const sessionWeather = toSessionWeatherData(openWeather, 'openweathermap');
-
-          const config: BaseSessionConfig = {
-            weapon_id: userWeapon.id,
-            weather: sessionWeather,
-            team_id: training?.team_id || null,
-            training_id: training?.id || null,
-            drill_id: drill.id,
-            drill_config: {
-              name: drill.name,
-              drill_goal: drill.drill_goal || 'engagement',
-              target_type: drill.target_type || 'paper',
-              distance_m: drill.distance_m,
-              rounds_per_shooter: drill.rounds_per_shooter,
-              time_limit_seconds: drill.time_limit_seconds,
-            },
-            session_mode: 'solo',
-            watch_controlled: false,
-            // Start as pending so user can configure watch/caliber in SessionPrepView
-            start_as_pending: true,
-          };
-
-          const newSession = await createSession(config);
-          await loadSessions();
-
-          // Navigate to activeSession which shows SessionPrepView for watch/caliber config
-          router.push({
-            pathname: '/(protected)/activeSession',
-            params: {
-              sessionId: newSession.id,
-              returnTo: 'trainingDetail',
-              returnId: training?.id,
-            },
-          });
-        } catch (error: any) {
-          Alert.alert('Error', error.message || 'Failed to start session');
-        } finally {
-          setQuickStartingDrillId(null);
-        }
-      } else {
-        // Fallback to sheet if no weapon assigned
+      // If no weapon assigned, fallback to sheet
+      if (!userWeapon) {
         setSelectedDrillToStart(drill);
+        return;
+      }
+
+      // If watch is connected and we haven't asked yet for this training, ask once
+      if (isWatchConnected && trainingWatchPreference === null) {
+        setPendingDrillForWatch(drill);
+        setShowWatchPrompt(true);
+        return;
+      }
+
+      // Use the stored preference (or false if no watch connected)
+      const useWatch = isWatchConnected && trainingWatchPreference === true;
+      await startDrillWithPreference(drill, useWatch);
+    },
+    [userWeapon, isWatchConnected, trainingWatchPreference, startDrillWithPreference]
+  );
+
+  // Handle watch prompt response
+  const handleWatchPromptSelect = useCallback(
+    async (useWatch: boolean) => {
+      setShowWatchPrompt(false);
+      // Save preference for this training (remembered for all drills)
+      setTrainingWatchPreference(useWatch);
+
+      // Start the pending drill with the selected preference
+      // Pass skipPrepView=true since we just set the preference (first drill)
+      if (pendingDrillForWatch) {
+        await startDrillWithPreference(pendingDrillForWatch, useWatch, true);
+        setPendingDrillForWatch(null);
       }
     },
-    [userWeapon, training?.team_id, training?.id, openWeather, loadSessions]
+    [pendingDrillForWatch, startDrillWithPreference]
   );
 
   const handleRefresh = useCallback(async () => {
@@ -790,6 +878,13 @@ export default function TrainingDetailScreen() {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           setShowCommanderActions(true);
         }}
+        // Watch preference props
+        isWatchConnected={isWatchConnected}
+        trainingWatchPreference={trainingWatchPreference}
+        onChangeWatchPreference={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setShowWatchPrompt(true);
+        }}
       />
 
       {/* Bottom Actions - Only show when action is needed */}
@@ -908,6 +1003,69 @@ export default function TrainingDetailScreen() {
         adding={addingDrill}
         colors={colors}
       />
+
+      {/* Watch Control Prompt - Asked once per training */}
+      <Modal
+        visible={showWatchPrompt}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setShowWatchPrompt(false);
+          setPendingDrillForWatch(null);
+        }}
+      >
+        <View style={styles.watchPromptOverlay}>
+          <View style={[styles.watchPromptCard, { backgroundColor: colors.card }]}>
+            {/* Header */}
+            <View style={styles.watchPromptHeader}>
+              <View style={[styles.watchPromptIcon, { backgroundColor: colors.green + '20' }]}>
+                <Watch size={28} color={colors.green} />
+              </View>
+              <Text style={[styles.watchPromptTitle, { color: colors.text }]}>
+                Watch Connected
+              </Text>
+              <Text style={[styles.watchPromptSubtitle, { color: colors.textMuted }]}>
+                {watchDevice?.name || 'Garmin Watch'}
+              </Text>
+            </View>
+
+            {/* Description */}
+            <View style={styles.watchPromptBody}>
+              <Text style={[styles.watchPromptDescription, { color: colors.text }]}>
+                How do you want to track sessions during this training?
+              </Text>
+              <Text style={[styles.watchPromptNote, { color: colors.textMuted }]}>
+                This choice will apply to all drills in this training.
+              </Text>
+            </View>
+
+            {/* Buttons */}
+            <View style={styles.watchPromptButtons}>
+              <TouchableOpacity
+                style={[styles.watchPromptBtn, { backgroundColor: colors.secondary }]}
+                onPress={() => handleWatchPromptSelect(false)}
+                activeOpacity={0.7}
+              >
+                <Smartphone size={20} color={colors.textMuted} />
+                <Text style={[styles.watchPromptBtnText, { color: colors.text }]}>
+                  Phone Only
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.watchPromptBtn, { backgroundColor: colors.green + '20' }]}
+                onPress={() => handleWatchPromptSelect(true)}
+                activeOpacity={0.7}
+              >
+                <Watch size={20} color={colors.green} />
+                <Text style={[styles.watchPromptBtnText, { color: colors.green, fontWeight: '600' }]}>
+                  Use Watch
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -975,6 +1133,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
+  },
+  chipWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   chipText: {
     fontSize: 13,
@@ -1076,5 +1239,74 @@ const styles = StyleSheet.create({
   notFoundText: {
     fontSize: 14,
     textAlign: 'center',
+  },
+  // Watch Prompt Modal
+  watchPromptOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  watchPromptCard: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  watchPromptHeader: {
+    alignItems: 'center',
+    paddingTop: 28,
+    paddingHorizontal: 24,
+  },
+  watchPromptIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  watchPromptTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  watchPromptSubtitle: {
+    fontSize: 14,
+  },
+  watchPromptBody: {
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  watchPromptDescription: {
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 8,
+  },
+  watchPromptNote: {
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  watchPromptButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+  },
+  watchPromptBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  watchPromptBtnText: {
+    fontSize: 15,
+    fontWeight: '500',
   },
 });
