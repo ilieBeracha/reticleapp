@@ -1,20 +1,20 @@
 /**
- * CREATE TRAINING - 3-Step Flow
+ * CREATE TRAINING - 2-Step Flow (V2 Simplified)
  *
  * 1. Details - Team, name, schedule
- * 2. Quick Selection - Recent drills, team drills, templates (tap to add)
- * 3. Custom/Library - Build custom drill or browse full library
+ * 2. Select & Configure - Canonical drills + team presets
  *
- * Training is a team entity that groups multiple drill sessions.
+ * Uses new canonical drills architecture:
+ * - Drills are "verbs" (execution patterns)
+ * - Presets are team shortcuts
+ * - Standards handle evaluation
  */
 
 import {
-  useCreateTraining
+  useCreateTrainingV2
 } from '@/components/training/create';
 import {
-  DrillAdjustModal,
-  DrillSelectionStep,
-  DrillsBuilder,
+  DrillSelectionStepV2,
   TrainingDetailsStep,
 } from '@/components/training/create/steps';
 import { useColors } from '@/hooks/ui/useColors';
@@ -22,7 +22,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowRight, ChevronLeft, Play, Sparkles, Users } from 'lucide-react-native';
+import { ArrowRight, ChevronLeft, Play, Target, Users } from 'lucide-react-native';
 import {
   ActivityIndicator,
   Modal,
@@ -50,7 +50,7 @@ export default function CreateTrainingScreen() {
     selectedTeamId,
     selectedTeam,
     isTeamLocked,
-    canCreateDrills,
+    canCreatePresets,
     title,
     setTitle,
     scheduledDate,
@@ -64,14 +64,14 @@ export default function CreateTrainingScreen() {
     setShowTimePicker,
     submitting,
     currentStep,
-    teamDrills,
+    loading,
+    canonicalDrills,
+    teamPresets,
+    adjustingDrill,
+    adjustModalVisible,
     step1Complete,
     step2Complete,
     canCreate,
-    // Step 2 - Quick Selection state
-    lastTrainingDrills,
-    adjustingDrill,
-    adjustModalVisible,
     // Actions
     handleSelectTeam,
     handleRemoveDrill,
@@ -80,12 +80,11 @@ export default function CreateTrainingScreen() {
     handleNextStep,
     handleBackStep,
     handleCreate,
-    // Step 2 - Quick Selection actions
     handleAdjustDrill,
     handleCloseAdjustModal,
     handleUpdateDrill,
-    handleGoToCustom,
-  } = useCreateTraining({ teamIdParam });
+    handleSavePreset,
+  } = useCreateTrainingV2({ teamIdParam });
 
   // ─────────────────────────────────────────────────────────────────────────
   // NO TEAMS STATE
@@ -125,12 +124,12 @@ export default function CreateTrainingScreen() {
   // MAIN RENDER
   // ─────────────────────────────────────────────────────────────────────────
 
-  const stepLabels = ['Details', 'Select', 'Custom'];
-  const totalSteps = 3;
+  const stepLabels = ['Details', 'Drills'];
+  const totalSteps = 2;
 
-  // Calculate progress - if we're on step 2 with drills, show as "almost done"
+  // Calculate progress
   const progressPercent = currentStep === 2 && drills.length > 0 
-    ? 85 
+    ? 90 
     : (currentStep / totalSteps) * 100;
 
   return (
@@ -163,8 +162,7 @@ export default function CreateTrainingScreen() {
 
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           {currentStep === 1 && 'New Training'}
-          {currentStep === 2 && 'Add Drills'}
-          {currentStep === 3 && 'Build Custom'}
+          {currentStep === 2 && 'Select Drills'}
         </Text>
 
         <View style={styles.headerButtonPlaceholder} />
@@ -220,46 +218,34 @@ export default function CreateTrainingScreen() {
         </Animated.View>
       )}
 
-      {/* Step 2: Quick Selection */}
+      {/* Step 2: Select & Configure Drills */}
       {currentStep === 2 && (
         <Animated.View entering={FadeInDown.duration(300)} style={styles.step2Container}>
           {/* Step 2 Header */}
           <View style={styles.stepHeader}>
             <View style={[styles.stepIconWrap, { backgroundColor: colors.card }]}>
-              <Sparkles size={20} color={colors.text} />
+              <Target size={20} color={colors.text} />
             </View>
             <View style={styles.stepHeaderText}>
               <Text style={[styles.stepQuestion, { color: colors.text }]}>
                 What drills will you train?
               </Text>
               <Text style={[styles.stepHint, { color: colors.textMuted }]}>
-                Tap to add · Tap added drill to adjust
+                Tap to configure · Tap added drill to adjust
               </Text>
             </View>
           </View>
 
-          <DrillSelectionStep
+          <DrillSelectionStepV2
             drills={drills}
-            teamDrills={teamDrills}
-            lastTrainingDrills={lastTrainingDrills}
+            canonicalDrills={canonicalDrills}
+            teamPresets={teamPresets}
+            loading={loading}
             onAddDrill={addDrill}
             onRemoveDrill={handleRemoveDrill}
             onAdjustDrill={handleAdjustDrill}
-            onBuildCustom={handleGoToCustom}
-          />
-        </Animated.View>
-      )}
-
-      {/* Step 3: Custom/Library */}
-      {currentStep === 3 && (
-        <Animated.View entering={FadeInDown.duration(300)}>
-          <DrillsBuilder
-            drills={drills}
-            teamDrills={teamDrills}
-            onAddDrill={addDrill}
-            onRemoveDrill={handleRemoveDrill}
-            onMoveDrill={handleMoveDrill}
-            onDrillIssued={handleBackStep}
+            onSavePreset={handleSavePreset}
+            canCreatePresets={canCreatePresets}
           />
         </Animated.View>
       )}
@@ -316,8 +302,6 @@ export default function CreateTrainingScreen() {
         </TouchableOpacity>
       )}
 
-      {/* Step 3 has no action button - drill creation auto-returns to Step 2 */}
-
       {currentStep === 2 && drills.length > 0 && (
         <Text style={[styles.footerHint, { color: colors.textMuted }]}>
           Team will be notified when training is created
@@ -327,14 +311,6 @@ export default function CreateTrainingScreen() {
       {/* ═══════════════════════════════════════════════════════════════════
           MODALS
       ═══════════════════════════════════════════════════════════════════ */}
-
-      {/* Drill Adjust Modal */}
-      <DrillAdjustModal
-        visible={adjustModalVisible}
-        drill={adjustingDrill}
-        onClose={handleCloseAdjustModal}
-        onSave={handleUpdateDrill}
-      />
 
       {/* Date Picker */}
       {showDatePicker && (

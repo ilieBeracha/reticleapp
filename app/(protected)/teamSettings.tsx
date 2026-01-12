@@ -3,6 +3,7 @@
  * 
  * Manage team configuration and preferences - native form sheet
  */
+import { StandardsManager } from '@/components/standards';
 import { WeaponAssignmentManager } from '@/components/weapons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
@@ -72,6 +73,7 @@ const SETTINGS_SECTIONS: SettingSection[] = [
   {
     title: 'Training',
     items: [
+      { id: 'standards', icon: 'checkmark-circle-outline', label: 'Performance Standards', description: 'Set expectations & condition modifiers', iconColor: '#22C55E' },
       { id: 'drill_defaults', icon: 'fitness-outline', label: 'Drill Defaults', description: 'Default drill configurations' },
       { id: 'scoring', icon: 'analytics-outline', label: 'Scoring Rules', description: 'Customize scoring criteria' },
       { id: 'targets', icon: 'disc-outline', label: 'Target Types', description: 'Manage available targets' },
@@ -160,6 +162,9 @@ export default function TeamSettingsSheet() {
   // Weapons Modal State
   const [weaponsModalVisible, setWeaponsModalVisible] = useState(false);
   const [teamMembers, setTeamMembers] = useState<{ id: string; full_name: string; avatar_url?: string | null }[]>([]);
+  
+  // Standards Modal State
+  const [standardsModalVisible, setStandardsModalVisible] = useState(false);
 
   // Load team members for weapon assignment
   useEffect(() => {
@@ -326,6 +331,13 @@ export default function TeamSettingsSheet() {
         }
         setWeaponsModalVisible(true);
         break;
+      case 'standards':
+        if (!canManage) {
+          Alert.alert('Permission Denied', 'Only commanders can manage performance standards.');
+          return;
+        }
+        setStandardsModalVisible(true);
+        break;
       case 'drill_defaults':
         showComingSoon('Drill Defaults');
         break;
@@ -368,6 +380,10 @@ export default function TeamSettingsSheet() {
     }
     // Only show Equipment section for commanders
     if (section.title === 'Equipment') {
+      return canManage ? section : { ...section, items: [] };
+    }
+    // Only show Training section for commanders
+    if (section.title === 'Training') {
       return canManage ? section : { ...section, items: [] };
     }
     return section;
@@ -504,6 +520,28 @@ export default function TeamSettingsSheet() {
               onClose={() => setWeaponsModalVisible(false)}
             />
           )}
+        </View>
+      </Modal>
+
+      {/* Performance Standards Modal */}
+      <Modal
+        visible={standardsModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setStandardsModalVisible(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          {/* Modal Header */}
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={() => setStandardsModalVisible(false)}>
+              <Text style={[styles.modalCancel, { color: colors.textMuted }]}>Close</Text>
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Performance Standards</Text>
+            <View style={{ width: 50 }} />
+          </View>
+          
+          {/* Standards Manager */}
+          {teamId && <StandardsManager teamId={teamId} />}
         </View>
       </Modal>
     </ScrollView>

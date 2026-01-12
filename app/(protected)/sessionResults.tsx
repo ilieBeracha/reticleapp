@@ -9,6 +9,7 @@
  */
 
 import { WeatherCard } from '@/components/session/WeatherDisplay';
+import { StandardsVerdict } from '@/components/standards';
 import { useColors } from '@/hooks/ui/useColors';
 import type { GarminSessionData } from '@/services/garminService';
 import { getSessionById } from '@/services/session/queries';
@@ -16,6 +17,7 @@ import { getSessionTargetsWithResults } from '@/services/session/targets';
 import type { SessionTargetWithResults, SessionWithDetails } from '@/services/session/types';
 import type { DecodedWeather } from '@/services/session/watchTypes';
 import { decodeWeather } from '@/services/session/weatherDecoder';
+import { getSessionVerdict, type SessionVerdict } from '@/services/standards';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
@@ -95,6 +97,7 @@ export default function SessionResultsScreen() {
   
   const [session, setSession] = useState<SessionWithDetails | null>(null);
   const [targets, setTargets] = useState<SessionTargetWithResults[]>([]);
+  const [verdict, setVerdict] = useState<SessionVerdict | null>(null);
   const [loading, setLoading] = useState(true);
   
   // Parse watch data from params
@@ -107,10 +110,12 @@ export default function SessionResultsScreen() {
       Promise.all([
         getSessionById(sessionId),
         getSessionTargetsWithResults(sessionId),
+        getSessionVerdict(sessionId).catch(() => null),
       ])
-        .then(([sessionData, targetData]) => {
+        .then(([sessionData, targetData, verdictData]) => {
           setSession(sessionData);
           setTargets(targetData);
+          setVerdict(verdictData);
         })
         .catch(console.error)
         .finally(() => setLoading(false));
@@ -294,6 +299,13 @@ export default function SessionResultsScreen() {
             Session recorded successfully
           </Text>
         </View>
+
+        {/* Standards Verdict (team sessions only) */}
+        {session?.team_id && (
+          <View style={styles.verdictContainer}>
+            <StandardsVerdict verdict={verdict} />
+          </View>
+        )}
 
         {/* Quick Stats - Smart display based on entry type */}
         <View style={styles.statsGrid}>
@@ -644,6 +656,10 @@ function StatCard({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  verdictContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 8,
   },
   header: {
     flexDirection: 'row',

@@ -2430,6 +2430,19 @@ COMMENT ON FUNCTION "public"."update_insight_triggers"("p_user_id" "uuid", "p_se
 
 
 
+CREATE OR REPLACE FUNCTION "public"."update_team_drill_presets_updated_at"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."update_team_drill_presets_updated_at"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."update_team_member_role"("p_team_id" "uuid", "p_user_id" "uuid", "p_role" "text", "p_details" "jsonb" DEFAULT NULL::"jsonb") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -2524,6 +2537,19 @@ ALTER FUNCTION "public"."update_team_member_role"("p_team_id" "uuid", "p_user_id
 
 COMMENT ON FUNCTION "public"."update_team_member_role"("p_team_id" "uuid", "p_user_id" "uuid", "p_role" "text", "p_details" "jsonb") IS 'Safely updates a team member role with permission checks, bypassing RLS recursion.';
 
+
+
+CREATE OR REPLACE FUNCTION "public"."update_team_standards_updated_at"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."update_team_standards_updated_at"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."update_updated_at_column"() RETURNS "trigger"
@@ -2698,9 +2724,9 @@ CREATE TABLE IF NOT EXISTS "public"."drill_templates" (
     "owner_type" "text" DEFAULT 'team'::"text" NOT NULL,
     "owner_id" "uuid",
     "is_default" boolean DEFAULT false,
+    "migrated_at" timestamp with time zone,
     CONSTRAINT "drill_templates_category_check" CHECK ((("category" IS NULL) OR ("category" = ANY (ARRAY['fundamentals'::"text", 'speed'::"text", 'accuracy'::"text", 'stress'::"text", 'tactical'::"text", 'competition'::"text", 'qualification'::"text"])))),
     CONSTRAINT "drill_templates_difficulty_check" CHECK ((("difficulty" IS NULL) OR ("difficulty" = ANY (ARRAY['beginner'::"text", 'intermediate'::"text", 'advanced'::"text", 'expert'::"text"])))),
-    CONSTRAINT "drill_templates_drill_goal_check" CHECK (("drill_goal" = ANY (ARRAY['grouping'::"text", 'achievement'::"text", 'zeroing'::"text", 'physical'::"text"]))),
     CONSTRAINT "drill_templates_min_accuracy_percent_check" CHECK ((("min_accuracy_percent" IS NULL) OR (("min_accuracy_percent" >= 0) AND ("min_accuracy_percent" <= 100)))),
     CONSTRAINT "drill_templates_movement_type_check" CHECK ((("movement_type" IS NULL) OR ("movement_type" = ANY (ARRAY['none'::"text", 'advance'::"text", 'retreat'::"text", 'lateral'::"text", 'diagonal'::"text", 'freestyle'::"text"])))),
     CONSTRAINT "drill_templates_owner_type_check" CHECK (("owner_type" = ANY (ARRAY['user'::"text", 'team'::"text"]))),
@@ -2788,6 +2814,48 @@ COMMENT ON COLUMN "public"."drill_templates"."is_default" IS 'True for system/de
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."drills" (
+    "id" "text" NOT NULL,
+    "name" "text" NOT NULL,
+    "description" "text",
+    "drill_goal" "text" NOT NULL,
+    "target_type" "text" NOT NULL,
+    "default_shots" integer DEFAULT 5 NOT NULL,
+    "default_strings" integer DEFAULT 1 NOT NULL,
+    "supports_time" boolean DEFAULT false NOT NULL,
+    "supports_position" boolean DEFAULT true NOT NULL,
+    "allowed_distances" integer[],
+    "fixed_shots" boolean DEFAULT false NOT NULL,
+    "category" "text",
+    "difficulty" "text",
+    "sort_order" integer DEFAULT 0,
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    CONSTRAINT "drills_category_check" CHECK (("category" = ANY (ARRAY['zeroing'::"text", 'grouping'::"text", 'speed'::"text", 'qualification'::"text"]))),
+    CONSTRAINT "drills_difficulty_check" CHECK (("difficulty" = ANY (ARRAY['beginner'::"text", 'intermediate'::"text", 'advanced'::"text"]))),
+    CONSTRAINT "drills_drill_goal_check" CHECK (("drill_goal" = ANY (ARRAY['grouping'::"text", 'engagement'::"text"]))),
+    CONSTRAINT "drills_target_type_check" CHECK (("target_type" = ANY (ARRAY['paper'::"text", 'tactical'::"text"])))
+);
+
+
+ALTER TABLE "public"."drills" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."drills" IS 'Canonical drill definitions - global, read-only execution patterns';
+
+
+
+COMMENT ON COLUMN "public"."drills"."id" IS 'Stable identifier, never changes';
+
+
+
+COMMENT ON COLUMN "public"."drills"."allowed_distances" IS 'If set, only these distances are valid. NULL = any distance';
+
+
+
+COMMENT ON COLUMN "public"."drills"."fixed_shots" IS 'If true, default_shots cannot be overridden';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."notifications" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -2816,7 +2884,7 @@ CREATE TABLE IF NOT EXISTS "public"."paper_target_results" (
     "scanned_image_url" "text",
     "notes" "text",
     "actual_shots_declared" integer,
-    CONSTRAINT "paper_target_results_paper_type_check" CHECK (("paper_type" = ANY (ARRAY['achievement'::"text", 'grouping'::"text"])))
+    CONSTRAINT "paper_target_results_paper_type_check" CHECK (("paper_type" = ANY (ARRAY['grouping'::"text", 'engagement'::"text"])))
 );
 
 
@@ -2893,6 +2961,29 @@ CREATE TABLE IF NOT EXISTS "public"."session_participants" (
 
 
 ALTER TABLE "public"."session_participants" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."session_standards_verdicts" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "session_id" "uuid" NOT NULL,
+    "evaluation_scope" "text" DEFAULT 'session'::"text" NOT NULL,
+    "scope_ref_id" "uuid",
+    "base_standard_id" "uuid",
+    "applied_modifiers" "jsonb" DEFAULT '[]'::"jsonb",
+    "effective_grouping_cm" numeric,
+    "effective_accuracy_pct" numeric,
+    "effective_time_seconds" integer,
+    "actual_grouping_cm" numeric,
+    "actual_accuracy_pct" numeric,
+    "actual_time_seconds" integer,
+    "passed" boolean NOT NULL,
+    "verdict_breakdown" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    CONSTRAINT "session_standards_verdicts_evaluation_scope_check" CHECK (("evaluation_scope" = ANY (ARRAY['session'::"text", 'drill'::"text", 'target'::"text"])))
+);
+
+
+ALTER TABLE "public"."session_standards_verdicts" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."session_stats" (
@@ -2977,6 +3068,34 @@ CREATE TABLE IF NOT EXISTS "public"."tactical_target_results" (
 ALTER TABLE "public"."tactical_target_results" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."team_drill_presets" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "team_id" "uuid" NOT NULL,
+    "drill_id" "text" NOT NULL,
+    "label" "text",
+    "distance_m" integer,
+    "rounds" integer,
+    "time_limit_seconds" integer,
+    "position" "text",
+    "strings_count" integer DEFAULT 1,
+    "created_by" "uuid",
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"(),
+    CONSTRAINT "team_drill_presets_position_check" CHECK (("position" = ANY (ARRAY['prone'::"text", 'kneeling'::"text", 'sitting'::"text", 'standing'::"text"])))
+);
+
+
+ALTER TABLE "public"."team_drill_presets" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."team_drill_presets" IS 'Team saved configurations for canonical drills';
+
+
+
+COMMENT ON COLUMN "public"."team_drill_presets"."label" IS 'Optional custom name. NULL = use drill name';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."team_invitations" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "invite_code" "text" NOT NULL,
@@ -3020,6 +3139,59 @@ ALTER TABLE "public"."team_members" OWNER TO "postgres";
 
 COMMENT ON TABLE "public"."team_members" IS 'Team membership';
 
+
+
+CREATE TABLE IF NOT EXISTS "public"."team_standard_modifiers" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "team_id" "uuid" NOT NULL,
+    "condition_type" "text" NOT NULL,
+    "condition_threshold" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "modifier_effect_type" "text" DEFAULT 'tolerance'::"text" NOT NULL,
+    "grouping_penalty_cm" numeric DEFAULT 0,
+    "accuracy_penalty_pct" numeric DEFAULT 0,
+    "time_penalty_seconds" integer DEFAULT 0,
+    "name" "text" NOT NULL,
+    "description" "text",
+    "icon" "text",
+    "created_by" "uuid",
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "is_active" boolean DEFAULT true,
+    CONSTRAINT "team_standard_modifiers_condition_type_check" CHECK (("condition_type" = ANY (ARRAY['weather_rain'::"text", 'weather_wind'::"text", 'weather_cold'::"text", 'weather_hot'::"text", 'fatigue_shots'::"text", 'fatigue_time'::"text", 'fatigue_hr'::"text", 'night_conditions'::"text", 'elevation_high'::"text", 'manual'::"text"]))),
+    CONSTRAINT "team_standard_modifiers_modifier_effect_type_check" CHECK (("modifier_effect_type" = ANY (ARRAY['tolerance'::"text", 'invalidate'::"text", 'override'::"text"])))
+);
+
+
+ALTER TABLE "public"."team_standard_modifiers" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."team_standards" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "team_id" "uuid" NOT NULL,
+    "name" "text" NOT NULL,
+    "description" "text",
+    "drill_goal" "text" NOT NULL,
+    "distance_m" integer NOT NULL,
+    "weapon_category" "text",
+    "primary_metric" "text" NOT NULL,
+    "expected_grouping_cm" numeric,
+    "expected_accuracy_pct" numeric,
+    "expected_time_seconds" integer,
+    "created_by" "uuid",
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"(),
+    "is_active" boolean DEFAULT true,
+    CONSTRAINT "positive_grouping" CHECK ((("expected_grouping_cm" IS NULL) OR ("expected_grouping_cm" > (0)::numeric))),
+    CONSTRAINT "positive_time" CHECK ((("expected_time_seconds" IS NULL) OR ("expected_time_seconds" > 0))),
+    CONSTRAINT "primary_metric_matches_goal" CHECK (((("primary_metric" = 'grouping_cm'::"text") AND ("drill_goal" = 'grouping'::"text")) OR (("primary_metric" = 'accuracy_pct'::"text") AND ("drill_goal" = 'engagement'::"text")))),
+    CONSTRAINT "team_standards_drill_goal_check" CHECK (("drill_goal" = ANY (ARRAY['grouping'::"text", 'engagement'::"text"]))),
+    CONSTRAINT "team_standards_primary_metric_check" CHECK (("primary_metric" = ANY (ARRAY['grouping_cm'::"text", 'accuracy_pct'::"text"]))),
+    CONSTRAINT "valid_accuracy" CHECK ((("expected_accuracy_pct" IS NULL) OR (("expected_accuracy_pct" >= (0)::numeric) AND ("expected_accuracy_pct" <= (100)::numeric)))),
+    CONSTRAINT "valid_engagement_standard" CHECK ((("drill_goal" <> 'engagement'::"text") OR ("expected_accuracy_pct" IS NOT NULL))),
+    CONSTRAINT "valid_grouping_standard" CHECK ((("drill_goal" <> 'grouping'::"text") OR ("expected_grouping_cm" IS NOT NULL)))
+);
+
+
+ALTER TABLE "public"."team_standards" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."team_weapons" (
@@ -3116,7 +3288,6 @@ CREATE TABLE IF NOT EXISTS "public"."training_drills" (
     "input_method" "text",
     CONSTRAINT "training_drills_category_check" CHECK ((("category" IS NULL) OR ("category" = ANY (ARRAY['fundamentals'::"text", 'speed'::"text", 'accuracy'::"text", 'stress'::"text", 'tactical'::"text", 'competition'::"text", 'qualification'::"text"])))),
     CONSTRAINT "training_drills_difficulty_check" CHECK ((("difficulty" IS NULL) OR ("difficulty" = ANY (ARRAY['beginner'::"text", 'intermediate'::"text", 'advanced'::"text", 'expert'::"text"])))),
-    CONSTRAINT "training_drills_drill_goal_check" CHECK (("drill_goal" = ANY (ARRAY['grouping'::"text", 'achievement'::"text"]))),
     CONSTRAINT "training_drills_input_method_check" CHECK ((("input_method" IS NULL) OR ("input_method" = ANY (ARRAY['scan'::"text", 'manual'::"text"])))),
     CONSTRAINT "training_drills_min_accuracy_percent_check" CHECK ((("min_accuracy_percent" IS NULL) OR (("min_accuracy_percent" >= 0) AND ("min_accuracy_percent" <= 100)))),
     CONSTRAINT "training_drills_movement_type_check" CHECK ((("movement_type" IS NULL) OR ("movement_type" = ANY (ARRAY['none'::"text", 'advance'::"text", 'retreat'::"text", 'lateral'::"text", 'diagonal'::"text", 'freestyle'::"text"])))),
@@ -3314,6 +3485,11 @@ ALTER TABLE ONLY "public"."drill_templates"
 
 
 
+ALTER TABLE ONLY "public"."drills"
+    ADD CONSTRAINT "drills_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."notifications"
     ADD CONSTRAINT "notifications_pkey" PRIMARY KEY ("id");
 
@@ -3384,6 +3560,16 @@ ALTER TABLE ONLY "public"."session_participants"
 
 
 
+ALTER TABLE ONLY "public"."session_standards_verdicts"
+    ADD CONSTRAINT "session_standards_verdicts_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."session_standards_verdicts"
+    ADD CONSTRAINT "session_standards_verdicts_session_id_evaluation_scope_scop_key" UNIQUE ("session_id", "evaluation_scope", "scope_ref_id");
+
+
+
 ALTER TABLE ONLY "public"."session_stats"
     ADD CONSTRAINT "session_stats_pkey" PRIMARY KEY ("id");
 
@@ -3424,8 +3610,23 @@ ALTER TABLE ONLY "public"."tactical_target_results"
 
 
 
+ALTER TABLE ONLY "public"."team_drill_presets"
+    ADD CONSTRAINT "team_drill_presets_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."team_members"
     ADD CONSTRAINT "team_members_pkey" PRIMARY KEY ("team_id", "user_id");
+
+
+
+ALTER TABLE ONLY "public"."team_standard_modifiers"
+    ADD CONSTRAINT "team_standard_modifiers_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."team_standards"
+    ADD CONSTRAINT "team_standards_pkey" PRIMARY KEY ("id");
 
 
 
@@ -3582,6 +3783,18 @@ CREATE INDEX "idx_session_timelines_session" ON "public"."session_timelines" USI
 
 
 
+CREATE INDEX "idx_session_verdicts_failed" ON "public"."session_standards_verdicts" USING "btree" ("passed") WHERE ("passed" = false);
+
+
+
+CREATE INDEX "idx_session_verdicts_scope" ON "public"."session_standards_verdicts" USING "btree" ("session_id", "evaluation_scope");
+
+
+
+CREATE INDEX "idx_session_verdicts_session" ON "public"."session_standards_verdicts" USING "btree" ("session_id");
+
+
+
 CREATE INDEX "idx_sessions_custom_drill_goal" ON "public"."sessions" USING "btree" ((("custom_drill_config" ->> 'drill_goal'::"text")));
 
 
@@ -3631,6 +3844,30 @@ CREATE INDEX "idx_team_members_team" ON "public"."team_members" USING "btree" ("
 
 
 CREATE INDEX "idx_team_members_user" ON "public"."team_members" USING "btree" ("user_id");
+
+
+
+CREATE INDEX "idx_team_modifiers_team" ON "public"."team_standard_modifiers" USING "btree" ("team_id") WHERE ("is_active" = true);
+
+
+
+CREATE INDEX "idx_team_presets_drill" ON "public"."team_drill_presets" USING "btree" ("drill_id");
+
+
+
+CREATE INDEX "idx_team_presets_team" ON "public"."team_drill_presets" USING "btree" ("team_id");
+
+
+
+CREATE UNIQUE INDEX "idx_team_presets_unique" ON "public"."team_drill_presets" USING "btree" ("team_id", "drill_id", COALESCE("label", ''::"text"));
+
+
+
+CREATE INDEX "idx_team_standards_lookup" ON "public"."team_standards" USING "btree" ("team_id", "drill_goal", "distance_m") WHERE ("is_active" = true);
+
+
+
+CREATE INDEX "idx_team_standards_team_active" ON "public"."team_standards" USING "btree" ("team_id") WHERE ("is_active" = true);
 
 
 
@@ -3750,6 +3987,14 @@ CREATE OR REPLACE TRIGGER "on_training_started" AFTER UPDATE ON "public"."traini
 
 
 
+CREATE OR REPLACE TRIGGER "team_drill_presets_updated_at" BEFORE UPDATE ON "public"."team_drill_presets" FOR EACH ROW EXECUTE FUNCTION "public"."update_team_drill_presets_updated_at"();
+
+
+
+CREATE OR REPLACE TRIGGER "team_standards_updated_at" BEFORE UPDATE ON "public"."team_standards" FOR EACH ROW EXECUTE FUNCTION "public"."update_team_standards_updated_at"();
+
+
+
 CREATE OR REPLACE TRIGGER "trigger_insight_generation" AFTER INSERT ON "public"."session_features" FOR EACH ROW EXECUTE FUNCTION "public"."notify_insight_generation"();
 
 
@@ -3848,6 +4093,16 @@ ALTER TABLE ONLY "public"."session_participants"
 
 
 
+ALTER TABLE ONLY "public"."session_standards_verdicts"
+    ADD CONSTRAINT "session_standards_verdicts_base_standard_id_fkey" FOREIGN KEY ("base_standard_id") REFERENCES "public"."team_standards"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."session_standards_verdicts"
+    ADD CONSTRAINT "session_standards_verdicts_session_id_fkey" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."session_stats"
     ADD CONSTRAINT "session_stats_session_id_fkey" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id") ON DELETE CASCADE;
 
@@ -3903,6 +4158,21 @@ ALTER TABLE ONLY "public"."tactical_target_results"
 
 
 
+ALTER TABLE ONLY "public"."team_drill_presets"
+    ADD CONSTRAINT "team_drill_presets_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "auth"."users"("id");
+
+
+
+ALTER TABLE ONLY "public"."team_drill_presets"
+    ADD CONSTRAINT "team_drill_presets_drill_id_fkey" FOREIGN KEY ("drill_id") REFERENCES "public"."drills"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."team_drill_presets"
+    ADD CONSTRAINT "team_drill_presets_team_id_fkey" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."team_members"
     ADD CONSTRAINT "team_members_team_fkey" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE CASCADE;
 
@@ -3910,6 +4180,26 @@ ALTER TABLE ONLY "public"."team_members"
 
 ALTER TABLE ONLY "public"."team_members"
     ADD CONSTRAINT "team_members_user_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."team_standard_modifiers"
+    ADD CONSTRAINT "team_standard_modifiers_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id");
+
+
+
+ALTER TABLE ONLY "public"."team_standard_modifiers"
+    ADD CONSTRAINT "team_standard_modifiers_team_id_fkey" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."team_standards"
+    ADD CONSTRAINT "team_standards_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id");
+
+
+
+ALTER TABLE ONLY "public"."team_standards"
+    ADD CONSTRAINT "team_standards_team_id_fkey" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE CASCADE;
 
 
 
@@ -4069,6 +4359,18 @@ CREATE POLICY "Anyone can view pending invitations" ON "public"."team_invitation
 
 
 
+CREATE POLICY "Commanders can create presets" ON "public"."team_drill_presets" FOR INSERT WITH CHECK (("team_id" IN ( SELECT "team_members"."team_id"
+   FROM "public"."team_members"
+  WHERE (("team_members"."user_id" = "auth"."uid"()) AND ("team_members"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text"]))))));
+
+
+
+CREATE POLICY "Commanders can delete presets" ON "public"."team_drill_presets" FOR DELETE USING (("team_id" IN ( SELECT "team_members"."team_id"
+   FROM "public"."team_members"
+  WHERE (("team_members"."user_id" = "auth"."uid"()) AND ("team_members"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text"]))))));
+
+
+
 CREATE POLICY "Commanders can delete team weapons" ON "public"."team_weapons" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM "public"."team_members"
   WHERE (("team_members"."team_id" = "team_weapons"."team_id") AND ("team_members"."user_id" = "auth"."uid"()) AND ("team_members"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text"]))))));
@@ -4084,6 +4386,24 @@ CREATE POLICY "Commanders can insert team weapons" ON "public"."team_weapons" FO
 CREATE POLICY "Commanders can manage drill templates" ON "public"."drill_templates" USING ((EXISTS ( SELECT 1
    FROM "public"."team_members"
   WHERE (("team_members"."team_id" = "drill_templates"."team_id") AND ("team_members"."user_id" = "auth"."uid"()) AND ("team_members"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text"]))))));
+
+
+
+CREATE POLICY "Commanders can manage modifiers" ON "public"."team_standard_modifiers" USING (("team_id" IN ( SELECT "team_members"."team_id"
+   FROM "public"."team_members"
+  WHERE (("team_members"."user_id" = "auth"."uid"()) AND ("team_members"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text"]))))));
+
+
+
+CREATE POLICY "Commanders can manage standards" ON "public"."team_standards" USING (("team_id" IN ( SELECT "team_members"."team_id"
+   FROM "public"."team_members"
+  WHERE (("team_members"."user_id" = "auth"."uid"()) AND ("team_members"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text"]))))));
+
+
+
+CREATE POLICY "Commanders can update presets" ON "public"."team_drill_presets" FOR UPDATE USING (("team_id" IN ( SELECT "team_members"."team_id"
+   FROM "public"."team_members"
+  WHERE (("team_members"."user_id" = "auth"."uid"()) AND ("team_members"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text"]))))));
 
 
 
@@ -4210,6 +4530,30 @@ CREATE POLICY "Owners can delete trainings" ON "public"."trainings" FOR DELETE U
 
 
 
+CREATE POLICY "System can insert verdicts" ON "public"."session_standards_verdicts" FOR INSERT WITH CHECK (true);
+
+
+
+CREATE POLICY "Team members can read modifiers" ON "public"."team_standard_modifiers" FOR SELECT USING (("team_id" IN ( SELECT "team_members"."team_id"
+   FROM "public"."team_members"
+  WHERE ("team_members"."user_id" = "auth"."uid"()))));
+
+
+
+CREATE POLICY "Team members can read standards" ON "public"."team_standards" FOR SELECT USING (("team_id" IN ( SELECT "team_members"."team_id"
+   FROM "public"."team_members"
+  WHERE ("team_members"."user_id" = "auth"."uid"()))));
+
+
+
+CREATE POLICY "Team members can read team verdicts" ON "public"."session_standards_verdicts" FOR SELECT USING (("session_id" IN ( SELECT "s"."id"
+   FROM "public"."sessions" "s"
+  WHERE ("s"."team_id" IN ( SELECT "team_members"."team_id"
+           FROM "public"."team_members"
+          WHERE ("team_members"."user_id" = "auth"."uid"()))))));
+
+
+
 CREATE POLICY "Team members can read team weapons" ON "public"."team_weapons" FOR SELECT USING ((EXISTS ( SELECT 1
    FROM "public"."team_members"
   WHERE (("team_members"."team_id" = "team_weapons"."team_id") AND ("team_members"."user_id" = "auth"."uid"())))));
@@ -4219,6 +4563,12 @@ CREATE POLICY "Team members can read team weapons" ON "public"."team_weapons" FO
 CREATE POLICY "Team members can view drill templates" ON "public"."drill_templates" FOR SELECT USING ((EXISTS ( SELECT 1
    FROM "public"."team_members"
   WHERE (("team_members"."team_id" = "drill_templates"."team_id") AND ("team_members"."user_id" = "auth"."uid"())))));
+
+
+
+CREATE POLICY "Team members can view presets" ON "public"."team_drill_presets" FOR SELECT USING (("team_id" IN ( SELECT "team_members"."team_id"
+   FROM "public"."team_members"
+  WHERE ("team_members"."user_id" = "auth"."uid"()))));
 
 
 
@@ -4327,6 +4677,12 @@ CREATE POLICY "Users can manage own baselines" ON "public"."user_baselines" USIN
 
 
 CREATE POLICY "Users can manage own insight triggers" ON "public"."user_insight_triggers" USING (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can read own verdicts" ON "public"."session_standards_verdicts" FOR SELECT USING (("session_id" IN ( SELECT "sessions"."id"
+   FROM "public"."sessions"
+  WHERE ("sessions"."user_id" = "auth"."uid"()))));
 
 
 
@@ -4522,6 +4878,9 @@ ALTER TABLE "public"."session_insights" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."session_participants" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."session_standards_verdicts" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."session_stats" ENABLE ROW LEVEL SECURITY;
 
 
@@ -4537,10 +4896,19 @@ ALTER TABLE "public"."sessions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."tactical_target_results" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."team_drill_presets" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."team_invitations" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."team_members" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."team_standard_modifiers" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."team_standards" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."team_weapons" ENABLE ROW LEVEL SECURITY;
@@ -4883,9 +5251,21 @@ GRANT ALL ON FUNCTION "public"."update_insight_triggers"("p_user_id" "uuid", "p_
 
 
 
+GRANT ALL ON FUNCTION "public"."update_team_drill_presets_updated_at"() TO "anon";
+GRANT ALL ON FUNCTION "public"."update_team_drill_presets_updated_at"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_team_drill_presets_updated_at"() TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."update_team_member_role"("p_team_id" "uuid", "p_user_id" "uuid", "p_role" "text", "p_details" "jsonb") TO "anon";
 GRANT ALL ON FUNCTION "public"."update_team_member_role"("p_team_id" "uuid", "p_user_id" "uuid", "p_role" "text", "p_details" "jsonb") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."update_team_member_role"("p_team_id" "uuid", "p_user_id" "uuid", "p_role" "text", "p_details" "jsonb") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."update_team_standards_updated_at"() TO "anon";
+GRANT ALL ON FUNCTION "public"."update_team_standards_updated_at"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_team_standards_updated_at"() TO "service_role";
 
 
 
@@ -4904,6 +5284,12 @@ GRANT ALL ON FUNCTION "public"."validate_invite_code"("p_invite_code" "text", "p
 GRANT ALL ON TABLE "public"."drill_templates" TO "anon";
 GRANT ALL ON TABLE "public"."drill_templates" TO "authenticated";
 GRANT ALL ON TABLE "public"."drill_templates" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."drills" TO "anon";
+GRANT ALL ON TABLE "public"."drills" TO "authenticated";
+GRANT ALL ON TABLE "public"."drills" TO "service_role";
 
 
 
@@ -4943,6 +5329,12 @@ GRANT ALL ON TABLE "public"."session_participants" TO "service_role";
 
 
 
+GRANT ALL ON TABLE "public"."session_standards_verdicts" TO "anon";
+GRANT ALL ON TABLE "public"."session_standards_verdicts" TO "authenticated";
+GRANT ALL ON TABLE "public"."session_standards_verdicts" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."session_stats" TO "anon";
 GRANT ALL ON TABLE "public"."session_stats" TO "authenticated";
 GRANT ALL ON TABLE "public"."session_stats" TO "service_role";
@@ -4967,6 +5359,12 @@ GRANT ALL ON TABLE "public"."tactical_target_results" TO "service_role";
 
 
 
+GRANT ALL ON TABLE "public"."team_drill_presets" TO "anon";
+GRANT ALL ON TABLE "public"."team_drill_presets" TO "authenticated";
+GRANT ALL ON TABLE "public"."team_drill_presets" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."team_invitations" TO "anon";
 GRANT ALL ON TABLE "public"."team_invitations" TO "authenticated";
 GRANT ALL ON TABLE "public"."team_invitations" TO "service_role";
@@ -4976,6 +5374,18 @@ GRANT ALL ON TABLE "public"."team_invitations" TO "service_role";
 GRANT ALL ON TABLE "public"."team_members" TO "anon";
 GRANT ALL ON TABLE "public"."team_members" TO "authenticated";
 GRANT ALL ON TABLE "public"."team_members" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."team_standard_modifiers" TO "anon";
+GRANT ALL ON TABLE "public"."team_standard_modifiers" TO "authenticated";
+GRANT ALL ON TABLE "public"."team_standard_modifiers" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."team_standards" TO "anon";
+GRANT ALL ON TABLE "public"."team_standards" TO "authenticated";
+GRANT ALL ON TABLE "public"."team_standards" TO "service_role";
 
 
 
