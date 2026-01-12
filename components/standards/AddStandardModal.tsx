@@ -66,10 +66,12 @@ export function AddStandardModal({
   const isEditing = !!editingStandard;
   
   // Form state
-  const [name, setName] = useState('');
+  const [nameSuffix, setNameSuffix] = useState(''); // User-editable part
   const [description, setDescription] = useState('');
   const [drillGoal, setDrillGoal] = useState<'grouping' | 'engagement'>('grouping');
+  const [useRange, setUseRange] = useState(false);
   const [distanceM, setDistanceM] = useState('100');
+  const [distanceMaxM, setDistanceMaxM] = useState('200');
   const [showCustomDistance, setShowCustomDistance] = useState(false);
   const [weaponCategory, setWeaponCategory] = useState<string | null>(null);
   const [expectedGroupingCm, setExpectedGroupingCm] = useState('');
@@ -77,11 +79,21 @@ export function AddStandardModal({
   const [expectedTimeSeconds, setExpectedTimeSeconds] = useState('');
   const [saving, setSaving] = useState(false);
   
+  // Auto-computed distance prefix (always in sync)
+  const distancePrefix = useRange ? `${distanceM}-${distanceMaxM}m` : `${distanceM}m`;
+  
+  // Full name combines prefix + suffix
+  const fullName = nameSuffix ? `${distancePrefix} ${nameSuffix}` : distancePrefix;
+  
   // Reset form when modal opens/closes
   useEffect(() => {
     if (visible) {
       if (editingStandard) {
-        setName(editingStandard.name);
+        // Extract suffix from existing name (remove distance prefix if present)
+        const existingName = editingStandard.name;
+        const distMatch = existingName.match(/^\d+(?:-\d+)?m\s*/);
+        const suffix = distMatch ? existingName.slice(distMatch[0].length) : existingName;
+        setNameSuffix(suffix);
         setDescription(editingStandard.description || '');
         setDrillGoal(editingStandard.drill_goal);
         setDistanceM(String(editingStandard.distance_m));
@@ -91,11 +103,15 @@ export function AddStandardModal({
         setExpectedTimeSeconds(editingStandard.expected_time_seconds?.toString() || '');
         // Check if distance is custom
         setShowCustomDistance(!COMMON_DISTANCES.includes(editingStandard.distance_m));
+        setUseRange(false);
+        setDistanceMaxM('200');
       } else {
-        setName('');
+        setNameSuffix('');
         setDescription('');
         setDrillGoal('grouping');
         setDistanceM('100');
+        setDistanceMaxM('200');
+        setUseRange(false);
         setShowCustomDistance(false);
         setWeaponCategory(null);
         setExpectedGroupingCm('');
@@ -105,22 +121,31 @@ export function AddStandardModal({
     }
   }, [visible, editingStandard]);
   
-  // Auto-generate name based on config
+  // Auto-generate suffix based on weapon and goal (only if suffix is empty)
   useEffect(() => {
-    if (!isEditing && !name) {
-      const weapon = weaponCategory ? ` ${weaponCategory.charAt(0).toUpperCase() + weaponCategory.slice(1)}` : '';
+    if (!isEditing && !nameSuffix) {
+      const weapon = weaponCategory ? `${weaponCategory.charAt(0).toUpperCase() + weaponCategory.slice(1)} ` : '';
       const goal = drillGoal === 'grouping' ? 'Grouping' : 'Engagement';
-      setName(`${distanceM}m${weapon} ${goal}`);
+      setNameSuffix(`${weapon}${goal}`);
     }
-  }, [distanceM, weaponCategory, drillGoal, isEditing, name]);
+  }, [weaponCategory, drillGoal, isEditing, nameSuffix]);
   
   // Check if distance is in common list
   const isDistanceInList = COMMON_DISTANCES.includes(Number(distanceM));
   
+  // Display string for distance
+  const distanceDisplay = useRange ? `${distanceM}–${distanceMaxM}m` : `${distanceM}m`;
+  
   // Validation
   const canSave = () => {
-    if (!name.trim()) return false;
+    if (!fullName.trim()) return false;
     if (!distanceM || isNaN(Number(distanceM))) return false;
+    
+    // If using range, validate max distance
+    if (useRange) {
+      if (!distanceMaxM || isNaN(Number(distanceMaxM))) return false;
+      if (Number(distanceMaxM) <= Number(distanceM)) return false; // Max must be > min
+    }
     
     if (drillGoal === 'grouping') {
       if (!expectedGroupingCm || isNaN(Number(expectedGroupingCm))) return false;
@@ -141,12 +166,19 @@ export function AddStandardModal({
     setSaving(true);
     
     try {
+      // Build description with range info if applicable
+      let finalDescription = description.trim();
+      if (useRange) {
+        const rangeNote = `Distance range: ${distanceM}-${distanceMaxM}m`;
+        finalDescription = finalDescription ? `${rangeNote}. ${finalDescription}` : rangeNote;
+      }
+      
       const input: CreateStandardInput = {
         team_id: teamId,
-        name: name.trim(),
-        description: description.trim() || undefined,
+        name: fullName.trim(),
+        description: finalDescription || undefined,
         drill_goal: drillGoal,
-        distance_m: Number(distanceM),
+        distance_m: Number(distanceM), // Store min distance
         weapon_category: weaponCategory,
         expected_grouping_cm: drillGoal === 'grouping' ? Number(expectedGroupingCm) : null,
         expected_accuracy_pct: drillGoal === 'engagement' ? Number(expectedAccuracyPct) : null,
@@ -205,7 +237,7 @@ export function AddStandardModal({
             >
               {/* Drill Goal - Primary Choice */}
               <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                <Text style={[styles.sectionTitle, styles.sectionTitleStandalone, { color: colors.text }]}>
                   Type
                 </Text>
                 <View style={styles.goalRow}>
@@ -284,100 +316,171 @@ export function AddStandardModal({
               {/* Distance */}
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Distance</Text>
-                  <View style={[styles.distanceBadge, { backgroundColor: colors.primary + '15' }]}>
-                    <Text style={[styles.distanceBadgeText, { color: colors.primary }]}>
-                      {distanceM}m
-                    </Text>
+                  <View style={styles.sectionHeaderLeft}>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Distance</Text>
+                    <View style={[styles.distanceBadge, { backgroundColor: colors.primary + '15' }]}>
+                      <Text style={[styles.distanceBadgeText, { color: colors.primary }]}>
+                        {distanceDisplay}
+                      </Text>
+                    </View>
+                  </View>
+                  
+                  {/* Compact Range Toggle */}
+                  <View style={[styles.rangeTogglePill, { backgroundColor: colors.secondary }]}>
+                    <TouchableOpacity
+                      style={[
+                        styles.rangeTogglePillOption,
+                        !useRange && { backgroundColor: colors.text }
+                      ]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setUseRange(false);
+                      }}
+                    >
+                      <Text style={[
+                        styles.rangeTogglePillText,
+                        { color: !useRange ? colors.background : colors.textMuted }
+                      ]}>
+                        Fixed
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.rangeTogglePillOption,
+                        useRange && { backgroundColor: colors.text }
+                      ]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setUseRange(true);
+                      }}
+                    >
+                      <Text style={[
+                        styles.rangeTogglePillText,
+                        { color: useRange ? colors.background : colors.textMuted }
+                      ]}>
+                        Range
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
                 
-                <ScrollView 
-                  horizontal 
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.distanceScroller}
-                >
-                  {COMMON_DISTANCES.map((d) => {
-                    const isSelected = distanceM === String(d) && !showCustomDistance;
-                    return (
+                {/* Range Inputs - Compact */}
+                {useRange ? (
+                  <View style={styles.rangeInputRow}>
+                    <View style={[styles.rangeInputBox, { backgroundColor: colors.secondary }]}>
+                      <TextInput
+                        style={[styles.rangeInput, { color: colors.text }]}
+                        value={distanceM}
+                        onChangeText={setDistanceM}
+                        keyboardType="number-pad"
+                        placeholder="100"
+                        placeholderTextColor={colors.textMuted}
+                      />
+                      <Text style={[styles.rangeInputUnit, { color: colors.textMuted }]}>m</Text>
+                    </View>
+                    <Text style={[styles.rangeSeparator, { color: colors.textMuted }]}>–</Text>
+                    <View style={[styles.rangeInputBox, { backgroundColor: colors.secondary }]}>
+                      <TextInput
+                        style={[styles.rangeInput, { color: colors.text }]}
+                        value={distanceMaxM}
+                        onChangeText={setDistanceMaxM}
+                        keyboardType="number-pad"
+                        placeholder="200"
+                        placeholderTextColor={colors.textMuted}
+                      />
+                      <Text style={[styles.rangeInputUnit, { color: colors.textMuted }]}>m</Text>
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    <ScrollView 
+                      horizontal 
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.distanceScroller}
+                    >
+                      {COMMON_DISTANCES.map((d) => {
+                        const isSelected = distanceM === String(d) && !showCustomDistance;
+                        return (
+                          <TouchableOpacity
+                            key={d}
+                            style={[
+                              styles.distanceChip,
+                              { 
+                                backgroundColor: isSelected ? colors.text : 'transparent',
+                                borderColor: isSelected ? colors.text : colors.border,
+                              }
+                            ]}
+                            onPress={() => {
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                              setDistanceM(String(d));
+                              setShowCustomDistance(false);
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[
+                              styles.distanceChipValue,
+                              { color: isSelected ? colors.background : colors.text }
+                            ]}>
+                              {d}
+                            </Text>
+                            <Text style={[
+                              styles.distanceChipUnit,
+                              { color: isSelected ? colors.background + 'AA' : colors.textMuted }
+                            ]}>
+                              m
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                      
+                      {/* Custom */}
                       <TouchableOpacity
-                        key={d}
                         style={[
                           styles.distanceChip,
+                          styles.distanceChipCustom,
                           { 
-                            backgroundColor: isSelected ? colors.text : 'transparent',
-                            borderColor: isSelected ? colors.text : colors.border,
+                            backgroundColor: (showCustomDistance || !isDistanceInList) ? colors.text : 'transparent',
+                            borderColor: (showCustomDistance || !isDistanceInList) ? colors.text : colors.border,
+                            borderStyle: 'dashed',
                           }
                         ]}
                         onPress={() => {
                           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                          setDistanceM(String(d));
-                          setShowCustomDistance(false);
+                          setShowCustomDistance(true);
                         }}
                         activeOpacity={0.7}
                       >
                         <Text style={[
                           styles.distanceChipValue,
-                          { color: isSelected ? colors.background : colors.text }
+                          { color: (showCustomDistance || !isDistanceInList) ? colors.background : colors.textMuted }
                         ]}>
-                          {d}
-                        </Text>
-                        <Text style={[
-                          styles.distanceChipUnit,
-                          { color: isSelected ? colors.background + 'AA' : colors.textMuted }
-                        ]}>
-                          m
+                          {(showCustomDistance || !isDistanceInList) ? distanceM : '···'}
                         </Text>
                       </TouchableOpacity>
-                    );
-                  })}
-                  
-                  {/* Custom */}
-                  <TouchableOpacity
-                    style={[
-                      styles.distanceChip,
-                      styles.distanceChipCustom,
-                      { 
-                        backgroundColor: (showCustomDistance || !isDistanceInList) ? colors.text : 'transparent',
-                        borderColor: (showCustomDistance || !isDistanceInList) ? colors.text : colors.border,
-                        borderStyle: 'dashed',
-                      }
-                    ]}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setShowCustomDistance(true);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[
-                      styles.distanceChipValue,
-                      { color: (showCustomDistance || !isDistanceInList) ? colors.background : colors.textMuted }
-                    ]}>
-                      {(showCustomDistance || !isDistanceInList) ? distanceM : '···'}
-                    </Text>
-                  </TouchableOpacity>
-                </ScrollView>
-                
-                {/* Custom Input */}
-                {showCustomDistance && (
-                  <View style={[styles.customInputRow, { backgroundColor: colors.secondary }]}>
-                    <TextInput
-                      style={[styles.customInput, { color: colors.text }]}
-                      value={distanceM}
-                      onChangeText={setDistanceM}
-                      keyboardType="number-pad"
-                      placeholder="Enter distance"
-                      placeholderTextColor={colors.textMuted}
-                      autoFocus
-                    />
-                    <Text style={[styles.customInputUnit, { color: colors.textMuted }]}>meters</Text>
-                  </View>
+                    </ScrollView>
+                    
+                    {/* Custom Input */}
+                    {showCustomDistance && (
+                      <View style={[styles.customInputRow, { backgroundColor: colors.secondary }]}>
+                        <TextInput
+                          style={[styles.customInput, { color: colors.text }]}
+                          value={distanceM}
+                          onChangeText={setDistanceM}
+                          keyboardType="number-pad"
+                          placeholder="Enter distance"
+                          placeholderTextColor={colors.textMuted}
+                          autoFocus
+                        />
+                        <Text style={[styles.customInputUnit, { color: colors.textMuted }]}>meters</Text>
+                      </View>
+                    )}
+                  </>
                 )}
               </View>
               
               {/* Weapon Category */}
               <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Weapon</Text>
+                <Text style={[styles.sectionTitle, styles.sectionTitleStandalone, { color: colors.text }]}>Weapon</Text>
                 <View style={styles.weaponRow}>
                   {WEAPON_CATEGORIES.map((w) => {
                     const isSelected = weaponCategory === w.value;
@@ -437,7 +540,7 @@ export function AddStandardModal({
               
               {/* Time Limit (Optional) */}
               <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                <Text style={[styles.sectionTitle, styles.sectionTitleStandalone, { color: colors.text }]}>
                   Time Limit <Text style={{ color: colors.textMuted, fontWeight: '400' }}>(optional)</Text>
                 </Text>
                 <View style={[styles.timeInputRow, { backgroundColor: colors.secondary }]}>
@@ -455,20 +558,30 @@ export function AddStandardModal({
                 </View>
               </View>
               
-              {/* Name & Description (Collapsed) */}
+              {/* Name - Distance prefix (auto) + editable suffix */}
               <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Name</Text>
-                <TextInput
-                  style={[styles.textInput, { backgroundColor: colors.secondary, color: colors.text }]}
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="e.g. 100m Rifle Grouping"
-                  placeholderTextColor={colors.textMuted}
-                />
+                <Text style={[styles.sectionTitle, styles.sectionTitleStandalone, { color: colors.text }]}>Name</Text>
+                <View style={[styles.nameInputRow, { backgroundColor: colors.secondary }]}>
+                  <View style={[styles.namePrefix, { backgroundColor: colors.primary + '20' }]}>
+                    <Text style={[styles.namePrefixText, { color: colors.primary }]}>
+                      {distancePrefix}
+                    </Text>
+                  </View>
+                  <TextInput
+                    style={[styles.nameSuffixInput, { color: colors.text }]}
+                    value={nameSuffix}
+                    onChangeText={setNameSuffix}
+                    placeholder="Rifle Grouping"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                </View>
+                <Text style={[styles.namePreview, { color: colors.textMuted }]}>
+                  Preview: {fullName}
+                </Text>
               </View>
               
               <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                <Text style={[styles.sectionTitle, styles.sectionTitleStandalone, { color: colors.text }]}>
                   Notes <Text style={{ color: colors.textMuted, fontWeight: '400' }}>(optional)</Text>
                 </Text>
                 <TextInput
@@ -576,6 +689,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  sectionTitleStandalone: {
     marginBottom: 12,
   },
   
@@ -615,15 +730,66 @@ const styles = StyleSheet.create({
   },
   
   // Distance
+  sectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   distanceBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
   distanceBadgeText: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '700',
   },
+  
+  // Compact Range Toggle Pill
+  rangeTogglePill: {
+    flexDirection: 'row',
+    borderRadius: 8,
+    padding: 3,
+  },
+  rangeTogglePillOption: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  rangeTogglePillText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  
+  // Compact Range Inputs
+  rangeInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rangeInputBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  rangeInput: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  rangeInputUnit: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginLeft: 2,
+  },
+  rangeSeparator: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  
   distanceScroller: {
     gap: 10,
     paddingVertical: 2,
@@ -742,6 +908,35 @@ const styles = StyleSheet.create({
   textArea: {
     minHeight: 70,
     textAlignVertical: 'top',
+  },
+  
+  // Name input with prefix
+  nameInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  namePrefix: {
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+  },
+  namePrefixText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  nameSuffixInput: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    fontSize: 16,
+  },
+  namePreview: {
+    fontSize: 12,
+    marginTop: 6,
+    fontStyle: 'italic',
   },
   
   // Footer

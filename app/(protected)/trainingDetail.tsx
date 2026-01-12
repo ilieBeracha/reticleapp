@@ -463,6 +463,7 @@ export default function TrainingDetailScreen() {
     startingDrillId,
     handleStartTraining,
     handleFinishTraining,
+    executeFinishTraining,
     handleCancelTraining,
   } = useTrainingActions({
     training,
@@ -534,13 +535,14 @@ export default function TrainingDetailScreen() {
           {
             text: 'Complete Training',
             onPress: () => {
-              handleFinishTraining();
+              // Use executeFinishTraining directly - no second confirmation needed
+              executeFinishTraining();
             },
           },
         ]
       );
     }
-  }, [allDrillsCompleted, canManageTraining, actionLoading, handleFinishTraining]);
+  }, [allDrillsCompleted, canManageTraining, actionLoading, executeFinishTraining]);
 
   // Reset auto-finish flag when training changes
   useEffect(() => {

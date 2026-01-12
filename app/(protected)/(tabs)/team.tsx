@@ -19,7 +19,7 @@ import type { TrainingWithDetails } from '@/types/workspace';
 import { format } from 'date-fns';
 import { Activity, BarChart3, BookOpen, Calendar, ChevronRight, Plus, Settings, Target, UserPlus, Users, Zap } from 'lucide-react-native';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -75,15 +75,18 @@ function TrainingRow({
   showDate,
   colors,
   onPress,
+  onViewReport,
 }: {
   training: TrainingWithDetails;
   showDate?: boolean;
   colors: ReturnType<typeof useColors>;
   onPress: () => void;
+  onViewReport?: () => void;
 }) {
   const statusConfig = getStatusConfig(training.status);
   const date = new Date(training.scheduled_at);
   const isLive = training.status === 'ongoing';
+  const isFinished = training.status === 'finished';
 
   return (
     <TouchableOpacity
@@ -110,6 +113,20 @@ function TrainingRow({
           {(training.drill_count ?? 0) > 0 && ` • ${training.drill_count} drills`}
         </Text>
       </View>
+
+      {/* Report button for finished trainings */}
+      {isFinished && onViewReport && (
+        <TouchableOpacity
+          style={[localStyles.reportBtn, { backgroundColor: '#10B98115' }]}
+          onPress={(e) => {
+            e.stopPropagation();
+            onViewReport();
+          }}
+          activeOpacity={0.7}
+        >
+          <BarChart3 size={14} color="#10B981" />
+        </TouchableOpacity>
+      )}
 
       <ChevronRight size={16} color={colors.border} />
     </TouchableOpacity>
@@ -188,6 +205,14 @@ const localStyles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  reportBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 4,
+  },
 });
 
 // ============================================================================
@@ -206,8 +231,21 @@ function ScheduleView({
   onCreateNew: () => void;
   canSchedule: boolean;
 }) {
+  const [showAllHistory, setShowAllHistory] = useState(false);
   const grouped = useMemo(() => groupTrainingsByTimeframe(trainings), [trainings]);
   const hasAny = trainings.length > 0;
+  const finishedTrainings = useMemo(() => 
+    grouped.past.filter(t => t.status === 'finished'),
+    [grouped.past]
+  );
+
+  // Navigate to training report
+  const handleViewReport = useCallback((trainingId: string) => {
+    router.push({
+      pathname: '/(protected)/trainingReport',
+      params: { trainingId },
+    });
+  }, []);
 
   const renderGroup = useCallback(
     (title: string, items: TrainingWithDetails[], showDate = false, isLive = false) => {
@@ -231,12 +269,13 @@ function ScheduleView({
               showDate={showDate}
               colors={colors}
               onPress={() => onPress(training)}
+              onViewReport={training.status === 'finished' ? () => handleViewReport(training.id) : undefined}
             />
           ))}
         </View>
       );
     },
-    [colors, onPress]
+    [colors, onPress, handleViewReport]
   );
 
   return (
@@ -278,12 +317,171 @@ function ScheduleView({
           {renderGroup('Tomorrow', grouped.tomorrow)}
           {renderGroup('This Week', grouped.thisWeek, true)}
           {renderGroup('Upcoming', grouped.upcoming, true)}
-          {grouped.past.length > 0 && renderGroup('Past', grouped.past.slice(0, 3), true)}
         </>
+      )}
+
+      {/* Training History Section - Shows all past trainings with reports */}
+      {finishedTrainings.length > 0 && (
+        <View style={historyStyles.container}>
+          <TouchableOpacity 
+            style={historyStyles.header}
+            onPress={() => setShowAllHistory(!showAllHistory)}
+            activeOpacity={0.7}
+          >
+            <View style={historyStyles.headerLeft}>
+              <BarChart3 size={18} color={colors.primary} />
+              <Text style={[historyStyles.headerTitle, { color: colors.text }]}>
+                Training History
+              </Text>
+              <View style={[historyStyles.countBadge, { backgroundColor: colors.primary + '15' }]}>
+                <Text style={[historyStyles.countText, { color: colors.primary }]}>
+                  {finishedTrainings.length}
+                </Text>
+              </View>
+            </View>
+            <ChevronRight 
+              size={18} 
+              color={colors.textMuted} 
+              style={{ transform: [{ rotate: showAllHistory ? '90deg' : '0deg' }] }}
+            />
+          </TouchableOpacity>
+
+          {/* Always show recent 3, expand to show all */}
+          <View style={historyStyles.list}>
+            {(showAllHistory ? finishedTrainings : finishedTrainings.slice(0, 3)).map((training) => (
+              <TouchableOpacity
+                key={training.id}
+                style={[historyStyles.historyRow, { backgroundColor: colors.card }]}
+                onPress={() => onPress(training)}
+                activeOpacity={0.7}
+              >
+                <View style={[historyStyles.historyIcon, { backgroundColor: '#10B98110' }]}>
+                  <Target size={16} color="#10B981" />
+                </View>
+                <View style={historyStyles.historyContent}>
+                  <Text style={[historyStyles.historyTitle, { color: colors.text }]} numberOfLines={1}>
+                    {training.title}
+                  </Text>
+                  <Text style={[historyStyles.historyMeta, { color: colors.textMuted }]}>
+                    {format(new Date(training.scheduled_at), 'MMM d, yyyy')}
+                    {(training.drill_count ?? 0) > 0 && ` • ${training.drill_count} drills`}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[historyStyles.reportBtn, { backgroundColor: colors.primary + '12' }]}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleViewReport(training.id);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <BarChart3 size={14} color={colors.primary} />
+                  <Text style={[historyStyles.reportBtnText, { color: colors.primary }]}>Report</Text>
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Show More / Show Less button */}
+          {finishedTrainings.length > 3 && (
+            <TouchableOpacity
+              style={[historyStyles.showMoreBtn, { borderColor: colors.border }]}
+              onPress={() => setShowAllHistory(!showAllHistory)}
+              activeOpacity={0.7}
+            >
+              <Text style={[historyStyles.showMoreText, { color: colors.textMuted }]}>
+                {showAllHistory ? 'Show Less' : `Show All (${finishedTrainings.length})`}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
       )}
     </View>
   );
 }
+
+// History section styles
+const historyStyles = StyleSheet.create({
+  container: {
+    marginTop: 24,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  countBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  countText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  list: {
+    gap: 8,
+  },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    gap: 12,
+  },
+  historyIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historyContent: {
+    flex: 1,
+  },
+  historyTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  historyMeta: {
+    fontSize: 12,
+  },
+  reportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  reportBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  showMoreBtn: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginTop: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
+  showMoreText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+});
 
 // ============================================================================
 // MAIN COMPONENT

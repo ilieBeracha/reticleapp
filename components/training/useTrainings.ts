@@ -11,12 +11,13 @@ import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { getTeamMembers } from '@/services/teamService';
+import { getRecentSessionsWithStats } from '@/services/session/queries';
 import { useTeamContext, useTeamPermissions, useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
 import type { TeamMemberWithProfile, TrainingWithDetails } from '@/types/workspace';
 
 import type { InternalTab, UseTrainingsReturn } from './trainings.types';
-import { calculateMemberStats, calculateTeamStats, getRoleConfig } from './trainings.helpers';
+import { calculateMemberStats, calculateTeamStatsFromSessions, getRoleConfig, type SessionStatsData } from './trainings.helpers';
 
 export function useTrainings(): UseTrainingsReturn {
   // Team context - single source of truth
@@ -30,6 +31,7 @@ export function useTrainings(): UseTrainingsReturn {
   const [activeTab, setActiveTab] = useState<InternalTab>('calendar');
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [members, setMembers] = useState<TeamMemberWithProfile[]>([]);
+  const [sessionStats, setSessionStats] = useState<SessionStatsData[]>([]);
 
   // Reset tab to calendar when switching teams
   useEffect(() => {
@@ -66,6 +68,25 @@ export function useTrainings(): UseTrainingsReturn {
     }, [activeTeamId, activeTab])
   );
 
+  // Load session stats for team (Manage tab - "This Week" section)
+  useFocusEffect(
+    useCallback(() => {
+      if (activeTeamId && activeTab === 'manage') {
+        getRecentSessionsWithStats({ days: 7, limit: 100, teamId: activeTeamId })
+          .then((sessions) => {
+            // Extract stats data for calculation
+            const statsData: SessionStatsData[] = sessions.map(s => ({
+              shots_fired: s.stats?.shots_fired ?? 0,
+              accuracy_pct: s.stats?.accuracy_pct ?? 0,
+              started_at: s.started_at,
+            }));
+            setSessionStats(statsData);
+          })
+          .catch(console.error);
+      }
+    }, [activeTeamId, activeTab])
+  );
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -76,6 +97,20 @@ export function useTrainings(): UseTrainingsReturn {
         try {
           const membersData = await getTeamMembers(activeTeamId);
           setMembers(membersData);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      // Refresh session stats for manage tab
+      if (activeTab === 'manage') {
+        try {
+          const sessions = await getRecentSessionsWithStats({ days: 7, limit: 100, teamId: activeTeamId });
+          const statsData: SessionStatsData[] = sessions.map(s => ({
+            shots_fired: s.stats?.shots_fired ?? 0,
+            accuracy_pct: s.stats?.accuracy_pct ?? 0,
+            started_at: s.started_at,
+          }));
+          setSessionStats(statsData);
         } catch (e) {
           console.error(e);
         }
@@ -102,8 +137,11 @@ export function useTrainings(): UseTrainingsReturn {
   // Member stats
   const memberStats = useMemo(() => calculateMemberStats(members), [members]);
 
-  // Team stats (this week)
-  const teamStats = useMemo(() => calculateTeamStats(activeTeamTrainings), [activeTeamTrainings]);
+  // Team stats (this week) - uses real session data when available
+  const teamStats = useMemo(
+    () => calculateTeamStatsFromSessions(activeTeamTrainings, sessionStats),
+    [activeTeamTrainings, sessionStats]
+  );
 
   // UI computed values - show switcher when user has any teams (allows switching/viewing team options)
   const showSwitcher = teamState !== 'no_teams';
