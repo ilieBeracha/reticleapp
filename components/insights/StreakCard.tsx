@@ -75,7 +75,7 @@ export function StreakCard({ sessions, colors }: StreakCardProps) {
           <View style={styles.header}>
             <Ionicons 
               name={isOnFire ? 'flame' : 'flame-outline'} 
-              size={18} 
+              size={16} 
               color={streakColor} 
             />
             <Text style={[styles.title, { color: colors.text }]}>Training Streak</Text>
@@ -113,7 +113,7 @@ export function StreakCard({ sessions, colors }: StreakCardProps) {
                   ]}
                 >
                   {item.hasSession && (
-                    <Ionicons name="checkmark" size={10} color="#fff" />
+                    <Ionicons name="checkmark" size={9} color="#fff" />
                   )}
                 </View>
                 <Text style={[styles.dayText, { color: colors.textMuted }]}>{item.label}</Text>
@@ -128,10 +128,10 @@ export function StreakCard({ sessions, colors }: StreakCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
-    padding: 16,
-    marginBottom: 12,
+    padding: 12,
+    marginBottom: 10,
   },
   row: {
     flexDirection: 'row',
@@ -139,74 +139,74 @@ const styles = StyleSheet.create({
   },
   info: {
     flex: 1,
-    gap: 4,
+    gap: 3,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     marginBottom: 2,
   },
   title: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   fireBadge: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
     paddingVertical: 2,
-    borderRadius: 6,
-    marginLeft: 4,
+    borderRadius: 5,
+    marginLeft: 3,
   },
   fireText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
     color: '#F97316',
   },
   streakRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: 6,
+    gap: 5,
   },
   streakValue: {
-    fontSize: 32,
+    fontSize: 26,
     fontWeight: '700',
-    letterSpacing: -1,
+    letterSpacing: -0.5,
   },
   streakLabel: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
   },
   best: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
   },
   weekContainer: {
     alignItems: 'flex-end',
-    gap: 8,
+    gap: 6,
   },
   weekLabel: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   dotsRow: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 5,
   },
   dayCol: {
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   dot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dayText: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '600',
   },
 });

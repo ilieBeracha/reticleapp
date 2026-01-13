@@ -7,18 +7,18 @@ import { StyleSheet } from 'react-native';
 export const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { flex: 1 },
-  content: { paddingHorizontal: 16, paddingTop: 16 },
+  content: { paddingHorizontal: 16, paddingTop: 14 },
   contentCentered: { flexGrow: 1, justifyContent: 'center' },
 
   // Team Switching Loader
   switchingLoader: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
+    paddingVertical: 48,
   },
   switchingText: {
     marginTop: 12,
-    fontSize: 14,
+    fontSize: 13,
   },
 
   // Header
@@ -32,29 +32,29 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
-    letterSpacing: -0.5,
+    letterSpacing: -0.4,
   },
   singleTeamPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    maxWidth: 200,
+    gap: 7,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 18,
+    maxWidth: 190,
   },
   singleTeamName: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    maxWidth: 100,
+    maxWidth: 90,
   },
   roleBadge: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 6,
   },
@@ -68,9 +68,9 @@ export const styles = StyleSheet.create({
     gap: 8,
   },
   addTeamBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -97,21 +97,21 @@ export const styles = StyleSheet.create({
 
   // Pulse Dot
   pulseDotContainer: {
-    width: 10,
-    height: 10,
+    width: 9,
+    height: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
   pulseDotOuter: {
     position: 'absolute',
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
   },
   pulseDotInner: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
   },
 
   // Schedule View
@@ -163,19 +163,19 @@ export const styles = StyleSheet.create({
 
   // Schedule groups
   scheduleGroup: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   scheduleGroupHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-    paddingHorizontal: 4,
+    gap: 7,
+    marginBottom: 10,
+    paddingHorizontal: 2,
   },
   scheduleGroupTitle: {
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   scheduleGroupCount: {
     fontSize: 11,

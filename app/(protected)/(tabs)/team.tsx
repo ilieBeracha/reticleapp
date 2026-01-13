@@ -17,8 +17,8 @@ import { useTrainings } from '@/components/training/useTrainings';
 import { useColors } from '@/hooks/ui/useColors';
 import type { TrainingWithDetails } from '@/types/workspace';
 import { format } from 'date-fns';
-import { Activity, BarChart3, BookOpen, Calendar, ChevronRight, Plus, Settings, Target, UserPlus, Users, Zap } from 'lucide-react-native';
 import { router } from 'expo-router';
+import { Activity, BarChart3, BookOpen, Calendar, ChevronRight, Plus, Settings, Target, UserPlus, Users, Zap } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -133,24 +133,25 @@ function TrainingRow({
   );
 }
 
-// Compact inline styles for training row
+// Training row styles
 const localStyles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 6,
-    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+    gap: 12,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    minWidth: 70,
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 7,
+    minWidth: 68,
     justifyContent: 'center',
   },
   statusText: {
@@ -161,62 +162,27 @@ const localStyles = StyleSheet.create({
   },
   rowContent: {
     flex: 1,
+    gap: 2,
   },
   rowTitle: {
     fontSize: 14,
     fontWeight: '600',
-    marginBottom: 2,
+    letterSpacing: -0.1,
   },
   rowMeta: {
     fontSize: 12,
   },
-  newBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  empty: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-  },
-  emptyTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  emptyText: {
-    fontSize: 13,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  emptyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  emptyBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
   reportBtn: {
-    width: 32,
-    height: 32,
+    width: 30,
+    height: 30,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 4,
   },
 });
 
 // ============================================================================
-// SCHEDULE VIEW - Agenda style with status
+// SCHEDULE VIEW - Clean two-section layout: Upcoming & Past
 // ============================================================================
 function ScheduleView({
   trainings,
@@ -231,10 +197,19 @@ function ScheduleView({
   onCreateNew: () => void;
   canSchedule: boolean;
 }) {
-  const [showAllHistory, setShowAllHistory] = useState(false);
+  const [showAllPast, setShowAllPast] = useState(false);
   const grouped = useMemo(() => groupTrainingsByTimeframe(trainings), [trainings]);
-  const hasAny = trainings.length > 0;
-  const finishedTrainings = useMemo(() => 
+  
+  // Combine all upcoming trainings into a single list (live, today, tomorrow, this week, upcoming)
+  const upcomingTrainings = useMemo(() => [
+    ...grouped.live,
+    ...grouped.today,
+    ...grouped.tomorrow,
+    ...grouped.thisWeek,
+    ...grouped.upcoming,
+  ], [grouped]);
+  
+  const pastTrainings = useMemo(() => 
     grouped.past.filter(t => t.status === 'finished'),
     [grouped.past]
   );
@@ -247,238 +222,349 @@ function ScheduleView({
     });
   }, []);
 
-  const renderGroup = useCallback(
-    (title: string, items: TrainingWithDetails[], showDate = false, isLive = false) => {
-      if (items.length === 0) return null;
-
-      return (
-        <View style={styles.scheduleGroup}>
-          <View style={styles.scheduleGroupHeader}>
-            {isLive && <PulseDot color={COLORS.live} />}
-            <Text style={[styles.scheduleGroupTitle, { color: isLive ? COLORS.live : colors.textMuted }]}>
-              {title.toUpperCase()}
-            </Text>
-            <Text style={[styles.scheduleGroupCount, { color: colors.border }]}>
-              {items.length}
-            </Text>
-          </View>
-          {items.map(training => (
-            <TrainingRow
-              key={training.id}
-              training={training}
-              showDate={showDate}
-              colors={colors}
-              onPress={() => onPress(training)}
-              onViewReport={training.status === 'finished' ? () => handleViewReport(training.id) : undefined}
-            />
-          ))}
-        </View>
-      );
-    },
-    [colors, onPress, handleViewReport]
-  );
+  // Get relative time label for training
+  const getTimeLabel = (training: TrainingWithDetails) => {
+    const date = new Date(training.scheduled_at);
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    if (training.status === 'ongoing') return 'Now';
+    if (date.toDateString() === now.toDateString()) return format(date, 'HH:mm');
+    if (date.toDateString() === tomorrow.toDateString()) return `Tomorrow, ${format(date, 'HH:mm')}`;
+    return format(date, 'MMM d, HH:mm');
+  };
 
   return (
-    <View style={styles.scheduleContainer}>
-      {/* Header - simple */}
-      <View style={styles.scheduleHeader}>
-        <Text style={[styles.scheduleHeaderTitle, { color: colors.text }]}>Schedule</Text>
+    <View style={scheduleStyles.container}>
+      {/* Header with add button */}
+      <View style={scheduleStyles.header}>
+        <Text style={[scheduleStyles.headerTitle, { color: colors.text }]}>Training Schedule</Text>
         {canSchedule && (
           <TouchableOpacity
-            style={[localStyles.newBtn, { backgroundColor: colors.text }]}
+            style={[scheduleStyles.addBtn, { backgroundColor: colors.text }]}
             onPress={onCreateNew}
+            activeOpacity={0.8}
           >
-            <Plus size={14} color={colors.background} />
+            <Plus size={17} color={colors.background} strokeWidth={2.5} />
           </TouchableOpacity>
         )}
       </View>
 
-      {!hasAny ? (
-        <View style={[localStyles.empty, { backgroundColor: colors.card }]}>
-          <Calendar size={24} color={colors.textMuted} style={{ marginBottom: 12 }} />
-          <Text style={[localStyles.emptyTitle, { color: colors.text }]}>No Trainings</Text>
-          <Text style={[localStyles.emptyText, { color: colors.textMuted }]}>
-            {canSchedule ? 'Schedule a training for your team' : 'No trainings scheduled yet'}
-          </Text>
-          {canSchedule && (
-            <TouchableOpacity
-              style={[localStyles.emptyBtn, { backgroundColor: colors.text }]}
-              onPress={onCreateNew}
-            >
-              <Plus size={16} color={colors.background} />
-              <Text style={[localStyles.emptyBtnText, { color: colors.background }]}>Create Training</Text>
-            </TouchableOpacity>
+      {/* UPCOMING SECTION */}
+      <View style={scheduleStyles.section}>
+        <View style={scheduleStyles.sectionHeader}>
+          <View style={scheduleStyles.sectionTitleRow}>
+            <View style={[scheduleStyles.sectionDot, { backgroundColor: '#3B82F6' }]} />
+            <Text style={[scheduleStyles.sectionTitle, { color: colors.text }]}>Upcoming</Text>
+          </View>
+          {upcomingTrainings.length > 0 && (
+            <Text style={[scheduleStyles.sectionCount, { color: colors.textMuted }]}>
+              {upcomingTrainings.length}
+            </Text>
           )}
         </View>
-      ) : (
-        <>
-          {renderGroup('Live Now', grouped.live, false, true)}
-          {renderGroup('Today', grouped.today)}
-          {renderGroup('Tomorrow', grouped.tomorrow)}
-          {renderGroup('This Week', grouped.thisWeek, true)}
-          {renderGroup('Upcoming', grouped.upcoming, true)}
-        </>
-      )}
 
-      {/* Training History Section - Shows all past trainings with reports */}
-      {finishedTrainings.length > 0 && (
-        <View style={historyStyles.container}>
-          <TouchableOpacity 
-            style={historyStyles.header}
-            onPress={() => setShowAllHistory(!showAllHistory)}
-            activeOpacity={0.7}
-          >
-            <View style={historyStyles.headerLeft}>
-              <BarChart3 size={18} color={colors.primary} />
-              <Text style={[historyStyles.headerTitle, { color: colors.text }]}>
-                Training History
-              </Text>
-              <View style={[historyStyles.countBadge, { backgroundColor: colors.primary + '15' }]}>
-                <Text style={[historyStyles.countText, { color: colors.primary }]}>
-                  {finishedTrainings.length}
-                </Text>
-              </View>
-            </View>
-            <ChevronRight 
-              size={18} 
-              color={colors.textMuted} 
-              style={{ transform: [{ rotate: showAllHistory ? '90deg' : '0deg' }] }}
-            />
-          </TouchableOpacity>
-
-          {/* Always show recent 3, expand to show all */}
-          <View style={historyStyles.list}>
-            {(showAllHistory ? finishedTrainings : finishedTrainings.slice(0, 3)).map((training) => (
+        {upcomingTrainings.length === 0 ? (
+          <View style={[scheduleStyles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Calendar size={20} color={colors.textMuted} style={{ opacity: 0.6 }} />
+            <Text style={[scheduleStyles.emptyCardText, { color: colors.textMuted }]}>
+              No upcoming trainings
+            </Text>
+            {canSchedule && (
               <TouchableOpacity
-                key={training.id}
-                style={[historyStyles.historyRow, { backgroundColor: colors.card }]}
-                onPress={() => onPress(training)}
+                style={[scheduleStyles.emptyCardBtn, { backgroundColor: colors.secondary }]}
+                onPress={onCreateNew}
                 activeOpacity={0.7}
               >
-                <View style={[historyStyles.historyIcon, { backgroundColor: '#10B98110' }]}>
-                  <Target size={16} color="#10B981" />
-                </View>
-                <View style={historyStyles.historyContent}>
-                  <Text style={[historyStyles.historyTitle, { color: colors.text }]} numberOfLines={1}>
-                    {training.title}
-                  </Text>
-                  <Text style={[historyStyles.historyMeta, { color: colors.textMuted }]}>
-                    {format(new Date(training.scheduled_at), 'MMM d, yyyy')}
-                    {(training.drill_count ?? 0) > 0 && ` • ${training.drill_count} drills`}
-                  </Text>
-                </View>
+                <Plus size={13} color={colors.text} strokeWidth={2.5} />
+                <Text style={[scheduleStyles.emptyCardBtnText, { color: colors.text }]}>Schedule</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          <View style={scheduleStyles.list}>
+            {upcomingTrainings.map((training) => {
+              const isLive = training.status === 'ongoing';
+              const statusConfig = getStatusConfig(training.status);
+              
+              return (
                 <TouchableOpacity
-                  style={[historyStyles.reportBtn, { backgroundColor: colors.primary + '12' }]}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleViewReport(training.id);
-                  }}
+                  key={training.id}
+                  style={[
+                    scheduleStyles.trainingRow,
+                    { backgroundColor: colors.card, borderColor: isLive ? COLORS.live + '40' : colors.border }
+                  ]}
+                  onPress={() => onPress(training)}
                   activeOpacity={0.7}
                 >
-                  <BarChart3 size={14} color={colors.primary} />
-                  <Text style={[historyStyles.reportBtnText, { color: colors.primary }]}>Report</Text>
+                  {/* Time/Status indicator */}
+                  <View style={[
+                    scheduleStyles.timeIndicator,
+                    { backgroundColor: isLive ? COLORS.live : colors.secondary }
+                  ]}>
+                    {isLive && <PulseDot color="#fff" />}
+                    <Text style={[
+                      scheduleStyles.timeText,
+                      { color: isLive ? '#fff' : colors.textMuted }
+                    ]}>
+                      {getTimeLabel(training)}
+                    </Text>
+                  </View>
+                  
+                  {/* Content */}
+                  <View style={scheduleStyles.rowContent}>
+                    <Text style={[scheduleStyles.rowTitle, { color: colors.text }]} numberOfLines={1}>
+                      {training.title}
+                    </Text>
+                    {(training.drill_count ?? 0) > 0 && (
+                      <Text style={[scheduleStyles.rowMeta, { color: colors.textMuted }]}>
+                        {training.drill_count} drill{training.drill_count !== 1 ? 's' : ''}
+                      </Text>
+                    )}
+                  </View>
+                  
+                  <ChevronRight size={16} color={colors.border} />
                 </TouchableOpacity>
-              </TouchableOpacity>
-            ))}
+              );
+            })}
           </View>
+        )}
+      </View>
 
-          {/* Show More / Show Less button */}
-          {finishedTrainings.length > 3 && (
-            <TouchableOpacity
-              style={[historyStyles.showMoreBtn, { borderColor: colors.border }]}
-              onPress={() => setShowAllHistory(!showAllHistory)}
-              activeOpacity={0.7}
-            >
-              <Text style={[historyStyles.showMoreText, { color: colors.textMuted }]}>
-                {showAllHistory ? 'Show Less' : `Show All (${finishedTrainings.length})`}
-              </Text>
-            </TouchableOpacity>
+      {/* PAST SECTION */}
+      <View style={scheduleStyles.section}>
+        <View style={scheduleStyles.sectionHeader}>
+          <View style={scheduleStyles.sectionTitleRow}>
+            <View style={[scheduleStyles.sectionDot, { backgroundColor: colors.textMuted, opacity: 0.5 }]} />
+            <Text style={[scheduleStyles.sectionTitle, { color: colors.text }]}>Completed</Text>
+          </View>
+          {pastTrainings.length > 0 && (
+            <Text style={[scheduleStyles.sectionCount, { color: colors.textMuted }]}>
+              {pastTrainings.length}
+            </Text>
           )}
         </View>
-      )}
+
+        {pastTrainings.length === 0 ? (
+          <View style={[scheduleStyles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <BarChart3 size={20} color={colors.textMuted} style={{ opacity: 0.6 }} />
+            <Text style={[scheduleStyles.emptyCardText, { color: colors.textMuted }]}>
+              No completed trainings yet
+            </Text>
+          </View>
+        ) : (
+          <>
+            <View style={scheduleStyles.list}>
+              {(showAllPast ? pastTrainings : pastTrainings.slice(0, 3)).map((training) => (
+                <TouchableOpacity
+                  key={training.id}
+                  style={[scheduleStyles.trainingRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  onPress={() => onPress(training)}
+                  activeOpacity={0.7}
+                >
+                  {/* Date indicator */}
+                  <View style={[scheduleStyles.dateIndicator, { backgroundColor: colors.secondary }]}>
+                    <Text style={[scheduleStyles.dateText, { color: colors.textMuted }]}>
+                      {format(new Date(training.scheduled_at), 'MMM d')}
+                    </Text>
+                  </View>
+                  
+                  {/* Content */}
+                  <View style={scheduleStyles.rowContent}>
+                    <Text style={[scheduleStyles.rowTitle, { color: colors.text }]} numberOfLines={1}>
+                      {training.title}
+                    </Text>
+                    {(training.drill_count ?? 0) > 0 && (
+                      <Text style={[scheduleStyles.rowMeta, { color: colors.textMuted }]}>
+                        {training.drill_count} drill{training.drill_count !== 1 ? 's' : ''}
+                      </Text>
+                    )}
+                  </View>
+                  
+                  {/* Report button */}
+                  <TouchableOpacity
+                    style={[scheduleStyles.reportBtn, { backgroundColor: '#10B98112' }]}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleViewReport(training.id);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <BarChart3 size={14} color="#10B981" />
+                  </TouchableOpacity>
+                  
+                  <ChevronRight size={16} color={colors.border} />
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            {/* Show more/less */}
+            {pastTrainings.length > 3 && (
+              <TouchableOpacity
+                style={[scheduleStyles.showMoreBtn, { borderColor: colors.border }]}
+                onPress={() => setShowAllPast(!showAllPast)}
+                activeOpacity={0.7}
+              >
+                <Text style={[scheduleStyles.showMoreText, { color: colors.textMuted }]}>
+                  {showAllPast ? 'Show less' : `View all ${pastTrainings.length}`}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
+      </View>
     </View>
   );
 }
 
-// History section styles
-const historyStyles = StyleSheet.create({
+// Schedule section styles
+const scheduleStyles = StyleSheet.create({
   container: {
-    marginTop: 24,
+    gap: 24,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
   },
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
+    letterSpacing: -0.2,
   },
-  countBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  countText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  list: {
-    gap: 8,
-  },
-  historyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    gap: 12,
-  },
-  historyIcon: {
-    width: 36,
-    height: 36,
+  addBtn: {
+    width: 32,
+    height: 32,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  historyContent: {
-    flex: 1,
+  
+  // Section styles
+  section: {
+    gap: 12,
   },
-  historyTitle: {
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  sectionDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    marginBottom: 2,
+    letterSpacing: -0.1,
   },
-  historyMeta: {
+  sectionCount: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  
+  // Training list
+  list: {
+    gap: 8,
+  },
+  trainingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 12,
+  },
+  timeIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 7,
+    minWidth: 58,
+    justifyContent: 'center',
+  },
+  timeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  dateIndicator: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 7,
+    minWidth: 58,
+    alignItems: 'center',
+  },
+  dateText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  rowContent: {
+    flex: 1,
+    gap: 2,
+  },
+  rowTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: -0.1,
+  },
+  rowMeta: {
     fontSize: 12,
   },
   reportBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  
+  // Empty state
+  emptyCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    gap: 12,
+    paddingVertical: 18,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  emptyCardText: {
+    flex: 1,
+    fontSize: 13,
+  },
+  emptyCardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 8,
   },
-  reportBtnText: {
+  emptyCardBtnText: {
     fontSize: 12,
     fontWeight: '600',
   },
+  
+  // Show more
   showMoreBtn: {
     alignItems: 'center',
-    paddingVertical: 12,
-    marginTop: 8,
+    paddingVertical: 10,
+    marginTop: 6,
     borderRadius: 10,
     borderWidth: 1,
-    borderStyle: 'dashed',
   },
   showMoreText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
   },
 });
@@ -545,7 +631,7 @@ export default function TeamScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.headerContainer, { borderBottomColor: colors.border }]}>
+      <View style={[styles.headerContainer, { borderBottomColor: 'transparent' }]}>
         <View style={styles.headerTop}>
           <Text style={[styles.title, { color: colors.text }]}>Team</Text>
           <View style={styles.headerRight}>
@@ -569,26 +655,40 @@ export default function TeamScreen() {
           </View>
         </View>
         
-        {/* Tab Bar */}
-        <View style={[styles.tabBar, { backgroundColor: colors.secondary }]}>
+        {/* Tab Bar - Refined pill style */}
+        <View style={[headerStyles.tabBar, { backgroundColor: colors.secondary }]}>
           <TouchableOpacity
-            style={[styles.tabItem, activeTab === 'calendar' && { backgroundColor: colors.card }]}
+            style={[
+              headerStyles.tabItem, 
+              activeTab === 'calendar' && [headerStyles.tabItemActive, { backgroundColor: colors.card }]
+            ]}
             onPress={() => handleTabChange('calendar')}
           >
-            <Calendar size={16} color={activeTab === 'calendar' ? colors.primary : colors.textMuted} />
-            <Text style={[styles.tabText, { color: activeTab === 'calendar' ? colors.primary : colors.textMuted }]}>
-              Calendar
+            <Calendar size={16} color={activeTab === 'calendar' ? colors.text : colors.textMuted} />
+            <Text style={[
+              headerStyles.tabText, 
+              { color: activeTab === 'calendar' ? colors.text : colors.textMuted },
+              activeTab === 'calendar' && headerStyles.tabTextActive
+            ]}>
+              Schedule
             </Text>
           </TouchableOpacity>
           
           {/* Team Members tab for soldiers */}
           {!canManage && (
             <TouchableOpacity
-              style={[styles.tabItem, activeTab === 'team' && { backgroundColor: colors.card }]}
+              style={[
+                headerStyles.tabItem, 
+                activeTab === 'team' && [headerStyles.tabItemActive, { backgroundColor: colors.card }]
+              ]}
               onPress={() => handleTabChange('team')}
             >
-              <Users size={16} color={activeTab === 'team' ? colors.primary : colors.textMuted} />
-              <Text style={[styles.tabText, { color: activeTab === 'team' ? colors.primary : colors.textMuted }]}>
+              <Users size={16} color={activeTab === 'team' ? colors.text : colors.textMuted} />
+              <Text style={[
+                headerStyles.tabText, 
+                { color: activeTab === 'team' ? colors.text : colors.textMuted },
+                activeTab === 'team' && headerStyles.tabTextActive
+              ]}>
                 Team
               </Text>
             </TouchableOpacity>
@@ -597,11 +697,18 @@ export default function TeamScreen() {
           {/* Manage tab for commanders */}
           {canManage && (
             <TouchableOpacity
-              style={[styles.tabItem, activeTab === 'manage' && { backgroundColor: colors.card }]}
+              style={[
+                headerStyles.tabItem, 
+                activeTab === 'manage' && [headerStyles.tabItemActive, { backgroundColor: colors.card }]
+              ]}
               onPress={() => handleTabChange('manage')}
             >
-              <Settings size={16} color={activeTab === 'manage' ? colors.primary : colors.textMuted} />
-              <Text style={[styles.tabText, { color: activeTab === 'manage' ? colors.primary : colors.textMuted }]}>
+              <Settings size={16} color={activeTab === 'manage' ? colors.text : colors.textMuted} />
+              <Text style={[
+                headerStyles.tabText, 
+                { color: activeTab === 'manage' ? colors.text : colors.textMuted },
+                activeTab === 'manage' && headerStyles.tabTextActive
+              ]}>
                 Manage
               </Text>
             </TouchableOpacity>
@@ -613,7 +720,7 @@ export default function TeamScreen() {
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: insets.bottom + 100 },
+
           loadingTeamTrainings && styles.contentCentered,
         ]}
         showsVerticalScrollIndicator={false}
@@ -674,6 +781,40 @@ export default function TeamScreen() {
     </View>
   );
 }
+
+// Header tab styles
+const headerStyles = StyleSheet.create({
+  tabBar: {
+    flexDirection: 'row',
+    padding: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  tabItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+  },
+  tabItemActive: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  tabText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  tabTextActive: {
+    fontWeight: '600',
+  },
+});
 
 // ============================================================================
 // MANAGE TAB COMPONENT - Commander Dashboard
@@ -744,7 +885,7 @@ function ManageTab({
               {memberStats.training} active • Tap to view
             </Text>
           </View>
-          <ChevronRight size={20} color="rgba(255,255,255,0.7)" />
+          <ChevronRight size={16} color="rgba(255,255,255,0.7)" />
         </TouchableOpacity>
       )}
 
@@ -755,7 +896,7 @@ function ManageTab({
           onPress={onCreateTraining}
           activeOpacity={0.85}
         >
-          <Plus size={20} color={colors.background} strokeWidth={2.5} />
+          <Plus size={18} color={colors.background} strokeWidth={2.5} />
           <Text style={[manageStyles.primaryActionText, { color: colors.background }]}>
             New Training
           </Text>
@@ -870,7 +1011,7 @@ function ManageTab({
               </View>
             </View>
           </View>
-          <ChevronRight size={18} color={colors.textMuted} />
+          <ChevronRight size={16} color={colors.textMuted} />
         </View>
       </TouchableOpacity>
 
@@ -885,7 +1026,7 @@ function ManageTab({
             activeOpacity={0.6}
           >
             <View style={[manageStyles.menuIcon, { backgroundColor: colors.primary + '12' }]}>
-              <Users size={16} color={colors.primary} />
+              <Users size={15} color={colors.primary} />
             </View>
             <Text style={[manageStyles.menuItemText, { color: colors.text }]}>Members & Roles</Text>
             <ChevronRight size={16} color={colors.border} />
@@ -899,7 +1040,7 @@ function ManageTab({
             activeOpacity={0.6}
           >
             <View style={[manageStyles.menuIcon, { backgroundColor: '#3B82F612' }]}>
-              <BookOpen size={16} color="#3B82F6" />
+              <BookOpen size={15} color="#3B82F6" />
             </View>
             <Text style={[manageStyles.menuItemText, { color: colors.text }]}>Drill Library</Text>
             <ChevronRight size={16} color={colors.border} />
@@ -913,7 +1054,7 @@ function ManageTab({
             activeOpacity={0.6}
           >
             <View style={[manageStyles.menuIcon, { backgroundColor: colors.secondary }]}>
-              <Settings size={16} color={colors.textMuted} />
+              <Settings size={15} color={colors.textMuted} />
             </View>
             <Text style={[manageStyles.menuItemText, { color: colors.text }]}>Settings</Text>
             <ChevronRight size={16} color={colors.border} />
@@ -936,7 +1077,7 @@ function ManageTab({
                   activeOpacity={0.6}
                 >
                   <View style={[manageStyles.menuIcon, { backgroundColor: '#10B98112' }]}>
-                    <BarChart3 size={16} color="#10B981" />
+                    <BarChart3 size={15} color="#10B981" />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[manageStyles.menuItemText, { color: colors.text }]} numberOfLines={1}>
@@ -970,7 +1111,7 @@ function ManageTab({
   );
 }
 
-// Elegant manage tab styles
+// Manage tab styles
 const manageStyles = StyleSheet.create({
   container: {
     gap: 20,
@@ -980,42 +1121,42 @@ const manageStyles = StyleSheet.create({
   liveBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 14,
+    padding: 12,
+    borderRadius: 12,
     backgroundColor: COLORS.live,
     borderWidth: 1,
     overflow: 'hidden',
   },
   liveBannerGlow: {
     position: 'absolute',
-    top: -50,
-    right: -50,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    top: -40,
+    right: -40,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
   liveIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     backgroundColor: 'rgba(0,0,0,0.2)',
-    paddingHorizontal: 8,
+    paddingHorizontal: 7,
     paddingVertical: 4,
     borderRadius: 6,
-    marginRight: 12,
+    marginRight: 11,
   },
   liveLabel: {
     fontSize: 10,
     fontWeight: '800',
     color: '#fff',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   liveBannerContent: {
     flex: 1,
   },
   liveBannerTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: '#fff',
     marginBottom: 2,
@@ -1035,18 +1176,18 @@ const manageStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    height: 48,
-    borderRadius: 12,
+    gap: 7,
+    height: 44,
+    borderRadius: 11,
   },
   primaryActionText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
   },
   secondaryAction: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -1054,7 +1195,7 @@ const manageStyles = StyleSheet.create({
 
   // Stats Section
   statsSection: {
-    gap: 12,
+    gap: 10,
   },
   statsHeader: {
     flexDirection: 'row',
@@ -1062,13 +1203,13 @@ const manageStyles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   statsSectionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
   goalPill: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 9,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 10,
   },
   goalPillText: {
     fontSize: 11,
@@ -1081,14 +1222,14 @@ const manageStyles = StyleSheet.create({
   statCard: {
     flex: 1,
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 12,
-    gap: 6,
+    padding: 12,
+    borderRadius: 11,
+    gap: 5,
   },
   statCardValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    letterSpacing: -0.5,
+    letterSpacing: -0.3,
   },
   statCardLabel: {
     fontSize: 11,
@@ -1097,7 +1238,7 @@ const manageStyles = StyleSheet.create({
 
   // Team Card
   teamCard: {
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
   },
@@ -1105,27 +1246,27 @@ const manageStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 14,
+    padding: 12,
   },
   teamCardLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 12,
   },
   memberAvatarStack: {
     flexDirection: 'row',
   },
   stackedAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#fff',
   },
   stackedAvatarText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: '#fff',
   },
@@ -1133,13 +1274,13 @@ const manageStyles = StyleSheet.create({
     borderWidth: 0,
   },
   teamCardTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   statusDots: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 9,
   },
   statusDotItem: {
     flexDirection: 'row',
@@ -1158,39 +1299,40 @@ const manageStyles = StyleSheet.create({
 
   // Menu Section
   menuSection: {
-    gap: 10,
+    gap: 8,
   },
   menuSectionTitle: {
     fontSize: 11,
     fontWeight: '600',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
+    marginLeft: 3,
   },
   menuCard: {
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    gap: 12,
+    padding: 12,
+    gap: 11,
   },
   menuIcon: {
-    width: 32,
-    height: 32,
+    width: 30,
+    height: 30,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   menuItemText: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '500',
   },
   menuDivider: {
     height: StyleSheet.hairlineWidth,
-    marginLeft: 58,
+    marginLeft: 53,
   },
   reportDate: {
     fontSize: 12,
@@ -1200,30 +1342,30 @@ const manageStyles = StyleSheet.create({
   // Team Footer
   teamFooter: {
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 6,
   },
   teamBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    gap: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 18,
   },
   teamBadgeText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
   },
   rolePill: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: 8,
+    borderRadius: 7,
   },
   rolePillText: {
     fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
 });
 
@@ -1328,7 +1470,7 @@ function TeamMembersTab({ colors, members, activeTeam }: TeamMembersTabProps) {
       {activeTeam && (
         <View style={[teamMembersStyles.teamHeader, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={[teamMembersStyles.teamIcon, { backgroundColor: colors.primary + '15' }]}>
-            <Users size={24} color={colors.primary} />
+            <Users size={20} color={colors.primary} />
           </View>
           <View>
             <Text style={[teamMembersStyles.teamName, { color: colors.text }]}>{activeTeam.name}</Text>
@@ -1342,7 +1484,7 @@ function TeamMembersTab({ colors, members, activeTeam }: TeamMembersTabProps) {
       {/* Members List */}
       {members.length === 0 ? (
         <View style={teamMembersStyles.emptyState}>
-          <Users size={48} color={colors.textMuted} style={{ opacity: 0.5 }} />
+          <Users size={40} color={colors.textMuted} style={{ opacity: 0.5 }} />
           <Text style={[teamMembersStyles.emptyText, { color: colors.textMuted }]}>
             No team members yet
           </Text>
@@ -1360,26 +1502,27 @@ function TeamMembersTab({ colors, members, activeTeam }: TeamMembersTabProps) {
 
 const teamMembersStyles = StyleSheet.create({
   container: {
-    gap: 16,
+    gap: 20,
   },
   teamHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    padding: 16,
+    padding: 14,
     borderRadius: 12,
     borderWidth: 1,
   },
   teamIcon: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   teamName: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: -0.2,
   },
   memberCount: {
     fontSize: 13,
@@ -1391,51 +1534,53 @@ const teamMembersStyles = StyleSheet.create({
   sectionTitle: {
     fontSize: 11,
     fontWeight: '600',
-    letterSpacing: 0.5,
-    marginBottom: 4,
+    letterSpacing: 0.4,
+    marginBottom: 8,
+    marginLeft: 3,
   },
   memberCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    padding: 12,
-    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
     borderWidth: 1,
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
   memberInfo: {
     flex: 1,
-    gap: 4,
+    gap: 3,
   },
   memberName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
   },
   memberMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 7,
   },
   roleBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
   roleBadgeText: {
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
   squadName: {
     fontSize: 12,
@@ -1443,10 +1588,10 @@ const teamMembersStyles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 48,
-    gap: 12,
+    paddingVertical: 56,
+    gap: 14,
   },
   emptyText: {
-    fontSize: 15,
+    fontSize: 14,
   },
 });

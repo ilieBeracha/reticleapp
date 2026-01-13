@@ -2,7 +2,7 @@ import { LoadingScreen } from '@/components/shared/LoadingScreen';
 import { GluestackUIProvider } from '@/components/shared/ui/gluestack-ui-provider';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ModalProvider } from '@/contexts/ModalContext';
-import { useColorScheme } from '@/hooks/ui/useColorScheme';
+import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import * as Sentry from '@sentry/react-native';
 import { useFonts } from 'expo-font';
@@ -58,17 +58,21 @@ export default Sentry.wrap(function RootLayout() {
     }
   }, [loaded]);
 
-  return <RootLayoutInner />;
+  // ThemeProvider must wrap everything that uses useTheme/useColors
+  return (
+    <ThemeProvider>
+      <RootLayoutInner />
+    </ThemeProvider>
+  );
 });
 
 function RootLayoutInner() {
-  const colorScheme = useColorScheme();
-  const mode = colorScheme === 'dark' ? 'dark' : 'light';
+  const { theme } = useTheme();
   return (
-    <GluestackUIProvider mode={'dark' as 'dark' | 'light' | 'system'}>
+    <GluestackUIProvider mode={theme}>
       <ModalProvider>
         <AuthProvider>
-          <LayoutWithLoadingOverlay colorScheme={mode} />
+          <LayoutWithLoadingOverlay colorScheme={theme} />
         </AuthProvider>
       </ModalProvider>
     </GluestackUIProvider>

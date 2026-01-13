@@ -14,3 +14,10 @@ export { TeamSection } from './TeamSection';
 export { RecentActivitySection } from './RecentActivitySection';
 export { PersonalSection } from './PersonalSection';
 
+// New engaging components
+export { QuickActionsRow } from './QuickActionsRow';
+export { WeeklyProgressRing } from './WeeklyProgressRing';
+export { DailyTip } from './DailyTip';
+export { WeeklyActivityChart } from './WeeklyActivityChart';
+export { HeroActions } from './HeroActions';
+

@@ -1,41 +1,63 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Appearance } from "react-native";
 
 type ThemeMode = "light" | "dark";
+type ThemePreference = "light" | "dark" | "system";
 
 interface ThemeContextType {
   theme: ThemeMode;
   isDark: boolean;
+  preference: ThemePreference;
+  setPreference: (pref: ThemePreference) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
-const THEME_STORAGE_KEY = "@app_theme";
+const THEME_PREFERENCE_KEY = "@app_theme_preference";
+
+function getSystemTheme(): ThemeMode {
+  const scheme = Appearance.getColorScheme();
+  return scheme === "dark" ? "dark" : "light";
+}
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Initialize with current device color scheme
-  const [theme, setThemeState] = useState<ThemeMode>(() => {
-    const initialScheme = Appearance.getColorScheme();
-    return initialScheme === "dark" ? "dark" : "light";
-  });
+  const [preference, setPreferenceState] = useState<ThemePreference>("system");
+  const [theme, setTheme] = useState<ThemeMode>(getSystemTheme);
 
-  // Listen to device theme changes
+  // Load saved preference on mount
   useEffect(() => {
-    // Clear any old cached theme preference (migrate to automatic mode)
-    AsyncStorage.removeItem(THEME_STORAGE_KEY).catch(() => {});
+    AsyncStorage.getItem(THEME_PREFERENCE_KEY)
+      .then((saved) => {
+        if (saved === "light" || saved === "dark" || saved === "system") {
+          setPreferenceState(saved);
+          if (saved !== "system") {
+            setTheme(saved);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
 
-    // Set initial theme
-    const currentScheme = Appearance.getColorScheme();
-    if (currentScheme) {
-      setThemeState(currentScheme === "dark" ? "dark" : "light");
-    }
-
-    // Listen for changes
+  // Listen for system theme changes (only applies when preference is "system")
+  useEffect(() => {
     const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-      setThemeState(colorScheme === "dark" ? "dark" : "light");
+      if (preference === "system") {
+        setTheme(colorScheme === "dark" ? "dark" : "light");
+      }
     });
-
     return () => subscription.remove();
+  }, [preference]);
+
+  // Update theme when preference changes
+  const setPreference = useCallback((pref: ThemePreference) => {
+    setPreferenceState(pref);
+    AsyncStorage.setItem(THEME_PREFERENCE_KEY, pref).catch(() => {});
+    
+    if (pref === "system") {
+      setTheme(getSystemTheme());
+    } else {
+      setTheme(pref);
+    }
   }, []);
 
   return (
@@ -43,6 +65,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       value={{
         theme,
         isDark: theme === "dark",
+        preference,
+        setPreference,
       }}
     >
       {children}

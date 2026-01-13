@@ -49,7 +49,7 @@ export function ShotGoalCard({ sessions, monthlyGoal = 1000 }: ShotGoalCardProps
         {/* Left: Info */}
         <View style={styles.info}>
           <View style={styles.header}>
-            <Ionicons name="flag" size={16} color={isComplete ? colors.green : colors.primary} />
+            <Ionicons name="flag" size={14} color={isComplete ? colors.green : colors.primary} />
             <Text style={[styles.title, { color: colors.text }]}>Monthly Goal</Text>
           </View>
           
@@ -66,7 +66,7 @@ export function ShotGoalCard({ sessions, monthlyGoal = 1000 }: ShotGoalCardProps
 
           {isComplete ? (
             <View style={[styles.statusBadge, { backgroundColor: `${colors.green}15` }]}>
-              <Ionicons name="checkmark-circle" size={12} color={colors.green} />
+              <Ionicons name="checkmark-circle" size={11} color={colors.green} />
               <Text style={[styles.statusText, { color: colors.green }]}>Goal reached!</Text>
             </View>
           ) : (
@@ -113,101 +113,101 @@ export function ShotGoalCard({ sessions, monthlyGoal = 1000 }: ShotGoalCardProps
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
-    padding: 16,
-    marginBottom: 12,
+    padding: 12,
+    marginBottom: 10,
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 10,
   },
   info: {
     flex: 1,
-    gap: 6,
+    gap: 4,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   title: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: 3,
+    gap: 2,
   },
   current: {
-    fontSize: 26,
+    fontSize: 20,
     fontWeight: '700',
-    letterSpacing: -0.5,
+    letterSpacing: -0.3,
   },
   divider: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '400',
   },
   target: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '600',
   },
   unit: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '500',
-    marginLeft: 4,
+    marginLeft: 3,
   },
   remaining: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
   statusText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
   ringContainer: {
-    marginLeft: 16,
+    marginLeft: 12,
   },
   ringBg: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 4,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 3,
     alignItems: 'center',
     justifyContent: 'center',
   },
   ringProgress: {
     position: 'absolute',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 4,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 3,
     borderLeftColor: 'transparent',
     borderBottomColor: 'transparent',
   },
   ringText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
   },
   progressTrack: {
-    height: 6,
-    borderRadius: 3,
+    height: 5,
+    borderRadius: 2.5,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: 2.5,
   },
 });

@@ -1,15 +1,17 @@
 import { Colors } from "@/constants/Colors";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useMemo } from "react";
-import { useColorScheme } from "react-native";
 
 /**
  * Optimized useColors hook
  * Returns all theme colors in a single memoized object
- * Only re-computes when color scheme changes
+ * Only re-computes when theme changes
+ * 
+ * Uses ThemeContext which respects user preference (light/dark/system)
  */
 export function useColors() {
-  const scheme = useColorScheme() ?? "light";
+  const { theme } = useTheme();
   
-  // Memoize the entire colors object based on the scheme
-  return useMemo(() => Colors[scheme], [scheme]);
+  // Memoize the entire colors object based on the theme
+  return useMemo(() => Colors[theme], [theme]);
 }

@@ -208,7 +208,7 @@ export function InsightsDashboard() {
                 activeOpacity={0.7}
               >
                 <View style={[styles.analysisIcon, { backgroundColor: `${colors.primary}15` }]}>
-                  <Ionicons name="analytics" size={22} color={colors.primary} />
+                  <Ionicons name="analytics" size={18} color={colors.primary} />
                 </View>
                 <View style={styles.analysisText}>
                   <Text style={[styles.analysisTitle, { color: colors.text }]}>
@@ -218,7 +218,7 @@ export function InsightsDashboard() {
                     See what changed and why
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </TouchableOpacity>
             )}
 
@@ -228,9 +228,9 @@ export function InsightsDashboard() {
               onPress={() => router.push('/sessionHistory')}
               activeOpacity={0.7}
             >
-              <Ionicons name="time-outline" size={18} color={colors.text} />
+              <Ionicons name="time-outline" size={16} color={colors.text} />
               <Text style={[styles.linkText, { color: colors.text }]}>Session History</Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </TouchableOpacity>
 
             {/* Activity */}
@@ -275,52 +275,52 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 8 : 16,
+    paddingHorizontal: 15,
+    paddingTop: Platform.OS === 'ios' ? 8 : 14,
   },
   
   // Header
   pageTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-    marginBottom: 16,
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    marginBottom: 14,
   },
   
   // Filters
   filterRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 20,
+    gap: 6,
+    marginBottom: 16,
   },
   timePill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   timePillText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
   },
   
   // Quick Stats
   quickStatsCard: {
     flexDirection: 'row',
-    borderRadius: 14,
-    paddingVertical: 16,
-    marginBottom: 12,
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginBottom: 10,
   },
   quickStat: {
     flex: 1,
     alignItems: 'center',
   },
   quickStatValue: {
-    fontSize: 22,
+    fontSize: 17,
     fontWeight: '700',
-    letterSpacing: -0.5,
+    letterSpacing: -0.3,
   },
   quickStatLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
     marginTop: 2,
     textTransform: 'uppercase',
@@ -336,15 +336,15 @@ const styles = StyleSheet.create({
   analysisCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 14,
-    marginBottom: 12,
-    gap: 14,
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 10,
+    gap: 12,
   },
   analysisIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -352,36 +352,36 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   analysisTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
   analysisSubtitle: {
-    fontSize: 13,
-    marginTop: 2,
+    fontSize: 11,
+    marginTop: 1,
   },
   
   // Link Card
   linkCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 24,
-    gap: 10,
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 20,
+    gap: 8,
   },
   linkText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   
   // Section
   sectionTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    marginBottom: 12,
-    marginTop: 8,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginBottom: 10,
+    marginTop: 6,
   },
   
   bottomSpacer: {

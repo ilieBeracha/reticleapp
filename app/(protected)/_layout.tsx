@@ -323,6 +323,16 @@ export default function ProtectedLayout() {
         />
 
         <Stack.Screen
+          name="weaponDetail"
+          options={{
+            headerShown: false,
+            presentation: "card",
+            gestureEnabled: true,
+            contentStyle: { backgroundColor: colors.background },
+          }}
+        />
+
+        <Stack.Screen
           name="sessionResults"
           options={{
             headerShown: false,

@@ -90,14 +90,14 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 12,
     borderWidth: 1,
-    padding: 14,
-    marginBottom: 12,
+    padding: 12,
+    marginBottom: 10,
   },
   title: {
     fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginBottom: 12,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginBottom: 10,
   },
   row: {
     flexDirection: 'row',
@@ -108,15 +108,15 @@ const styles = StyleSheet.create({
   },
   divider: {
     width: 1,
-    height: 40,
-    marginHorizontal: 14,
+    height: 36,
+    marginHorizontal: 12,
   },
   bar: {
-    height: 6,
-    borderRadius: 3,
+    height: 5,
+    borderRadius: 2.5,
     flexDirection: 'row',
     overflow: 'hidden',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   barSegment: {
     height: '100%',
@@ -128,12 +128,12 @@ const styles = StyleSheet.create({
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
   },
   legendText: {
     fontSize: 10,

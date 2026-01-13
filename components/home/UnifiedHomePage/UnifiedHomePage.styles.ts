@@ -75,15 +75,15 @@ export const styles = StyleSheet.create({
   // ═══════════════════════════════════════════════════════════════════════════
   // SECTION
   // ═══════════════════════════════════════════════════════════════════════════
-  section: { marginBottom: 28 },
+  section: { marginBottom: 14 },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 12,
+    gap: 5,
+    marginBottom: 10,
   },
   sectionTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -321,13 +321,13 @@ export const styles = StyleSheet.create({
   recentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    gap: 12,
+    padding: 12,
+    gap: 10,
   },
   recentIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -335,31 +335,31 @@ export const styles = StyleSheet.create({
   recentTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     marginBottom: 2,
   },
   recentTitle: { 
-    fontSize: 14, 
+    fontSize: 13, 
     fontWeight: '600', 
     flex: 1 
   },
-  recentMeta: { fontSize: 12 },
+  recentMeta: { fontSize: 11 },
   recentRight: {
     alignItems: 'flex-end',
-    gap: 4,
+    gap: 3,
   },
   recentTime: { 
-    fontSize: 11, 
+    fontSize: 10, 
     fontWeight: '500' 
   },
   recentDivider: { 
     height: 1, 
-    marginLeft: 62 
+    marginLeft: 56 
   },
   bioBadge: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },

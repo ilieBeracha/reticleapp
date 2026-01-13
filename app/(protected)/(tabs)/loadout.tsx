@@ -1,7 +1,7 @@
 /**
  * Loadout Screen - User's Arsenal
  *
- * Clean card-based design with two-row weapon cards
+ * Clean, compact design with weapon cards and stats overview
  */
 
 import { CreateWeaponFlow, WeaponPicker } from '@/components/weapons';
@@ -21,11 +21,15 @@ import {
 import type { WeaponCategory } from '@/types/workspace';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import {
   ChevronRight,
+  Crosshair,
   Plus,
   Star,
+  Target,
   Users,
+  Zap,
 } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -44,14 +48,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // HELPERS
 // ============================================================================
 
-function getCategoryAbbrev(category: WeaponCategory | null): string {
+function getCategoryIcon(category: WeaponCategory | null, color: string) {
+  const size = 14;
   switch (category) {
-    case 'precision_rifle': return 'PR';
-    case 'rifle': return 'RF';
-    case 'carbine': return 'CB';
-    case 'pistol': return 'PT';
-    case 'shotgun': return 'SG';
-    default: return 'WP';
+    case 'precision_rifle':
+      return <Crosshair size={size} color={color} />;
+    case 'rifle':
+    case 'carbine':
+      return <Target size={size} color={color} />;
+    default:
+      return <Zap size={size} color={color} />;
   }
 }
 
@@ -59,6 +65,38 @@ function formatNumber(num: number): string {
   if (num >= 10000) return `${(num / 1000).toFixed(0)}k`;
   if (num >= 1000) return `${(num / 1000).toFixed(1)}k`;
   return num.toString();
+}
+
+// ============================================================================
+// STATS OVERVIEW COMPONENT
+// ============================================================================
+
+interface StatsOverviewProps {
+  weaponCount: number;
+  totalSessions: number;
+  totalRounds: number;
+  colors: ReturnType<typeof useColors>;
+}
+
+function StatsOverview({ weaponCount, totalSessions, totalRounds, colors }: StatsOverviewProps) {
+  return (
+    <View style={[s.statsRow, { backgroundColor: colors.card }]}>
+      <View style={s.statItem}>
+        <Text style={[s.statValue, { color: colors.text }]}>{weaponCount}</Text>
+        <Text style={[s.statLabel, { color: colors.textMuted }]}>Weapons</Text>
+      </View>
+      <View style={[s.statDivider, { backgroundColor: colors.border }]} />
+      <View style={s.statItem}>
+        <Text style={[s.statValue, { color: colors.text }]}>{totalSessions}</Text>
+        <Text style={[s.statLabel, { color: colors.textMuted }]}>Sessions</Text>
+      </View>
+      <View style={[s.statDivider, { backgroundColor: colors.border }]} />
+      <View style={s.statItem}>
+        <Text style={[s.statValue, { color: colors.text }]}>{formatNumber(totalRounds)}</Text>
+        <Text style={[s.statLabel, { color: colors.textMuted }]}>Rounds</Text>
+      </View>
+    </View>
+  );
 }
 
 // ============================================================================
@@ -76,78 +114,61 @@ interface WeaponCardProps {
 
 function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }: WeaponCardProps) {
   const categoryConfig = weapon.category ? getCategoryConfig(weapon.category) : null;
-  const abbrev = getCategoryAbbrev(weapon.category);
 
   return (
     <TouchableOpacity
-      style={[styles.card, { backgroundColor: colors.card }]}
+      style={[s.card, { backgroundColor: colors.card, borderColor: isDefault ? '#f59e0b40' : colors.border }]}
       onPress={onPress}
       activeOpacity={0.7}
     >
-      {/* Row 1: Badge + Name + Default */}
-      <View style={styles.cardRow1}>
-        <View style={[styles.badge, { backgroundColor: `${colors.text}08` }]}>
-          <Text style={[styles.badgeText, { color: colors.text }]}>{abbrev}</Text>
+      <View style={s.cardMain}>
+        {/* Category Icon */}
+        <View style={[s.cardIcon, { backgroundColor: `${colors.primary}12` }]}>
+          {getCategoryIcon(weapon.category, colors.primary)}
         </View>
-        
-        <View style={styles.cardTitleArea}>
-          <Text style={[styles.cardName, { color: colors.text }]} numberOfLines={1}>
-            {weapon.name}
-          </Text>
-          <Text style={[styles.cardMeta, { color: colors.textMuted }]} numberOfLines={1}>
+
+        {/* Info */}
+        <View style={s.cardInfo}>
+          <View style={s.cardNameRow}>
+            <Text style={[s.cardName, { color: colors.text }]} numberOfLines={1}>
+              {weapon.name}
+            </Text>
+            {isDefault && (
+              <View style={s.defaultBadge}>
+                <Star size={10} color="#f59e0b" fill="#f59e0b" />
+              </View>
+            )}
+          </View>
+          <Text style={[s.cardMeta, { color: colors.textMuted }]} numberOfLines={1}>
             {categoryConfig?.label || 'Weapon'}{weapon.caliber ? ` · ${weapon.caliber}` : ''}
           </Text>
         </View>
 
+        {/* Stats inline */}
+        <View style={s.cardStats}>
+          <Text style={[s.cardStatText, { color: colors.textMuted }]}>
+            {stats?.total_sessions ?? 0} sess · {formatNumber(stats?.total_rounds_fired ?? 0)} rds
+          </Text>
+        </View>
+
+        {/* Actions */}
         <TouchableOpacity
-          style={[
-            styles.defaultBtn,
-            { 
-              backgroundColor: isDefault ? '#f59e0b12' : 'transparent',
-              borderColor: isDefault ? '#f59e0b40' : `${colors.text}12`,
-            }
-          ]}
-          onPress={() => {
+          style={[s.starBtn, { backgroundColor: isDefault ? '#f59e0b15' : 'transparent' }]}
+          onPress={(e) => {
+            e.stopPropagation();
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             onSetDefault();
           }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Star
-            size={16}
+            size={14}
             color={isDefault ? '#f59e0b' : colors.textMuted}
             fill={isDefault ? '#f59e0b' : 'none'}
           />
         </TouchableOpacity>
-      </View>
 
-      {/* Row 2: Stats */}
-      <View style={[styles.cardRow2, { borderTopColor: `${colors.text}06` }]}>
-        <View style={styles.stat}>
-          <Text style={[styles.statValue, { color: colors.text }]}>
-            {stats?.total_sessions ?? 0}
-          </Text>
-          <Text style={[styles.statLabel, { color: colors.textMuted }]}>Sessions</Text>
-        </View>
-        
-        <View style={[styles.statDivider, { backgroundColor: `${colors.text}08` }]} />
-        
-        <View style={styles.stat}>
-          <Text style={[styles.statValue, { color: colors.text }]}>
-            {formatNumber(stats?.total_rounds_fired ?? 0)}
-          </Text>
-          <Text style={[styles.statLabel, { color: colors.textMuted }]}>Bullets</Text>
-        </View>
-        
-        <View style={[styles.statDivider, { backgroundColor: `${colors.text}08` }]} />
-        
-        <View style={styles.stat}>
-          <Text style={[styles.statValue, { color: colors.text }]}>
-            {stats?.avg_accuracy_pct != null ? `${stats.avg_accuracy_pct}%` : '—'}
-          </Text>
-          <Text style={[styles.statLabel, { color: colors.textMuted }]}>Accuracy</Text>
-        </View>
-
-        <ChevronRight size={18} color={colors.textMuted} style={styles.chevron} />
+        <ChevronRight size={14} color={colors.border} />
       </View>
     </TouchableOpacity>
   );
@@ -215,7 +236,10 @@ export default function LoadoutScreen() {
 
   const handleWeaponPress = useCallback((weapon: UserWeapon) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    console.log('Weapon pressed:', weapon.id);
+    router.push({
+      pathname: '/(protected)/weaponDetail',
+      params: { weaponId: weapon.id },
+    } as any);
   }, []);
 
   const handleSetDefault = useCallback(async (weaponId: string) => {
@@ -269,13 +293,18 @@ export default function LoadoutScreen() {
     [loadData]
   );
 
+  const handleTeamWeaponsPress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/(protected)/teamWeapons' as any);
+  }, []);
+
   // ─────────────────────────────────────────────────────────────────────────
   // LOADING
   // ─────────────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+      <View style={[s.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
@@ -286,38 +315,63 @@ export default function LoadoutScreen() {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[s.container, { backgroundColor: colors.background }]}>
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
+        style={s.scrollView}
+        contentContainerStyle={[s.scrollContent, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
         }
       >
         {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Loadout</Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            {weapons.length} weapon{weapons.length !== 1 ? 's' : ''} · {formatNumber(totalStats.rounds)} bullets fired
-          </Text>
+        <View style={s.header}>
+          <View style={s.headerTop}>
+            <Text style={[s.title, { color: colors.text }]}>Loadout</Text>
+            <TouchableOpacity
+              style={[s.addBtn, { backgroundColor: colors.primary }]}
+              onPress={handleAddWeapon}
+              activeOpacity={0.8}
+            >
+              <Plus size={18} color="#fff" strokeWidth={2.5} />
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Team Link */}
+        {/* Stats Overview */}
+        <StatsOverview
+          weaponCount={weapons.length}
+          totalSessions={totalStats.sessions}
+          totalRounds={totalStats.rounds}
+          colors={colors}
+        />
+
+        {/* Team Weapons Link */}
         {hasTeams && (
           <TouchableOpacity
-            style={[styles.teamLink, { backgroundColor: colors.card }]}
+            style={[s.teamLink, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={handleTeamWeaponsPress}
             activeOpacity={0.7}
           >
-            <Users size={18} color={colors.textMuted} />
-            <Text style={[styles.teamLinkText, { color: colors.text }]}>Team Weapons</Text>
-            <ChevronRight size={18} color={colors.textMuted} />
+            <View style={[s.teamIcon, { backgroundColor: `${colors.blue}12` }]}>
+              <Users size={14} color={colors.blue} />
+            </View>
+            <Text style={[s.teamLinkText, { color: colors.text }]}>Team Weapons</Text>
+            <ChevronRight size={14} color={colors.textMuted} />
           </TouchableOpacity>
         )}
 
-        {/* Weapons */}
+        {/* Section Header */}
+        <View style={s.sectionHeader}>
+          <Text style={[s.sectionTitle, { color: colors.text }]}>My Weapons</Text>
+          {weapons.length > 0 && (
+            <Text style={[s.sectionCount, { color: colors.textMuted }]}>{weapons.length}</Text>
+          )}
+        </View>
+
+        {/* Weapons List */}
         {weapons.length > 0 ? (
-          <View style={styles.cardList}>
+          <View style={s.cardList}>
             {weapons.map((weapon) => (
               <WeaponCard
                 key={weapon.id}
@@ -331,32 +385,24 @@ export default function LoadoutScreen() {
             ))}
           </View>
         ) : (
-          <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>No weapons yet</Text>
-            <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-              Add your first weapon to start tracking
+          <View style={[s.emptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[s.emptyIcon, { backgroundColor: colors.secondary }]}>
+              <Target size={24} color={colors.textMuted} />
+            </View>
+            <Text style={[s.emptyTitle, { color: colors.text }]}>No weapons yet</Text>
+            <Text style={[s.emptySubtitle, { color: colors.textMuted }]}>
+              Add your first weapon to start tracking performance
             </Text>
             <TouchableOpacity
-              style={[styles.emptyButton, { backgroundColor: colors.primary }]}
+              style={[s.emptyButton, { backgroundColor: colors.primary }]}
               onPress={handleAddWeapon}
             >
-              <Plus size={18} color="#fff" />
-              <Text style={styles.emptyButtonText}>Add Weapon</Text>
+              <Plus size={16} color="#fff" />
+              <Text style={s.emptyButtonText}>Add Weapon</Text>
             </TouchableOpacity>
           </View>
         )}
       </ScrollView>
-
-      {/* FAB */}
-      {weapons.length > 0 && (
-        <TouchableOpacity
-          style={[styles.fab, { backgroundColor: colors.primary }]}
-          onPress={handleAddWeapon}
-          activeOpacity={0.9}
-        >
-          <Plus size={24} color="#fff" strokeWidth={2.5} />
-        </TouchableOpacity>
-      )}
 
       {/* Modals */}
       <Modal
@@ -396,7 +442,7 @@ export default function LoadoutScreen() {
 // STYLES
 // ============================================================================
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -409,98 +455,41 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
 
   // Header
   header: {
-    marginBottom: 24,
+    marginBottom: 16,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   title: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: '700',
-    letterSpacing: -0.5,
-    marginBottom: 4,
+    letterSpacing: -0.4,
   },
-  subtitle: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-
-  // Team Link
-  teamLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 16,
-    borderRadius: 14,
-    marginBottom: 20,
-  },
-  teamLinkText: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-
-  // Card List
-  cardList: {
-    gap: 12,
-  },
-
-  // Card
-  card: {
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  cardRow1: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    gap: 14,
-  },
-  badge: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badgeText: {
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  cardTitleArea: {
-    flex: 1,
-    gap: 2,
-  },
-  cardName: {
-    fontSize: 17,
-    fontWeight: '600',
-    letterSpacing: -0.3,
-  },
-  cardMeta: {
-    fontSize: 13,
-    fontWeight: '400',
-  },
-  defaultBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    borderWidth: 1.5,
+  addBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  // Stats Row
-  cardRow2: {
+  // Stats Overview
+  statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
     paddingHorizontal: 16,
-    borderTopWidth: 1,
+    borderRadius: 12,
+    marginBottom: 12,
   },
-  stat: {
+  statItem: {
     flex: 1,
     alignItems: 'center',
   },
@@ -516,57 +505,154 @@ const styles = StyleSheet.create({
   },
   statDivider: {
     width: 1,
-    height: 28,
+    height: 24,
   },
-  chevron: {
-    marginLeft: 8,
+
+  // Team Link
+  teamLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  teamIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  teamLinkText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  // Section Header
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: -0.1,
+  },
+  sectionCount: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+
+  // Card List
+  cardList: {
+    gap: 8,
+  },
+
+  // Card
+  card: {
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  cardMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    gap: 10,
+  },
+  cardIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardInfo: {
+    flex: 1,
+    gap: 1,
+  },
+  cardNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  cardName: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
+  defaultBadge: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#f59e0b15',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardMeta: {
+    fontSize: 11,
+    fontWeight: '400',
+  },
+  cardStats: {
+    paddingHorizontal: 8,
+  },
+  cardStatText: {
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  starBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Empty State
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: 32,
-    borderRadius: 16,
+    paddingVertical: 40,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  emptyIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   emptySubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
+    lineHeight: 18,
   },
   emptyButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
+    gap: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 10,
   },
   emptyButtonText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: '#fff',
-  },
-
-  // FAB
-  fab: {
-    position: 'absolute',
-    bottom: 100,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
   },
 });
