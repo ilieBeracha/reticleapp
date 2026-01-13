@@ -79,12 +79,23 @@ interface WidgetInsightRequest {
   widget_data: Record<string, unknown>;
 }
 
+interface DailyTipRequest {
+  mode: 'daily_tip';
+  user_id: string;
+  user_stats: {
+    streak: number;
+    accuracy: number;
+    sessions_this_week: number;
+    total_sessions: number;
+  };
+}
+
 interface SessionInsightRequest {
   mode?: 'session';
   session_id: string;
 }
 
-type InsightRequest = WidgetInsightRequest | SessionInsightRequest;
+type InsightRequest = WidgetInsightRequest | SessionInsightRequest | DailyTipRequest;
 
 // ============================================================================
 // SESSION TO TEXT (for Pinecone embedding)
@@ -668,6 +679,219 @@ function getWidgetTitle(widgetType: WidgetType): string {
 }
 
 // ============================================================================
+// DAILY TIP GENERATION (Personalized via Pinecone)
+// ============================================================================
+
+interface DailyTipResult {
+  title: string;
+  content: string;
+  category: 'technique' | 'fundamentals' | 'mental' | 'training';
+  personalized: boolean;
+  based_on?: string;
+}
+
+async function generateDailyTip(
+  userId: string,
+  userStats: { streak: number; accuracy: number; sessions_this_week: number; total_sessions: number },
+  pineconeApiKey: string,
+  pineconeIndexHost: string,
+  anthropicApiKey: string
+): Promise<DailyTipResult> {
+  
+  // Query recent sessions from Pinecone to understand user's patterns
+  let sessionContext = '';
+  let weakAreas: string[] = [];
+  let strongAreas: string[] = [];
+  
+  try {
+    // Get sessions with different characteristics
+    const [
+      lowAccuracySessions,
+      highAccuracySessions,
+      recentSessions,
+      groupingSessions,
+    ] = await Promise.all([
+      queryPineconeWithFilter(userId, pineconeApiKey, pineconeIndexHost, {
+        accuracy_pct: { $lt: 60 },
+      }, 10),
+      queryPineconeWithFilter(userId, pineconeApiKey, pineconeIndexHost, {
+        accuracy_pct: { $gte: 80 },
+      }, 10),
+      queryPineconeWithFilter(userId, pineconeApiKey, pineconeIndexHost, {}, 20), // Recent sessions
+      queryPineconeWithFilter(userId, pineconeApiKey, pineconeIndexHost, {
+        drill_goal: { $eq: 'grouping' },
+      }, 10),
+    ]);
+
+    // Analyze patterns
+    if (lowAccuracySessions.length > 0) {
+      const positions = lowAccuracySessions
+        .map(s => s.fields.position as string)
+        .filter(Boolean);
+      const distances = lowAccuracySessions
+        .map(s => s.fields.distance_m as number)
+        .filter(Boolean);
+      
+      // Find common patterns in low accuracy sessions
+      const positionCounts: Record<string, number> = {};
+      positions.forEach(p => { positionCounts[p] = (positionCounts[p] || 0) + 1; });
+      const weakPosition = Object.entries(positionCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+      if (weakPosition) weakAreas.push(`${weakPosition} position`);
+      
+      const avgDistance = distances.length > 0 ? distances.reduce((a, b) => a + b, 0) / distances.length : 0;
+      if (avgDistance > 100) weakAreas.push('long range shooting');
+    }
+
+    if (highAccuracySessions.length > 0) {
+      const positions = highAccuracySessions
+        .map(s => s.fields.position as string)
+        .filter(Boolean);
+      const positionCounts: Record<string, number> = {};
+      positions.forEach(p => { positionCounts[p] = (positionCounts[p] || 0) + 1; });
+      const strongPosition = Object.entries(positionCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+      if (strongPosition) strongAreas.push(`${strongPosition} position`);
+    }
+
+    // Check grouping performance
+    if (groupingSessions.length > 0) {
+      const dispersions = groupingSessions
+        .map(s => s.fields.dispersion_cm as number)
+        .filter(Boolean);
+      const avgDispersion = dispersions.length > 0 ? dispersions.reduce((a, b) => a + b, 0) / dispersions.length : 0;
+      if (avgDispersion > 8) weakAreas.push('shot consistency');
+      else if (avgDispersion < 4) strongAreas.push('grouping precision');
+    }
+
+    // Build context from session data
+    const sessionTexts = recentSessions
+      .slice(0, 5)
+      .map(s => s.fields.text as string)
+      .filter(Boolean);
+    
+    sessionContext = `
+User's recent training patterns (from ${recentSessions.length} sessions):
+${sessionTexts.join('\n')}
+
+Identified weak areas: ${weakAreas.length > 0 ? weakAreas.join(', ') : 'None identified'}
+Identified strong areas: ${strongAreas.length > 0 ? strongAreas.join(', ') : 'Still gathering data'}
+`;
+  } catch (error) {
+    console.error('Failed to query Pinecone for daily tip:', error);
+    sessionContext = 'No session history available yet.';
+  }
+
+  // Build the prompt for Claude
+  const prompt = `You are a shooting coach generating a personalized daily tip for a shooter.
+
+User Statistics:
+- Training streak: ${userStats.streak} days
+- Average accuracy: ${userStats.accuracy}%
+- Sessions this week: ${userStats.sessions_this_week}
+- Total sessions: ${userStats.total_sessions}
+
+${sessionContext}
+
+Generate ONE specific, actionable shooting tip that is PERSONALIZED to this shooter's patterns and current stats.
+
+Rules:
+- If they have weak areas, address one of them
+- If they have a streak going, acknowledge consistency
+- If accuracy is low, focus on fundamentals
+- If sessions_this_week is 0, encourage getting back to training
+- Keep the tip practical and specific to their data
+- Maximum 2 sentences for the tip content
+
+Respond with ONLY valid JSON in this exact format:
+{
+  "title": "Short title (3-5 words)",
+  "content": "The actual tip content (1-2 sentences max)",
+  "category": "technique" | "fundamentals" | "mental" | "training",
+  "based_on": "What user data this tip addresses"
+}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': anthropicApiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 300,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Claude API error for daily tip:', await response.text());
+      throw new Error('Claude API failed');
+    }
+
+    const data = await response.json();
+    const content = data.content?.[0]?.text || '';
+
+    // Parse JSON response
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]) as {
+        title: string;
+        content: string;
+        category: 'technique' | 'fundamentals' | 'mental' | 'training';
+        based_on?: string;
+      };
+
+      return {
+        title: parsed.title || 'Training Tip',
+        content: parsed.content || 'Focus on your fundamentals today.',
+        category: parsed.category || 'training',
+        personalized: true,
+        based_on: parsed.based_on,
+      };
+    }
+  } catch (error) {
+    console.error('Failed to generate personalized tip:', error);
+  }
+
+  // Fallback to a generic tip based on stats
+  return getFallbackTip(userStats);
+}
+
+function getFallbackTip(stats: { streak: number; accuracy: number; sessions_this_week: number }): DailyTipResult {
+  if (stats.streak >= 5) {
+    return {
+      title: 'Mental Focus',
+      content: 'Great streak! Visualize each shot before taking it. See the bullet hitting the target. Confidence breeds accuracy.',
+      category: 'mental',
+      personalized: false,
+    };
+  }
+  if (stats.accuracy < 50 && stats.sessions_this_week > 0) {
+    return {
+      title: 'Trigger Press',
+      content: 'Focus on pressing straight back. Let the shot surprise you. Anticipation causes most misses.',
+      category: 'technique',
+      personalized: false,
+    };
+  }
+  if (stats.sessions_this_week === 0) {
+    return {
+      title: 'Deliberate Practice',
+      content: 'Quality over quantity. 50 focused rounds beat 200 rushed ones. Every shot should have purpose.',
+      category: 'training',
+      personalized: false,
+    };
+  }
+  return {
+    title: 'Breathing Control',
+    content: 'Take a deep breath, hold at the natural pause, then squeeze. Consistent breathing improves groupings.',
+    category: 'technique',
+    personalized: false,
+  };
+}
+
+// ============================================================================
 // MAIN HANDLER
 // ============================================================================
 
@@ -729,6 +953,49 @@ Deno.serve(async (req) => {
         success: true,
         widget_type,
         insight,
+      }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ========================================================================
+    // MODE: DAILY TIP (personalized tip based on Pinecone session history)
+    // ========================================================================
+    if ('mode' in body && body.mode === 'daily_tip') {
+      const { user_id, user_stats } = body as DailyTipRequest;
+      
+      if (!user_id) {
+        return new Response(JSON.stringify({ error: 'user_id required' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      
+      console.log(`💡 Daily tip request for user ${user_id}`);
+      
+      // If AI services not configured, return fallback tip
+      if (!pineconeApiKey || !pineconeIndexHost || !anthropicApiKey) {
+        console.log('AI services not configured, using fallback tip');
+        const fallbackTip = getFallbackTip(user_stats || { streak: 0, accuracy: 0, sessions_this_week: 0 });
+        return new Response(JSON.stringify({
+          success: true,
+          tip: fallbackTip,
+        }), {
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      
+      const tip = await generateDailyTip(
+        user_id,
+        user_stats || { streak: 0, accuracy: 0, sessions_this_week: 0, total_sessions: 0 },
+        pineconeApiKey,
+        pineconeIndexHost,
+        anthropicApiKey
+      );
+      
+      return new Response(JSON.stringify({
+        success: true,
+        tip,
       }), {
         headers: { 'Content-Type': 'application/json' },
       });

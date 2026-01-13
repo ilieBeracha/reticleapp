@@ -18,9 +18,6 @@ export function RecentActivitySection({
 }: RecentActivitySectionProps) {
   return (
     <Animated.View entering={FadeIn.delay(150)} style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Recent Activity</Text>
-      </View>
       
       {sessions.length > 0 ? (
         <View style={[styles.recentList, { backgroundColor: colors.card, borderColor: colors.border }]}>

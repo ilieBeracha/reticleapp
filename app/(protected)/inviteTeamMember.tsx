@@ -259,7 +259,7 @@ export default function InviteTeamMemberSheet() {
   // MAIN FORM
   // ══════════════════════════════════════════════════════════════════════════
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.card }]}>
       <KeyboardAvoidingView 
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

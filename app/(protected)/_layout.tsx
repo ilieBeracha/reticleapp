@@ -1,5 +1,4 @@
 import { Header } from '@/components/shared/Header';
-import { ThemeProvider } from '@/contexts/ThemeContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { useOrphanedSessionCheck } from '@/hooks/useOrphanedSessionCheck';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -14,21 +13,20 @@ export default function ProtectedLayout() {
 
 
   return (
-    <ThemeProvider>
-      <Stack
-        screenOptions={{
-          headerShown: true,
-          headerStyle: { backgroundColor: colors.background },
-          headerShadowVisible: false,
-          headerTitle: () => (
-            <Header
-              onNotificationPress={() => router.push('/(protected)/notifications')}
-            />
-          ),
-          headerTitleAlign: 'left',
-          headerTintColor: colors.text,
-        }}
-      >
+    <Stack
+      screenOptions={{
+        headerShown: true,
+        headerStyle: { backgroundColor: colors.background },
+        headerShadowVisible: false,
+        headerTitle: () => (
+          <Header
+            onNotificationPress={() => router.push('/(protected)/notifications')}
+          />
+        ),
+        headerTitleAlign: 'left',
+        headerTintColor: colors.text,
+      }}
+    >
         <Stack.Screen
           name="index"
           options={{ headerShown: false }}
@@ -130,7 +128,7 @@ export default function ProtectedLayout() {
           name="createSession"
           options={{
             headerShown: false,
-            presentation: "formSheet",
+            presentation: "containedModal",
             gestureEnabled: true,
             sheetGrabberVisible: true,
             contentStyle: { backgroundColor: colors.background },
@@ -366,7 +364,6 @@ export default function ProtectedLayout() {
           }}
         />
 
-      </Stack>
-    </ThemeProvider>
+    </Stack>
   );
 }

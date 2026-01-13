@@ -1,127 +1,207 @@
 /**
  * DailyTip Component
  *
- * Shows rotating tips and insights to keep users engaged.
- * Content changes based on time of day and user stats.
+ * Shows personalized tips based on user's session history from Pinecone.
+ * Tips are cached per day - only one AI-generated tip per user per day.
+ * Falls back to static tips if AI is unavailable.
  */
 
+import { useAuth } from '@/contexts/AuthContext';
+import { getPersonalizedDailyTip, type PersonalizedTip } from '@/services/insights';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { format } from 'date-fns';
 import * as Haptics from 'expo-haptics';
-import { Lightbulb, RefreshCw, X } from 'lucide-react-native';
-import { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Lightbulb, Sparkles } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   FadeIn,
   FadeOut,
-  SlideInRight,
-  SlideOutLeft,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
 } from 'react-native-reanimated';
 import type { Colors } from '../UnifiedHomePage.types';
+
+const DAILY_TIP_CACHE_KEY = 'daily_tip_cache';
 
 interface DailyTipProps {
   colors: Colors;
   streak: number;
   accuracy: number;
   sessionsThisWeek: number;
+  totalSessions?: number;
 }
 
-const TIPS = [
+// Fallback tips when AI is loading or unavailable
+const FALLBACK_TIPS: PersonalizedTip[] = [
   {
-    id: 'breathing',
     title: 'Breathing Control',
     content: 'Take a deep breath, hold at the natural pause, then squeeze. Consistent breathing improves groupings.',
     category: 'technique',
+    personalized: false,
   },
   {
-    id: 'trigger',
     title: 'Trigger Press',
     content: 'Focus on pressing straight back. Let the shot surprise you. Anticipation causes most misses.',
     category: 'technique',
+    personalized: false,
   },
   {
-    id: 'sight',
     title: 'Sight Alignment',
     content: 'Equal height, equal light. Keep your focus on the front sight, let the target blur slightly.',
     category: 'technique',
+    personalized: false,
   },
   {
-    id: 'stance',
     title: 'Natural Point of Aim',
     content: 'Close your eyes, assume your stance, open them. If you\'re not on target, adjust your feet, not your arms.',
     category: 'fundamentals',
+    personalized: false,
   },
   {
-    id: 'grip',
     title: 'Consistent Grip',
     content: 'Firm but not tense. Your grip should be the same pressure every shot. Practice dry-fire daily.',
     category: 'fundamentals',
+    personalized: false,
   },
   {
-    id: 'follow',
     title: 'Follow Through',
     content: 'Hold your sight picture after the shot breaks. This helps identify errors and builds muscle memory.',
     category: 'technique',
+    personalized: false,
   },
   {
-    id: 'mental',
     title: 'Mental Focus',
     content: 'Visualize each shot before taking it. See the bullet hitting the target. Confidence breeds accuracy.',
     category: 'mental',
+    personalized: false,
   },
   {
-    id: 'drills',
     title: 'Deliberate Practice',
     content: 'Quality over quantity. 50 focused rounds beat 200 rushed ones. Every shot should have purpose.',
     category: 'training',
+    personalized: false,
   },
 ];
 
-function getTipOfTheDay(streak: number, accuracy: number, sessionsThisWeek: number): typeof TIPS[0] {
+function getInitialTip(streak: number, accuracy: number, sessionsThisWeek: number): PersonalizedTip {
   const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
 
   // Personalized tip selection based on stats
   if (streak >= 5) {
-    return TIPS.find(t => t.id === 'mental') || TIPS[dayOfYear % TIPS.length];
+    return FALLBACK_TIPS.find(t => t.title === 'Mental Focus') || FALLBACK_TIPS[dayOfYear % FALLBACK_TIPS.length];
   }
   if (accuracy < 50 && sessionsThisWeek > 0) {
-    return TIPS.find(t => t.id === 'trigger') || TIPS[dayOfYear % TIPS.length];
+    return FALLBACK_TIPS.find(t => t.title === 'Trigger Press') || FALLBACK_TIPS[dayOfYear % FALLBACK_TIPS.length];
   }
   if (sessionsThisWeek === 0) {
-    return TIPS.find(t => t.id === 'drills') || TIPS[dayOfYear % TIPS.length];
+    return FALLBACK_TIPS.find(t => t.title === 'Deliberate Practice') || FALLBACK_TIPS[dayOfYear % FALLBACK_TIPS.length];
   }
 
-  return TIPS[dayOfYear % TIPS.length];
+  return FALLBACK_TIPS[dayOfYear % FALLBACK_TIPS.length];
 }
 
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+interface CachedTip {
+  tip: PersonalizedTip;
+  date: string; // YYYY-MM-DD
+  userId: string;
+}
 
-export function DailyTip({ colors, streak, accuracy, sessionsThisWeek }: DailyTipProps) {
-  const [dismissed, setDismissed] = useState(false);
-  const [tipIndex, setTipIndex] = useState(0);
-  const scale = useSharedValue(1);
+async function getCachedTip(userId: string): Promise<PersonalizedTip | null> {
+  try {
+    const cached = await AsyncStorage.getItem(DAILY_TIP_CACHE_KEY);
+    if (!cached) return null;
+    
+    const data: CachedTip = JSON.parse(cached);
+    const today = format(new Date(), 'yyyy-MM-dd');
+    
+    // Check if cache is from today and for the same user
+    if (data.date === today && data.userId === userId) {
+      return data.tip;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Failed to get cached tip:', error);
+    return null;
+  }
+}
 
-  const initialTip = getTipOfTheDay(streak, accuracy, sessionsThisWeek);
-  const [currentTip, setCurrentTip] = useState(initialTip);
+async function cacheTip(userId: string, tip: PersonalizedTip): Promise<void> {
+  try {
+    const data: CachedTip = {
+      tip,
+      date: format(new Date(), 'yyyy-MM-dd'),
+      userId,
+    };
+    await AsyncStorage.setItem(DAILY_TIP_CACHE_KEY, JSON.stringify(data));
+  } catch (error) {
+    console.error('Failed to cache tip:', error);
+  }
+}
 
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
+export function DailyTip({ colors, streak, accuracy, sessionsThisWeek, totalSessions = 0 }: DailyTipProps) {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [currentTip, setCurrentTip] = useState<PersonalizedTip>(() => 
+    getInitialTip(streak, accuracy, sessionsThisWeek)
+  );
 
-  const handleRefresh = () => {
+  // Fetch personalized tip on mount - cached per day
+  useEffect(() => {
+    let mounted = true;
+    
+    const loadTip = async () => {
+      // If no user or not enough sessions, use fallback
+      if (!user?.id || totalSessions < 3) {
+        setLoading(false);
+        return;
+      }
+      
+      // Check cache first
+      const cachedTip = await getCachedTip(user.id);
+      if (cachedTip) {
+        if (mounted) {
+          setCurrentTip(cachedTip);
+          setLoading(false);
+        }
+        return;
+      }
+      
+      // No cache - fetch new tip from AI
+      try {
+        const tip = await getPersonalizedDailyTip(user.id, {
+          streak,
+          accuracy,
+          sessionsThisWeek,
+          totalSessions,
+        });
+        
+        if (mounted) {
+          setCurrentTip(tip);
+          // Cache the tip for today
+          await cacheTip(user.id, tip);
+        }
+      } catch (error) {
+        console.error('Failed to fetch personalized tip:', error);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadTip();
+    
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]); // Only fetch on mount
+
+  const [expanded, setExpanded] = useState(false);
+
+  const handleToggle = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const nextIndex = (tipIndex + 1) % TIPS.length;
-    setTipIndex(nextIndex);
-    setCurrentTip(TIPS[nextIndex]);
+    setExpanded(!expanded);
   };
-
-  const handleDismiss = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setDismissed(true);
-  };
-
-  if (dismissed) return null;
 
   const categoryColors: Record<string, string> = {
     technique: colors.indigo,
@@ -138,87 +218,108 @@ export function DailyTip({ colors, streak, accuracy, sessionsThisWeek }: DailyTi
       exiting={FadeOut.duration(200)}
       style={s.container}
     >
-      <View style={[s.card, { backgroundColor: `${tipColor}08`, borderColor: `${tipColor}20` }]}>
+      <TouchableOpacity 
+        activeOpacity={0.7}
+        onPress={handleToggle}
+        style={[s.card, { backgroundColor: `${tipColor}08`, borderColor: `${tipColor}20` }]}
+      >
         <View style={s.header}>
-          <View style={s.headerLeft}>
-            <View style={[s.iconBg, { backgroundColor: `${tipColor}15` }]}>
-              <Lightbulb size={14} color={tipColor} />
-            </View>
-            <View>
-              <Text style={[s.category, { color: tipColor }]}>
-                {currentTip.category.toUpperCase()}
-              </Text>
-              <Text style={[s.title, { color: colors.text }]}>
-                {currentTip.title}
-              </Text>
-            </View>
+          <View style={[s.iconBg, { backgroundColor: `${tipColor}15` }]}>
+            {loading ? (
+              <ActivityIndicator size={12} color={tipColor} />
+            ) : (
+              <Lightbulb size={12} color={tipColor} />
+            )}
           </View>
-          <View style={s.actions}>
-            <TouchableOpacity onPress={handleRefresh} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <RefreshCw size={16} color={colors.textMuted} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleDismiss} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <X size={16} color={colors.textMuted} />
-            </TouchableOpacity>
+          <View style={s.titleContainer}>
+            <Text style={[s.title, { color: colors.text }]} numberOfLines={1}>
+              {currentTip.title}
+            </Text>
           </View>
+          {currentTip.personalized && (
+            <View style={[s.aiBadge, { backgroundColor: `${colors.primary}15` }]}>
+              <Sparkles size={8} color={colors.primary} />
+              <Text style={[s.aiBadgeText, { color: colors.primary }]}>AI</Text>
+            </View>
+          )}
         </View>
-        <Text style={[s.content, { color: colors.text }]}>
-          {currentTip.content}
-        </Text>
-      </View>
+        
+        {expanded && (
+          <Animated.View entering={FadeIn.duration(200)} style={s.expandedContent}>
+            <Text style={[s.content, { color: colors.text }]}>
+              {currentTip.content}
+            </Text>
+            {currentTip.personalized && currentTip.based_on && (
+              <Text style={[s.basedOn, { color: colors.textMuted }]}>
+                Based on: {currentTip.based_on}
+              </Text>
+            )}
+          </Animated.View>
+        )}
+      </TouchableOpacity>
     </Animated.View>
   );
 }
 
 const s = StyleSheet.create({
   container: {
-    marginBottom: 14,
+    marginBottom: 10,
   },
   card: {
-    padding: 12,
-    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 10,
     borderWidth: 1,
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  headerLeft: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    flex: 1,
+    gap: 8,
   },
   iconBg: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  category: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    marginBottom: 1,
+  titleContainer: {
+    flex: 1,
   },
   title: {
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: -0.2,
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: -0.1,
   },
-  actions: {
+  aiBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 2,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  aiBadgeText: {
+    fontSize: 8,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  expandedContent: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(128,128,128,0.2)',
   },
   content: {
     fontSize: 12,
     lineHeight: 17,
     fontWeight: '500',
     opacity: 0.85,
-    paddingLeft: 40,
+  },
+  basedOn: {
+    fontSize: 10,
+    fontWeight: '500',
+    marginTop: 6,
+    fontStyle: 'italic',
   },
 });

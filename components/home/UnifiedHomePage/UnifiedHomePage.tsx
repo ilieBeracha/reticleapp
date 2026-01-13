@@ -72,6 +72,8 @@ export function UnifiedHomePage() {
     todayTrainings,
     hasActiveSession,
     allSessions,
+    defaultWeapon,
+    defaultWeaponStats,
 
     // Handlers
     onRefresh,
@@ -129,8 +131,9 @@ export function UnifiedHomePage() {
         <CoachMessage message={coachMessage} colors={colors} />
 
         {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* HERO ACTIONS - Solo session button & Today's team trainings */}
+        {/* SECTION: QUICK ACTIONS */}
         {/* ─────────────────────────────────────────────────────────────────── */}
+        <Text style={[localStyles.sectionTitle, { color: colors.textMuted }]}>QUICK ACTIONS</Text>
         <HeroActions
           colors={colors}
           activeSession={homeState.activeSession}
@@ -138,27 +141,29 @@ export function UnifiedHomePage() {
           starting={starting}
           onStartSession={handleStartSession}
           onActiveSessionPress={handleActiveSessionPress}
+          defaultWeapon={defaultWeapon}
+          defaultWeaponStats={defaultWeaponStats}
           todayTrainings={todayTrainings}
           onTrainingPress={handleTrainingPress}
         />
 
         {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* DAILY TIP */}
+        {/* SECTION: THIS WEEK */}
         {/* ─────────────────────────────────────────────────────────────────── */}
+        <Text style={[localStyles.sectionTitle, { color: colors.textMuted }]}>THIS WEEK</Text>
         <DailyTip
           colors={colors}
           streak={streak}
           accuracy={weeklyStats.accuracy}
           sessionsThisWeek={weeklyStats.sessions}
-          />
-          {/* ─────────────────────────────────────────────────────────────────── */}
-          {/* WEEKLY STATS */}
-          <WeeklyStatsCard stats={weeklyStats} streak={streak} colors={colors} />
-          {/* ─────────────────────────────────────────────────────────────────── */}
+          totalSessions={allSessions.length}
+        />
+        <WeeklyStatsCard stats={weeklyStats} streak={streak} colors={colors} />
 
         {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* RECENT ACTIVITY */}
+        {/* SECTION: RECENT ACTIVITY */}
         {/* ─────────────────────────────────────────────────────────────────── */}
+        <Text style={[localStyles.sectionTitle, { color: colors.textMuted }]}>RECENT ACTIVITY</Text>
         <RecentActivitySection
           sessions={recentSessions}
           colors={colors}
@@ -203,6 +208,13 @@ export function UnifiedHomePage() {
 }
 
 const localStyles = StyleSheet.create({
+  sectionTitle: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+    marginTop: 6,
+  },
   viewAllLink: {
     flexDirection: 'row',
     alignItems: 'center',

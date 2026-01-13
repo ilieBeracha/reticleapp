@@ -329,7 +329,7 @@ export default function SessionDetailScreen() {
   if (loading) {
     return (
       <ScrollView
-        style={styles.scrollView}
+        style={[styles.scrollView, { backgroundColor: colors.card }]}
         contentContainerStyle={[styles.scrollContent, { paddingTop: 24 }]}
         showsVerticalScrollIndicator={false}
       >

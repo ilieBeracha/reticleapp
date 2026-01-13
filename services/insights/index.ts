@@ -429,3 +429,94 @@ export async function triggerInsightGeneration(sessionId: string): Promise<{
     return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
 }
+
+// ============================================================================
+// PERSONALIZED DAILY TIP (Pinecone + AI)
+// ============================================================================
+
+export interface PersonalizedTip {
+  title: string;
+  content: string;
+  category: 'technique' | 'fundamentals' | 'mental' | 'training';
+  personalized: boolean;
+  based_on?: string;
+}
+
+/**
+ * Get a personalized daily tip based on user's session history from Pinecone.
+ * Falls back to rule-based tips if AI services are unavailable.
+ */
+export async function getPersonalizedDailyTip(
+  userId: string,
+  userStats: {
+    streak: number;
+    accuracy: number;
+    sessionsThisWeek: number;
+    totalSessions: number;
+  }
+): Promise<PersonalizedTip> {
+  try {
+    const { data, error } = await supabase.functions.invoke('generate-insights', {
+      body: {
+        mode: 'daily_tip',
+        user_id: userId,
+        user_stats: {
+          streak: userStats.streak,
+          accuracy: userStats.accuracy,
+          sessions_this_week: userStats.sessionsThisWeek,
+          total_sessions: userStats.totalSessions,
+        },
+      },
+    });
+
+    if (error) {
+      console.error('[insights] Daily tip error:', error);
+      return getFallbackTip(userStats);
+    }
+
+    if (data?.success && data?.tip) {
+      return data.tip as PersonalizedTip;
+    }
+
+    return getFallbackTip(userStats);
+  } catch (err) {
+    console.error('[insights] Failed to get personalized tip:', err);
+    return getFallbackTip(userStats);
+  }
+}
+
+/**
+ * Fallback tips when AI is not available
+ */
+function getFallbackTip(stats: { streak: number; accuracy: number; sessionsThisWeek: number }): PersonalizedTip {
+  if (stats.streak >= 5) {
+    return {
+      title: 'Mental Focus',
+      content: 'Great streak! Visualize each shot before taking it. See the bullet hitting the target. Confidence breeds accuracy.',
+      category: 'mental',
+      personalized: false,
+    };
+  }
+  if (stats.accuracy < 50 && stats.sessionsThisWeek > 0) {
+    return {
+      title: 'Trigger Press',
+      content: 'Focus on pressing straight back. Let the shot surprise you. Anticipation causes most misses.',
+      category: 'technique',
+      personalized: false,
+    };
+  }
+  if (stats.sessionsThisWeek === 0) {
+    return {
+      title: 'Deliberate Practice',
+      content: 'Quality over quantity. 50 focused rounds beat 200 rushed ones. Every shot should have purpose.',
+      category: 'training',
+      personalized: false,
+    };
+  }
+  return {
+    title: 'Breathing Control',
+    content: 'Take a deep breath, hold at the natural pause, then squeeze. Consistent breathing improves groupings.',
+    category: 'technique',
+    personalized: false,
+  };
+}

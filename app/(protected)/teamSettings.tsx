@@ -391,7 +391,7 @@ export default function TeamSettingsSheet() {
 
   return (
     <ScrollView
-      style={styles.scrollView}
+      style={[styles.scrollView, { backgroundColor: colors.card }]}
       contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
       showsVerticalScrollIndicator={false}
     >

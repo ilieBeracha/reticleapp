@@ -25,6 +25,10 @@ interface ModalContextType {
   selectedTraining: TrainingWithDetails | null;
   setSelectedTraining: (training: TrainingWithDetails | null) => void;
   
+  // Action triggers - call these to trigger actions from anywhere
+  openCreateSession: () => void;
+  setOpenCreateSession: (callback: (() => void) | null) => void;
+  
   // Callback getters - call these to get current callback and invoke
   getOnSessionCreated: () => (() => void) | null;
   getOnTeamCreated: () => (() => void) | null;
@@ -61,6 +65,9 @@ export function ModalProvider({ children }: { children: ReactNode }) {
   const [selectedMember, setSelectedMember] = useState<TeamMemberWithProfile | null>(null);
   const [selectedTraining, setSelectedTraining] = useState<TrainingWithDetails | null>(null);
   
+  // Action trigger refs - stable functions callable from anywhere
+  const openCreateSessionRef = useRef<(() => void) | null>(null);
+  
   // Callback refs - updating these doesn't cause re-renders
   const onSessionCreatedRef = useRef<(() => void) | null>(null);
   const onTeamCreatedRef = useRef<(() => void) | null>(null);
@@ -70,6 +77,15 @@ export function ModalProvider({ children }: { children: ReactNode }) {
   const onTrainingCreatedRef = useRef<(() => void) | null>(null);
   const onTrainingUpdatedRef = useRef<(() => void) | null>(null);
 
+  // Action trigger setter and callable
+  const setOpenCreateSession = useCallback((cb: (() => void) | null) => {
+    openCreateSessionRef.current = cb;
+  }, []);
+  
+  const openCreateSession = useCallback(() => {
+    openCreateSessionRef.current?.();
+  }, []);
+  
   // Stable setter functions
   const setOnSessionCreated = useCallback((cb: (() => void) | null) => {
     onSessionCreatedRef.current = cb;
@@ -111,6 +127,9 @@ export function ModalProvider({ children }: { children: ReactNode }) {
     setSelectedMember,
     selectedTraining,
     setSelectedTraining,
+    // Action triggers - callable from anywhere
+    openCreateSession,
+    setOpenCreateSession,
     // Getters for accessing current callback
     getOnSessionCreated,
     getOnTeamCreated,
@@ -139,6 +158,9 @@ export function ModalProvider({ children }: { children: ReactNode }) {
     selectedTeam,
     selectedMember,
     selectedTraining,
+    // Action triggers
+    openCreateSession,
+    setOpenCreateSession,
     // All other values are stable refs/callbacks
     getOnSessionCreated,
     getOnTeamCreated,

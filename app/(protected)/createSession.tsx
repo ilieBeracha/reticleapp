@@ -13,7 +13,7 @@ import {
   SessionIntentStep,
   useSessionCreation,
 } from '@/components/session/creation';
-import type { Position, SessionPurpose, TargetType } from '@/components/session/creation/sessionCreation.types';
+import type { Position, SessionPurpose } from '@/components/session/creation/sessionCreation.types';
 import { DrillPresetPicker, PresetForm } from '@/components/shared/drills';
 import { CreateWeaponFlow, WeaponPicker } from '@/components/weapons';
 import { getCategoryConfig } from '@/constants/weaponCategories';
@@ -292,59 +292,82 @@ export default function CreateSessionScreen() {
   const stepLabels = ['Goal', 'Details'];
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={[styles.headerButton, { backgroundColor: colors.card }]}
-          onPress={effectiveStep > 1 ? creation.goBack : () => router.back()}
-          activeOpacity={0.7}
-        >
-          {effectiveStep > 1 ? (
-            <ChevronLeft size={20} color={colors.text} />
-          ) : (
-            <Ionicons name="close" size={20} color={colors.text} />
-          )}
-        </TouchableOpacity>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Fixed Header */}
+      <View style={[styles.headerContainer, { paddingTop: insets.top + 8 }]}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={[styles.headerButton, { backgroundColor: colors.card }]}
+            onPress={effectiveStep > 1 ? creation.goBack : () => router.back()}
+            activeOpacity={0.7}
+          >
+            {effectiveStep > 1 ? (
+              <ChevronLeft size={18} color={colors.text} />
+            ) : (
+              <Ionicons name="close" size={18} color={colors.text} />
+            )}
+          </TouchableOpacity>
 
-        <Text style={[styles.headerTitle, { color: colors.text }]}>New Session</Text>
-
-        <View style={styles.headerButtonPlaceholder} />
-      </View>
-
-      <View style={styles.progressBar}>
-        <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
-          <View 
-            style={[
-              styles.progressFill, 
-              { 
-                backgroundColor: colors.primary,
-                width: `${(effectiveStep / 2) * 100}%`,
-              }
-            ]} 
-          />
-        </View>
-        <View style={styles.progressLabels}>
-          {stepLabels.map((label, idx) => (
-            <Text
-              key={label}
-              style={[
-                styles.progressLabel,
-                { 
-                  color: effectiveStep > idx ? colors.text : colors.textMuted,
-                  fontWeight: effectiveStep === idx + 1 ? '600' : '400',
-                },
-              ]}
-            >
-              {label}
+          <View style={styles.headerCenter}>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>New Session</Text>
+            <Text style={[styles.headerStep, { color: colors.textMuted }]}>
+              Step {effectiveStep} of 2
             </Text>
-          ))}
+          </View>
+
+          <View style={styles.headerButtonPlaceholder} />
+        </View>
+
+        {/* Progress indicator */}
+        <View style={styles.progressContainer}>
+          {stepLabels.map((label, idx) => {
+            const isActive = effectiveStep === idx + 1;
+            const isComplete = effectiveStep > idx + 1;
+            return (
+              <View key={label} style={styles.progressStep}>
+                <View 
+                  style={[
+                    styles.progressDot,
+                    { 
+                      backgroundColor: isActive || isComplete ? colors.primary : colors.border,
+                    },
+                    isActive && styles.progressDotActive,
+                  ]} 
+                />
+                <Text
+                  style={[
+                    styles.progressLabel,
+                    { 
+                      color: isActive ? colors.text : colors.textMuted,
+                      fontWeight: isActive ? '600' : '400',
+                    },
+                  ]}
+                >
+                  {label}
+                </Text>
+              </View>
+            );
+          })}
+          <View style={[styles.progressLine, { backgroundColor: colors.border }]}>
+            <View 
+              style={[
+                styles.progressLineFill, 
+                { 
+                  backgroundColor: colors.primary,
+                  width: effectiveStep > 1 ? '100%' : '0%',
+                }
+              ]} 
+            />
+          </View>
         </View>
       </View>
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
 
       {creation.state.step === 'intent' && (
         <SessionIntentStep
@@ -429,39 +452,41 @@ export default function CreateSessionScreen() {
         </>
       )}
 
-      <View style={styles.spacer} />
+      </ScrollView>
 
-      {(isLastStep) && (
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[
-              styles.button,
-              { 
-                backgroundColor: canContinue ? colors.primary : colors.secondary,
-                opacity: canContinue ? 1 : 0.6,
-              },
-            ]}
-            onPress={handleButtonPress}
-            disabled={!canContinue || creation.state.isSubmitting}
-            activeOpacity={0.85}
-          >
-            {creation.state.isSubmitting ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <CornerDownRight size={18} color="#fff" fill="#fff" />
-                <Text style={styles.buttonText}>
-                  Preview Session
-                </Text>
-              </>
+      {/* Fixed Bottom Button */}
+      {isLastStep && (
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
+          <View style={[styles.bottomBarInner, { borderTopColor: colors.border }]}>
+            {!hasWeapon && (
+              <Text style={[styles.weaponRequiredHint, { color: colors.orange }]}>
+                Select a weapon to continue
+              </Text>
             )}
-          </TouchableOpacity>
-          
-          {!hasWeapon && (
-            <Text style={[styles.weaponRequiredHint, { color: colors.orange }]}>
-              Select a weapon to continue
-            </Text>
-          )}
+            <TouchableOpacity
+              style={[
+                styles.button,
+                { 
+                  backgroundColor: canContinue ? colors.primary : colors.secondary,
+                  opacity: canContinue ? 1 : 0.5,
+                },
+              ]}
+              onPress={handleButtonPress}
+              disabled={!canContinue || creation.state.isSubmitting}
+              activeOpacity={0.85}
+            >
+              {creation.state.isSubmitting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <CornerDownRight size={18} color="#fff" fill="#fff" />
+                  <Text style={styles.buttonText}>
+                    Start Session
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -522,7 +547,7 @@ export default function CreateSessionScreen() {
           }}
         />
       </Modal>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -530,13 +555,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-  },
   
-  // Header
+  // Header Container (fixed at top)
+  headerContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -544,42 +568,77 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   headerButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerButtonPlaceholder: {
-    width: 40,
+    width: 36,
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '600',
     letterSpacing: -0.3,
   },
+  headerStep: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
+  },
   
-  // Progress
-  progressBar: {
-    marginBottom: 24,
-  },
-  progressTrack: {
-    height: 4,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  progressLabels: {
+  // Progress indicator
+  progressContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 10,
+    position: 'relative',
+    paddingHorizontal: 20,
+  },
+  progressStep: {
+    alignItems: 'center',
+    gap: 6,
+    zIndex: 1,
+  },
+  progressDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  progressDotActive: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
   },
   progressLabel: {
-    fontSize: 12,
+    fontSize: 11,
     letterSpacing: 0.2,
+  },
+  progressLine: {
+    position: 'absolute',
+    left: 40,
+    right: 40,
+    top: 5,
+    height: 2,
+    borderRadius: 1,
+  },
+  progressLineFill: {
+    height: '100%',
+    borderRadius: 1,
+  },
+  
+  // ScrollView
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 20,
   },
 
   // Step 2 header
@@ -588,7 +647,7 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   step2Title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '700',
     letterSpacing: -0.5,
   },
@@ -598,7 +657,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   sectionLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -607,15 +666,15 @@ const styles = StyleSheet.create({
   weaponCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 14,
+    padding: 12,
+    borderRadius: 12,
     borderWidth: 1,
-    gap: 12,
+    gap: 10,
   },
   weaponIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -624,16 +683,16 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   weaponName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     letterSpacing: -0.3,
   },
   weaponHint: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
   },
   weaponLoadingText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
   },
   
@@ -641,16 +700,16 @@ const styles = StyleSheet.create({
   weaponEmptyCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 14,
+    padding: 12,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    gap: 12,
+    gap: 10,
   },
   weaponEmptyIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -659,17 +718,17 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   weaponEmptyTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     letterSpacing: -0.2,
   },
   weaponEmptySubtitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
   },
   weaponSelectBtn: {
-    width: 32,
-    height: 32,
+    width: 30,
+    height: 30,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
@@ -686,32 +745,36 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   
-  // Spacer & Button
-  spacer: {
-    flexGrow: 1,
-    minHeight: 32,
+  // Bottom Bar (fixed)
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
   },
-  buttonContainer: {
-    paddingTop: 16,
+  bottomBarInner: {
+    paddingTop: 12,
+    borderTopWidth: 1,
   },
   button: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-    height: 56,
-    borderRadius: 16,
+    gap: 8,
+    height: 52,
+    borderRadius: 14,
   },
   buttonText: {
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '600',
     color: '#fff',
     letterSpacing: -0.2,
   },
   weaponRequiredHint: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
     textAlign: 'center',
-    marginTop: 12,
+    marginBottom: 10,
   },
 });

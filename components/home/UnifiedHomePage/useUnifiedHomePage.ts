@@ -14,11 +14,12 @@ import { Alert } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModals } from '@/contexts/ModalContext';
 import {
-    deleteSession,
-    getMyActivePersonalSession,
-    getRecentSessionsWithStats,
-    type SessionWithDetails,
+  deleteSession,
+  getMyActivePersonalSession,
+  getRecentSessionsWithStats,
+  type SessionWithDetails,
 } from '@/services/sessionService';
+import { getDefaultWeapon, getWeaponStats, type UserWeapon, type WeaponStats } from '@/services/weaponService';
 import { useGarminStore } from '@/store/garminStore';
 import { useSessionStore } from '@/store/sessionStore';
 import { useTeamStore } from '@/store/teamStore';
@@ -27,11 +28,11 @@ import { mapSessionToHomeSession, type HomeSession } from '../types';
 import { useHomeState } from '../useHomeState';
 import { RECENT_SESSIONS_LIMIT, SESSION_FETCH_DAYS, SESSION_FETCH_LIMIT } from './UnifiedHomePage.constants';
 import {
-    calculateLastSessionDaysAgo,
-    calculateStreak,
-    calculateWeeklyStats,
-    getCoachMessage,
-    getGreeting,
+  calculateLastSessionDaysAgo,
+  calculateStreak,
+  calculateWeeklyStats,
+  getCoachMessage,
+  getGreeting,
 } from './UnifiedHomePage.helpers';
 import type { WeeklyStats } from './UnifiedHomePage.types';
 
@@ -65,6 +66,8 @@ export function useUnifiedHomePage() {
   const [starting, setStarting] = useState(false);
   const [allSessions, setAllSessions] = useState<SessionWithDetails[]>([]);
   const [loadingAllSessions, setLoadingAllSessions] = useState(true);
+  const [defaultWeapon, setDefaultWeapon] = useState<UserWeapon | null>(null);
+  const [weaponStatsMap, setWeaponStatsMap] = useState<Map<string, WeaponStats>>(new Map());
   const initialLoadDone = useRef(false);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -84,12 +87,26 @@ export function useUnifiedHomePage() {
     }
   }, []);
 
+  const loadWeaponData = useCallback(async () => {
+    try {
+      const [weapon, stats] = await Promise.all([
+        getDefaultWeapon(),
+        getWeaponStats(),
+      ]);
+      setDefaultWeapon(weapon);
+      setWeaponStatsMap(stats);
+    } catch (error) {
+      console.error('Failed to load weapon data:', error);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       if (initialLoadDone.current) {
         loadAllSessions();
         loadMyUpcomingTrainings();
         loadMyStats();
+        loadWeaponData();
         return;
       }
       initialLoadDone.current = true;
@@ -97,7 +114,8 @@ export function useUnifiedHomePage() {
       loadMyUpcomingTrainings();
       loadMyStats();
       loadTeams();
-    }, [loadAllSessions, loadMyUpcomingTrainings, loadMyStats, loadTeams])
+      loadWeaponData();
+    }, [loadAllSessions, loadMyUpcomingTrainings, loadMyStats, loadTeams, loadWeaponData])
   );
 
   useEffect(() => {
@@ -132,7 +150,7 @@ export function useUnifiedHomePage() {
     return myUpcomingTrainings
       .filter((t) => {
         if (t.status === 'ongoing') return true; // Always show ongoing
-        const trainingDate = new Date(t.scheduled_date || t.created_at || '');
+        const trainingDate = new Date(t.scheduled_at || t.created_at || '');
         return trainingDate >= today && trainingDate < tomorrow;
       })
       .filter((t) => !allSessions.some((s) => s.training_id === t.id && s.status === 'active'));
@@ -188,6 +206,12 @@ export function useUnifiedHomePage() {
     [weeklyStats, homeState.activeSession, upcomingTrainings, streak]
   );
 
+  // Default weapon stats
+  const defaultWeaponStats = useMemo(() => {
+    if (!defaultWeapon) return null;
+    return weaponStatsMap.get(defaultWeapon.id) || null;
+  }, [defaultWeapon, weaponStatsMap]);
+
   // UI state
   const hasActiveSession = homeState.activeSession && homeState.activeSession.origin === 'solo';
   const hasTeamContent = upcomingTrainings.length > 0 || hasTeams;
@@ -200,9 +224,9 @@ export function useUnifiedHomePage() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await Promise.all([loadAllSessions(), loadMyUpcomingTrainings(), loadMyStats(), loadTeams()]);
+    await Promise.all([loadAllSessions(), loadMyUpcomingTrainings(), loadMyStats(), loadTeams(), loadWeaponData()]);
     setRefreshing(false);
-  }, [loadAllSessions, loadMyUpcomingTrainings, loadMyStats, loadTeams]);
+  }, [loadAllSessions, loadMyUpcomingTrainings, loadMyStats, loadTeams, loadWeaponData]);
 
   const handleStartSession = useCallback(async () => {
     if (starting) return;
@@ -287,6 +311,8 @@ export function useUnifiedHomePage() {
     hasTeamContent,
     hasTeams,
     allSessions, // Raw session data for charts
+    defaultWeapon, // Default weapon info
+    defaultWeaponStats, // Stats for default weapon
 
     // Handlers
     onRefresh,

@@ -171,17 +171,15 @@ const stepperStyles = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// HITS STEPPER (CIRCULAR)
+// HITS STEPPER (CIRCULAR) - Simple hits-only mode
 // ═══════════════════════════════════════════════════════════════════════════
 interface HitsStepperProps {
   value: number;
-  max: number;
   onChange: (value: number) => void;
 }
 
 const HitsStepper = React.memo(function HitsStepper({
   value,
-  max,
   onChange,
 }: HitsStepperProps) {
   const handleDecrement = useCallback(() => {
@@ -192,20 +190,14 @@ const HitsStepper = React.memo(function HitsStepper({
   }, [value, onChange]);
 
   const handleIncrement = useCallback(() => {
-    if (value < max) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      onChange(value + 1);
-    }
-  }, [value, max, onChange]);
-
-  const percentage = max > 0 ? Math.round((value / max) * 100) : 0;
-  const isGood = percentage >= 80;
-  const isOkay = percentage >= 50 && percentage < 80;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onChange(value + 1);
+  }, [value, onChange]);
 
   return (
     <View style={hitsStyles.container}>
       <Text style={hitsStyles.label}>HITS ON TARGET</Text>
-      <Text style={hitsStyles.sublabel}>Out of {max} bullets fired</Text>
+      <Text style={hitsStyles.sublabel}>How many rounds hit?</Text>
 
       <View style={hitsStyles.row}>
         <TouchableOpacity
@@ -218,59 +210,32 @@ const HitsStepper = React.memo(function HitsStepper({
         </TouchableOpacity>
 
         <View style={hitsStyles.valueContainer}>
-          <View
-            style={[
-              hitsStyles.valueRing,
-              isGood && hitsStyles.valueRingGood,
-              isOkay && hitsStyles.valueRingOkay,
-              !isGood && !isOkay && value > 0 && hitsStyles.valueRingBad,
-            ]}
-          >
+          <View style={[hitsStyles.valueRing, value > 0 && hitsStyles.valueRingGood]}>
             <Text style={hitsStyles.value}>{value}</Text>
-            <Text style={hitsStyles.maxLabel}>/ {max}</Text>
+            <Text style={hitsStyles.maxLabel}>hits</Text>
           </View>
-          <Text
-            style={[
-              hitsStyles.percentage,
-              isGood && { color: COLORS.primary },
-              isOkay && { color: COLORS.warning },
-              !isGood && !isOkay && value > 0 && { color: COLORS.danger },
-            ]}
-          >
-            {percentage}% accuracy
-          </Text>
         </View>
 
         <TouchableOpacity
-          style={[hitsStyles.btn, value >= max && hitsStyles.btnDisabled]}
+          style={hitsStyles.btn}
           onPress={handleIncrement}
-          disabled={value >= max}
           activeOpacity={0.7}
         >
-          <Plus size={28} color={value >= max ? COLORS.textDim : COLORS.white} strokeWidth={2.5} />
+          <Plus size={28} color={COLORS.white} strokeWidth={2.5} />
         </TouchableOpacity>
       </View>
 
       {/* Quick select */}
       <View style={hitsStyles.quickRow}>
-        <TouchableOpacity
-          style={[hitsStyles.quickBtn, value === 0 && hitsStyles.quickBtnActive]}
-          onPress={() => { Haptics.selectionAsync(); onChange(0); }}
-        >
-          <Text style={[hitsStyles.quickText, value === 0 && hitsStyles.quickTextActive]}>None</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[hitsStyles.quickBtn, value === Math.floor(max / 2) && hitsStyles.quickBtnActive]}
-          onPress={() => { Haptics.selectionAsync(); onChange(Math.floor(max / 2)); }}
-        >
-          <Text style={[hitsStyles.quickText, value === Math.floor(max / 2) && hitsStyles.quickTextActive]}>Half</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[hitsStyles.quickBtn, value === max && hitsStyles.quickBtnActive]}
-          onPress={() => { Haptics.selectionAsync(); onChange(max); }}
-        >
-          <Text style={[hitsStyles.quickText, value === max && hitsStyles.quickTextActive]}>All</Text>
-        </TouchableOpacity>
+        {[1, 3, 5, 10, 15].map((num) => (
+          <TouchableOpacity
+            key={num}
+            style={[hitsStyles.quickBtn, value === num && hitsStyles.quickBtnActive]}
+            onPress={() => { Haptics.selectionAsync(); onChange(num); }}
+          >
+            <Text style={[hitsStyles.quickText, value === num && hitsStyles.quickTextActive]}>{num}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
     </View>
   );
@@ -311,8 +276,6 @@ const hitsStyles = StyleSheet.create({
     justifyContent: "center",
   },
   valueRingGood: { borderColor: COLORS.primary, backgroundColor: `${COLORS.primary}15` },
-  valueRingOkay: { borderColor: COLORS.warning, backgroundColor: `${COLORS.warning}15` },
-  valueRingBad: { borderColor: COLORS.danger, backgroundColor: `${COLORS.danger}15` },
   value: {
     fontSize: 36,
     fontWeight: "700",
@@ -320,10 +283,9 @@ const hitsStyles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   maxLabel: { fontSize: 13, color: COLORS.textDim, marginTop: -2 },
-  percentage: { fontSize: 13, color: COLORS.textMuted, marginTop: 10, fontWeight: "500" },
-  quickRow: { flexDirection: "row", gap: 12, marginTop: 20 },
+  quickRow: { flexDirection: "row", gap: 10, marginTop: 20 },
   quickBtn: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
     backgroundColor: COLORS.card,
@@ -362,8 +324,11 @@ export function TacticalTargetFlow({
   onComplete,
   onCancel,
 }: TacticalTargetFlowProps) {
+  // For engagement (non-grouping): skip directly to results
+  // For grouping: show setup only if distance/bullets not locked
   const setupLocked = lockDistance && lockBullets;
-  const [step, setStep] = useState<FlowStep>(setupLocked ? "results" : "setup");
+  const skipSetup = !isGrouping || setupLocked; // Engagement always skips setup
+  const [step, setStep] = useState<FlowStep>(skipSetup ? "results" : "setup");
   const [saving, setSaving] = useState(false);
 
   // Setup state
@@ -407,9 +372,9 @@ export function TacticalTargetFlow({
       return;
     }
 
-    if (!isGrouping && hits > bullets) {
+    if (!isGrouping && hits <= 0) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert("Invalid Hits", "Hits cannot exceed bullets fired.");
+      Alert.alert("Missing Hits", "Please enter the number of hits.");
       return;
     }
 
@@ -435,13 +400,14 @@ export function TacticalTargetFlow({
           result_notes: notes || null,
         });
       } else {
-        // For engagement: Use tactical target with hits
+        // For engagement: Use tactical target with hits only
+        // bullets_fired = hits (we only track what hit)
         await addTargetWithTacticalResult({
           session_id: sessionId,
           distance_m: distance,
           lane_number: null,
-          planned_shots: bullets,
-          bullets_fired: bullets,
+          planned_shots: hits, // Use hits as planned
+          bullets_fired: hits, // We only know hits
           hits: hits,
           is_stage_cleared: stageCleared,
           time_seconds: time ? parseFloat(time) : null,
@@ -570,6 +536,8 @@ export function TacticalTargetFlow({
   // ═══════════════════════════════════════════════════════════════════════════
   // RESULTS STEP
   // ═══════════════════════════════════════════════════════════════════════════
+  const canGoBack = isGrouping && !setupLocked;
+  
   return (
     <ScrollView
       style={styles.scrollView}
@@ -579,12 +547,12 @@ export function TacticalTargetFlow({
     >
       {/* Header */}
       <View style={styles.header}>
-        {setupLocked ? (
-          <View style={{ width: 40 }} />
-        ) : (
+        {canGoBack ? (
           <TouchableOpacity onPress={() => setStep("setup")} style={styles.backBtn}>
             <ArrowLeft size={20} color={COLORS.white} />
           </TouchableOpacity>
+        ) : (
+          <View style={{ width: 40 }} />
         )}
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Log Results</Text>
@@ -595,11 +563,13 @@ export function TacticalTargetFlow({
               <Crosshair size={14} color={COLORS.primary} />
             )}
             <Text style={styles.headerSubtitle}>
-              {isGrouping ? 'Grouping' : 'Tactical'} • {distance}m • {bullets} bullets
+              {isGrouping ? `Grouping • ${distance}m • ${bullets} shots` : `Engagement • ${distance}m`}
             </Text>
           </View>
         </View>
-        <View style={{ width: 40 }} />
+        <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
+          <Text style={styles.closeBtnText}>✕</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Hits Stepper OR Group Size Input */}
@@ -647,9 +617,9 @@ export function TacticalTargetFlow({
           </View>
         </View>
       ) : (
-        // ENGAGEMENT: Show hits stepper
+        // ENGAGEMENT: Show simple hits stepper
         <View style={styles.hitsSection}>
-          <HitsStepper value={hits} max={bullets} onChange={setHits} />
+          <HitsStepper value={hits} onChange={setHits} />
         </View>
       )}
 
@@ -744,7 +714,7 @@ export function TacticalTargetFlow({
         </LinearGradient>
       </TouchableOpacity>
 
-      {!setupLocked && (
+      {canGoBack && (
         <TouchableOpacity
           style={styles.cancelBtn}
           onPress={() => setStep("setup")}

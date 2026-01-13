@@ -5,8 +5,8 @@
  * No side effects, state, or React dependencies.
  */
 
-import type { CoachMessageContext, WeeklyStats } from './UnifiedHomePage.types';
 import type { SessionWithDetails } from '@/services/session/types';
+import type { CoachMessageContext, WeeklyStats } from './UnifiedHomePage.types';
 
 /**
  * Get contextual coach message based on user state

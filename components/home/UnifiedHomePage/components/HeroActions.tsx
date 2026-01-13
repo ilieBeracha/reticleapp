@@ -3,13 +3,15 @@
  *
  * Compact actions section:
  * - Solo Session: 50% width - start/continue practice
- * - Quick Actions: 25% each - Weapons & Stats
+ * - Default Weapon: 25% - shows weapon name & rounds
+ * - Weapon Stats: 25% - shows accuracy or sessions
  * - Team Coming Up: Only shows if there are trainings today
  */
 
+import type { UserWeapon, WeaponStats } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { BarChart3, BookOpen, Calendar, ChevronRight, Play, Target } from 'lucide-react-native';
+import { Calendar, ChevronRight, Crosshair, Play, Target, Zap } from 'lucide-react-native';
 import { useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
@@ -42,10 +44,21 @@ interface HeroActionsProps {
   starting: boolean;
   onStartSession: () => void;
   onActiveSessionPress: () => void;
+  // Weapon data
+  defaultWeapon: UserWeapon | null;
+  defaultWeaponStats: WeaponStats | null;
   // Team
   todayTrainings: TodayTraining[];
   onTrainingPress: (training: TodayTraining) => void;
 }
+
+// Format large numbers (e.g., 1500 -> 1.5k)
+const formatNumber = (num: number): string => {
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  }
+  return num.toString();
+};
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -56,6 +69,8 @@ export function HeroActions({
   starting,
   onStartSession,
   onActiveSessionPress,
+  defaultWeapon,
+  defaultWeaponStats,
   todayTrainings,
   onTrainingPress,
 }: HeroActionsProps) {
@@ -112,12 +127,20 @@ export function HeroActions({
 
   const handleWeaponPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/(protected)/weaponLibrary' as any);
+    if (defaultWeapon) {
+      router.push(`/(protected)/weaponDetail?weaponId=${defaultWeapon.id}` as any);
+    } else {
+      router.push('/(protected)/(tabs)/loadout' as any);
+    }
   };
 
   const handleStatsPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/(protected)/stats' as any);
+    if (defaultWeapon) {
+      router.push(`/(protected)/weaponDetail?weaponId=${defaultWeapon.id}` as any);
+    } else {
+      router.push('/(protected)/(tabs)/loadout' as any);
+    }
   };
 
   const handleTrainingItemPress = (training: TodayTraining) => {
@@ -150,9 +173,7 @@ export function HeroActions({
         <AnimatedTouchable
           style={[
             s.soloButton,
-            {
-              backgroundColor: hasActiveSession ? colors.green : colors.primary,
-            },
+            hasActiveSession && s.soloButtonActive,
             soloAnimStyle,
           ]}
           onPress={handleSoloPress}
@@ -161,27 +182,28 @@ export function HeroActions({
           activeOpacity={1}
           disabled={starting}
         >
-          <View style={s.soloIcon}>
-            {hasActiveSession ? (
-              <View style={s.liveIconContainer}>
-                <Animated.View style={[s.livePulse, pulseStyle]} />
-                <Play size={12} color="#fff" fill="#fff" />
+          {hasActiveSession ? (
+            <View style={s.liveIconContainer}>
+              <Animated.View style={[s.livePulse, pulseStyle]} />
+              <View style={s.soloIconLive}>
+                <Play size={11} color="#fff" fill="#fff" />
               </View>
-            ) : (
-              <Target size={14} color="#fff" strokeWidth={2.5} />
-            )}
-          </View>
-          <Text style={s.soloText} numberOfLines={1}>
-            {hasActiveSession
-              ? 'Continue'
-              : 'Start Session'}
+            </View>
+          ) : (
+            <View style={s.soloIconDefault}>
+              <Target size={13} color="rgba(255,255,255,0.9)" strokeWidth={2} />
+            </View>
+          )}
+          <Text style={[s.soloText, hasActiveSession && s.soloTextActive]} numberOfLines={1}>
+            {hasActiveSession ? 'Continue' : 'Start Session'}
           </Text>
+          <ChevronRight size={14} color={hasActiveSession ? '#fff' : 'rgba(255,255,255,0.5)'} />
         </AnimatedTouchable>
 
-        {/* Weapons - 25% */}
+        {/* Default Weapon - 25% */}
         <AnimatedTouchable
           style={[
-            s.quickAction,
+            s.statCard,
             { backgroundColor: colors.card, borderColor: colors.border },
             weaponAnimStyle,
           ]}
@@ -190,16 +212,33 @@ export function HeroActions({
           onPressOut={() => { weaponScale.value = withSpring(1); }}
           activeOpacity={1}
         >
-          <View style={[s.quickIcon, { backgroundColor: `${colors.indigo}15` }]}>
-            <BookOpen size={14} color={colors.indigo} />
-          </View>
-          <Text style={[s.quickLabel, { color: colors.text }]}>Weapons</Text>
+          {defaultWeapon ? (
+            <>
+              <View style={[s.statIcon, { backgroundColor: `${colors.indigo}15` }]}>
+                <Crosshair size={12} color={colors.indigo} />
+              </View>
+              <Text style={[s.statValue, { color: colors.text }]} numberOfLines={1}>
+                {defaultWeapon.name.length > 6 ? defaultWeapon.name.slice(0, 5) + '…' : defaultWeapon.name}
+              </Text>
+              <Text style={[s.statLabel, { color: colors.textMuted }]} numberOfLines={1}>
+                {defaultWeapon.caliber || 'Weapon'}
+              </Text>
+            </>
+          ) : (
+            <>
+              <View style={[s.statIcon, { backgroundColor: `${colors.primary}15` }]}>
+                <Zap size={12} color={colors.primary} />
+              </View>
+              <Text style={[s.statValue, { color: colors.textMuted }]}>—</Text>
+              <Text style={[s.statLabel, { color: colors.textMuted }]}>Add</Text>
+            </>
+          )}
         </AnimatedTouchable>
 
-        {/* Stats - 25% */}
+        {/* Weapon Stats - 25% */}
         <AnimatedTouchable
           style={[
-            s.quickAction,
+            s.statCard,
             { backgroundColor: colors.card, borderColor: colors.border },
             statsAnimStyle,
           ]}
@@ -208,10 +247,25 @@ export function HeroActions({
           onPressOut={() => { statsScale.value = withSpring(1); }}
           activeOpacity={1}
         >
-          <View style={[s.quickIcon, { backgroundColor: `${colors.green}15` }]}>
-            <BarChart3 size={14} color={colors.green} />
-          </View>
-          <Text style={[s.quickLabel, { color: colors.text }]}>Stats</Text>
+          {defaultWeaponStats ? (
+            <>
+              <View style={[s.statIcon, { backgroundColor: `${colors.green}15` }]}>
+                <Target size={12} color={colors.green} />
+              </View>
+              <Text style={[s.statValue, { color: colors.text }]}>
+                {formatNumber(defaultWeaponStats.total_rounds_fired)}
+              </Text>
+              <Text style={[s.statLabel, { color: colors.textMuted }]}>Rounds</Text>
+            </>
+          ) : (
+            <>
+              <View style={[s.statIcon, { backgroundColor: `${colors.green}15` }]}>
+                <Target size={12} color={colors.green} />
+              </View>
+              <Text style={[s.statValue, { color: colors.textMuted }]}>0</Text>
+              <Text style={[s.statLabel, { color: colors.textMuted }]}>Rounds</Text>
+            </>
+          )}
         </AnimatedTouchable>
       </View>
 
@@ -300,29 +354,43 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
-  soloIcon: {
-    width: 24,
-    height: 24,
+  soloButtonActive: {
+    backgroundColor: '#0d5c2e',
+    borderColor: 'rgba(16,185,129,0.3)',
+  },
+  soloIconDefault: {
+    width: 26,
+    height: 26,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  soloIconLive: {
+    width: 22,
+    height: 22,
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.2)',
   },
   soloText: {
+    flex: 1,
     fontSize: 13,
     fontWeight: '600',
-    color: '#fff',
+    color: 'rgba(255,255,255,0.85)',
     letterSpacing: -0.2,
+  },
+  soloTextActive: {
+    color: '#fff',
   },
   liveIconContainer: {
     alignItems: 'center',
@@ -330,32 +398,38 @@ const s = StyleSheet.create({
   },
   livePulse: {
     position: 'absolute',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(16,185,129,0.4)',
   },
 
-  // Quick Action Buttons - flex: 1 (25% each)
-  quickAction: {
+  // Stat Cards - flex: 1 (25% each)
+  statCard: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
     borderRadius: 10,
     borderWidth: 1,
-    gap: 3,
+    gap: 1,
   },
-  quickIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: 7,
+  statIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  quickLabel: {
-    fontSize: 10,
-    fontWeight: '600',
+  statValue: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  statLabel: {
+    fontSize: 9,
+    fontWeight: '500',
     letterSpacing: -0.1,
   },
 

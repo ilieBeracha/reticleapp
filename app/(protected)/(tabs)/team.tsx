@@ -1,15 +1,13 @@
 /**
  * Team Tab - Unified Team Workspace
- * 
+ *
  * If an activeTeam is selected, the Team tab IS the team workspace.
  * There is NO additional "team page" required to see team content.
  */
 
 import { NoTeamsEmptyState } from '@/components/teams/NoTeamsEmptyState';
 import { TeamSwitcherPill, TeamSwitcherSheet } from '@/components/teams/TeamSwitcherSheet';
-import {
-  getStatusConfig,
-} from '@/components/training';
+import { getStatusConfig } from '@/components/training';
 import { COLORS, PULSE_ANIMATION } from '@/components/training/trainings.constants';
 import { groupTrainingsByTimeframe } from '@/components/training/trainings.helpers';
 import { styles } from '@/components/training/trainings.styles';
@@ -18,7 +16,19 @@ import { useColors } from '@/hooks/ui/useColors';
 import type { TrainingWithDetails } from '@/types/workspace';
 import { format } from 'date-fns';
 import { router } from 'expo-router';
-import { Activity, BarChart3, BookOpen, Calendar, ChevronRight, Plus, Settings, Target, UserPlus, Users, Zap } from 'lucide-react-native';
+import {
+  Activity,
+  BarChart3,
+  BookOpen,
+  Calendar,
+  ChevronRight,
+  Plus,
+  Settings,
+  Target,
+  UserPlus,
+  Users,
+  Zap,
+} from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -59,9 +69,7 @@ function PulseDot({ color }: { color: string }) {
 
   return (
     <View style={styles.pulseDotContainer}>
-      <Animated.View
-        style={[styles.pulseDotOuter, { backgroundColor: color, opacity: pulseAnim }]}
-      />
+      <Animated.View style={[styles.pulseDotOuter, { backgroundColor: color, opacity: pulseAnim }]} />
       <View style={[styles.pulseDotInner, { backgroundColor: color }]} />
     </View>
   );
@@ -89,17 +97,11 @@ function TrainingRow({
   const isFinished = training.status === 'finished';
 
   return (
-    <TouchableOpacity
-      style={[localStyles.row, { backgroundColor: colors.card }]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
+    <TouchableOpacity style={[localStyles.row, { backgroundColor: colors.card }]} onPress={onPress} activeOpacity={0.7}>
       {/* Status badge - only colorful element */}
       <View style={[localStyles.statusBadge, { backgroundColor: statusConfig.bg }]}>
         {isLive && <PulseDot color={statusConfig.color} />}
-        <Text style={[localStyles.statusText, { color: statusConfig.color }]}>
-          {statusConfig.label}
-        </Text>
+        <Text style={[localStyles.statusText, { color: statusConfig.color }]}>{statusConfig.label}</Text>
       </View>
 
       {/* Content */}
@@ -199,20 +201,14 @@ function ScheduleView({
 }) {
   const [showAllPast, setShowAllPast] = useState(false);
   const grouped = useMemo(() => groupTrainingsByTimeframe(trainings), [trainings]);
-  
+
   // Combine all upcoming trainings into a single list (live, today, tomorrow, this week, upcoming)
-  const upcomingTrainings = useMemo(() => [
-    ...grouped.live,
-    ...grouped.today,
-    ...grouped.tomorrow,
-    ...grouped.thisWeek,
-    ...grouped.upcoming,
-  ], [grouped]);
-  
-  const pastTrainings = useMemo(() => 
-    grouped.past.filter(t => t.status === 'finished'),
-    [grouped.past]
+  const upcomingTrainings = useMemo(
+    () => [...grouped.live, ...grouped.today, ...grouped.tomorrow, ...grouped.thisWeek, ...grouped.upcoming],
+    [grouped]
   );
+
+  const pastTrainings = useMemo(() => grouped.past.filter((t) => t.status === 'finished'), [grouped.past]);
 
   // Navigate to training report
   const handleViewReport = useCallback((trainingId: string) => {
@@ -228,7 +224,7 @@ function ScheduleView({
     const now = new Date();
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
+
     if (training.status === 'ongoing') return 'Now';
     if (date.toDateString() === now.toDateString()) return format(date, 'HH:mm');
     if (date.toDateString() === tomorrow.toDateString()) return `Tomorrow, ${format(date, 'HH:mm')}`;
@@ -253,84 +249,79 @@ function ScheduleView({
 
       {/* UPCOMING SECTION */}
       <View style={scheduleStyles.section}>
-        <View style={scheduleStyles.sectionHeader}>
-          <View style={scheduleStyles.sectionTitleRow}>
-            <View style={[scheduleStyles.sectionDot, { backgroundColor: '#3B82F6' }]} />
-            <Text style={[scheduleStyles.sectionTitle, { color: colors.text }]}>Upcoming</Text>
-          </View>
-          {upcomingTrainings.length > 0 && (
-            <Text style={[scheduleStyles.sectionCount, { color: colors.textMuted }]}>
-              {upcomingTrainings.length}
-            </Text>
-          )}
-        </View>
-
-        {upcomingTrainings.length === 0 ? (
-          <View style={[scheduleStyles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Calendar size={20} color={colors.textMuted} style={{ opacity: 0.6 }} />
-            <Text style={[scheduleStyles.emptyCardText, { color: colors.textMuted }]}>
-              No upcoming trainings
-            </Text>
-            {canSchedule && (
-              <TouchableOpacity
-                style={[scheduleStyles.emptyCardBtn, { backgroundColor: colors.secondary }]}
-                onPress={onCreateNew}
-                activeOpacity={0.7}
-              >
-                <Plus size={13} color={colors.text} strokeWidth={2.5} />
-                <Text style={[scheduleStyles.emptyCardBtnText, { color: colors.text }]}>Schedule</Text>
-              </TouchableOpacity>
+          <View style={scheduleStyles.sectionHeader}>
+            <View style={scheduleStyles.sectionTitleRow}>
+              <View style={[scheduleStyles.sectionDot, { backgroundColor: '#3B82F6' }]} />
+              <Text style={[scheduleStyles.sectionTitle, { color: colors.text }]}>Upcoming</Text>
+            </View>
+            {upcomingTrainings.length > 0 && (
+              <Text style={[scheduleStyles.sectionCount, { color: colors.textMuted }]}>{upcomingTrainings.length}</Text>
             )}
           </View>
-        ) : (
-          <View style={scheduleStyles.list}>
-            {upcomingTrainings.map((training) => {
-              const isLive = training.status === 'ongoing';
-              const statusConfig = getStatusConfig(training.status);
-              
-              return (
+
+          {upcomingTrainings.length === 0 ? (
+            <View style={[scheduleStyles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Calendar size={20} color={colors.textMuted} style={{ opacity: 0.6 }} />
+              <Text style={[scheduleStyles.emptyCardText, { color: colors.textMuted }]}>No upcoming trainings</Text>
+              {canSchedule && (
                 <TouchableOpacity
-                  key={training.id}
-                  style={[
-                    scheduleStyles.trainingRow,
-                    { backgroundColor: colors.card, borderColor: isLive ? COLORS.live + '40' : colors.border }
-                  ]}
-                  onPress={() => onPress(training)}
+                  style={[scheduleStyles.emptyCardBtn, { backgroundColor: colors.secondary }]}
+                  onPress={onCreateNew}
                   activeOpacity={0.7}
                 >
-                  {/* Time/Status indicator */}
-                  <View style={[
-                    scheduleStyles.timeIndicator,
-                    { backgroundColor: isLive ? COLORS.live : colors.secondary }
-                  ]}>
-                    {isLive && <PulseDot color="#fff" />}
-                    <Text style={[
-                      scheduleStyles.timeText,
-                      { color: isLive ? '#fff' : colors.textMuted }
-                    ]}>
-                      {getTimeLabel(training)}
-                    </Text>
-                  </View>
-                  
-                  {/* Content */}
-                  <View style={scheduleStyles.rowContent}>
-                    <Text style={[scheduleStyles.rowTitle, { color: colors.text }]} numberOfLines={1}>
-                      {training.title}
-                    </Text>
-                    {(training.drill_count ?? 0) > 0 && (
-                      <Text style={[scheduleStyles.rowMeta, { color: colors.textMuted }]}>
-                        {training.drill_count} drill{training.drill_count !== 1 ? 's' : ''}
-                      </Text>
-                    )}
-                  </View>
-                  
-                  <ChevronRight size={16} color={colors.border} />
+                  <Plus size={13} color={colors.text} strokeWidth={2.5} />
+                  <Text style={[scheduleStyles.emptyCardBtnText, { color: colors.text }]}>Schedule</Text>
                 </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
-      </View>
+              )}
+            </View>
+          ) : (
+            <View style={scheduleStyles.list}>
+              {upcomingTrainings.map((training) => {
+                const isLive = training.status === 'ongoing';
+                const statusConfig = getStatusConfig(training.status);
+
+                return (
+                  <TouchableOpacity
+                    key={training.id}
+                    style={[
+                      scheduleStyles.trainingRow,
+                      { backgroundColor: colors.card, borderColor: isLive ? COLORS.live + '40' : colors.border },
+                    ]}
+                    onPress={() => onPress(training)}
+                    activeOpacity={0.7}
+                  >
+                    {/* Time/Status indicator */}
+                    <View
+                      style={[
+                        scheduleStyles.timeIndicator,
+                        { backgroundColor: isLive ? COLORS.live : colors.secondary },
+                      ]}
+                    >
+                      {isLive && <PulseDot color="#fff" />}
+                      <Text style={[scheduleStyles.timeText, { color: isLive ? '#fff' : colors.textMuted }]}>
+                        {getTimeLabel(training)}
+                      </Text>
+                    </View>
+
+                    {/* Content */}
+                    <View style={scheduleStyles.rowContent}>
+                      <Text style={[scheduleStyles.rowTitle, { color: colors.text }]} numberOfLines={1}>
+                        {training.title}
+                      </Text>
+                      {(training.drill_count ?? 0) > 0 && (
+                        <Text style={[scheduleStyles.rowMeta, { color: colors.textMuted }]}>
+                          {training.drill_count} drill{training.drill_count !== 1 ? 's' : ''}
+                        </Text>
+                      )}
+                    </View>
+
+                    <ChevronRight size={16} color={colors.border} />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+        </View>
 
       {/* PAST SECTION */}
       <View style={scheduleStyles.section}>
@@ -340,18 +331,14 @@ function ScheduleView({
             <Text style={[scheduleStyles.sectionTitle, { color: colors.text }]}>Completed</Text>
           </View>
           {pastTrainings.length > 0 && (
-            <Text style={[scheduleStyles.sectionCount, { color: colors.textMuted }]}>
-              {pastTrainings.length}
-            </Text>
+            <Text style={[scheduleStyles.sectionCount, { color: colors.textMuted }]}>{pastTrainings.length}</Text>
           )}
         </View>
 
         {pastTrainings.length === 0 ? (
           <View style={[scheduleStyles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <BarChart3 size={20} color={colors.textMuted} style={{ opacity: 0.6 }} />
-            <Text style={[scheduleStyles.emptyCardText, { color: colors.textMuted }]}>
-              No completed trainings yet
-            </Text>
+            <Text style={[scheduleStyles.emptyCardText, { color: colors.textMuted }]}>No completed trainings yet</Text>
           </View>
         ) : (
           <>
@@ -369,7 +356,7 @@ function ScheduleView({
                       {format(new Date(training.scheduled_at), 'MMM d')}
                     </Text>
                   </View>
-                  
+
                   {/* Content */}
                   <View style={scheduleStyles.rowContent}>
                     <Text style={[scheduleStyles.rowTitle, { color: colors.text }]} numberOfLines={1}>
@@ -381,7 +368,7 @@ function ScheduleView({
                       </Text>
                     )}
                   </View>
-                  
+
                   {/* Report button */}
                   <TouchableOpacity
                     style={[scheduleStyles.reportBtn, { backgroundColor: '#10B98112' }]}
@@ -393,12 +380,12 @@ function ScheduleView({
                   >
                     <BarChart3 size={14} color="#10B981" />
                   </TouchableOpacity>
-                  
+
                   <ChevronRight size={16} color={colors.border} />
                 </TouchableOpacity>
               ))}
             </View>
-            
+
             {/* Show more/less */}
             {pastTrainings.length > 3 && (
               <TouchableOpacity
@@ -421,7 +408,7 @@ function ScheduleView({
 // Schedule section styles
 const scheduleStyles = StyleSheet.create({
   container: {
-    gap: 24,
+    gap: 16,
   },
   header: {
     flexDirection: 'row',
@@ -429,7 +416,7 @@ const scheduleStyles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     letterSpacing: -0.2,
   },
@@ -440,10 +427,10 @@ const scheduleStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  
+
   // Section styles
   section: {
-    gap: 12,
+    gap: 10,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -469,7 +456,7 @@ const scheduleStyles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
   },
-  
+
   // Training list
   list: {
     gap: 8,
@@ -527,7 +514,7 @@ const scheduleStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  
+
   // Empty state
   emptyCard: {
     flexDirection: 'row',
@@ -554,7 +541,7 @@ const scheduleStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  
+
   // Show more
   showMoreBtn: {
     alignItems: 'center',
@@ -575,7 +562,7 @@ const scheduleStyles = StyleSheet.create({
 export default function TeamScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  
+
   const {
     teamState,
     teams,
@@ -629,7 +616,7 @@ export default function TeamScreen() {
 
   // Main render
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Header */}
       <View style={[styles.headerContainer, { borderBottomColor: 'transparent' }]}>
         <View style={styles.headerTop}>
@@ -639,56 +626,60 @@ export default function TeamScreen() {
               <TeamSwitcherPill onPress={() => setSwitcherOpen(true)} />
             ) : (
               activeTeam && (
-              <View style={[styles.singleTeamPill, { backgroundColor: colors.secondary }]}>
-                <Users size={14} color={colors.primary} />
-                <Text style={[styles.singleTeamName, { color: colors.text }]} numberOfLines={1}>
-                  {activeTeam.name}
-                </Text>
-                {roleConfig && (
-                  <View style={[styles.roleBadge, { backgroundColor: roleConfig.color + '20' }]}>
+                <View style={[styles.singleTeamPill, { backgroundColor: colors.secondary }]}>
+                  <Users size={14} color={colors.primary} />
+                  <Text style={[styles.singleTeamName, { color: colors.text }]} numberOfLines={1}>
+                    {activeTeam.name}
+                  </Text>
+                  {roleConfig && (
+                    <View style={[styles.roleBadge, { backgroundColor: roleConfig.color + '20' }]}>
                       <Text style={[styles.roleText, { color: roleConfig.color }]}>{roleConfig.label}</Text>
-                  </View>
-                )}
-              </View>
+                    </View>
+                  )}
+                </View>
               )
             )}
           </View>
         </View>
-        
+
         {/* Tab Bar - Refined pill style */}
         <View style={[headerStyles.tabBar, { backgroundColor: colors.secondary }]}>
           <TouchableOpacity
             style={[
-              headerStyles.tabItem, 
-              activeTab === 'calendar' && [headerStyles.tabItemActive, { backgroundColor: colors.card }]
+              headerStyles.tabItem,
+              activeTab === 'calendar' && [headerStyles.tabItemActive, { backgroundColor: colors.card }],
             ]}
             onPress={() => handleTabChange('calendar')}
           >
             <Calendar size={16} color={activeTab === 'calendar' ? colors.text : colors.textMuted} />
-            <Text style={[
-              headerStyles.tabText, 
-              { color: activeTab === 'calendar' ? colors.text : colors.textMuted },
-              activeTab === 'calendar' && headerStyles.tabTextActive
-            ]}>
+            <Text
+              style={[
+                headerStyles.tabText,
+                { color: activeTab === 'calendar' ? colors.text : colors.textMuted },
+                activeTab === 'calendar' && headerStyles.tabTextActive,
+              ]}
+            >
               Schedule
             </Text>
           </TouchableOpacity>
-          
+
           {/* Team Members tab for soldiers */}
           {!canManage && (
             <TouchableOpacity
               style={[
-                headerStyles.tabItem, 
-                activeTab === 'team' && [headerStyles.tabItemActive, { backgroundColor: colors.card }]
+                headerStyles.tabItem,
+                activeTab === 'team' && [headerStyles.tabItemActive, { backgroundColor: colors.card }],
               ]}
               onPress={() => handleTabChange('team')}
             >
               <Users size={16} color={activeTab === 'team' ? colors.text : colors.textMuted} />
-              <Text style={[
-                headerStyles.tabText, 
-                { color: activeTab === 'team' ? colors.text : colors.textMuted },
-                activeTab === 'team' && headerStyles.tabTextActive
-              ]}>
+              <Text
+                style={[
+                  headerStyles.tabText,
+                  { color: activeTab === 'team' ? colors.text : colors.textMuted },
+                  activeTab === 'team' && headerStyles.tabTextActive,
+                ]}
+              >
                 Team
               </Text>
             </TouchableOpacity>
@@ -698,17 +689,19 @@ export default function TeamScreen() {
           {canManage && (
             <TouchableOpacity
               style={[
-                headerStyles.tabItem, 
-                activeTab === 'manage' && [headerStyles.tabItemActive, { backgroundColor: colors.card }]
+                headerStyles.tabItem,
+                activeTab === 'manage' && [headerStyles.tabItemActive, { backgroundColor: colors.card }],
               ]}
               onPress={() => handleTabChange('manage')}
             >
               <Settings size={16} color={activeTab === 'manage' ? colors.text : colors.textMuted} />
-              <Text style={[
-                headerStyles.tabText, 
-                { color: activeTab === 'manage' ? colors.text : colors.textMuted },
-                activeTab === 'manage' && headerStyles.tabTextActive
-              ]}>
+              <Text
+                style={[
+                  headerStyles.tabText,
+                  { color: activeTab === 'manage' ? colors.text : colors.textMuted },
+                  activeTab === 'manage' && headerStyles.tabTextActive,
+                ]}
+              >
                 Manage
               </Text>
             </TouchableOpacity>
@@ -718,11 +711,7 @@ export default function TeamScreen() {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[
-          styles.content,
-
-          loadingTeamTrainings && styles.contentCentered,
-        ]}
+        contentContainerStyle={[styles.content, loadingTeamTrainings && styles.contentCentered]}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />}
       >
@@ -732,12 +721,12 @@ export default function TeamScreen() {
             <Text style={[styles.switchingText, { color: colors.textMuted }]}>Loading team data...</Text>
           </View>
         ) : (
-        <>
+          <>
             {/* CALENDAR TAB */}
-        {activeTab === 'calendar' && (
+            {activeTab === 'calendar' && (
               <ScheduleView
-              trainings={activeTeamTrainings}
-              colors={colors}
+                trainings={activeTeamTrainings}
+                colors={colors}
                 onPress={handleTrainingPress}
                 onCreateNew={handleCreateTraining}
                 canSchedule={canSchedule}
@@ -746,11 +735,7 @@ export default function TeamScreen() {
 
             {/* TEAM MEMBERS TAB (for soldiers) */}
             {activeTab === 'team' && !canManage && (
-              <TeamMembersTab
-                colors={colors}
-                members={members}
-                activeTeam={activeTeam}
-              />
+              <TeamMembersTab colors={colors} members={members} activeTeam={activeTeam} />
             )}
 
             {/* MANAGE TAB (for commanders) */}
@@ -764,7 +749,9 @@ export default function TeamScreen() {
                 teamStats={teamStats}
                 members={members}
                 roleConfig={roleConfig}
-                pastTrainings={groupTrainingsByTimeframe(activeTeamTrainings).past.filter(t => t.status === 'finished')}
+                pastTrainings={groupTrainingsByTimeframe(activeTeamTrainings).past.filter(
+                  (t) => t.status === 'finished'
+                )}
                 onTrainingPress={handleTrainingPress}
                 onCreateTraining={handleCreateTraining}
                 onOpenLibrary={handleOpenLibrary}
@@ -854,7 +841,7 @@ function ManageTab({
   onTeamSettings,
 }: ManageTabProps) {
   const progressPct = Math.min(100, (teamStats.totalShots / teamStats.weeklyGoal) * 100);
-  
+
   // Navigate to training report
   const handleViewReport = useCallback((trainingId: string) => {
     router.push({
@@ -881,9 +868,7 @@ function ManageTab({
             <Text style={manageStyles.liveBannerTitle} numberOfLines={1}>
               {liveTraining.title}
             </Text>
-            <Text style={manageStyles.liveBannerMeta}>
-              {memberStats.training} active • Tap to view
-            </Text>
+            <Text style={manageStyles.liveBannerMeta}>{memberStats.training} active • Tap to view</Text>
           </View>
           <ChevronRight size={16} color="rgba(255,255,255,0.7)" />
         </TouchableOpacity>
@@ -897,9 +882,7 @@ function ManageTab({
           activeOpacity={0.85}
         >
           <Plus size={18} color={colors.background} strokeWidth={2.5} />
-          <Text style={[manageStyles.primaryActionText, { color: colors.background }]}>
-            New Training
-          </Text>
+          <Text style={[manageStyles.primaryActionText, { color: colors.background }]}>New Training</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[manageStyles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -921,35 +904,31 @@ function ManageTab({
       <View style={manageStyles.statsSection}>
         <View style={manageStyles.statsHeader}>
           <Text style={[manageStyles.statsSectionTitle, { color: colors.text }]}>This Week</Text>
-          <View style={[manageStyles.goalPill, { backgroundColor: progressPct >= 100 ? '#10B98115' : colors.secondary }]}>
+          <View
+            style={[manageStyles.goalPill, { backgroundColor: progressPct >= 100 ? '#10B98115' : colors.secondary }]}
+          >
             <Text style={[manageStyles.goalPillText, { color: progressPct >= 100 ? '#10B981' : colors.textMuted }]}>
               {Math.round(progressPct)}% of goal
             </Text>
           </View>
         </View>
-        
+
         <View style={manageStyles.statsRow}>
           <View style={[manageStyles.statCard, { backgroundColor: colors.card }]}>
             <Activity size={16} color="#3B82F6" />
-            <Text style={[manageStyles.statCardValue, { color: colors.text }]}>
-              {teamStats.sessionsThisWeek}
-            </Text>
+            <Text style={[manageStyles.statCardValue, { color: colors.text }]}>{teamStats.sessionsThisWeek}</Text>
             <Text style={[manageStyles.statCardLabel, { color: colors.textMuted }]}>Sessions</Text>
           </View>
           <View style={[manageStyles.statCard, { backgroundColor: colors.card }]}>
             <Zap size={16} color="#F59E0B" />
             <Text style={[manageStyles.statCardValue, { color: colors.text }]}>
-              {teamStats.totalShots >= 1000 
-                ? `${(teamStats.totalShots / 1000).toFixed(1)}k`
-                : teamStats.totalShots}
+              {teamStats.totalShots >= 1000 ? `${(teamStats.totalShots / 1000).toFixed(1)}k` : teamStats.totalShots}
             </Text>
             <Text style={[manageStyles.statCardLabel, { color: colors.textMuted }]}>Shots</Text>
           </View>
           <View style={[manageStyles.statCard, { backgroundColor: colors.card }]}>
             <Target size={16} color="#10B981" />
-            <Text style={[manageStyles.statCardValue, { color: colors.text }]}>
-              {teamStats.avgAccuracy}%
-            </Text>
+            <Text style={[manageStyles.statCardValue, { color: colors.text }]}>{teamStats.avgAccuracy}%</Text>
             <Text style={[manageStyles.statCardLabel, { color: colors.textMuted }]}>Accuracy</Text>
           </View>
         </View>
@@ -969,7 +948,7 @@ function ManageTab({
                   key={m.user_id}
                   style={[
                     manageStyles.stackedAvatar,
-                    { 
+                    {
                       backgroundColor: ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6'][i % 4],
                       marginLeft: i > 0 ? -10 : 0,
                       zIndex: 4 - i,
@@ -982,7 +961,13 @@ function ManageTab({
                 </View>
               ))}
               {members.length > 4 && (
-                <View style={[manageStyles.stackedAvatar, manageStyles.moreAvatar, { backgroundColor: colors.secondary, marginLeft: -10 }]}>
+                <View
+                  style={[
+                    manageStyles.stackedAvatar,
+                    manageStyles.moreAvatar,
+                    { backgroundColor: colors.secondary, marginLeft: -10 },
+                  ]}
+                >
                   <Text style={[manageStyles.stackedAvatarText, { color: colors.textMuted, fontSize: 10 }]}>
                     +{members.length - 4}
                   </Text>
@@ -990,14 +975,14 @@ function ManageTab({
               )}
             </View>
             <View>
-              <Text style={[manageStyles.teamCardTitle, { color: colors.text }]}>
-                {members.length} Members
-              </Text>
+              <Text style={[manageStyles.teamCardTitle, { color: colors.text }]}>{members.length} Members</Text>
               <View style={manageStyles.statusDots}>
                 {memberStats.training > 0 && (
                   <View style={manageStyles.statusDotItem}>
                     <View style={[manageStyles.miniDot, { backgroundColor: COLORS.training }]} />
-                    <Text style={[manageStyles.statusDotText, { color: colors.textMuted }]}>{memberStats.training}</Text>
+                    <Text style={[manageStyles.statusDotText, { color: colors.textMuted }]}>
+                      {memberStats.training}
+                    </Text>
                   </View>
                 )}
                 <View style={manageStyles.statusDotItem}>
@@ -1018,13 +1003,9 @@ function ManageTab({
       {/* Management Menu - Clean list */}
       <View style={manageStyles.menuSection}>
         <Text style={[manageStyles.menuSectionTitle, { color: colors.textMuted }]}>MANAGE</Text>
-        
+
         <View style={[manageStyles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <TouchableOpacity
-            style={manageStyles.menuItem}
-            onPress={onViewMembers}
-            activeOpacity={0.6}
-          >
+          <TouchableOpacity style={manageStyles.menuItem} onPress={onViewMembers} activeOpacity={0.6}>
             <View style={[manageStyles.menuIcon, { backgroundColor: colors.primary + '12' }]}>
               <Users size={15} color={colors.primary} />
             </View>
@@ -1034,11 +1015,7 @@ function ManageTab({
 
           <View style={[manageStyles.menuDivider, { backgroundColor: colors.border }]} />
 
-          <TouchableOpacity
-            style={manageStyles.menuItem}
-            onPress={onOpenLibrary}
-            activeOpacity={0.6}
-          >
+          <TouchableOpacity style={manageStyles.menuItem} onPress={onOpenLibrary} activeOpacity={0.6}>
             <View style={[manageStyles.menuIcon, { backgroundColor: '#3B82F612' }]}>
               <BookOpen size={15} color="#3B82F6" />
             </View>
@@ -1048,11 +1025,7 @@ function ManageTab({
 
           <View style={[manageStyles.menuDivider, { backgroundColor: colors.border }]} />
 
-          <TouchableOpacity
-            style={manageStyles.menuItem}
-            onPress={onTeamSettings}
-            activeOpacity={0.6}
-          >
+          <TouchableOpacity style={manageStyles.menuItem} onPress={onTeamSettings} activeOpacity={0.6}>
             <View style={[manageStyles.menuIcon, { backgroundColor: colors.secondary }]}>
               <Settings size={15} color={colors.textMuted} />
             </View>
@@ -1066,7 +1039,7 @@ function ManageTab({
       {pastTrainings.length > 0 && (
         <View style={manageStyles.menuSection}>
           <Text style={[manageStyles.menuSectionTitle, { color: colors.textMuted }]}>REPORTS</Text>
-          
+
           <View style={[manageStyles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {pastTrainings.slice(0, 5).map((training, idx) => (
               <View key={training.id}>
@@ -1386,8 +1359,8 @@ function TeamMembersTab({ colors, members, activeTeam }: TeamMembersTabProps) {
       squad_commanders: [],
       soldiers: [],
     };
-    
-    members.forEach(member => {
+
+    members.forEach((member) => {
       // Role is nested: member.role.role
       const role = member.role?.role || 'soldier';
       if (role === 'owner' || role === 'commander') {
@@ -1398,7 +1371,7 @@ function TeamMembersTab({ colors, members, activeTeam }: TeamMembersTabProps) {
         groups.soldiers.push(member);
       }
     });
-    
+
     return groups;
   }, [members]);
 
@@ -1428,23 +1401,15 @@ function TeamMembersTab({ colors, members, activeTeam }: TeamMembersTabProps) {
         style={[teamMembersStyles.memberCard, { backgroundColor: colors.card, borderColor: colors.border }]}
       >
         <View style={[teamMembersStyles.avatar, { backgroundColor: colors.primary + '20' }]}>
-          <Text style={[teamMembersStyles.avatarText, { color: colors.primary }]}>
-            {name.charAt(0).toUpperCase()}
-          </Text>
+          <Text style={[teamMembersStyles.avatarText, { color: colors.primary }]}>{name.charAt(0).toUpperCase()}</Text>
         </View>
         <View style={teamMembersStyles.memberInfo}>
           <Text style={[teamMembersStyles.memberName, { color: colors.text }]}>{name}</Text>
           <View style={teamMembersStyles.memberMeta}>
             <View style={[teamMembersStyles.roleBadge, { backgroundColor: badge.bg }]}>
-              <Text style={[teamMembersStyles.roleBadgeText, { color: badge.color }]}>
-                {badge.label}
-              </Text>
+              <Text style={[teamMembersStyles.roleBadgeText, { color: badge.color }]}>{badge.label}</Text>
             </View>
-            {squad && (
-              <Text style={[teamMembersStyles.squadName, { color: colors.textMuted }]}>
-                • {squad}
-              </Text>
-            )}
+            {squad && <Text style={[teamMembersStyles.squadName, { color: colors.textMuted }]}>• {squad}</Text>}
           </View>
         </View>
       </View>
@@ -1453,7 +1418,7 @@ function TeamMembersTab({ colors, members, activeTeam }: TeamMembersTabProps) {
 
   const renderSection = (title: string, membersList: any[]) => {
     if (membersList.length === 0) return null;
-    
+
     return (
       <View style={teamMembersStyles.section}>
         <Text style={[teamMembersStyles.sectionTitle, { color: colors.textMuted }]}>
@@ -1485,9 +1450,7 @@ function TeamMembersTab({ colors, members, activeTeam }: TeamMembersTabProps) {
       {members.length === 0 ? (
         <View style={teamMembersStyles.emptyState}>
           <Users size={40} color={colors.textMuted} style={{ opacity: 0.5 }} />
-          <Text style={[teamMembersStyles.emptyText, { color: colors.textMuted }]}>
-            No team members yet
-          </Text>
+          <Text style={[teamMembersStyles.emptyText, { color: colors.textMuted }]}>No team members yet</Text>
         </View>
       ) : (
         <>
