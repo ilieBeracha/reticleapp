@@ -22,6 +22,10 @@
 
 This integration enables communication between the React Native app and Garmin wearables via the **ConnectIQ Mobile SDK**. It uses the `react-native-garmin-connect` npm package with **custom patches** to fix session-based device handling, improve error reporting, and add debug logging.
 
+If you’re trying to understand the **why** behind the patch (and the exact native flow fixes), start here:
+
+- `docs/garmin-native-tract-api-fix.md`
+
 ### Key Features
 
 - Device pairing via Garmin Connect Mobile (GCM)

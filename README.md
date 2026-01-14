@@ -117,6 +117,7 @@ store/
 ### Technical Docs (`docs/`)
 - **`docs/garmin-integration.md`** ← Garmin Connect IQ integration (patch-based, critical!)
 - **`docs/garmin-architecture.md`** ← System architecture for Garmin flow
+- **`docs/garmin-native-tract-api-fix.md`** ← Deep dive: why the native patch exists + what exactly it fixes
 - **`docs/garmin-drill-sync-spec.md`** ← Drill sync protocol (phone ↔ watch)
 - **`docs/WATCH-APP-INSTRUCTIONS.md`** ← Instructions for watch app developer
 - `docs/data-flow-map.md` - UI → Store → Service → DB flows
