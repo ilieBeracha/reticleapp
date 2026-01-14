@@ -3,7 +3,7 @@ import { DrillProgress, getMyDrillProgress, getTrainingById } from '@/services/t
 import type { TrainingWithDetails } from '@/types/workspace';
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 
 interface UseTrainingDetailReturn {
@@ -26,56 +26,87 @@ export function useTrainingDetail(
   const [loading, setLoading] = useState(true);
   const [loadingSessions, setLoadingSessions] = useState(false);
 
+  // Guards to prevent state updates during navigation or after unmount
+  const isMountedRef = useRef(true);
+  const isFetchingRef = useRef(false);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   const fetchTraining = useCallback(async (id: string) => {
+    if (!isMountedRef.current) return;
     setLoading(true);
     try {
       const data = await getTrainingById(id);
-      setTraining(data);
+      if (isMountedRef.current) setTraining(data);
     } catch (error) {
       console.error('Failed to fetch training:', error);
-      Alert.alert('Error', 'Failed to load training details');
-      router.back();
+      if (isMountedRef.current) {
+        Alert.alert('Error', 'Failed to load training details');
+        router.back();
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) setLoading(false);
     }
   }, []);
 
   const fetchSessions = useCallback(async (id: string) => {
+    if (!isMountedRef.current) return;
     setLoadingSessions(true);
     try {
       const data = await getTrainingSessions(id);
-      setSessions(data);
+      if (isMountedRef.current) setSessions(data);
     } catch (error) {
       console.error('Failed to fetch training sessions:', error);
-      setSessions([]);
+      if (isMountedRef.current) setSessions([]);
     } finally {
-      setLoadingSessions(false);
+      if (isMountedRef.current) setLoadingSessions(false);
     }
   }, []);
 
   const fetchDrillProgress = useCallback(async (id: string) => {
+    if (!isMountedRef.current) return;
     try {
       const progress = await getMyDrillProgress(id);
-      setDrillProgress(progress);
+      if (isMountedRef.current) setDrillProgress(progress);
     } catch (error) {
       console.error('Failed to fetch drill progress:', error);
-      setDrillProgress([]);
+      if (isMountedRef.current) setDrillProgress([]);
     }
   }, []);
 
   const refetch = useCallback(() => {
-    if (trainingId) {
-      fetchTraining(trainingId);
-      fetchSessions(trainingId);
-      fetchDrillProgress(trainingId);
-    }
+    if (!trainingId || isFetchingRef.current) return;
+
+    isFetchingRef.current = true;
+    Promise.all([
+      fetchTraining(trainingId),
+      fetchSessions(trainingId),
+      fetchDrillProgress(trainingId),
+    ]).finally(() => {
+      setTimeout(() => {
+        isFetchingRef.current = false;
+      }, 500);
+    });
   }, [trainingId, fetchTraining, fetchSessions, fetchDrillProgress]);
 
   useEffect(() => {
     if (trainingId) {
-      fetchTraining(trainingId);
-      fetchSessions(trainingId);
-      fetchDrillProgress(trainingId);
+      isFetchingRef.current = true;
+
+      Promise.all([
+        fetchTraining(trainingId),
+        fetchSessions(trainingId),
+        fetchDrillProgress(trainingId),
+      ]).finally(() => {
+        setTimeout(() => {
+          isFetchingRef.current = false;
+        }, 500);
+      });
     } else {
       Alert.alert('Error', 'No training selected');
       router.back();
@@ -84,10 +115,23 @@ export function useTrainingDetail(
 
   useFocusEffect(
     useCallback(() => {
+      // Skip if already fetching or component unmounted
+      if (!isMountedRef.current || isFetchingRef.current) return;
+
       if (trainingId) {
-        fetchTraining(trainingId);
-        fetchSessions(trainingId);
-        fetchDrillProgress(trainingId);
+        isFetchingRef.current = true;
+
+        // Batch the fetches
+        Promise.all([
+          fetchTraining(trainingId),
+          fetchSessions(trainingId),
+          fetchDrillProgress(trainingId),
+        ]).finally(() => {
+          // Add small delay before allowing next fetch to prevent rapid refires
+          setTimeout(() => {
+            isFetchingRef.current = false;
+          }, 500);
+        });
       }
     }, [trainingId, fetchTraining, fetchSessions, fetchDrillProgress])
   );
