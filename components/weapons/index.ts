@@ -5,6 +5,7 @@
  */
 
 export { CreateWeaponFlow } from './CreateWeaponFlow';
+export { PolicyExplainer, type PolicyExplainerProps, type UserRole } from './PolicyExplainer';
 export { ShareWeaponWithTeam } from './ShareWeaponWithTeam';
 export { WeaponAssignmentManager } from './WeaponAssignmentManager';
 export { WeaponManagement } from './WeaponManagement';

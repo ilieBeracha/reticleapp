@@ -186,6 +186,25 @@ export async function getTeamWeaponPolicy(teamId: string): Promise<WeaponPolicy 
 }
 
 /**
+ * Update a team's weapon policy
+ * Only commanders/owners should be able to call this
+ */
+export async function updateTeamWeaponPolicy(
+  teamId: string,
+  weaponPolicy: WeaponPolicy
+): Promise<void> {
+  const { error } = await supabase
+    .from('teams')
+    .update({ weapon_policy: weaponPolicy })
+    .eq('id', teamId);
+
+  if (error) {
+    console.error('Failed to update weapon policy:', error);
+    throw new Error(error.message || 'Failed to update weapon policy');
+  }
+}
+
+/**
  * Update a team
  */
 export async function updateTeam(input: UpdateTeamInput): Promise<Team> {

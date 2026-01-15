@@ -4,15 +4,28 @@
  * Manage team configuration and preferences - native form sheet
  */
 import { StandardsManager } from '@/components/standards';
+import { WeaponPolicyStep } from '@/components/team/creation';
 import { WeaponAssignmentManager } from '@/components/weapons';
+import {
+  getWeaponPolicyConfig,
+  WEAPON_POLICIES,
+  type WeaponPolicy,
+} from '@/constants/weaponPolicy';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
-import { deleteTeam, getTeamMembers, removeTeamMember, updateTeam } from '@/services/teamService';
+import {
+  deleteTeam,
+  getTeamMembers,
+  getTeamWeaponPolicy,
+  removeTeamMember,
+  updateTeam,
+  updateTeamWeaponPolicy,
+} from '@/services/teamService';
 import { useTeamStore } from '@/store/teamStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -68,6 +81,7 @@ const SETTINGS_SECTIONS: SettingSection[] = [
     title: 'Equipment',
     items: [
       { id: 'weapons', icon: 'hardware-chip-outline', label: 'Team Weapons', description: 'Manage weapons & assignments' },
+      { id: 'weapon_policy', icon: 'shield-checkmark-outline', label: 'Weapon Policy', description: 'Configure weapon access rules' },
     ],
   },
   {
@@ -165,6 +179,12 @@ export default function TeamSettingsSheet() {
   
   // Standards Modal State
   const [standardsModalVisible, setStandardsModalVisible] = useState(false);
+  
+  // Weapon Policy Modal State
+  const [policyModalVisible, setPolicyModalVisible] = useState(false);
+  const [weaponPolicy, setWeaponPolicy] = useState<WeaponPolicy | null>(null);
+  const [selectedPolicy, setSelectedPolicy] = useState<WeaponPolicy | null>(null);
+  const [savingPolicy, setSavingPolicy] = useState(false);
 
   // Load team members for weapon assignment
   useEffect(() => {
@@ -178,6 +198,16 @@ export default function TeamSettingsSheet() {
       }).catch(console.error);
     }
   }, [teamId, canManage]);
+  
+  // Load weapon policy
+  useEffect(() => {
+    if (teamId) {
+      getTeamWeaponPolicy(teamId).then(policy => {
+        setWeaponPolicy(policy);
+        setSelectedPolicy(policy);
+      }).catch(console.error);
+    }
+  }, [teamId]);
 
   const showComingSoon = (feature: string) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -305,6 +335,30 @@ export default function TeamSettingsSheet() {
     }
   };
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // SAVE WEAPON POLICY
+  // ─────────────────────────────────────────────────────────────────────────
+  const handleSavePolicy = useCallback(async () => {
+    if (!teamId || !selectedPolicy || selectedPolicy === weaponPolicy) {
+      setPolicyModalVisible(false);
+      return;
+    }
+    
+    setSavingPolicy(true);
+    try {
+      await updateTeamWeaponPolicy(teamId, selectedPolicy);
+      setWeaponPolicy(selectedPolicy);
+      await loadTeams(); // Refresh team data
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setPolicyModalVisible(false);
+    } catch (error) {
+      console.error('Failed to update weapon policy:', error);
+      Alert.alert('Error', 'Failed to update weapon policy. Please try again.');
+    } finally {
+      setSavingPolicy(false);
+    }
+  }, [teamId, selectedPolicy, weaponPolicy, loadTeams]);
+
   const handleSettingPress = (item: SettingItem) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -330,6 +384,14 @@ export default function TeamSettingsSheet() {
           return;
         }
         setWeaponsModalVisible(true);
+        break;
+      case 'weapon_policy':
+        if (!canManage) {
+          Alert.alert('Permission Denied', 'Only commanders can change weapon policy.');
+          return;
+        }
+        setSelectedPolicy(weaponPolicy);
+        setPolicyModalVisible(true);
         break;
       case 'standards':
         if (!canManage) {
@@ -544,6 +606,56 @@ export default function TeamSettingsSheet() {
           {teamId && <StandardsManager teamId={teamId} />}
         </View>
       </Modal>
+
+      {/* Weapon Policy Modal */}
+      <Modal
+        visible={policyModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setPolicyModalVisible(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          {/* Modal Header */}
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={() => setPolicyModalVisible(false)} disabled={savingPolicy}>
+              <Text style={[styles.modalCancel, { color: colors.textMuted }]}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Weapon Policy</Text>
+            <TouchableOpacity 
+              onPress={handleSavePolicy} 
+              disabled={savingPolicy || selectedPolicy === weaponPolicy}
+            >
+              {savingPolicy ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Text style={[
+                  styles.modalSave, 
+                  { color: selectedPolicy !== weaponPolicy ? colors.primary : colors.textMuted }
+                ]}>
+                  Save
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+          
+          {/* Policy Change Warning */}
+          <View style={[styles.policyWarning, { backgroundColor: `${colors.yellow}12`, borderColor: colors.yellow }]}>
+            <Ionicons name="warning-outline" size={18} color={colors.yellow} />
+            <Text style={[styles.policyWarningText, { color: colors.text }]}>
+              Changing the policy affects how members can select weapons for training sessions.
+            </Text>
+          </View>
+          
+          {/* Policy Selector */}
+          <View style={styles.policySelector}>
+            <WeaponPolicyStep
+              value={selectedPolicy || 'personal'}
+              onChange={setSelectedPolicy}
+              hideHeader
+            />
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -631,6 +743,26 @@ const styles = StyleSheet.create({
   textArea: {
     minHeight: 100,
     paddingTop: 14,
+  },
+  
+  // Policy Modal
+  policyWarning: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    margin: 16,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  policyWarningText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  policySelector: {
+    flex: 1,
+    paddingHorizontal: 8,
   },
 });
 

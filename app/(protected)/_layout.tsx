@@ -105,7 +105,7 @@ export default function ProtectedLayout() {
             presentation: "formSheet",
             gestureEnabled: true,
             sheetGrabberVisible: true,
-            contentStyle: { backgroundColor: colors.card },
+            contentStyle: { backgroundColor: colors.background },
             sheetAllowedDetents: [0.6, 0.85],
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
@@ -143,11 +143,11 @@ export default function ProtectedLayout() {
         <Stack.Screen
           name="inviteTeamMember"
           options={{
-            headerShown: false,
-            presentation: "formSheet",
+            headerShown: true,
+            presentation: "card",
             gestureEnabled: true,
             sheetGrabberVisible: true,
-            contentStyle: { backgroundColor: colors.card },
+            contentStyle: { backgroundColor: colors.background },
             sheetAllowedDetents: [0.85, 0.95],
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
@@ -181,7 +181,7 @@ export default function ProtectedLayout() {
             sheetLargestUndimmedDetentIndex: -1,
           }}
         />
-        
+
         <Stack.Screen
           name="memberPreview"
           options={{

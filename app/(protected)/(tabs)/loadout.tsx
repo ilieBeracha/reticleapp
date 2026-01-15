@@ -1,13 +1,17 @@
 /**
- * Loadout Screen - User's Arsenal
+ * Loadout Screen - User's Weapon Knowledge Base
  *
- * Clean, compact design with weapon cards and stats overview
+ * Shows all weapons the user has a relationship with:
+ * - Personal weapons they own
+ * - Team weapons assigned to them or used in sessions
+ * 
+ * Can filter by "All" or specific team context
  */
 
 import { CreateWeaponFlow, WeaponPicker } from '@/components/weapons';
 import { getCategoryConfig } from '@/constants/weaponCategories';
 import { useColors } from '@/hooks/ui/useColors';
-import { getMyTeams } from '@/services/teamService';
+import { getMyTeams, type Team } from '@/services/teamService';
 import {
   createUserWeapon,
   getDefaultWeaponId,
@@ -110,10 +114,15 @@ interface WeaponCardProps {
   onPress: () => void;
   onSetDefault: () => void;
   colors: ReturnType<typeof useColors>;
+  showSource?: boolean;
 }
 
-function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }: WeaponCardProps) {
+function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors, showSource = true }: WeaponCardProps) {
   const categoryConfig = weapon.category ? getCategoryConfig(weapon.category) : null;
+  
+  // Determine weapon source
+  const isTeamWeapon = !!weapon.team_weapon_id;
+  const teamName = weapon.team_weapon?.team?.name;
 
   return (
     <TouchableOpacity
@@ -123,8 +132,12 @@ function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }:
     >
       <View style={s.cardMain}>
         {/* Category Icon */}
-        <View style={[s.cardIcon, { backgroundColor: `${colors.primary}12` }]}>
-          {getCategoryIcon(weapon.category, colors.primary)}
+        <View style={[s.cardIcon, { backgroundColor: isTeamWeapon ? `${colors.blue}12` : `${colors.primary}12` }]}>
+          {isTeamWeapon ? (
+            <Users size={14} color={colors.blue} />
+          ) : (
+            getCategoryIcon(weapon.category, colors.primary)
+          )}
         </View>
 
         {/* Info */}
@@ -139,9 +152,16 @@ function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }:
               </View>
             )}
           </View>
-          <Text style={[s.cardMeta, { color: colors.textMuted }]} numberOfLines={1}>
-            {categoryConfig?.label || 'Weapon'}{weapon.caliber ? ` · ${weapon.caliber}` : ''}
-          </Text>
+          <View style={s.cardMetaRow}>
+            <Text style={[s.cardMeta, { color: colors.textMuted }]} numberOfLines={1}>
+              {categoryConfig?.label || 'Weapon'}{weapon.caliber ? ` · ${weapon.caliber}` : ''}
+            </Text>
+            {showSource && isTeamWeapon && teamName && (
+              <View style={[s.sourceBadge, { backgroundColor: `${colors.blue}12` }]}>
+                <Text style={[s.sourceText, { color: colors.blue }]}>{teamName}</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Stats inline */}
@@ -178,6 +198,9 @@ function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }:
 // MAIN COMPONENT
 // ============================================================================
 
+// Team filter segment type
+type TeamFilter = 'all' | string; // 'all' or team_id
+
 export default function LoadoutScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -186,7 +209,8 @@ export default function LoadoutScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [weapons, setWeapons] = useState<UserWeapon[]>([]);
   const [weaponStats, setWeaponStats] = useState<Map<string, WeaponStats>>(new Map());
-  const [hasTeams, setHasTeams] = useState(false);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [selectedFilter, setSelectedFilter] = useState<TeamFilter>('all');
   const [showAddWeapon, setShowAddWeapon] = useState(false);
   const [showWeaponPicker, setShowWeaponPicker] = useState(false);
   const [defaultWeaponId, setDefaultWeaponIdState] = useState<string | null>(null);
@@ -202,7 +226,7 @@ export default function LoadoutScreen() {
 
       setWeapons(weaponsData);
       setWeaponStats(statsData);
-      setHasTeams(teamsData.length > 0);
+      setTeams(teamsData);
       setDefaultWeaponIdState(storedDefaultId);
     } catch (error) {
       console.error('[LoadoutScreen] Failed to load data:', error);
@@ -223,16 +247,48 @@ export default function LoadoutScreen() {
     loadData();
   }, [loadData]);
 
-  // Aggregate stats
+  // Filter weapons by selected team
+  const filteredWeapons = useMemo(() => {
+    if (selectedFilter === 'all') {
+      return weapons;
+    }
+    if (selectedFilter === 'personal') {
+      // Show only personal weapons (no team_weapon_id)
+      return weapons.filter(w => !w.team_weapon_id);
+    }
+    // Filter to show weapons from selected team
+    return weapons.filter(w => w.team_weapon?.team_id === selectedFilter);
+  }, [weapons, selectedFilter]);
+
+  // Get unique team IDs from user's weapons for the filter tabs
+  const teamsWithWeapons = useMemo(() => {
+    const teamIds = new Set<string>();
+    weapons.forEach(w => {
+      if (w.team_weapon?.team_id) {
+        teamIds.add(w.team_weapon.team_id);
+      }
+    });
+    return teams.filter(t => teamIds.has(t.id));
+  }, [weapons, teams]);
+
+  // Aggregate stats for filtered weapons
   const totalStats = useMemo(() => {
     let sessions = 0;
     let rounds = 0;
-    weaponStats.forEach((s) => {
-      sessions += s.total_sessions;
-      rounds += s.total_rounds_fired;
+    filteredWeapons.forEach((w) => {
+      const s = weaponStats.get(w.id);
+      if (s) {
+        sessions += s.total_sessions;
+        rounds += s.total_rounds_fired;
+      }
     });
     return { sessions, rounds };
-  }, [weaponStats]);
+  }, [filteredWeapons, weaponStats]);
+
+  const handleFilterChange = useCallback((filter: TeamFilter) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedFilter(filter);
+  }, []);
 
   const handleWeaponPress = useCallback((weapon: UserWeapon) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -293,11 +349,6 @@ export default function LoadoutScreen() {
     [loadData]
   );
 
-  const handleTeamWeaponsPress = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/(protected)/teamWeapons' as any);
-  }, []);
-
   // ─────────────────────────────────────────────────────────────────────────
   // LOADING
   // ─────────────────────────────────────────────────────────────────────────
@@ -338,41 +389,100 @@ export default function LoadoutScreen() {
           </View>
         </View>
 
+        {/* Filter Tabs - Only show if user has team weapons */}
+        {teamsWithWeapons.length > 0 && (
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            style={s.filterScroll}
+            contentContainerStyle={s.filterContainer}
+          >
+            <TouchableOpacity
+              style={[
+                s.filterTab,
+                { 
+                  backgroundColor: selectedFilter === 'all' ? colors.primary : colors.card,
+                  borderColor: selectedFilter === 'all' ? colors.primary : colors.border,
+                }
+              ]}
+              onPress={() => handleFilterChange('all')}
+              activeOpacity={0.7}
+            >
+              <Text style={[
+                s.filterTabText,
+                { color: selectedFilter === 'all' ? '#fff' : colors.text }
+              ]}>
+                All
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                s.filterTab,
+                { 
+                  backgroundColor: selectedFilter === 'personal' ? colors.primary : colors.card,
+                  borderColor: selectedFilter === 'personal' ? colors.primary : colors.border,
+                }
+              ]}
+              onPress={() => handleFilterChange('personal')}
+              activeOpacity={0.7}
+            >
+              <Text style={[
+                s.filterTabText,
+                { color: selectedFilter === 'personal' ? '#fff' : colors.text }
+              ]}>
+                Personal
+              </Text>
+            </TouchableOpacity>
+            {teamsWithWeapons.map((team) => (
+              <TouchableOpacity
+                key={team.id}
+                style={[
+                  s.filterTab,
+                  { 
+                    backgroundColor: selectedFilter === team.id ? colors.blue : colors.card,
+                    borderColor: selectedFilter === team.id ? colors.blue : colors.border,
+                  }
+                ]}
+                onPress={() => handleFilterChange(team.id)}
+                activeOpacity={0.7}
+              >
+                <Users size={12} color={selectedFilter === team.id ? '#fff' : colors.blue} />
+                <Text 
+                  style={[
+                    s.filterTabText,
+                    { color: selectedFilter === team.id ? '#fff' : colors.text }
+                  ]}
+                  numberOfLines={1}
+                >
+                  {team.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
         {/* Stats Overview */}
         <StatsOverview
-          weaponCount={weapons.length}
+          weaponCount={filteredWeapons.length}
           totalSessions={totalStats.sessions}
           totalRounds={totalStats.rounds}
           colors={colors}
         />
 
-        {/* Team Weapons Link */}
-        {hasTeams && (
-          <TouchableOpacity
-            style={[s.teamLink, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={handleTeamWeaponsPress}
-            activeOpacity={0.7}
-          >
-            <View style={[s.teamIcon, { backgroundColor: `${colors.blue}12` }]}>
-              <Users size={14} color={colors.blue} />
-            </View>
-            <Text style={[s.teamLinkText, { color: colors.text }]}>Team Weapons</Text>
-            <ChevronRight size={14} color={colors.textMuted} />
-          </TouchableOpacity>
-        )}
-
         {/* Section Header */}
         <View style={s.sectionHeader}>
-          <Text style={[s.sectionTitle, { color: colors.text }]}>My Weapons</Text>
-          {weapons.length > 0 && (
-            <Text style={[s.sectionCount, { color: colors.textMuted }]}>{weapons.length}</Text>
+          <Text style={[s.sectionTitle, { color: colors.text }]}>
+            {selectedFilter === 'all' ? 'All Weapons' : selectedFilter === 'personal' ? 'Personal Weapons' : 'Team Weapons'}
+          </Text>
+          {filteredWeapons.length > 0 && (
+            <Text style={[s.sectionCount, { color: colors.textMuted }]}>{filteredWeapons.length}</Text>
           )}
         </View>
 
         {/* Weapons List */}
-        {weapons.length > 0 ? (
+        {filteredWeapons.length > 0 ? (
           <View style={s.cardList}>
-            {weapons.map((weapon) => (
+            {filteredWeapons.map((weapon) => (
               <WeaponCard
                 key={weapon.id}
                 weapon={weapon}
@@ -381,6 +491,7 @@ export default function LoadoutScreen() {
                 onPress={() => handleWeaponPress(weapon)}
                 onSetDefault={() => handleSetDefault(weapon.id)}
                 colors={colors}
+                showSource={selectedFilter === 'all'}
               />
             ))}
           </View>
@@ -389,17 +500,23 @@ export default function LoadoutScreen() {
             <View style={[s.emptyIcon, { backgroundColor: colors.secondary }]}>
               <Target size={24} color={colors.textMuted} />
             </View>
-            <Text style={[s.emptyTitle, { color: colors.text }]}>No weapons yet</Text>
-            <Text style={[s.emptySubtitle, { color: colors.textMuted }]}>
-              Add your first weapon to start tracking performance
+            <Text style={[s.emptyTitle, { color: colors.text }]}>
+              {selectedFilter === 'all' ? 'No weapons yet' : 'No weapons in this view'}
             </Text>
-            <TouchableOpacity
-              style={[s.emptyButton, { backgroundColor: colors.primary }]}
-              onPress={handleAddWeapon}
-            >
-              <Plus size={16} color="#fff" />
-              <Text style={s.emptyButtonText}>Add Weapon</Text>
-            </TouchableOpacity>
+            <Text style={[s.emptySubtitle, { color: colors.textMuted }]}>
+              {selectedFilter === 'all' 
+                ? 'Add your first weapon to start tracking performance'
+                : 'Use weapons in training sessions to see them here'}
+            </Text>
+            {selectedFilter === 'all' && (
+              <TouchableOpacity
+                style={[s.emptyButton, { backgroundColor: colors.primary }]}
+                onPress={handleAddWeapon}
+              >
+                <Plus size={16} color="#fff" />
+                <Text style={s.emptyButtonText}>Add Weapon</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </ScrollView>
@@ -480,6 +597,30 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
 
+  // Filter Tabs
+  filterScroll: {
+    marginBottom: 12,
+    marginHorizontal: -16,
+  },
+  filterContainer: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  filterTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  filterTabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    maxWidth: 100,
+  },
+
   // Stats Overview
   statsRow: {
     flexDirection: 'row',
@@ -506,30 +647,6 @@ const s = StyleSheet.create({
   statDivider: {
     width: 1,
     height: 24,
-  },
-
-  // Team Link
-  teamLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-  teamIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  teamLinkText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '600',
   },
 
   // Section Header
@@ -596,9 +713,23 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  cardMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   cardMeta: {
     fontSize: 11,
     fontWeight: '400',
+  },
+  sourceBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  sourceText: {
+    fontSize: 9,
+    fontWeight: '600',
   },
   cardStats: {
     paddingHorizontal: 8,

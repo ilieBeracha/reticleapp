@@ -22,12 +22,15 @@ import type { WeaponCategory } from '@/types/workspace';
 import { format } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import {
   ArrowLeft,
   Calendar,
   ChevronRight,
   Crosshair,
   Edit3,
+  Info,
+  Share2,
   Star,
   Target,
   Trash2,
@@ -276,24 +279,80 @@ export default function WeaponDetailScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
         }
       >
-        {/* Hero Section */}
+        {/* Enhanced Hero Section */}
         <View style={[s.heroCard, { backgroundColor: colors.card }]}>
-          <View style={[s.heroIcon, { backgroundColor: `${colors.primary}15` }]}>
-            {getCategoryIcon(weapon.category, colors.primary, 28)}
+          <View style={[s.heroIconLarge, { backgroundColor: `${colors.primary}15` }]}>
+            {getCategoryIcon(weapon.category, colors.primary, 40)}
           </View>
-          <View style={s.heroInfo}>
-            <Text style={[s.heroName, { color: colors.text }]}>{weapon.name}</Text>
-            <Text style={[s.heroMeta, { color: colors.textMuted }]}>
-              {categoryConfig?.label || 'Weapon'}
-              {weapon.caliber && ` · ${weapon.caliber}`}
-            </Text>
-          </View>
-          {isDefault && (
-            <View style={s.defaultBadge}>
-              <Star size={12} color="#f59e0b" fill="#f59e0b" />
-              <Text style={s.defaultText}>Default</Text>
+          <Text style={[s.heroName, { color: colors.text }]}>{weapon.name}</Text>
+          <View style={s.heroBadges}>
+            <View style={[s.categoryBadge, { backgroundColor: `${colors.primary}12` }]}>
+              {getCategoryIcon(weapon.category, colors.primary, 14)}
+              <Text style={[s.categoryBadgeText, { color: colors.primary }]}>
+                {categoryConfig?.label || 'Weapon'}
+              </Text>
             </View>
-          )}
+            {weapon.caliber && (
+              <View style={[s.caliberBadge, { backgroundColor: colors.secondary }]}>
+                <Text style={[s.caliberBadgeText, { color: colors.textMuted }]}>
+                  {weapon.caliber}
+                </Text>
+              </View>
+            )}
+            {isDefault && (
+              <View style={s.defaultBadge}>
+                <Star size={12} color="#f59e0b" fill="#f59e0b" />
+                <Text style={s.defaultText}>Default</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Quick Actions */}
+        <View style={s.quickActions}>
+          <TouchableOpacity
+            style={[s.quickAction, { backgroundColor: isDefault ? '#f59e0b15' : colors.card, borderColor: isDefault ? '#f59e0b40' : colors.border }]}
+            onPress={handleToggleDefault}
+            activeOpacity={0.7}
+          >
+            <Star size={18} color={isDefault ? '#f59e0b' : colors.textMuted} fill={isDefault ? '#f59e0b' : 'none'} />
+            <Text style={[s.quickActionText, { color: isDefault ? '#f59e0b' : colors.text }]}>
+              {isDefault ? 'Default' : 'Set Default'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* About This Weapon */}
+        <View style={s.section}>
+          <Text style={[s.sectionTitle, { color: colors.text }]}>About This Weapon</Text>
+          <View style={[s.aboutCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={s.aboutRow}>
+              <View style={[s.aboutIcon, { backgroundColor: `${colors.blue}12` }]}>
+                <Info size={16} color={colors.blue} />
+              </View>
+              <View style={s.aboutContent}>
+                <Text style={[s.aboutLabel, { color: colors.textMuted }]}>Source</Text>
+                <Text style={[s.aboutValue, { color: colors.text }]}>
+                  {weapon.team_weapon_id ? 'From Team Catalog' : 'Personal Weapon'}
+                </Text>
+              </View>
+            </View>
+            <View style={[s.aboutDivider, { backgroundColor: colors.border }]} />
+            <View style={s.aboutRow}>
+              <View style={[s.aboutIcon, { backgroundColor: `${colors.primary}12` }]}>
+                {getCategoryIcon(weapon.category, colors.primary, 16)}
+              </View>
+              <View style={s.aboutContent}>
+                <Text style={[s.aboutLabel, { color: colors.textMuted }]}>Type</Text>
+                <Text style={[s.aboutValue, { color: colors.text }]}>
+                  {categoryConfig?.label || 'General Weapon'}
+                </Text>
+                <Text style={[s.aboutHint, { color: colors.textMuted }]}>
+                  {categoryConfig?.description || 'Multi-purpose firearm'}
+                </Text>
+              </View>
+            </View>
+          </View>
         </View>
 
         {/* Stats Row */}
@@ -509,40 +568,62 @@ const s = StyleSheet.create({
     paddingTop: 16,
   },
 
-  // Hero
+  // Hero (Enhanced)
   heroCard: {
-    flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 14,
-    marginBottom: 12,
-    gap: 14,
+    padding: 24,
+    borderRadius: 20,
+    marginBottom: 16,
+    gap: 12,
   },
-  heroIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
+  heroIconLarge: {
+    width: 88,
+    height: 88,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  heroInfo: {
-    flex: 1,
-    gap: 2,
+    marginBottom: 8,
   },
   heroName: {
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    textAlign: 'center',
   },
-  heroMeta: {
-    fontSize: 14,
+  heroBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  categoryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  categoryBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  caliberBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  caliberBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   defaultBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     backgroundColor: '#f59e0b15',
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
   },
@@ -550,6 +631,69 @@ const s = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#f59e0b',
+  },
+  
+  // Quick Actions
+  quickActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 20,
+  },
+  quickAction: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  quickActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  
+  // About Card
+  aboutCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  aboutRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 14,
+    gap: 12,
+  },
+  aboutIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aboutContent: {
+    flex: 1,
+    gap: 2,
+  },
+  aboutLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  aboutValue: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  aboutHint: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  aboutDivider: {
+    height: 1,
+    marginLeft: 62,
   },
 
   // Stats

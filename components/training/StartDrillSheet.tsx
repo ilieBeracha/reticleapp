@@ -1,20 +1,32 @@
-import { WeaponPicker, CreateWeaponFlow } from '@/components/weapons';
+import { WeaponPicker, CreateWeaponFlow, PolicyExplainer } from '@/components/weapons';
 import { getCategoryConfig } from '@/constants/weaponCategories';
-import type { WeaponPolicy } from '@/constants/weaponPolicy';
+import {
+  isAssignedPolicy,
+  isCatalogPolicy,
+  isPersonalPolicy,
+  type WeaponPolicy,
+} from '@/constants/weaponPolicy';
 import { useColors } from '@/hooks/ui/useColors';
 import { useOpenWeather } from '@/hooks/useOpenWeather';
 import { supabase } from '@/lib/supabase';
 import type { BaseSessionConfig } from '@/services/session/types';
 import { createSession } from '@/services/sessionService';
-import { getTeamWeaponPolicy } from '@/services/teamService';
-import { getAssignedWeapons, getOrCreatePersonalProfile, getUserWeapon, type UserWeapon } from '@/services/weaponService';
+import { getMyRoleInTeam, getTeamWeaponPolicy } from '@/services/teamService';
+import {
+  getAssignedWeapons,
+  getOrCreatePersonalProfile,
+  getTeamDefaultWeapon,
+  getTeamWeapons,
+  getUserWeapon,
+  type UserWeapon,
+} from '@/services/weaponService';
 import { toSessionWeatherData } from '@/services/weather';
 import { useSessionStore } from '@/store/sessionStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { ChevronRight, Crosshair, Plus, Target } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -26,6 +38,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TrainingBlockedView, type BlockReason } from './TrainingBlockedView';
 
 interface StartDrillSheetProps {
   visible: boolean;
@@ -53,9 +66,39 @@ export function StartDrillSheet({
   const [loadingWeapon, setLoadingWeapon] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [weaponPolicy, setWeaponPolicy] = useState<WeaponPolicy | null>(null);
+  const [teamWeaponsCount, setTeamWeaponsCount] = useState<number>(0);
+  const [isCommanderOrOwner, setIsCommanderOrOwner] = useState(false);
   
   const [showWeaponPicker, setShowWeaponPicker] = useState(false);
   const [showCreateWeapon, setShowCreateWeapon] = useState(false);
+  
+  // Determine if training is blocked based on policy
+  const blockStatus = useMemo((): { blocked: boolean; reason: BlockReason } | null => {
+    if (loadingWeapon) return null;
+    
+    // If we have a weapon, never blocked
+    if (selectedWeapon) return { blocked: false, reason: 'unknown' };
+    
+    // Commanders/owners are never blocked by assignment policy - they manage it
+    if (isCommanderOrOwner) return { blocked: false, reason: 'unknown' };
+    
+    // Check policy-based restrictions for members
+    if (isAssignedPolicy(weaponPolicy)) {
+      // For assigned policy, members must have weapon assigned
+      return { blocked: true, reason: 'no_assignment' };
+    }
+    
+    if (isCatalogPolicy(weaponPolicy)) {
+      // For catalog policy, team must have weapons in catalog
+      if (teamWeaponsCount === 0) {
+        return { blocked: true, reason: 'empty_catalog' };
+      }
+      return { blocked: false, reason: 'unknown' };
+    }
+    
+    // For personal policy or no teamId, user just needs to select a weapon
+    return { blocked: false, reason: 'unknown' };
+  }, [loadingWeapon, selectedWeapon, weaponPolicy, teamWeaponsCount, isCommanderOrOwner]);
 
   // Auto-load assigned weapon and team weapon policy
   useEffect(() => {
@@ -76,15 +119,19 @@ export function StartDrillSheet({
 
     async function loadTeamData() {
       try {
-        // Fetch weapon policy and assigned weapon in parallel
-        const [policy, authResult] = await Promise.all([
+        // Fetch weapon policy, auth, team weapons count, and user role in parallel
+        const [policy, authResult, teamWeapons, userRole] = await Promise.all([
           getTeamWeaponPolicy(teamId!),
           supabase.auth.getUser(),
+          getTeamWeapons(teamId!),
+          getMyRoleInTeam(teamId!),
         ]);
         
         if (cancelled) return;
         
         setWeaponPolicy(policy);
+        setTeamWeaponsCount(teamWeapons.length);
+        setIsCommanderOrOwner(userRole === 'owner' || userRole === 'commander');
         
         const user = authResult.data?.user;
         if (!user) {
@@ -92,13 +139,28 @@ export function StartDrillSheet({
           return;
         }
 
-        const assignedWeapons = await getAssignedWeapons(teamId!, user.id);
-        if (cancelled) return;
-
-        if (assignedWeapons.length > 0) {
-          const personalProfile = await getOrCreatePersonalProfile(assignedWeapons[0].id);
+        // For assigned policy, auto-load assigned weapon
+        if (isAssignedPolicy(policy)) {
+          const assignedWeapons = await getAssignedWeapons(teamId!, user.id);
           if (cancelled) return;
-          setSelectedWeapon(personalProfile);
+
+          if (assignedWeapons.length > 0) {
+            const personalProfile = await getOrCreatePersonalProfile(assignedWeapons[0].id);
+            if (cancelled) return;
+            setSelectedWeapon(personalProfile);
+          }
+        }
+        
+        // For catalog policy, try to auto-select team default weapon
+        if (isCatalogPolicy(policy) && teamWeapons.length > 0) {
+          const defaultTeamWeapon = await getTeamDefaultWeapon(teamId!);
+          if (cancelled) return;
+          
+          if (defaultTeamWeapon) {
+            const personalProfile = await getOrCreatePersonalProfile(defaultTeamWeapon.id);
+            if (cancelled) return;
+            setSelectedWeapon(personalProfile);
+          }
         }
       } catch (error) {
         console.error('[StartDrillSheet] Failed to load team data:', error);
@@ -180,114 +242,165 @@ export function StartDrillSheet({
 
   if (!visible) return null;
 
+  // Check if training is blocked
+  const isTrainingBlocked = blockStatus?.blocked === true;
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}>
-          {/* Header */}
-          <View style={styles.sheetHeader}>
-            <TouchableOpacity onPress={onClose} style={[styles.sheetCloseBtn, { backgroundColor: colors.card }]}>
-              <Ionicons name="close" size={20} color={colors.text} />
-            </TouchableOpacity>
-            <Text style={[styles.sheetTitle, { color: colors.text }]}>Start Drill</Text>
-            <View style={{ width: 40 }} />
-          </View>
-
-          {/* Drill Hero */}
-          <View style={[styles.drillHero, { backgroundColor: colors.card }]}>
-            <View style={[styles.drillHeroIcon, { backgroundColor: colors.primary + '15' }]}>
-              <Target size={32} color={colors.primary} />
+        {/* Show blocked view when training cannot proceed */}
+        {isTrainingBlocked && blockStatus ? (
+          <View style={styles.blockedContainer}>
+            {/* Header for blocked state */}
+            <View style={[styles.blockedHeader, { borderBottomColor: colors.border }]}>
+              <TouchableOpacity onPress={onClose} style={[styles.sheetCloseBtn, { backgroundColor: colors.card }]}>
+                <Ionicons name="close" size={20} color={colors.text} />
+              </TouchableOpacity>
+              <Text style={[styles.sheetTitle, { color: colors.text }]}>Start Drill</Text>
+              <View style={{ width: 40 }} />
             </View>
-            <Text style={[styles.drillHeroTitle, { color: colors.text }]}>{drill?.name || 'Training Drill'}</Text>
-            <View style={styles.drillHeroBadge}>
-              <Text style={[styles.drillHeroBadgeText, { color: colors.textMuted }]}>
-                {drill?.distance_m}m • {drill?.rounds_per_shooter} shots
+            
+            {/* Drill info badge */}
+            <View style={[styles.drillBadgeSmall, { backgroundColor: colors.card }]}>
+              <Target size={16} color={colors.primary} />
+              <Text style={[styles.drillBadgeText, { color: colors.text }]}>
+                {drill?.name || 'Training Drill'}
               </Text>
             </View>
+            
+            {/* Blocked View */}
+            <TrainingBlockedView
+              weaponPolicy={weaponPolicy || 'assigned'}
+              reason={blockStatus.reason}
+            />
           </View>
-
-          {/* Weapon Selector */}
-          <View style={styles.sectionContainer}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Weapon</Text>
-            {loadingWeapon ? (
-              <View style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <ActivityIndicator size="small" color={colors.textMuted} />
-                <Text style={[styles.weaponLoadingText, { color: colors.textMuted }]}>Assigning weapon...</Text>
+        ) : (
+          <>
+            <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}>
+              {/* Header */}
+              <View style={styles.sheetHeader}>
+                <TouchableOpacity onPress={onClose} style={[styles.sheetCloseBtn, { backgroundColor: colors.card }]}>
+                  <Ionicons name="close" size={20} color={colors.text} />
+                </TouchableOpacity>
+                <Text style={[styles.sheetTitle, { color: colors.text }]}>Start Drill</Text>
+                <View style={{ width: 40 }} />
               </View>
-            ) : selectedWeapon ? (
-              <TouchableOpacity
-                style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.primary }]}
-                onPress={() => setShowWeaponPicker(true)}
-              >
-                <View style={[styles.weaponIcon, { backgroundColor: colors.primary + '15' }]}>
-                  <Crosshair size={20} color={colors.primary} />
-                </View>
-                <View style={styles.weaponInfo}>
-                  <Text style={[styles.weaponName, { color: colors.text }]}>{selectedWeapon.name}</Text>
-                  <Text style={[styles.weaponHint, { color: colors.textMuted }]}>Ready to use</Text>
-                </View>
-                <ChevronRight size={18} color={colors.textMuted} />
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={[styles.weaponEmptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={() => setShowWeaponPicker(true)}
-              >
-                <View style={[styles.weaponEmptyIcon, { backgroundColor: colors.secondary }]}>
-                  <Plus size={20} color={colors.textMuted} />
-                </View>
-                <Text style={[styles.weaponEmptyTitle, { color: colors.textMuted }]}>Select Weapon</Text>
-              </TouchableOpacity>
-            )}
-          </View>
 
-          {/* Quick Settings (Read only / display) */}
-          <View style={styles.specsRow}>
-            <View style={[styles.specItem, { backgroundColor: colors.card }]}>
-              <Text style={[styles.specLabel, { color: colors.textMuted }]}>DISTANCE</Text>
-              <Text style={[styles.specValue, { color: colors.text }]}>{drill?.distance_m}m</Text>
-            </View>
-            <View style={[styles.specItem, { backgroundColor: colors.card }]}>
-              <Text style={[styles.specLabel, { color: colors.textMuted }]}>ROUNDS</Text>
-              <Text style={[styles.specValue, { color: colors.text }]}>{drill?.rounds_per_shooter}</Text>
-            </View>
-            {drill?.time_limit_seconds && (
-              <View style={[styles.specItem, { backgroundColor: colors.card }]}>
-                <Text style={[styles.specLabel, { color: colors.textMuted }]}>TIME</Text>
-                <Text style={[styles.specValue, { color: colors.text }]}>{drill.time_limit_seconds}s</Text>
+              {/* Drill Hero */}
+              <View style={[styles.drillHero, { backgroundColor: colors.card }]}>
+                <View style={[styles.drillHeroIcon, { backgroundColor: colors.primary + '15' }]}>
+                  <Target size={32} color={colors.primary} />
+                </View>
+                <Text style={[styles.drillHeroTitle, { color: colors.text }]}>{drill?.name || 'Training Drill'}</Text>
+                <View style={styles.drillHeroBadge}>
+                  <Text style={[styles.drillHeroBadgeText, { color: colors.textMuted }]}>
+                    {drill?.distance_m}m • {drill?.rounds_per_shooter} shots
+                  </Text>
+                </View>
               </View>
-            )}
-          </View>
-        </ScrollView>
 
-      {/* Footer Action */}
-      <View style={[styles.sheetFooter, { backgroundColor: colors.background, paddingBottom: insets.bottom + 16 }]}>
-        <TouchableOpacity
-          style={[
-            styles.startButton, 
-            { 
-              backgroundColor: selectedWeapon ? colors.text : colors.secondary, 
-              opacity: selectedWeapon ? 1 : 0.6 
-            }
-          ]}
-          onPress={handleStart}
-          disabled={!selectedWeapon || isSubmitting || loadingWeapon}
-        >
-          {isSubmitting ? (
-            <ActivityIndicator color={colors.background} />
-          ) : (
-            <>
-              <Target size={20} color={colors.background} />
-              <Text style={[styles.startButtonText, { color: colors.background }]}>
-                Continue to Setup
+              {/* Policy indicator for team trainings */}
+              {teamId && weaponPolicy && (
+                <View style={styles.policySection}>
+                  <PolicyExplainer
+                    policy={weaponPolicy}
+                    userRole="member"
+                    hasWeapon={!!selectedWeapon}
+                    catalogCount={teamWeaponsCount}
+                    compact
+                  />
+                </View>
+              )}
+
+              {/* Weapon Selector */}
+              <View style={styles.sectionContainer}>
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Weapon</Text>
+                {loadingWeapon ? (
+                  <View style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <ActivityIndicator size="small" color={colors.textMuted} />
+                    <Text style={[styles.weaponLoadingText, { color: colors.textMuted }]}>Loading weapon...</Text>
+                  </View>
+                ) : selectedWeapon ? (
+                  <TouchableOpacity
+                    style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.primary }]}
+                    onPress={() => !isAssignedPolicy(weaponPolicy) && setShowWeaponPicker(true)}
+                    disabled={isAssignedPolicy(weaponPolicy)}
+                  >
+                    <View style={[styles.weaponIcon, { backgroundColor: colors.primary + '15' }]}>
+                      <Crosshair size={20} color={colors.primary} />
+                    </View>
+                    <View style={styles.weaponInfo}>
+                      <Text style={[styles.weaponName, { color: colors.text }]}>{selectedWeapon.name}</Text>
+                      <Text style={[styles.weaponHint, { color: colors.textMuted }]}>
+                        {isAssignedPolicy(weaponPolicy) ? 'Assigned to you' : 'Tap to change'}
+                      </Text>
+                    </View>
+                    {!isAssignedPolicy(weaponPolicy) && (
+                      <ChevronRight size={18} color={colors.textMuted} />
+                    )}
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.weaponEmptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={() => setShowWeaponPicker(true)}
+                  >
+                    <View style={[styles.weaponEmptyIcon, { backgroundColor: colors.secondary }]}>
+                      <Plus size={20} color={colors.textMuted} />
+                    </View>
+                    <Text style={[styles.weaponEmptyTitle, { color: colors.textMuted }]}>Select Weapon</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Quick Settings (Read only / display) */}
+              <View style={styles.specsRow}>
+                <View style={[styles.specItem, { backgroundColor: colors.card }]}>
+                  <Text style={[styles.specLabel, { color: colors.textMuted }]}>DISTANCE</Text>
+                  <Text style={[styles.specValue, { color: colors.text }]}>{drill?.distance_m}m</Text>
+                </View>
+                <View style={[styles.specItem, { backgroundColor: colors.card }]}>
+                  <Text style={[styles.specLabel, { color: colors.textMuted }]}>ROUNDS</Text>
+                  <Text style={[styles.specValue, { color: colors.text }]}>{drill?.rounds_per_shooter}</Text>
+                </View>
+                {drill?.time_limit_seconds && (
+                  <View style={[styles.specItem, { backgroundColor: colors.card }]}>
+                    <Text style={[styles.specLabel, { color: colors.textMuted }]}>TIME</Text>
+                    <Text style={[styles.specValue, { color: colors.text }]}>{drill.time_limit_seconds}s</Text>
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+
+            {/* Footer Action */}
+            <View style={[styles.sheetFooter, { backgroundColor: colors.background, paddingBottom: insets.bottom + 16 }]}>
+              <TouchableOpacity
+                style={[
+                  styles.startButton, 
+                  { 
+                    backgroundColor: selectedWeapon ? colors.text : colors.secondary, 
+                    opacity: selectedWeapon ? 1 : 0.6 
+                  }
+                ]}
+                onPress={handleStart}
+                disabled={!selectedWeapon || isSubmitting || loadingWeapon}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator color={colors.background} />
+                ) : (
+                  <>
+                    <Target size={20} color={colors.background} />
+                    <Text style={[styles.startButtonText, { color: colors.background }]}>
+                      Continue to Setup
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <Text style={[styles.setupHint, { color: colors.textMuted }]}>
+                Configure watch & detection in next step
               </Text>
-            </>
-          )}
-        </TouchableOpacity>
-        <Text style={[styles.setupHint, { color: colors.textMuted }]}>
-          Configure watch & detection in next step
-        </Text>
-      </View>
+            </View>
+          </>
+        )}
 
         {/* Modals */}
         <Modal visible={showWeaponPicker} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowWeaponPicker(false)}>
@@ -326,6 +439,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
   },
+  
+  // Blocked state styles
+  blockedContainer: {
+    flex: 1,
+  },
+  blockedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+  },
+  drillBadgeSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginTop: 16,
+  },
+  drillBadgeText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  
+  // Policy section
+  policySection: {
+    marginBottom: 20,
+  },
+  
   sheetHeader: {
     flexDirection: 'row',
     alignItems: 'center',

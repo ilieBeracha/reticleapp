@@ -6,9 +6,18 @@
  * - Add new team weapons
  * - Assign/unassign weapons to team members
  * - View and approve/reject weapon contribution requests
+ * - Display active weapon policy with contextual hints
  */
 
+import {
+  getWeaponPolicyConfig,
+  isAssignedPolicy,
+  isCatalogPolicy,
+  isPersonalPolicy,
+  type WeaponPolicy,
+} from '@/constants/weaponPolicy';
 import { useColors } from '@/hooks/ui/useColors';
+import { getTeamWeaponPolicy } from '@/services/teamService';
 import {
   approveSharedWeapon,
   assignTeamWeapon,
@@ -25,11 +34,14 @@ import {
   type UserWeapon,
   type WeaponCategory,
 } from '@/services/weaponService';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
   AlertTriangle,
   Check,
   ChevronRight,
+  Lock,
+  Package,
   Plus,
   RefreshCw,
   Search,
@@ -83,6 +95,7 @@ export function WeaponAssignmentManager({
   const [pendingWeapons, setPendingWeapons] = useState<PendingWeapon[]>([]);
   const [selectedWeapon, setSelectedWeapon] = useState<TeamWeapon | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [weaponPolicy, setWeaponPolicy] = useState<WeaponPolicy | null>(null);
 
   // Create weapon modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -107,12 +120,14 @@ export function WeaponAssignmentManager({
   const loadData = async () => {
     try {
       setLoading(true);
-      const [weapons, pending] = await Promise.all([
+      const [weapons, pending, policy] = await Promise.all([
         getTeamWeaponsWithAssignments(teamId),
         getPendingSharedWeapons(teamId),
+        getTeamWeaponPolicy(teamId),
       ]);
       setTeamWeapons(weapons);
       setPendingWeapons(pending as PendingWeapon[]);
+      setWeaponPolicy(policy);
     } catch (err) {
       console.error('Failed to load weapon assignments:', err);
     } finally {
@@ -421,6 +436,16 @@ export function WeaponAssignmentManager({
           Select a team member (1 weapon per member)
         </Text>
         
+        {/* Show assignment requirement hint for 'assigned' policy */}
+        {isAssignedPolicy(weaponPolicy) && (
+          <View style={[styles.assignmentHint, { backgroundColor: `${colors.yellow}12`, borderColor: colors.yellow }]}>
+            <Lock size={14} color={colors.yellow} />
+            <Text style={[styles.assignmentHintText, { color: colors.text }]}>
+              Members cannot participate without an assigned weapon
+            </Text>
+          </View>
+        )}
+        
         <FlatList
           data={teamMembers}
           keyExtractor={(item) => item.id}
@@ -443,6 +468,113 @@ export function WeaponAssignmentManager({
           <RefreshCw size={20} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
+
+      {/* Policy Banner */}
+      {weaponPolicy && (
+        <View style={[
+          styles.policyBanner, 
+          { 
+            backgroundColor: isAssignedPolicy(weaponPolicy) 
+              ? `${colors.yellow}12` 
+              : isCatalogPolicy(weaponPolicy)
+                ? `${colors.blue}12`
+                : `${colors.green}12`,
+            borderColor: isAssignedPolicy(weaponPolicy) 
+              ? colors.yellow 
+              : isCatalogPolicy(weaponPolicy)
+                ? colors.blue
+                : colors.green,
+          }
+        ]}>
+          <View style={styles.policyBannerLeft}>
+            {isAssignedPolicy(weaponPolicy) ? (
+              <Lock size={18} color={colors.yellow} />
+            ) : isCatalogPolicy(weaponPolicy) ? (
+              <Package size={18} color={colors.blue} />
+            ) : (
+              <User size={18} color={colors.green} />
+            )}
+            <View style={styles.policyBannerText}>
+              <Text style={[styles.policyLabel, { color: colors.text }]}>
+                {getWeaponPolicyConfig(weaponPolicy).label}
+              </Text>
+              <Text style={[styles.policyHint, { color: colors.textMuted }]}>
+                {isAssignedPolicy(weaponPolicy) 
+                  ? 'Members must use their assigned weapon' 
+                  : isCatalogPolicy(weaponPolicy)
+                    ? 'Members choose from team catalog'
+                    : 'Members can use personal weapons'}
+              </Text>
+            </View>
+          </View>
+          <Ionicons 
+            name={getWeaponPolicyConfig(weaponPolicy).icon as any} 
+            size={20} 
+            color={colors.textMuted} 
+          />
+        </View>
+      )}
+
+      {/* Assignment Progress - for Assigned policy */}
+      {isAssignedPolicy(weaponPolicy) && !loading && (
+        <View style={styles.assignmentProgress}>
+          {/* Progress bar */}
+          <View style={styles.progressHeader}>
+            <Text style={[styles.progressTitle, { color: colors.text }]}>
+              Assignment Progress
+            </Text>
+            <Text style={[styles.progressCount, { 
+              color: usersWithWeapons.size === teamMembers.length ? colors.green : colors.yellow 
+            }]}>
+              {usersWithWeapons.size} of {teamMembers.length}
+            </Text>
+          </View>
+          <View style={[styles.progressBarBg, { backgroundColor: colors.secondary }]}>
+            <View 
+              style={[
+                styles.progressBarFill, 
+                { 
+                  backgroundColor: usersWithWeapons.size === teamMembers.length ? colors.green : colors.yellow,
+                  width: `${teamMembers.length > 0 ? (usersWithWeapons.size / teamMembers.length) * 100 : 0}%`,
+                }
+              ]} 
+            />
+          </View>
+          
+          {/* Unassigned members list */}
+          {usersWithWeapons.size < teamMembers.length && (
+            <View style={[styles.unassignedSection, { backgroundColor: `${colors.yellow}08`, borderColor: `${colors.yellow}30` }]}>
+              <View style={styles.unassignedHeader}>
+                <AlertTriangle size={16} color={colors.yellow} />
+                <Text style={[styles.unassignedTitle, { color: colors.yellow }]}>
+                  {teamMembers.length - usersWithWeapons.size} Member{teamMembers.length - usersWithWeapons.size !== 1 ? 's' : ''} Waiting
+                </Text>
+              </View>
+              <Text style={[styles.unassignedHint, { color: colors.textMuted }]}>
+                These members cannot train until assigned a weapon:
+              </Text>
+              <View style={styles.unassignedList}>
+                {teamMembers
+                  .filter(m => !usersWithWeapons.has(m.id))
+                  .slice(0, 5)
+                  .map((member, index) => (
+                    <View key={member.id} style={[styles.unassignedMember, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      <User size={14} color={colors.textMuted} />
+                      <Text style={[styles.unassignedMemberName, { color: colors.text }]} numberOfLines={1}>
+                        {member.full_name}
+                      </Text>
+                    </View>
+                  ))}
+                {teamMembers.filter(m => !usersWithWeapons.has(m.id)).length > 5 && (
+                  <Text style={[styles.unassignedMore, { color: colors.textMuted }]}>
+                    +{teamMembers.filter(m => !usersWithWeapons.has(m.id)).length - 5} more
+                  </Text>
+                )}
+              </View>
+            </View>
+          )}
+        </View>
+      )}
 
       {/* Add Weapon Button */}
       <TouchableOpacity
@@ -894,6 +1026,123 @@ const styles = StyleSheet.create({
   },
   emptyHint: {
     fontSize: 13,
+  },
+  
+  // Policy Banner
+  policyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  policyBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  policyBannerText: {
+    flex: 1,
+    gap: 1,
+  },
+  policyLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  policyHint: {
+    fontSize: 12,
+  },
+  assignmentHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 8,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  assignmentHintText: {
+    fontSize: 13,
+    flex: 1,
+  },
+  
+  // Assignment Progress
+  assignmentProgress: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    gap: 10,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  progressTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  progressCount: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  progressBarBg: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  unassignedSection: {
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 8,
+    marginTop: 4,
+  },
+  unassignedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  unassignedTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  unassignedHint: {
+    fontSize: 12,
+  },
+  unassignedList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  unassignedMember: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  unassignedMemberName: {
+    fontSize: 12,
+    fontWeight: '500',
+    maxWidth: 100,
+  },
+  unassignedMore: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    alignSelf: 'center',
+    marginLeft: 4,
   },
   
   // Add Weapon Button

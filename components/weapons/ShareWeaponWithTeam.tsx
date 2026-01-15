@@ -5,8 +5,16 @@
  * 1. User selects their personal weapon
  * 2. User selects which team to share with
  * 3. Request goes to commander for approval
+ * 
+ * NOTE: Sharing is only available when team's weapon policy is 'personal'.
+ * For 'catalog' or 'assigned' policies, shows a disabled state.
  */
 
+import {
+  getWeaponPolicyConfig,
+  isPersonalPolicy,
+  type WeaponPolicy,
+} from '@/constants/weaponPolicy';
 import { useColors } from '@/hooks/ui/useColors';
 import {
   getCategoryLabel,
@@ -16,12 +24,14 @@ import {
   withdrawSharedWeapon,
   type UserWeapon,
 } from '@/services/weaponService';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
   AlertTriangle,
   ArrowRight,
   Check,
   Clock,
+  Lock,
   Share2,
   X,
 } from 'lucide-react-native';
@@ -43,6 +53,8 @@ import {
 interface ShareWeaponWithTeamProps {
   teamId: string;
   teamName: string;
+  /** Team's weapon policy - sharing only available for 'personal' policy */
+  weaponPolicy?: WeaponPolicy | null;
   onClose: () => void;
   onSuccess?: () => void;
 }
@@ -54,6 +66,7 @@ interface ShareWeaponWithTeamProps {
 export function ShareWeaponWithTeam({
   teamId,
   teamName,
+  weaponPolicy,
   onClose,
   onSuccess,
 }: ShareWeaponWithTeamProps) {
@@ -63,11 +76,18 @@ export function ShareWeaponWithTeam({
   const [myWeapons, setMyWeapons] = useState<UserWeapon[]>([]);
   const [sharedWeapons, setSharedWeapons] = useState<UserWeapon[]>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  
+  // Check if sharing is allowed based on policy
+  const isSharingAllowed = isPersonalPolicy(weaponPolicy) || weaponPolicy === null || weaponPolicy === undefined;
 
   // Load user's personal weapons
   useEffect(() => {
-    loadWeapons();
-  }, []);
+    if (isSharingAllowed) {
+      loadWeapons();
+    } else {
+      setLoading(false);
+    }
+  }, [isSharingAllowed]);
 
   const loadWeapons = async () => {
     try {
@@ -194,6 +214,60 @@ export function ShareWeaponWithTeam({
       </View>
     );
   };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // POLICY BLOCKED STATE
+  // ─────────────────────────────────────────────────────────────────────────
+  
+  if (!isSharingAllowed && weaponPolicy) {
+    const policyConfig = getWeaponPolicyConfig(weaponPolicy);
+    
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        {/* Header */}
+        <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={onClose}>
+            <X size={20} color={colors.textMuted} />
+          </TouchableOpacity>
+          <View style={styles.headerCenter}>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Share Weapon</Text>
+            <View style={styles.teamBadge}>
+              <ArrowRight size={12} color={colors.textMuted} />
+              <Text style={[styles.teamName, { color: colors.textMuted }]}>{teamName}</Text>
+            </View>
+          </View>
+          <View style={{ width: 20 }} />
+        </View>
+
+        {/* Policy Blocked Message */}
+        <View style={styles.blockedContainer}>
+          <View style={[styles.blockedIcon, { backgroundColor: `${colors.yellow}15` }]}>
+            <Lock size={32} color={colors.yellow} />
+          </View>
+          <Text style={[styles.blockedTitle, { color: colors.text }]}>
+            Sharing Not Available
+          </Text>
+          <Text style={[styles.blockedMessage, { color: colors.textMuted }]}>
+            This team uses the "{policyConfig.label}" weapon policy.
+          </Text>
+          <View style={[styles.policyInfo, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Ionicons name={policyConfig.icon as any} size={20} color={colors.textMuted} />
+            <View style={styles.policyInfoText}>
+              <Text style={[styles.policyInfoLabel, { color: colors.text }]}>{policyConfig.label}</Text>
+              <Text style={[styles.policyInfoHint, { color: colors.textMuted }]}>{policyConfig.hint}</Text>
+            </View>
+          </View>
+          <Text style={[styles.blockedHint, { color: colors.textMuted }]}>
+            Only teams with "Bring Your Own" policy allow members to share personal weapons.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // NORMAL STATE
+  // ─────────────────────────────────────────────────────────────────────────
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -382,6 +456,59 @@ const styles = StyleSheet.create({
   },
   emptyHint: {
     fontSize: 13,
+  },
+  
+  // Policy Blocked State
+  blockedContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    gap: 16,
+  },
+  blockedIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  blockedTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  blockedMessage: {
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  policyInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  policyInfoText: {
+    gap: 2,
+  },
+  policyInfoLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  policyInfoHint: {
+    fontSize: 12,
+  },
+  blockedHint: {
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginTop: 16,
   },
 });
 

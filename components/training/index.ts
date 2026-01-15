@@ -6,6 +6,7 @@ export { ParticipantInsights } from './ParticipantInsights';
 export { SessionCard } from './SessionCard';
 export { SessionsSection } from './SessionsSection';
 export { TrainingActions } from './TrainingActions';
+export { TrainingBlockedView, type BlockReason, type TrainingBlockedViewProps } from './TrainingBlockedView';
 export { TrainingHeader } from './TrainingHeader';
 export { TrainingStartModal } from './TrainingStartModal';
 export { TrainingSummary } from './TrainingSummary';

@@ -70,6 +70,7 @@ export interface TeamWeapon {
   // Joined
   base_weapon?: GlobalWeapon;
   assigned_user?: { id: string; full_name: string; avatar_url: string | null };
+  team?: { id: string; name: string };
 }
 
 // Cleaning interval types
@@ -410,7 +411,10 @@ export async function getUserWeapons(): Promise<UserWeapon[]> {
     .select(`
       *,
       base_weapon:weapons(*),
-      team_weapon:team_weapons!user_weapons_team_weapon_id_fkey(*)
+      team_weapon:team_weapons!user_weapons_team_weapon_id_fkey(
+        *,
+        team:teams!team_weapons_team_id_fkey(id, name)
+      )
     `)
     .eq('user_id', user.id) // Explicit filter to ensure we get current user's weapons
     .order('is_favorite', { ascending: false })
@@ -550,6 +554,70 @@ export async function getDefaultWeapon(): Promise<UserWeapon | null> {
     .single();
 
   return first || null;
+}
+
+// ============================================================================
+// TEAM DEFAULT WEAPON (FOR CATALOG POLICY)
+// ============================================================================
+
+/**
+ * Get the team default weapon key for AsyncStorage
+ */
+function getTeamDefaultKey(teamId: string): string {
+  return `@reticle:team_default_weapon:${teamId}`;
+}
+
+/**
+ * Get the stored default weapon ID for a specific team
+ * Used when Catalog policy is active - member can set a preferred weapon
+ */
+export async function getTeamDefaultWeaponId(teamId: string): Promise<string | null> {
+  try {
+    const id = await AsyncStorage.getItem(getTeamDefaultKey(teamId));
+    return id;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Set the default weapon ID for a specific team
+ * Used when Catalog policy is active - member sets preferred weapon
+ */
+export async function setTeamDefaultWeaponId(teamId: string, weaponId: string | null): Promise<void> {
+  try {
+    const key = getTeamDefaultKey(teamId);
+    if (weaponId) {
+      await AsyncStorage.setItem(key, weaponId);
+    } else {
+      await AsyncStorage.removeItem(key);
+    }
+  } catch (error) {
+    console.error('[weaponService] Failed to save team default weapon:', error);
+  }
+}
+
+/**
+ * Get the user's default weapon for a team (Catalog policy)
+ * Returns the team weapon if it exists and is still in the catalog
+ */
+export async function getTeamDefaultWeapon(teamId: string): Promise<TeamWeapon | null> {
+  const storedId = await getTeamDefaultWeaponId(teamId);
+  if (!storedId) return null;
+
+  // Verify the weapon still exists in team catalog
+  const { data } = await supabase
+    .from('team_weapons')
+    .select('*')
+    .eq('id', storedId)
+    .eq('team_id', teamId)
+    .single();
+
+  if (data) return data;
+
+  // Weapon no longer exists, clear stored default
+  await setTeamDefaultWeaponId(teamId, null);
+  return null;
 }
 
 /**
