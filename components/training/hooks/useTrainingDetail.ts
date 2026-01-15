@@ -1,7 +1,6 @@
 import { getTrainingSessions, SessionWithDetails } from '@/services/sessionService';
 import { DrillProgress, getMyDrillProgress, getTrainingById } from '@/services/trainingService';
 import type { TrainingWithDetails } from '@/types/workspace';
-import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert } from 'react-native';
@@ -113,28 +112,8 @@ export function useTrainingDetail(
     }
   }, [trainingId, fetchTraining, fetchSessions, fetchDrillProgress]);
 
-  useFocusEffect(
-    useCallback(() => {
-      // Skip if already fetching or component unmounted
-      if (!isMountedRef.current || isFetchingRef.current) return;
-
-      if (trainingId) {
-        isFetchingRef.current = true;
-
-        // Batch the fetches
-        Promise.all([
-          fetchTraining(trainingId),
-          fetchSessions(trainingId),
-          fetchDrillProgress(trainingId),
-        ]).finally(() => {
-          // Add small delay before allowing next fetch to prevent rapid refires
-          setTimeout(() => {
-            isFetchingRef.current = false;
-          }, 500);
-        });
-      }
-    }, [trainingId, fetchTraining, fetchSessions, fetchDrillProgress])
-  );
+  // NOTE: Removed useFocusEffect - it was causing rerenders on back navigation
+  // Data is fetched on mount via useEffect above. Use refetch() or pull-to-refresh for updates.
 
   return {
     training,

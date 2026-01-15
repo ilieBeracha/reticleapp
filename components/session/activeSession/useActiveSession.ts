@@ -136,7 +136,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
   // LIVE TIMER
   // ============================================================================
   useEffect(() => {
-    if (session?.started_at) {
+    if (session?.started_at && session?.watch_controlled) {
       const updateElapsed = () => {
         setElapsedTime(calculateElapsedSeconds(session.started_at));
       };
@@ -146,7 +146,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
         if (timerRef.current) clearInterval(timerRef.current);
       };
     }
-  }, [session?.started_at]);
+  }, [session?.started_at, session?.watch_controlled]);
 
   // ============================================================================
   // COMPUTED VALUES
@@ -532,14 +532,15 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
           ? { bullets: String(nextTargetPlan.nextBullets) }
           : {}),
         ...(isGrouping ? { isGrouping: '1' } : {}),
+        showTimeInput: session?.watch_controlled ? '0' : '1',
       },
     });
-  }, [sessionId, defaultDistance, hasDrill, drill, nextTargetPlan, isGrouping, lockedConfig]);
+  }, [sessionId, defaultDistance, hasDrill, drill, nextTargetPlan, isGrouping, lockedConfig, session?.watch_controlled]);
 
   const handleManualRoute = useCallback(() => {
     if (!canAddTarget) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    
+ 
     // For training mode, use locked config values strictly
     const distance = lockedConfig?.distance_m ?? defaultDistance;
     
@@ -553,9 +554,10 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
           ? { bullets: String(nextTargetPlan.nextBullets) }
           : {}),
         ...(isGrouping ? { isGrouping: '1' } : {}),
+        showTimeInput: session?.watch_controlled ? '0' : '1',
       },
     });
-  }, [canAddTarget, sessionId, defaultDistance, hasDrill, nextTargetPlan, isGrouping, lockedConfig]);
+  }, [canAddTarget, sessionId, defaultDistance, hasDrill, nextTargetPlan, isGrouping, lockedConfig, session?.watch_controlled]);
 
   const handleScanRoute = useCallback(() => {
     if (!canAddTarget) return;

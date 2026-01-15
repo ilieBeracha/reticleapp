@@ -466,7 +466,7 @@ export default function ActiveSessionScreen() {
               {session.drill_name || 'Drill'}
             </Text>
           </View>
-          {drill?.time_limit_seconds ? (
+          {drill?.time_limit_seconds && watchState.isWatchControlled ? (
             <View style={styles.timerContainer}>
               <View style={[styles.liveDot, drillProgress?.overTime && { backgroundColor: COLORS.error }]} />
               <Text style={[styles.timerText, { color: drillProgress?.overTime ? COLORS.error : colors.text }]}>
@@ -633,7 +633,7 @@ export default function ActiveSessionScreen() {
           </Text>
         </View>
 
-        {drill?.time_limit_seconds ? (
+        {drill?.time_limit_seconds && watchState.isWatchControlled ? (
           <View style={styles.timerContainer}>
             <View style={[styles.liveDot, drillProgress?.overTime && { backgroundColor: COLORS.error }]} />
             <Text style={[styles.timerText, { color: drillProgress?.overTime ? COLORS.error : colors.text }]}>

@@ -310,6 +310,7 @@ interface TacticalTargetFlowProps {
   lockBullets?: boolean;
   /** When true, shows group size (cm) input instead of hits counter */
   isGrouping?: boolean;
+  showTimeInput?: boolean;
   onComplete?: () => void;
   onCancel?: () => void;
 }
@@ -321,6 +322,7 @@ export function TacticalTargetFlow({
   lockDistance = false,
   lockBullets = false,
   isGrouping = false,
+  showTimeInput = true,
   onComplete,
   onCancel,
 }: TacticalTargetFlowProps) {
@@ -624,7 +626,7 @@ export function TacticalTargetFlow({
       )}
 
       {/* Time Input - only for engagement */}
-      {!isGrouping && (
+      {!isGrouping && showTimeInput && (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.cardIconBox}>
@@ -632,12 +634,55 @@ export function TacticalTargetFlow({
             </View>
             <View style={styles.cardHeaderText}>
               <Text style={styles.cardTitle}>Engagement Time</Text>
-              <Text style={styles.cardHint}>Optional - how fast?</Text>
+              <Text style={styles.cardHint}>
+                {time ? `${time}s` : 'Optional - how fast?'}
+              </Text>
             </View>
           </View>
-          <View style={styles.timeInputContainer}>
+          
+          {/* Time chips */}
+          <View style={styles.timeChipsContainer}>
+            <TouchableOpacity
+              style={[
+                styles.timeChip,
+                !time && styles.timeChipSelected,
+              ]}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setTime("");
+              }}
+            >
+              <Text style={[styles.timeChipText, !time && styles.timeChipTextSelected]}>
+                Skip
+              </Text>
+            </TouchableOpacity>
+            {[3, 5, 10, 15, 20, 30].map((seconds) => {
+              const isSelected = time === String(seconds);
+              return (
+                <TouchableOpacity
+                  key={seconds}
+                  style={[
+                    styles.timeChip,
+                    isSelected && styles.timeChipSelected,
+                  ]}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setTime(String(seconds));
+                  }}
+                >
+                  <Text style={[styles.timeChipText, isSelected && styles.timeChipTextSelected]}>
+                    {seconds}s
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          
+          {/* Custom input */}
+          <View style={styles.timeCustomRow}>
+            <Text style={styles.timeCustomLabel}>Custom:</Text>
             <TextInput
-              style={styles.timeInput}
+              style={styles.timeCustomInput}
               value={time}
               onChangeText={setTime}
               placeholder="0.0"
@@ -645,7 +690,7 @@ export function TacticalTargetFlow({
               keyboardType="decimal-pad"
               returnKeyType="done"
             />
-            <Text style={styles.timeUnit}>seconds</Text>
+            <Text style={styles.timeCustomUnit}>sec</Text>
           </View>
         </View>
       )}
@@ -853,23 +898,55 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 15, fontWeight: "600", color: COLORS.white },
   cardHint: { fontSize: 12, color: COLORS.textDim, marginTop: 1 },
 
-  // Time Input
-  timeInputContainer: {
+  // Time Input with Chips
+  timeChipsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  timeChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: COLORS.cardHover,
+  },
+  timeChipSelected: {
+    backgroundColor: `${COLORS.primary}25`,
+  },
+  timeChipText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.textMuted,
+  },
+  timeChipTextSelected: {
+    color: COLORS.primary,
+  },
+  timeCustomRow: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: COLORS.cardHover,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    height: 52,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    height: 44,
   },
-  timeInput: {
+  timeCustomLabel: {
+    fontSize: 13,
+    color: COLORS.textDim,
+    marginRight: 8,
+  },
+  timeCustomInput: {
     flex: 1,
-    fontSize: 24,
+    fontSize: 16,
     fontWeight: "600",
     color: COLORS.white,
     fontVariant: ["tabular-nums"],
   },
-  timeUnit: { fontSize: 14, color: COLORS.textMuted, marginLeft: 8 },
+  timeCustomUnit: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    marginLeft: 4,
+  },
 
   // Toggle
   toggleCard: {

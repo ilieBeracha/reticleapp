@@ -4,8 +4,19 @@
  * Design: Clean, monochrome, Apple-inspired
  * - Typography-first, minimal decoration
  * - Category indicated subtly, not with loud colors
+ * 
+ * Supports weapon policy enforcement:
+ * - personal: Show all weapons (default)
+ * - catalog: Only team catalog weapons
+ * - assigned: Only weapons assigned to current user
  */
 
+import { 
+  isAssignedPolicy, 
+  isCatalogPolicy, 
+  isPersonalPolicy,
+  type WeaponPolicy 
+} from '@/constants/weaponPolicy';
 import { useColors } from '@/hooks/ui/useColors';
 import type { WeaponCategory } from '@/services/weaponService';
 import {
@@ -18,17 +29,19 @@ import {
 } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
 import {
+  AlertCircle,
   Check,
   ChevronRight,
   Clock,
   Crosshair,
+  Lock,
   Plus,
   Search,
   Star,
   Users,
   X,
 } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   SectionList,
@@ -60,6 +73,8 @@ interface WeaponPickerProps {
   onClose: () => void;
   teamId?: string;
   weaponCategory?: WeaponCategory | 'any' | null;
+  /** Team's weapon policy - controls which weapons are available */
+  weaponPolicy?: WeaponPolicy | null;
   /** Hide the "Add New Weapon" option - for contexts where weapon creation isn't allowed */
   hideAddNew?: boolean;
 }
@@ -76,6 +91,7 @@ export function WeaponPicker({
   onClose,
   teamId,
   weaponCategory,
+  weaponPolicy,
   hideAddNew = false,
 }: WeaponPickerProps) {
   const colors = useColors();
@@ -86,15 +102,26 @@ export function WeaponPicker({
   const [error, setError] = useState<string | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
 
+  // Derived: Should we hide the add new button based on policy?
+  // - catalog: Users can only select from team catalog, no personal weapons
+  // - assigned: Users can only use assigned weapons, no adding
+  const shouldHideAddNew = useMemo(() => {
+    return hideAddNew || isCatalogPolicy(weaponPolicy) || isAssignedPolicy(weaponPolicy);
+  }, [hideAddNew, weaponPolicy]);
+
   useEffect(() => {
     loadWeapons();
-  }, [teamId, weaponCategory]);
+  }, [teamId, weaponCategory, weaponPolicy]);
 
   const loadWeapons = async () => {
     try {
       setLoading(true);
       setError(null);
-      const weaponData = await getWeaponPickerData({ teamId, weaponCategory });
+      const weaponData = await getWeaponPickerData({ 
+        teamId, 
+        weaponCategory,
+        weaponPolicy: weaponPolicy ?? undefined,
+      });
       setData(weaponData);
     } catch (err: any) {
       console.error('Failed to load weapons:', err);
@@ -195,7 +222,7 @@ export function WeaponPicker({
       // Catalog weapons need to be created as user weapons first
       if (onSelectCatalog) {
         onSelectCatalog(weapon as GlobalWeapon);
-      } else if (onAddNew && !hideAddNew) {
+      } else if (onAddNew && !shouldHideAddNew) {
         // Fallback: trigger add new flow with catalog weapon pre-selected
         onAddNew();
       }
@@ -203,7 +230,7 @@ export function WeaponPicker({
       // Personal, recent, assigned, team - all are user weapons
       onSelect(weapon as UserWeapon);
     }
-  }, [onSelect, onSelectCatalog, onAddNew, hideAddNew]);
+  }, [onSelect, onSelectCatalog, onAddNew, shouldHideAddNew]);
 
   const handleShowCatalog = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -218,11 +245,44 @@ export function WeaponPicker({
   }, []);
 
   const handleCreateCustom = useCallback(() => {
-    if (onAddNew && !hideAddNew) {
+    if (onAddNew && !shouldHideAddNew) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       onAddNew();
     }
-  }, [onAddNew, hideAddNew]);
+  }, [onAddNew, shouldHideAddNew]);
+
+  // Get policy-appropriate empty state content
+  const getEmptyStateContent = useCallback(() => {
+    if (searchQuery) {
+      return {
+        icon: <Crosshair size={28} color={colors.textMuted} />,
+        title: 'No matches',
+        hint: 'Try a different search',
+      };
+    }
+    
+    if (isAssignedPolicy(weaponPolicy)) {
+      return {
+        icon: <Lock size={28} color={colors.textMuted} />,
+        title: 'No weapon assigned',
+        hint: 'Contact your commander to get a weapon assigned',
+      };
+    }
+    
+    if (isCatalogPolicy(weaponPolicy)) {
+      return {
+        icon: <AlertCircle size={28} color={colors.textMuted} />,
+        title: 'No team weapons',
+        hint: 'Your team catalog is empty',
+      };
+    }
+    
+    return {
+      icon: <Crosshair size={28} color={colors.textMuted} />,
+      title: 'No weapons yet',
+      hint: 'Add your first weapon to get started',
+    };
+  }, [searchQuery, weaponPolicy, colors]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -246,8 +306,8 @@ export function WeaponPicker({
         )}
       </View>
 
-      {/* Action buttons based on view - hidden when hideAddNew is true */}
-      {!hideAddNew && (
+      {/* Action buttons based on view - hidden when policy restricts or hideAddNew is true */}
+      {!shouldHideAddNew && (
         showCatalog ? (
           <TouchableOpacity
             style={[styles.addNewBtn, { backgroundColor: colors.card }]}
@@ -312,20 +372,22 @@ export function WeaponPicker({
             />
           )}
           ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
-                <Crosshair size={28} color={colors.textMuted} />
-              </View>
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                {searchQuery ? 'No matches' : 'No weapons yet'}
-              </Text>
-              <Text style={[styles.emptyHint, { color: colors.textMuted }]}>
-                {searchQuery 
-                  ? 'Try a different search'
-                  : 'Add your first weapon to get started'
-                }
-              </Text>
-            </View>
+            (() => {
+              const emptyContent = getEmptyStateContent();
+              return (
+                <View style={styles.emptyState}>
+                  <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
+                    {emptyContent.icon}
+                  </View>
+                  <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                    {emptyContent.title}
+                  </Text>
+                  <Text style={[styles.emptyHint, { color: colors.textMuted }]}>
+                    {emptyContent.hint}
+                  </Text>
+                </View>
+              );
+            })()
           }
           contentContainerStyle={styles.listContent}
           stickySectionHeadersEnabled

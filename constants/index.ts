@@ -57,3 +57,6 @@ export * from './drillLibrary';
 
 // Category drills
 export * from './categoryDrills';
+
+// Weapon policy
+export * from './weaponPolicy';

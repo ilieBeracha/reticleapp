@@ -1,3 +1,4 @@
+import { DEFAULT_WEAPON_POLICY, type WeaponPolicy } from '@/constants/weaponPolicy';
 import { SQUAD_TEMPLATES } from '@/helpers/team/squads';
 import {
   addSquad,
@@ -14,8 +15,12 @@ import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Keyboard } from 'react-native';
 
-type Step = 'form' | 'success';
+/** Form step: basics, squads, policy, success */
+type FormStep = 'basics' | 'squads' | 'policy' | 'success';
 type CreatedTeamSummary = { id: string; name: string };
+
+/** Total number of form steps (excluding success) */
+const TOTAL_STEPS = 3;
 
 export function useCreateTeamForm() {
   const { createTeam, setActiveTeam } = useTeamStore();
@@ -25,19 +30,60 @@ export function useCreateTeamForm() {
   const [squads, setSquads] = useState<string[]>([]);
   const [newSquadName, setNewSquadName] = useState('');
   const [showSquadSection, setShowSquadSection] = useState(false);
-  const [step, setStep] = useState<Step>('form');
+  const [weaponPolicy, setWeaponPolicy] = useState<WeaponPolicy>(DEFAULT_WEAPON_POLICY);
+  const [formStep, setFormStep] = useState<FormStep>('basics');
   const [createdTeam, setCreatedTeam] = useState<CreatedTeamSummary | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const trimmedTeamName = useMemo(() => normalizeTeamName(teamName), [teamName]);
+  
+  /** Can proceed from step 1 (basics) to step 2 (squads) */
+  const canProceedToSquads = useMemo(
+    () => isTeamNamePresent(trimmedTeamName),
+    [trimmedTeamName]
+  );
+  
+  /** Can submit form (on step 3) */
   const canSubmit = useMemo(
     () => isTeamNamePresent(trimmedTeamName) && !submitting,
     [trimmedTeamName, submitting]
   );
+  
+  /** Current step number (1-indexed for display) */
+  const currentStepNumber = formStep === 'basics' ? 1 : formStep === 'squads' ? 2 : formStep === 'policy' ? 3 : 3;
 
   const toggleSquadSection = useCallback(() => {
     setShowSquadSection((v) => !v);
   }, []);
+
+  /** Go to next step */
+  const goToNextStep = useCallback(() => {
+    Keyboard.dismiss();
+    
+    if (formStep === 'basics') {
+      if (!canProceedToSquads) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        Alert.alert('Team Name Required', 'Please enter a name for your team.');
+        return;
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setFormStep('squads');
+    } else if (formStep === 'squads') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setFormStep('policy');
+    }
+  }, [formStep, canProceedToSquads]);
+
+  /** Go to previous step */
+  const goToPreviousStep = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    if (formStep === 'squads') {
+      setFormStep('basics');
+    } else if (formStep === 'policy') {
+      setFormStep('squads');
+    }
+  }, [formStep]);
 
   const handleCreate = useCallback(async () => {
     if (!isTeamNamePresent(trimmedTeamName)) {
@@ -55,18 +101,19 @@ export function useCreateTeamForm() {
         name: trimmedTeamName,
         description: normalizeTeamDescription(teamDescription) || undefined,
         squads: squads.length > 0 ? squads : undefined,
+        weapon_policy: weaponPolicy,
       });
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setCreatedTeam({ id: team.id, name: team.name });
-      setStep('success');
+      setFormStep('success');
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Error', error.message || 'Failed to create team');
     } finally {
       setSubmitting(false);
     }
-  }, [trimmedTeamName, teamDescription, squads, createTeam]);
+  }, [trimmedTeamName, teamDescription, squads, weaponPolicy, createTeam]);
 
   const handleOpenTeam = useCallback(() => {
     if (!createdTeam) return;
@@ -116,13 +163,17 @@ export function useCreateTeamForm() {
     squads,
     newSquadName,
     showSquadSection,
-    step,
+    weaponPolicy,
+    formStep,
     createdTeam,
     submitting,
 
     // Derived
     canSubmit,
+    canProceedToSquads,
     trimmedTeamName,
+    currentStepNumber,
+    totalSteps: TOTAL_STEPS,
     squadTemplates: SQUAD_TEMPLATES,
 
     // Setters
@@ -130,9 +181,12 @@ export function useCreateTeamForm() {
     setTeamDescription,
     setNewSquadName,
     setShowSquadSection,
+    setWeaponPolicy,
 
     // Actions
     toggleSquadSection,
+    goToNextStep,
+    goToPreviousStep,
     handleCreate,
     handleOpenTeam,
     handleAddSquad,

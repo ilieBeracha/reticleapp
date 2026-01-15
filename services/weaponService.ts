@@ -7,6 +7,12 @@
  * - Layer 3: Personal weapons (user-managed)
  */
 
+import { 
+  isAssignedPolicy, 
+  isCatalogPolicy, 
+  isPersonalPolicy, 
+  type WeaponPolicy 
+} from '@/constants/weaponPolicy';
 import { supabase } from '@/lib/supabase';
 import type { WeaponCategory } from '@/types/workspace';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -683,21 +689,68 @@ export interface WeaponPickerOptions {
   teamId?: string;
   /** Filter weapons by category (from drill's weapon_category) */
   weaponCategory?: WeaponCategory | 'any' | null;
+  /** Team's weapon policy - controls which weapons are available */
+  weaponPolicy?: WeaponPolicy | null;
 }
 
 /**
  * Get all weapons for the weapon picker UI
- * Returns data organized by section
+ * Returns data organized by section, filtered by team's weapon policy
  * 
  * @param options.teamId - Team context for team weapons
  * @param options.weaponCategory - Filter by category (null or 'any' = show all)
+ * @param options.weaponPolicy - Team weapon policy:
+ *   - 'personal': Show all weapons (default behavior)
+ *   - 'catalog': Only show team catalog weapons
+ *   - 'assigned': Only show weapons assigned to current user
  */
 export async function getWeaponPickerData(options: WeaponPickerOptions = {}): Promise<WeaponPickerData> {
-  const { teamId, weaponCategory } = options;
+  const { teamId, weaponCategory, weaponPolicy } = options;
   
   // Get current user for assigned weapons
   const { data: { user } } = await supabase.auth.getUser();
   
+  // Filter helper for category
+  const filterByCategory = <T extends { category?: WeaponCategory | null }>(items: T[]): T[] => {
+    if (!weaponCategory || weaponCategory === 'any') return items;
+    return items.filter(item => item.category === weaponCategory);
+  };
+  
+  // ─────────────────────────────────────────────────────────────────────────
+  // POLICY: ASSIGNED - Only show weapons assigned to current user
+  // ─────────────────────────────────────────────────────────────────────────
+  if (isAssignedPolicy(weaponPolicy)) {
+    const assignedToMe = teamId && user 
+      ? await getAssignedWeapons(teamId, user.id) 
+      : [];
+    
+    return {
+      recentlyUsed: [],
+      assignedToMe: filterByCategory(assignedToMe),
+      myWeapons: [],
+      teamWeapons: [],
+      globalWeapons: [],
+    };
+  }
+  
+  // ─────────────────────────────────────────────────────────────────────────
+  // POLICY: CATALOG - Only show team catalog weapons
+  // ─────────────────────────────────────────────────────────────────────────
+  if (isCatalogPolicy(weaponPolicy)) {
+    const teamWeapons = teamId ? await getTeamWeapons(teamId) : [];
+    
+    return {
+      recentlyUsed: [],
+      assignedToMe: [],
+      myWeapons: [],
+      teamWeapons: filterByCategory(teamWeapons),
+      globalWeapons: [],
+    };
+  }
+  
+  // ─────────────────────────────────────────────────────────────────────────
+  // POLICY: PERSONAL (default) - Show all weapons
+  // ─────────────────────────────────────────────────────────────────────────
   const [recentlyUsed, myWeapons, teamWeapons, globalWeapons, assignedToMe] = await Promise.all([
     getRecentlyUsedWeapons(3),
     getUserWeapons(),
@@ -706,22 +759,6 @@ export async function getWeaponPickerData(options: WeaponPickerOptions = {}): Pr
     // Get team weapons assigned to current user
     teamId && user ? getAssignedWeapons(teamId, user.id) : Promise.resolve([]),
   ]);
-
-  // If no category filter or 'any', return all
-  if (!weaponCategory || weaponCategory === 'any') {
-    return {
-      recentlyUsed,
-      assignedToMe,
-      myWeapons,
-      teamWeapons,
-      globalWeapons,
-    };
-  }
-
-  // Filter by category
-  const filterByCategory = <T extends { category?: WeaponCategory | null }>(items: T[]): T[] => {
-    return items.filter(item => item.category === weaponCategory);
-  };
 
   return {
     recentlyUsed: filterByCategory(recentlyUsed),

@@ -1,10 +1,12 @@
 import { WeaponPicker, CreateWeaponFlow } from '@/components/weapons';
 import { getCategoryConfig } from '@/constants/weaponCategories';
+import type { WeaponPolicy } from '@/constants/weaponPolicy';
 import { useColors } from '@/hooks/ui/useColors';
 import { useOpenWeather } from '@/hooks/useOpenWeather';
 import { supabase } from '@/lib/supabase';
 import type { BaseSessionConfig } from '@/services/session/types';
 import { createSession } from '@/services/sessionService';
+import { getTeamWeaponPolicy } from '@/services/teamService';
 import { getAssignedWeapons, getOrCreatePersonalProfile, getUserWeapon, type UserWeapon } from '@/services/weaponService';
 import { toSessionWeatherData } from '@/services/weather';
 import { useSessionStore } from '@/store/sessionStore';
@@ -50,11 +52,12 @@ export function StartDrillSheet({
   const [selectedWeapon, setSelectedWeapon] = useState<UserWeapon | null>(null);
   const [loadingWeapon, setLoadingWeapon] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [weaponPolicy, setWeaponPolicy] = useState<WeaponPolicy | null>(null);
   
   const [showWeaponPicker, setShowWeaponPicker] = useState(false);
   const [showCreateWeapon, setShowCreateWeapon] = useState(false);
 
-  // Auto-load assigned weapon
+  // Auto-load assigned weapon and team weapon policy
   useEffect(() => {
     if (!visible) return;
     
@@ -71,10 +74,20 @@ export function StartDrillSheet({
 
     let cancelled = false;
 
-    async function loadTeamWeapon() {
+    async function loadTeamData() {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user || cancelled) {
+        // Fetch weapon policy and assigned weapon in parallel
+        const [policy, authResult] = await Promise.all([
+          getTeamWeaponPolicy(teamId!),
+          supabase.auth.getUser(),
+        ]);
+        
+        if (cancelled) return;
+        
+        setWeaponPolicy(policy);
+        
+        const user = authResult.data?.user;
+        if (!user) {
           setLoadingWeapon(false);
           return;
         }
@@ -88,13 +101,13 @@ export function StartDrillSheet({
           setSelectedWeapon(personalProfile);
         }
       } catch (error) {
-        console.error('[StartDrillSheet] Failed to load team weapon:', error);
+        console.error('[StartDrillSheet] Failed to load team data:', error);
       } finally {
         if (!cancelled) setLoadingWeapon(false);
       }
     }
 
-    loadTeamWeapon();
+    loadTeamData();
 
     return () => {
       cancelled = true;
@@ -286,6 +299,8 @@ export function StartDrillSheet({
               setShowWeaponPicker(false);
               setShowCreateWeapon(true);
             }}
+            teamId={teamId}
+            weaponPolicy={weaponPolicy}
           />
         </Modal>
         

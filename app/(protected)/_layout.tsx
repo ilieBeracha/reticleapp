@@ -4,9 +4,11 @@ import { useOrphanedSessionCheck } from '@/hooks/useOrphanedSessionCheck';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useGarminInitialize } from '@/store/garminStore';
 import { router, Stack } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ProtectedLayout() {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   useGarminInitialize();
   usePushNotifications();
   useOrphanedSessionCheck();
@@ -86,10 +88,10 @@ export default function ProtectedLayout() {
           name="createTeam"
           options={{
             headerShown: false,
-            presentation: "formSheet",
+            presentation: "containedModal",
             gestureEnabled: true,
             sheetGrabberVisible: true,
-            contentStyle: { backgroundColor: colors.card },
+            contentStyle: { backgroundColor: colors.card , paddingTop: insets.top},
             sheetAllowedDetents: [0.8, 0.95],
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,

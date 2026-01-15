@@ -441,6 +441,16 @@ export default function TrainingDetailScreen() {
 
   const handledAutoStartRef = useRef<string | null>(null);
   const autoFinishTriggeredRef = useRef(false);
+  const isMountedRef = useRef(true);
+  const isLoadingTeamRef = useRef(false);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // TRAINING DATA
@@ -558,14 +568,15 @@ export default function TrainingDetailScreen() {
   // Load user's assigned weapon for this training's team
   useEffect(() => {
     if (!training?.team_id || !session?.user?.id) return;
+    if (!isMountedRef.current) return;
 
     let cancelled = false;
     async function loadWeapon() {
       try {
         const assigned = await getAssignedWeapons(training!.team_id!, session!.user!.id);
-        if (!cancelled && assigned.length > 0) {
+        if (!cancelled && isMountedRef.current && assigned.length > 0) {
           const profile = await getOrCreatePersonalProfile(assigned[0].id);
-          if (!cancelled) setUserWeapon(profile);
+          if (!cancelled && isMountedRef.current) setUserWeapon(profile);
         }
       } catch (e) {
         console.error('Failed to load assigned weapon', e);
@@ -585,19 +596,27 @@ export default function TrainingDetailScreen() {
 
   const loadTeamProgress = useCallback(async () => {
     if (!training?.id || !canManageTraining) return;
+    // Prevent duplicate loads
+    if (isLoadingTeamRef.current || !isMountedRef.current) return;
+
+    isLoadingTeamRef.current = true;
     setLoadingTeamProgress(true);
     try {
       const sessions = await getTrainingSessionsWithStats(training.id);
-      setTeamSessions(sessions);
+      if (isMountedRef.current) setTeamSessions(sessions);
     } catch (error) {
       console.error('[TrainingDetail] Failed to load team progress:', error);
     } finally {
-      setLoadingTeamProgress(false);
+      if (isMountedRef.current) setLoadingTeamProgress(false);
+      // Debounce before allowing next load
+      setTimeout(() => {
+        isLoadingTeamRef.current = false;
+      }, 500);
     }
   }, [training?.id, canManageTraining]);
 
   useEffect(() => {
-    if (shouldLoadTeamData) loadTeamProgress();
+    if (shouldLoadTeamData && !isLoadingTeamRef.current) loadTeamProgress();
   }, [shouldLoadTeamData, loadTeamProgress]);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -875,7 +894,15 @@ export default function TrainingDetailScreen() {
         startingDrillId={startingDrillId}
         onStartDrill={handleStartDrill}
         onAddDrill={handleOpenAddDrill}
-        onBack={() => router.back()}
+        onBack={() => {
+          // If we can go back normally, do so
+          // Otherwise navigate to home to break any potential loops
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace('/(protected)/(tabs)');
+          }
+        }}
         onShowCommanderActions={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           setShowCommanderActions(true);

@@ -10,12 +10,13 @@ import { useLocalSearchParams } from "expo-router";
  * For grouping: Shows group size (cm) input
  */
 export default function TacticalTargetSheet() {
-  const { sessionId, distance, bullets, locked, isGrouping } = useLocalSearchParams<{
+  const { sessionId, distance, bullets, locked, isGrouping, showTimeInput } = useLocalSearchParams<{
     sessionId: string;
     distance?: string;
     bullets?: string;
     locked?: string;
     isGrouping?: string;
+    showTimeInput?: string;
   }>();
 
   if (!sessionId) {
@@ -30,6 +31,7 @@ export default function TacticalTargetSheet() {
       lockDistance={locked === '1'}
       lockBullets={locked === '1'}
       isGrouping={isGrouping === '1'}
+      showTimeInput={showTimeInput !== '0'}
     />
   );
 }

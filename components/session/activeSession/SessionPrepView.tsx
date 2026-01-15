@@ -102,11 +102,19 @@ export function SessionPrepView({
   const [weapon, setWeapon] = useState<UserWeapon | null>(null);
   const [showSensitivity, setShowSensitivity] = useState(false);
   const [customSensitivity, setCustomSensitivity] = useState<number | null>(null);
+  const [timeLimit, setTimeLimit] = useState<number | null>(null);
   
   const drill = session.drill_config;
   const drillName = session.drill_name || drill?.name || 'Practice Session';
   const isGrouping = isGroupingGoal(drill?.drill_goal);
   const isTeamSession = !!session.team_id;
+  const timeLimitOptions = [30, 60, 90, 120, 180];
+
+  useEffect(() => {
+    if (typeof drill?.time_limit_seconds === 'number') {
+      setTimeLimit(drill.time_limit_seconds);
+    }
+  }, [drill?.time_limit_seconds]);
 
   // Load full weapon info (for caliber, etc)
   useEffect(() => {
@@ -157,16 +165,20 @@ export function SessionPrepView({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
     try {
-      // Store the sensitivity preference in session metadata
-      // This will be used by useActiveSession when building watch payload
+      // Store watch preferences in session metadata
+      // These will be used by useActiveSession when building watch payload
+      const customDrillConfig: Record<string, any> = {
+        ...(session.drill_config || {}),
+      };
       if (customSensitivity !== null) {
-        await updateSession(session.id, {
-          custom_drill_config: {
-            ...(session.drill_config || {}),
-            detection_sensitivity: customSensitivity,
-          },
-        });
+        customDrillConfig.detection_sensitivity = customSensitivity;
         console.log(`[SessionPrep] Saved custom sensitivity: ${customSensitivity}G`);
+      }
+      if (isWatchConnected) {
+        customDrillConfig.time_limit_seconds = timeLimit ?? null;
+      }
+      if (customSensitivity !== null || isWatchConnected) {
+        await updateSession(session.id, { custom_drill_config: customDrillConfig });
       }
       
       const activated = await activateSession(session.id, true);
@@ -264,13 +276,13 @@ export function SessionPrepView({
                 </View>
               </>
             )}
-            {drill?.time_limit_seconds && (
+            {timeLimit != null && (
               <>
                 <View style={[styles.drillMetaDot, { backgroundColor: colors.border }]} />
                 <View style={styles.drillMetaItem}>
                   <Clock size={14} color={colors.textMuted} />
                   <Text style={[styles.drillMetaText, { color: colors.text }]}>
-                    {Math.floor(drill.time_limit_seconds / 60)}:{String(drill.time_limit_seconds % 60).padStart(2, '0')}
+                    {Math.floor(timeLimit / 60)}:{String(timeLimit % 60).padStart(2, '0')}
                   </Text>
                 </View>
               </>
@@ -457,6 +469,69 @@ export function SessionPrepView({
                 </Text>
               </Animated.View>
             )}
+          </Animated.View>
+        )}
+
+        {/* Time Limit (watch only) */}
+        {isWatchConnected && (
+          <Animated.View
+            entering={FadeInDown.delay(300).duration(400)}
+            style={[styles.timeLimitCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+          >
+            <View style={styles.timeLimitHeader}>
+              <View style={[styles.timeLimitIcon, { backgroundColor: `${colors.primary}15` }]}>
+                <Clock size={18} color={colors.primary} />
+              </View>
+              <View style={styles.timeLimitHeaderText}>
+                <Text style={[styles.timeLimitLabel, { color: colors.textMuted }]}>Time Limit</Text>
+                <Text style={[styles.timeLimitValue, { color: colors.text }]}>
+                  {timeLimit == null ? 'No limit' : `${timeLimit}s`}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.timeLimitOptions}>
+              <TouchableOpacity
+                style={[
+                  styles.timeLimitOption,
+                  { backgroundColor: timeLimit == null ? `${colors.primary}15` : colors.secondary },
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setTimeLimit(null);
+                }}
+              >
+                <Text style={[
+                  styles.timeLimitOptionText,
+                  { color: timeLimit == null ? colors.primary : colors.text }
+                ]}>
+                  No limit
+                </Text>
+              </TouchableOpacity>
+              {timeLimitOptions.map((value) => {
+                const isSelected = timeLimit === value;
+                return (
+                  <TouchableOpacity
+                    key={value}
+                    style={[
+                      styles.timeLimitOption,
+                      { backgroundColor: isSelected ? `${colors.primary}15` : colors.secondary },
+                    ]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setTimeLimit(value);
+                    }}
+                  >
+                    <Text style={[
+                      styles.timeLimitOptionText,
+                      { color: isSelected ? colors.primary : colors.text }
+                    ]}>
+                      {value}s
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </Animated.View>
         )}
 
@@ -712,6 +787,52 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '500',
+  },
+  timeLimitCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    gap: 12,
+  },
+  timeLimitHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  timeLimitIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timeLimitHeaderText: {
+    flex: 1,
+  },
+  timeLimitLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    textTransform: 'uppercase',
+  },
+  timeLimitValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  timeLimitOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  timeLimitOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  timeLimitOptionText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   
   // Actions

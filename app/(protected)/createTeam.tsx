@@ -1,37 +1,47 @@
-import { useCreateTeamForm } from "@/hooks/team/useCreateTeamForm";
-import { useColors } from "@/hooks/ui/useColors";
-import { Ionicons } from "@expo/vector-icons";
+import { WeaponPolicyStep } from '@/components/team/creation';
+import { useCreateTeamForm } from '@/hooks/team/useCreateTeamForm';
+import { useColors } from '@/hooks/ui/useColors';
+import { Ionicons } from '@expo/vector-icons';
 import {
-    ActivityIndicator,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-} from "react-native";
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import Animated, { FadeInRight, FadeOutLeft } from 'react-native-reanimated';
 
 /**
- * CREATE TEAM - Native Form Sheet
- * Team-First Architecture: Teams are the primary entity
+ * CREATE TEAM - Stepper Form Sheet
+ * Step 1: Name and description
+ * Step 2: Squads
+ * Step 3: Weapon policy
  */
 export default function CreateTeamSheet() {
   const colors = useColors();
+
   const {
     teamName,
     teamDescription,
     squads,
     newSquadName,
-    showSquadSection,
-    step,
+    weaponPolicy,
+    formStep,
     createdTeam,
     submitting,
     canSubmit,
+    canProceedToSquads,
+    currentStepNumber,
+    totalSteps,
     squadTemplates,
     setTeamName,
     setTeamDescription,
     setNewSquadName,
-    toggleSquadSection,
+    setWeaponPolicy,
+    goToNextStep,
+    goToPreviousStep,
     handleCreate,
     handleOpenTeam,
     handleAddSquad,
@@ -41,22 +51,20 @@ export default function CreateTeamSheet() {
   } = useCreateTeamForm();
 
   // Success state
-  if (step === 'success' && createdTeam) {
+  if (formStep === 'success' && createdTeam) {
     return (
       <View style={[styles.successContainer, { backgroundColor: colors.card }]}>
         <View style={[styles.successIcon, { backgroundColor: colors.primary + '15' }]}>
           <Ionicons name="checkmark-circle" size={48} color={colors.primary} />
         </View>
-        
-        <Text style={[styles.successTitle, { color: colors.text }]}>
-          Team Created!
-        </Text>
-        
+
+        <Text style={[styles.successTitle, { color: colors.text }]}>Team Created!</Text>
+
         <Text style={[styles.successSubtitle, { color: colors.textMuted }]}>
-          <Text style={{ fontWeight: '600', color: colors.text }}>{createdTeam.name}</Text>
-          {' '}is ready. You can invite team members anytime.
+          <Text style={{ fontWeight: '600', color: colors.text }}>{createdTeam.name}</Text> is ready. You can invite
+          team members anytime.
         </Text>
-        
+
         <View style={styles.successActions}>
           <TouchableOpacity
             style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
@@ -72,88 +80,112 @@ export default function CreateTeamSheet() {
   }
 
   return (
-    <ScrollView
-      style={[styles.scrollView, { backgroundColor: colors.card }]}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-    >
-        {/* Header */}
-        <View style={styles.header}>
+    <View style={[styles.container, { backgroundColor: colors.card }]}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets
+      >
+          {/* Header with Step Indicator */}
+          <View style={styles.header}>
           <View style={[styles.headerIcon, { backgroundColor: colors.primary + '15' }]}>
             <Ionicons name="people" size={28} color={colors.primary} />
           </View>
           <Text style={[styles.title, { color: colors.text }]}>Create Team</Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            Start training together with your team
-          </Text>
-        </View>
 
-        {/* Team Name */}
-        <View style={styles.inputSection}>
-          <View style={styles.labelRow}>
-            <Ionicons name="flag" size={16} color={colors.primary} />
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Team Name</Text>
-            <Text style={[styles.required, { color: colors.destructive }]}>*</Text>
-          </View>
-          <View style={[styles.inputWrapper, { backgroundColor: colors.background, borderColor: teamName ? colors.primary : colors.border }]}>
-            <TextInput
-              style={[styles.input, { color: colors.text }]}
-              placeholder="e.g. Alpha Team, First Platoon..."
-              placeholderTextColor={colors.textMuted}
-              value={teamName}
-              onChangeText={setTeamName}
-              returnKeyType="next"
-              autoCapitalize="words"
-              autoFocus
-            />
-          </View>
-        </View>
-
-        {/* Description */}
-        <View style={styles.inputSection}>
-          <View style={styles.labelRow}>
-            <Ionicons name="document-text-outline" size={16} color={colors.textMuted} />
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Description</Text>
-            <Text style={[styles.optional, { color: colors.textMuted }]}>optional</Text>
-          </View>
-          <View style={[styles.inputWrapper, styles.textAreaWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
-            <TextInput
-              style={[styles.textArea, { color: colors.text }]}
-              placeholder="What's this team's purpose?"
-              placeholderTextColor={colors.textMuted}
-              value={teamDescription}
-              onChangeText={setTeamDescription}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-            />
-          </View>
-        </View>
-
-        {/* Squads Toggle */}
-        <TouchableOpacity
-          style={[styles.squadToggle, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={toggleSquadSection}
-          activeOpacity={0.7}
-        >
-          <View style={styles.squadToggleLeft}>
-            <View style={[styles.squadToggleIcon, { backgroundColor: colors.secondary }]}>
-              <Ionicons name="shield-outline" size={18} color={colors.text} />
+          {/* Step indicator */}
+          <View style={styles.stepIndicator}>
+            <View style={styles.stepDots}>
+              {Array.from({ length: totalSteps }, (_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.stepDot,
+                    {
+                      backgroundColor: i + 1 <= currentStepNumber ? colors.primary : colors.border,
+                    },
+                  ]}
+                />
+              ))}
             </View>
-            <View>
-              <Text style={[styles.squadToggleTitle, { color: colors.text }]}>Add Squads</Text>
-              <Text style={[styles.squadToggleDesc, { color: colors.textMuted }]}>
-                {squads.length > 0 ? `${squads.length} squad${squads.length > 1 ? 's' : ''} added` : 'Organize into sub-units'}
-              </Text>
-            </View>
+            <Text style={[styles.stepText, { color: colors.textMuted }]}>
+              Step {currentStepNumber} of {totalSteps}
+            </Text>
           </View>
-          <Ionicons name={showSquadSection ? 'chevron-up' : 'chevron-down'} size={20} color={colors.textMuted} />
-        </TouchableOpacity>
+        </View>
 
-        {/* Squads Section */}
-        {showSquadSection && (
-          <View style={[styles.squadSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {/* STEP 1: Name & Description */}
+        {formStep === 'basics' && (
+          <Animated.View entering={FadeInRight.duration(200)} exiting={FadeOutLeft.duration(200)}>
+            <Text style={[styles.stepTitle, { color: colors.text }]}>What's your team?</Text>
+            <Text style={[styles.stepSubtitle, { color: colors.textMuted }]}>Basic information about your team</Text>
+
+            {/* Team Name */}
+            <View style={styles.inputSection}>
+              <View style={styles.labelRow}>
+                <Ionicons name="flag" size={16} color={colors.primary} />
+                <Text style={[styles.inputLabel, { color: colors.text }]}>Team Name</Text>
+                <Text style={[styles.required, { color: colors.destructive }]}>*</Text>
+              </View>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  { backgroundColor: colors.background, borderColor: teamName ? colors.primary : colors.border },
+                ]}
+              >
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  placeholder="e.g. Alpha Team, First Platoon..."
+                  placeholderTextColor={colors.textMuted}
+                  value={teamName}
+                  onChangeText={setTeamName}
+                  returnKeyType="next"
+                  autoCapitalize="words"
+                  autoFocus
+                />
+              </View>
+            </View>
+
+            {/* Description */}
+            <View style={styles.inputSection}>
+              <View style={styles.labelRow}>
+                <Ionicons name="document-text-outline" size={16} color={colors.textMuted} />
+                <Text style={[styles.inputLabel, { color: colors.text }]}>Description</Text>
+                <Text style={[styles.optional, { color: colors.textMuted }]}>optional</Text>
+              </View>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  styles.textAreaWrapper,
+                  { backgroundColor: colors.background, borderColor: colors.border },
+                ]}
+              >
+                <TextInput
+                  style={[styles.textArea, { color: colors.text }]}
+                  placeholder="What's this team's purpose?"
+                  placeholderTextColor={colors.textMuted}
+                  value={teamDescription}
+                  onChangeText={setTeamDescription}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                />
+              </View>
+            </View>
+          </Animated.View>
+        )}
+
+        {/* STEP 2: Squads */}
+        {formStep === 'squads' && (
+          <Animated.View entering={FadeInRight.duration(200)} exiting={FadeOutLeft.duration(200)}>
+            <Text style={[styles.stepTitle, { color: colors.text }]}>Organize into squads</Text>
+            <Text style={[styles.stepSubtitle, { color: colors.textMuted }]}>
+              Add sub-units to your team (optional)
+            </Text>
+
             {/* Templates */}
             {squads.length === 0 && (
               <View style={styles.templatesSection}>
@@ -174,7 +206,12 @@ export default function CreateTeamSheet() {
 
             {/* Squad Input */}
             <View style={styles.squadInputRow}>
-              <View style={[styles.squadInputWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <View
+                style={[
+                  styles.squadInputWrapper,
+                  { backgroundColor: colors.background, borderColor: colors.border },
+                ]}
+              >
                 <TextInput
                   style={[styles.squadInput, { color: colors.text }]}
                   placeholder="Enter squad name..."
@@ -183,10 +220,14 @@ export default function CreateTeamSheet() {
                   onChangeText={setNewSquadName}
                   onSubmitEditing={handleAddSquad}
                   returnKeyType="done"
+                  autoFocus
                 />
               </View>
               <TouchableOpacity
-                style={[styles.addSquadBtn, { backgroundColor: newSquadName.trim() ? colors.primary : colors.muted }]}
+                style={[
+                  styles.addSquadBtn,
+                  { backgroundColor: newSquadName.trim() ? colors.primary : colors.muted },
+                ]}
                 onPress={handleAddSquad}
                 disabled={!newSquadName.trim()}
                 activeOpacity={0.7}
@@ -199,10 +240,19 @@ export default function CreateTeamSheet() {
             {squads.length > 0 && (
               <View style={styles.squadChipsContainer}>
                 {squads.map((squad) => (
-                  <View key={squad} style={[styles.squadChip, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }]}>
+                  <View
+                    key={squad}
+                    style={[
+                      styles.squadChip,
+                      { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' },
+                    ]}
+                  >
                     <Ionicons name="shield" size={14} color={colors.primary} />
                     <Text style={[styles.squadChipText, { color: colors.primary }]}>{squad}</Text>
-                    <TouchableOpacity onPress={() => handleRemoveSquad(squad)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <TouchableOpacity
+                      onPress={() => handleRemoveSquad(squad)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
                       <Ionicons name="close-circle" size={16} color={colors.primary} />
                     </TouchableOpacity>
                   </View>
@@ -217,54 +267,144 @@ export default function CreateTeamSheet() {
                 <Text style={[styles.clearAllText, { color: colors.destructive }]}>Clear all</Text>
               </TouchableOpacity>
             )}
-          </View>
+
+            {/* Skip hint */}
+            {squads.length === 0 && (
+              <View style={[styles.infoCard, { backgroundColor: colors.secondary, marginTop: 20 }]}>
+                <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
+                <Text style={[styles.infoText, { color: colors.textMuted }]}>
+                  Squads are optional. You can skip this step and add them later.
+                </Text>
+              </View>
+            )}
+          </Animated.View>
         )}
 
-        {/* Info */}
-        <View style={[styles.infoCard, { backgroundColor: colors.secondary }]}>
-          <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
-          <Text style={[styles.infoText, { color: colors.textMuted }]}>
-            You'll be the team owner. Invite members and assign roles after creating.
-          </Text>
-        </View>
+        {/* STEP 3: Weapon Policy */}
+        {formStep === 'policy' && (
+          <Animated.View entering={FadeInRight.duration(200)} exiting={FadeOutLeft.duration(200)}>
+            <Text style={[styles.stepTitle, { color: colors.text }]}>Weapon Policy</Text>
+            <Text style={[styles.stepSubtitle, { color: colors.textMuted }]}>
+              How will team members access weapons?
+            </Text>
 
-        {/* Create Button */}
-        <TouchableOpacity
-          style={[
-            styles.createButton, 
-            { 
-              backgroundColor: teamName.trim() ? colors.primary : colors.muted,
-              opacity: submitting ? 0.85 : 1,
-            }
-          ]}
-          onPress={handleCreate}
-          disabled={!canSubmit}
-          activeOpacity={0.8}
-        >
-          {submitting ? (
-            <>
-              <ActivityIndicator color="#fff" size="small" />
-              <Text style={styles.createButtonText}>Creating...</Text>
-            </>
-          ) : (
-            <>
-              <Ionicons name="add-circle" size={20} color="#fff" />
-              <Text style={styles.createButtonText}>Create Team</Text>
-            </>
-          )}
-        </TouchableOpacity>
-    </ScrollView>
+            <View style={styles.policySection}>
+              <WeaponPolicyStep value={weaponPolicy} onChange={setWeaponPolicy} disabled={submitting} hideHeader />
+            </View>
+
+            {/* Info */}
+            <View style={[styles.infoCard, { backgroundColor: colors.secondary }]}>
+              <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
+              <Text style={[styles.infoText, { color: colors.textMuted }]}>
+                You'll be the team owner. Invite members and assign roles after creating.
+              </Text>
+            </View>
+          </Animated.View>
+        )}
+      </ScrollView>
+
+      {/* Footer with Navigation - fixed at bottom */}
+      <View style={[styles.footer, { borderTopColor: colors.border }]}>
+        {formStep === 'basics' && (
+          <>
+            <View style={styles.footerSpacer} />
+            <TouchableOpacity
+              style={[styles.nextButton, { backgroundColor: canProceedToSquads ? colors.primary : colors.muted }]}
+              onPress={goToNextStep}
+              disabled={!canProceedToSquads}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.nextButtonText}>Continue</Text>
+              <Ionicons name="arrow-forward" size={18} color="#fff" />
+            </TouchableOpacity>
+          </>
+        )}
+
+        {formStep === 'squads' && (
+          <>
+            <TouchableOpacity
+              style={[styles.backButton, { borderColor: colors.border }]}
+              onPress={goToPreviousStep}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-back" size={18} color={colors.text} />
+              <Text style={[styles.backButtonText, { color: colors.text }]}>Back</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.nextButton, { backgroundColor: colors.primary }]}
+              onPress={goToNextStep}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.nextButtonText}>{squads.length > 0 ? 'Continue' : 'Skip'}</Text>
+              <Ionicons name="arrow-forward" size={18} color="#fff" />
+            </TouchableOpacity>
+          </>
+        )}
+
+        {formStep === 'policy' && (
+          <>
+            <TouchableOpacity
+              style={[styles.backButton, { borderColor: colors.border }]}
+              onPress={goToPreviousStep}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-back" size={18} color={colors.text} />
+              <Text style={[styles.backButtonText, { color: colors.text }]}>Back</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.createButton,
+                {
+                  backgroundColor: colors.primary,
+                  opacity: submitting ? 0.85 : 1,
+                },
+              ]}
+              onPress={handleCreate}
+              disabled={!canSubmit}
+              activeOpacity={0.8}
+            >
+              {submitting ? (
+                <>
+                  <ActivityIndicator color="#fff" size="small" />
+                  <Text style={styles.createButtonText}>Creating...</Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                  <Text style={styles.createButtonText}>Create Team</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: { flex: 1 },
   scrollView: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20 },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 20, gap: 20 },
 
-  header: { alignItems: 'center', paddingVertical: 24 },
-  headerIcon: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  title: { fontSize: 22, fontWeight: '700', letterSpacing: -0.5 },
-  subtitle: { fontSize: 14, marginTop: 4 },
+  header: { alignItems: 'center', paddingTop: 24, paddingBottom: 16, paddingHorizontal: 20 },
+  headerIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  title: { fontSize: 22, fontWeight: '700', letterSpacing: -0.5, marginBottom: 12 },
+
+  stepIndicator: { alignItems: 'center', gap: 8 },
+  stepDots: { flexDirection: 'row', gap: 8 },
+  stepDot: { width: 32, height: 4, borderRadius: 2 },
+  stepText: { fontSize: 13, fontWeight: '500' },
+
+  stepTitle: { fontSize: 18, fontWeight: '600', marginBottom: 4 },
+  stepSubtitle: { fontSize: 14, marginBottom: 20 },
 
   inputSection: { marginBottom: 16 },
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
@@ -276,7 +416,15 @@ const styles = StyleSheet.create({
   input: { height: 48, paddingHorizontal: 14, fontSize: 15 },
   textArea: { minHeight: 80, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 },
 
-  squadToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 12, borderWidth: 1, marginBottom: 12 },
+  squadToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
   squadToggleLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   squadToggleIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   squadToggleTitle: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
@@ -293,23 +441,93 @@ const styles = StyleSheet.create({
   squadInput: { height: 44, paddingHorizontal: 12, fontSize: 14 },
   addSquadBtn: { width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   squadChipsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-  squadChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
+  squadChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
   squadChipText: { fontSize: 13, fontWeight: '600' },
-  clearAllBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 12, paddingVertical: 8 },
+  clearAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: 12,
+    paddingVertical: 8,
+  },
   clearAllText: { fontSize: 13, fontWeight: '500' },
 
-  infoCard: { flexDirection: 'row', alignItems: 'flex-start', padding: 14, borderRadius: 12, gap: 10, marginBottom: 20 },
+  policySection: { marginBottom: 20 },
+  infoCard: { flexDirection: 'row', alignItems: 'flex-start', padding: 14, borderRadius: 12, gap: 10 },
   infoText: { flex: 1, fontSize: 13, lineHeight: 18 },
 
-  createButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 52, borderRadius: 14, gap: 8 },
-  createButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+  footer: { flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 16, gap: 12, borderTopWidth: 1 },
+  footerSpacer: { flex: 1 },
+
+  nextButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 48,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    gap: 8,
+  },
+  nextButtonText: { fontSize: 15, fontWeight: '600', color: '#fff' },
+
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 48,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 6,
+  },
+  backButtonText: { fontSize: 15, fontWeight: '500' },
+
+  createButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 48,
+    borderRadius: 12,
+    gap: 8,
+  },
+  createButtonText: { fontSize: 15, fontWeight: '600', color: '#fff' },
 
   // Success state
-  successContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingVertical: 60 },
-  successIcon: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
+  successContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: 60,
+  },
+  successIcon: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
   successTitle: { fontSize: 26, fontWeight: '700', letterSpacing: -0.4, marginBottom: 10 },
   successSubtitle: { fontSize: 15, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
   successActions: { width: '100%', gap: 12 },
-  primaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 52, borderRadius: 12, gap: 8 },
+  primaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 52,
+    borderRadius: 12,
+    gap: 8,
+  },
   primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });
