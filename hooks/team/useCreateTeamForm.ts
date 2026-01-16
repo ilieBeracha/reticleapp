@@ -1,4 +1,3 @@
-import { DEFAULT_WEAPON_POLICY, type WeaponPolicy } from '@/constants/weaponPolicy';
 import { SQUAD_TEMPLATES } from '@/helpers/team/squads';
 import {
   addSquad,
@@ -9,18 +8,30 @@ import {
   normalizeTeamName,
   removeSquad,
 } from '@/helpers/team/validation';
+import { createTeamWeapon } from '@/services/weaponService';
 import { useTeamStore } from '@/store/teamStore';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Keyboard } from 'react-native';
 
-/** Form step: basics, squads, policy, success */
-type FormStep = 'basics' | 'squads' | 'policy' | 'success';
+/** Form step: basics, squads, weapon, success */
+type FormStep = 'basics' | 'squads' | 'weapon' | 'success';
 type CreatedTeamSummary = { id: string; name: string };
+
+/** Simple weapon to add during team creation */
+export interface InitialTeamWeapon {
+  id: string; // temp ID for list key
+  name: string;
+  category: string | null;
+  caliber: string | null;
+}
 
 /** Total number of form steps (excluding success) */
 const TOTAL_STEPS = 3;
+
+/** Generate a unique temp ID */
+const generateTempId = () => `temp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
 export function useCreateTeamForm() {
   const { createTeam, setActiveTeam } = useTeamStore();
@@ -30,7 +41,7 @@ export function useCreateTeamForm() {
   const [squads, setSquads] = useState<string[]>([]);
   const [newSquadName, setNewSquadName] = useState('');
   const [showSquadSection, setShowSquadSection] = useState(false);
-  const [weaponPolicy, setWeaponPolicy] = useState<WeaponPolicy>(DEFAULT_WEAPON_POLICY);
+  const [initialWeapons, setInitialWeapons] = useState<InitialTeamWeapon[]>([]);
   const [formStep, setFormStep] = useState<FormStep>('basics');
   const [createdTeam, setCreatedTeam] = useState<CreatedTeamSummary | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -50,7 +61,10 @@ export function useCreateTeamForm() {
   );
   
   /** Current step number (1-indexed for display) */
-  const currentStepNumber = formStep === 'basics' ? 1 : formStep === 'squads' ? 2 : formStep === 'policy' ? 3 : 3;
+  const currentStepNumber = formStep === 'basics' ? 1 
+    : formStep === 'squads' ? 2 
+    : formStep === 'weapon' ? 3 
+    : 3;
 
   const toggleSquadSection = useCallback(() => {
     setShowSquadSection((v) => !v);
@@ -70,7 +84,7 @@ export function useCreateTeamForm() {
       setFormStep('squads');
     } else if (formStep === 'squads') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      setFormStep('policy');
+      setFormStep('weapon');
     }
   }, [formStep, canProceedToSquads]);
 
@@ -80,7 +94,7 @@ export function useCreateTeamForm() {
     
     if (formStep === 'squads') {
       setFormStep('basics');
-    } else if (formStep === 'policy') {
+    } else if (formStep === 'weapon') {
       setFormStep('squads');
     }
   }, [formStep]);
@@ -101,8 +115,26 @@ export function useCreateTeamForm() {
         name: trimmedTeamName,
         description: normalizeTeamDescription(teamDescription) || undefined,
         squads: squads.length > 0 ? squads : undefined,
-        weapon_policy: weaponPolicy,
       });
+
+      // Add all initial weapons to the team
+      const validWeapons = initialWeapons.filter(w => w.name.trim());
+      if (validWeapons.length > 0) {
+        await Promise.all(
+          validWeapons.map(async (weapon) => {
+            try {
+              await createTeamWeapon({
+                team_id: team.id,
+                name: weapon.name.trim(),
+                category: weapon.category as any,
+                caliber: weapon.caliber || undefined,
+              });
+            } catch (weaponError) {
+              console.warn('Failed to add weapon:', weapon.name, weaponError);
+            }
+          })
+        );
+      }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setCreatedTeam({ id: team.id, name: team.name });
@@ -113,7 +145,7 @@ export function useCreateTeamForm() {
     } finally {
       setSubmitting(false);
     }
-  }, [trimmedTeamName, teamDescription, squads, weaponPolicy, createTeam]);
+  }, [trimmedTeamName, teamDescription, squads, initialWeapons, createTeam]);
 
   const handleOpenTeam = useCallback(() => {
     if (!createdTeam) return;
@@ -156,6 +188,28 @@ export function useCreateTeamForm() {
 
   const clearAllSquads = useCallback(() => setSquads([]), []);
 
+  /** Add a new empty weapon to the list */
+  const addWeapon = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setInitialWeapons((prev) => [
+      ...prev,
+      { id: generateTempId(), name: '', category: null, caliber: null },
+    ]);
+  }, []);
+
+  /** Update a weapon by its temp ID */
+  const updateWeapon = useCallback((id: string, updates: Partial<Omit<InitialTeamWeapon, 'id'>>) => {
+    setInitialWeapons((prev) =>
+      prev.map((w) => (w.id === id ? { ...w, ...updates } : w))
+    );
+  }, []);
+
+  /** Remove a weapon by its temp ID */
+  const removeWeapon = useCallback((id: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setInitialWeapons((prev) => prev.filter((w) => w.id !== id));
+  }, []);
+
   return {
     // State
     teamName,
@@ -163,7 +217,7 @@ export function useCreateTeamForm() {
     squads,
     newSquadName,
     showSquadSection,
-    weaponPolicy,
+    initialWeapons,
     formStep,
     createdTeam,
     submitting,
@@ -181,7 +235,6 @@ export function useCreateTeamForm() {
     setTeamDescription,
     setNewSquadName,
     setShowSquadSection,
-    setWeaponPolicy,
 
     // Actions
     toggleSquadSection,
@@ -193,6 +246,11 @@ export function useCreateTeamForm() {
     handleRemoveSquad,
     handleApplyTemplate,
     clearAllSquads,
+    
+    // Weapon actions
+    addWeapon,
+    updateWeapon,
+    removeWeapon,
   };
 }
 

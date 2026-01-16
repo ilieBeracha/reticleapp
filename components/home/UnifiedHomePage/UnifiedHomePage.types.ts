@@ -12,7 +12,8 @@ export interface WeeklyStats {
   shots: number;
   hits: number;
   accuracy: number;
-  bestGroup: string;
+  avgGroup: string; // Average/median grouping this week
+  avgGroupCm: number | null; // Raw value for filtering
   sessions: number;
   totalTimeMinutes: number;
 }

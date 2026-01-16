@@ -487,10 +487,10 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     // For training mode, use locked config values strictly
     // For solo mode, use defaults but allow user to change
     const distance = lockedConfig?.distance_m ?? defaultDistance;
-    const maxShots = lockedConfig?.rounds_per_shooter && !isInfiniteShots(lockedConfig.rounds_per_shooter)
-      ? String(lockedConfig.rounds_per_shooter)
-      : drill?.rounds_per_shooter && !isInfiniteShots(drill.rounds_per_shooter)
-        ? String(drill.rounds_per_shooter)
+    const maxShots = lockedConfig?.bullets && !isInfiniteShots(lockedConfig.bullets)
+      ? String(lockedConfig.bullets)
+      : drill?.bullets && !isInfiniteShots(drill.bullets)
+        ? String(drill.bullets)
         : undefined;
 
     router.push({
@@ -565,10 +565,10 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     
     // For training mode, use locked config values strictly
     const distance = lockedConfig?.distance_m ?? defaultDistance;
-    const maxShots = lockedConfig?.rounds_per_shooter && !isInfiniteShots(lockedConfig.rounds_per_shooter)
-      ? String(lockedConfig.rounds_per_shooter)
-      : drill?.rounds_per_shooter && !isInfiniteShots(drill.rounds_per_shooter)
-        ? String(drill.rounds_per_shooter)
+    const maxShots = lockedConfig?.bullets && !isInfiniteShots(lockedConfig.bullets)
+      ? String(lockedConfig.bullets)
+      : drill?.bullets && !isInfiniteShots(drill.bullets)
+        ? String(drill.bullets)
         : undefined;
     
     router.push({
@@ -643,6 +643,39 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     const meetsRequirements = !!drillProgress && drillProgress.isComplete && drillProgress.meetsAccuracy && drillProgress.meetsTime;
+    const isManualSession = !session?.watch_controlled;
+    
+    // For manual sessions that meet requirements - skip confirmation, just end directly
+    if (isManualSession && (!hasDrill || meetsRequirements)) {
+      setEnding(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      try {
+        await endSession(sessionId!);
+
+        if (session?.team_id) {
+          await loadTeamSessions();
+        } else {
+          await loadPersonalSessions();
+        }
+
+        // Navigation - same logic as in Alert.alert callback
+        if (session?.training_id) {
+          router.replace({
+            pathname: '/(protected)/trainingDetail',
+            params: { id: session.training_id },
+          });
+        } else {
+          router.replace('/(protected)/(tabs)');
+        }
+      } catch (error) {
+        Alert.alert('Error', 'Failed to end session. Please try again.');
+      } finally {
+        setEnding(false);
+      }
+      return;
+    }
+
+    // For watch sessions or manual sessions not meeting requirements - show confirmation
     const { title, message } = buildEndSessionMessage(
       hasDrill,
       drill,
@@ -731,6 +764,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     elapsedTime,
     session?.team_id,
     session?.training_id,
+    session?.watch_controlled,
     loadPersonalSessions,
     loadTeamSessions,
     hasDrill,

@@ -3,7 +3,8 @@ import { useColors } from '@/hooks/ui/useColors';
 import { useOrphanedSessionCheck } from '@/hooks/useOrphanedSessionCheck';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useGarminInitialize } from '@/store/garminStore';
-import { router, Stack } from 'expo-router';
+import { router, Stack, usePathname, useSegments } from 'expo-router';
+import { useEffect, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ProtectedLayout() {
@@ -12,6 +13,18 @@ export default function ProtectedLayout() {
   useGarminInitialize();
   usePushNotifications();
   useOrphanedSessionCheck();
+
+  // DEV: Log all route changes
+  const pathname = usePathname();
+  const segments = useSegments();
+  const prevPath = useRef<string | null>(null);
+  
+  useEffect(() => {
+    if (__DEV__ && pathname !== prevPath.current) {
+      console.log(`[NAV] → ${pathname}`, { segments });
+      prevPath.current = pathname;
+    }
+  }, [pathname, segments]);
 
 
   return (
@@ -49,7 +62,7 @@ export default function ProtectedLayout() {
             presentation: "formSheet",
             gestureEnabled: true,
             sheetGrabberVisible: true,
-            contentStyle: { backgroundColor: colors.card },
+            contentStyle: { backgroundColor: colors.background },
             sheetAllowedDetents: [0.75, 0.92],
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
@@ -116,11 +129,11 @@ export default function ProtectedLayout() {
           name="createTraining"
           options={{
             headerShown: false,
-            presentation: "formSheet",
+            presentation: "containedModal",
             gestureEnabled: true,
-            sheetGrabberVisible: true,
-            contentStyle: { backgroundColor: colors.card },
-            sheetAllowedDetents: [0.85, 0.95],
+            sheetGrabberVisible: false,
+            contentStyle: { backgroundColor: colors.background, paddingTop: insets.top },
+            sheetAllowedDetents: [0.6, 0.85],
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
         }}

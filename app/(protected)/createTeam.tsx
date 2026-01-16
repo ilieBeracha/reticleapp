@@ -1,4 +1,4 @@
-import { WeaponPolicyStep } from '@/components/team/creation';
+import { WeaponSetupStep } from '@/components/team/creation';
 import { useCreateTeamForm } from '@/hooks/team/useCreateTeamForm';
 import { useColors } from '@/hooks/ui/useColors';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,7 +17,7 @@ import Animated, { FadeInRight, FadeOutLeft } from 'react-native-reanimated';
  * CREATE TEAM - Stepper Form Sheet
  * Step 1: Name and description
  * Step 2: Squads
- * Step 3: Weapon policy
+ * Step 3: Add weapon (optional)
  */
 export default function CreateTeamSheet() {
   const colors = useColors();
@@ -27,7 +27,7 @@ export default function CreateTeamSheet() {
     teamDescription,
     squads,
     newSquadName,
-    weaponPolicy,
+    initialWeapons,
     formStep,
     createdTeam,
     submitting,
@@ -39,7 +39,6 @@ export default function CreateTeamSheet() {
     setTeamName,
     setTeamDescription,
     setNewSquadName,
-    setWeaponPolicy,
     goToNextStep,
     goToPreviousStep,
     handleCreate,
@@ -48,6 +47,9 @@ export default function CreateTeamSheet() {
     handleRemoveSquad,
     handleApplyTemplate,
     clearAllSquads,
+    addWeapon,
+    updateWeapon,
+    removeWeapon,
   } = useCreateTeamForm();
 
   // Success state
@@ -280,27 +282,24 @@ export default function CreateTeamSheet() {
           </Animated.View>
         )}
 
-        {/* STEP 3: Weapon Policy */}
-        {formStep === 'policy' && (
+        {/* STEP 3: Add Weapons (Optional) */}
+        {formStep === 'weapon' && (
           <Animated.View entering={FadeInRight.duration(200)} exiting={FadeOutLeft.duration(200)}>
-            <Text style={[styles.stepTitle, { color: colors.text }]}>Weapon Policy</Text>
+            <Text style={[styles.stepTitle, { color: colors.text }]}>Team Weapons</Text>
             <Text style={[styles.stepSubtitle, { color: colors.textMuted }]}>
-              How will team members access weapons?
+              Add weapons for your team to use
             </Text>
 
-            <View style={styles.policySection}>
-              <WeaponPolicyStep value={weaponPolicy} onChange={setWeaponPolicy} disabled={submitting} hideHeader />
-            </View>
-
-            {/* Info */}
-            <View style={[styles.infoCard, { backgroundColor: colors.secondary }]}>
-              <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
-              <Text style={[styles.infoText, { color: colors.textMuted }]}>
-                You'll be the team owner. Invite members and assign roles after creating.
-              </Text>
-            </View>
+            <WeaponSetupStep 
+              weapons={initialWeapons}
+              onAddWeapon={addWeapon}
+              onUpdateWeapon={updateWeapon}
+              onRemoveWeapon={removeWeapon}
+              disabled={submitting} 
+            />
           </Animated.View>
         )}
+
       </ScrollView>
 
       {/* Footer with Navigation - fixed at bottom */}
@@ -341,7 +340,7 @@ export default function CreateTeamSheet() {
           </>
         )}
 
-        {formStep === 'policy' && (
+        {formStep === 'weapon' && (
           <>
             <TouchableOpacity
               style={[styles.backButton, { borderColor: colors.border }]}

@@ -108,7 +108,7 @@ export const CATEGORY_CONFIGS: Record<WeaponCategory, CategoryConfig> = {
   precision_rifle: {
     label: 'Precision Rifle',
     description: 'Long-range accuracy and consistency',
-    icon: 'crosshairs',
+    icon: 'locate-outline',
     distances: {
       min: 100,
       max: 1000,
@@ -187,7 +187,7 @@ export const CATEGORY_CONFIGS: Record<WeaponCategory, CategoryConfig> = {
   rifle: {
     label: 'Rifle',
     description: 'Versatile medium to long range',
-    icon: 'target',
+    icon: 'disc-outline',
     distances: {
       min: 25,
       max: 500,
@@ -244,7 +244,7 @@ export const CATEGORY_CONFIGS: Record<WeaponCategory, CategoryConfig> = {
   carbine: {
     label: 'Carbine',
     description: 'Close to medium range, dynamic',
-    icon: 'zap',
+    icon: 'flash-outline',
     distances: {
       min: 10,
       max: 300,
@@ -312,7 +312,7 @@ export const CATEGORY_CONFIGS: Record<WeaponCategory, CategoryConfig> = {
   pistol: {
     label: 'Pistol',
     description: 'Close range, quick engagement',
-    icon: 'circle-dot',
+    icon: 'radio-button-on',
     distances: {
       min: 3,
       max: 50,
@@ -437,7 +437,7 @@ export const CATEGORY_CONFIGS: Record<WeaponCategory, CategoryConfig> = {
   any: {
     label: 'Any Weapon',
     description: 'General training',
-    icon: 'asterisk',
+    icon: 'apps-outline',
     distances: {
       min: 5,
       max: 500,

@@ -64,10 +64,8 @@ export function getAccuracyColor(
 
 interface DrillConfig {
   strings_count?: number | null;
-  target_count?: number | null;
   target_type?: string | null;
-  rounds_per_shooter?: number | null;
-  min_accuracy_percent?: number | null;
+  bullets?: number | null;
   time_limit_seconds?: number | null;
 }
 
@@ -84,21 +82,18 @@ export function calculateDrillProgress(
   if (!drill) return null;
 
   // === Drill semantics (IMPORTANT) ===
-  // - strings_count = how many rounds/repetitions
-  // - tactical: rounds_per_shooter = bullets per round (per entry)
-  // - paper(scan): rounds_per_shooter = MAX allowed shots cap (default: infinite)
-  const rounds = drill.strings_count && drill.strings_count > 0 ? drill.strings_count : 1;
-  const targetsPerRound = drill.target_count && drill.target_count > 0 ? drill.target_count : 1;
+  // - strings_count = how many entries/repetitions
+  // - bullets = shots required per entry
+  const strings = drill.strings_count && drill.strings_count > 0 ? drill.strings_count : 1;
   const isPaper = drill.target_type === 'paper';
-  const bulletsPerRound = drill.rounds_per_shooter;
+  const bulletsPerString = drill.bullets;
 
-  // If target_count is set, drills may require multiple target entries per round/string.
-  const requiredTargets = rounds * targetsPerRound;
-  const requiredRounds = isPaper ? 0 : (bulletsPerRound ?? 0) * requiredTargets;
+  const requiredTargets = strings;
+  const requiredBullets = isPaper ? 0 : (bulletsPerString ?? 0) * strings;
 
   const shotsProgress =
-    !isPaper && requiredRounds > 0 
-      ? Math.min(100, Math.round((totalShots / requiredRounds) * 100)) 
+    !isPaper && requiredBullets > 0 
+      ? Math.min(100, Math.round((totalShots / requiredBullets) * 100)) 
       : 0;
   const targetsProgress = requiredTargets > 0 
     ? Math.min(100, Math.round((targetsCount / requiredTargets) * 100)) 
@@ -106,20 +101,17 @@ export function calculateDrillProgress(
 
   const isComplete = isPaper
     ? targetsCount >= requiredTargets
-    : totalShots >= requiredRounds && targetsCount >= requiredTargets;
-  const meetsAccuracy = !drill.min_accuracy_percent || accuracy >= drill.min_accuracy_percent;
+    : totalShots >= requiredBullets && targetsCount >= requiredTargets;
   const meetsTime = !drill.time_limit_seconds || elapsedTime <= drill.time_limit_seconds;
 
   return {
-    rounds,
-    targetsPerRound,
-    bulletsPerRound: bulletsPerRound ?? null,
-    requiredRounds,
+    strings,
+    bulletsPerString: bulletsPerString ?? null,
+    requiredBullets,
     requiredTargets,
     shotsProgress,
     targetsProgress,
     isComplete,
-    meetsAccuracy,
     meetsTime,
     overTime: drill.time_limit_seconds ? elapsedTime > drill.time_limit_seconds : false,
     isPaper,
@@ -144,16 +136,16 @@ export function calculateNextTargetPlan(
     return { remainingShots: 0, remainingTargets, nextBullets: 0 };
   }
 
-  const remainingShots = Math.max(0, drillProgress.requiredRounds - totalShots);
+  const remainingShots = Math.max(0, drillProgress.requiredBullets - totalShots);
 
   if (remainingShots <= 0 || remainingTargets <= 0) {
     return { remainingShots, remainingTargets, nextBullets: 0 };
   }
 
-  // Drill contract: fixed bullets per round
+  // Drill contract: fixed bullets per string
   const nextBullets = remainingTargets === 1
     ? remainingShots
-    : Math.min(remainingShots, drillProgress.bulletsPerRound ?? 0);
+    : Math.min(remainingShots, drillProgress.bulletsPerString ?? 0);
 
   return { remainingShots, remainingTargets, nextBullets };
 }
@@ -210,9 +202,8 @@ interface SessionForPayload {
     target_type?: string | null;
     input_method?: string | null;
     distance_m?: number | null;
-    rounds_per_shooter?: number | null;
+    bullets?: number | null;
     time_limit_seconds?: number | null;
-    par_time_seconds?: number | null;
     strings_count?: number | null;
     /** User-calibrated detection sensitivity in G-force */
     detection_sensitivity?: number | null;
@@ -273,8 +264,8 @@ export function buildWatchSessionPayload(
   
   const drillConfig = session.drill_config;
   
-  // rounds = bullets per string (0 = unlimited)
-  const rounds = drillConfig?.rounds_per_shooter || 0;
+  // bullets per string (0 = unlimited)
+  const bulletsPerString = drillConfig?.bullets || 0;
   const strings = drillConfig?.strings_count || 1;
   
   // Priority for custom sensitivity:
@@ -357,11 +348,9 @@ export function buildWatchSessionPayload(
   // Build goal description string
   const buildGoalDescription = (): string => {
     const parts: string[] = [];
-    if (rounds > 0) parts.push(`${rounds} shots`);
+    if (bulletsPerString > 0) parts.push(`${bulletsPerString} shots`);
     if (drillConfig?.time_limit_seconds) {
       parts.push(`under ${drillConfig.time_limit_seconds}s`);
-    } else if (drillConfig?.par_time_seconds) {
-      parts.push(`par ${drillConfig.par_time_seconds}s`);
     }
     return parts.length > 0 ? parts.join(' ') : (drillConfig?.drill_goal || 'Practice');
   };
@@ -373,10 +362,10 @@ export function buildWatchSessionPayload(
     drillType: mapDrillType(drillConfig?.drill_goal),
     inputMethod: mapInputMethod(drillConfig?.input_method),
     distance: drillConfig?.distance_m || 0,
-    rounds,      // Shots per string (0 = unlimited)
+    rounds: bulletsPerString,  // Watch expects "rounds" (bullets per string)
     strings,     // Number of strings/stages
     timeLimit: drillConfig?.time_limit_seconds || 0,
-    parTime: drillConfig?.par_time_seconds || 0,
+    parTime: 0,  // Legacy field, no longer used
     watchMode: session.watch_controlled ? 'primary' : 'supplementary',
     
     // Detection configuration (new enhanced format)
@@ -421,7 +410,7 @@ export function buildWatchSessionPayloadLegacy(
 // ============================================================================
 
 interface DrillProgressForMessage {
-  requiredRounds: number;
+  requiredBullets: number;
   requiredTargets: number;
 }
 
@@ -435,7 +424,6 @@ export function buildEndSessionMessage(
   meetsRequirements: boolean,
   totalShots: number,
   targetsCount: number,
-  accuracy: number,
   elapsedTime: number
 ): { title: string; message: string } {
   if (!hasDrill || !drill || !drillProgress || meetsRequirements) {
@@ -453,12 +441,9 @@ export function buildEndSessionMessage(
           `Targets: ${targetsCount}/${drillProgress.requiredTargets}`,
         ]
       : [
-          `Shots: ${totalShots}/${drillProgress.requiredRounds}`,
+          `Shots: ${totalShots}/${drillProgress.requiredBullets}`,
           `Targets: ${targetsCount}/${drillProgress.requiredTargets}`,
         ]),
-    ...(drill.min_accuracy_percent
-      ? [`Accuracy: ${accuracy}% (min ${drill.min_accuracy_percent}%)`]
-      : []),
     ...(drill.time_limit_seconds
       ? [`Time: ${formatTime(elapsedTime)} (limit ${formatTime(drill.time_limit_seconds)})`]
       : []),

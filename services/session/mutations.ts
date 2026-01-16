@@ -126,7 +126,7 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
 
   // DRILL-FIRST: Every session must have a drill source
   const hasCustomConfig =
-    config.drill_config && config.drill_config.distance_m > 0 && config.drill_config.rounds_per_shooter > 0;
+    config.drill_config && config.drill_config.distance_m > 0 && config.drill_config.bullets > 0;
 
   if (!config.drill_id && !config.drill_template_id && !hasCustomConfig) {
     throw new Error('A drill configuration is required. Use custom drill, training drill, or drill template.');
@@ -175,15 +175,15 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
     }
   }
 
-  // Build custom drill config for inline storage
+  // Build custom drill config for inline storage (DB uses rounds_per_shooter)
   const customDrillConfig = hasCustomConfig
     ? {
         name: config.drill_config!.name || 'Quick Practice',
         drill_goal: config.drill_config!.drill_goal,
         target_type: config.drill_config!.target_type || 'paper',
-        input_method: config.drill_config!.input_method ?? null, // User's choice
+        input_method: config.drill_config!.input_method ?? null,
         distance_m: config.drill_config!.distance_m,
-        rounds_per_shooter: config.drill_config!.rounds_per_shooter,
+        rounds_per_shooter: config.drill_config!.bullets,  // Map bullets → DB column
         time_limit_seconds: config.drill_config!.time_limit_seconds ?? null,
         strings_count: config.drill_config!.strings_count ?? null,
         position: config.drill_config!.position ?? null,
@@ -1075,10 +1075,10 @@ export async function saveWatchSessionData(
       const drill = session.drill_config;
       const stats = await calculateSessionStats(data.sessionId);
       
-      const meetsShotCount = !drill.rounds_per_shooter || stats.totalShotsFired >= drill.rounds_per_shooter;
-      const targetRequirement = (drill.strings_count ?? 1) * (drill.target_count ?? 1);
+      const meetsShotCount = !drill.bullets || stats.totalShotsFired >= drill.bullets;
+      const targetRequirement = drill.strings_count ?? 1;
       const meetsTargetCount = stats.targetCount >= targetRequirement;
-      const meetsAccuracy = !drill.min_accuracy_percent || stats.accuracyPct >= drill.min_accuracy_percent;
+      const meetsAccuracy = true;  // Simplified: accuracy check removed (legacy)
       
       const endedAt = new Date(calculatedEndedAt).getTime();
       const startedAt = session.started_at ? new Date(session.started_at).getTime() : endedAt;
@@ -1351,10 +1351,10 @@ export async function saveTransformedWatchData(
       const drillConfig = session.drill_config;
       const stats = await calculateSessionStats(data.sessionId);
       
-      const meetsShotCount = !drillConfig.rounds_per_shooter || stats.totalShotsFired >= drillConfig.rounds_per_shooter;
-      const targetRequirement = (drillConfig.strings_count ?? 1) * (drillConfig.target_count ?? 1);
+      const meetsShotCount = !drillConfig.bullets || stats.totalShotsFired >= drillConfig.bullets;
+      const targetRequirement = drillConfig.strings_count ?? 1;
       const meetsTargetCount = stats.targetCount >= targetRequirement;
-      const meetsAccuracy = !drillConfig.min_accuracy_percent || stats.accuracyPct >= drillConfig.min_accuracy_percent;
+      const meetsAccuracy = true;  // Simplified: accuracy check removed (legacy)
       
       const endedAt = new Date(calculatedEndedAt).getTime();
       const startedAt = session.started_at ? new Date(session.started_at).getTime() : endedAt;

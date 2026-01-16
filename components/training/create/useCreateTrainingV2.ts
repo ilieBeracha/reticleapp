@@ -93,6 +93,7 @@ export interface UseCreateTrainingV2Return {
   handleRemoveDrill: (drillId: string) => void;
   handleMoveDrill: (index: number, direction: 'up' | 'down') => void;
   addDrill: (drill: TrainingDrillItem) => void;
+  updateDrill: (drill: TrainingDrillItem) => void;
   handleNextStep: () => void;
   handleBackStep: () => void;
   handleCreate: () => Promise<void>;
@@ -272,6 +273,11 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
     setAdjustingDrill(null);
   }, []);
 
+  // Simple update without modal handling (for inline edits)
+  const updateDrill = useCallback((updated: TrainingDrillItem) => {
+    setDrills(prev => prev.map(d => d.id === updated.id ? updated : d));
+  }, []);
+
   // ============================================================================
   // SAVE PRESET
   // ============================================================================
@@ -285,7 +291,7 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
         drill_id: drillId,
         label: label || null,
         distance_m: config.distance_m,
-        rounds: config.rounds,
+        bullets: config.bullets,
         time_limit_seconds: config.time_limit_seconds,
         position: config.position,
         strings_count: config.strings_count,
@@ -340,7 +346,7 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
         drill_goal: d.drill_goal || 'grouping',
         target_type: d.target_type || 'paper',
         distance_m: d.config.distance_m,
-        rounds_per_shooter: d.config.rounds,
+        rounds_per_shooter: d.config.bullets,  // DB column is rounds_per_shooter
         time_limit_seconds: d.config.time_limit_seconds ?? undefined,
         strings_count: d.config.strings_count,
         position: d.config.position ?? undefined,
@@ -437,6 +443,7 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
     handleRemoveDrill,
     handleMoveDrill,
     addDrill,
+    updateDrill,
     handleNextStep,
     handleBackStep,
     handleCreate,

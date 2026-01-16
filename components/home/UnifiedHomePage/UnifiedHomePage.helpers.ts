@@ -95,16 +95,15 @@ export function calculateWeeklyStats(completedSessions: SessionWithDetails[]): W
   let shots = 0;
   let hits = 0;
   let totalTimeMs = 0;
-  let minDispersion = 1000;
-  let hasDispersion = false;
+  const dispersions: number[] = [];
 
   completedSessions.forEach((s) => {
     if (s.stats) {
       shots += s.stats.shots_fired || 0;
       hits += s.stats.hits_total || 0;
+      // Collect all dispersions for median calculation
       if (s.stats.best_dispersion_cm && s.stats.best_dispersion_cm > 0) {
-        hasDispersion = true;
-        minDispersion = Math.min(minDispersion, s.stats.best_dispersion_cm);
+        dispersions.push(s.stats.best_dispersion_cm);
       }
     }
     if (s.started_at && s.ended_at) {
@@ -115,10 +114,22 @@ export function calculateWeeklyStats(completedSessions: SessionWithDetails[]): W
   });
 
   const accuracy = shots > 0 ? Math.round((hits / shots) * 100) : 0;
-  const bestGroup = hasDispersion ? `${minDispersion.toFixed(1)}cm` : '—';
+  
+  // Calculate median dispersion (more representative than mean for groupings)
+  let avgGroupCm: number | null = null;
+  let avgGroup = '—';
+  if (dispersions.length > 0) {
+    dispersions.sort((a, b) => a - b);
+    const mid = Math.floor(dispersions.length / 2);
+    avgGroupCm = dispersions.length % 2 === 0
+      ? (dispersions[mid - 1] + dispersions[mid]) / 2
+      : dispersions[mid];
+    avgGroup = `${avgGroupCm.toFixed(1)}cm`;
+  }
+  
   const totalTimeMinutes = Math.round(totalTimeMs / 60000);
 
-  return { shots, hits, accuracy, bestGroup, sessions: completedSessions.length, totalTimeMinutes };
+  return { shots, hits, accuracy, avgGroup, avgGroupCm, sessions: completedSessions.length, totalTimeMinutes };
 }
 
 /**

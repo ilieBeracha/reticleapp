@@ -267,12 +267,12 @@ export function SessionPrepView({
               <MapPin size={14} color={colors.textMuted} />
               <Text style={[styles.drillMetaText, { color: colors.text }]}>{drill?.distance_m || 25}m</Text>
             </View>
-            {drill?.rounds_per_shooter && (
+            {drill?.bullets && (
               <>
                 <View style={[styles.drillMetaDot, { backgroundColor: colors.border }]} />
                 <View style={styles.drillMetaItem}>
                   <Zap size={14} color={colors.textMuted} />
-                  <Text style={[styles.drillMetaText, { color: colors.text }]}>{drill.rounds_per_shooter} shots</Text>
+                  <Text style={[styles.drillMetaText, { color: colors.text }]}>{drill.bullets} bullets</Text>
                 </View>
               </>
             )}

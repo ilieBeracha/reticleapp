@@ -48,9 +48,7 @@ export default function CreateTrainingScreen() {
   const {
     teams,
     selectedTeamId,
-    selectedTeam,
     isTeamLocked,
-    canCreatePresets,
     title,
     setTitle,
     scheduledDate,
@@ -64,26 +62,16 @@ export default function CreateTrainingScreen() {
     setShowTimePicker,
     submitting,
     currentStep,
-    loading,
-    canonicalDrills,
-    teamPresets,
-    adjustingDrill,
-    adjustModalVisible,
     step1Complete,
-    step2Complete,
     canCreate,
     // Actions
     handleSelectTeam,
     handleRemoveDrill,
-    handleMoveDrill,
     addDrill,
+    updateDrill,
     handleNextStep,
     handleBackStep,
     handleCreate,
-    handleAdjustDrill,
-    handleCloseAdjustModal,
-    handleUpdateDrill,
-    handleSavePreset,
   } = useCreateTrainingV2({ teamIdParam });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -228,24 +216,19 @@ export default function CreateTrainingScreen() {
             </View>
             <View style={styles.stepHeaderText}>
               <Text style={[styles.stepQuestion, { color: colors.text }]}>
-                What drills will you train?
+                Build your program
               </Text>
               <Text style={[styles.stepHint, { color: colors.textMuted }]}>
-                Tap to configure · Tap added drill to adjust
+                Add engagement or grouping drills
               </Text>
             </View>
           </View>
 
           <DrillSelectionStepV2
             drills={drills}
-            canonicalDrills={canonicalDrills}
-            teamPresets={teamPresets}
-            loading={loading}
             onAddDrill={addDrill}
+            onUpdateDrill={updateDrill}
             onRemoveDrill={handleRemoveDrill}
-            onAdjustDrill={handleAdjustDrill}
-            onSavePreset={handleSavePreset}
-            canCreatePresets={canCreatePresets}
           />
         </Animated.View>
       )}

@@ -176,12 +176,17 @@ const stepperStyles = StyleSheet.create({
 interface HitsStepperProps {
   value: number;
   onChange: (value: number) => void;
+  /** Maximum allowed hits (drill limit). If undefined, no limit. */
+  max?: number;
 }
 
 const HitsStepper = React.memo(function HitsStepper({
   value,
   onChange,
+  max,
 }: HitsStepperProps) {
+  const atMax = max !== undefined && value >= max;
+  
   const handleDecrement = useCallback(() => {
     if (value > 0) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -190,9 +195,10 @@ const HitsStepper = React.memo(function HitsStepper({
   }, [value, onChange]);
 
   const handleIncrement = useCallback(() => {
+    if (max !== undefined && value >= max) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onChange(value + 1);
-  }, [value, onChange]);
+  }, [value, onChange, max]);
 
   return (
     <View style={hitsStyles.container}>
@@ -212,22 +218,23 @@ const HitsStepper = React.memo(function HitsStepper({
         <View style={hitsStyles.valueContainer}>
           <View style={[hitsStyles.valueRing, value > 0 && hitsStyles.valueRingGood]}>
             <Text style={hitsStyles.value}>{value}</Text>
-            <Text style={hitsStyles.maxLabel}>hits</Text>
+            <Text style={hitsStyles.maxLabel}>{max ? `/ ${max}` : 'hits'}</Text>
           </View>
         </View>
 
         <TouchableOpacity
-          style={hitsStyles.btn}
+          style={[hitsStyles.btn, atMax && hitsStyles.btnDisabled]}
           onPress={handleIncrement}
+          disabled={atMax}
           activeOpacity={0.7}
         >
-          <Plus size={28} color={COLORS.white} strokeWidth={2.5} />
+          <Plus size={28} color={atMax ? COLORS.textDim : COLORS.white} strokeWidth={2.5} />
         </TouchableOpacity>
       </View>
 
-      {/* Quick select */}
+      {/* Quick select - filter to show only options <= max */}
       <View style={hitsStyles.quickRow}>
-        {[1, 3, 5, 10, 15].map((num) => (
+        {[1, 3, 5, 10, 15].filter(num => max === undefined || num <= max).map((num) => (
           <TouchableOpacity
             key={num}
             style={[hitsStyles.quickBtn, value === num && hitsStyles.quickBtnActive]}
@@ -403,14 +410,15 @@ export function TacticalTargetFlow({
         });
       } else {
         // For engagement: Use tactical target with hits only
-        // bullets_fired = hits (we only track what hit)
+        // Cap hits to drill limit, but bullets_fired = planned shots (user fired all)
+        const cappedHits = Math.min(hits, bullets);
         await addTargetWithTacticalResult({
           session_id: sessionId,
           distance_m: distance,
           lane_number: null,
-          planned_shots: hits, // Use hits as planned
-          bullets_fired: hits, // We only know hits
-          hits: hits,
+          planned_shots: bullets,
+          bullets_fired: bullets, // User fired all planned shots
+          hits: cappedHits, // Cap hits to drill limit
           is_stage_cleared: stageCleared,
           time_seconds: time ? parseFloat(time) : null,
           result_notes: notes || null,
@@ -619,21 +627,21 @@ export function TacticalTargetFlow({
           </View>
         </View>
       ) : (
-        // ENGAGEMENT: Show simple hits stepper
+        // ENGAGEMENT: Show simple hits stepper with drill limit as max
         <View style={styles.hitsSection}>
-          <HitsStepper value={hits} onChange={setHits} />
+          <HitsStepper value={hits} onChange={setHits} max={bullets} />
         </View>
       )}
 
-      {/* Time Input - only for engagement */}
-      {!isGrouping && showTimeInput && (
+      {/* Time Input - for both engagement and grouping in manual mode */}
+      {showTimeInput && (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.cardIconBox}>
               <Timer size={18} color={COLORS.primary} />
             </View>
             <View style={styles.cardHeaderText}>
-              <Text style={styles.cardTitle}>Engagement Time</Text>
+              <Text style={styles.cardTitle}>{isGrouping ? 'Shot Time' : 'Engagement Time'}</Text>
               <Text style={styles.cardHint}>
                 {time ? `${time}s` : 'Optional - how fast?'}
               </Text>

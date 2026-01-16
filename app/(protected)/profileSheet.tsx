@@ -81,6 +81,7 @@ export default function ProfileSheet() {
     <ScrollView
       style={[styles.scrollView, { backgroundColor: colors.card }]}
       contentContainerStyle={styles.scrollContent}
+      keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}
@@ -228,7 +229,7 @@ export default function ProfileSheet() {
           )}
 
           {/* Integrations */}
-          <View style={[styles.separator, { backgroundColor: colors.border }]} />
+          <View style={[styles.separator]} />
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => {

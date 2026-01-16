@@ -17,6 +17,8 @@ import {
   useActiveSession,
 } from '@/components/session/activeSession';
 import { useColors } from '@/hooks/ui/useColors';
+import { useIsGarminConnected } from '@/store/garminStore';
+import { activateSession } from '@/services/sessionService';
 import { useOpenWeather } from '@/hooks/useOpenWeather';
 import { isGroupingSession } from '@/utils/drillGoal';
 import { formatMaxShots } from '@/utils/drillShots';
@@ -38,7 +40,7 @@ import {
   X,
   Zap,
 } from 'lucide-react-native';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -267,6 +269,34 @@ export default function ActiveSessionScreen() {
   } = useActiveSession({ sessionId });
 
   const { weather, loading: weatherLoading, error: weatherError } = useOpenWeather();
+  const isWatchConnected = useIsGarminConnected();
+  
+  // Auto-activation state for skipping SessionPrepView when no watch
+  const [autoActivating, setAutoActivating] = useState(false);
+  const autoActivatedRef = useRef(false);
+  
+  // Auto-activate session when no watch connected (skip SessionPrepView)
+  useEffect(() => {
+    if (
+      session?.status === 'pending' &&
+      !isWatchConnected &&
+      !autoActivating &&
+      !autoActivatedRef.current
+    ) {
+      autoActivatedRef.current = true;
+      setAutoActivating(true);
+      
+      activateSession(session.id, false)
+        .then(() => {
+          handleRefresh();
+        })
+        .catch((err) => {
+          console.error('[ActiveSession] Auto-activation failed:', err);
+          setAutoActivating(false);
+          autoActivatedRef.current = false;
+        });
+    }
+  }, [session?.id, session?.status, isWatchConnected, autoActivating, handleRefresh]);
 
   const renderEmpty = useCallback(
     () => (
@@ -345,9 +375,22 @@ export default function ActiveSessionScreen() {
     );
   }
 
-  // Show prep view for ALL sessions (both solo and team)
-  // Team sessions just won't have the "back to edit" option since drill is locked
+  // Show prep view ONLY when watch is connected (for configuring sensitivity, etc.)
+  // When no watch: auto-activation effect handles it - show loading state while activating
   if (session.status === 'pending') {
+    // No watch connected - show loading while auto-activating
+    if (!isWatchConnected || autoActivating) {
+      return (
+        <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+          <ActivityIndicator size="large" color={colors.text} />
+          <Text style={[styles.statusTitle, { color: colors.text, marginTop: 16 }]}>
+            Starting session...
+          </Text>
+        </View>
+      );
+    }
+    
+    // Watch connected - show SessionPrepView for configuration
     return (
       <SessionPrepView
         session={session}

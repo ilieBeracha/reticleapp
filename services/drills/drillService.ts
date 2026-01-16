@@ -50,7 +50,7 @@ export interface TeamDrillPreset {
   drill_id: string;
   label: string | null;
   distance_m: number | null;
-  rounds: number | null;
+  bullets: number | null;  // DB column: rounds
   time_limit_seconds: number | null;
   position: ShootingPosition | null;
   strings_count: number;
@@ -66,7 +66,7 @@ export interface TeamDrillPreset {
  */
 export interface DrillConfig {
   distance_m: number;
-  rounds: number;
+  bullets: number;
   time_limit_seconds?: number | null;
   position?: ShootingPosition | null;
   strings_count: number;
@@ -189,7 +189,7 @@ export async function getTeamPresets(teamId: string): Promise<TeamDrillPreset[]>
     throw new Error(error.message);
   }
 
-  return data as TeamDrillPreset[];
+  return (data || []).map(mapPresetFromDB);
 }
 
 /**
@@ -211,7 +211,7 @@ export async function getPresetsForDrill(teamId: string, drillId: string): Promi
     throw new Error(error.message);
   }
 
-  return data as TeamDrillPreset[];
+  return (data || []).map(mapPresetFromDB);
 }
 
 /**
@@ -222,10 +222,18 @@ export interface CreatePresetInput {
   drill_id: string;
   label?: string | null;
   distance_m?: number | null;
-  rounds?: number | null;
+  bullets?: number | null;  // DB column: rounds
   time_limit_seconds?: number | null;
   position?: ShootingPosition | null;
   strings_count?: number;
+}
+
+// Helper to map DB row (rounds) to TypeScript (bullets)
+function mapPresetFromDB(row: any): TeamDrillPreset {
+  return {
+    ...row,
+    bullets: row.rounds,  // Map DB column to TypeScript field
+  };
 }
 
 export async function createTeamPreset(input: CreatePresetInput): Promise<TeamDrillPreset> {
@@ -239,7 +247,7 @@ export async function createTeamPreset(input: CreatePresetInput): Promise<TeamDr
       drill_id: input.drill_id,
       label: input.label || null,
       distance_m: input.distance_m || null,
-      rounds: input.rounds || null,
+      rounds: input.bullets || null,  // Map TypeScript field to DB column
       time_limit_seconds: input.time_limit_seconds || null,
       position: input.position || null,
       strings_count: input.strings_count || 1,
@@ -256,7 +264,7 @@ export async function createTeamPreset(input: CreatePresetInput): Promise<TeamDr
     throw new Error(error.message);
   }
 
-  return data as TeamDrillPreset;
+  return mapPresetFromDB(data);
 }
 
 /**
@@ -271,7 +279,7 @@ export async function updateTeamPreset(
     .update({
       label: updates.label,
       distance_m: updates.distance_m,
-      rounds: updates.rounds,
+      rounds: updates.bullets,  // Map TypeScript field to DB column
       time_limit_seconds: updates.time_limit_seconds,
       position: updates.position,
       strings_count: updates.strings_count,
@@ -288,7 +296,7 @@ export async function updateTeamPreset(
     throw new Error(error.message);
   }
 
-  return data as TeamDrillPreset;
+  return mapPresetFromDB(data);
 }
 
 /**
@@ -323,7 +331,7 @@ export function buildTrainingDrillItem(
     drill_id: drill.id,
     config: {
       distance_m: config.distance_m ?? 100,
-      rounds: config.rounds ?? drill.default_shots,
+      bullets: config.bullets ?? drill.default_shots,
       time_limit_seconds: config.time_limit_seconds ?? null,
       position: config.position ?? null,
       strings_count: config.strings_count ?? drill.default_strings,
@@ -350,7 +358,7 @@ export function buildTrainingDrillItemFromPreset(preset: TeamDrillPreset): Train
     drill_id: preset.drill_id,
     config: {
       distance_m: preset.distance_m ?? 100,
-      rounds: preset.rounds ?? preset.drill.default_shots,
+      bullets: preset.bullets ?? preset.drill.default_shots,
       time_limit_seconds: preset.time_limit_seconds ?? null,
       position: preset.position ?? null,
       strings_count: preset.strings_count ?? preset.drill.default_strings,

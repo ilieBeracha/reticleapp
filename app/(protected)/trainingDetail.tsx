@@ -49,17 +49,19 @@ import { useSessionStore } from '@/store/sessionStore';
 import { useTeamStore } from '@/store/teamStore';
 import { useGarminDevice, useIsGarminConnected } from '@/store/garminStore';
 import type { Drill } from '@/types/workspace';
-import { format, formatDistanceToNow } from 'date-fns';
+import { differenceInSeconds, format, formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   AlertCircle,
   ArrowLeft,
   CheckCircle2,
+  Clock,
   MoreHorizontal,
   Play,
   Smartphone,
   Target,
+  Timer,
   Users,
   Watch,
 } from 'lucide-react-native';
@@ -113,6 +115,7 @@ function ParallaxScrollContent({
   onAddDrill,
   onBack,
   onShowCommanderActions,
+  onShowTrainingDetails,
   // Watch preference props
   isWatchConnected,
   trainingWatchPreference,
@@ -121,6 +124,45 @@ function ParallaxScrollContent({
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scrollOffset = useScrollViewOffset(scrollRef);
   const [activeTab, setActiveTab] = useState<TabType>('drills');
+
+  // Active users count (unique users who have sessions)
+  const activeUsersCount = useMemo(() => {
+    return new Set(teamSessions.map((s: any) => s.user_id)).size;
+  }, [teamSessions]);
+
+  // Time remaining until auto-close
+  const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
+  
+  useEffect(() => {
+    if (!isOngoing || !training.auto_close_at) {
+      setTimeRemaining(null);
+      return;
+    }
+
+    const updateTime = () => {
+      const now = new Date();
+      const end = new Date(training.auto_close_at);
+      const diff = differenceInSeconds(end, now);
+      
+      if (diff <= 0) {
+        setTimeRemaining(null);
+        return;
+      }
+
+      const hours = Math.floor(diff / 3600);
+      const mins = Math.floor((diff % 3600) / 60);
+      
+      if (hours > 0) {
+        setTimeRemaining(`${hours}h ${mins}m left`);
+      } else {
+        setTimeRemaining(`${mins}m left`);
+      }
+    };
+
+    updateTime();
+    const interval = setInterval(updateTime, 60000); // Update every minute
+    return () => clearInterval(interval);
+  }, [isOngoing, training.auto_close_at]);
 
   // Show tabs only for commanders during ongoing/finished training
   const showTabs = canManageTraining && (isOngoing || isFinished);
@@ -188,20 +230,51 @@ function ParallaxScrollContent({
           )}
         </View>
 
-        {/* Title + Status */}
-        <TrainingHero
-          training={training}
-          colors={colors}
-          onAutoCloseExpired={onAutoCloseExpired}
-        />
+        {/* Title + Status - Long press for details */}
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onLongPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            onShowTrainingDetails();
+          }}
+          delayLongPress={400}
+        >
+          <TrainingHero
+            training={training}
+            colors={colors}
+            onAutoCloseExpired={onAutoCloseExpired}
+          />
+        </TouchableOpacity>
 
         {/* Quick Stats - Colored Chips */}
         <View style={styles.chipsRow}>
-          <View style={[styles.chip, { backgroundColor: colors.primary + '15' }]}>
+          {/* Drills Progress */}
+          <View style={[styles.chip, styles.chipWithIcon, { backgroundColor: colors.primary + '15' }]}>
+            <Target size={12} color={colors.primary} />
             <Text style={[styles.chipText, { color: colors.primary }]}>
               {completedCount}/{drills.length} drills
             </Text>
           </View>
+
+          {/* Active Users - Show during ongoing/finished when there are sessions */}
+          {(isOngoing || isFinished) && activeUsersCount > 0 && (
+            <View style={[styles.chip, styles.chipWithIcon, { backgroundColor: colors.green + '15' }]}>
+              <Users size={12} color={colors.green} />
+              <Text style={[styles.chipText, { color: colors.green }]}>
+                {activeUsersCount} active
+              </Text>
+            </View>
+          )}
+
+          {/* Time Remaining - Only during ongoing with auto-close */}
+          {isOngoing && timeRemaining && (
+            <View style={[styles.chip, styles.chipWithIcon, { backgroundColor: colors.orange + '15' }]}>
+              <Timer size={12} color={colors.orange} />
+              <Text style={[styles.chipText, { color: colors.orange }]}>
+                {timeRemaining}
+              </Text>
+            </View>
+          )}
 
           <TouchableOpacity
             style={[
@@ -434,6 +507,9 @@ export default function TrainingDetailScreen() {
   const [trainingWatchPreference, setTrainingWatchPreference] = useState<boolean | null>(null);
   const [showWatchPrompt, setShowWatchPrompt] = useState(false);
   const [pendingDrillForWatch, setPendingDrillForWatch] = useState<any>(null);
+  
+  // Training details modal (long press)
+  const [showTrainingDetails, setShowTrainingDetails] = useState(false);
   
   // Garmin connection status
   const isWatchConnected = useIsGarminConnected();
@@ -907,6 +983,7 @@ export default function TrainingDetailScreen() {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           setShowCommanderActions(true);
         }}
+        onShowTrainingDetails={() => setShowTrainingDetails(true)}
         // Watch preference props
         isWatchConnected={isWatchConnected}
         trainingWatchPreference={trainingWatchPreference}
@@ -1094,6 +1171,120 @@ export default function TrainingDetailScreen() {
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* Training Details Modal - Long Press */}
+      <Modal
+        visible={showTrainingDetails}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowTrainingDetails(false)}
+      >
+        <TouchableOpacity 
+          style={styles.detailsOverlay}
+          activeOpacity={1}
+          onPress={() => setShowTrainingDetails(false)}
+        >
+          <View style={[styles.detailsCard, { backgroundColor: colors.card }]}>
+            {/* Header */}
+            <View style={styles.detailsHeader}>
+              <Text style={[styles.detailsTitle, { color: colors.text }]}>Training Details</Text>
+              <TouchableOpacity onPress={() => setShowTrainingDetails(false)}>
+                <AlertCircle size={24} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Stats Grid */}
+            <View style={styles.detailsGrid}>
+              {/* Drills Progress */}
+              <View style={[styles.detailsItem, { backgroundColor: colors.secondary }]}>
+                <Target size={20} color={colors.primary} />
+                <Text style={[styles.detailsItemValue, { color: colors.text }]}>
+                  {completedCount}/{drills.length}
+                </Text>
+                <Text style={[styles.detailsItemLabel, { color: colors.textMuted }]}>
+                  Drills Completed
+                </Text>
+              </View>
+
+              {/* Active Users */}
+              <View style={[styles.detailsItem, { backgroundColor: colors.secondary }]}>
+                <Users size={20} color={colors.green} />
+                <Text style={[styles.detailsItemValue, { color: colors.text }]}>
+                  {new Set(teamSessions.map((s: SessionWithDetails) => s.user_id)).size}
+                </Text>
+                <Text style={[styles.detailsItemLabel, { color: colors.textMuted }]}>
+                  Active Users
+                </Text>
+              </View>
+
+              {/* Total Sessions */}
+              <View style={[styles.detailsItem, { backgroundColor: colors.secondary }]}>
+                <CheckCircle2 size={20} color={colors.blue} />
+                <Text style={[styles.detailsItemValue, { color: colors.text }]}>
+                  {teamSessions.length}
+                </Text>
+                <Text style={[styles.detailsItemLabel, { color: colors.textMuted }]}>
+                  Total Sessions
+                </Text>
+              </View>
+
+              {/* Time Info */}
+              <View style={[styles.detailsItem, { backgroundColor: colors.secondary }]}>
+                <Clock size={20} color={colors.orange} />
+                <Text style={[styles.detailsItemValue, { color: colors.text }]}>
+                  {training?.auto_close_at 
+                    ? formatDistanceToNow(new Date(training.auto_close_at), { addSuffix: false })
+                    : '—'
+                  }
+                </Text>
+                <Text style={[styles.detailsItemLabel, { color: colors.textMuted }]}>
+                  {training?.auto_close_at ? 'Time Remaining' : 'No Auto-Close'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Additional Info */}
+            <View style={[styles.detailsSection, { borderTopColor: colors.border }]}>
+              {training?.description && (
+                <View style={styles.detailsRow}>
+                  <Text style={[styles.detailsRowLabel, { color: colors.textMuted }]}>Description</Text>
+                  <Text style={[styles.detailsRowValue, { color: colors.text }]} numberOfLines={2}>
+                    {training.description}
+                  </Text>
+                </View>
+              )}
+              
+              <View style={styles.detailsRow}>
+                <Text style={[styles.detailsRowLabel, { color: colors.textMuted }]}>Scheduled</Text>
+                <Text style={[styles.detailsRowValue, { color: colors.text }]}>
+                  {format(new Date(training?.scheduled_at || Date.now()), 'PPp')}
+                </Text>
+              </View>
+
+              {training?.started_at && (
+                <View style={styles.detailsRow}>
+                  <Text style={[styles.detailsRowLabel, { color: colors.textMuted }]}>Started</Text>
+                  <Text style={[styles.detailsRowValue, { color: colors.text }]}>
+                    {format(new Date(training.started_at), 'PPp')}
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.detailsRow}>
+                <Text style={[styles.detailsRowLabel, { color: colors.textMuted }]}>Created by</Text>
+                <Text style={[styles.detailsRowValue, { color: colors.text }]}>
+                  {training?.creator?.full_name || 'Unknown'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Hint */}
+            <Text style={[styles.detailsHint, { color: colors.textMuted }]}>
+              Tap anywhere to close
+            </Text>
+          </View>
+        </TouchableOpacity>
       </Modal>
     </View>
   );
@@ -1337,5 +1528,75 @@ const styles = StyleSheet.create({
   watchPromptBtnText: {
     fontSize: 15,
     fontWeight: '500',
+  },
+  // Training Details Modal
+  detailsOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  detailsCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 20,
+    padding: 20,
+  },
+  detailsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  detailsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  detailsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 16,
+  },
+  detailsItem: {
+    width: '48%',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    gap: 6,
+  },
+  detailsItemValue: {
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  detailsItemLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  detailsSection: {
+    borderTopWidth: 1,
+    paddingTop: 16,
+    gap: 12,
+  },
+  detailsRow: {
+    gap: 4,
+  },
+  detailsRowLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  detailsRowValue: {
+    fontSize: 14,
+  },
+  detailsHint: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 16,
+    fontStyle: 'italic',
   },
 });

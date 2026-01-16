@@ -8,15 +8,13 @@ import type { SessionStats, SessionTargetWithResults, SessionWithDetails } from 
 // DRILL PROGRESS
 // ============================================================================
 export interface DrillProgress {
-  rounds: number;
-  targetsPerRound: number;
-  bulletsPerRound: number | null;
-  requiredRounds: number;
+  strings: number;
+  bulletsPerString: number | null;
+  requiredBullets: number;
   requiredTargets: number;
   shotsProgress: number;
   targetsProgress: number;
   isComplete: boolean;
-  meetsAccuracy: boolean;
   meetsTime: boolean;
   overTime: boolean;
   isPaper: boolean;

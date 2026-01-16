@@ -53,7 +53,7 @@ export interface DrillConfig {
   target_type: 'paper' | 'tactical';
   input_method?: 'scan' | 'manual' | null; // User's explicit choice
   distance_m: number;
-  rounds_per_shooter: number;
+  bullets: number;  // DB column: rounds_per_shooter
   time_limit_seconds?: number | null;
   strings_count?: number | null; // Number of entries allowed (null = unlimited)
   /** Shooting position: prone, standing, kneeling, sitting */
@@ -135,30 +135,33 @@ export interface SessionDrillConfig {
   target_type: 'paper' | 'tactical'; // Secondary: input method hint
   input_method?: 'scan' | 'manual' | null; // Commander's explicit choice (overrides target_type inference)
   distance_m: number;
-  rounds_per_shooter: number;
+  bullets: number;  // DB column: rounds_per_shooter
   time_limit_seconds?: number | null;
-  par_time_seconds?: number | null;
-  scoring_mode?: string | null;
-  min_accuracy_percent?: number | null;
-  points_per_hit?: number | null;
-  penalty_per_miss?: number | null;
-  target_count?: number | null;
-  target_size?: string | null;
-  shots_per_target?: number | null;
-  target_exposure_seconds?: number | null;
   position?: string | null;
-  start_position?: string | null;
-  weapon_category?: string | null;
   strings_count?: number | null;
-  reload_required?: boolean | null;
-  movement_type?: string | null;
-  movement_distance_m?: number | null;
-  difficulty?: string | null;
   category?: string | null;
-  instructions?: string | null;
-  safety_notes?: string | null;
   /** Custom detection sensitivity in G-force (user calibrated) */
   detection_sensitivity?: number | null;
+  
+  // === LEGACY FIELDS (deprecated - kept for backward compatibility) ===
+  /** @deprecated Use bullets instead */ rounds_per_shooter?: number;
+  /** @deprecated */ par_time_seconds?: number | null;
+  /** @deprecated */ scoring_mode?: string | null;
+  /** @deprecated */ min_accuracy_percent?: number | null;
+  /** @deprecated */ points_per_hit?: number | null;
+  /** @deprecated */ penalty_per_miss?: number | null;
+  /** @deprecated */ target_count?: number | null;
+  /** @deprecated */ target_size?: string | null;
+  /** @deprecated */ shots_per_target?: number | null;
+  /** @deprecated */ target_exposure_seconds?: number | null;
+  /** @deprecated */ start_position?: string | null;
+  /** @deprecated */ weapon_category?: string | null;
+  /** @deprecated */ reload_required?: boolean | null;
+  /** @deprecated */ movement_type?: string | null;
+  /** @deprecated */ movement_distance_m?: number | null;
+  /** @deprecated */ difficulty?: string | null;
+  /** @deprecated */ instructions?: string | null;
+  /** @deprecated */ safety_notes?: string | null;
 }
 
 /** Aggregated session statistics (computed from targets) */
