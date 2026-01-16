@@ -54,6 +54,17 @@ export default function ProtectedLayout() {
             headerBackVisible: false,
           }}
         />
+
+        {/* Team Context - Dynamic route for team workspace */}
+        <Stack.Screen
+          name="team/[teamId]"
+          options={{
+            headerShown: false,
+            presentation: "card",
+            gestureEnabled: true,
+            contentStyle: { backgroundColor: colors.background },
+          }}
+        />
         
         <Stack.Screen
           name="profileSheet"
@@ -162,6 +173,20 @@ export default function ProtectedLayout() {
             sheetGrabberVisible: true,
             contentStyle: { backgroundColor: colors.card },
             sheetAllowedDetents: [0.85, 0.95],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+          }}
+        />
+
+        <Stack.Screen
+          name="teamsList"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.background },
+            sheetAllowedDetents: [0.7, 0.95],
             sheetInitialDetentIndex: 0,
             sheetLargestUndimmedDetentIndex: -1,
           }}

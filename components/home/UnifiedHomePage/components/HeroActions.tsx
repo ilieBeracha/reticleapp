@@ -11,7 +11,7 @@
 import type { UserWeapon, WeaponStats } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { Calendar, ChevronRight, Crosshair, Play, Target, Zap } from 'lucide-react-native';
+import { ChevronRight, Crosshair, Play, Target, Zap } from 'lucide-react-native';
 import { useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
@@ -148,11 +148,6 @@ export function HeroActions({
     onTrainingPress(training);
   };
 
-  const handleViewAllTeam = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/(protected)/(tabs)/team');
-  };
-
   // Format time from scheduled_date or scheduled_at
   const formatTime = (training: TodayTraining) => {
     const dateString = training.scheduled_at || training.scheduled_date;
@@ -214,15 +209,10 @@ export function HeroActions({
         >
           {defaultWeapon ? (
             <>
-              <View style={[s.statIcon, { backgroundColor: `${colors.indigo}15` }]}>
+              <View style={[s.statIcon, { backgroundColor: `${colors.indigo}15` , marginBottom: 2 }]}>
                 <Crosshair size={12} color={colors.indigo} />
               </View>
-              <Text style={[s.statValue, { color: colors.text }]} numberOfLines={1}>
-                {defaultWeapon.name.length > 6 ? defaultWeapon.name.slice(0, 5) + '…' : defaultWeapon.name}
-              </Text>
-              <Text style={[s.statLabel, { color: colors.textMuted }]} numberOfLines={1}>
-                {defaultWeapon.caliber || 'Weapon'}
-              </Text>
+              <Text style={[s.statValue, { color: colors.textMuted }]}>Current Loadout</Text>
             </>
           ) : (
             <>
@@ -235,103 +225,9 @@ export function HeroActions({
           )}
         </AnimatedTouchable>
 
-        {/* Weapon Stats - 25% */}
-        <AnimatedTouchable
-          style={[
-            s.statCard,
-            { backgroundColor: colors.card, borderColor: colors.border },
-            statsAnimStyle,
-          ]}
-          onPress={handleStatsPress}
-          onPressIn={() => { statsScale.value = withSpring(0.95); }}
-          onPressOut={() => { statsScale.value = withSpring(1); }}
-          activeOpacity={1}
-        >
-          {defaultWeaponStats ? (
-            <>
-              <View style={[s.statIcon, { backgroundColor: `${colors.green}15` }]}>
-                <Target size={12} color={colors.green} />
-              </View>
-              <Text style={[s.statValue, { color: colors.text }]}>
-                {formatNumber(defaultWeaponStats.total_rounds_fired)}
-              </Text>
-              <Text style={[s.statLabel, { color: colors.textMuted }]}>Rounds</Text>
-            </>
-          ) : (
-            <>
-              <View style={[s.statIcon, { backgroundColor: `${colors.green}15` }]}>
-                <Target size={12} color={colors.green} />
-              </View>
-              <Text style={[s.statValue, { color: colors.textMuted }]}>0</Text>
-              <Text style={[s.statLabel, { color: colors.textMuted }]}>Rounds</Text>
-            </>
-          )}
-        </AnimatedTouchable>
       </View>
 
-      {/* ─────────────────────────────────────────────────────────────────── */}
-      {/* TEAM COMING UP - Only shows if there are today's trainings */}
-      {/* ─────────────────────────────────────────────────────────────────── */}
-      {hasTodayTrainings && (
-        <View style={[s.comingUpSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={s.comingUpHeader}>
-            <View style={s.comingUpTitleRow}>
-              <Calendar size={12} color={colors.textMuted} />
-              <Text style={[s.comingUpTitle, { color: colors.textMuted }]}>TODAY</Text>
-            </View>
-            {todayTrainings.length > 2 && (
-              <TouchableOpacity onPress={handleViewAllTeam} activeOpacity={0.7}>
-                <Text style={[s.viewAllText, { color: colors.primary }]}>View all</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <View style={s.trainingsList}>
-            {todayTrainings.slice(0, 2).map((training, index) => {
-              const isLive = training.status === 'ongoing';
-              
-              return (
-                <TouchableOpacity
-                  key={training.id}
-                  style={[
-                    s.trainingItem,
-                    { borderColor: isLive ? colors.orange : 'transparent' },
-                    isLive && { backgroundColor: `${colors.orange}08` },
-                    index < Math.min(todayTrainings.length, 2) - 1 && { marginBottom: 6 },
-                  ]}
-                  onPress={() => handleTrainingItemPress(training)}
-                  activeOpacity={0.7}
-                >
-                  <View style={s.trainingItemLeft}>
-                    {isLive ? (
-                      <View style={[s.liveIndicator, { backgroundColor: colors.orange }]}>
-                        <Animated.View style={[s.liveDot, pulseStyle]} />
-                      </View>
-                    ) : (
-                      <View style={[s.timeIndicator, { backgroundColor: colors.secondary }]}>
-                        <Text style={[s.timeText, { color: colors.textMuted }]}>
-                          {formatTime(training)}
-                        </Text>
-                      </View>
-                    )}
-                    <View style={s.trainingInfo}>
-                      <Text style={[s.trainingTitle, { color: colors.text }]} numberOfLines={1}>
-                        {training.title}
-                      </Text>
-                      {training.team?.name && (
-                        <Text style={[s.teamName, { color: colors.textMuted }]} numberOfLines={1}>
-                          {training.team.name}
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                  <ChevronRight size={14} color={colors.border} />
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-      )}
+    
     </Animated.View>
   );
 }

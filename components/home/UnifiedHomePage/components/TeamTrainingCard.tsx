@@ -85,14 +85,14 @@ const s = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
+    padding: 8,
     borderRadius: 14,
     borderWidth: 1,
     gap: 12,
   },
   icon: {
-    width: 42,
-    height: 42,
+    width: 36,
+    height: 36,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',

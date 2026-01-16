@@ -1,26 +1,26 @@
 /**
  * UnifiedHomePage
  *
- * Elegant, flowing layout with personal overview first,
- * team content below, and coach-like guidance throughout.
- *
- * This component is the main orchestrator - it uses the hook for state
- * and delegates rendering to sub-components.
+ * Clean, organized layout with three distinct sections:
+ * - ME: Personal overview, quick actions, coach guidance
+ * - TEAM: Team training and collaboration
+ * - LAST WEEK: Recent activity and performance stats
  */
 
 import { useColors } from '@/hooks/ui/useColors';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { Clock, History } from 'lucide-react-native';
+import { Calendar, Clock, History, Users } from 'lucide-react-native';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { styles } from './UnifiedHomePage.styles';
 import {
   CoachMessage,
   DailyTip,
   HeroActions,
   HomeHeader,
-  RecentActivitySection
+  RecentActivitySection,
+  TeamSection,
 } from './components';
 import { WeeklyStatsCard } from './components/WeeklyStatsCard';
 import { useUnifiedHomePage } from './useUnifiedHomePage';
@@ -66,11 +66,12 @@ export function UnifiedHomePage() {
     homeState,
     weeklyStats,
     streak,
-    lastSessionDaysAgo,
     coachMessage,
     recentSessions,
+    upcomingTrainings,
     todayTrainings,
     hasActiveSession,
+    hasTeams,
     allSessions,
     defaultWeapon,
     defaultWeaponStats,
@@ -113,91 +114,128 @@ export function UnifiedHomePage() {
           />
         }
       >
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* HEADER */}
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        <HomeHeader
-          greeting={greeting}
-          firstName={firstName}
-          avatarUrl={avatarUrl}
-          fallbackInitial={fallbackInitial}
-          isGarminConnected={isGarminConnected}
-          colors={colors}
-        />
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* SECTION: ME                                                         */}
+        {/* Personal overview, quick actions, and coach guidance                */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        <Animated.View entering={FadeInDown.duration(300)} style={localStyles.sectionContainer}>
+          {/* Section Header */}
+        
 
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* COACH MESSAGE */}
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        <CoachMessage message={coachMessage} colors={colors} />
+          {/* Header with greeting */}
+          <HomeHeader
+            greeting={greeting}
+            firstName={firstName}
+            avatarUrl={avatarUrl}
+            fallbackInitial={fallbackInitial}
+            isGarminConnected={isGarminConnected}
+            colors={colors}
+          />
 
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* SECTION: QUICK ACTIONS */}
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        <Text style={[localStyles.sectionTitle, { color: colors.textMuted }]}>QUICK ACTIONS</Text>
-        <HeroActions
-          colors={colors}
-          activeSession={homeState.activeSession}
-          hasActiveSession={!!hasActiveSession}
-          starting={starting}
-          onStartSession={handleStartSession}
-          onActiveSessionPress={handleActiveSessionPress}
-          defaultWeapon={defaultWeapon}
-          defaultWeaponStats={defaultWeaponStats}
-          todayTrainings={todayTrainings}
-          onTrainingPress={handleTrainingPress}
-        />
+          {/* Coach Message */}
+          <CoachMessage message={coachMessage} colors={colors} />
 
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* SECTION: THIS WEEK */}
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        <Text style={[localStyles.sectionTitle, { color: colors.textMuted }]}>THIS WEEK</Text>
-        <DailyTip
-          colors={colors}
-          streak={streak}
-          accuracy={weeklyStats.accuracy}
-          sessionsThisWeek={weeklyStats.sessions}
-          totalSessions={allSessions.length}
-        />
-        <WeeklyStatsCard stats={weeklyStats} streak={streak} colors={colors} />
+          {/* Quick Actions */}
+          <HeroActions
+            colors={colors}
+            activeSession={homeState.activeSession}
+            hasActiveSession={!!hasActiveSession}
+            starting={starting}
+            onStartSession={handleStartSession}
+            onActiveSessionPress={handleActiveSessionPress}
+            defaultWeapon={defaultWeapon}
+            defaultWeaponStats={defaultWeaponStats}
+            todayTrainings={todayTrainings}
+            onTrainingPress={handleTrainingPress}
+          />
+        </Animated.View>
 
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* SECTION: RECENT ACTIVITY */}
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        <Text style={[localStyles.sectionTitle, { color: colors.textMuted }]}>RECENT ACTIVITY</Text>
-        <RecentActivitySection
-          sessions={recentSessions}
-          colors={colors}
-          onSessionPress={handleSessionPress}
-        />
+        {/* Section Divider */}
+        <View style={[localStyles.sectionDivider, { backgroundColor: colors.border }]} />
 
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* VIEW ALL SESSIONS LINK */}
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        <Animated.View entering={FadeIn.delay(200)}>
-          <AnimatedTouchable
-            style={[localStyles.viewAllLink, { backgroundColor: colors.card, borderColor: colors.border }, viewAllAnimStyle]}
-            onPress={handleViewAllPress}
-            onPressIn={handleViewAllPressIn}
-            onPressOut={handleViewAllPressOut}
-            activeOpacity={1}
-          >
-            <View style={localStyles.viewAllContent}>
-              <View style={[localStyles.viewAllIcon, { backgroundColor: `${colors.primary}12` }]}>
-                <History size={16} color={colors.primary} />
-              </View>
-              <View>
-                <Text style={[localStyles.viewAllTitle, { color: colors.text }]}>
-                  {recentSessions.length > 0 ? 'View All Sessions' : 'Session History'}
-                </Text>
-                <Text style={[localStyles.viewAllSubtitle, { color: colors.textMuted }]}>
-                  {recentSessions.length > 0 ? 'Browse full history' : 'Your training log'}
-                </Text>
-              </View>
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* SECTION: TEAM                                                       */}
+        {/* Team training and collaboration                                     */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        <Animated.View entering={FadeInDown.duration(300).delay(100)} style={localStyles.sectionContainer}>
+          {/* Section Header */}
+          <View style={localStyles.sectionHeader}>
+            <View style={[localStyles.sectionIcon, { backgroundColor: `${colors.orange}15` }]}>
+              <Users size={14} color={colors.orange} />
             </View>
-            <View style={[localStyles.viewAllArrow, { backgroundColor: colors.secondary }]}>
-              <Clock size={13} color={colors.textMuted} />
+            <Text style={[localStyles.sectionLabel, { color: colors.textMuted }]}>TEAM</Text>
+          </View>
+
+          {/* Team Content */}
+          <TeamSection
+            trainings={upcomingTrainings}
+            hasTeams={hasTeams}
+            colors={colors}
+            onTrainingPress={handleTrainingPress}
+          />
+        </Animated.View>
+
+        {/* Section Divider */}
+        <View style={[localStyles.sectionDivider, { backgroundColor: colors.border }]} />
+
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* SECTION: LAST WEEK                                                  */}
+        {/* Recent activity and performance stats                               */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        <Animated.View entering={FadeInDown.duration(300).delay(200)} style={localStyles.sectionContainer}>
+          {/* Section Header */}
+          <View style={localStyles.sectionHeader}>
+            <View style={[localStyles.sectionIcon, { backgroundColor: `${colors.green}15` }]}>
+              <Calendar size={14} color={colors.green} />
             </View>
-          </AnimatedTouchable>
+            <Text style={[localStyles.sectionLabel, { color: colors.textMuted }]}>LAST WEEK</Text>
+          </View>
+
+          {/* Weekly Stats */}
+          <DailyTip
+            colors={colors}
+            streak={streak}
+            accuracy={weeklyStats.accuracy}
+            sessionsThisWeek={weeklyStats.sessions}
+            totalSessions={allSessions.length}
+          />
+          <WeeklyStatsCard stats={weeklyStats} streak={streak} colors={colors} />
+
+          {/* Recent Activity */}
+          <Text style={[localStyles.subsectionTitle, { color: colors.textMuted }]}>Recent Sessions</Text>
+          <RecentActivitySection
+            sessions={recentSessions}
+            colors={colors}
+            onSessionPress={handleSessionPress}
+          />
+
+          {/* View All Sessions Link */}
+          <Animated.View entering={FadeIn.delay(300)}>
+            <AnimatedTouchable
+              style={[localStyles.viewAllLink, { backgroundColor: colors.card, borderColor: colors.border }, viewAllAnimStyle]}
+              onPress={handleViewAllPress}
+              onPressIn={handleViewAllPressIn}
+              onPressOut={handleViewAllPressOut}
+              activeOpacity={1}
+            >
+              <View style={localStyles.viewAllContent}>
+                <View style={[localStyles.viewAllIcon, { backgroundColor: `${colors.primary}12` }]}>
+                  <History size={16} color={colors.primary} />
+                </View>
+                <View>
+                  <Text style={[localStyles.viewAllTitle, { color: colors.text }]}>
+                    {recentSessions.length > 0 ? 'View All Sessions' : 'Session History'}
+                  </Text>
+                  <Text style={[localStyles.viewAllSubtitle, { color: colors.textMuted }]}>
+                    {recentSessions.length > 0 ? 'Browse full history' : 'Your training log'}
+                  </Text>
+                </View>
+              </View>
+              <View style={[localStyles.viewAllArrow, { backgroundColor: colors.secondary }]}>
+                <Clock size={13} color={colors.textMuted} />
+              </View>
+            </AnimatedTouchable>
+          </Animated.View>
         </Animated.View>
 
         {/* Bottom spacing */}
@@ -208,13 +246,47 @@ export function UnifiedHomePage() {
 }
 
 const localStyles = StyleSheet.create({
-  sectionTitle: {
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 0.8,
-    marginBottom: 8,
-    marginTop: 6,
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SECTION STRUCTURE
+  // ═══════════════════════════════════════════════════════════════════════════
+  sectionContainer: {
+    paddingVertical: 4,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  sectionIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+  },
+  sectionDivider: {
+    height: 1,
+    marginVertical: 8,
+    opacity: 0.5,
+  },
+  subsectionTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginTop: 16,
+    marginBottom: 10,
+    textTransform: 'uppercase',
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // VIEW ALL LINK
+  // ═══════════════════════════════════════════════════════════════════════════
   viewAllLink: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -222,7 +294,7 @@ const localStyles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    marginTop: 4,
+    marginTop: 12,
   },
   viewAllContent: {
     flexDirection: 'row',

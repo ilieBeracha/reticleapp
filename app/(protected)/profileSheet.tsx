@@ -1,7 +1,7 @@
 /**
  * Profile Sheet
  * 
- * Personal account settings displayed as a bottom sheet.
+ * Unified settings: profile, teams & integrations, system config.
  */
 import { BaseAvatar } from '@/components/shared/Avatar';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,19 +9,19 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
 import { useNotifications } from '@/hooks/useNotifications';
-import { sendTestNotification } from '@/services/notifications';
+import { useTeamStore } from '@/store/teamStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -38,23 +38,23 @@ export default function ProfileSheet() {
   const { signOut, profileAvatarUrl } = useAuth();
   const { isEnabled: notificationsEnabled, requestPermission } = useNotifications();
   const { preference, setPreference } = useTheme();
+  const { teams } = useTeamStore();
   const [showThemeOptions, setShowThemeOptions] = useState(false);
 
-  const handleTestNotification = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  const avatarUri = profileAvatarUrl;
+  const fallbackInitial = fullName?.charAt(0)?.toUpperCase() || email?.charAt(0)?.toUpperCase() || 'U';
 
-    if (!notificationsEnabled) {
-      const granted = await requestPermission();
-      if (!granted) {
-        await delay(2000);
-        Alert.alert('Notifications Disabled', 'Please enable notifications in your device settings.', [{ text: 'OK' }]);
-        return;
-      }
-    }
+  const handleViewTeams = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/(protected)/teamsList' as any);
+  }, []);
 
-    await sendTestNotification();
-    Alert.alert('Notification Scheduled', 'You will receive a test notification in 3 seconds.');
-  }, [notificationsEnabled, requestPermission]);
+  const handleIntegrations = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/(protected)/integrations' as any);
+  }, []);
+
+  
 
   const handleSignOut = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -74,9 +74,6 @@ export default function ProfileSheet() {
     ]);
   }, [signOut]);
 
-  const avatarUri = profileAvatarUrl;
-  const fallbackInitial = fullName?.charAt(0)?.toUpperCase() || email?.charAt(0)?.toUpperCase() || 'U';
-
   return (
     <ScrollView
       style={[styles.scrollView, { backgroundColor: colors.card }]}
@@ -86,18 +83,11 @@ export default function ProfileSheet() {
     >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Profile</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
       </View>
 
-      {/* Profile Card */}
-      <TouchableOpacity
-        style={[styles.profileCard, { backgroundColor: colors.background }]}
-        activeOpacity={0.7}
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          router.push('/(protected)/userMenu' as any);
-        }}
-      >
+      {/* 1. Profile Card */}
+      <View style={[styles.profileCard, { backgroundColor: colors.background }]}>
         <BaseAvatar
           source={avatarUri ? { uri: avatarUri } : undefined}
           fallbackText={fallbackInitial}
@@ -112,12 +102,45 @@ export default function ProfileSheet() {
             {email || 'No email'}
           </Text>
         </View>
-        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-      </TouchableOpacity>
+      </View>
 
-      {/* Settings Section */}
+      {/* 2. Teams & Integrations */}
       <View style={styles.section}>
-        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>SETTINGS</Text>
+        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>PERSONAL</Text>
+
+        <View style={[styles.menuGroup, { backgroundColor: colors.background }]}>
+          {/* My Teams */}
+          <TouchableOpacity style={styles.menuItem} onPress={handleViewTeams}>
+            <View style={[styles.iconContainer, { backgroundColor: colors.primary }]}>
+              <Ionicons name="people" size={18} color="#fff" />
+            </View>
+            <View style={styles.menuItemContent}>
+              <Text style={[styles.menuItemText, { color: colors.text }]}>My Teams</Text>
+              <Text style={[styles.menuItemSubtitle, { color: colors.textMuted }]}>
+                {teams.length > 0 ? `${teams.length} team${teams.length !== 1 ? 's' : ''}` : 'Join or create a team'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </TouchableOpacity>
+
+          {/* Integrations */}
+          <View style={[styles.separator, { backgroundColor: colors.border }]} />
+          <TouchableOpacity style={styles.menuItem} onPress={handleIntegrations}>
+            <View style={[styles.iconContainer, { backgroundColor: '#22C55E' }]}>
+              <Ionicons name="extension-puzzle" size={18} color="#fff" />
+            </View>
+            <View style={styles.menuItemContent}>
+              <Text style={[styles.menuItemText, { color: colors.text }]}>Integrations</Text>
+              <Text style={[styles.menuItemSubtitle, { color: colors.textMuted }]}>Garmin, Apple Watch</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* 3. System Settings */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>SYSTEM</Text>
 
         <View style={[styles.menuGroup, { backgroundColor: colors.background }]}>
           {/* Notifications Toggle */}
@@ -150,16 +173,7 @@ export default function ProfileSheet() {
           </View>
 
           {/* Test Notification */}
-          <View style={[styles.separator, { backgroundColor: colors.border }]} />
-          <TouchableOpacity style={styles.menuItem} onPress={handleTestNotification}>
-            <View style={[styles.iconContainer, { backgroundColor: colors.textMuted }]}>
-              <Ionicons name="notifications-outline" size={18} color="#fff" />
-            </View>
-            <View style={styles.menuItemContent}>
-              <Text style={[styles.menuItemText, { color: colors.text }]}>Test Notification</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-          </TouchableOpacity>
+          
 
           {/* Appearance */}
           <View style={[styles.separator, { backgroundColor: colors.border }]} />
@@ -227,25 +241,6 @@ export default function ProfileSheet() {
               })}
             </View>
           )}
-
-          {/* Integrations */}
-          <View style={[styles.separator]} />
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push('/(protected)/integrations' as any);
-            }}
-          >
-            <View style={[styles.iconContainer, { backgroundColor: '#22C55E' }]}>
-              <Ionicons name="extension-puzzle" size={18} color="#fff" />
-            </View>
-            <View style={styles.menuItemContent}>
-              <Text style={[styles.menuItemText, { color: colors.text }]}>Integrations</Text>
-              <Text style={[styles.menuItemSubtitle, { color: colors.textMuted }]}>Garmin, Apple Watch</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-          </TouchableOpacity>
 
           {/* Help & Support */}
           <View style={[styles.separator, { backgroundColor: colors.border }]} />

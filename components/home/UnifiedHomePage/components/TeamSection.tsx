@@ -2,8 +2,11 @@
  * TeamSection Component
  * 
  * Displays team training section with upcoming trainings or empty state.
+ * Navigates to team context (/team/[teamId]) for team-related actions.
  */
 
+import { useTeamStore } from '@/store/teamStore';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { Calendar, ChevronRight, Users } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -18,6 +21,23 @@ export function TeamSection({
   colors, 
   onTrainingPress 
 }: TeamSectionProps) {
+  const { teams, activeTeamId } = useTeamStore();
+
+  // Navigate to team context
+  const handleViewTeam = (teamId?: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const targetTeamId = teamId || activeTeamId || teams[0]?.id;
+    if (targetTeamId) {
+      router.push(`/(protected)/team/${targetTeamId}`);
+    }
+  };
+
+  // Navigate to create/join team flow
+  const handleJoinTeam = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/(protected)/createTeam');
+  };
+
   return (
     <Animated.View entering={FadeInUp.duration(350).delay(100)} style={styles.section}>
       <View style={styles.sectionHeader}>
@@ -35,6 +55,16 @@ export function TeamSection({
               onPress={() => onTrainingPress(training)}
             />
           ))}
+          
+          {/* View Team button when there are trainings */}
+          <TouchableOpacity
+            style={[localStyles.viewTeamBtn, { borderColor: colors.border }]}
+            onPress={() => handleViewTeam(trainings[0]?.team_id)}
+            activeOpacity={0.7}
+          >
+            <Text style={[localStyles.viewTeamText, { color: colors.primary }]}>View Team</Text>
+            <ChevronRight size={14} color={colors.primary} />
+          </TouchableOpacity>
         </View>
       ) : hasTeams ? (
         <View style={[styles.emptyTeam, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -44,16 +74,16 @@ export function TeamSection({
           </Text>
           <TouchableOpacity
             style={styles.viewScheduleBtn}
-            onPress={() => router.push('/(protected)/(tabs)/team')}
+            onPress={() => handleViewTeam()}
           >
-            <Text style={[styles.viewScheduleText, { color: colors.primary }]}>Schedule</Text>
+            <Text style={[styles.viewScheduleText, { color: colors.primary }]}>View Schedule</Text>
             <ChevronRight size={14} color={colors.primary} />
           </TouchableOpacity>
         </View>
       ) : (
         <TouchableOpacity 
           style={[localStyles.joinTeamCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={() => router.push('/(protected)/(tabs)/team')}
+          onPress={handleJoinTeam}
           activeOpacity={0.7}
         >
           <View style={[localStyles.joinTeamIcon, { backgroundColor: colors.secondary }]}>
@@ -91,4 +121,18 @@ const localStyles = StyleSheet.create({
   joinTeamContent: { flex: 1, gap: 2 },
   joinTeamTitle: { fontSize: 14, fontWeight: '600' },
   joinTeamText: { fontSize: 12 },
+  viewTeamBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 8,
+    marginTop: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  viewTeamText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
 });

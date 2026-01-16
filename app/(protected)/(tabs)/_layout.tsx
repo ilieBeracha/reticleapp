@@ -6,11 +6,12 @@ import { Platform } from 'react-native';
 /**
  * Main Tab Layout
  *
- * 4 tabs:
- * - Team: Teams, calendar, trainings (with internal tabs)
+ * 3 tabs:
+ * - Home: Central hub for all user data
  * - Insight: Shooting stats and analytics
- * - Home: Dashboard (center)
- * - Profile: Personal settings
+ * - Loadout: Weapons and equipment
+ *
+ * Team context is accessed via push navigation from Home (/team/[teamId])
  */
 
 const getTabIcon = (sfSymbol: string, ionicon: keyof typeof Ionicons.glyphMap): any => {
@@ -53,15 +54,6 @@ export default function TabsLayout() {
         options={{
           title: 'Loadout',
           tabBarIcon: ({ focused }) => getTabIcon('scope', focused ? 'aperture' : 'aperture-outline'),
-        }}
-      />
-
-      <Tabs.Screen
-        name="team"
-        options={{
-          role: 'search',
-          title: 'Team',
-          tabBarIcon: ({ focused }) => getTabIcon('person.2', focused ? 'people' : 'people-outline'),
         }}
       />
     </Tabs>

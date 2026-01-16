@@ -155,22 +155,6 @@ export async function clearDeliveredNotifications(): Promise<void> {
 // NOTIFICATION TEMPLATES
 // ═══════════════════════════════════════════════════════════════════════════
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TESTING
-// ─────────────────────────────────────────────────────────────────────────────
-
-export async function sendTestNotification(): Promise<string> {
-  return scheduleNotification({
-    title: 'Test Notification',
-    body: 'This is a test notification from Reticle!',
-    data: { type: 'reminder', screen: 'personal' },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-      seconds: 3,
-      channelId: 'default',
-    },
-  });
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TRAININGS
