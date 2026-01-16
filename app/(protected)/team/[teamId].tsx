@@ -10,7 +10,7 @@
  */
 
 import { NoTeamsEmptyState } from '@/components/teams/NoTeamsEmptyState';
-import { TeamSwitcherPill, TeamSwitcherSheet } from '@/components/teams/TeamSwitcherSheet';
+import { TeamSwitcherPill } from '@/components/teams/TeamSwitcherSheet';
 import { COLORS, PULSE_ANIMATION } from '@/components/training/trainings.constants';
 import { groupTrainingsByTimeframe } from '@/components/training/trainings.helpers';
 import { useColors } from '@/hooks/ui/useColors';
@@ -121,7 +121,6 @@ export default function TeamContextScreen() {
   const { teamTrainings, loadTeamTrainings, loadingTeamTrainings } = useTrainingStore();
 
   const [refreshing, setRefreshing] = useState(false);
-  const [switcherOpen, setSwitcherOpen] = useState(false);
   const [members, setMembers] = useState<TeamMemberWithProfile[]>([]);
   const [sessionStats, setSessionStats] = useState<{ shots: number; sessions: number; accuracy: number }>({ shots: 0, sessions: 0, accuracy: 0 });
 
@@ -201,7 +200,7 @@ export default function TeamContextScreen() {
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>{activeTeam.name}</Text>
         </View>
         {showSwitcher ? (
-          <TeamSwitcherPill onPress={() => setSwitcherOpen(true)} />
+          <TeamSwitcherPill />
         ) : roleConfig ? (
           <View style={[styles.roleBadge, { backgroundColor: roleConfig.color + '15' }]}>
             <Text style={[styles.roleText, { color: roleConfig.color }]}>{roleConfig.label}</Text>
@@ -473,7 +472,6 @@ export default function TeamContextScreen() {
         )}
       </ScrollView>
 
-      <TeamSwitcherSheet visible={switcherOpen} onClose={() => setSwitcherOpen(false)} />
     </View>
   );
 }

@@ -107,6 +107,20 @@ export default function ProtectedLayout() {
             sheetLargestUndimmedDetentIndex: -1,
           }}
         />
+
+        <Stack.Screen
+          name="teamSwitcher"
+          options={{
+            headerShown: false,
+            presentation: "formSheet",
+            gestureEnabled: true,
+            sheetGrabberVisible: true,
+            contentStyle: { backgroundColor: colors.card },
+            sheetAllowedDetents: [0.5, 0.75],
+            sheetInitialDetentIndex: 0,
+            sheetLargestUndimmedDetentIndex: -1,
+          }}
+        />
         
         <Stack.Screen
           name="createTeam"
