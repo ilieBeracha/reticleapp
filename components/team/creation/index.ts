@@ -8,4 +8,4 @@
 export { WeaponPolicyStep } from './WeaponPolicyStep';
 
 // Types
-export type { WeaponPolicyStepProps, PolicyCardProps } from './WeaponPolicyStep.types';
+export type { PolicyCardProps, WeaponPolicyStepProps } from './WeaponPolicyStep.types';

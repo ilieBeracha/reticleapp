@@ -45,9 +45,9 @@ import {
   type UserWeapon,
 } from '@/services/weaponService';
 import { toSessionWeatherData } from '@/services/weather';
+import { useGarminDevice, useIsGarminConnected } from '@/store/garminStore';
 import { useSessionStore } from '@/store/sessionStore';
 import { useTeamStore } from '@/store/teamStore';
-import { useGarminDevice, useIsGarminConnected } from '@/store/garminStore';
 import type { Drill } from '@/types/workspace';
 import { format, formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';

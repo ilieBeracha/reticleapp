@@ -5,19 +5,19 @@
  * Handles team context, data loading, and navigation.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { getTeamMembers } from '@/services/teamService';
 import { getRecentSessionsWithStats } from '@/services/session/queries';
+import { getTeamMembers } from '@/services/teamService';
 import { useTeamContext, useTeamPermissions, useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
 import type { TeamMemberWithProfile, TrainingWithDetails } from '@/types/workspace';
 
-import type { InternalTab, UseTrainingsReturn } from './trainings.types';
 import { calculateMemberStats, calculateTeamStatsFromSessions, getRoleConfig, type SessionStatsData } from './trainings.helpers';
+import type { InternalTab, UseTrainingsReturn } from './trainings.types';
 
 export function useTrainings(): UseTrainingsReturn {
   // Team context - single source of truth
@@ -57,10 +57,10 @@ export function useTrainings(): UseTrainingsReturn {
     }, [activeTeamId, loadTeamTrainings])
   );
 
-  // Load team members for stats (Manage tab) and team view (Team tab for soldiers)
+  // Load team members (for unified Team tab - visible to all roles)
   useFocusEffect(
     useCallback(() => {
-      if (activeTeamId && (activeTab === 'manage' || activeTab === 'team')) {
+      if (activeTeamId && activeTab === 'team') {
         getTeamMembers(activeTeamId)
           .then(setMembers)
           .catch(console.error);
@@ -68,10 +68,10 @@ export function useTrainings(): UseTrainingsReturn {
     }, [activeTeamId, activeTab])
   );
 
-  // Load session stats for team (Manage tab - "This Week" section)
+  // Load session stats for team (for commanders - "This Week" section in Team tab)
   useFocusEffect(
     useCallback(() => {
-      if (activeTeamId && activeTab === 'manage') {
+      if (activeTeamId && activeTab === 'team' && canManage) {
         getRecentSessionsWithStats({ days: 7, limit: 100, teamId: activeTeamId })
           .then((sessions) => {
             // Extract stats data for calculation
@@ -84,7 +84,7 @@ export function useTrainings(): UseTrainingsReturn {
           })
           .catch(console.error);
       }
-    }, [activeTeamId, activeTab])
+    }, [activeTeamId, activeTab, canManage])
   );
 
   const onRefresh = useCallback(async () => {
@@ -93,31 +93,32 @@ export function useTrainings(): UseTrainingsReturn {
     await loadTeams();
     if (activeTeamId) {
       await loadTeamTrainings(activeTeamId);
-      if (activeTab === 'manage' || activeTab === 'team') {
+      // Load members for unified Team tab (visible to all roles)
+      if (activeTab === 'team') {
         try {
           const membersData = await getTeamMembers(activeTeamId);
           setMembers(membersData);
         } catch (e) {
           console.error(e);
         }
-      }
-      // Refresh session stats for manage tab
-      if (activeTab === 'manage') {
-        try {
-          const sessions = await getRecentSessionsWithStats({ days: 7, limit: 100, teamId: activeTeamId });
-          const statsData: SessionStatsData[] = sessions.map(s => ({
-            shots_fired: s.stats?.shots_fired ?? 0,
-            accuracy_pct: s.stats?.accuracy_pct ?? 0,
-            started_at: s.started_at,
-          }));
-          setSessionStats(statsData);
-        } catch (e) {
-          console.error(e);
+        // Refresh session stats for commanders
+        if (canManage) {
+          try {
+            const sessions = await getRecentSessionsWithStats({ days: 7, limit: 100, teamId: activeTeamId });
+            const statsData: SessionStatsData[] = sessions.map(s => ({
+              shots_fired: s.stats?.shots_fired ?? 0,
+              accuracy_pct: s.stats?.accuracy_pct ?? 0,
+              started_at: s.started_at,
+            }));
+            setSessionStats(statsData);
+          } catch (e) {
+            console.error(e);
+          }
         }
       }
     }
     setRefreshing(false);
-  }, [loadTeams, loadTeamTrainings, activeTeamId, activeTab]);
+  }, [loadTeams, loadTeamTrainings, activeTeamId, activeTab, canManage]);
 
   // ============================================================================
   // COMPUTED DATA

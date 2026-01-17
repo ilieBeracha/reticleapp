@@ -771,6 +771,105 @@ export async function getWeaponPickerData(options: WeaponPickerOptions = {}): Pr
 
 
 // ============================================================================
+// UNIFIED LOADOUT: Get all accessible weapons for the user
+// ============================================================================
+
+export type WeaponSource = 'personal' | 'team_assigned' | 'team_pool';
+
+export interface AccessibleWeapon {
+  id: string;
+  name: string;
+  category: WeaponCategory | null;
+  caliber: string | null;
+  source: WeaponSource;
+  teamId?: string;
+  teamName?: string;
+  // Stats (optional, populated separately)
+  stats?: WeaponStats;
+  // Original data
+  userWeapon?: UserWeapon;
+  teamWeapon?: TeamWeapon;
+}
+
+/**
+ * Get all weapons accessible to the current user across all sources:
+ * - Personal weapons (user_weapons)
+ * - Team-assigned weapons (team_weapons where assigned_to = user)
+ * - Team pool weapons (team_weapons available to user's teams)
+ */
+export async function getAllAccessibleWeapons(): Promise<AccessibleWeapon[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  // Get user's teams
+  const { data: teamMembers } = await supabase
+    .from('team_members')
+    .select('team_id, teams!inner(id, name)')
+    .eq('user_id', user.id);
+
+  const userTeams = (teamMembers ?? []).map((tm: any) => ({
+    id: tm.team_id,
+    name: tm.teams?.name ?? 'Unknown Team',
+  }));
+
+  const teamIds = userTeams.map(t => t.id);
+  const teamNameMap = new Map(userTeams.map(t => [t.id, t.name]));
+
+  // Parallel fetch all weapon sources
+  const [personalWeapons, teamWeapons] = await Promise.all([
+    getUserWeapons(),
+    teamIds.length > 0
+      ? supabase
+          .from('team_weapons')
+          .select('*, base_weapon:weapons(*)')
+          .in('team_id', teamIds)
+          .eq('is_active', true)
+          .order('name')
+          .then(({ data, error }) => {
+            if (error) throw error;
+            return data || [];
+          })
+      : Promise.resolve([]),
+  ]);
+
+  const result: AccessibleWeapon[] = [];
+
+  // Add personal weapons
+  personalWeapons.forEach(w => {
+    result.push({
+      id: w.id,
+      name: w.name,
+      category: w.category,
+      caliber: w.caliber || w.base_weapon?.caliber || null,
+      source: 'personal',
+      userWeapon: w,
+    });
+  });
+
+  // Add team weapons (distinguish assigned vs pool)
+  (teamWeapons as TeamWeapon[]).forEach(tw => {
+    // Skip if user already has a personal weapon linked to this team weapon
+    const isLinkedToPersonal = personalWeapons.some(pw => pw.team_weapon_id === tw.id);
+    if (isLinkedToPersonal) return;
+
+    const isAssignedToMe = tw.assigned_to === user.id;
+    
+    result.push({
+      id: tw.id,
+      name: tw.name,
+      category: tw.category,
+      caliber: tw.caliber || tw.base_weapon?.caliber || null,
+      source: isAssignedToMe ? 'team_assigned' : 'team_pool',
+      teamId: tw.team_id,
+      teamName: teamNameMap.get(tw.team_id),
+      teamWeapon: tw,
+    });
+  });
+
+  return result;
+}
+
+// ============================================================================
 // WEAPON ASSIGNMENT (Commander manages team weapons)
 // ============================================================================
 

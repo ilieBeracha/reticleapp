@@ -1062,43 +1062,48 @@ $$;
 ALTER FUNCTION "public"."create_session"("p_workspace_type" "text", "p_workspace_owner_id" "uuid", "p_org_workspace_id" "uuid", "p_team_id" "uuid", "p_session_mode" "text", "p_session_data" "jsonb") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."create_team_with_owner"("p_name" "text", "p_description" "text" DEFAULT NULL::"text", "p_squads" "text"[] DEFAULT ARRAY[]::"text"[]) RETURNS "jsonb"
+CREATE TABLE IF NOT EXISTS "public"."teams" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "name" "text" NOT NULL,
+    "team_type" "text",
+    "description" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "squads" "text"[] DEFAULT ARRAY[]::"text"[],
+    "created_by" "uuid" NOT NULL,
+    CONSTRAINT "teams_team_type_check" CHECK (("team_type" = ANY (ARRAY['field'::"text", 'back_office'::"text"])))
+);
+
+
+ALTER TABLE "public"."teams" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."teams" IS 'Teams within organizations';
+
+
+
+COMMENT ON COLUMN "public"."teams"."squads" IS 'Optional array of squad names within this team. Users can create squads on-demand.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."create_team_with_owner"("p_name" "text", "p_description" "text" DEFAULT NULL::"text", "p_squads" "text"[] DEFAULT ARRAY[]::"text"[]) RETURNS "public"."teams"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
 DECLARE
-    v_user_id uuid;
-    v_team_id uuid;
-    v_team jsonb;
+  v_user_id UUID := auth.uid();
+  v_team public.teams;
 BEGIN
-    -- Get current user
-    v_user_id := auth.uid();
-    IF v_user_id IS NULL THEN
-        RAISE EXCEPTION 'Not authenticated';
-    END IF;
-    
-    -- Create team
-    INSERT INTO public.teams (name, description, squads, created_by)
-    VALUES (p_name, p_description, p_squads, v_user_id)
-    RETURNING id INTO v_team_id;
-    
-    -- Add creator as owner
-    INSERT INTO public.team_members (team_id, user_id, role)
-    VALUES (v_team_id, v_user_id, 'owner');
-    
-    -- Return team data
-    SELECT jsonb_build_object(
-        'id', t.id,
-        'name', t.name,
-        'description', t.description,
-        'squads', t.squads,
-        'created_by', t.created_by,
-        'created_at', t.created_at
-    ) INTO v_team
-    FROM public.teams t
-    WHERE t.id = v_team_id;
-    
-    RETURN v_team;
+  -- Create the team
+  INSERT INTO public.teams (name, description, squads, created_by)
+  VALUES (p_name, p_description, p_squads, v_user_id)
+  RETURNING * INTO v_team;
+
+  -- Add creator as owner
+  INSERT INTO public.team_members (team_id, user_id, role)
+  VALUES (v_team.id, v_user_id, 'owner');
+
+  RETURN v_team;
 END;
 $$;
 
@@ -3222,30 +3227,6 @@ CREATE TABLE IF NOT EXISTS "public"."team_weapons" (
 ALTER TABLE "public"."team_weapons" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."teams" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "name" "text" NOT NULL,
-    "team_type" "text",
-    "description" "text",
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "squads" "text"[] DEFAULT ARRAY[]::"text"[],
-    "created_by" "uuid" NOT NULL,
-    CONSTRAINT "teams_team_type_check" CHECK (("team_type" = ANY (ARRAY['field'::"text", 'back_office'::"text"])))
-);
-
-
-ALTER TABLE "public"."teams" OWNER TO "postgres";
-
-
-COMMENT ON TABLE "public"."teams" IS 'Teams within organizations';
-
-
-
-COMMENT ON COLUMN "public"."teams"."squads" IS 'Optional array of squad names within this team. Users can create squads on-demand.';
-
-
-
 CREATE TABLE IF NOT EXISTS "public"."training_drills" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "training_id" "uuid" NOT NULL,
@@ -3321,7 +3302,7 @@ COMMENT ON COLUMN "public"."training_drills"."instance_notes" IS 'Training-speci
 
 CREATE TABLE IF NOT EXISTS "public"."trainings" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "team_id" "uuid",
+    "team_id" "uuid" NOT NULL,
     "title" "text" NOT NULL,
     "description" "text",
     "scheduled_at" timestamp with time zone NOT NULL,
@@ -3339,6 +3320,10 @@ CREATE TABLE IF NOT EXISTS "public"."trainings" (
 
 
 ALTER TABLE "public"."trainings" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."trainings"."team_id" IS 'Team that owns this training. Required - trainings always belong to a team.';
+
 
 
 COMMENT ON COLUMN "public"."trainings"."manual_start" IS 'If true, commander starts training manually. If false, training auto-starts at scheduled_at time.';
@@ -4365,6 +4350,10 @@ CREATE POLICY "Commanders can create presets" ON "public"."team_drill_presets" F
 
 
 
+CREATE POLICY "Commanders can create trainings" ON "public"."trainings" FOR INSERT WITH CHECK ((("created_by" = "auth"."uid"()) AND "public"."is_team_admin"("team_id")));
+
+
+
 CREATE POLICY "Commanders can delete presets" ON "public"."team_drill_presets" FOR DELETE USING (("team_id" IN ( SELECT "team_members"."team_id"
    FROM "public"."team_members"
   WHERE (("team_members"."user_id" = "auth"."uid"()) AND ("team_members"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text"]))))));
@@ -4490,6 +4479,10 @@ CREATE POLICY "Owners and commanders can delete invitations" ON "public"."team_i
 
 
 
+CREATE POLICY "Owners and commanders can delete trainings" ON "public"."trainings" FOR DELETE USING ("public"."is_team_admin"("team_id"));
+
+
+
 CREATE POLICY "Owners and commanders can remove members" ON "public"."team_members" FOR DELETE USING (("public"."is_team_admin"("team_id") OR ("user_id" = "auth"."uid"())));
 
 
@@ -4518,7 +4511,7 @@ CREATE POLICY "Owners and commanders can update teams" ON "public"."teams" FOR U
 
 
 
-CREATE POLICY "Owners and commanders can update trainings" ON "public"."trainings" FOR UPDATE USING ((("created_by" = "auth"."uid"()) OR (("team_id" IS NOT NULL) AND "public"."is_team_admin"("team_id"))));
+CREATE POLICY "Owners and commanders can update trainings" ON "public"."trainings" FOR UPDATE USING ("public"."is_team_admin"("team_id"));
 
 
 
@@ -4824,7 +4817,7 @@ CREATE POLICY "Users can view targets from own sessions" ON "public"."session_ta
 
 
 
-CREATE POLICY "Users can view team trainings" ON "public"."trainings" FOR SELECT USING ((("created_by" = "auth"."uid"()) OR (("team_id" IS NOT NULL) AND "public"."is_team_member"("team_id"))));
+CREATE POLICY "Users can view team trainings" ON "public"."trainings" FOR SELECT USING ((("team_id" IS NOT NULL) AND "public"."is_team_member"("team_id")));
 
 
 
@@ -5026,6 +5019,12 @@ GRANT ALL ON TABLE "public"."sessions" TO "service_role";
 GRANT ALL ON FUNCTION "public"."create_session"("p_workspace_type" "text", "p_workspace_owner_id" "uuid", "p_org_workspace_id" "uuid", "p_team_id" "uuid", "p_session_mode" "text", "p_session_data" "jsonb") TO "anon";
 GRANT ALL ON FUNCTION "public"."create_session"("p_workspace_type" "text", "p_workspace_owner_id" "uuid", "p_org_workspace_id" "uuid", "p_team_id" "uuid", "p_session_mode" "text", "p_session_data" "jsonb") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."create_session"("p_workspace_type" "text", "p_workspace_owner_id" "uuid", "p_org_workspace_id" "uuid", "p_team_id" "uuid", "p_session_mode" "text", "p_session_data" "jsonb") TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."teams" TO "anon";
+GRANT ALL ON TABLE "public"."teams" TO "authenticated";
+GRANT ALL ON TABLE "public"."teams" TO "service_role";
 
 
 
@@ -5392,12 +5391,6 @@ GRANT ALL ON TABLE "public"."team_standards" TO "service_role";
 GRANT ALL ON TABLE "public"."team_weapons" TO "anon";
 GRANT ALL ON TABLE "public"."team_weapons" TO "authenticated";
 GRANT ALL ON TABLE "public"."team_weapons" TO "service_role";
-
-
-
-GRANT ALL ON TABLE "public"."teams" TO "anon";
-GRANT ALL ON TABLE "public"."teams" TO "authenticated";
-GRANT ALL ON TABLE "public"."teams" TO "service_role";
 
 
 

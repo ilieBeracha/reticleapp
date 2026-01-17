@@ -7,7 +7,8 @@ import type { TeamMemberWithProfile, TrainingWithDetails } from '@/types/workspa
 // ============================================================================
 // TAB TYPES
 // ============================================================================
-export type InternalTab = 'calendar' | 'manage' | 'team';
+// Unified tabs - same for all roles (soldiers and commanders see same tabs)
+export type InternalTab = 'calendar' | 'team';
 
 // ============================================================================
 // ROLE CONFIG

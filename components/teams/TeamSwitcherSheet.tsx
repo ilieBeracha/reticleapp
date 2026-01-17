@@ -10,23 +10,23 @@ import type { TeamWithRole } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import {
-    Check,
-    ChevronDown,
-    Crown,
-    Plus,
-    Shield,
-    Target,
-    UserPlus,
-    Users,
+  Check,
+  ChevronDown,
+  Crown,
+  Plus,
+  Shield,
+  Target,
+  UserPlus,
+  Users,
 } from 'lucide-react-native';
 import { useCallback } from 'react';
 import {
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 

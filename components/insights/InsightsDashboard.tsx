@@ -1,86 +1,132 @@
 /**
- * Insights Dashboard
- * 
- * Main analytics screen with session overview and single analysis entry point.
+ * Insights Dashboard (Redesigned)
+ *
+ * Main analytics screen with five progressive sections:
+ * 1. Totals / Performance Snapshot
+ * 2. Strengths
+ * 3. Weaknesses
+ * 4. Trends
+ * 5. Recommendations
+ *
+ * Philosophy: Insights ≠ Dashboard
+ * - Dashboard = what happened
+ * - Insights = what it means + what to do next
  */
 
 import { useColors } from '@/hooks/ui/useColors';
 import { getRecentSessionsWithStats, type SessionWithDetails } from '@/services/sessionService';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
+import { Clock, History } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-
-import { EmptyState, StreakCard, useInsightsData } from './index';
 import {
-  AllTimeStatsCard,
-  DistanceBreakdownCard,
-  MonthlyComparisonCard,
-  SessionTypeCard,
-  ShotGoalCard,
-  TrainingConsistencyCard,
-} from './widgets';
+  ActivityIndicator,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+
+import { EvidenceSheet } from './EvidenceSheet';
+import { computeInsights } from './insights.engine';
+import {
+  ComputedInsights,
+  DEFAULT_FILTERS,
+  EvidenceContext,
+  InsightsFilters,
+  Recommendation,
+  StrengthCard,
+  TotalsMetric,
+  TrendData,
+  WeaknessCard,
+} from './insights.types';
+import { InsightsFilterBar } from './InsightsFilterBar';
+import {
+  RecommendationsSection,
+  StrengthsSection,
+  TotalsSection,
+  TrendsSection,
+  WeaknessesSection,
+} from './sections';
 
 // ============================================================================
-// TYPES
+// CONSTANTS
 // ============================================================================
 
-type TimeFilter = 'week' | 'month' | 'year' | 'all';
+const MIN_SESSIONS_MESSAGE = 5;
 
 // ============================================================================
-// COMPONENTS
+// EMPTY STATE COMPONENT
 // ============================================================================
 
-function TimeFilterPill({ 
-  filter, 
-  selected, 
-  onPress, 
-  colors 
-}: { 
-  filter: TimeFilter; 
-  selected: boolean; 
-  onPress: () => void;
+interface EmptyStateProps {
   colors: ReturnType<typeof useColors>;
-}) {
-  const labels: Record<TimeFilter, string> = {
-    week: '7D',
-    month: '30D',
-    year: '1Y',
-    all: 'All',
-  };
-  
-  return (
-    <TouchableOpacity
-      style={[
-        styles.timePill,
-        { backgroundColor: selected ? colors.primary : colors.card }
-      ]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <Text style={[
-        styles.timePillText,
-        { color: selected ? '#fff' : colors.textMuted }
-      ]}>
-        {labels[filter]}
-      </Text>
-    </TouchableOpacity>
-  );
+  onStartSession: () => void;
 }
 
-function QuickStat({ value, label, colors }: { value: string; label: string; colors: ReturnType<typeof useColors> }) {
+function EmptyState({ colors, onStartSession }: EmptyStateProps) {
   return (
-    <View style={styles.quickStat}>
-      <Text style={[styles.quickStatValue, { color: colors.text }]}>{value}</Text>
-      <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>{label}</Text>
+    <View style={[styles.emptyContainer, { backgroundColor: colors.card }]}>
+      <View style={[styles.emptyIconContainer, { backgroundColor: `${colors.primary}10` }]}>
+        <Ionicons name="analytics" size={32} color={colors.primary} />
+      </View>
+      <Text style={[styles.emptyTitle, { color: colors.text }]}>
+        Start Building Your Insights
+      </Text>
+      <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+        Complete your first sessions to unlock personalized performance analysis
+      </Text>
+      <TouchableOpacity
+        style={[styles.emptyButton, { backgroundColor: colors.primary }]}
+        onPress={onStartSession}
+      >
+        <Text style={styles.emptyButtonText}>Start Training</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
-function SectionTitle({ children }: { children: string }) {
-  const colors = useColors();
+// ============================================================================
+// NOT ENOUGH DATA STATE
+// ============================================================================
+
+interface NotEnoughDataProps {
+  colors: ReturnType<typeof useColors>;
+  currentSessions: number;
+  minRequired: number;
+}
+
+function NotEnoughDataState({ colors, currentSessions, minRequired }: NotEnoughDataProps) {
+  const progress = Math.min(currentSessions / minRequired, 1);
+
   return (
-    <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{children}</Text>
+    <View style={[styles.notEnoughContainer, { backgroundColor: colors.card }]}>
+      <View style={[styles.progressIconContainer, { backgroundColor: `${colors.primary}10` }]}>
+        <Ionicons name="hourglass" size={24} color={colors.primary} />
+      </View>
+      <Text style={[styles.notEnoughTitle, { color: colors.text }]}>
+        Building Your Profile
+      </Text>
+      <Text style={[styles.notEnoughText, { color: colors.textMuted }]}>
+        {minRequired - currentSessions} more session{minRequired - currentSessions !== 1 ? 's' : ''} needed for full insights
+      </Text>
+      {/* Progress bar */}
+      <View style={[styles.progressBarContainer, { backgroundColor: colors.background }]}>
+        <View
+          style={[
+            styles.progressBarFill,
+            { width: `${progress * 100}%`, backgroundColor: colors.primary },
+          ]}
+        />
+      </View>
+      <Text style={[styles.progressText, { color: colors.textMuted }]}>
+        {currentSessions} of {minRequired} sessions
+      </Text>
+    </View>
   );
 }
 
@@ -92,76 +138,126 @@ export function InsightsDashboard() {
   const colors = useColors();
   const router = useRouter();
 
-  const { sessions: storeSessions, isLoading: storeLoading, onRefresh: storeRefresh } = useInsightsData();
-
-  const [sessionsWithStats, setSessionsWithStats] = useState<SessionWithDetails[]>([]);
-  const [loadingStats, setLoadingStats] = useState(true);
+  // Data state
+  const [sessions, setSessions] = useState<SessionWithDetails[]>([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
 
-  const loadSessionsWithStats = useCallback(async () => {
+  // Filter state
+  const [filters, setFilters] = useState<InsightsFilters>(DEFAULT_FILTERS);
+
+  // Evidence sheet state
+  const [evidenceContext, setEvidenceContext] = useState<EvidenceContext | null>(null);
+  const [showEvidence, setShowEvidence] = useState(false);
+
+  // Load sessions
+  const loadSessions = useCallback(async () => {
     try {
-      const sessions = await getRecentSessionsWithStats({ days: 365, limit: 500 });
-      setSessionsWithStats(sessions);
-    } catch (error) {
-      console.error('Failed to load sessions:', error);
+      const data = await getRecentSessionsWithStats({ days: 365, limit: 500 });
+      setSessions(data);
+    } catch (e) {
+      console.error('Failed to load sessions:', e);
     } finally {
-      setLoadingStats(false);
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadSessionsWithStats();
-  }, [loadSessionsWithStats]);
+    loadSessions();
+  }, [loadSessions]);
 
+  // Refresh handler
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([storeRefresh(), loadSessionsWithStats()]);
+    await loadSessions();
     setRefreshing(false);
-  }, [storeRefresh, loadSessionsWithStats]);
+  }, [loadSessions]);
 
-  // Filter sessions by time
-  const filteredSessions = useMemo(() => {
-    if (timeFilter === 'all') return sessionsWithStats;
-    
-    const now = new Date();
-    const days = { week: 7, month: 30, year: 365 }[timeFilter];
-    const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-    
-    return sessionsWithStats.filter(s => new Date(s.started_at) >= cutoff);
-  }, [sessionsWithStats, timeFilter]);
+  // Compute insights
+  const insights: ComputedInsights = useMemo(() => {
+    return computeInsights(sessions, filters);
+  }, [sessions, filters]);
 
-  // Calculate quick stats
-  const quickStats = useMemo(() => {
-    const completed = filteredSessions.filter(s => s.status === 'completed');
-    let shots = 0, hits = 0;
-    
-    completed.forEach(s => {
-      if (s.stats) {
-        shots += s.stats.shots_fired;
-        hits += s.stats.hits_total;
-      }
+  // Handlers for evidence view
+  const openEvidenceForTotals = useCallback((metric: TotalsMetric) => {
+    setEvidenceContext({
+      insightType: 'totals',
+      insightId: metric.id,
+      title: metric.label,
+      sessionIds: metric.evidenceIds,
     });
-    
-    return {
-      sessions: completed.length,
-      shots,
-      accuracy: shots > 0 ? Math.round((hits / shots) * 100) : 0,
-    };
-  }, [filteredSessions]);
+    setShowEvidence(true);
+  }, []);
 
-  const isLoading = storeLoading || loadingStats;
+  const openEvidenceForStrength = useCallback((strength: StrengthCard) => {
+    setEvidenceContext({
+      insightType: 'strength',
+      insightId: strength.id,
+      title: strength.label,
+      sessionIds: strength.evidenceIds,
+    });
+    setShowEvidence(true);
+  }, []);
 
-  if (isLoading) {
+  const openEvidenceForWeakness = useCallback((weakness: WeaknessCard) => {
+    setEvidenceContext({
+      insightType: 'weakness',
+      insightId: weakness.id,
+      title: weakness.label,
+      sessionIds: weakness.evidenceIds,
+    });
+    setShowEvidence(true);
+  }, []);
+
+  const openEvidenceForTrend = useCallback((trend: TrendData) => {
+    setEvidenceContext({
+      insightType: 'trend',
+      insightId: trend.id,
+      title: trend.label,
+      sessionIds: trend.evidenceIds,
+    });
+    setShowEvidence(true);
+  }, []);
+
+  const openEvidenceForRecommendation = useCallback((rec: Recommendation) => {
+    setEvidenceContext({
+      insightType: 'recommendation',
+      insightId: rec.id,
+      title: rec.title,
+      sessionIds: rec.evidenceIds,
+    });
+    setShowEvidence(true);
+  }, []);
+
+  // Handle add to training plan (placeholder)
+  const handleAddToTrainingPlan = useCallback((rec: Recommendation) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    // TODO: Implement add to training plan
+    console.log('Add to training plan:', rec);
+  }, []);
+
+  // Navigate to session history
+  const goToSessionHistory = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/sessionHistory');
+  }, [router]);
+
+  // Navigate to start session
+  const goToStartSession = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push('/(protected)/(tabs)');
+  }, [router]);
+
+  // Loading state
+  if (loading) {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.textMuted} />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
-  const hasData = sessionsWithStats.length > 0;
-  const hasEnoughForAnalysis = sessionsWithStats.length >= 8;
+  const hasData = sessions.length > 0;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -170,91 +266,136 @@ export function InsightsDashboard() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.text} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.text}
+          />
         }
       >
         {/* Header */}
-        <Text style={[styles.pageTitle, { color: colors.text }]}>Insights</Text>
-
-        {/* Time Filter */}
-        <View style={styles.filterRow}>
-          {(['week', 'month', 'year', 'all'] as TimeFilter[]).map((f) => (
-            <TimeFilterPill
-              key={f}
-              filter={f}
-              selected={timeFilter === f}
-              onPress={() => setTimeFilter(f)}
-              colors={colors}
-            />
-          ))}
+        <View style={styles.headerRow}>
+          <Text style={[styles.pageTitle, { color: colors.text }]}>Insights</Text>
         </View>
 
-        {hasData ? (
-          <>
-            {/* Quick Stats */}
-            <View style={[styles.quickStatsCard, { backgroundColor: colors.card }]}>
-              <QuickStat value={String(quickStats.sessions)} label="Sessions" colors={colors} />
-              <View style={[styles.quickStatDivider, { backgroundColor: colors.border }]} />
-              <QuickStat value={`${quickStats.accuracy}%`} label="Accuracy" colors={colors} />
-              <View style={[styles.quickStatDivider, { backgroundColor: colors.border }]} />
-              <QuickStat value={quickStats.shots.toLocaleString()} label="Shots" colors={colors} />
-            </View>
+        {/* Filter Bar */}
+        {hasData && (
+          <InsightsFilterBar filters={filters} onFiltersChange={setFilters} />
+        )}
 
-            {/* Performance Analysis - Single Entry Point */}
-            {hasEnoughForAnalysis && (
-              <TouchableOpacity
-                style={[styles.analysisCard, { backgroundColor: colors.card }]}
-                onPress={() => router.push('/(protected)/analysis')}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.analysisIcon, { backgroundColor: `${colors.primary}15` }]}>
-                  <Ionicons name="analytics" size={18} color={colors.primary} />
-                </View>
-                <View style={styles.analysisText}>
-                  <Text style={[styles.analysisTitle, { color: colors.text }]}>
-                    Performance Analysis
-                  </Text>
-                  <Text style={[styles.analysisSubtitle, { color: colors.textMuted }]}>
-                    See what changed and why
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-              </TouchableOpacity>
+        {/* Content */}
+        {!hasData ? (
+          <EmptyState colors={colors} onStartSession={goToStartSession} />
+        ) : !insights.hasEnoughData ? (
+          <>
+            <NotEnoughDataState
+              colors={colors}
+              currentSessions={insights.sessionCount}
+              minRequired={insights.minSessionsRequired}
+            />
+            
+            {/* Still show totals even with limited data */}
+            {insights.totals.length > 0 && (
+              <View style={styles.section}>
+                <TotalsSection
+                  metrics={insights.totals}
+                  onMetricPress={openEvidenceForTotals}
+                />
+              </View>
             )}
 
-            {/* Links */}
+            {/* Session history link */}
             <TouchableOpacity
               style={[styles.linkCard, { backgroundColor: colors.card }]}
-              onPress={() => router.push('/sessionHistory')}
+              onPress={goToSessionHistory}
               activeOpacity={0.7}
             >
-              <Ionicons name="time-outline" size={16} color={colors.text} />
-              <Text style={[styles.linkText, { color: colors.text }]}>Session History</Text>
+              <History size={16} color={colors.text} />
+              <Text style={[styles.linkText, { color: colors.text }]}>
+                Session History
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            {/* 1. Totals / Performance Snapshot */}
+            <View style={styles.section}>
+              <TotalsSection
+                metrics={insights.totals}
+                onMetricPress={openEvidenceForTotals}
+              />
+            </View>
+
+            {/* Session history link */}
+            <TouchableOpacity
+              style={[styles.linkCard, { backgroundColor: colors.card }]}
+              onPress={goToSessionHistory}
+              activeOpacity={0.7}
+            >
+              <History size={16} color={colors.text} />
+              <Text style={[styles.linkText, { color: colors.text }]}>
+                Session History
+              </Text>
               <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </TouchableOpacity>
 
-            {/* Activity */}
-            <SectionTitle>ACTIVITY</SectionTitle>
-            <MonthlyComparisonCard sessions={filteredSessions} />
-            <TrainingConsistencyCard sessions={filteredSessions} />
-            <ShotGoalCard sessions={filteredSessions} monthlyGoal={1000} />
-            <StreakCard sessions={storeSessions} colors={colors} />
+            {/* 2. Strengths */}
+            <View style={styles.section}>
+              <StrengthsSection
+                strengths={insights.strengths}
+                onStrengthPress={openEvidenceForStrength}
+              />
+            </View>
 
-            {/* Performance */}
-            <SectionTitle>PERFORMANCE</SectionTitle>
-            <DistanceBreakdownCard sessions={filteredSessions} />
-            <SessionTypeCard sessions={filteredSessions} />
+            {/* 3. Weaknesses */}
+            <View style={styles.section}>
+              <WeaknessesSection
+                weaknesses={insights.weaknesses}
+                onWeaknessPress={openEvidenceForWeakness}
+              />
+            </View>
 
-            {/* Career */}
-            <SectionTitle>CAREER</SectionTitle>
-            <AllTimeStatsCard sessions={filteredSessions} />
+            {/* 4. Trends */}
+            <View style={styles.section}>
+              <TrendsSection
+                trends={insights.trends}
+                onTrendPress={openEvidenceForTrend}
+              />
+            </View>
+
+            {/* 5. Recommendations */}
+            <View style={styles.section}>
+              <RecommendationsSection
+                recommendations={insights.recommendations}
+                onRecommendationPress={openEvidenceForRecommendation}
+                onAddToTrainingPlan={handleAddToTrainingPlan}
+                onShowEvidence={openEvidenceForRecommendation}
+              />
+            </View>
           </>
-        ) : (
-          <EmptyState colors={colors} />
+        )}
+
+        {/* Data range info */}
+        {hasData && insights.dateRange.start && (
+          <View style={styles.dateRangeContainer}>
+            <Clock size={12} color={colors.textMuted} />
+            <Text style={[styles.dateRangeText, { color: colors.textMuted }]}>
+              Data from {new Date(insights.dateRange.start).toLocaleDateString()} to{' '}
+              {new Date(insights.dateRange.end).toLocaleDateString()}
+            </Text>
+          </View>
         )}
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
+
+      {/* Evidence Sheet */}
+      <EvidenceSheet
+        visible={showEvidence}
+        context={evidenceContext}
+        onClose={() => setShowEvidence(false)}
+      />
     </View>
   );
 }
@@ -278,95 +419,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingTop: Platform.OS === 'ios' ? 8 : 14,
   },
-  
+
   // Header
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
   pageTitle: {
     fontSize: 22,
     fontWeight: '700',
     letterSpacing: -0.3,
-    marginBottom: 14,
   },
-  
-  // Filters
-  filterRow: {
-    flexDirection: 'row',
-    gap: 6,
-    marginBottom: 16,
+
+  // Sections
+  section: {
+    marginTop: 24,
   },
-  timePill: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  timePillText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  
-  // Quick Stats
-  quickStatsCard: {
-    flexDirection: 'row',
-    borderRadius: 12,
-    paddingVertical: 14,
-    marginBottom: 10,
-  },
-  quickStat: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  quickStatValue: {
-    fontSize: 17,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
-  quickStatLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    marginTop: 2,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-  quickStatDivider: {
-    width: 1,
-    height: '70%',
-    alignSelf: 'center',
-  },
-  
-  // Analysis Card
-  analysisCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 10,
-    gap: 12,
-  },
-  analysisIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  analysisText: {
-    flex: 1,
-  },
-  analysisTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  analysisSubtitle: {
-    fontSize: 11,
-    marginTop: 1,
-  },
-  
-  // Link Card
+
+  // Link card
   linkCard: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
     borderRadius: 10,
-    marginBottom: 20,
+    marginTop: 16,
     gap: 8,
   },
   linkText: {
@@ -374,16 +452,93 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  
-  // Section
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    marginBottom: 10,
-    marginTop: 6,
+
+  // Empty state
+  emptyContainer: {
+    alignItems: 'center',
+    padding: 32,
+    borderRadius: 16,
+    marginTop: 20,
+    gap: 16,
   },
-  
+  emptyIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  emptyText: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  emptyButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  emptyButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+
+  // Not enough data
+  notEnoughContainer: {
+    alignItems: 'center',
+    padding: 24,
+    borderRadius: 16,
+    marginTop: 20,
+    gap: 12,
+  },
+  progressIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notEnoughTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  notEnoughText: {
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  progressBarContainer: {
+    width: '100%',
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  progressText: {
+    fontSize: 12,
+  },
+
+  // Date range
+  dateRangeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 32,
+  },
+  dateRangeText: {
+    fontSize: 11,
+  },
+
   bottomSpacer: {
     height: 100,
   },

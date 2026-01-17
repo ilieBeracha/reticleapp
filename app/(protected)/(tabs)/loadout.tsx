@@ -1,21 +1,27 @@
 /**
- * Loadout Screen - User's Arsenal
+ * Loadout Screen - Unified Arsenal
  *
- * Clean, compact design with weapon cards and stats overview
+ * Shows ALL weapons accessible to the user in one list:
+ * - Personal weapons
+ * - Team-assigned weapons
+ * - Team pool weapons
+ *
+ * Uses source filters instead of separate routes.
  */
 
 import { CreateWeaponFlow, WeaponPicker } from '@/components/weapons';
 import { getCategoryConfig } from '@/constants/weaponCategories';
 import { useColors } from '@/hooks/ui/useColors';
-import { getMyTeams } from '@/services/teamService';
 import {
   createUserWeapon,
+  getAllAccessibleWeapons,
   getDefaultWeaponId,
-  getUserWeapons,
   getWeaponStats,
   setDefaultWeaponId,
+  type AccessibleWeapon,
   type GlobalWeapon,
   type UserWeapon,
+  type WeaponSource,
   type WeaponStats,
 } from '@/services/weaponService';
 import type { WeaponCategory } from '@/types/workspace';
@@ -28,6 +34,7 @@ import {
   Plus,
   Star,
   Target,
+  User,
   Users,
   Zap,
 } from 'lucide-react-native';
@@ -43,6 +50,19 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+type SourceFilter = 'all' | 'personal' | 'team_assigned' | 'team_pool';
+
+const SOURCE_FILTER_CONFIG: Record<SourceFilter, { label: string; shortLabel: string }> = {
+  all: { label: 'All', shortLabel: 'All' },
+  personal: { label: 'Personal', shortLabel: 'Mine' },
+  team_assigned: { label: 'Assigned', shortLabel: 'Assigned' },
+  team_pool: { label: 'Team Pool', shortLabel: 'Pool' },
+};
 
 // ============================================================================
 // HELPERS
@@ -61,10 +81,96 @@ function getCategoryIcon(category: WeaponCategory | null, color: string) {
   }
 }
 
+function getSourceIcon(source: WeaponSource, color: string, size = 10) {
+  switch (source) {
+    case 'personal':
+      return <User size={size} color={color} />;
+    case 'team_assigned':
+      return <Star size={size} color={color} />;
+    case 'team_pool':
+      return <Users size={size} color={color} />;
+  }
+}
+
+function getSourceConfig(source: WeaponSource) {
+  switch (source) {
+    case 'personal':
+      return { label: 'Personal', color: '#10B981', bg: '#10B98115' };
+    case 'team_assigned':
+      return { label: 'Assigned', color: '#3B82F6', bg: '#3B82F615' };
+    case 'team_pool':
+      return { label: 'Pool', color: '#8B5CF6', bg: '#8B5CF615' };
+  }
+}
+
 function formatNumber(num: number): string {
   if (num >= 10000) return `${(num / 1000).toFixed(0)}k`;
   if (num >= 1000) return `${(num / 1000).toFixed(1)}k`;
   return num.toString();
+}
+
+// ============================================================================
+// FILTER PILLS COMPONENT
+// ============================================================================
+
+interface SourceFilterPillsProps {
+  selected: SourceFilter;
+  onChange: (filter: SourceFilter) => void;
+  counts: Record<SourceFilter, number>;
+  colors: ReturnType<typeof useColors>;
+}
+
+function SourceFilterPills({ selected, onChange, counts, colors }: SourceFilterPillsProps) {
+  const filters: SourceFilter[] = ['all', 'personal', 'team_assigned', 'team_pool'];
+  
+  // Only show filters that have weapons (except 'all' which is always shown)
+  const visibleFilters = filters.filter(f => f === 'all' || counts[f] > 0);
+  
+  // If only personal weapons exist, don't show filters at all
+  if (visibleFilters.length <= 2 && counts.personal === counts.all) {
+    return null;
+  }
+
+  return (
+    <View style={s.filterRow}>
+      {visibleFilters.map((filter) => {
+        const isSelected = selected === filter;
+        const config = SOURCE_FILTER_CONFIG[filter];
+        const count = counts[filter];
+        
+        return (
+          <TouchableOpacity
+            key={filter}
+            style={[
+              s.filterPill,
+              { backgroundColor: isSelected ? colors.primary : colors.card },
+            ]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onChange(filter);
+            }}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                s.filterPillText,
+                { color: isSelected ? '#fff' : colors.textMuted },
+              ]}
+            >
+              {config.shortLabel}
+            </Text>
+            {filter !== 'all' && count > 0 && (
+              <View style={[s.filterCount, { backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : colors.secondary }]}>
+                <Text style={[s.filterCountText, { color: isSelected ? '#fff' : colors.textMuted }]}>
+                  {count}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
 }
 
 // ============================================================================
@@ -104,7 +210,7 @@ function StatsOverview({ weaponCount, totalSessions, totalRounds, colors }: Stat
 // ============================================================================
 
 interface WeaponCardProps {
-  weapon: UserWeapon;
+  weapon: AccessibleWeapon;
   stats: WeaponStats | undefined;
   isDefault: boolean;
   onPress: () => void;
@@ -114,6 +220,7 @@ interface WeaponCardProps {
 
 function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }: WeaponCardProps) {
   const categoryConfig = weapon.category ? getCategoryConfig(weapon.category) : null;
+  const sourceConfig = getSourceConfig(weapon.source);
 
   return (
     <TouchableOpacity
@@ -139,9 +246,24 @@ function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }:
               </View>
             )}
           </View>
-          <Text style={[s.cardMeta, { color: colors.textMuted }]} numberOfLines={1}>
-            {categoryConfig?.label || 'Weapon'}{weapon.caliber ? ` · ${weapon.caliber}` : ''}
-          </Text>
+          <View style={s.cardMetaRow}>
+            {/* Source badge */}
+            <View style={[s.sourceBadge, { backgroundColor: sourceConfig.bg }]}>
+              {getSourceIcon(weapon.source, sourceConfig.color)}
+              <Text style={[s.sourceBadgeText, { color: sourceConfig.color }]}>
+                {sourceConfig.label}
+              </Text>
+            </View>
+            <Text style={[s.cardMeta, { color: colors.textMuted }]} numberOfLines={1}>
+              {categoryConfig?.label || 'Weapon'}{weapon.caliber ? ` · ${weapon.caliber}` : ''}
+            </Text>
+          </View>
+          {/* Team name for team weapons */}
+          {weapon.teamName && (
+            <Text style={[s.teamNameText, { color: colors.textMuted }]} numberOfLines={1}>
+              {weapon.teamName}
+            </Text>
+          )}
         </View>
 
         {/* Stats inline */}
@@ -151,22 +273,24 @@ function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }:
           </Text>
         </View>
 
-        {/* Actions */}
-        <TouchableOpacity
-          style={[s.starBtn, { backgroundColor: isDefault ? '#f59e0b15' : 'transparent' }]}
-          onPress={(e) => {
-            e.stopPropagation();
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            onSetDefault();
-          }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Star
-            size={14}
-            color={isDefault ? '#f59e0b' : colors.textMuted}
-            fill={isDefault ? '#f59e0b' : 'none'}
-          />
-        </TouchableOpacity>
+        {/* Actions - only show star for personal weapons */}
+        {weapon.source === 'personal' && (
+          <TouchableOpacity
+            style={[s.starBtn, { backgroundColor: isDefault ? '#f59e0b15' : 'transparent' }]}
+            onPress={(e) => {
+              e.stopPropagation();
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onSetDefault();
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Star
+              size={14}
+              color={isDefault ? '#f59e0b' : colors.textMuted}
+              fill={isDefault ? '#f59e0b' : 'none'}
+            />
+          </TouchableOpacity>
+        )}
 
         <ChevronRight size={14} color={colors.border} />
       </View>
@@ -184,25 +308,23 @@ export default function LoadoutScreen() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [weapons, setWeapons] = useState<UserWeapon[]>([]);
+  const [weapons, setWeapons] = useState<AccessibleWeapon[]>([]);
   const [weaponStats, setWeaponStats] = useState<Map<string, WeaponStats>>(new Map());
-  const [hasTeams, setHasTeams] = useState(false);
   const [showAddWeapon, setShowAddWeapon] = useState(false);
   const [showWeaponPicker, setShowWeaponPicker] = useState(false);
   const [defaultWeaponId, setDefaultWeaponIdState] = useState<string | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
 
   const loadData = useCallback(async () => {
     try {
-      const [weaponsData, statsData, teamsData, storedDefaultId] = await Promise.all([
-        getUserWeapons(),
+      const [weaponsData, statsData, storedDefaultId] = await Promise.all([
+        getAllAccessibleWeapons(),
         getWeaponStats(),
-        getMyTeams(),
         getDefaultWeaponId(),
       ]);
 
       setWeapons(weaponsData);
       setWeaponStats(statsData);
-      setHasTeams(teamsData.length > 0);
       setDefaultWeaponIdState(storedDefaultId);
     } catch (error) {
       console.error('[LoadoutScreen] Failed to load data:', error);
@@ -223,23 +345,55 @@ export default function LoadoutScreen() {
     loadData();
   }, [loadData]);
 
-  // Aggregate stats
+  // Filter counts for pills
+  const filterCounts = useMemo(() => {
+    const counts: Record<SourceFilter, number> = {
+      all: weapons.length,
+      personal: 0,
+      team_assigned: 0,
+      team_pool: 0,
+    };
+    weapons.forEach(w => {
+      counts[w.source]++;
+    });
+    return counts;
+  }, [weapons]);
+
+  // Filtered weapons
+  const filteredWeapons = useMemo(() => {
+    if (sourceFilter === 'all') return weapons;
+    return weapons.filter(w => w.source === sourceFilter);
+  }, [weapons, sourceFilter]);
+
+  // Aggregate stats for filtered weapons
   const totalStats = useMemo(() => {
     let sessions = 0;
     let rounds = 0;
-    weaponStats.forEach((s) => {
-      sessions += s.total_sessions;
-      rounds += s.total_rounds_fired;
+    filteredWeapons.forEach((w) => {
+      const stats = weaponStats.get(w.id);
+      if (stats) {
+        sessions += stats.total_sessions;
+        rounds += stats.total_rounds_fired;
+      }
     });
     return { sessions, rounds };
-  }, [weaponStats]);
+  }, [filteredWeapons, weaponStats]);
 
-  const handleWeaponPress = useCallback((weapon: UserWeapon) => {
+  const handleWeaponPress = useCallback((weapon: AccessibleWeapon) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push({
-      pathname: '/(protected)/weaponDetail',
-      params: { weaponId: weapon.id },
-    } as any);
+    // Navigate to weapon detail - for team weapons, we may need different handling
+    if (weapon.source === 'personal' && weapon.userWeapon) {
+      router.push({
+        pathname: '/(protected)/weaponDetail',
+        params: { weaponId: weapon.id },
+      } as any);
+    } else {
+      // For team weapons, show info but don't allow editing (they're managed in Team tab)
+      router.push({
+        pathname: '/(protected)/weaponDetail',
+        params: { weaponId: weapon.id, source: weapon.source },
+      } as any);
+    }
   }, []);
 
   const handleSetDefault = useCallback(async (weaponId: string) => {
@@ -293,11 +447,6 @@ export default function LoadoutScreen() {
     [loadData]
   );
 
-  const handleTeamWeaponsPress = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/(protected)/teamWeapons' as any);
-  }, []);
-
   // ─────────────────────────────────────────────────────────────────────────
   // LOADING
   // ─────────────────────────────────────────────────────────────────────────
@@ -340,41 +489,36 @@ export default function LoadoutScreen() {
 
         {/* Stats Overview */}
         <StatsOverview
-          weaponCount={weapons.length}
+          weaponCount={filteredWeapons.length}
           totalSessions={totalStats.sessions}
           totalRounds={totalStats.rounds}
           colors={colors}
         />
 
-        {/* Team Weapons Link */}
-        {hasTeams && (
-          <TouchableOpacity
-            style={[s.teamLink, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={handleTeamWeaponsPress}
-            activeOpacity={0.7}
-          >
-            <View style={[s.teamIcon, { backgroundColor: `${colors.blue}12` }]}>
-              <Users size={14} color={colors.blue} />
-            </View>
-            <Text style={[s.teamLinkText, { color: colors.text }]}>Team Weapons</Text>
-            <ChevronRight size={14} color={colors.textMuted} />
-          </TouchableOpacity>
-        )}
+        {/* Source Filter Pills */}
+        <SourceFilterPills
+          selected={sourceFilter}
+          onChange={setSourceFilter}
+          counts={filterCounts}
+          colors={colors}
+        />
 
         {/* Section Header */}
         <View style={s.sectionHeader}>
-          <Text style={[s.sectionTitle, { color: colors.text }]}>My Weapons</Text>
-          {weapons.length > 0 && (
-            <Text style={[s.sectionCount, { color: colors.textMuted }]}>{weapons.length}</Text>
+          <Text style={[s.sectionTitle, { color: colors.text }]}>
+            {sourceFilter === 'all' ? 'All Weapons' : SOURCE_FILTER_CONFIG[sourceFilter].label}
+          </Text>
+          {filteredWeapons.length > 0 && (
+            <Text style={[s.sectionCount, { color: colors.textMuted }]}>{filteredWeapons.length}</Text>
           )}
         </View>
 
         {/* Weapons List */}
-        {weapons.length > 0 ? (
+        {filteredWeapons.length > 0 ? (
           <View style={s.cardList}>
-            {weapons.map((weapon) => (
+            {filteredWeapons.map((weapon) => (
               <WeaponCard
-                key={weapon.id}
+                key={`${weapon.source}-${weapon.id}`}
                 weapon={weapon}
                 stats={weaponStats.get(weapon.id)}
                 isDefault={defaultWeaponId === weapon.id}
@@ -389,17 +533,25 @@ export default function LoadoutScreen() {
             <View style={[s.emptyIcon, { backgroundColor: colors.secondary }]}>
               <Target size={24} color={colors.textMuted} />
             </View>
-            <Text style={[s.emptyTitle, { color: colors.text }]}>No weapons yet</Text>
-            <Text style={[s.emptySubtitle, { color: colors.textMuted }]}>
-              Add your first weapon to start tracking performance
+            <Text style={[s.emptyTitle, { color: colors.text }]}>
+              {sourceFilter === 'all' ? 'No weapons yet' : `No ${SOURCE_FILTER_CONFIG[sourceFilter].label.toLowerCase()} weapons`}
             </Text>
-            <TouchableOpacity
-              style={[s.emptyButton, { backgroundColor: colors.primary }]}
-              onPress={handleAddWeapon}
-            >
-              <Plus size={16} color="#fff" />
-              <Text style={s.emptyButtonText}>Add Weapon</Text>
-            </TouchableOpacity>
+            <Text style={[s.emptySubtitle, { color: colors.textMuted }]}>
+              {sourceFilter === 'all' 
+                ? 'Add your first weapon to start tracking performance'
+                : sourceFilter === 'personal'
+                  ? 'Create a personal weapon to get started'
+                  : 'Team weapons will appear here when available'}
+            </Text>
+            {sourceFilter === 'all' || sourceFilter === 'personal' ? (
+              <TouchableOpacity
+                style={[s.emptyButton, { backgroundColor: colors.primary }]}
+                onPress={handleAddWeapon}
+              >
+                <Plus size={16} color="#fff" />
+                <Text style={s.emptyButtonText}>Add Weapon</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         )}
       </ScrollView>
@@ -480,6 +632,36 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
 
+  // Filter Pills
+  filterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  filterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+  },
+  filterPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  filterCount: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  filterCountText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+
   // Stats Overview
   statsRow: {
     flexDirection: 'row',
@@ -506,30 +688,6 @@ const s = StyleSheet.create({
   statDivider: {
     width: 1,
     height: 24,
-  },
-
-  // Team Link
-  teamLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-  teamIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  teamLinkText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '600',
   },
 
   // Section Header
@@ -576,7 +734,7 @@ const s = StyleSheet.create({
   },
   cardInfo: {
     flex: 1,
-    gap: 1,
+    gap: 2,
   },
   cardNameRow: {
     flexDirection: 'row',
@@ -596,9 +754,33 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  cardMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  sourceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  sourceBadgeText: {
+    fontSize: 9,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.2,
+  },
   cardMeta: {
     fontSize: 11,
     fontWeight: '400',
+  },
+  teamNameText: {
+    fontSize: 10,
+    fontWeight: '400',
+    marginTop: 1,
   },
   cardStats: {
     paddingHorizontal: 8,

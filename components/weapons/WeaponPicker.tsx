@@ -11,11 +11,10 @@
  * - assigned: Only weapons assigned to current user
  */
 
-import { 
-  isAssignedPolicy, 
-  isCatalogPolicy, 
-  isPersonalPolicy,
-  type WeaponPolicy 
+import {
+  isAssignedPolicy,
+  isCatalogPolicy,
+  type WeaponPolicy
 } from '@/constants/weaponPolicy';
 import { useColors } from '@/hooks/ui/useColors';
 import type { WeaponCategory } from '@/services/weaponService';

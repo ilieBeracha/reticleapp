@@ -5,13 +5,13 @@
  * - Solo Session: 50% width - start/continue practice
  * - Default Weapon: 25% - shows weapon name & rounds
  * - Weapon Stats: 25% - shows accuracy or sessions
- * - Team Coming Up: Only shows if there are trainings today
+ * - Today's Reminders: Passive display of today's trainings (not interactive)
  */
 
 import type { UserWeapon, WeaponStats } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { Calendar, ChevronRight, Crosshair, Play, Target, Zap } from 'lucide-react-native';
+import { Bell, ChevronRight, Crosshair, Play, Target, Zap } from 'lucide-react-native';
 import { useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
@@ -47,9 +47,9 @@ interface HeroActionsProps {
   // Weapon data
   defaultWeapon: UserWeapon | null;
   defaultWeaponStats: WeaponStats | null;
-  // Team
+  // Team - passive reminders only
   todayTrainings: TodayTraining[];
-  onTrainingPress: (training: TodayTraining) => void;
+  onTrainingPress: (training: TodayTraining) => void; // Keep for backwards compat but won't use
 }
 
 // Format large numbers (e.g., 1500 -> 1.5k)
@@ -143,12 +143,8 @@ export function HeroActions({
     }
   };
 
-  const handleTrainingItemPress = (training: TodayTraining) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onTrainingPress(training);
-  };
-
-  const handleViewAllTeam = () => {
+  // Navigate to Team tab for full schedule
+  const handleGoToTeam = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push('/(protected)/(tabs)/team');
   };
@@ -270,65 +266,63 @@ export function HeroActions({
       </View>
 
       {/* ─────────────────────────────────────────────────────────────────── */}
-      {/* TEAM COMING UP - Only shows if there are today's trainings */}
+      {/* TODAY'S REMINDERS - Passive display (not interactive cards) */}
       {/* ─────────────────────────────────────────────────────────────────── */}
       {hasTodayTrainings && (
-        <View style={[s.comingUpSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={s.comingUpHeader}>
-            <View style={s.comingUpTitleRow}>
-              <Calendar size={12} color={colors.textMuted} />
-              <Text style={[s.comingUpTitle, { color: colors.textMuted }]}>TODAY</Text>
+        <View style={[s.reminderSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={s.reminderHeader}>
+            <View style={s.reminderTitleRow}>
+              <Bell size={12} color={colors.textMuted} />
+              <Text style={[s.reminderTitle, { color: colors.textMuted }]}>REMINDERS</Text>
             </View>
-            {todayTrainings.length > 2 && (
-              <TouchableOpacity onPress={handleViewAllTeam} activeOpacity={0.7}>
-                <Text style={[s.viewAllText, { color: colors.primary }]}>View all</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity onPress={handleGoToTeam} activeOpacity={0.7} style={s.viewInTeamBtn}>
+              <Text style={[s.viewInTeamText, { color: colors.primary }]}>Team tab</Text>
+              <ChevronRight size={12} color={colors.primary} />
+            </TouchableOpacity>
           </View>
 
-          <View style={s.trainingsList}>
+          <View style={s.reminderContent}>
             {todayTrainings.slice(0, 2).map((training, index) => {
               const isLive = training.status === 'ongoing';
               
               return (
-                <TouchableOpacity
+                <View
                   key={training.id}
                   style={[
-                    s.trainingItem,
-                    { borderColor: isLive ? colors.orange : 'transparent' },
-                    isLive && { backgroundColor: `${colors.orange}08` },
-                    index < Math.min(todayTrainings.length, 2) - 1 && { marginBottom: 6 },
+                    s.reminderItem,
+                    isLive && [s.reminderItemLive, { borderColor: `${colors.orange}30` }],
+                    index < Math.min(todayTrainings.length, 2) - 1 && { marginBottom: 4 },
                   ]}
-                  onPress={() => handleTrainingItemPress(training)}
-                  activeOpacity={0.7}
                 >
-                  <View style={s.trainingItemLeft}>
-                    {isLive ? (
-                      <View style={[s.liveIndicator, { backgroundColor: colors.orange }]}>
-                        <Animated.View style={[s.liveDot, pulseStyle]} />
-                      </View>
-                    ) : (
-                      <View style={[s.timeIndicator, { backgroundColor: colors.secondary }]}>
-                        <Text style={[s.timeText, { color: colors.textMuted }]}>
-                          {formatTime(training)}
-                        </Text>
-                      </View>
-                    )}
-                    <View style={s.trainingInfo}>
-                      <Text style={[s.trainingTitle, { color: colors.text }]} numberOfLines={1}>
-                        {training.title}
-                      </Text>
-                      {training.team?.name && (
-                        <Text style={[s.teamName, { color: colors.textMuted }]} numberOfLines={1}>
-                          {training.team.name}
-                        </Text>
-                      )}
+                  {isLive ? (
+                    <View style={[s.liveIndicator, { backgroundColor: colors.orange }]}>
+                      <Animated.View style={[s.liveDot, pulseStyle]} />
                     </View>
+                  ) : (
+                    <View style={[s.timeIndicator, { backgroundColor: colors.secondary }]}>
+                      <Text style={[s.timeText, { color: colors.textMuted }]}>
+                        {formatTime(training)}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={s.reminderInfo}>
+                    <Text style={[s.reminderText, { color: colors.text }]} numberOfLines={1}>
+                      {training.title}
+                    </Text>
+                    {training.team?.name && (
+                      <Text style={[s.reminderTeam, { color: colors.textMuted }]} numberOfLines={1}>
+                        {training.team.name}
+                      </Text>
+                    )}
                   </View>
-                  <ChevronRight size={14} color={colors.border} />
-                </TouchableOpacity>
+                </View>
               );
             })}
+            {todayTrainings.length > 2 && (
+              <Text style={[s.moreRemindersText, { color: colors.textMuted }]}>
+                +{todayTrainings.length - 2} more
+              </Text>
+            )}
           </View>
         </View>
       )}
@@ -433,89 +427,99 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-  // Coming Up Section
-  comingUpSection: {
-    borderRadius: 12,
+  // Reminder Section (Passive, non-interactive)
+  reminderSection: {
+    borderRadius: 10,
     borderWidth: 1,
     overflow: 'hidden',
   },
-  comingUpHeader: {
+  reminderHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
-  comingUpTitleRow: {
+  reminderTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
-  comingUpTitle: {
-    fontSize: 11,
+  reminderTitle: {
+    fontSize: 9,
     fontWeight: '600',
-    letterSpacing: 0.3,
+    letterSpacing: 0.4,
     textTransform: 'uppercase',
   },
-  viewAllText: {
-    fontSize: 11,
+  viewInTeamBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  viewInTeamText: {
+    fontSize: 10,
     fontWeight: '600',
   },
 
-  // Training Items
-  trainingsList: {
-    paddingHorizontal: 10,
-    paddingBottom: 10,
-  },
-  trainingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
+  // Reminder Items (non-interactive)
+  reminderContent: {
     paddingHorizontal: 8,
-    borderRadius: 8,
-    borderWidth: 1,
+    paddingBottom: 8,
   },
-  trainingItemLeft: {
+  reminderItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    flex: 1,
+    gap: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+    borderRadius: 6,
+  },
+  reminderItemLive: {
+    backgroundColor: 'rgba(249, 115, 22, 0.06)',
+    borderWidth: 1,
+    paddingVertical: 6,
+    paddingHorizontal: 6,
   },
   liveIndicator: {
-    width: 44,
-    height: 22,
-    borderRadius: 6,
+    width: 38,
+    height: 18,
+    borderRadius: 5,
     alignItems: 'center',
     justifyContent: 'center',
   },
   liveDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: '#fff',
   },
   timeIndicator: {
-    minWidth: 44,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    minWidth: 38,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 5,
     alignItems: 'center',
   },
   timeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
   },
-  trainingInfo: {
+  reminderInfo: {
     flex: 1,
   },
-  trainingTitle: {
-    fontSize: 13,
-    fontWeight: '600',
+  reminderText: {
+    fontSize: 12,
+    fontWeight: '500',
     letterSpacing: -0.1,
   },
-  teamName: {
-    fontSize: 11,
+  reminderTeam: {
+    fontSize: 10,
     marginTop: 1,
+  },
+  moreRemindersText: {
+    fontSize: 10,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 4,
   },
 });

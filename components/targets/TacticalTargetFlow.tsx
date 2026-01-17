@@ -176,11 +176,13 @@ const stepperStyles = StyleSheet.create({
 interface HitsStepperProps {
   value: number;
   onChange: (value: number) => void;
+  bulletsFired: number;
 }
 
 const HitsStepper = React.memo(function HitsStepper({
   value,
   onChange,
+  bulletsFired,
 }: HitsStepperProps) {
   const handleDecrement = useCallback(() => {
     if (value > 0) {
@@ -190,14 +192,18 @@ const HitsStepper = React.memo(function HitsStepper({
   }, [value, onChange]);
 
   const handleIncrement = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onChange(value + 1);
-  }, [value, onChange]);
+    if (value < bulletsFired) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      onChange(value + 1);
+    }
+  }, [value, onChange, bulletsFired]);
+
+  const accuracy = bulletsFired > 0 ? Math.round((value / bulletsFired) * 100) : 0;
 
   return (
     <View style={hitsStyles.container}>
       <Text style={hitsStyles.label}>HITS ON TARGET</Text>
-      <Text style={hitsStyles.sublabel}>How many rounds hit?</Text>
+      <Text style={hitsStyles.sublabel}>Out of {bulletsFired} shots fired</Text>
 
       <View style={hitsStyles.row}>
         <TouchableOpacity
@@ -212,30 +218,36 @@ const HitsStepper = React.memo(function HitsStepper({
         <View style={hitsStyles.valueContainer}>
           <View style={[hitsStyles.valueRing, value > 0 && hitsStyles.valueRingGood]}>
             <Text style={hitsStyles.value}>{value}</Text>
-            <Text style={hitsStyles.maxLabel}>hits</Text>
+            <Text style={hitsStyles.maxLabel}>/ {bulletsFired}</Text>
           </View>
         </View>
 
         <TouchableOpacity
-          style={hitsStyles.btn}
+          style={[hitsStyles.btn, value >= bulletsFired && hitsStyles.btnDisabled]}
           onPress={handleIncrement}
+          disabled={value >= bulletsFired}
           activeOpacity={0.7}
         >
-          <Plus size={28} color={COLORS.white} strokeWidth={2.5} />
+          <Plus size={28} color={value >= bulletsFired ? COLORS.textDim : COLORS.white} strokeWidth={2.5} />
         </TouchableOpacity>
       </View>
 
-      {/* Quick select */}
+      {/* Accuracy display */}
+      <Text style={hitsStyles.accuracyText}>{accuracy}% accuracy</Text>
+
+      {/* Quick select - only show values up to bulletsFired */}
       <View style={hitsStyles.quickRow}>
-        {[1, 3, 5, 10, 15].map((num) => (
-          <TouchableOpacity
-            key={num}
-            style={[hitsStyles.quickBtn, value === num && hitsStyles.quickBtnActive]}
-            onPress={() => { Haptics.selectionAsync(); onChange(num); }}
-          >
-            <Text style={[hitsStyles.quickText, value === num && hitsStyles.quickTextActive]}>{num}</Text>
-          </TouchableOpacity>
-        ))}
+        {[0, Math.floor(bulletsFired / 4), Math.floor(bulletsFired / 2), Math.floor(bulletsFired * 0.75), bulletsFired]
+          .filter((num, idx, arr) => arr.indexOf(num) === idx && num <= bulletsFired) // unique values
+          .map((num) => (
+            <TouchableOpacity
+              key={num}
+              style={[hitsStyles.quickBtn, value === num && hitsStyles.quickBtnActive]}
+              onPress={() => { Haptics.selectionAsync(); onChange(num); }}
+            >
+              <Text style={[hitsStyles.quickText, value === num && hitsStyles.quickTextActive]}>{num}</Text>
+            </TouchableOpacity>
+          ))}
       </View>
     </View>
   );
@@ -283,7 +295,14 @@ const hitsStyles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   maxLabel: { fontSize: 13, color: COLORS.textDim, marginTop: -2 },
-  quickRow: { flexDirection: "row", gap: 10, marginTop: 20 },
+  accuracyText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.textMuted,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  quickRow: { flexDirection: "row", gap: 10, marginTop: 12 },
   quickBtn: {
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -374,11 +393,7 @@ export function TacticalTargetFlow({
       return;
     }
 
-    if (!isGrouping && hits <= 0) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert("Missing Hits", "Please enter the number of hits.");
-      return;
-    }
+    // Note: hits can be 0 (completely missed) - that's a valid result
 
     if (isGrouping && !groupSizeCm) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -402,15 +417,16 @@ export function TacticalTargetFlow({
           result_notes: notes || null,
         });
       } else {
-        // For engagement: Use tactical target with hits only
-        // bullets_fired = hits (we only track what hit)
+        // For engagement: Use tactical target
+        // bullets_fired = how many shots fired (from drill config)
+        // hits = how many actually hit the target
         await addTargetWithTacticalResult({
           session_id: sessionId,
           distance_m: distance,
           lane_number: null,
-          planned_shots: hits, // Use hits as planned
-          bullets_fired: hits, // We only know hits
-          hits: hits,
+          planned_shots: bullets, // From drill config
+          bullets_fired: bullets, // How many were actually fired
+          hits: hits, // How many hit
           is_stage_cleared: stageCleared,
           time_seconds: time ? parseFloat(time) : null,
           result_notes: notes || null,
@@ -565,7 +581,7 @@ export function TacticalTargetFlow({
               <Crosshair size={14} color={COLORS.primary} />
             )}
             <Text style={styles.headerSubtitle}>
-              {isGrouping ? `Grouping • ${distance}m • ${bullets} shots` : `Engagement • ${distance}m`}
+              {isGrouping ? `Grouping • ${distance}m • ${bullets} shots` : `Engagement • ${distance}m • ${bullets} shots`}
             </Text>
           </View>
         </View>
@@ -621,7 +637,7 @@ export function TacticalTargetFlow({
       ) : (
         // ENGAGEMENT: Show simple hits stepper
         <View style={styles.hitsSection}>
-          <HitsStepper value={hits} onChange={setHits} />
+          <HitsStepper value={hits} onChange={setHits} bulletsFired={bullets} />
         </View>
       )}
 

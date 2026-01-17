@@ -1,5 +1,4 @@
-import { WeaponPicker, CreateWeaponFlow } from '@/components/weapons';
-import { getCategoryConfig } from '@/constants/weaponCategories';
+import { CreateWeaponFlow, WeaponPicker } from '@/components/weapons';
 import type { WeaponPolicy } from '@/constants/weaponPolicy';
 import { useColors } from '@/hooks/ui/useColors';
 import { useOpenWeather } from '@/hooks/useOpenWeather';

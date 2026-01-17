@@ -1,9 +1,7 @@
 import { SessionHistoryCatalog } from '@/components/session/history';
 import { useColors } from '@/hooks/ui/useColors';
-import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
-import React from 'react';
-import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /**
@@ -30,15 +28,7 @@ export default function SessionHistoryScreen() {
           headerStyle: {
             backgroundColor: Platform.OS === 'ios' ? 'transparent' : colors.background,
           },
-          headerLeft: () => (
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={styles.backButton}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="chevron-back" size={28} color={colors.text} />
-            </TouchableOpacity>
-          ),
+         
         }}
       />
       <View style={[styles.content, { paddingTop: Platform.OS === 'ios' ? insets.top + 44 : 0 }]}>
