@@ -6,6 +6,7 @@
  * from session data with applied filters.
  */
 
+import { DRILL_GOAL } from '@/constants';
 import type { SessionWithDetails } from '@/services/session/types';
 import {
   ACCURACY_CHANGE_THRESHOLD,
@@ -175,8 +176,8 @@ export function applyFilters(
     // Drill type filter
     if (filters.drillType !== 'all') {
       const drillGoal = session.drill_config?.drill_goal;
-      if (filters.drillType === 'grouping' && drillGoal !== 'grouping') return false;
-      if (filters.drillType === 'engagement' && drillGoal !== 'engagement') return false;
+      if (filters.drillType === DRILL_GOAL.GROUPING && drillGoal !== DRILL_GOAL.GROUPING) return false;
+      if (filters.drillType === DRILL_GOAL.ENGAGEMENT && drillGoal !== DRILL_GOAL.ENGAGEMENT) return false;
       if (filters.drillType === 'stress') {
         // Stress drills have time limits or are marked as stress
         const hasTimeLimit = session.drill_config?.time_limit_seconds != null;
@@ -198,32 +199,65 @@ export function applyFilters(
 // ============================================================================
 
 /**
+ * Check if session is a grouping session (measured by dispersion in cm)
+ */
+function isGroupingSession(session: SessionWithDetails): boolean {
+  return session.drill_config?.drill_goal === DRILL_GOAL.GROUPING;
+}
+
+/**
+ * Check if session is an engagement session (measured by hits/shots)
+ */
+function isEngagementSession(session: SessionWithDetails): boolean {
+  const goal = session.drill_config?.drill_goal;
+  // Engagement if explicitly set, or if not grouping and has hits data
+  return goal === DRILL_GOAL.ENGAGEMENT || (goal !== DRILL_GOAL.GROUPING && session.stats?.hits_total != null);
+}
+
+/**
  * Compute totals/snapshot metrics
+ * 
+ * IMPORTANT: Grouping and Engagement are different metrics:
+ * - Grouping sessions: measured by dispersion (cm) - smaller is better
+ * - Engagement sessions: measured by accuracy (hits/shots) - higher is better
  */
 export function computeTotals(sessions: SessionWithDetails[]): TotalsMetric[] {
   const completed = sessions.filter((s) => s.status === 'completed');
   const totals: TotalsMetric[] = [];
 
-  // Aggregate stats
-  let totalShots = 0;
-  let totalHits = 0;
-  const dispersions: number[] = [];
-  const accuracies: number[] = [];
-  const sessionIds: string[] = [];
+  // Separate sessions by type
+  const groupingSessions = completed.filter(isGroupingSession);
+  const engagementSessions = completed.filter(isEngagementSession);
 
-  completed.forEach((s) => {
-    sessionIds.push(s.id);
+  // Aggregate engagement stats (hits/shots)
+  let engagementShots = 0;
+  let engagementHits = 0;
+  const engagementAccuracies: number[] = [];
+  const engagementSessionIds: string[] = [];
+
+  engagementSessions.forEach((s) => {
+    engagementSessionIds.push(s.id);
     if (s.stats) {
-      totalShots += s.stats.shots_fired;
-      totalHits += s.stats.hits_total;
-      if (s.stats.best_dispersion_cm != null) {
-        dispersions.push(s.stats.best_dispersion_cm);
-      }
+      engagementShots += s.stats.shots_fired;
+      engagementHits += s.stats.hits_total;
       if (s.stats.shots_fired > 0) {
-        accuracies.push((s.stats.hits_total / s.stats.shots_fired) * 100);
+        engagementAccuracies.push((s.stats.hits_total / s.stats.shots_fired) * 100);
       }
     }
   });
+
+  // Aggregate grouping stats (dispersion)
+  const dispersions: number[] = [];
+  const groupingSessionIds: string[] = [];
+
+  groupingSessions.forEach((s) => {
+    groupingSessionIds.push(s.id);
+    if (s.stats?.best_dispersion_cm != null) {
+      dispersions.push(s.stats.best_dispersion_cm);
+    }
+  });
+
+  const allSessionIds = completed.map((s) => s.id);
 
   // Sessions count
   totals.push({
@@ -231,20 +265,23 @@ export function computeTotals(sessions: SessionWithDetails[]): TotalsMetric[] {
     label: 'Sessions',
     value: completed.length,
     unit: '',
-    evidenceIds: sessionIds,
+    evidenceIds: allSessionIds,
   });
 
-  // Total shots
-  totals.push({
-    id: 'shots',
-    label: 'Total Shots',
-    value: totalShots,
-    unit: '',
-    evidenceIds: sessionIds,
-  });
+  // Total shots (from engagement sessions only - grouping shots are all hits by definition)
+  if (engagementShots > 0) {
+    totals.push({
+      id: 'shots',
+      label: 'Shots Fired',
+      value: engagementShots,
+      unit: '',
+      subtitle: 'engagement',
+      evidenceIds: engagementSessionIds,
+    });
+  }
 
-  // Hit percentage (median)
-  const medianAccuracy = median(accuracies);
+  // Hit percentage (median) - ONLY from engagement sessions
+  const medianAccuracy = median(engagementAccuracies);
   if (medianAccuracy !== null) {
     totals.push({
       id: 'hit_pct',
@@ -252,11 +289,24 @@ export function computeTotals(sessions: SessionWithDetails[]): TotalsMetric[] {
       value: Math.round(medianAccuracy),
       unit: '%',
       subtitle: 'median',
-      evidenceIds: sessionIds,
+      evidenceIds: engagementSessionIds,
     });
   }
 
-  // Median grouping
+  // Overall accuracy - ONLY from engagement sessions
+  if (engagementShots > 0) {
+    const overallAccuracy = Math.round((engagementHits / engagementShots) * 100);
+    totals.push({
+      id: 'accuracy',
+      label: 'Accuracy',
+      value: overallAccuracy,
+      unit: '%',
+      subtitle: DRILL_GOAL.ENGAGEMENT,
+      evidenceIds: engagementSessionIds,
+    });
+  }
+
+  // Median grouping - ONLY from grouping sessions
   const medianDispersion = median(dispersions);
   if (medianDispersion !== null) {
     totals.push({
@@ -264,22 +314,10 @@ export function computeTotals(sessions: SessionWithDetails[]): TotalsMetric[] {
       label: 'Median Group',
       value: Math.round(medianDispersion * 10) / 10,
       unit: 'cm',
-      evidenceIds: sessionIds.filter((id) => {
-        const s = completed.find((sess) => sess.id === id);
-        return s?.stats?.best_dispersion_cm != null;
-      }),
+      subtitle: DRILL_GOAL.GROUPING,
+      evidenceIds: groupingSessionIds,
     });
   }
-
-  // Overall accuracy
-  const overallAccuracy = totalShots > 0 ? Math.round((totalHits / totalShots) * 100) : 0;
-  totals.push({
-    id: 'accuracy',
-    label: 'Accuracy',
-    value: overallAccuracy,
-    unit: '%',
-    evidenceIds: sessionIds,
-  });
 
   return totals;
 }
@@ -342,6 +380,9 @@ function groupByCategory(
 
 /**
  * Compute strengths from sessions
+ * 
+ * IMPORTANT: Accuracy strengths come from engagement sessions only.
+ * Grouping strengths come from grouping sessions only.
  */
 export function computeStrengths(
   sessions: SessionWithDetails[],
@@ -354,30 +395,39 @@ export function computeStrengths(
     return strengths;
   }
 
-  // Calculate overall baseline
+  // Separate sessions by type
+  const engagementSessions = completed.filter(isEngagementSession);
+  const groupingSessions = completed.filter(isGroupingSession);
+
+  // Calculate engagement baseline (accuracy)
   let baselineShots = 0;
   let baselineHits = 0;
-  const baselineDispersions: number[] = [];
 
-  completed.forEach((s) => {
+  engagementSessions.forEach((s) => {
     if (s.stats) {
       baselineShots += s.stats.shots_fired;
       baselineHits += s.stats.hits_total;
-      if (s.stats.best_dispersion_cm != null) {
-        baselineDispersions.push(s.stats.best_dispersion_cm);
-      }
     }
   });
 
   const baselineAccuracy = baselineShots > 0 ? (baselineHits / baselineShots) * 100 : 0;
+
+  // Calculate grouping baseline (dispersion)
+  const baselineDispersions: number[] = [];
+  groupingSessions.forEach((s) => {
+    if (s.stats?.best_dispersion_cm != null) {
+      baselineDispersions.push(s.stats.best_dispersion_cm);
+    }
+  });
+
   const baselineMedianDispersion = median(baselineDispersions);
 
-  // Group by position
-  const byPosition = groupByCategory(completed, (s) =>
+  // Group ENGAGEMENT sessions by position (for accuracy strengths)
+  const engagementByPosition = groupByCategory(engagementSessions, (s) =>
     s.drill_config?.position?.toLowerCase() || null
   );
 
-  byPosition.forEach((stats, position) => {
+  engagementByPosition.forEach((stats, position) => {
     if (stats.shots < MIN_SHOTS_FOR_CATEGORY) return;
 
     // Check if accuracy is above baseline
@@ -403,11 +453,18 @@ export function computeStrengths(
         evidenceIds: stats.sessions.map((s) => s.id),
       });
     }
+  });
 
+  // Group GROUPING sessions by position (for dispersion strengths)
+  const groupingByPosition = groupByCategory(groupingSessions, (s) =>
+    s.drill_config?.position?.toLowerCase() || null
+  );
+
+  groupingByPosition.forEach((stats, position) => {
     // Check if grouping is better than baseline
     if (stats.medianDispersion !== null && baselineMedianDispersion !== null) {
       const dispersionDelta = baselineMedianDispersion - stats.medianDispersion;
-      if (dispersionDelta >= GROUPING_CHANGE_THRESHOLD) {
+      if (dispersionDelta >= GROUPING_CHANGE_THRESHOLD && stats.dispersions.length >= 3) {
         const confidence = determineConfidence(stats.shots, stats.sessions.length);
         strengths.push({
           id: `strength-position-grouping-${position}`,
@@ -431,15 +488,15 @@ export function computeStrengths(
     }
   });
 
-  // Group by distance bucket
-  const byDistance = groupByCategory(completed, (s) => {
+  // Group ENGAGEMENT sessions by distance bucket (for accuracy strengths)
+  const engagementByDistance = groupByCategory(engagementSessions, (s) => {
     const distance = s.drill_config?.distance_m ?? s.stats?.avg_distance_m;
     const bucket = getDistanceBucket(distance ?? null);
     if (!bucket) return null;
     return `${DISTANCE_BUCKETS[bucket as keyof typeof DISTANCE_BUCKETS].label}`;
   });
 
-  byDistance.forEach((stats, distanceLabel) => {
+  engagementByDistance.forEach((stats, distanceLabel) => {
     if (stats.shots < MIN_SHOTS_FOR_CATEGORY) return;
 
     const accuracyDelta = stats.accuracy - baselineAccuracy;
@@ -466,10 +523,45 @@ export function computeStrengths(
     }
   });
 
-  // Group by weapon
-  const byWeapon = groupByCategory(completed, (s) => s.weapon_name || null);
+  // Group GROUPING sessions by distance bucket (for dispersion strengths)
+  const groupingByDistance = groupByCategory(groupingSessions, (s) => {
+    const distance = s.drill_config?.distance_m ?? s.stats?.avg_distance_m;
+    const bucket = getDistanceBucket(distance ?? null);
+    if (!bucket) return null;
+    return `${DISTANCE_BUCKETS[bucket as keyof typeof DISTANCE_BUCKETS].label}`;
+  });
 
-  byWeapon.forEach((stats, weaponName) => {
+  groupingByDistance.forEach((stats, distanceLabel) => {
+    if (stats.medianDispersion !== null && baselineMedianDispersion !== null) {
+      const dispersionDelta = baselineMedianDispersion - stats.medianDispersion;
+      if (dispersionDelta >= GROUPING_CHANGE_THRESHOLD && stats.dispersions.length >= 3) {
+        const confidence = determineConfidence(stats.shots, stats.sessions.length);
+        strengths.push({
+          id: `strength-distance-grouping-${distanceLabel}`,
+          category: 'distance',
+          label: `${distanceLabel} (Grouping)`,
+          primaryValue: `${Math.round(stats.medianDispersion * 10) / 10} cm`,
+          context: `${Math.round(dispersionDelta * 10) / 10} cm tighter than baseline`,
+          metric: {
+            value: stats.medianDispersion,
+            baseline: baselineMedianDispersion,
+            delta: -dispersionDelta,
+            direction: 'up',
+            isSignificant: true,
+            confidence,
+            dataPoints: stats.dispersions.length,
+            unit: 'cm',
+          },
+          evidenceIds: stats.sessions.map((s) => s.id),
+        });
+      }
+    }
+  });
+
+  // Group ENGAGEMENT sessions by weapon (for accuracy strengths)
+  const engagementByWeapon = groupByCategory(engagementSessions, (s) => s.weapon_name || null);
+
+  engagementByWeapon.forEach((stats, weaponName) => {
     if (stats.shots < MIN_SHOTS_FOR_CATEGORY) return;
 
     const accuracyDelta = stats.accuracy - baselineAccuracy;
@@ -507,6 +599,12 @@ export function computeStrengths(
 /**
  * Compute weaknesses from sessions
  */
+/**
+ * Compute weaknesses from sessions
+ * 
+ * IMPORTANT: Accuracy weaknesses come from engagement sessions only.
+ * Grouping weaknesses come from grouping sessions only.
+ */
 export function computeWeaknesses(
   sessions: SessionWithDetails[],
   filters: InsightsFilters
@@ -518,30 +616,39 @@ export function computeWeaknesses(
     return weaknesses;
   }
 
-  // Calculate overall baseline
+  // Separate sessions by type
+  const engagementSessions = completed.filter(isEngagementSession);
+  const groupingSessions = completed.filter(isGroupingSession);
+
+  // Calculate engagement baseline (accuracy)
   let baselineShots = 0;
   let baselineHits = 0;
-  const baselineDispersions: number[] = [];
 
-  completed.forEach((s) => {
+  engagementSessions.forEach((s) => {
     if (s.stats) {
       baselineShots += s.stats.shots_fired;
       baselineHits += s.stats.hits_total;
-      if (s.stats.best_dispersion_cm != null) {
-        baselineDispersions.push(s.stats.best_dispersion_cm);
-      }
     }
   });
 
   const baselineAccuracy = baselineShots > 0 ? (baselineHits / baselineShots) * 100 : 0;
+
+  // Calculate grouping baseline (dispersion)
+  const baselineDispersions: number[] = [];
+  groupingSessions.forEach((s) => {
+    if (s.stats?.best_dispersion_cm != null) {
+      baselineDispersions.push(s.stats.best_dispersion_cm);
+    }
+  });
+
   const baselineMedianDispersion = median(baselineDispersions);
 
-  // Group by position
-  const byPosition = groupByCategory(completed, (s) =>
+  // Group ENGAGEMENT sessions by position (for accuracy weaknesses)
+  const engagementByPosition = groupByCategory(engagementSessions, (s) =>
     s.drill_config?.position?.toLowerCase() || null
   );
 
-  byPosition.forEach((stats, position) => {
+  engagementByPosition.forEach((stats, position) => {
     if (stats.shots < MIN_SHOTS_FOR_CATEGORY) return;
 
     // Check if accuracy is below baseline
@@ -797,7 +904,7 @@ export function computeTrends(
         .map((s) => s.id);
       trends.push({
         id: 'trend-grouping',
-        metricType: 'grouping',
+        metricType: DRILL_GOAL.GROUPING,
         label: 'Grouping Consistency',
         direction: delta > 0 ? 'improving' : 'declining',
         magnitude: Math.round(Math.abs(secondAvg - firstAvg) * 10) / 10,

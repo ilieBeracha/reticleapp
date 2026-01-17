@@ -345,11 +345,11 @@ export function TacticalTargetFlow({
   onComplete,
   onCancel,
 }: TacticalTargetFlowProps) {
-  // For engagement (non-grouping): skip directly to results
-  // For grouping: show setup only if distance/bullets not locked
-  const setupLocked = lockDistance && lockBullets;
-  const skipSetup = !isGrouping || setupLocked; // Engagement always skips setup
-  const [step, setStep] = useState<FlowStep>(skipSetup ? "results" : "setup");
+  // ALWAYS skip setup step - go directly to results
+  // - Grouping: enter group size (cm) + shots count
+  // - Engagement: enter hits count
+  // Distance and bullets come from drill config or defaults
+  const [step, setStep] = useState<FlowStep>("results");
   const [saving, setSaving] = useState(false);
 
   // Setup state
@@ -359,6 +359,7 @@ export function TacticalTargetFlow({
   // Results state
   const [hits, setHits] = useState(0);
   const [groupSizeCm, setGroupSizeCm] = useState("");  // For grouping mode
+  const [groupingShots, setGroupingShots] = useState(0);  // Shots in the group (required)
   const [time, setTime] = useState("");
   const [stageCleared, setStageCleared] = useState(false);
   const [notes, setNotes] = useState("");
@@ -401,18 +402,25 @@ export function TacticalTargetFlow({
       return;
     }
 
+    if (isGrouping && groupingShots < 2) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      Alert.alert("Missing Shots", "A group requires at least 2 shots.");
+      return;
+    }
+
     setSaving(true);
 
     try {
       if (isGrouping) {
         // For grouping: Use paper target with dispersion
+        // groupingShots = how many shots are in the group (entered manually)
         await addTargetWithPaperResult({
           session_id: sessionId,
           distance_m: distance,
           lane_number: null,
-          planned_shots: bullets,
+          planned_shots: groupingShots,
           paper_type: PAPER_TYPE.GROUPING,
-          bullets_fired: bullets,
+          bullets_fired: groupingShots,
           dispersion_cm: parseFloat(groupSizeCm),
           result_notes: notes || null,
         });
@@ -446,7 +454,7 @@ export function TacticalTargetFlow({
       Alert.alert("Error", error.message || "Failed to add target");
       setSaving(false);
     }
-  }, [sessionId, distance, bullets, hits, groupSizeCm, isGrouping, time, stageCleared, notes, onComplete]);
+  }, [sessionId, distance, bullets, hits, groupSizeCm, groupingShots, isGrouping, time, stageCleared, notes, onComplete]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // SETUP STEP
@@ -554,7 +562,8 @@ export function TacticalTargetFlow({
   // ═══════════════════════════════════════════════════════════════════════════
   // RESULTS STEP
   // ═══════════════════════════════════════════════════════════════════════════
-  const canGoBack = isGrouping && !setupLocked;
+  // Never show back button - we always skip the setup step
+  const canGoBack = false;
   
   return (
     <ScrollView
@@ -581,7 +590,7 @@ export function TacticalTargetFlow({
               <Crosshair size={14} color={COLORS.primary} />
             )}
             <Text style={styles.headerSubtitle}>
-              {isGrouping ? `Grouping • ${distance}m • ${bullets} shots` : `Engagement • ${distance}m • ${bullets} shots`}
+              {isGrouping ? `Grouping • ${distance}m` : `Engagement • ${distance}m • ${bullets} shots`}
             </Text>
           </View>
         </View>
@@ -632,6 +641,54 @@ export function TacticalTargetFlow({
                 </Text>
               </TouchableOpacity>
             ))}
+          </View>
+
+          {/* Total Shots in Group (Required) */}
+          <View style={styles.groupingShotsSection}>
+            <Text style={styles.groupingShotsLabel}>Shots in Group <Text style={{ color: COLORS.danger }}>*</Text></Text>
+            <View style={styles.groupingShotsRow}>
+              <TouchableOpacity
+                style={[styles.groupingShotsBtn, groupingShots <= 2 && styles.groupingBtnDisabled]}
+                onPress={() => {
+                  if (groupingShots > 2) {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setGroupingShots(groupingShots - 1);
+                  }
+                }}
+                disabled={groupingShots <= 2}
+              >
+                <Minus size={20} color={groupingShots <= 2 ? COLORS.textDim : COLORS.white} />
+              </TouchableOpacity>
+              <Text style={[styles.groupingShotsValue, groupingShots < 2 && { color: COLORS.textDim }]}>
+                {groupingShots < 2 ? '—' : groupingShots}
+              </Text>
+              <TouchableOpacity
+                style={styles.groupingShotsBtn}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  // Jump to 2 if below minimum
+                  setGroupingShots(groupingShots < 2 ? 2 : groupingShots + 1);
+                }}
+              >
+                <Plus size={20} color={COLORS.white} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.groupingShotsQuickRow}>
+              {[2, 3, 5, 10].map((val) => (
+                <TouchableOpacity
+                  key={val}
+                  style={[styles.groupingShotsQuickBtn, groupingShots === val && styles.groupingShotsQuickBtnActive]}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setGroupingShots(val);
+                  }}
+                >
+                  <Text style={[styles.groupingShotsQuickText, groupingShots === val && styles.groupingShotsQuickTextActive]}>
+                    {val}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         </View>
       ) : (
@@ -1092,6 +1149,70 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
   },
   groupingQuickTextActive: {
+    color: COLORS.primary,
+  },
+
+  // Grouping shots stepper
+  groupingShotsSection: {
+    marginTop: 24,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  groupingShotsLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.textMuted,
+    textAlign: "center",
+    marginBottom: 12,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  groupingShotsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 20,
+  },
+  groupingShotsBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.cardHover,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  groupingBtnDisabled: {
+    opacity: 0.4,
+  },
+  groupingShotsValue: {
+    fontSize: 36,
+    fontWeight: "700",
+    color: COLORS.white,
+    minWidth: 60,
+    textAlign: "center",
+  },
+  groupingShotsQuickRow: {
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "center",
+    marginTop: 16,
+  },
+  groupingShotsQuickBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: COLORS.cardHover,
+  },
+  groupingShotsQuickBtnActive: {
+    backgroundColor: `${COLORS.primary}25`,
+  },
+  groupingShotsQuickText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.textMuted,
+  },
+  groupingShotsQuickTextActive: {
     color: COLORS.primary,
   },
 
