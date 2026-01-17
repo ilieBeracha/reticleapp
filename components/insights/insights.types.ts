@@ -183,6 +183,8 @@ export interface TrendData {
   timeWindow: string;
   /** What triggered this change? */
   trigger?: string;
+  /** Confidence based on data volume */
+  confidence?: ConfidenceLevel;
   /** Data points for the trend line */
   dataPoints: TrendDataPoint[];
   /** Session IDs in this trend */

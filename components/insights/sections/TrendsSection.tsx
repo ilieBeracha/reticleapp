@@ -3,6 +3,11 @@
  *
  * Shows performance changes over time.
  * "Am I improving or decaying — and why?"
+ *
+ * AI Explanation:
+ * - Each card has a "Why?" button
+ * - Explanations load on demand (never auto-load)
+ * - Cached per insight ID
  */
 
 import { useColors } from '@/hooks/ui/useColors';
@@ -17,6 +22,8 @@ import {
 import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import type { TrendData, TrendDataPoint, TrendDirection } from '../insights.types';
+import { useAIExplanations, type ExplanationParams } from '../AIExplanationProvider';
+import { AIExplanationBlock, WhyButton } from '../AIExplanationBlock';
 
 // ============================================================================
 // PROPS
@@ -172,6 +179,52 @@ function TrendCard({ trend, onPress, colors }: TrendCardProps) {
   const magnitudeUnit = trend.metricType === 'grouping' ? 'cm' : '%';
   const magnitudeSign = isImproving ? (trend.metricType === 'grouping' ? '-' : '+') : '';
 
+  const { getExplanation, isLoading, getError, requestExplanation } = useAIExplanations();
+  
+  const insightId = trend.id;
+  const explanation = getExplanation(insightId);
+  const loading = isLoading(insightId);
+  const error = getError(insightId);
+
+  const handleRequestExplanation = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    const isGrouping = trend.metricType === 'grouping';
+    
+    // Get first and last data points for baseline comparison
+    const firstValue = trend.dataPoints[0]?.value ?? 0;
+    const lastValue = trend.dataPoints[trend.dataPoints.length - 1]?.value ?? 0;
+    
+    // Map trend direction to metric direction
+    let metricDirection: 'up' | 'down' | 'stable' = 'stable';
+    if (isImproving) {
+      metricDirection = isGrouping ? 'down' : 'up'; // For grouping, improving = tighter = down
+    } else if (isDeclining) {
+      metricDirection = isGrouping ? 'up' : 'down';
+    }
+    
+    const params: ExplanationParams = {
+      insight_type: 'trend',
+      metric_type: isGrouping ? 'grouping' : 'accuracy',
+      decided_values: {
+        current_value: lastValue,
+        baseline_value: firstValue,
+        is_significant: Math.abs(trend.magnitude) > (isGrouping ? 1 : 5),
+        direction: metricDirection,
+        confidence: trend.confidence || 'medium',
+        data_points: trend.dataPoints.length,
+        unit: isGrouping ? 'cm' : '%',
+      },
+      context: {
+        evidence_session_ids: trend.evidenceIds || [],
+        category_label: trend.label,
+        engine_context: `${trend.direction} trend (${magnitudeSign}${Math.abs(trend.magnitude)}${magnitudeUnit}) over ${trend.timeWindow}. ${trend.trigger || ''}`,
+      },
+    };
+    
+    requestExplanation(insightId, params);
+  };
+
   return (
     <TouchableOpacity
       style={[styles.trendCard, { backgroundColor: colors.card }]}
@@ -203,6 +256,11 @@ function TrendCard({ trend, onPress, colors }: TrendCardProps) {
             </View>
           </View>
         </View>
+        <WhyButton
+          onPress={handleRequestExplanation}
+          loading={loading}
+          hasExplanation={!!explanation?.success}
+        />
         {onPress && (
           <ChevronRight size={16} color={colors.textMuted} />
         )}
@@ -223,6 +281,18 @@ function TrendCard({ trend, onPress, colors }: TrendCardProps) {
             {trend.trigger}
           </Text>
         </View>
+      )}
+
+      {/* AI Explanation (appears after "Why?" is clicked) */}
+      {(explanation || loading) && (
+        <AIExplanationBlock
+          response={explanation}
+          loading={loading}
+          error={error}
+          onRequestExplanation={handleRequestExplanation}
+          showTrigger={false}
+          compact
+        />
       )}
     </TouchableOpacity>
   );

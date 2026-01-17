@@ -1,3 +1,52 @@
+# === USER INSTRUCTIONS ===
+# =====================================================================
+# PAGE USAGE DOCUMENTATION
+# =====================================================================
+
+ALWAYS enforce page usage documentation.
+
+For EVERY file that represents a PAGE, SCREEN, or ROUTE
+(e.g. under /app, /pages, /screens, /(tabs), /(protected), etc.):
+
+1. At the TOP of the file, ensure there is a documentation comment block
+   titled exactly: "PAGE USAGE".
+
+2. If the comment does NOT exist:
+   - CREATE it.
+
+3. If the comment EXISTS:
+   - UPDATE it if anything in the page behavior, responsibility,
+     or usage status has changed.
+
+4. The "PAGE USAGE" comment MUST include:
+   - Purpose: one clear sentence explaining what the page is for
+   - When it is used: how / when users reach this page
+   - Ownership: which layer owns logic (UI only / Engine / AI / Both)
+   - Context sensitivity:
+       - Uses team context? (Yes/No)
+       - Uses filters? (Yes/No)
+   - Status:
+       - IN USE / PARTIALLY USED / DEPRECATED / EXPERIMENTAL
+   - Last reviewed date (YYYY-MM-DD)
+
+5. If the page is NOT currently used by routing or navigation:
+   - Status MUST be "NOT IN USE"
+   - Include the reason (legacy, planned, replaced, unknown)
+
+6. This comment MUST be kept in sync with code changes.
+   - If logic is added/removed, the comment MUST be updated.
+   - If routing changes affect the page, the comment MUST be updated.
+
+7. NEVER remove the comment.
+8. NEVER leave the comment stale.
+9. Treat stale documentation as a BUG.
+
+This rule applies EVEN IF the user does not ask for documentation.
+
+If a page cannot be clearly classified,
+STOP and ask the user to clarify usage BEFORE modifying code.
+
+
 # =====================================================================
 # SUPABASE SCHEMA + MIGRATION RULES
 # =====================================================================

@@ -408,9 +408,10 @@ export async function getRecentSessionsWithStats(
     const dateThresholdISO = dateThreshold.toISOString();
 
     // Build base query with date filter
+    // Use SESSION_SELECT_WITH_WEAPON to include weapon info for filtering
     let query = supabase
       .from('sessions')
-      .select(SESSION_SELECT_MINIMAL)
+      .select(SESSION_SELECT_WITH_WEAPON)
       .or(`started_at.gte.${dateThresholdISO},status.eq.active`)
       .order('started_at', { ascending: false })
       .limit(limit);

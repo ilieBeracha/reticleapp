@@ -3,6 +3,11 @@
  *
  * Shows areas where user performs below baseline or has high variance.
  * "What is limiting my ceiling right now?"
+ *
+ * AI Explanation:
+ * - Each card has a "Why?" button
+ * - Explanations load on demand (never auto-load)
+ * - Cached per insight ID
  */
 
 import { useColors } from '@/hooks/ui/useColors';
@@ -12,6 +17,8 @@ import { AlertTriangle, ChevronRight, TrendingDown } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import type { WeaknessCard } from '../insights.types';
+import { useAIExplanations, type ExplanationParams } from '../AIExplanationProvider';
+import { AIExplanationBlock, WhyButton } from '../AIExplanationBlock';
 
 // ============================================================================
 // PROPS
@@ -102,6 +109,41 @@ function WeaknessCardItem({ weakness, onPress, colors }: WeaknessCardItemProps) 
   const iconName = CATEGORY_ICONS[weakness.category] || 'warning';
   const isHighSeverity = Math.abs(weakness.metric.delta) >= 10 || (weakness.variance && weakness.variance >= 30);
   const accentColor = isHighSeverity ? colors.red : '#F59E0B';
+  
+  const { getExplanation, isLoading, getError, requestExplanation } = useAIExplanations();
+  
+  const insightId = weakness.id;
+  const explanation = getExplanation(insightId);
+  const loading = isLoading(insightId);
+  const error = getError(insightId);
+
+  const handleRequestExplanation = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    const isGrouping = weakness.metric.unit === 'cm';
+    const params: ExplanationParams = {
+      insight_type: 'weakness',
+      metric_type: weakness.category === 'variance' ? 'consistency' : (isGrouping ? 'grouping' : 'accuracy'),
+      decided_values: {
+        current_value: weakness.metric.value,
+        baseline_value: weakness.metric.baseline ?? weakness.metric.value,
+        is_significant: Math.abs(weakness.metric.delta) > (isGrouping ? 0.5 : 5),
+        direction: weakness.metric.direction,
+        confidence: weakness.metric.confidence,
+        data_points: weakness.metric.dataPoints,
+        unit: (weakness.metric.unit as '%' | 'cm' | 's' | '') || '%',
+      },
+      context: {
+        evidence_session_ids: weakness.evidenceIds || [],
+        category_label: weakness.label,
+        engine_context: weakness.variance 
+          ? `High variance (${weakness.variance}% CV). ${weakness.context || ''}`
+          : weakness.context,
+      },
+    };
+    
+    requestExplanation(insightId, params);
+  };
 
   return (
     <TouchableOpacity
@@ -135,6 +177,11 @@ function WeaknessCardItem({ weakness, onPress, colors }: WeaknessCardItemProps) 
                 : weakness.category.charAt(0).toUpperCase() + weakness.category.slice(1)}
             </Text>
           </View>
+          <WhyButton
+            onPress={handleRequestExplanation}
+            loading={loading}
+            hasExplanation={!!explanation?.success}
+          />
           {onPress && (
             <ChevronRight size={16} color={colors.textMuted} />
           )}
@@ -174,6 +221,17 @@ function WeaknessCardItem({ weakness, onPress, colors }: WeaknessCardItemProps) 
             <VarianceIndicator variance={weakness.variance} colors={colors} />
           )}
         </View>
+
+        {/* AI Explanation (appears after "Why?" is clicked) */}
+        {(explanation || loading) && (
+          <AIExplanationBlock
+            response={explanation}
+            loading={loading}
+            error={error}
+            onRequestExplanation={handleRequestExplanation}
+            showTrigger={false}
+          />
+        )}
       </View>
     </TouchableOpacity>
   );

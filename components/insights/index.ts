@@ -13,6 +13,10 @@ export { InsightsFilterBar } from './InsightsFilterBar';
 // Evidence Sheet
 export { EvidenceSheet } from './EvidenceSheet';
 
+// AI Explanation Components
+export { AIExplanationBlock, WhyButton } from './AIExplanationBlock';
+export { AIExplanationProvider, useAIExplanations } from './AIExplanationProvider';
+
 // Sections
 export {
   RecommendationsSection,
@@ -55,6 +59,25 @@ export {
   RECENT_SESSION_COUNT, shouldShowExplain
 } from './changeRules';
 
+// AI Context Contract (Insights Engine ↔ AI Layer)
+export {
+  createAIContextRequest,
+  createFallbackAIResponse,
+  validateAIResponse,
+} from './ai-context.contract';
+
+export type {
+  AIContextRequest,
+  AIContextResponse,
+  AIExplanation,
+  AIResponseValidation,
+  AISimilarPattern,
+  AIViolation,
+  GuardrailRule,
+  InsightCategory,
+  MetricType,
+} from './ai-context.contract';
+
 // Legacy Components (for backwards compatibility)
 export { CompletionCard } from './CompletionCard';
 export { HeroStatsRow } from './HeroStatsRow';
@@ -66,6 +89,11 @@ export { WeeklyActivityChart } from './WeeklyActivityChart';
 
 // Hooks
 export { useInsightsData } from './hooks';
+export { 
+  useAIContext, 
+  buildExplanationParams, 
+  buildTrendExplanationParams 
+} from './hooks';
 
 // Legacy Types
 export type {

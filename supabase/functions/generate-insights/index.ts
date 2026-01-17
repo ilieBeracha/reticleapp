@@ -1,21 +1,211 @@
 /**
  * Supabase Edge Function: Generate Insights
  * 
- * Two modes:
- * 1. Session mode (default): Triggered after session ends
- *    - Upserts session embedding to Pinecone
- *    - Detects anomalies for immediate insights
- *    - Refreshes user baseline
+ * REFACTORED to comply with AI Context Contract.
  * 
- * 2. Widget mode: On-demand AI analysis for dashboard widgets
- *    - Queries Pinecone for relevant sessions
- *    - Generates contextual AI insight for specific widget
+ * CORE PRINCIPLE:
+ * "Deterministic engine decides. AI explains and contextualizes."
+ * 
+ * This function NEVER:
+ * - Decides strengths, weaknesses, or trends
+ * - Overrides thresholds or baselines
+ * - Invents metrics or evidence
+ * 
+ * This function ONLY:
+ * - Stores session embeddings in Pinecone
+ * - Finds similar sessions for context
+ * - Generates explanations for ALREADY-DECIDED insights
+ * - Provides non-authoritative daily tips (clearly labeled)
+ * 
+ * Modes:
+ * 1. session: Upserts session embedding to Pinecone (no decision making)
+ * 2. explain_insight: Explains a decided insight (contract-compliant)
+ * 3. daily_tip: Non-authoritative motivational tip
+ * 4. chat: Answer questions with guardrails
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // ============================================================================
-// TYPES
+// CONTRACT TYPES (mirrored from ai-context.contract.ts)
+// ============================================================================
+
+type InsightCategory = 'strength' | 'weakness' | 'trend' | 'anomaly' | 'recommendation';
+type MetricType = 'accuracy' | 'grouping' | 'consistency' | 'time' | 'stress';
+type MetricDirection = 'up' | 'down' | 'stable';
+type ConfidenceLevel = 'high' | 'medium' | 'low';
+
+interface AIContextRequest {
+  request_id: string;
+  user_id: string;
+  insight_type: InsightCategory;
+  metric_type: MetricType;
+  decided_values: {
+    current_value: number;
+    baseline_value: number;
+    delta: number;
+    is_significant: boolean;
+    direction: MetricDirection;
+    confidence: ConfidenceLevel;
+    data_points: number;
+    unit: '%' | 'cm' | 's' | '';
+  };
+  context: {
+    filters_applied: Record<string, string | undefined>;
+    evidence_session_ids: string[];
+    category_label?: string;
+    engine_context?: string;
+  };
+  response_type: 'explanation' | 'similar_patterns' | 'widget_summary' | 'tip';
+}
+
+interface AIExplanation {
+  text: string;
+  possible_factors?: string[];
+  considerations?: string[];
+}
+
+interface AISimilarPattern {
+  session_count: number;
+  time_range?: string;
+  common_factors?: string[];
+  similarity_score?: number;
+}
+
+interface AIContextResponse {
+  request_id: string;
+  success: boolean;
+  error?: string;
+  explanation?: AIExplanation;
+  similar_patterns?: AISimilarPattern[];
+  confidence_note?: string;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+type GuardrailRule =
+  | 'NO_DIRECTION_CONTRADICTION'
+  | 'NO_SIGNIFICANCE_OVERRIDE'
+  | 'NO_METRIC_INVENTION'
+  | 'NO_DIRECTIVE_LANGUAGE'
+  | 'MUST_REFERENCE_EVIDENCE'
+  | 'NO_NUMERIC_CLAIMS'
+  | 'NO_RANKING_CLAIMS';
+
+interface AIViolation {
+  rule: GuardrailRule;
+  message: string;
+  severity: 'error' | 'warning';
+}
+
+interface AIResponseValidation {
+  is_valid: boolean;
+  violations: AIViolation[];
+}
+
+// ============================================================================
+// GUARDRAIL VALIDATION
+// ============================================================================
+
+function validateAIResponse(
+  request: AIContextRequest,
+  response: AIContextResponse
+): AIResponseValidation {
+  const violations: AIViolation[] = [];
+  
+  if (!response.success || !response.explanation) {
+    return { is_valid: true, violations: [] };
+  }
+  
+  const text = response.explanation.text.toLowerCase();
+  const { decided_values, metric_type } = request;
+  
+  // Rule: NO_DIRECTION_CONTRADICTION
+  if (decided_values.direction === 'down' || decided_values.delta < 0) {
+    if (text.includes('improving') || text.includes('increased') || text.includes('better')) {
+      // Exception: for grouping, "decreased" dispersion IS improvement
+      if (metric_type !== 'grouping') {
+        violations.push({
+          rule: 'NO_DIRECTION_CONTRADICTION',
+          message: `AI said "improving" but direction is ${decided_values.direction}`,
+          severity: 'error',
+        });
+      }
+    }
+  }
+  
+  if (decided_values.direction === 'up' || decided_values.delta > 0) {
+    if (text.includes('declining') || text.includes('decreased') || text.includes('worse')) {
+      if (metric_type !== 'grouping') {
+        violations.push({
+          rule: 'NO_DIRECTION_CONTRADICTION',
+          message: `AI said "declining" but direction is ${decided_values.direction}`,
+          severity: 'error',
+        });
+      }
+    }
+  }
+  
+  // Rule: NO_SIGNIFICANCE_OVERRIDE
+  if (!decided_values.is_significant) {
+    if (text.includes('significant') || text.includes('major') || text.includes('substantial')) {
+      violations.push({
+        rule: 'NO_SIGNIFICANCE_OVERRIDE',
+        message: 'AI claimed significance but is_significant is false',
+        severity: 'error',
+      });
+    }
+  }
+  
+  // Rule: NO_DIRECTIVE_LANGUAGE
+  const directiveWords = ['you should', 'you must', 'you need to', 'do this', 'stop doing'];
+  for (const directive of directiveWords) {
+    if (text.includes(directive)) {
+      violations.push({
+        rule: 'NO_DIRECTIVE_LANGUAGE',
+        message: `AI used directive language: "${directive}"`,
+        severity: 'warning',
+      });
+    }
+  }
+  
+  // Rule: NO_RANKING_CLAIMS
+  const rankingWords = ['best', 'worst', 'most important', 'top priority', 'main weakness'];
+  for (const ranking of rankingWords) {
+    if (text.includes(ranking)) {
+      violations.push({
+        rule: 'NO_RANKING_CLAIMS',
+        message: `AI made ranking claim: "${ranking}"`,
+        severity: 'warning',
+      });
+    }
+  }
+  
+  return {
+    is_valid: violations.filter(v => v.severity === 'error').length === 0,
+    violations,
+  };
+}
+
+function createFallbackResponse(request_id: string, reason: string): AIContextResponse {
+  return {
+    request_id,
+    success: false,
+    error: reason,
+    explanation: {
+      text: 'A change was detected based on your recent performance data.',
+      possible_factors: [],
+      considerations: [],
+    },
+    confidence_note: 'Explanation unavailable due to validation constraints.',
+  };
+}
+
+// ============================================================================
+// SESSION TYPES (for Pinecone)
 // ============================================================================
 
 interface SessionFeatures {
@@ -52,50 +242,6 @@ interface SessionFeatures {
   weather_condition: string | null;
   weather_condition_severity: string | null;
 }
-
-interface UserBaseline {
-  n: number;
-  avg_accuracy: number | null;
-  std_accuracy: number | null;
-  avg_grouping: number | null;
-  std_grouping: number | null;
-}
-
-interface GeneratedInsight {
-  title: string;
-  summary: string;
-  primary_factor: string | null;
-  secondary_factor: string | null;
-  score: number;
-  tags: string[];
-  insight_type: string;
-  evidence: Record<string, unknown>;
-}
-
-interface WidgetInsightRequest {
-  mode: 'widget_insight';
-  widget_type: string;
-  user_id: string;
-  widget_data: Record<string, unknown>;
-}
-
-interface DailyTipRequest {
-  mode: 'daily_tip';
-  user_id: string;
-  user_stats: {
-    streak: number;
-    accuracy: number;
-    sessions_this_week: number;
-    total_sessions: number;
-  };
-}
-
-interface SessionInsightRequest {
-  mode?: 'session';
-  session_id: string;
-}
-
-type InsightRequest = WidgetInsightRequest | SessionInsightRequest | DailyTipRequest;
 
 // ============================================================================
 // SESSION TO TEXT (for Pinecone embedding)
@@ -293,523 +439,131 @@ async function findSimilarSessions(
     }));
 }
 
-async function queryPineconeWithFilter(
-  userId: string,
-  pineconeApiKey: string,
-  indexHost: string,
-  filter: Record<string, unknown>,
-  topK: number = 50
-): Promise<Array<{ fields: Record<string, unknown> }>> {
-  const namespace = `user_${userId}`;
-  
-  // Create a generic query embedding
-  const queryText = 'shooting session performance analysis';
-  const queryEmbedding = await generateEmbedding(queryText, pineconeApiKey);
-
-  const response = await fetch(`https://${indexHost}/query`, {
-    method: 'POST',
-    headers: {
-      'Api-Key': pineconeApiKey,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      namespace: namespace,
-      vector: queryEmbedding,
-      topK: topK,
-      includeMetadata: true,
-      filter: filter,
-    }),
-  });
-
-  if (!response.ok) {
-    console.error('Pinecone query failed:', await response.text());
-    return [];
-  }
-
-  const data = await response.json();
-  return (data.matches || []).map((m: { metadata?: Record<string, unknown> }) => ({
-    fields: m.metadata || {},
-  }));
-}
-
-function computeSimilarityBaseline(
-  similarSessions: Array<{ fields: Record<string, unknown>; score: number }>
-): UserBaseline | null {
-  if (similarSessions.length < 1) return null;
-
-  const accuracies: number[] = [];
-  const groupings: number[] = [];
-
-  for (const session of similarSessions) {
-    if (session.fields.accuracy_pct != null) {
-      accuracies.push(session.fields.accuracy_pct as number);
-    }
-    if (session.fields.dispersion_cm != null) {
-      groupings.push(session.fields.dispersion_cm as number);
-    }
-  }
-
-  const calcMean = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
-  const calcStd = (arr: number[], mean: number | null) => {
-    if (arr.length < 2 || mean === null) return null;
-    const variance = arr.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / (arr.length - 1);
-    return Math.sqrt(variance);
-  };
-
-  const avgAccuracy = calcMean(accuracies);
-  const avgGrouping = calcMean(groupings);
-
-  return {
-    n: similarSessions.length,
-    avg_accuracy: avgAccuracy,
-    std_accuracy: calcStd(accuracies, avgAccuracy),
-    avg_grouping: avgGrouping,
-    std_grouping: calcStd(groupings, avgGrouping),
-  };
-}
-
 // ============================================================================
-// ANOMALY DETECTION
+// EXPLAIN INSIGHT (CONTRACT-COMPLIANT)
 // ============================================================================
 
-function isGroupingGoal(goal: string | null): boolean {
-  return goal === 'grouping' || goal === 'cold_bore';
-}
-
-function detectAnomaly(
-  features: SessionFeatures,
-  baseline: UserBaseline | null
-): { isAnomaly: boolean; type?: string; insight?: GeneratedInsight } {
-  if (!baseline || baseline.n < 3) {
-    return { isAnomaly: false };
-  }
-  
-  const isGrouping = isGroupingGoal(features.drill_goal);
-  
-  if (isGrouping && features.dispersion_cm !== null && baseline.avg_grouping) {
-    const diff = features.dispersion_cm - baseline.avg_grouping;
-    const pctDiff = (diff / baseline.avg_grouping) * 100;
-    
-    if (Math.abs(pctDiff) > 30) {
-      const isPositive = pctDiff < 0; // Lower dispersion is better
-      return {
-        isAnomaly: true,
-        type: isPositive ? 'tight_grouping' : 'wide_grouping',
-        insight: {
-          title: isPositive ? 'Exceptional grouping' : 'Grouping wider than usual',
-          summary: isPositive 
-            ? `Dispersion ${features.dispersion_cm.toFixed(1)}cm is ${Math.abs(diff).toFixed(1)}cm tighter than your average ${baseline.avg_grouping.toFixed(1)}cm.`
-            : `Dispersion ${features.dispersion_cm.toFixed(1)}cm is ${diff.toFixed(1)}cm wider than your average ${baseline.avg_grouping.toFixed(1)}cm.`,
-          primary_factor: isPositive ? 'consistency' : 'execution',
-          secondary_factor: isPositive ? null : 'stance',
-          score: isPositive ? 85 : 75,
-          tags: ['anomaly', 'grouping', isPositive ? 'positive' : 'negative'],
-          insight_type: isPositive ? 'anomaly_high' : 'anomaly_low',
-          evidence: { session_dispersion: features.dispersion_cm, baseline_dispersion: baseline.avg_grouping, diff },
-        },
-      };
-    }
-  } else if (!isGrouping && features.accuracy_pct !== null && baseline.avg_accuracy) {
-    const diff = features.accuracy_pct - baseline.avg_accuracy;
-    
-    if (Math.abs(diff) > 15) {
-      const isPositive = diff > 0;
-      return {
-        isAnomaly: true,
-        type: isPositive ? 'above_average' : 'below_average',
-        insight: {
-          title: isPositive ? 'Outstanding accuracy' : 'Accuracy below baseline',
-          summary: isPositive
-            ? `${features.accuracy_pct}% accuracy is ${Math.round(diff)}% above your average ${Math.round(baseline.avg_accuracy)}%.`
-            : `${features.accuracy_pct}% accuracy is ${Math.abs(Math.round(diff))}% below your average ${Math.round(baseline.avg_accuracy)}%.`,
-          primary_factor: isPositive ? 'consistency' : 'execution',
-          secondary_factor: isPositive ? null : (features.flinch_count >= 2 ? 'trigger' : null),
-          score: isPositive ? 85 : 75,
-          tags: ['anomaly', 'accuracy', isPositive ? 'positive' : 'negative'],
-          insight_type: isPositive ? 'anomaly_high' : 'anomaly_low',
-          evidence: { session_accuracy: features.accuracy_pct, baseline_accuracy: baseline.avg_accuracy, diff },
-        },
-      };
-    }
-  }
-  
-  return { isAnomaly: false };
-}
-
-// ============================================================================
-// WIDGET INSIGHT GENERATION
-// ============================================================================
-
-type WidgetType = 
-  | 'distance_breakdown'
-  | 'weapon_performance'
-  | 'position_analysis'
-  | 'monthly_trends'
-  | 'shot_goal'
-  | 'streak'
-  | 'all_time';
-
-async function generateWidgetInsight(
-  widgetType: WidgetType,
-  userId: string,
-  widgetData: Record<string, unknown>,
-  pineconeApiKey: string,
-  pineconeIndexHost: string,
+/**
+ * Generates an AI explanation for an ALREADY-DECIDED insight.
+ * 
+ * This function:
+ * - Receives decided values from the Insights Engine
+ * - Builds a constrained prompt
+ * - Validates AI output against guardrails
+ * - Returns a compliant AIContextResponse
+ */
+async function explainInsight(
+  request: AIContextRequest,
+  pineconeApiKey: string | undefined,
+  pineconeIndexHost: string | undefined,
   anthropicApiKey: string
-): Promise<{ title: string; summary: string; observations?: string[]; factors?: string }> {
+): Promise<AIContextResponse> {
+  const { decided_values, context, metric_type, insight_type } = request;
   
-  let context = '';
-  let prompt = '';
+  // Build similarity context if Pinecone is available
+  let similarityContext = '';
+  let similarPatterns: AISimilarPattern[] = [];
   
-  switch (widgetType) {
-    case 'distance_breakdown': {
-      // Query sessions at different distances
-      const closeRange = await queryPineconeWithFilter(userId, pineconeApiKey, pineconeIndexHost, {
-        distance_m: { $lte: 50 },
-      });
-      const mediumRange = await queryPineconeWithFilter(userId, pineconeApiKey, pineconeIndexHost, {
-        $and: [{ distance_m: { $gt: 50 } }, { distance_m: { $lte: 100 } }],
-      });
-      const longRange = await queryPineconeWithFilter(userId, pineconeApiKey, pineconeIndexHost, {
-        distance_m: { $gt: 100 },
-      });
+  if (pineconeApiKey && pineconeIndexHost && context.evidence_session_ids.length > 0) {
+    try {
+      // Query for similar sessions
+      const queryText = `${metric_type} ${insight_type} ${context.category_label || ''}`;
+      const queryEmbedding = await generateEmbedding(queryText, pineconeApiKey);
       
-      const calcAvg = (sessions: Array<{ fields: Record<string, unknown> }>) => {
-        const accs = sessions.filter(s => s.fields.accuracy_pct != null).map(s => s.fields.accuracy_pct as number);
-        return accs.length > 0 ? Math.round(accs.reduce((a, b) => a + b, 0) / accs.length) : null;
-      };
-      
-      context = `
-Distance Performance Data:
-- Close range (≤50m): ${closeRange.length} sessions, avg ${calcAvg(closeRange) ?? 'N/A'}% accuracy
-- Medium range (51-100m): ${mediumRange.length} sessions, avg ${calcAvg(mediumRange) ?? 'N/A'}% accuracy
-- Long range (>100m): ${longRange.length} sessions, avg ${calcAvg(longRange) ?? 'N/A'}% accuracy
-
-Current widget display: ${JSON.stringify(widgetData)}`;
-      
-      prompt = `Analyze this shooter's distance-based performance. ${context}
-
-Provide 2-3 SHORT factual observations about patterns you see. No advice, no suggestions - just observations.
-Format: Return JSON array of strings, each max 15 words.
-Example: ["Close range accuracy is 15% higher than long range", "Medium range needs the most practice"]`;
-      break;
-    }
-    
-    case 'weapon_performance': {
-      // Query sessions by weapon category
-      const rifles = await queryPineconeWithFilter(userId, pineconeApiKey, pineconeIndexHost, {
-        weapon_category: { $eq: 'rifle' },
-      });
-      const pistols = await queryPineconeWithFilter(userId, pineconeApiKey, pineconeIndexHost, {
-        weapon_category: { $eq: 'pistol' },
-      });
-      const carbines = await queryPineconeWithFilter(userId, pineconeApiKey, pineconeIndexHost, {
-        weapon_category: { $eq: 'carbine' },
-      });
-      const precisionRifles = await queryPineconeWithFilter(userId, pineconeApiKey, pineconeIndexHost, {
-        weapon_category: { $eq: 'precision_rifle' },
+      const response = await fetch(`https://${pineconeIndexHost}/query`, {
+        method: 'POST',
+        headers: {
+          'Api-Key': pineconeApiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          namespace: `user_${request.user_id}`,
+          vector: queryEmbedding,
+          topK: 10,
+          includeMetadata: true,
+        }),
       });
       
-      const calcAvg = (sessions: Array<{ fields: Record<string, unknown> }>) => {
-        const accs = sessions.filter(s => s.fields.accuracy_pct != null).map(s => s.fields.accuracy_pct as number);
-        return accs.length > 0 ? Math.round(accs.reduce((a, b) => a + b, 0) / accs.length) : null;
-      };
-      
-      const calcGrouping = (sessions: Array<{ fields: Record<string, unknown> }>) => {
-        const groups = sessions.filter(s => s.fields.dispersion_cm != null).map(s => s.fields.dispersion_cm as number);
-        return groups.length > 0 ? Math.round((groups.reduce((a, b) => a + b, 0) / groups.length) * 10) / 10 : null;
-      };
-      
-      context = `
-Weapon Performance Data from Pinecone:
-- Rifles: ${rifles.length} sessions, avg ${calcAvg(rifles) ?? 'N/A'}% accuracy, avg grouping ${calcGrouping(rifles) ?? 'N/A'}cm
-- Pistols: ${pistols.length} sessions, avg ${calcAvg(pistols) ?? 'N/A'}% accuracy
-- Carbines: ${carbines.length} sessions, avg ${calcAvg(carbines) ?? 'N/A'}% accuracy
-- Precision Rifles: ${precisionRifles.length} sessions, avg ${calcAvg(precisionRifles) ?? 'N/A'}% accuracy, avg grouping ${calcGrouping(precisionRifles) ?? 'N/A'}cm
-
-Widget data from client: ${JSON.stringify(widgetData)}`;
-      
-      prompt = `Analyze this shooter's weapon-specific performance patterns. ${context}
-
-Provide 2-3 SHORT factual observations comparing performance across weapons. Note which weapon type they perform best with. No advice - just patterns and comparisons.
-Format: Return JSON array of strings, each max 15 words.`;
-      break;
-    }
-    
-    case 'position_analysis': {
-      const prone = await queryPineconeWithFilter(userId, pineconeApiKey, pineconeIndexHost, {
-        position: { $eq: 'prone' },
-      });
-      const standing = await queryPineconeWithFilter(userId, pineconeApiKey, pineconeIndexHost, {
-        position: { $eq: 'standing' },
-      });
-      const kneeling = await queryPineconeWithFilter(userId, pineconeApiKey, pineconeIndexHost, {
-        position: { $eq: 'kneeling' },
-      });
-      
-      const calcAvg = (sessions: Array<{ fields: Record<string, unknown> }>) => {
-        const accs = sessions.filter(s => s.fields.accuracy_pct != null).map(s => s.fields.accuracy_pct as number);
-        return accs.length > 0 ? Math.round(accs.reduce((a, b) => a + b, 0) / accs.length) : null;
-      };
-      
-      context = `
-Position Performance Data:
-- Prone: ${prone.length} sessions, avg ${calcAvg(prone) ?? 'N/A'}% accuracy
-- Standing: ${standing.length} sessions, avg ${calcAvg(standing) ?? 'N/A'}% accuracy
-- Kneeling: ${kneeling.length} sessions, avg ${calcAvg(kneeling) ?? 'N/A'}% accuracy
-
-Widget display: ${JSON.stringify(widgetData)}`;
-      
-      prompt = `Analyze position-based shooting performance. ${context}
-
-Provide 2-3 SHORT factual observations. No advice.
-Format: Return JSON array of strings, each max 15 words.`;
-      break;
-    }
-    
-    case 'monthly_trends':
-    case 'shot_goal':
-    case 'streak':
-    case 'all_time':
-    default: {
-      // Generic analysis based on widget data
-      context = `Widget type: ${widgetType}\nWidget data: ${JSON.stringify(widgetData, null, 2)}`;
-      
-      prompt = `Analyze this shooting performance data. ${context}
-
-Provide 2-3 SHORT factual observations about patterns or notable stats.
-Format: Return JSON array of strings, each max 15 words.`;
-      break;
+      if (response.ok) {
+        const data = await response.json();
+        const matches = data.matches || [];
+        
+        if (matches.length > 0) {
+          const positions = matches.map((m: { metadata?: { position?: string } }) => m.metadata?.position).filter(Boolean);
+          const distances = matches.map((m: { metadata?: { distance_m?: number } }) => m.metadata?.distance_m).filter(Boolean);
+          
+          const positionCounts: Record<string, number> = {};
+          positions.forEach((p: string) => { positionCounts[p] = (positionCounts[p] || 0) + 1; });
+          const commonPositions = Object.entries(positionCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 2)
+            .map(([pos]) => pos);
+          
+          similarPatterns.push({
+            session_count: matches.length,
+            common_factors: commonPositions.length > 0 ? [`Common position: ${commonPositions.join(', ')}`] : undefined,
+            similarity_score: matches[0]?.score,
+          });
+          
+          similarityContext = `\nSimilar sessions found: ${matches.length}`;
+          if (commonPositions.length > 0) {
+            similarityContext += `\nCommon positions in similar sessions: ${commonPositions.join(', ')}`;
+          }
+          if (distances.length > 0) {
+            const avgDist = distances.reduce((a: number, b: number) => a + b, 0) / distances.length;
+            similarityContext += `\nAverage distance in similar sessions: ${Math.round(avgDist)}m`;
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Pinecone similarity query failed:', e);
     }
   }
   
-  // Build structured prompt - explanatory only, not prescriptive
-  const structuredPrompt = `You are a training analyst reviewing shooting performance data.
+  // Build the constrained prompt
+  const directionWord = metric_type === 'grouping'
+    ? (decided_values.delta < 0 ? 'tighter (improved)' : 'wider (declined)')
+    : (decided_values.direction === 'up' ? 'increased' : decided_values.direction === 'down' ? 'decreased' : 'stable');
+  
+  const prompt = `You are a shooting performance analyst. Your role is ONLY to explain patterns, NEVER to advise.
 
-Your role is to EXPLAIN patterns, not to advise or recommend actions.
+DECIDED VALUES (these are FINAL and AUTHORITATIVE - do NOT contradict):
+- Metric: ${metric_type}
+- Current value: ${decided_values.current_value}${decided_values.unit}
+- Baseline value: ${decided_values.baseline_value}${decided_values.unit}
+- Change: ${decided_values.delta > 0 ? '+' : ''}${decided_values.delta}${decided_values.unit} (${directionWord})
+- Is significant: ${decided_values.is_significant ? 'YES' : 'NO'}
+- Confidence: ${decided_values.confidence}
+- Data points: ${decided_values.data_points} sessions
+- Category: ${context.category_label || 'General'}
 
-${context}
+${context.engine_context ? `Additional context: ${context.engine_context}` : ''}
+${similarityContext}
 
-Respond with a JSON object containing:
-- "summary": One clear sentence stating the most notable pattern or change (max 20 words)
-- "observations": Array of 2-3 factual observations about the data (each max 15 words)
-- "factors": One sentence explaining possible reasons for this pattern (max 25 words)
+FILTERS APPLIED: ${Object.entries(context.filters_applied).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(', ') || 'None'}
 
-IMPORTANT:
-- Be factual and analytical, not motivational
-- Do NOT give advice or recommendations
-- Do NOT use phrases like "consider", "try", "should", "could improve"
-- The "factors" field explains WHY, not WHAT TO DO
+Your task:
+1. Explain what this ${decided_values.is_significant ? 'significant ' : ''}change means in practical terms
+2. Suggest 2-3 POSSIBLE contributing factors (phrase as possibilities, not facts)
+3. Mention what the shooter might consider (not "should" or "must")
 
-Example response format:
+RULES:
+- Do NOT say "improving" if direction is declining
+- Do NOT say "significant" if is_significant is NO
+- Do NOT use "should", "must", "need to"
+- Do NOT rank importance or say "best", "worst", "main"
+- Reference the actual numbers provided
+
+Respond ONLY with valid JSON:
 {
-  "summary": "Long range accuracy dropped 11% compared to previous sessions.",
-  "observations": ["25m+ accuracy is now 58% vs 69% baseline", "Close and medium range remained stable"],
-  "factors": "Possible contributing factors: fewer long-range sessions recently, or environmental conditions during those sessions."
-}
-
-Respond ONLY with valid JSON, no other text.`;
-
-  // Call Claude
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': anthropicApiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-3-haiku-20240307',
-      max_tokens: 400,
-      messages: [{ role: 'user', content: structuredPrompt }],
-    }),
-  });
-
-  if (!response.ok) {
-    console.error('Claude API error:', await response.text());
-    return {
-      title: getWidgetTitle(widgetType),
-      summary: 'Could not generate insight at this time.',
-    };
-  }
-
-  const data = await response.json();
-  const content = data.content?.[0]?.text || '';
-  
-  // Parse structured JSON response
-  try {
-    // Find JSON object in response
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]) as {
-        summary?: string;
-        observations?: string[];
-        factors?: string;
-      };
-      
-      return {
-        title: getWidgetTitle(widgetType),
-        summary: parsed.summary || 'Analysis complete.',
-        observations: parsed.observations || [],
-        factors: parsed.factors,
-      };
-    }
-  } catch (e) {
-    console.error('Failed to parse LLM JSON response:', e, content);
-  }
-  
-  // Fallback: try to extract any useful text
-  return {
-    title: getWidgetTitle(widgetType),
-    summary: content.slice(0, 150) || 'Analysis complete.',
-  };
-}
-
-function getWidgetTitle(widgetType: WidgetType): string {
-  const titles: Record<WidgetType, string> = {
-    distance_breakdown: 'Distance Analysis',
-    weapon_performance: 'Weapon Performance',
-    position_analysis: 'Position Patterns',
-    monthly_trends: 'Monthly Trends',
-    shot_goal: 'Training Progress',
-    streak: 'Consistency Analysis',
-    all_time: 'Career Overview',
-  };
-  return titles[widgetType] || 'Performance Analysis';
-}
-
-// ============================================================================
-// DAILY TIP GENERATION (Personalized via Pinecone)
-// ============================================================================
-
-interface DailyTipResult {
-  title: string;
-  content: string;
-  category: 'technique' | 'fundamentals' | 'mental' | 'training';
-  personalized: boolean;
-  based_on?: string;
-}
-
-async function generateDailyTip(
-  userId: string,
-  userStats: { streak: number; accuracy: number; sessions_this_week: number; total_sessions: number },
-  pineconeApiKey: string,
-  pineconeIndexHost: string,
-  anthropicApiKey: string
-): Promise<DailyTipResult> {
-  
-  // Query recent sessions from Pinecone to understand user's patterns
-  let sessionContext = '';
-  let weakAreas: string[] = [];
-  let strongAreas: string[] = [];
-  
-  try {
-    // Get sessions with different characteristics
-    const [
-      lowAccuracySessions,
-      highAccuracySessions,
-      recentSessions,
-      groupingSessions,
-    ] = await Promise.all([
-      queryPineconeWithFilter(userId, pineconeApiKey, pineconeIndexHost, {
-        accuracy_pct: { $lt: 60 },
-      }, 10),
-      queryPineconeWithFilter(userId, pineconeApiKey, pineconeIndexHost, {
-        accuracy_pct: { $gte: 80 },
-      }, 10),
-      queryPineconeWithFilter(userId, pineconeApiKey, pineconeIndexHost, {}, 20), // Recent sessions
-      queryPineconeWithFilter(userId, pineconeApiKey, pineconeIndexHost, {
-        drill_goal: { $eq: 'grouping' },
-      }, 10),
-    ]);
-
-    // Analyze patterns
-    if (lowAccuracySessions.length > 0) {
-      const positions = lowAccuracySessions
-        .map(s => s.fields.position as string)
-        .filter(Boolean);
-      const distances = lowAccuracySessions
-        .map(s => s.fields.distance_m as number)
-        .filter(Boolean);
-      
-      // Find common patterns in low accuracy sessions
-      const positionCounts: Record<string, number> = {};
-      positions.forEach(p => { positionCounts[p] = (positionCounts[p] || 0) + 1; });
-      const weakPosition = Object.entries(positionCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
-      if (weakPosition) weakAreas.push(`${weakPosition} position`);
-      
-      const avgDistance = distances.length > 0 ? distances.reduce((a, b) => a + b, 0) / distances.length : 0;
-      if (avgDistance > 100) weakAreas.push('long range shooting');
-    }
-
-    if (highAccuracySessions.length > 0) {
-      const positions = highAccuracySessions
-        .map(s => s.fields.position as string)
-        .filter(Boolean);
-      const positionCounts: Record<string, number> = {};
-      positions.forEach(p => { positionCounts[p] = (positionCounts[p] || 0) + 1; });
-      const strongPosition = Object.entries(positionCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
-      if (strongPosition) strongAreas.push(`${strongPosition} position`);
-    }
-
-    // Check grouping performance
-    if (groupingSessions.length > 0) {
-      const dispersions = groupingSessions
-        .map(s => s.fields.dispersion_cm as number)
-        .filter(Boolean);
-      const avgDispersion = dispersions.length > 0 ? dispersions.reduce((a, b) => a + b, 0) / dispersions.length : 0;
-      if (avgDispersion > 8) weakAreas.push('shot consistency');
-      else if (avgDispersion < 4) strongAreas.push('grouping precision');
-    }
-
-    // Build context from session data
-    const sessionTexts = recentSessions
-      .slice(0, 5)
-      .map(s => s.fields.text as string)
-      .filter(Boolean);
-    
-    sessionContext = `
-User's recent training patterns (from ${recentSessions.length} sessions):
-${sessionTexts.join('\n')}
-
-Identified weak areas: ${weakAreas.length > 0 ? weakAreas.join(', ') : 'None identified'}
-Identified strong areas: ${strongAreas.length > 0 ? strongAreas.join(', ') : 'Still gathering data'}
-`;
-  } catch (error) {
-    console.error('Failed to query Pinecone for daily tip:', error);
-    sessionContext = 'No session history available yet.';
-  }
-
-  // Build the prompt for Claude
-  const prompt = `You are a shooting coach generating a personalized daily tip for a shooter.
-
-User Statistics:
-- Training streak: ${userStats.streak} days
-- Average accuracy: ${userStats.accuracy}%
-- Sessions this week: ${userStats.sessions_this_week}
-- Total sessions: ${userStats.total_sessions}
-
-${sessionContext}
-
-Generate ONE specific, actionable shooting tip that is PERSONALIZED to this shooter's patterns and current stats.
-
-Rules:
-- If they have weak areas, address one of them
-- If they have a streak going, acknowledge consistency
-- If accuracy is low, focus on fundamentals
-- If sessions_this_week is 0, encourage getting back to training
-- Keep the tip practical and specific to their data
-- Maximum 2 sentences for the tip content
-
-Respond with ONLY valid JSON in this exact format:
-{
-  "title": "Short title (3-5 words)",
-  "content": "The actual tip content (1-2 sentences max)",
-  "category": "technique" | "fundamentals" | "mental" | "training",
-  "based_on": "What user data this tip addresses"
+  "text": "One clear explanation paragraph (max 50 words)",
+  "possible_factors": ["Factor 1", "Factor 2"],
+  "considerations": ["Something to consider"]
 }`;
 
   try {
+    console.log('📤 Calling Claude API...');
+    
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -825,71 +579,366 @@ Respond with ONLY valid JSON in this exact format:
     });
 
     if (!response.ok) {
-      console.error('Claude API error for daily tip:', await response.text());
+      const errorText = await response.text();
+      console.error('❌ Claude API error:', response.status, errorText);
+      return createFallbackResponse(request.request_id, 'AI service error');
+    }
+
+    const data = await response.json();
+    const content = data.content?.[0]?.text || '';
+    
+    console.log('📥 Claude response received, length:', content.length);
+    
+    // Parse JSON
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error('❌ Could not parse JSON from Claude response');
+      return createFallbackResponse(request.request_id, 'Invalid AI response format');
+    }
+    
+    const parsed = JSON.parse(jsonMatch[0]) as AIExplanation;
+    
+    console.log('✅ Parsed explanation:', parsed.text?.slice(0, 50) + '...');
+    
+    // Build response
+    const aiResponse: AIContextResponse = {
+      request_id: request.request_id,
+      success: true,
+      explanation: {
+        text: parsed.text || '',
+        possible_factors: parsed.possible_factors || [],
+        considerations: parsed.considerations || [],
+      },
+      similar_patterns: similarPatterns.length > 0 ? similarPatterns : undefined,
+      confidence_note: `Based on ${decided_values.data_points} sessions${similarPatterns.length > 0 ? ` and ${similarPatterns[0].session_count} similar patterns` : ''}`,
+      usage: {
+        prompt_tokens: data.usage?.input_tokens || 0,
+        completion_tokens: data.usage?.output_tokens || 0,
+        total_tokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
+      },
+    };
+    
+    // VALIDATE against guardrails
+    const validation = validateAIResponse(request, aiResponse);
+    
+    if (!validation.is_valid) {
+      console.warn('⚠️ AI response failed guardrails:', validation.violations);
+      return createFallbackResponse(request.request_id, `Guardrail violation: ${validation.violations[0].message}`);
+    }
+    
+    if (validation.violations.length > 0) {
+      console.warn('⚠️ AI response has warnings:', validation.violations);
+    }
+    
+    console.log('✅ Explanation ready, returning response');
+    return aiResponse;
+    
+  } catch (error) {
+    console.error('❌ explainInsight error:', error);
+    return createFallbackResponse(request.request_id, 'Explanation generation failed');
+  }
+}
+
+// ============================================================================
+// DAILY TIP (NON-AUTHORITATIVE)
+// ============================================================================
+
+interface DailyTipRequest {
+  mode: 'daily_tip';
+  user_id: string;
+  user_stats: {
+    streak: number;
+    accuracy: number;
+    sessions_this_week: number;
+    total_sessions: number;
+  };
+}
+
+interface DailyTipResult {
+  title: string;
+  content: string;
+  category: 'technique' | 'fundamentals' | 'mental' | 'training';
+  personalized: boolean;
+  /** Clearly labeled as non-authoritative */
+  disclaimer: string;
+}
+
+async function generateDailyTip(
+  userId: string,
+  userStats: { streak: number; accuracy: number; sessions_this_week: number; total_sessions: number },
+  pineconeApiKey: string | undefined,
+  pineconeIndexHost: string | undefined,
+  anthropicApiKey: string
+): Promise<DailyTipResult> {
+  
+  // Build context from Pinecone (for personalization only, not decisions)
+  let sessionContext = '';
+  
+  if (pineconeApiKey && pineconeIndexHost) {
+    try {
+      const queryText = 'recent shooting session performance';
+      const queryEmbedding = await generateEmbedding(queryText, pineconeApiKey);
+      
+      const response = await fetch(`https://${pineconeIndexHost}/query`, {
+        method: 'POST',
+        headers: {
+          'Api-Key': pineconeApiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          namespace: `user_${userId}`,
+          vector: queryEmbedding,
+          topK: 10,
+          includeMetadata: true,
+        }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const matches = data.matches || [];
+        
+        if (matches.length > 0) {
+          const texts = matches
+            .slice(0, 3)
+            .map((m: { metadata?: { text?: string } }) => m.metadata?.text)
+            .filter(Boolean);
+          sessionContext = `Recent session patterns: ${texts.join('; ')}`;
+        }
+      }
+    } catch (e) {
+      console.error('Pinecone query for tip failed:', e);
+    }
+  }
+
+  const prompt = `Generate a SHORT daily training tip for a shooter.
+
+User stats:
+- Streak: ${userStats.streak} days
+- Average accuracy: ${userStats.accuracy}%
+- Sessions this week: ${userStats.sessions_this_week}
+- Total sessions: ${userStats.total_sessions}
+
+${sessionContext ? `Context: ${sessionContext}` : ''}
+
+Generate ONE general training tip. This is motivational content, NOT analysis.
+
+Rules:
+- Keep it general and encouraging
+- Max 2 sentences
+- Focus on fundamentals
+
+Respond with JSON:
+{
+  "title": "3-5 word title",
+  "content": "1-2 sentence tip",
+  "category": "technique" | "fundamentals" | "mental" | "training"
+}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': anthropicApiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 150,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
       throw new Error('Claude API failed');
     }
 
     const data = await response.json();
     const content = data.content?.[0]?.text || '';
-
-    // Parse JSON response
+    
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]) as {
         title: string;
         content: string;
         category: 'technique' | 'fundamentals' | 'mental' | 'training';
-        based_on?: string;
       };
-
+      
       return {
         title: parsed.title || 'Training Tip',
         content: parsed.content || 'Focus on your fundamentals today.',
         category: parsed.category || 'training',
-        personalized: true,
-        based_on: parsed.based_on,
+        personalized: sessionContext.length > 0,
+        disclaimer: 'This is a general tip, not personalized analysis.',
       };
     }
   } catch (error) {
-    console.error('Failed to generate personalized tip:', error);
+    console.error('generateDailyTip error:', error);
   }
 
-  // Fallback to a generic tip based on stats
+  // Fallback
   return getFallbackTip(userStats);
 }
 
 function getFallbackTip(stats: { streak: number; accuracy: number; sessions_this_week: number }): DailyTipResult {
-  if (stats.streak >= 5) {
-    return {
-      title: 'Mental Focus',
-      content: 'Great streak! Visualize each shot before taking it. See the bullet hitting the target. Confidence breeds accuracy.',
-      category: 'mental',
-      personalized: false,
-    };
-  }
-  if (stats.accuracy < 50 && stats.sessions_this_week > 0) {
-    return {
-      title: 'Trigger Press',
-      content: 'Focus on pressing straight back. Let the shot surprise you. Anticipation causes most misses.',
+  const tips: DailyTipResult[] = [
+    {
+      title: 'Breathing Control',
+      content: 'Take a deep breath, hold at the natural pause, then squeeze. Consistent breathing improves groupings.',
       category: 'technique',
       personalized: false,
-    };
-  }
-  if (stats.sessions_this_week === 0) {
-    return {
+      disclaimer: 'This is a general tip, not personalized analysis.',
+    },
+    {
+      title: 'Trigger Press',
+      content: 'Focus on pressing straight back. Let the shot surprise you.',
+      category: 'technique',
+      personalized: false,
+      disclaimer: 'This is a general tip, not personalized analysis.',
+    },
+    {
+      title: 'Mental Focus',
+      content: 'Visualize each shot before taking it. See the bullet hitting the target.',
+      category: 'mental',
+      personalized: false,
+      disclaimer: 'This is a general tip, not personalized analysis.',
+    },
+    {
       title: 'Deliberate Practice',
-      content: 'Quality over quantity. 50 focused rounds beat 200 rushed ones. Every shot should have purpose.',
+      content: 'Quality over quantity. 50 focused rounds beat 200 rushed ones.',
       category: 'training',
       personalized: false,
-    };
-  }
-  return {
-    title: 'Breathing Control',
-    content: 'Take a deep breath, hold at the natural pause, then squeeze. Consistent breathing improves groupings.',
-    category: 'technique',
-    personalized: false,
+      disclaimer: 'This is a general tip, not personalized analysis.',
+    },
+  ];
+  
+  // Simple selection based on stats
+  if (stats.streak >= 5) return tips[2]; // Mental focus for consistent users
+  if (stats.accuracy < 50) return tips[1]; // Trigger press for low accuracy
+  if (stats.sessions_this_week === 0) return tips[3]; // Deliberate practice
+  return tips[0]; // Default breathing
+}
+
+// ============================================================================
+// CHAT WITH GUARDRAILS
+// ============================================================================
+
+interface ChatRequest {
+  mode: 'chat';
+  user_id: string;
+  question: string;
+  /** DECIDED context from the Insights Engine - AI cannot contradict */
+  decided_context: {
+    accuracy?: { current: number; baseline: number; delta: number; direction: MetricDirection };
+    grouping?: { current: number; baseline: number; delta: number };
+    position_breakdown?: Array<{ label: string; current: number; delta: number }>;
+    distance_breakdown?: Array<{ label: string; current: number; delta: number }>;
   };
 }
+
+async function handleChat(
+  request: ChatRequest,
+  anthropicApiKey: string
+): Promise<{ answer: string; guardrail_warnings?: string[] }> {
+  const { question, decided_context } = request;
+  
+  // Build context string from DECIDED values
+  const contextStr = `
+DECIDED PERFORMANCE DATA (these are authoritative - do not contradict):
+
+${decided_context.accuracy ? `Accuracy:
+- Current: ${decided_context.accuracy.current}%
+- Baseline: ${decided_context.accuracy.baseline}%
+- Change: ${decided_context.accuracy.delta > 0 ? '+' : ''}${decided_context.accuracy.delta}%
+- Direction: ${decided_context.accuracy.direction}` : 'Accuracy: No data'}
+
+${decided_context.grouping ? `Grouping:
+- Current: ${decided_context.grouping.current}cm
+- Baseline: ${decided_context.grouping.baseline}cm
+- Change: ${decided_context.grouping.delta > 0 ? '+' : ''}${decided_context.grouping.delta}cm` : 'Grouping: No data'}
+
+${decided_context.position_breakdown?.length ? `Position breakdown:
+${decided_context.position_breakdown.map(p => `- ${p.label}: ${p.current}% (${p.delta > 0 ? '+' : ''}${p.delta}%)`).join('\n')}` : ''}
+
+${decided_context.distance_breakdown?.length ? `Distance breakdown:
+${decided_context.distance_breakdown.map(d => `- ${d.label}: ${d.current}% (${d.delta > 0 ? '+' : ''}${d.delta}%)`).join('\n')}` : ''}
+`;
+
+  const prompt = `You are answering a question about shooting performance data.
+
+${contextStr}
+
+User's question: "${question}"
+
+RULES:
+- Be concise (2-3 sentences max)
+- Reference the data above
+- Do NOT contradict the decided values
+- If accuracy is declining, do not say it's improving
+- If you don't have data, say so
+- Do NOT give training advice unless asked
+
+Answer:`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': anthropicApiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 200,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      return { answer: 'I couldn\'t process that question. Please try again.' };
+    }
+
+    const data = await response.json();
+    const answer = data.content?.[0]?.text || 'I couldn\'t generate an answer.';
+    
+    // Simple guardrail check on answer
+    const warnings: string[] = [];
+    const answerLower = answer.toLowerCase();
+    
+    if (decided_context.accuracy?.direction === 'down') {
+      if (answerLower.includes('improving') || answerLower.includes('increased')) {
+        warnings.push('Answer may contradict accuracy direction');
+      }
+    }
+    
+    return { answer, guardrail_warnings: warnings.length > 0 ? warnings : undefined };
+    
+  } catch (error) {
+    console.error('Chat error:', error);
+    return { answer: 'I couldn\'t process that question.' };
+  }
+}
+
+// ============================================================================
+// REQUEST TYPES
+// ============================================================================
+
+interface SessionRequest {
+  mode?: 'session';
+  session_id: string;
+}
+
+interface ExplainInsightRequest {
+  mode: 'explain_insight';
+  request: AIContextRequest;
+}
+
+type InsightRequest = 
+  | SessionRequest 
+  | ExplainInsightRequest 
+  | DailyTipRequest 
+  | ChatRequest;
 
 // ============================================================================
 // MAIN HANDLER
@@ -919,47 +968,46 @@ Deno.serve(async (req) => {
     const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
 
     // ========================================================================
-    // MODE: WIDGET INSIGHT (on-demand AI analysis)
+    // MODE: EXPLAIN INSIGHT (contract-compliant AI explanation)
     // ========================================================================
-    if ('mode' in body && body.mode === 'widget_insight') {
-      const { widget_type, user_id, widget_data } = body as WidgetInsightRequest;
+    if ('mode' in body && body.mode === 'explain_insight') {
+      const { request: aiRequest } = body as ExplainInsightRequest;
       
-      if (!widget_type || !user_id) {
-        return new Response(JSON.stringify({ error: 'widget_type and user_id required' }), {
+      if (!aiRequest || !aiRequest.decided_values) {
+        return new Response(JSON.stringify({ 
+          error: 'AIContextRequest with decided_values required' 
+        }), {
           status: 400,
           headers: { 'Content-Type': 'application/json' },
         });
       }
       
-      if (!pineconeApiKey || !pineconeIndexHost || !anthropicApiKey) {
-        return new Response(JSON.stringify({ error: 'AI services not configured' }), {
-          status: 503,
+      if (!anthropicApiKey) {
+        return new Response(JSON.stringify(
+          createFallbackResponse(aiRequest.request_id, 'AI service not configured')
+        ), {
           headers: { 'Content-Type': 'application/json' },
         });
       }
       
-      console.log(`🤖 Widget insight request: ${widget_type} for user ${user_id}`);
+      console.log(`🤖 Explain insight: ${aiRequest.insight_type} - ${aiRequest.metric_type}`);
       
-      const insight = await generateWidgetInsight(
-        widget_type as WidgetType,
-        user_id,
-        widget_data || {},
+      const response = await explainInsight(
+        aiRequest,
         pineconeApiKey,
         pineconeIndexHost,
         anthropicApiKey
       );
       
-      return new Response(JSON.stringify({
-        success: true,
-        widget_type,
-        insight,
-      }), {
+      console.log(`📤 Returning response, success: ${response.success}`);
+      
+      return new Response(JSON.stringify(response), {
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
     // ========================================================================
-    // MODE: DAILY TIP (personalized tip based on Pinecone session history)
+    // MODE: DAILY TIP (non-authoritative)
     // ========================================================================
     if ('mode' in body && body.mode === 'daily_tip') {
       const { user_id, user_stats } = body as DailyTipRequest;
@@ -973,14 +1021,9 @@ Deno.serve(async (req) => {
       
       console.log(`💡 Daily tip request for user ${user_id}`);
       
-      // If AI services not configured, return fallback tip
-      if (!pineconeApiKey || !pineconeIndexHost || !anthropicApiKey) {
-        console.log('AI services not configured, using fallback tip');
+      if (!anthropicApiKey) {
         const fallbackTip = getFallbackTip(user_stats || { streak: 0, accuracy: 0, sessions_this_week: 0 });
-        return new Response(JSON.stringify({
-          success: true,
-          tip: fallbackTip,
-        }), {
+        return new Response(JSON.stringify({ success: true, tip: fallbackTip }), {
           headers: { 'Content-Type': 'application/json' },
         });
       }
@@ -993,26 +1036,18 @@ Deno.serve(async (req) => {
         anthropicApiKey
       );
       
-      return new Response(JSON.stringify({
-        success: true,
-        tip,
-      }), {
+      return new Response(JSON.stringify({ success: true, tip }), {
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
     // ========================================================================
-    // MODE: CHAT (answer questions about performance)
+    // MODE: CHAT (with guardrails)
     // ========================================================================
     if ('mode' in body && body.mode === 'chat') {
-      const { user_id, question, context } = body as {
-        mode: 'chat';
-        user_id: string;
-        question: string;
-        context: Record<string, unknown>;
-      };
+      const chatRequest = body as ChatRequest;
       
-      if (!user_id || !question) {
+      if (!chatRequest.user_id || !chatRequest.question) {
         return new Response(JSON.stringify({ error: 'user_id and question required' }), {
           status: 400,
           headers: { 'Content-Type': 'application/json' },
@@ -1026,83 +1061,19 @@ Deno.serve(async (req) => {
         });
       }
       
-      console.log(`💬 Chat question from user ${user_id}: ${question}`);
+      console.log(`💬 Chat: ${chatRequest.question.slice(0, 50)}...`);
       
-      // Build context string from analysis data
-      const contextStr = `
-Performance Analysis Data:
-
-Accuracy:
-- Current: ${context.accuracy?.current ?? 'N/A'}%
-- Baseline: ${context.accuracy?.baseline ?? 'N/A'}%
-- Change: ${context.accuracy?.delta ?? 0}% (${context.accuracy?.direction ?? 'stable'})
-- Recent shots: ${context.accuracy?.recentShots ?? 'N/A'}
-
-Grouping:
-- Current: ${context.grouping?.current ?? 'N/A'}cm
-- Baseline: ${context.grouping?.baseline ?? 'N/A'}cm
-- Change: ${context.grouping?.delta ?? 0}cm
-
-Distance breakdown:
-${(context.distance as Array<{label: string; current: number; delta: number}> || [])
-  .map(d => `- ${d.label}: ${d.current}% (${d.delta > 0 ? '+' : ''}${d.delta}%)`)
-  .join('\n') || 'No distance data'}
-
-Position breakdown:
-${(context.position as Array<{label: string; current: number; delta: number}> || [])
-  .map(p => `- ${p.label}: ${p.current}% (${p.delta > 0 ? '+' : ''}${p.delta}%)`)
-  .join('\n') || 'No position data'}
-`;
-
-      const chatPrompt = `You are a training analyst for a shooter. Answer their question based on the data provided.
-
-${contextStr}
-
-User's question: "${question}"
-
-Rules:
-- Be concise (2-3 sentences max)
-- Be factual, reference the data
-- Don't give training advice unless specifically asked
-- If you don't have data to answer, say so
-
-Answer:`;
-
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': anthropicApiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-3-haiku-20240307',
-          max_tokens: 200,
-          messages: [{ role: 'user', content: chatPrompt }],
-        }),
-      });
-
-      if (!response.ok) {
-        console.error('Claude API error:', await response.text());
-        return new Response(JSON.stringify({ 
-          answer: 'I couldn\'t process that question. Please try again.' 
-        }), {
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-
-      const data = await response.json();
-      const answer = data.content?.[0]?.text || 'I couldn\'t generate an answer.';
+      const result = await handleChat(chatRequest, anthropicApiKey);
       
-      return new Response(JSON.stringify({ answer }), {
+      return new Response(JSON.stringify(result), {
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
     // ========================================================================
-    // MODE: SESSION INSIGHT (after session ends)
+    // MODE: SESSION (Pinecone upsert only - NO decision making)
     // ========================================================================
-    const { session_id } = body as SessionInsightRequest;
+    const { session_id } = body as SessionRequest;
 
     if (!session_id) {
       return new Response(JSON.stringify({ error: 'session_id required' }), {
@@ -1154,10 +1125,9 @@ Answer:`;
     // 3. Generate text for embedding
     const sessionText = sessionToText(features);
 
-    // 4. Upsert to Pinecone (always)
-    let baseline: UserBaseline | null = null;
+    // 4. Upsert to Pinecone (this is pure storage, no decisions)
     let pineconeStatus = 'not_configured';
-    let similarSessions: Array<{ fields: Record<string, unknown>; score: number }> = [];
+    let similarSessionsCount = 0;
     
     if (pineconeApiKey && pineconeIndexHost) {
       try {
@@ -1165,50 +1135,18 @@ Answer:`;
         pineconeStatus = 'upsert_success';
         console.log('✅ PINECONE: Upserted session embedding');
 
-        // Search for similar sessions to compute baseline
-        similarSessions = await findSimilarSessions(features, sessionText, pineconeApiKey, pineconeIndexHost);
-        console.log(`🔍 PINECONE: Found ${similarSessions.length} similar sessions`);
-
-        if (similarSessions.length >= 1) {
-          baseline = computeSimilarityBaseline(similarSessions);
-          pineconeStatus = 'baseline_computed';
-        }
+        // Find similar sessions (for context only, returned to client)
+        const similarSessions = await findSimilarSessions(features, sessionText, pineconeApiKey, pineconeIndexHost);
+        similarSessionsCount = similarSessions.length;
+        console.log(`🔍 PINECONE: Found ${similarSessionsCount} similar sessions`);
+        
       } catch (pineconeError) {
         pineconeStatus = 'error';
         console.error('❌ PINECONE ERROR:', pineconeError);
       }
     }
 
-    // 5. Check for anomalies (only generate insight if anomaly detected)
-    const anomaly = detectAnomaly(features, baseline);
-    let insights: GeneratedInsight[] = [];
-    
-    if (anomaly.isAnomaly && anomaly.insight) {
-      console.log(`🚨 ANOMALY detected: ${anomaly.type}`);
-      insights = [anomaly.insight];
-      
-      // Save anomaly insight to database
-      const { error: insertError } = await supabase
-        .from('session_insights')
-        .insert({
-          session_id,
-          user_id: features.user_id,
-          title: anomaly.insight.title,
-          summary: anomaly.insight.summary,
-          primary_factor: anomaly.insight.primary_factor,
-          secondary_factor: anomaly.insight.secondary_factor,
-          score: anomaly.insight.score,
-          tags: anomaly.insight.tags,
-          insight_type: anomaly.insight.insight_type,
-          evidence: anomaly.insight.evidence,
-        });
-
-      if (insertError) {
-        console.error('Failed to save insight:', insertError);
-      }
-    }
-
-    // 6. Refresh user baseline
+    // 5. Refresh user baseline (this is a database operation, not AI decision)
     const conditionKey = [
       features.drill_goal || 'unknown',
       features.position || 'unknown',
@@ -1222,15 +1160,24 @@ Answer:`;
       p_limit: 30,
     });
 
+    // NOTE: Anomaly detection has been REMOVED from this function.
+    // The Insights Engine (insights.engine.ts) is now the sole authority
+    // for detecting anomalies, strengths, weaknesses, and trends.
+    // 
+    // If the client wants AI explanation of an anomaly:
+    // 1. Engine detects anomaly and computes decided_values
+    // 2. Client calls mode: 'explain_insight' with AIContextRequest
+    // 3. This function generates explanation with guardrails
+
     return new Response(
       JSON.stringify({
         success: true,
         session_id,
         pinecone_status: pineconeStatus,
-        similar_sessions_found: similarSessions.length,
-        anomaly_detected: anomaly.isAnomaly,
-        anomaly_type: anomaly.type || null,
-        insights_generated: insights.length,
+        similar_sessions_found: similarSessionsCount,
+        // Removed: anomaly_detected, anomaly_type, insights_generated
+        // These are now computed by the Insights Engine
+        note: 'Session indexed. Use mode: explain_insight with decided values for AI explanation.',
       }),
       { headers: { 'Content-Type': 'application/json' } }
     );

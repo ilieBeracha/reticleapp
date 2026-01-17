@@ -11,8 +11,14 @@
  * Philosophy: Insights ≠ Dashboard
  * - Dashboard = what happened
  * - Insights = what it means + what to do next
+ *
+ * AI Integration:
+ * - Engine computes insights (authoritative)
+ * - AI explains on demand (assistive)
+ * - "Why?" buttons on cards load AI explanations
  */
 
+import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { getRecentSessionsWithStats, type SessionWithDetails } from '@/services/sessionService';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,6 +37,7 @@ import {
   View,
 } from 'react-native';
 
+import { AIExplanationProvider } from './AIExplanationProvider';
 import { EvidenceSheet } from './EvidenceSheet';
 import { computeInsights } from './insights.engine';
 import {
@@ -137,6 +144,7 @@ function NotEnoughDataState({ colors, currentSessions, minRequired }: NotEnoughD
 export function InsightsDashboard() {
   const colors = useColors();
   const router = useRouter();
+  const { user } = useAuth();
 
   // Data state
   const [sessions, setSessions] = useState<SessionWithDetails[]>([]);
@@ -259,24 +267,28 @@ export function InsightsDashboard() {
 
   const hasData = sessions.length > 0;
 
+  // User ID for AI explanations (fallback to empty string if not logged in)
+  const userId = user?.id ?? '';
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={colors.text}
-          />
-        }
-      >
-        {/* Header */}
-        <View style={styles.headerRow}>
-          <Text style={[styles.pageTitle, { color: colors.text }]}>Insights</Text>
-        </View>
+    <AIExplanationProvider userId={userId}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.text}
+            />
+          }
+        >
+          {/* Header */}
+          <View style={styles.headerRow}>
+            <Text style={[styles.pageTitle, { color: colors.text }]}>Insights</Text>
+          </View>
 
         {/* Filter Bar */}
         {hasData && (
@@ -390,13 +402,14 @@ export function InsightsDashboard() {
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
-      {/* Evidence Sheet */}
-      <EvidenceSheet
-        visible={showEvidence}
-        context={evidenceContext}
-        onClose={() => setShowEvidence(false)}
-      />
-    </View>
+        {/* Evidence Sheet */}
+        <EvidenceSheet
+          visible={showEvidence}
+          context={evidenceContext}
+          onClose={() => setShowEvidence(false)}
+        />
+      </View>
+    </AIExplanationProvider>
   );
 }
 

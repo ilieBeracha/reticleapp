@@ -3,6 +3,11 @@
  *
  * Shows areas where user performs above baseline.
  * "What should I trust myself with?"
+ *
+ * AI Explanation:
+ * - Each card has a "Why?" button
+ * - Explanations load on demand (never auto-load)
+ * - Cached per insight ID
  */
 
 import { useColors } from '@/hooks/ui/useColors';
@@ -12,6 +17,8 @@ import { ChevronRight, Shield, TrendingUp } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import type { ConfidenceLevel, StrengthCard } from '../insights.types';
+import { useAIExplanations, type ExplanationParams } from '../AIExplanationProvider';
+import { AIExplanationBlock, WhyButton } from '../AIExplanationBlock';
 
 // ============================================================================
 // PROPS
@@ -74,6 +81,38 @@ interface StrengthCardItemProps {
 
 function StrengthCardItem({ strength, onPress, colors }: StrengthCardItemProps) {
   const iconName = CATEGORY_ICONS[strength.category] || 'checkmark-circle';
+  const { getExplanation, isLoading, getError, requestExplanation } = useAIExplanations();
+  
+  const insightId = strength.id;
+  const explanation = getExplanation(insightId);
+  const loading = isLoading(insightId);
+  const error = getError(insightId);
+
+  const handleRequestExplanation = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    const isGrouping = strength.metric.unit === 'cm';
+    const params: ExplanationParams = {
+      insight_type: 'strength',
+      metric_type: isGrouping ? 'grouping' : 'accuracy',
+      decided_values: {
+        current_value: strength.metric.value,
+        baseline_value: strength.metric.baseline ?? strength.metric.value,
+        is_significant: Math.abs(strength.metric.delta) > (isGrouping ? 0.5 : 5),
+        direction: strength.metric.direction,
+        confidence: strength.metric.confidence,
+        data_points: strength.metric.dataPoints,
+        unit: (strength.metric.unit as '%' | 'cm' | 's' | '') || '%',
+      },
+      context: {
+        evidence_session_ids: strength.evidenceIds || [],
+        category_label: strength.label,
+        engine_context: strength.context,
+      },
+    };
+    
+    requestExplanation(insightId, params);
+  };
 
   return (
     <TouchableOpacity
@@ -105,6 +144,11 @@ function StrengthCardItem({ strength, onPress, colors }: StrengthCardItemProps) 
               {strength.category.charAt(0).toUpperCase() + strength.category.slice(1)}
             </Text>
           </View>
+          <WhyButton
+            onPress={handleRequestExplanation}
+            loading={loading}
+            hasExplanation={!!explanation?.success}
+          />
           {onPress && (
             <ChevronRight size={16} color={colors.textMuted} />
           )}
@@ -140,6 +184,17 @@ function StrengthCardItem({ strength, onPress, colors }: StrengthCardItemProps) 
             {strength.metric.dataPoints.toLocaleString()} shots
           </Text>
         </View>
+
+        {/* AI Explanation (appears after "Why?" is clicked) */}
+        {(explanation || loading) && (
+          <AIExplanationBlock
+            response={explanation}
+            loading={loading}
+            error={error}
+            onRequestExplanation={handleRequestExplanation}
+            showTrigger={false}
+          />
+        )}
       </View>
     </TouchableOpacity>
   );
