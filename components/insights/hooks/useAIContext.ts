@@ -31,13 +31,12 @@
  * ```
  */
 
-import { useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useCallback, useState } from 'react';
 import type {
-  AIContextRequest,
   AIContextResponse,
   InsightCategory,
-  MetricType,
+  MetricType
 } from '../ai-context.contract';
 import { createAIContextRequest, createFallbackAIResponse } from '../ai-context.contract';
 
