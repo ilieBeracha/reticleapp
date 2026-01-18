@@ -1,12 +1,11 @@
 /**
- * Insights Dashboard (Redesigned)
+ * Insights Dashboard (Redesigned v2.1)
  *
- * Main analytics screen with five progressive sections:
- * 1. Totals / Performance Snapshot
- * 2. Strengths
- * 3. Weaknesses
- * 4. Trends
- * 5. Recommendations
+ * Main analytics screen with new progressive hierarchy:
+ * 1. Training Overview (answers "Am I improving?" immediately)
+ * 2. Top Recommendations (actionable next steps)
+ * 3. Context Breakdown (engagement ↔ grouping connection)
+ * 4. Detailed Breakdown (collapsed: Strengths, Weaknesses, Trends)
  *
  * Philosophy: Insights ≠ Dashboard
  * - Dashboard = what happened
@@ -25,7 +24,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Clock, History } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -39,12 +38,15 @@ import {
 
 import { AIExplanationProvider } from './AIExplanationProvider';
 import { EvidenceSheet } from './EvidenceSheet';
-import { computeInsights } from './insights.engine';
+import { computeContextProfiles, computeInsights, computeOverviewStatus } from './insights.engine';
 import {
+  ComputedContextProfiles,
   ComputedInsights,
+  ContextProfile,
   DEFAULT_FILTERS,
   EvidenceContext,
   InsightsFilters,
+  OverviewStatus,
   Recommendation,
   StrengthCard,
   TotalsMetric,
@@ -53,11 +55,11 @@ import {
 } from './insights.types';
 import { InsightsFilterBar } from './InsightsFilterBar';
 import {
+  ContextSummarySection,
+  DetailedBreakdownSection,
+  OverviewSection,
   RecommendationsSection,
-  StrengthsSection,
   TotalsSection,
-  TrendsSection,
-  WeaknessesSection,
 } from './sections';
 
 // ============================================================================
@@ -186,6 +188,22 @@ export function InsightsDashboard() {
     return computeInsights(sessions, filters);
   }, [sessions, filters]);
 
+  // Compute context profiles (engagement ↔ grouping connection)
+  const contextProfiles: ComputedContextProfiles = useMemo(() => {
+    // Apply same filters as insights
+    const filteredSessions = sessions.filter((s) => s.status === 'completed');
+    return computeContextProfiles(filteredSessions);
+  }, [sessions]);
+
+  // Compute overview status (for Training Overview card)
+  const overviewStatus: OverviewStatus = useMemo(() => {
+    return computeOverviewStatus(insights, contextProfiles);
+  }, [insights, contextProfiles]);
+
+  // Scroll ref for "View Details"
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [detailsYOffset, setDetailsYOffset] = useState(0);
+
   // Handlers for evidence view
   const openEvidenceForTotals = useCallback((metric: TotalsMetric) => {
     setEvidenceContext({
@@ -237,6 +255,24 @@ export function InsightsDashboard() {
     setShowEvidence(true);
   }, []);
 
+  const openEvidenceForContextProfile = useCallback((profile: ContextProfile) => {
+    // Combine evidence from both engagement and grouping
+    const sessionIds = [
+      ...(profile.engagement?.evidenceIds ?? []),
+      ...(profile.grouping?.evidenceIds ?? []),
+    ];
+    // Deduplicate
+    const uniqueIds = [...new Set(sessionIds)];
+    
+    setEvidenceContext({
+      insightType: 'strength', // Reuse strength type for display purposes
+      insightId: profile.keyString,
+      title: profile.label,
+      sessionIds: uniqueIds,
+    });
+    setShowEvidence(true);
+  }, []);
+
   // Handle add to training plan (placeholder)
   const handleAddToTrainingPlan = useCallback((rec: Recommendation) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -256,7 +292,64 @@ export function InsightsDashboard() {
     router.push('/(protected)/(tabs)');
   }, [router]);
 
-  // Loading state
+  // Scroll to details handler
+  const scrollToDetails = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    scrollViewRef.current?.scrollTo({ y: detailsYOffset, animated: true });
+  }, [detailsYOffset]);
+
+  // Open evidence for overview accuracy/grouping
+  const openEvidenceForOverviewAccuracy = useCallback(() => {
+    if (overviewStatus.accuracy?.evidenceIds.length) {
+      setEvidenceContext({
+        insightType: 'trend',
+        insightId: 'accuracy-trend',
+        title: 'Accuracy Trend',
+        sessionIds: overviewStatus.accuracy.evidenceIds,
+      });
+      setShowEvidence(true);
+    }
+  }, [overviewStatus.accuracy]);
+
+  const openEvidenceForOverviewGrouping = useCallback(() => {
+    if (overviewStatus.grouping?.evidenceIds.length) {
+      setEvidenceContext({
+        insightType: 'trend',
+        insightId: 'grouping-trend',
+        title: 'Grouping Trend',
+        sessionIds: overviewStatus.grouping.evidenceIds,
+      });
+      setShowEvidence(true);
+    }
+  }, [overviewStatus.grouping]);
+
+  // Open evidence for focus item
+  const openEvidenceForFocus = useCallback(() => {
+    if (overviewStatus.focusItem) {
+      setEvidenceContext({
+        insightType: overviewStatus.focusItem.sourceType === 'weakness' ? 'weakness' : 'recommendation',
+        insightId: overviewStatus.focusItem.sourceId,
+        title: overviewStatus.focusItem.label,
+        sessionIds: overviewStatus.focusItem.evidenceIds,
+      });
+      setShowEvidence(true);
+    }
+  }, [overviewStatus.focusItem]);
+
+  // Open evidence for trust item
+  const openEvidenceForTrust = useCallback(() => {
+    if (overviewStatus.trustItem) {
+      setEvidenceContext({
+        insightType: 'strength',
+        insightId: overviewStatus.trustItem.sourceId,
+        title: overviewStatus.trustItem.label,
+        sessionIds: overviewStatus.trustItem.evidenceIds,
+      });
+      setShowEvidence(true);
+    }
+  }, [overviewStatus.trustItem]);
+
+  // Loading state - ALL HOOKS MUST BE DEFINED BEFORE THIS EARLY RETURN
   if (loading) {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
@@ -274,6 +367,7 @@ export function InsightsDashboard() {
     <AIExplanationProvider userId={userId}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
@@ -290,117 +384,126 @@ export function InsightsDashboard() {
             <Text style={[styles.pageTitle, { color: colors.text }]}>Insights</Text>
           </View>
 
-        {/* Filter Bar */}
-        {hasData && (
-          <InsightsFilterBar filters={filters} onFiltersChange={setFilters} />
-        )}
+          {/* Filter Bar */}
+          {hasData && (
+            <InsightsFilterBar filters={filters} onFiltersChange={setFilters} />
+          )}
 
-        {/* Content */}
-        {!hasData ? (
-          <EmptyState colors={colors} onStartSession={goToStartSession} />
-        ) : !insights.hasEnoughData ? (
-          <>
-            <NotEnoughDataState
-              colors={colors}
-              currentSessions={insights.sessionCount}
-              minRequired={insights.minSessionsRequired}
-            />
-            
-            {/* Still show totals even with limited data */}
-            {insights.totals.length > 0 && (
+          {/* Content */}
+          {!hasData ? (
+            <EmptyState colors={colors} onStartSession={goToStartSession} />
+          ) : (
+            <>
+              {/* 1. Training Overview Card */}
               <View style={styles.section}>
-                <TotalsSection
-                  metrics={insights.totals}
-                  onMetricPress={openEvidenceForTotals}
+                <OverviewSection
+                  status={overviewStatus}
+                  onAccuracyPress={openEvidenceForOverviewAccuracy}
+                  onGroupingPress={openEvidenceForOverviewGrouping}
+                  onFocusPress={openEvidenceForFocus}
+                  onTrustPress={openEvidenceForTrust}
+                  onViewDetails={scrollToDetails}
                 />
               </View>
-            )}
 
-            {/* Session history link */}
-            <TouchableOpacity
-              style={[styles.linkCard, { backgroundColor: colors.card }]}
-              onPress={goToSessionHistory}
-              activeOpacity={0.7}
-            >
-              <History size={16} color={colors.text} />
-              <Text style={[styles.linkText, { color: colors.text }]}>
-                Session History
+              {/* Show limited content when not enough data */}
+              {!insights.hasEnoughData ? (
+                <>
+                  {/* Still show totals even with limited data */}
+                  {insights.totals.length > 0 && (
+                    <View style={styles.section}>
+                      <TotalsSection
+                        metrics={insights.totals}
+                        onMetricPress={openEvidenceForTotals}
+                      />
+                    </View>
+                  )}
+
+                  {/* Session history link */}
+                  <TouchableOpacity
+                    style={[styles.linkCard, { backgroundColor: colors.card }]}
+                    onPress={goToSessionHistory}
+                    activeOpacity={0.7}
+                  >
+                    <History size={16} color={colors.text} />
+                    <Text style={[styles.linkText, { color: colors.text }]}>
+                      Session History
+                    </Text>
+                    <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  {/* 2. Top Recommendations (promoted above details) */}
+                  {insights.recommendations.length > 0 && (
+                    <View style={styles.section}>
+                      <RecommendationsSection
+                        recommendations={insights.recommendations}
+                        onRecommendationPress={openEvidenceForRecommendation}
+                        onAddToTrainingPlan={handleAddToTrainingPlan}
+                        onShowEvidence={openEvidenceForRecommendation}
+                        maxVisible={2}
+                      />
+                    </View>
+                  )}
+
+                  {/* 3. Context Summary (compact view, expands in place) */}
+                  {contextProfiles.profiles.length > 0 && (
+                    <View style={styles.section}>
+                      <ContextSummarySection
+                        profiles={contextProfiles.profiles}
+                        summary={contextProfiles.summary}
+                        onViewEvidence={openEvidenceForContextProfile}
+                        maxVisible={5}
+                      />
+                    </View>
+                  )}
+
+                  {/* Session history link */}
+                  <TouchableOpacity
+                    style={[styles.linkCard, { backgroundColor: colors.card }]}
+                    onPress={goToSessionHistory}
+                    activeOpacity={0.7}
+                  >
+                    <History size={16} color={colors.text} />
+                    <Text style={[styles.linkText, { color: colors.text }]}>
+                      Session History
+                    </Text>
+                    <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                  </TouchableOpacity>
+
+                  {/* 4. Detailed Breakdown (collapsed accordion) */}
+                  <View
+                    style={styles.section}
+                    onLayout={(e) => setDetailsYOffset(e.nativeEvent.layout.y)}
+                  >
+                    <DetailedBreakdownSection
+                      strengths={insights.strengths}
+                      weaknesses={insights.weaknesses}
+                      trends={insights.trends}
+                      onStrengthPress={openEvidenceForStrength}
+                      onWeaknessPress={openEvidenceForWeakness}
+                      onTrendPress={openEvidenceForTrend}
+                    />
+                  </View>
+                </>
+              )}
+            </>
+          )}
+
+          {/* Data range info */}
+          {hasData && insights.dateRange.start && (
+            <View style={styles.dateRangeContainer}>
+              <Clock size={12} color={colors.textMuted} />
+              <Text style={[styles.dateRangeText, { color: colors.textMuted }]}>
+                Data from {new Date(insights.dateRange.start).toLocaleDateString()} to{' '}
+                {new Date(insights.dateRange.end).toLocaleDateString()}
               </Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            {/* 1. Totals / Performance Snapshot */}
-            <View style={styles.section}>
-              <TotalsSection
-                metrics={insights.totals}
-                onMetricPress={openEvidenceForTotals}
-              />
             </View>
+          )}
 
-            {/* Session history link */}
-            <TouchableOpacity
-              style={[styles.linkCard, { backgroundColor: colors.card }]}
-              onPress={goToSessionHistory}
-              activeOpacity={0.7}
-            >
-              <History size={16} color={colors.text} />
-              <Text style={[styles.linkText, { color: colors.text }]}>
-                Session History
-              </Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-            </TouchableOpacity>
-
-            {/* 2. Strengths */}
-            <View style={styles.section}>
-              <StrengthsSection
-                strengths={insights.strengths}
-                onStrengthPress={openEvidenceForStrength}
-              />
-            </View>
-
-            {/* 3. Weaknesses */}
-            <View style={styles.section}>
-              <WeaknessesSection
-                weaknesses={insights.weaknesses}
-                onWeaknessPress={openEvidenceForWeakness}
-              />
-            </View>
-
-            {/* 4. Trends */}
-            <View style={styles.section}>
-              <TrendsSection
-                trends={insights.trends}
-                onTrendPress={openEvidenceForTrend}
-              />
-            </View>
-
-            {/* 5. Recommendations */}
-            <View style={styles.section}>
-              <RecommendationsSection
-                recommendations={insights.recommendations}
-                onRecommendationPress={openEvidenceForRecommendation}
-                onAddToTrainingPlan={handleAddToTrainingPlan}
-                onShowEvidence={openEvidenceForRecommendation}
-              />
-            </View>
-          </>
-        )}
-
-        {/* Data range info */}
-        {hasData && insights.dateRange.start && (
-          <View style={styles.dateRangeContainer}>
-            <Clock size={12} color={colors.textMuted} />
-            <Text style={[styles.dateRangeText, { color: colors.textMuted }]}>
-              Data from {new Date(insights.dateRange.start).toLocaleDateString()} to{' '}
-              {new Date(insights.dateRange.end).toLocaleDateString()}
-            </Text>
-          </View>
-        )}
-
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
+          <View style={styles.bottomSpacer} />
+        </ScrollView>
 
         {/* Evidence Sheet */}
         <EvidenceSheet

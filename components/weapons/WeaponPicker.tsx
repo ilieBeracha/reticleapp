@@ -11,11 +11,7 @@
  * - assigned: Only weapons assigned to current user
  */
 
-import {
-  isAssignedPolicy,
-  isCatalogPolicy,
-  type WeaponPolicy
-} from '@/constants/weaponPolicy';
+// WeaponPolicy imports removed - team context now controls behavior directly
 import { useColors } from '@/hooks/ui/useColors';
 import type { WeaponCategory } from '@/services/weaponService';
 import {
@@ -70,10 +66,9 @@ interface WeaponPickerProps {
   onSelectCatalog?: (weapon: GlobalWeapon) => void;
   onAddNew?: () => void;
   onClose: () => void;
+  /** When teamId is provided, only assigned weapons are shown (no personal weapons) */
   teamId?: string;
   weaponCategory?: WeaponCategory | 'any' | null;
-  /** Team's weapon policy - controls which weapons are available */
-  weaponPolicy?: WeaponPolicy | null;
   /** Hide the "Add New Weapon" option - for contexts where weapon creation isn't allowed */
   hideAddNew?: boolean;
 }
@@ -90,7 +85,6 @@ export function WeaponPicker({
   onClose,
   teamId,
   weaponCategory,
-  weaponPolicy,
   hideAddNew = false,
 }: WeaponPickerProps) {
   const colors = useColors();
@@ -101,16 +95,17 @@ export function WeaponPicker({
   const [error, setError] = useState<string | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
 
-  // Derived: Should we hide the add new button based on policy?
-  // - catalog: Users can only select from team catalog, no personal weapons
-  // - assigned: Users can only use assigned weapons, no adding
+  // In team context, only show assigned weapons (no personal weapons, no add new)
+  const isTeamContext = !!teamId;
+  
+  // Hide add new button in team context
   const shouldHideAddNew = useMemo(() => {
-    return hideAddNew || isCatalogPolicy(weaponPolicy) || isAssignedPolicy(weaponPolicy);
-  }, [hideAddNew, weaponPolicy]);
+    return hideAddNew || isTeamContext;
+  }, [hideAddNew, isTeamContext]);
 
   useEffect(() => {
     loadWeapons();
-  }, [teamId, weaponCategory, weaponPolicy]);
+  }, [teamId, weaponCategory]);
 
   const loadWeapons = async () => {
     try {
@@ -119,7 +114,6 @@ export function WeaponPicker({
       const weaponData = await getWeaponPickerData({ 
         teamId, 
         weaponCategory,
-        weaponPolicy: weaponPolicy ?? undefined,
       });
       setData(weaponData);
     } catch (err: any) {
@@ -149,7 +143,20 @@ export function WeaponPicker({
       return result;
     }
 
-    // Normal view: show recent, assigned, my weapons, team (no catalog)
+    // In team context: ONLY show assigned weapons (no personal, no team catalog)
+    if (isTeamContext) {
+      if (data.assignedToMe && data.assignedToMe.length > 0) {
+        result.push({
+          title: 'Your Assigned Weapon',
+          icon: <Users size={12} color={colors.textMuted} />,
+          data: data.assignedToMe,
+          type: 'assigned',
+        });
+      }
+      return result;
+    }
+
+    // Non-team view: show recent, assigned, my weapons, team (no catalog)
     if (data.recentlyUsed.length > 0) {
       result.push({
         title: 'Recent',
@@ -195,7 +202,7 @@ export function WeaponPicker({
     }
 
     return result;
-  }, [data, colors, showCatalog]);
+  }, [data, colors, showCatalog, isTeamContext]);
 
   const filteredSections = useCallback((): WeaponSection[] => {
     const allSections = sections();
@@ -250,7 +257,7 @@ export function WeaponPicker({
     }
   }, [onAddNew, shouldHideAddNew]);
 
-  // Get policy-appropriate empty state content
+  // Get context-appropriate empty state content
   const getEmptyStateContent = useCallback(() => {
     if (searchQuery) {
       return {
@@ -260,19 +267,12 @@ export function WeaponPicker({
       };
     }
     
-    if (isAssignedPolicy(weaponPolicy)) {
+    // Team context: Only assigned weapons allowed
+    if (isTeamContext) {
       return {
         icon: <Lock size={28} color={colors.textMuted} />,
         title: 'No weapon assigned',
-        hint: 'Contact your commander to get a weapon assigned',
-      };
-    }
-    
-    if (isCatalogPolicy(weaponPolicy)) {
-      return {
-        icon: <AlertCircle size={28} color={colors.textMuted} />,
-        title: 'No team weapons',
-        hint: 'Your team catalog is empty',
+        hint: 'Ask your commander to assign you a weapon',
       };
     }
     
@@ -281,7 +281,7 @@ export function WeaponPicker({
       title: 'No weapons yet',
       hint: 'Add your first weapon to get started',
     };
-  }, [searchQuery, weaponPolicy, colors]);
+  }, [searchQuery, colors, isTeamContext]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

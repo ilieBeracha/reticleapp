@@ -1,4 +1,3 @@
-import { WeaponPolicyStep } from '@/components/team/creation';
 import { useCreateTeamForm } from '@/hooks/team/useCreateTeamForm';
 import { useColors } from '@/hooks/ui/useColors';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,8 +15,7 @@ import Animated, { FadeInRight, FadeOutLeft } from 'react-native-reanimated';
 /**
  * CREATE TEAM - Stepper Form Sheet
  * Step 1: Name and description
- * Step 2: Squads
- * Step 3: Weapon policy
+ * Step 2: Squads (weapons are assigned per-member, not via policy)
  */
 export default function CreateTeamSheet() {
   const colors = useColors();
@@ -27,7 +25,6 @@ export default function CreateTeamSheet() {
     teamDescription,
     squads,
     newSquadName,
-    weaponPolicy,
     formStep,
     createdTeam,
     submitting,
@@ -39,7 +36,6 @@ export default function CreateTeamSheet() {
     setTeamName,
     setTeamDescription,
     setNewSquadName,
-    setWeaponPolicy,
     goToNextStep,
     goToPreviousStep,
     handleCreate,
@@ -280,27 +276,6 @@ export default function CreateTeamSheet() {
           </Animated.View>
         )}
 
-        {/* STEP 3: Weapon Policy */}
-        {formStep === 'policy' && (
-          <Animated.View entering={FadeInRight.duration(200)} exiting={FadeOutLeft.duration(200)}>
-            <Text style={[styles.stepTitle, { color: colors.text }]}>Weapon Policy</Text>
-            <Text style={[styles.stepSubtitle, { color: colors.textMuted }]}>
-              How will team members access weapons?
-            </Text>
-
-            <View style={styles.policySection}>
-              <WeaponPolicyStep value={weaponPolicy} onChange={setWeaponPolicy} disabled={submitting} hideHeader />
-            </View>
-
-            {/* Info */}
-            <View style={[styles.infoCard, { backgroundColor: colors.secondary }]}>
-              <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
-              <Text style={[styles.infoText, { color: colors.textMuted }]}>
-                You'll be the team owner. Invite members and assign roles after creating.
-              </Text>
-            </View>
-          </Animated.View>
-        )}
       </ScrollView>
 
       {/* Footer with Navigation - fixed at bottom */}
@@ -321,27 +296,6 @@ export default function CreateTeamSheet() {
         )}
 
         {formStep === 'squads' && (
-          <>
-            <TouchableOpacity
-              style={[styles.backButton, { borderColor: colors.border }]}
-              onPress={goToPreviousStep}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="arrow-back" size={18} color={colors.text} />
-              <Text style={[styles.backButtonText, { color: colors.text }]}>Back</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.nextButton, { backgroundColor: colors.primary }]}
-              onPress={goToNextStep}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.nextButtonText}>{squads.length > 0 ? 'Continue' : 'Skip'}</Text>
-              <Ionicons name="arrow-forward" size={18} color="#fff" />
-            </TouchableOpacity>
-          </>
-        )}
-
-        {formStep === 'policy' && (
           <>
             <TouchableOpacity
               style={[styles.backButton, { borderColor: colors.border }]}
@@ -461,7 +415,6 @@ const styles = StyleSheet.create({
   },
   clearAllText: { fontSize: 13, fontWeight: '500' },
 
-  policySection: { marginBottom: 20 },
   infoCard: { flexDirection: 'row', alignItems: 'flex-start', padding: 14, borderRadius: 12, gap: 10 },
   infoText: { flex: 1, fontSize: 13, lineHeight: 18 },
 

@@ -33,6 +33,8 @@ interface TrendsSectionProps {
   trends: TrendData[];
   onTrendPress?: (trend: TrendData) => void;
   maxVisible?: number;
+  /** Hide section header (for use inside accordion) */
+  hideHeader?: boolean;
 }
 
 // ============================================================================
@@ -326,25 +328,28 @@ export function TrendsSection({
   trends,
   onTrendPress,
   maxVisible = 3,
+  hideHeader = false,
 }: TrendsSectionProps) {
   const colors = useColors();
   const visibleTrends = trends.slice(0, maxVisible);
 
   return (
     <View style={styles.container}>
-      <View style={styles.sectionHeader}>
-        <View style={styles.titleRow}>
-          <View style={[styles.sectionIcon, { backgroundColor: `${colors.primary}15` }]}>
-            <Activity size={14} color={colors.primary} />
+      {!hideHeader && (
+        <View style={styles.sectionHeader}>
+          <View style={styles.titleRow}>
+            <View style={[styles.sectionIcon, { backgroundColor: `${colors.primary}15` }]}>
+              <Activity size={14} color={colors.primary} />
+            </View>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Trends
+            </Text>
           </View>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Trends
+          <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
+            How your performance is changing
           </Text>
         </View>
-        <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
-          How your performance is changing
-        </Text>
-      </View>
+      )}
 
       {visibleTrends.length > 0 ? (
         <View style={styles.cardsContainer}>
@@ -363,7 +368,7 @@ export function TrendsSection({
           )}
         </View>
       ) : (
-        <EmptyState colors={colors} />
+        !hideHeader && <EmptyState colors={colors} />
       )}
     </View>
   );

@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { BookOpen, Plus } from 'lucide-react-native';
+import { AlertCircle, BookOpen, Plus } from 'lucide-react-native';
 import { DrillChapter } from './DrillChapter';
 import type { ExecutionPhaseContentProps } from './types';
 
@@ -17,9 +17,12 @@ export function ExecutionPhaseContent({
   startingDrillId,
   onStartDrill,
   onAddDrill,
+  userWeapon,
+  similarStatsMap,
 }: ExecutionPhaseContentProps) {
   const drills = training.drills || [];
   const isOngoing = training.status === 'ongoing';
+  const hasWeapon = !!userWeapon;
 
   if (drills.length === 0) {
     return (
@@ -43,11 +46,27 @@ export function ExecutionPhaseContent({
 
   return (
     <View style={styles.content}>
+      {/* No weapon banner - prominent when ongoing */}
+      {isOngoing && !hasWeapon && (
+        <View style={[styles.noWeaponBanner, { backgroundColor: colors.orange + '15', borderColor: colors.orange + '30' }]}>
+          <AlertCircle size={18} color={colors.orange} />
+          <View style={styles.noWeaponBannerContent}>
+            <Text style={[styles.noWeaponBannerTitle, { color: colors.orange }]}>
+              No weapon assigned
+            </Text>
+            <Text style={[styles.noWeaponBannerHint, { color: colors.textMuted }]}>
+              You need a weapon to start sessions. Ask your commander.
+            </Text>
+          </View>
+        </View>
+      )}
+
       {/* Drills - Vertical Column */}
       <View style={styles.drillsColumn}>
         {drills.map((drill: any, index: number) => {
           const progress = drillProgress.find(p => p.drillId === drill.id);
           const isCompleted = progress?.completed || false;
+          const similarStats = similarStatsMap?.get(drill.id);
 
           return (
             <DrillChapter
@@ -60,6 +79,8 @@ export function ExecutionPhaseContent({
               onStart={() => onStartDrill(drill)}
               isStarting={startingDrillId === drill.id}
               colors={colors}
+              hasWeapon={hasWeapon}
+              similarStats={similarStats}
             />
           );
         })}
@@ -82,6 +103,25 @@ export function ExecutionPhaseContent({
 const styles = StyleSheet.create({
   content: {
     gap: 12,
+  },
+  noWeaponBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  noWeaponBannerContent: {
+    flex: 1,
+    gap: 2,
+  },
+  noWeaponBannerTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  noWeaponBannerHint: {
+    fontSize: 12,
   },
   drillsColumn: {
     flexDirection: 'column',

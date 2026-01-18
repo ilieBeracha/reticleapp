@@ -346,6 +346,7 @@ function ParallaxScrollContent({
               startingDrillId={quickStartingDrillId || startingDrillId}
               onStartDrill={onStartDrill}
               onAddDrill={onAddDrill}
+              userWeapon={userWeapon}
             />
           </PhaseSection>
 

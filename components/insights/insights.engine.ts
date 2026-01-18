@@ -4,6 +4,18 @@
  * Core computation logic for the Insights page.
  * Computes totals, strengths, weaknesses, trends, and recommendations
  * from session data with applied filters.
+ *
+ * ARCHITECTURE:
+ * - This engine is AUTHORITATIVE for all insight decisions
+ * - All decisions are DETERMINISTIC and TESTABLE
+ * - AI explains only; it never computes or decides
+ *
+ * KEY IMPROVEMENTS (v2.0):
+ * 1. Explicit baseline strategy (global vs context baselines)
+ * 2. Context-aware thresholds (scale by distance, baseline)
+ * 3. Semantic clarity for grouping metrics (best group vs typical)
+ * 4. Variance detection scoped to matching contexts
+ * 5. Context profiles bridging engagement and grouping
  */
 
 import { DRILL_GOAL } from '@/constants';
@@ -17,18 +29,32 @@ import {
   getConfidence,
 } from './changeRules';
 import {
+  BaselineStrategy,
+  BaselineValues,
   CategoryStats,
+  ComputedContextProfiles,
   ComputedInsights,
   ConfidenceLevel,
+  ContextEngagementMetrics,
+  ContextGroupingMetrics,
+  ContextKey,
+  ContextProfile,
+  ContextQuadrant,
   DEFAULT_FILTERS,
+  DEFAULT_THRESHOLD_CONFIG,
   DISTANCE_BUCKETS,
+  FocusItem,
   InsightsFilters,
   MetricDirection,
+  OverviewStatus,
   Recommendation,
   StrengthCard,
+  ThresholdConfig,
   TotalsMetric,
   TrendData,
   TrendDataPoint,
+  TrendSummary,
+  TrustItem,
   WeaknessCard
 } from './insights.types';
 
@@ -38,7 +64,7 @@ import {
 
 const MIN_SESSIONS_FOR_INSIGHTS = 5;
 const MIN_SHOTS_FOR_VARIANCE = 30;
-const VARIANCE_THRESHOLD = 0.3; // 30% coefficient of variation = high variance
+const MIN_SESSIONS_FOR_CONTEXT_BASELINE = 3;
 const TREND_WINDOW_WEEKS = 6;
 
 // ============================================================================
@@ -69,6 +95,12 @@ function standardDeviation(values: number[]): number {
 
 /**
  * Calculate coefficient of variation (CV)
+ *
+ * WHY: CV measures relative variability (std dev / mean).
+ * High CV (>30%) indicates inconsistent performance.
+ *
+ * LIMITATION: CV on bounded [0-100] values can be problematic near bounds.
+ * For accuracy near 0% or 100%, consider using IQR instead.
  */
 function coefficientOfVariation(values: number[]): number {
   if (values.length < 2) return 0;
@@ -78,9 +110,25 @@ function coefficientOfVariation(values: number[]): number {
 }
 
 /**
+ * Calculate Interquartile Range (IQR)
+ *
+ * WHY: IQR is robust to outliers and works better than CV
+ * for bounded metrics like accuracy percentage.
+ */
+export function interquartileRange(values: number[]): number {
+  if (values.length < 4) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const q1Index = Math.floor(sorted.length * 0.25);
+  const q3Index = Math.floor(sorted.length * 0.75);
+  const q1 = sorted[q1Index];
+  const q3 = sorted[q3Index];
+  return q3 - q1;
+}
+
+/**
  * Get distance bucket for a given distance
  */
-function getDistanceBucket(distance: number | null): string | null {
+export function getDistanceBucket(distance: number | null): string | null {
   if (distance === null) return null;
   for (const [key, bucket] of Object.entries(DISTANCE_BUCKETS)) {
     if (distance >= bucket.min && distance < bucket.max) {
@@ -115,6 +163,178 @@ function isSignificantChange(
   }
 
   return { isSignificant, direction, delta };
+}
+
+// ============================================================================
+// CONTEXT-AWARE THRESHOLDS
+// ============================================================================
+
+/**
+ * Calculate context-aware accuracy threshold.
+ *
+ * WHY: A flat 5% threshold doesn't scale:
+ * - At 95% accuracy, a 5% change is trivial
+ * - At 35% accuracy, a 5% change is huge
+ *
+ * FORMULA: max(absoluteFloor, relativeFactor * baselineAccuracy)
+ */
+export function getAccuracyThreshold(
+  baselineAccuracy: number,
+  config: ThresholdConfig = DEFAULT_THRESHOLD_CONFIG
+): number {
+  const relativeThreshold = baselineAccuracy * config.accuracy.relativeFactor;
+  return Math.max(config.accuracy.absoluteFloor, relativeThreshold);
+}
+
+/**
+ * Calculate context-aware grouping threshold.
+ *
+ * WHY: A flat 0.5cm threshold doesn't scale:
+ * - At 25m, 0.5cm change is meaningful
+ * - At 300m+, 0.5cm is noise
+ *
+ * Thresholds are scaled by distance bucket.
+ */
+export function getGroupingThreshold(
+  distanceBucket: string | null,
+  config: ThresholdConfig = DEFAULT_THRESHOLD_CONFIG
+): number {
+  if (!distanceBucket) return config.grouping.default;
+  return config.grouping[distanceBucket as keyof typeof config.grouping] ?? config.grouping.default;
+}
+
+// ============================================================================
+// BASELINE COMPUTATION
+// ============================================================================
+
+/**
+ * Create context key from session.
+ *
+ * WHY: Context keys enable apples-to-apples comparisons.
+ * Comparing prone@300m to standing@25m is not meaningful.
+ */
+export function createContextKey(session: SessionWithDetails): ContextKey {
+  const distance = session.drill_config?.distance_m ?? session.stats?.avg_distance_m;
+  return {
+    position: session.drill_config?.position?.toLowerCase() || null,
+    distanceBucket: getDistanceBucket(distance ?? null),
+    weaponCategory: session.weapon_category || null,
+    drillType: session.drill_config?.drill_goal === DRILL_GOAL.GROUPING
+      ? 'grouping'
+      : session.drill_config?.drill_goal === DRILL_GOAL.ENGAGEMENT
+        ? 'engagement'
+        : null,
+    isTimed: session.drill_config?.time_limit_seconds != null,
+  };
+}
+
+/**
+ * Serialize context key to string for map lookup.
+ */
+export function serializeContextKey(key: ContextKey): string {
+  return `${key.position || 'any'}|${key.distanceBucket || 'any'}|${key.weaponCategory || 'any'}|${key.drillType || 'any'}|${key.isTimed}`;
+}
+
+/**
+ * Create human-readable label for context key.
+ */
+export function labelContextKey(key: ContextKey): string {
+  const parts: string[] = [];
+  if (key.position) parts.push(key.position.charAt(0).toUpperCase() + key.position.slice(1));
+  if (key.distanceBucket) {
+    const bucket = DISTANCE_BUCKETS[key.distanceBucket as keyof typeof DISTANCE_BUCKETS];
+    if (bucket) parts.push(bucket.label);
+  }
+  if (key.weaponCategory) parts.push(key.weaponCategory);
+  if (key.isTimed) parts.push('timed');
+  return parts.length > 0 ? parts.join(' @ ') : 'All conditions';
+}
+
+/**
+ * Compute baseline values from sessions.
+ *
+ * WHY: Explicit baseline computation ensures fair comparisons.
+ */
+function computeBaselineValues(
+  engagementSessions: SessionWithDetails[],
+  groupingSessions: SessionWithDetails[]
+): BaselineValues {
+  // Engagement: weighted accuracy
+  let totalShots = 0;
+  let totalHits = 0;
+  engagementSessions.forEach((s) => {
+    if (s.stats) {
+      totalShots += s.stats.shots_fired;
+      totalHits += s.stats.hits_total;
+    }
+  });
+  const accuracy = totalShots > 0 ? (totalHits / totalShots) * 100 : null;
+
+  // Grouping: median of best dispersions
+  const bestDispersions: number[] = [];
+  groupingSessions.forEach((s) => {
+    if (s.stats?.best_dispersion_cm != null) {
+      bestDispersions.push(s.stats.best_dispersion_cm);
+    }
+  });
+  const medianBestGroup = median(bestDispersions);
+
+  // Confidence
+  const totalSessions = engagementSessions.length + groupingSessions.length;
+  const confidence = determineConfidence(totalShots, totalSessions);
+
+  return {
+    accuracy,
+    accuracySessions: engagementSessions.length,
+    accuracyShots: totalShots,
+    medianBestGroup,
+    groupingSessions: groupingSessions.length,
+    confidence,
+  };
+}
+
+/**
+ * Compute baseline strategy (global + context baselines).
+ *
+ * WHY: Two-tier baseline strategy:
+ * - Global baseline for Totals and high-level framing
+ * - Context baselines for strengths/weaknesses within specific conditions
+ *
+ * FALLBACK: When context baseline is sparse (<3 sessions),
+ * use global baseline but mark insight as preliminary.
+ */
+export function computeBaselines(sessions: SessionWithDetails[]): BaselineStrategy {
+  const completed = sessions.filter((s) => s.status === 'completed');
+
+  // Separate by type
+  const engagementSessions = completed.filter(isEngagementSession);
+  const groupingSessions = completed.filter(isGroupingSession);
+
+  // Global baseline
+  const global = computeBaselineValues(engagementSessions, groupingSessions);
+
+  // Context baselines
+  const contextMap = new Map<string, { engagement: SessionWithDetails[]; grouping: SessionWithDetails[] }>();
+
+  completed.forEach((session) => {
+    const key = serializeContextKey(createContextKey(session));
+    if (!contextMap.has(key)) {
+      contextMap.set(key, { engagement: [], grouping: [] });
+    }
+    const bucket = contextMap.get(key)!;
+    if (isGroupingSession(session)) {
+      bucket.grouping.push(session);
+    } else if (isEngagementSession(session)) {
+      bucket.engagement.push(session);
+    }
+  });
+
+  const context = new Map<string, BaselineValues>();
+  contextMap.forEach((bucket, key) => {
+    context.set(key, computeBaselineValues(bucket.engagement, bucket.grouping));
+  });
+
+  return { global, context };
 }
 
 // ============================================================================
@@ -216,10 +436,16 @@ function isEngagementSession(session: SessionWithDetails): boolean {
 
 /**
  * Compute totals/snapshot metrics
- * 
+ *
  * IMPORTANT: Grouping and Engagement are different metrics:
  * - Grouping sessions: measured by dispersion (cm) - smaller is better
  * - Engagement sessions: measured by accuracy (hits/shots) - higher is better
+ *
+ * SEMANTIC CLARITY (v2.0):
+ * - "Overall Accuracy" = total hits / total shots (weighted)
+ * - "Typical Session" = median(session accuracy)
+ * - "Best Group (Median)" = median of best dispersions per session
+ *   NOTE: This is NOT "median grouping" — each session contributes its BEST group.
  */
 export function computeTotals(sessions: SessionWithDetails[]): TotalsMetric[] {
   const completed = sessions.filter((s) => s.status === 'completed');
@@ -246,14 +472,14 @@ export function computeTotals(sessions: SessionWithDetails[]): TotalsMetric[] {
     }
   });
 
-  // Aggregate grouping stats (dispersion)
-  const dispersions: number[] = [];
+  // Aggregate grouping stats (best dispersion per session)
+  const bestDispersions: number[] = [];
   const groupingSessionIds: string[] = [];
 
   groupingSessions.forEach((s) => {
     groupingSessionIds.push(s.id);
     if (s.stats?.best_dispersion_cm != null) {
-      dispersions.push(s.stats.best_dispersion_cm);
+      bestDispersions.push(s.stats.best_dispersion_cm);
     }
   });
 
@@ -280,12 +506,27 @@ export function computeTotals(sessions: SessionWithDetails[]): TotalsMetric[] {
     });
   }
 
-  // Hit percentage (median) - ONLY from engagement sessions
+  // Overall accuracy (weighted) - ONLY from engagement sessions
+  // WHY: This is the "true" accuracy across all shots
+  if (engagementShots > 0) {
+    const overallAccuracy = Math.round((engagementHits / engagementShots) * 100);
+    totals.push({
+      id: 'overall_accuracy',
+      label: 'Overall Accuracy',
+      value: overallAccuracy,
+      unit: '%',
+      subtitle: 'weighted',
+      evidenceIds: engagementSessionIds,
+    });
+  }
+
+  // Typical session accuracy (median) - ONLY from engagement sessions
+  // WHY: Median gives equal weight to each session, resistant to outliers
   const medianAccuracy = median(engagementAccuracies);
   if (medianAccuracy !== null) {
     totals.push({
-      id: 'hit_pct',
-      label: 'Hit %',
+      id: 'typical_accuracy',
+      label: 'Typical Session',
       value: Math.round(medianAccuracy),
       unit: '%',
       subtitle: 'median',
@@ -293,7 +534,7 @@ export function computeTotals(sessions: SessionWithDetails[]): TotalsMetric[] {
     });
   }
 
-  // Overall accuracy - ONLY from engagement sessions
+  // DEPRECATED: Keep old 'accuracy' ID for backward compatibility
   if (engagementShots > 0) {
     const overallAccuracy = Math.round((engagementHits / engagementShots) * 100);
     totals.push({
@@ -306,13 +547,40 @@ export function computeTotals(sessions: SessionWithDetails[]): TotalsMetric[] {
     });
   }
 
-  // Median grouping - ONLY from grouping sessions
-  const medianDispersion = median(dispersions);
-  if (medianDispersion !== null) {
+  // DEPRECATED: Keep old 'hit_pct' ID for backward compatibility
+  if (medianAccuracy !== null) {
+    totals.push({
+      id: 'hit_pct',
+      label: 'Hit %',
+      value: Math.round(medianAccuracy),
+      unit: '%',
+      subtitle: 'median',
+      evidenceIds: engagementSessionIds,
+    });
+  }
+
+  // Best Group (Median) - ONLY from grouping sessions
+  // WHY: "best_dispersion_cm" represents the BEST group from each session.
+  // We take the MEDIAN of these best groups across sessions.
+  // This is NOT "median grouping" — each session contributes only its best.
+  const medianBestDispersion = median(bestDispersions);
+  if (medianBestDispersion !== null) {
+    totals.push({
+      id: 'best_group_median',
+      label: 'Best Group (Median)',
+      value: Math.round(medianBestDispersion * 10) / 10,
+      unit: 'cm',
+      subtitle: 'of best groups',
+      evidenceIds: groupingSessionIds,
+    });
+  }
+
+  // DEPRECATED: Keep old 'median_group' ID for backward compatibility
+  if (medianBestDispersion !== null) {
     totals.push({
       id: 'median_group',
       label: 'Median Group',
-      value: Math.round(medianDispersion * 10) / 10,
+      value: Math.round(medianBestDispersion * 10) / 10,
       unit: 'cm',
       subtitle: DRILL_GOAL.GROUPING,
       evidenceIds: groupingSessionIds,
@@ -327,7 +595,10 @@ export function computeTotals(sessions: SessionWithDetails[]): TotalsMetric[] {
 // ============================================================================
 
 /**
- * Group sessions by category and compute stats
+ * Group sessions by category and compute stats.
+ *
+ * NOTE: For grouping metrics, we use best_dispersion_cm.
+ * The naming reflects this: "bestDispersions", "medianBestDispersion".
  */
 function groupByCategory(
   sessions: SessionWithDetails[],
@@ -347,6 +618,11 @@ function groupByCategory(
         shots: 0,
         hits: 0,
         accuracy: 0,
+        // New naming (v2.0)
+        bestDispersions: [],
+        avgBestDispersion: null,
+        medianBestDispersion: null,
+        // DEPRECATED: Keep for backward compatibility
         dispersions: [],
         avgDispersion: null,
         medianDispersion: null,
@@ -360,6 +636,8 @@ function groupByCategory(
       stats.shots += session.stats.shots_fired;
       stats.hits += session.stats.hits_total;
       if (session.stats.best_dispersion_cm != null) {
+        stats.bestDispersions.push(session.stats.best_dispersion_cm);
+        // DEPRECATED: Keep for backward compatibility
         stats.dispersions.push(session.stats.best_dispersion_cm);
       }
     }
@@ -368,25 +646,37 @@ function groupByCategory(
   // Calculate derived stats
   groups.forEach((stats) => {
     stats.accuracy = stats.shots > 0 ? (stats.hits / stats.shots) * 100 : 0;
-    stats.avgDispersion =
-      stats.dispersions.length > 0
-        ? stats.dispersions.reduce((a, b) => a + b, 0) / stats.dispersions.length
+
+    // New naming (v2.0)
+    stats.avgBestDispersion =
+      stats.bestDispersions.length > 0
+        ? stats.bestDispersions.reduce((a, b) => a + b, 0) / stats.bestDispersions.length
         : null;
-    stats.medianDispersion = median(stats.dispersions);
+    stats.medianBestDispersion = median(stats.bestDispersions);
+
+    // DEPRECATED: Keep for backward compatibility
+    stats.avgDispersion = stats.avgBestDispersion;
+    stats.medianDispersion = stats.medianBestDispersion;
   });
 
   return groups;
 }
 
 /**
- * Compute strengths from sessions
- * 
+ * Compute strengths from sessions.
+ *
  * IMPORTANT: Accuracy strengths come from engagement sessions only.
  * Grouping strengths come from grouping sessions only.
+ *
+ * IMPROVEMENTS (v2.0):
+ * - Context-aware thresholds (scale by baseline accuracy, distance)
+ * - Explicit baseline values in output
+ * - Improved naming for grouping metrics (best group, not median grouping)
  */
 export function computeStrengths(
   sessions: SessionWithDetails[],
-  filters: InsightsFilters
+  filters: InsightsFilters,
+  thresholdConfig: ThresholdConfig = DEFAULT_THRESHOLD_CONFIG
 ): StrengthCard[] {
   const strengths: StrengthCard[] = [];
   const completed = sessions.filter((s) => s.status === 'completed');
@@ -412,15 +702,19 @@ export function computeStrengths(
 
   const baselineAccuracy = baselineShots > 0 ? (baselineHits / baselineShots) * 100 : 0;
 
-  // Calculate grouping baseline (dispersion)
-  const baselineDispersions: number[] = [];
+  // Context-aware accuracy threshold
+  // WHY: A flat 5% threshold doesn't scale. At 95% accuracy, 5% is trivial.
+  const accuracyThreshold = getAccuracyThreshold(baselineAccuracy, thresholdConfig);
+
+  // Calculate grouping baseline (best dispersion per session)
+  const baselineBestDispersions: number[] = [];
   groupingSessions.forEach((s) => {
     if (s.stats?.best_dispersion_cm != null) {
-      baselineDispersions.push(s.stats.best_dispersion_cm);
+      baselineBestDispersions.push(s.stats.best_dispersion_cm);
     }
   });
 
-  const baselineMedianDispersion = median(baselineDispersions);
+  const baselineMedianBestDispersion = median(baselineBestDispersions);
 
   // Group ENGAGEMENT sessions by position (for accuracy strengths)
   const engagementByPosition = groupByCategory(engagementSessions, (s) =>
@@ -432,7 +726,7 @@ export function computeStrengths(
 
     // Check if accuracy is above baseline
     const accuracyDelta = stats.accuracy - baselineAccuracy;
-    if (accuracyDelta >= ACCURACY_CHANGE_THRESHOLD) {
+    if (accuracyDelta >= accuracyThreshold) {
       const confidence = determineConfidence(stats.shots, stats.sessions.length);
       strengths.push({
         id: `strength-position-${position}`,
@@ -462,24 +756,30 @@ export function computeStrengths(
 
   groupingByPosition.forEach((stats, position) => {
     // Check if grouping is better than baseline
-    if (stats.medianDispersion !== null && baselineMedianDispersion !== null) {
-      const dispersionDelta = baselineMedianDispersion - stats.medianDispersion;
-      if (dispersionDelta >= GROUPING_CHANGE_THRESHOLD && stats.dispersions.length >= 3) {
+    if (stats.medianBestDispersion !== null && baselineMedianBestDispersion !== null) {
+      // Determine distance bucket for this position's sessions
+      const firstSession = stats.sessions[0];
+      const distance = firstSession?.drill_config?.distance_m ?? firstSession?.stats?.avg_distance_m;
+      const distanceBucket = getDistanceBucket(distance ?? null);
+      const groupingThreshold = getGroupingThreshold(distanceBucket, thresholdConfig);
+
+      const dispersionDelta = baselineMedianBestDispersion - stats.medianBestDispersion;
+      if (dispersionDelta >= groupingThreshold && stats.bestDispersions.length >= 3) {
         const confidence = determineConfidence(stats.shots, stats.sessions.length);
         strengths.push({
           id: `strength-position-grouping-${position}`,
           category: 'position',
-          label: `${position.charAt(0).toUpperCase() + position.slice(1)} (Grouping)`,
-          primaryValue: `${Math.round(stats.medianDispersion * 10) / 10} cm`,
+          label: `${position.charAt(0).toUpperCase() + position.slice(1)} (Best Group)`,
+          primaryValue: `${Math.round(stats.medianBestDispersion * 10) / 10} cm`,
           context: `${Math.round(dispersionDelta * 10) / 10} cm tighter than baseline`,
           metric: {
-            value: stats.medianDispersion,
-            baseline: baselineMedianDispersion,
+            value: stats.medianBestDispersion,
+            baseline: baselineMedianBestDispersion,
             delta: -dispersionDelta,
             direction: 'up', // Smaller is better
             isSignificant: true,
             confidence,
-            dataPoints: stats.dispersions.length,
+            dataPoints: stats.bestDispersions.length,
             unit: 'cm',
           },
           evidenceIds: stats.sessions.map((s) => s.id),
@@ -500,7 +800,7 @@ export function computeStrengths(
     if (stats.shots < MIN_SHOTS_FOR_CATEGORY) return;
 
     const accuracyDelta = stats.accuracy - baselineAccuracy;
-    if (accuracyDelta >= ACCURACY_CHANGE_THRESHOLD) {
+    if (accuracyDelta >= accuracyThreshold) {
       const confidence = determineConfidence(stats.shots, stats.sessions.length);
       strengths.push({
         id: `strength-distance-${distanceLabel}`,
@@ -528,28 +828,32 @@ export function computeStrengths(
     const distance = s.drill_config?.distance_m ?? s.stats?.avg_distance_m;
     const bucket = getDistanceBucket(distance ?? null);
     if (!bucket) return null;
-    return `${DISTANCE_BUCKETS[bucket as keyof typeof DISTANCE_BUCKETS].label}`;
+    return bucket; // Return bucket key, not label
   });
 
-  groupingByDistance.forEach((stats, distanceLabel) => {
-    if (stats.medianDispersion !== null && baselineMedianDispersion !== null) {
-      const dispersionDelta = baselineMedianDispersion - stats.medianDispersion;
-      if (dispersionDelta >= GROUPING_CHANGE_THRESHOLD && stats.dispersions.length >= 3) {
+  groupingByDistance.forEach((stats, distanceBucket) => {
+    if (stats.medianBestDispersion !== null && baselineMedianBestDispersion !== null) {
+      // Context-aware grouping threshold
+      const groupingThreshold = getGroupingThreshold(distanceBucket, thresholdConfig);
+      const distanceLabel = DISTANCE_BUCKETS[distanceBucket as keyof typeof DISTANCE_BUCKETS]?.label || distanceBucket;
+
+      const dispersionDelta = baselineMedianBestDispersion - stats.medianBestDispersion;
+      if (dispersionDelta >= groupingThreshold && stats.bestDispersions.length >= 3) {
         const confidence = determineConfidence(stats.shots, stats.sessions.length);
         strengths.push({
-          id: `strength-distance-grouping-${distanceLabel}`,
+          id: `strength-distance-grouping-${distanceBucket}`,
           category: 'distance',
-          label: `${distanceLabel} (Grouping)`,
-          primaryValue: `${Math.round(stats.medianDispersion * 10) / 10} cm`,
+          label: `${distanceLabel} (Best Group)`,
+          primaryValue: `${Math.round(stats.medianBestDispersion * 10) / 10} cm`,
           context: `${Math.round(dispersionDelta * 10) / 10} cm tighter than baseline`,
           metric: {
-            value: stats.medianDispersion,
-            baseline: baselineMedianDispersion,
+            value: stats.medianBestDispersion,
+            baseline: baselineMedianBestDispersion,
             delta: -dispersionDelta,
             direction: 'up',
             isSignificant: true,
             confidence,
-            dataPoints: stats.dispersions.length,
+            dataPoints: stats.bestDispersions.length,
             unit: 'cm',
           },
           evidenceIds: stats.sessions.map((s) => s.id),
@@ -565,7 +869,7 @@ export function computeStrengths(
     if (stats.shots < MIN_SHOTS_FOR_CATEGORY) return;
 
     const accuracyDelta = stats.accuracy - baselineAccuracy;
-    if (accuracyDelta >= ACCURACY_CHANGE_THRESHOLD) {
+    if (accuracyDelta >= accuracyThreshold) {
       const confidence = determineConfidence(stats.shots, stats.sessions.length);
       strengths.push({
         id: `strength-weapon-${weaponName}`,
@@ -597,17 +901,20 @@ export function computeStrengths(
 // ============================================================================
 
 /**
- * Compute weaknesses from sessions
- */
-/**
- * Compute weaknesses from sessions
- * 
+ * Compute weaknesses from sessions.
+ *
  * IMPORTANT: Accuracy weaknesses come from engagement sessions only.
  * Grouping weaknesses come from grouping sessions only.
+ *
+ * IMPROVEMENTS (v2.0):
+ * - Context-aware thresholds (scale by baseline accuracy, distance)
+ * - Variance calculated ONLY within matching context keys
+ * - IQR available as robust alternative to CV
  */
 export function computeWeaknesses(
   sessions: SessionWithDetails[],
-  filters: InsightsFilters
+  filters: InsightsFilters,
+  thresholdConfig: ThresholdConfig = DEFAULT_THRESHOLD_CONFIG
 ): WeaknessCard[] {
   const weaknesses: WeaknessCard[] = [];
   const completed = sessions.filter((s) => s.status === 'completed');
@@ -633,15 +940,18 @@ export function computeWeaknesses(
 
   const baselineAccuracy = baselineShots > 0 ? (baselineHits / baselineShots) * 100 : 0;
 
-  // Calculate grouping baseline (dispersion)
-  const baselineDispersions: number[] = [];
+  // Context-aware accuracy threshold
+  const accuracyThreshold = getAccuracyThreshold(baselineAccuracy, thresholdConfig);
+
+  // Calculate grouping baseline (best dispersion per session)
+  const baselineBestDispersions: number[] = [];
   groupingSessions.forEach((s) => {
     if (s.stats?.best_dispersion_cm != null) {
-      baselineDispersions.push(s.stats.best_dispersion_cm);
+      baselineBestDispersions.push(s.stats.best_dispersion_cm);
     }
   });
 
-  const baselineMedianDispersion = median(baselineDispersions);
+  const baselineMedianBestDispersion = median(baselineBestDispersions);
 
   // Group ENGAGEMENT sessions by position (for accuracy weaknesses)
   const engagementByPosition = groupByCategory(engagementSessions, (s) =>
@@ -653,15 +963,17 @@ export function computeWeaknesses(
 
     // Check if accuracy is below baseline
     const accuracyDelta = stats.accuracy - baselineAccuracy;
-    if (accuracyDelta <= -ACCURACY_CHANGE_THRESHOLD) {
+    if (accuracyDelta <= -accuracyThreshold) {
       const confidence = determineConfidence(stats.shots, stats.sessions.length);
 
-      // Calculate variance
+      // Calculate variance WITHIN this context only
+      // WHY: Variance across mixed contexts (different distances) produces false positives
       const sessionAccuracies = stats.sessions
         .filter((s) => s.stats && s.stats.shots_fired > 0)
         .map((s) => (s.stats!.hits_total / s.stats!.shots_fired) * 100);
       const variance = coefficientOfVariation(sessionAccuracies);
-      const hasHighVariance = variance >= VARIANCE_THRESHOLD;
+      const iqr = interquartileRange(sessionAccuracies);
+      const hasHighVariance = variance >= thresholdConfig.variance;
 
       weaknesses.push({
         id: `weakness-position-${position}`,
@@ -669,7 +981,7 @@ export function computeWeaknesses(
         label: position.charAt(0).toUpperCase() + position.slice(1),
         primaryValue: `${Math.round(stats.accuracy)}%`,
         context: hasHighVariance
-          ? 'High variance between sessions'
+          ? 'High variance within this position'
           : `${Math.round(Math.abs(accuracyDelta))}% below baseline`,
         metric: {
           value: stats.accuracy,
@@ -687,6 +999,7 @@ export function computeWeaknesses(
     }
 
     // Check for high variance even if accuracy is okay
+    // WHY: Inconsistency is a weakness even if average performance is good
     if (stats.sessions.length >= 3) {
       const sessionAccuracies = stats.sessions
         .filter((s) => s.stats && s.stats.shots_fired > 0)
@@ -694,7 +1007,7 @@ export function computeWeaknesses(
       const variance = coefficientOfVariation(sessionAccuracies);
 
       if (
-        variance >= VARIANCE_THRESHOLD &&
+        variance >= thresholdConfig.variance &&
         !weaknesses.find((w) => w.id === `weakness-position-${position}`)
       ) {
         const confidence = determineConfidence(stats.shots, stats.sessions.length);
@@ -703,10 +1016,10 @@ export function computeWeaknesses(
           category: 'variance',
           label: `${position.charAt(0).toUpperCase() + position.slice(1)} Consistency`,
           primaryValue: `${Math.round(variance * 100)}%`,
-          context: 'Coefficient of variation',
+          context: 'Coefficient of variation (within position)',
           metric: {
             value: variance * 100,
-            baseline: 15, // Expected CV
+            baseline: 15, // Expected CV for consistent shooter
             delta: (variance * 100) - 15,
             direction: 'down',
             isSignificant: true,
@@ -721,29 +1034,33 @@ export function computeWeaknesses(
     }
   });
 
-  // Group by distance bucket
-  const byDistance = groupByCategory(completed, (s) => {
+  // Group ENGAGEMENT sessions by distance bucket (for accuracy weaknesses)
+  // WHY: Separate from position analysis to avoid double-counting
+  const engagementByDistance = groupByCategory(engagementSessions, (s) => {
     const distance = s.drill_config?.distance_m ?? s.stats?.avg_distance_m;
     const bucket = getDistanceBucket(distance ?? null);
     if (!bucket) return null;
-    return `${DISTANCE_BUCKETS[bucket as keyof typeof DISTANCE_BUCKETS].label}`;
+    return bucket; // Use bucket key for threshold lookup
   });
 
-  byDistance.forEach((stats, distanceLabel) => {
+  engagementByDistance.forEach((stats, distanceBucket) => {
     if (stats.shots < MIN_SHOTS_FOR_CATEGORY) return;
 
+    const distanceLabel = DISTANCE_BUCKETS[distanceBucket as keyof typeof DISTANCE_BUCKETS]?.label || distanceBucket;
     const accuracyDelta = stats.accuracy - baselineAccuracy;
-    if (accuracyDelta <= -ACCURACY_CHANGE_THRESHOLD) {
+
+    if (accuracyDelta <= -accuracyThreshold) {
       const confidence = determineConfidence(stats.shots, stats.sessions.length);
 
+      // Variance within this distance context only
       const sessionAccuracies = stats.sessions
         .filter((s) => s.stats && s.stats.shots_fired > 0)
         .map((s) => (s.stats!.hits_total / s.stats!.shots_fired) * 100);
       const variance = coefficientOfVariation(sessionAccuracies);
 
       weaknesses.push({
-        id: `weakness-distance-${distanceLabel}`,
-        category: 'position', // Distance is a form of position weakness
+        id: `weakness-distance-${distanceBucket}`,
+        category: 'position', // Distance is a form of context weakness
         label: distanceLabel,
         primaryValue: `${Math.round(stats.accuracy)}%`,
         context: `${Math.round(Math.abs(accuracyDelta))}% below baseline`,
@@ -757,7 +1074,7 @@ export function computeWeaknesses(
           dataPoints: stats.shots,
           unit: '%',
         },
-        variance: variance >= VARIANCE_THRESHOLD ? Math.round(variance * 100) : null,
+        variance: variance >= thresholdConfig.variance ? Math.round(variance * 100) : null,
         evidenceIds: stats.sessions.map((s) => s.id),
       });
     }
@@ -1010,15 +1327,506 @@ export function generateRecommendations(
 }
 
 // ============================================================================
+// CONTEXT PROFILES (NEW MODULE)
+// ============================================================================
+
+/**
+ * Compute context profiles for bridging engagement and grouping metrics.
+ *
+ * WHY: Users want to understand how their engagement (hit rate) relates to
+ * their grouping (precision). This module computes per-context metrics
+ * WITHOUT mixing units, enabling narratives like:
+ * "In prone at 100-300m, you hit targets well but your groups are loose."
+ *
+ * ARCHITECTURE:
+ * - Each unique context (position + distance + weapon category + timed) gets a profile
+ * - Engagement metrics: accuracy delta vs baseline (positive = better)
+ * - Grouping metrics: dispersion delta vs baseline (inverted: positive = tighter = better)
+ * - Quadrant classification: strong_both, hits_loose, tight_misses, struggling
+ *
+ * FALLBACK STRATEGY:
+ * - If context baseline has < MIN_SESSIONS_FOR_CONTEXT_BASELINE sessions,
+ *   use global baseline but mark insight as "preliminary"
+ */
+export function computeContextProfiles(
+  sessions: SessionWithDetails[],
+  thresholdConfig: ThresholdConfig = DEFAULT_THRESHOLD_CONFIG
+): ComputedContextProfiles {
+  const completed = sessions.filter((s) => s.status === 'completed');
+
+  // Compute baseline strategy
+  const baselines = computeBaselines(completed);
+
+  // Group sessions by context key
+  const contextGroups = new Map<string, {
+    key: ContextKey;
+    engagement: SessionWithDetails[];
+    grouping: SessionWithDetails[];
+  }>();
+
+  completed.forEach((session) => {
+    const key = createContextKey(session);
+    const keyString = serializeContextKey(key);
+
+    if (!contextGroups.has(keyString)) {
+      contextGroups.set(keyString, {
+        key,
+        engagement: [],
+        grouping: [],
+      });
+    }
+
+    const group = contextGroups.get(keyString)!;
+    if (isGroupingSession(session)) {
+      group.grouping.push(session);
+    } else if (isEngagementSession(session)) {
+      group.engagement.push(session);
+    }
+  });
+
+  // Compute profiles
+  const profiles: ContextProfile[] = [];
+  let strongBothCount = 0;
+  let hitsLooseCount = 0;
+  let tightMissesCount = 0;
+  let strugglingCount = 0;
+  let insufficientDataCount = 0;
+
+  contextGroups.forEach((group, keyString) => {
+    const { key, engagement, grouping } = group;
+
+    // Determine which baseline to use (context or global fallback)
+    const contextBaseline = baselines.context.get(keyString);
+    const useContextBaseline = contextBaseline &&
+      (contextBaseline.accuracySessions >= MIN_SESSIONS_FOR_CONTEXT_BASELINE ||
+       contextBaseline.groupingSessions >= MIN_SESSIONS_FOR_CONTEXT_BASELINE);
+    const isPreliminary = !useContextBaseline;
+
+    // Compute engagement metrics
+    let engagementMetrics: ContextEngagementMetrics | null = null;
+    if (engagement.length > 0) {
+      let shots = 0;
+      let hits = 0;
+      engagement.forEach((s) => {
+        if (s.stats) {
+          shots += s.stats.shots_fired;
+          hits += s.stats.hits_total;
+        }
+      });
+
+      if (shots > 0) {
+        const accuracy = (hits / shots) * 100;
+        const baselineAccuracy = useContextBaseline && contextBaseline?.accuracy != null
+          ? contextBaseline.accuracy
+          : baselines.global.accuracy ?? 0;
+        const delta = accuracy - baselineAccuracy;
+        const threshold = getAccuracyThreshold(baselineAccuracy, thresholdConfig);
+        const normalizedDelta = threshold > 0 ? delta / threshold : 0;
+
+        engagementMetrics = {
+          accuracy,
+          baselineAccuracy,
+          delta,
+          normalizedDelta,
+          shots,
+          sessions: engagement.length,
+          evidenceIds: engagement.map((s) => s.id),
+        };
+      }
+    }
+
+    // Compute grouping metrics
+    let groupingMetrics: ContextGroupingMetrics | null = null;
+    if (grouping.length > 0) {
+      const bestDispersions: number[] = [];
+      grouping.forEach((s) => {
+        if (s.stats?.best_dispersion_cm != null) {
+          bestDispersions.push(s.stats.best_dispersion_cm);
+        }
+      });
+
+      const medianBestGroup = median(bestDispersions);
+      if (medianBestGroup !== null) {
+        const baselineMedianBestGroup = useContextBaseline && contextBaseline?.medianBestGroup != null
+          ? contextBaseline.medianBestGroup
+          : baselines.global.medianBestGroup ?? medianBestGroup;
+
+        // Inverted: positive delta = tighter = better
+        const delta = baselineMedianBestGroup - medianBestGroup;
+        const threshold = getGroupingThreshold(key.distanceBucket, thresholdConfig);
+        const normalizedDelta = threshold > 0 ? delta / threshold : 0;
+
+        groupingMetrics = {
+          medianBestGroup,
+          baselineMedianBestGroup,
+          delta,
+          normalizedDelta,
+          sessions: grouping.length,
+          evidenceIds: grouping.map((s) => s.id),
+        };
+      }
+    }
+
+    // Classify quadrant
+    let quadrant: ContextQuadrant;
+    if (engagementMetrics === null && groupingMetrics === null) {
+      quadrant = 'insufficient_data';
+      insufficientDataCount++;
+    } else if (engagementMetrics === null) {
+      quadrant = 'grouping_only';
+    } else if (groupingMetrics === null) {
+      quadrant = 'engagement_only';
+    } else {
+      // Both metrics available - classify into 2x2
+      const engagementGood = engagementMetrics.normalizedDelta >= 0;
+      const groupingGood = groupingMetrics.normalizedDelta >= 0;
+
+      if (engagementGood && groupingGood) {
+        quadrant = 'strong_both';
+        strongBothCount++;
+      } else if (engagementGood && !groupingGood) {
+        quadrant = 'hits_loose';
+        hitsLooseCount++;
+      } else if (!engagementGood && groupingGood) {
+        quadrant = 'tight_misses';
+        tightMissesCount++;
+      } else {
+        quadrant = 'struggling';
+        strugglingCount++;
+      }
+    }
+
+    // Determine confidence
+    const totalSessions = engagement.length + grouping.length;
+    const totalShots = engagementMetrics?.shots ?? 0;
+    const confidence = determineConfidence(totalShots, totalSessions);
+
+    profiles.push({
+      key,
+      keyString,
+      engagement: engagementMetrics,
+      grouping: groupingMetrics,
+      quadrant,
+      confidence,
+      isPreliminary,
+      label: labelContextKey(key),
+    });
+  });
+
+  return {
+    profiles,
+    globalBaseline: baselines.global,
+    contextBaselines: baselines.context,
+    summary: {
+      totalContexts: profiles.length,
+      strongBothCount,
+      hitsLooseCount,
+      tightMissesCount,
+      strugglingCount,
+      insufficientDataCount,
+    },
+  };
+}
+
+/**
+ * Get conversion insights from context profiles.
+ *
+ * WHY: Surfaces actionable narratives from the 2x2 matrix:
+ * - "hits_loose": "You're converting hits but your mechanics are loose"
+ * - "tight_misses": "Your groups are tight but you're missing targets"
+ *
+ * This is a deterministic derivation, NOT AI-generated.
+ */
+export function getConversionInsights(
+  profiles: ContextProfile[]
+): Array<{
+  profile: ContextProfile;
+  insight: string;
+  severity: 'low' | 'medium' | 'high';
+}> {
+  const insights: Array<{
+    profile: ContextProfile;
+    insight: string;
+    severity: 'low' | 'medium' | 'high';
+  }> = [];
+
+  profiles.forEach((profile) => {
+    if (profile.quadrant === 'insufficient_data') return;
+
+    switch (profile.quadrant) {
+      case 'strong_both':
+        // Positive reinforcement
+        insights.push({
+          profile,
+          insight: `Strong performance in ${profile.label}: good hits and tight groups`,
+          severity: 'low',
+        });
+        break;
+
+      case 'hits_loose':
+        // WARNING: Converting but mechanics need work
+        insights.push({
+          profile,
+          insight: `${profile.label}: hitting targets but groups are ${Math.abs(profile.grouping?.delta ?? 0).toFixed(1)}cm looser than baseline. Mechanics may degrade under stress.`,
+          severity: 'medium',
+        });
+        break;
+
+      case 'tight_misses':
+        // WARNING: Precise but not converting
+        insights.push({
+          profile,
+          insight: `${profile.label}: groups are tight but accuracy is ${Math.abs(profile.engagement?.delta ?? 0).toFixed(0)}% below baseline. Check zero or shot placement.`,
+          severity: 'medium',
+        });
+        break;
+
+      case 'struggling':
+        // CRITICAL: Both metrics below baseline
+        insights.push({
+          profile,
+          insight: `${profile.label}: both accuracy and grouping are below baseline. Fundamental review recommended.`,
+          severity: 'high',
+        });
+        break;
+
+      case 'engagement_only':
+        if (profile.engagement && profile.engagement.normalizedDelta < -1) {
+          insights.push({
+            profile,
+            insight: `${profile.label}: accuracy ${Math.abs(profile.engagement.delta).toFixed(0)}% below baseline (no grouping data)`,
+            severity: 'medium',
+          });
+        }
+        break;
+
+      case 'grouping_only':
+        if (profile.grouping && profile.grouping.normalizedDelta < -1) {
+          insights.push({
+            profile,
+            insight: `${profile.label}: best groups ${Math.abs(profile.grouping.delta).toFixed(1)}cm looser than baseline (no engagement data)`,
+            severity: 'medium',
+          });
+        }
+        break;
+    }
+  });
+
+  // Sort by severity (high first)
+  const severityOrder = { high: 0, medium: 1, low: 2 };
+  return insights.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+}
+
+// ============================================================================
+// OVERVIEW STATUS COMPUTATION
+// ============================================================================
+
+/**
+ * Get the top focus item from weaknesses or recommendations.
+ *
+ * WHY: The overview card needs a single "Focus" item to answer
+ * "Where should I work on?" immediately.
+ *
+ * PRIORITY:
+ * 1. High-priority recommendations (if any)
+ * 2. Worst weakness (highest severity)
+ * 3. Medium-priority recommendations
+ */
+export function getTopFocusItem(
+  weaknesses: WeaknessCard[],
+  recommendations: Recommendation[]
+): FocusItem | null {
+  // Check for high-priority recommendation first
+  const highPriorityRec = recommendations.find((r) => r.priority === 'high');
+  if (highPriorityRec) {
+    return {
+      label: highPriorityRec.title,
+      reason: highPriorityRec.description,
+      sourceType: 'recommendation',
+      sourceId: highPriorityRec.id,
+      evidenceIds: highPriorityRec.evidenceIds,
+    };
+  }
+
+  // Check for worst weakness (first in list is highest severity)
+  if (weaknesses.length > 0) {
+    const worst = weaknesses[0];
+    const deltaDesc =
+      worst.metric.unit === 'cm'
+        ? `groups ${Math.abs(worst.metric.delta).toFixed(1)}cm looser`
+        : `accuracy ${Math.abs(worst.metric.delta).toFixed(0)}% lower`;
+    return {
+      label: worst.label,
+      reason: deltaDesc,
+      sourceType: 'weakness',
+      sourceId: worst.id,
+      evidenceIds: worst.evidenceIds,
+    };
+  }
+
+  // Fallback to medium-priority recommendation
+  const mediumRec = recommendations.find((r) => r.priority === 'medium');
+  if (mediumRec) {
+    return {
+      label: mediumRec.title,
+      reason: mediumRec.description,
+      sourceType: 'recommendation',
+      sourceId: mediumRec.id,
+      evidenceIds: mediumRec.evidenceIds,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Get the top trust item from strengths.
+ *
+ * WHY: The overview card needs a single "Trust" item to answer
+ * "What can I rely on?" immediately.
+ *
+ * PRIORITY: Highest confidence strength, then highest delta.
+ */
+export function getTopTrustItem(strengths: StrengthCard[]): TrustItem | null {
+  if (strengths.length === 0) return null;
+
+  // Sort by confidence (high > medium > low), then by delta magnitude
+  const sorted = [...strengths].sort((a, b) => {
+    const confOrder = { high: 0, medium: 1, low: 2 };
+    const confDiff = confOrder[a.metric.confidence] - confOrder[b.metric.confidence];
+    if (confDiff !== 0) return confDiff;
+    return Math.abs(b.metric.delta) - Math.abs(a.metric.delta);
+  });
+
+  const top = sorted[0];
+  return {
+    label: top.label,
+    primaryValue: top.primaryValue,
+    confidence: top.metric.confidence,
+    sourceId: top.id,
+    evidenceIds: top.evidenceIds,
+  };
+}
+
+/**
+ * Derive trend summary from computed trends.
+ *
+ * WHY: Trends array may have multiple trends per metric type.
+ * We need to distill into a single summary for each axis.
+ */
+function deriveTrendSummary(
+  trends: TrendData[],
+  metricType: 'accuracy' | 'grouping',
+  baselines: BaselineStrategy
+): TrendSummary | null {
+  // Find the trend for this metric type
+  const relevantTrends = trends.filter((t) => t.metricType === metricType);
+  if (relevantTrends.length === 0) {
+    // No trend data, but we might have baseline data
+    if (metricType === 'accuracy' && baselines.global.accuracy !== null) {
+      return {
+        currentValue: Math.round(baselines.global.accuracy),
+        delta: 0,
+        direction: 'stable',
+        confidence: baselines.global.confidence,
+        unit: '%',
+        evidenceIds: [],
+      };
+    }
+    if (metricType === 'grouping' && baselines.global.medianBestGroup !== null) {
+      return {
+        currentValue: Math.round(baselines.global.medianBestGroup * 10) / 10,
+        delta: 0,
+        direction: 'stable',
+        confidence: baselines.global.confidence,
+        unit: 'cm',
+        evidenceIds: [],
+      };
+    }
+    return null;
+  }
+
+  // Use the most recent/primary trend
+  const trend = relevantTrends[0];
+  const lastPoint = trend.dataPoints[trend.dataPoints.length - 1];
+  const currentValue = lastPoint?.value ?? 0;
+
+  // Map trend direction to our display direction
+  const direction: 'improving' | 'stable' | 'declining' = trend.direction;
+
+  return {
+    currentValue: metricType === 'grouping' 
+      ? Math.round(currentValue * 10) / 10 
+      : Math.round(currentValue),
+    delta: metricType === 'grouping'
+      ? Math.round(trend.magnitude * 10) / 10
+      : Math.round(trend.magnitude),
+    direction,
+    confidence: trend.confidence ?? 'medium',
+    unit: metricType === 'grouping' ? 'cm' : '%',
+    evidenceIds: trend.evidenceIds,
+  };
+}
+
+/**
+ * Compute overview status from insights and context profiles.
+ *
+ * WHY: The overview card needs a single computed state that:
+ * 1. Shows accuracy + grouping status at a glance
+ * 2. Highlights top focus area
+ * 3. Highlights top trust area
+ * 4. Communicates data sufficiency
+ */
+export function computeOverviewStatus(
+  insights: ComputedInsights,
+  contextProfiles: ComputedContextProfiles
+): OverviewStatus {
+  // Get baselines for trend computation
+  const baselines: BaselineStrategy = {
+    global: contextProfiles.globalBaseline,
+    context: contextProfiles.contextBaselines,
+  };
+
+  // Derive trend summaries
+  const accuracy = deriveTrendSummary(insights.trends, 'accuracy', baselines);
+  const grouping = deriveTrendSummary(insights.trends, 'grouping', baselines);
+
+  // Get focus and trust items
+  const focusItem = insights.hasEnoughData
+    ? getTopFocusItem(insights.weaknesses, insights.recommendations)
+    : null;
+  const trustItem = insights.hasEnoughData
+    ? getTopTrustItem(insights.strengths)
+    : null;
+
+  return {
+    accuracy,
+    grouping,
+    focusItem,
+    trustItem,
+    sessionCount: insights.sessionCount,
+    shotCount: insights.shotCount,
+    hasEnoughData: insights.hasEnoughData,
+    sessionsNeeded: Math.max(0, insights.minSessionsRequired - insights.sessionCount),
+  };
+}
+
+// ============================================================================
 // MAIN COMPUTATION FUNCTION
 // ============================================================================
 
 /**
- * Compute all insights from sessions
+ * Compute all insights from sessions.
+ *
+ * IMPROVEMENTS (v2.0):
+ * - Context-aware thresholds
+ * - Explicit baseline strategy
+ * - Improved semantic clarity for grouping metrics
  */
 export function computeInsights(
   allSessions: SessionWithDetails[],
-  filters: InsightsFilters = DEFAULT_FILTERS
+  filters: InsightsFilters = DEFAULT_FILTERS,
+  thresholdConfig: ThresholdConfig = DEFAULT_THRESHOLD_CONFIG
 ): ComputedInsights {
   // Apply filters
   const sessions = applyFilters(allSessions, filters);
@@ -1041,10 +1849,10 @@ export function computeInsights(
 
   const hasEnoughData = completed.length >= MIN_SESSIONS_FOR_INSIGHTS;
 
-  // Compute all sections
+  // Compute all sections with context-aware thresholds
   const totals = computeTotals(sessions);
-  const strengths = hasEnoughData ? computeStrengths(sessions, filters) : [];
-  const weaknesses = hasEnoughData ? computeWeaknesses(sessions, filters) : [];
+  const strengths = hasEnoughData ? computeStrengths(sessions, filters, thresholdConfig) : [];
+  const weaknesses = hasEnoughData ? computeWeaknesses(sessions, filters, thresholdConfig) : [];
   const trends = hasEnoughData ? computeTrends(sessions, filters) : [];
   const recommendations = hasEnoughData
     ? generateRecommendations(strengths, weaknesses, trends, sessions)

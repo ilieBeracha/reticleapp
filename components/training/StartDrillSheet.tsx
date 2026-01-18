@@ -1,11 +1,9 @@
 import { CreateWeaponFlow, WeaponPicker } from '@/components/weapons';
-import type { WeaponPolicy } from '@/constants/weaponPolicy';
 import { useColors } from '@/hooks/ui/useColors';
 import { useOpenWeather } from '@/hooks/useOpenWeather';
 import { supabase } from '@/lib/supabase';
 import type { BaseSessionConfig } from '@/services/session/types';
 import { createSession } from '@/services/sessionService';
-import { getTeamWeaponPolicy } from '@/services/teamService';
 import { getAssignedWeapons, getOrCreatePersonalProfile, getUserWeapon, type UserWeapon } from '@/services/weaponService';
 import { toSessionWeatherData } from '@/services/weather';
 import { useSessionStore } from '@/store/sessionStore';
@@ -51,7 +49,6 @@ export function StartDrillSheet({
   const [selectedWeapon, setSelectedWeapon] = useState<UserWeapon | null>(null);
   const [loadingWeapon, setLoadingWeapon] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [weaponPolicy, setWeaponPolicy] = useState<WeaponPolicy | null>(null);
   
   const [showWeaponPicker, setShowWeaponPicker] = useState(false);
   const [showCreateWeapon, setShowCreateWeapon] = useState(false);
@@ -75,22 +72,16 @@ export function StartDrillSheet({
 
     async function loadTeamData() {
       try {
-        // Fetch weapon policy and assigned weapon in parallel
-        const [policy, authResult] = await Promise.all([
-          getTeamWeaponPolicy(teamId!),
-          supabase.auth.getUser(),
-        ]);
-        
+        const { data: authData } = await supabase.auth.getUser();
         if (cancelled) return;
         
-        setWeaponPolicy(policy);
-        
-        const user = authResult.data?.user;
+        const user = authData?.user;
         if (!user) {
           setLoadingWeapon(false);
           return;
         }
 
+        // Get user's assigned weapon from team
         const assignedWeapons = await getAssignedWeapons(teamId!, user.id);
         if (cancelled) return;
 
@@ -299,7 +290,6 @@ export function StartDrillSheet({
               setShowCreateWeapon(true);
             }}
             teamId={teamId}
-            weaponPolicy={weaponPolicy}
           />
         </Modal>
         

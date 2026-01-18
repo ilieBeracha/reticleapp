@@ -4,7 +4,6 @@
  * Teams are the primary entity - no organization layer
  */
 
-import { DEFAULT_WEAPON_POLICY, type WeaponPolicy } from '@/constants/weaponPolicy';
 import { supabase } from '@/lib/supabase';
 import type {
   Team,
@@ -62,7 +61,6 @@ export interface CreateTeamInput {
   name: string;
   description?: string;
   squads?: string[];
-  weapon_policy?: WeaponPolicy;
 }
 
 export interface UpdateTeamInput {
@@ -80,7 +78,6 @@ export async function createTeam(input: CreateTeamInput): Promise<Team> {
     p_name: input.name,
     p_description: input.description || null,
     p_squads: input.squads || [],
-    p_weapon_policy: input.weapon_policy || DEFAULT_WEAPON_POLICY,
   });
 
   if (error) {
@@ -164,25 +161,6 @@ export async function getTeamWithMembers(teamId: string): Promise<TeamWithMember
     members,
     member_count: members.length || 0,
   };
-}
-
-/**
- * Get a team's weapon policy
- * Used by weapon picker to filter available weapons
- */
-export async function getTeamWeaponPolicy(teamId: string): Promise<WeaponPolicy | null> {
-  const { data, error } = await supabase
-    .from('teams')
-    .select('weapon_policy')
-    .eq('id', teamId)
-    .single();
-
-  if (error) {
-    console.error('Failed to fetch team weapon policy:', error);
-    return null; // Return null instead of throwing - fallback to default behavior
-  }
-
-  return data?.weapon_policy as WeaponPolicy || null;
 }
 
 /**

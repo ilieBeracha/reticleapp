@@ -28,6 +28,8 @@ interface WeaknessesSectionProps {
   weaknesses: WeaknessCard[];
   onWeaknessPress?: (weakness: WeaknessCard) => void;
   maxVisible?: number;
+  /** Hide section header (for use inside accordion) */
+  hideHeader?: boolean;
 }
 
 // ============================================================================
@@ -265,25 +267,28 @@ export function WeaknessesSection({
   weaknesses,
   onWeaknessPress,
   maxVisible = 5,
+  hideHeader = false,
 }: WeaknessesSectionProps) {
   const colors = useColors();
   const visibleWeaknesses = weaknesses.slice(0, maxVisible);
 
   return (
     <View style={styles.container}>
-      <View style={styles.sectionHeader}>
-        <View style={styles.titleRow}>
-          <View style={[styles.sectionIcon, { backgroundColor: `${colors.red}15` }]}>
-            <AlertTriangle size={14} color={colors.red} />
+      {!hideHeader && (
+        <View style={styles.sectionHeader}>
+          <View style={styles.titleRow}>
+            <View style={[styles.sectionIcon, { backgroundColor: `${colors.red}15` }]}>
+              <AlertTriangle size={14} color={colors.red} />
+            </View>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Weaknesses
+            </Text>
           </View>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Weaknesses
+          <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
+            What's limiting your ceiling
           </Text>
         </View>
-        <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
-          What's limiting your ceiling
-        </Text>
-      </View>
+      )}
 
       {visibleWeaknesses.length > 0 ? (
         <View style={styles.cardsContainer}>
@@ -302,7 +307,7 @@ export function WeaknessesSection({
           )}
         </View>
       ) : (
-        <EmptyState colors={colors} />
+        !hideHeader && <EmptyState colors={colors} />
       )}
     </View>
   );

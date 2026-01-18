@@ -1,20 +1,25 @@
 /**
  * SquadStatusContent Component
- * Shows real-time soldier status and progress during training
+ * Shows real-time soldier status, team performance, and drill breakdown for commanders
  */
 
 import type { SessionWithDetails } from '@/services/session/types';
 import {
   Activity,
+  Award,
+  BarChart3,
   CheckCircle,
   Circle,
   Clock,
+  Crosshair,
   Target,
+  TrendingUp,
   User,
+  Users,
 } from 'lucide-react-native';
-import { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useMemo, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 
 interface DrillProgress {
   drillId: string;
@@ -44,7 +49,18 @@ interface SoldierStatus {
   completedDrills: number;
   totalShots: number;
   totalHits: number;
+  bestGroup?: number;
+  avgTime?: number;
   lastActivity?: Date;
+}
+
+interface DrillStats {
+  drillId: string;
+  name: string;
+  completedBy: number;
+  avgAccuracy: number | null;
+  avgTime: number | null;
+  bestAccuracy: { name: string; value: number } | null;
 }
 
 export function SquadStatusContent({
@@ -53,6 +69,8 @@ export function SquadStatusContent({
   drillProgress,
   colors,
 }: SquadStatusContentProps) {
+  const [viewMode, setViewMode] = useState<'soldiers' | 'drills'>('soldiers');
+
   // Process soldier status from sessions
   const soldiers = useMemo<SoldierStatus[]>(() => {
     if (!teamSessions.length) return [];
@@ -63,6 +81,7 @@ export function SquadStatusContent({
       const existing = soldierMap.get(session.user_id);
       const shots = session.stats?.shots_fired ?? 0;
       const hits = session.stats?.hits_total ?? 0;
+      const bestGroup = session.stats?.best_dispersion_cm;
       const isActive = session.status === 'active';
       const isCompleted = session.status === 'completed';
 
@@ -75,11 +94,15 @@ export function SquadStatusContent({
           completedDrills: isCompleted ? 1 : 0,
           totalShots: shots,
           totalHits: hits,
+          bestGroup: bestGroup ?? undefined,
           lastActivity: session.ended_at ? new Date(session.ended_at) : session.started_at ? new Date(session.started_at) : undefined,
         });
       } else {
         existing.totalShots += shots;
         existing.totalHits += hits;
+        if (bestGroup && (!existing.bestGroup || bestGroup < existing.bestGroup)) {
+          existing.bestGroup = bestGroup;
+        }
         if (isCompleted) existing.completedDrills++;
         if (isActive) {
           existing.status = 'active';
@@ -102,12 +125,76 @@ export function SquadStatusContent({
     });
   }, [teamSessions]);
 
+  // Per-drill statistics
+  const drillStats = useMemo<DrillStats[]>(() => {
+    return drills.map(drill => {
+      const drillSessions = teamSessions.filter(s => s.drill_id === drill.id && s.status === 'completed');
+      const completedBy = new Set(drillSessions.map(s => s.user_id)).size;
+      
+      // Calculate averages
+      let totalAccuracy = 0;
+      let accuracyCount = 0;
+      let bestAccuracy: { name: string; value: number } | null = null;
+      
+      drillSessions.forEach(session => {
+        const shots = session.stats?.shots_fired ?? 0;
+        const hits = session.stats?.hits_total ?? 0;
+        if (shots > 0) {
+          const acc = Math.round((hits / shots) * 100);
+          totalAccuracy += acc;
+          accuracyCount++;
+          if (!bestAccuracy || acc > bestAccuracy.value) {
+            bestAccuracy = { name: session.user_full_name || 'Unknown', value: acc };
+          }
+        }
+      });
+
+      return {
+        drillId: drill.id,
+        name: drill.name,
+        completedBy,
+        avgAccuracy: accuracyCount > 0 ? Math.round(totalAccuracy / accuracyCount) : null,
+        avgTime: null,
+        bestAccuracy,
+      };
+    });
+  }, [drills, teamSessions]);
+
   // Count stats
-  const stats = useMemo(() => {
+  const stats = useMemo<{
+    active: number;
+    completed: number;
+    total: number;
+    avgAccuracy: number | null;
+    topPerformer: { name: string; accuracy: number } | null;
+  }>(() => {
     const active = soldiers.filter(s => s.status === 'active').length;
     const completed = soldiers.filter(s => s.completedDrills === drills.length && s.completedDrills > 0).length;
     const total = soldiers.length;
-    return { active, completed, total };
+    
+    // Team averages
+    let totalAccuracy = 0;
+    let accuracyCount = 0;
+    let topPerformer: { name: string; accuracy: number } | null = null;
+    
+    soldiers.forEach(s => {
+      if (s.totalShots > 0) {
+        const acc = Math.round((s.totalHits / s.totalShots) * 100);
+        totalAccuracy += acc;
+        accuracyCount++;
+        if (!topPerformer || acc > topPerformer.accuracy) {
+          topPerformer = { name: s.name, accuracy: acc };
+        }
+      }
+    });
+
+    return { 
+      active, 
+      completed, 
+      total,
+      avgAccuracy: accuracyCount > 0 ? Math.round(totalAccuracy / accuracyCount) : null,
+      topPerformer,
+    };
   }, [soldiers, drills.length]);
 
   if (soldiers.length === 0) {
@@ -124,6 +211,41 @@ export function SquadStatusContent({
 
   return (
     <View style={styles.container}>
+      {/* Team Performance Summary */}
+      <View style={[styles.performanceCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.performanceHeader}>
+          <BarChart3 size={16} color={colors.primary} />
+          <Text style={[styles.performanceTitle, { color: colors.text }]}>Team Performance</Text>
+        </View>
+        <View style={styles.performanceGrid}>
+          <View style={styles.perfItem}>
+            <Text style={[styles.perfValue, { color: colors.text }]}>{stats.completed}/{stats.total}</Text>
+            <Text style={[styles.perfLabel, { color: colors.textMuted }]}>Completed all</Text>
+          </View>
+          <View style={[styles.perfDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.perfItem}>
+            <Text style={[styles.perfValue, { color: stats.avgAccuracy && stats.avgAccuracy >= 70 ? colors.green : colors.text }]}>
+              {stats.avgAccuracy !== null ? `${stats.avgAccuracy}%` : '—'}
+            </Text>
+            <Text style={[styles.perfLabel, { color: colors.textMuted }]}>Team avg accuracy</Text>
+          </View>
+          {stats.topPerformer && (
+            <>
+              <View style={[styles.perfDivider, { backgroundColor: colors.border }]} />
+              <View style={styles.perfItem}>
+                <View style={styles.topPerformerRow}>
+                  <Award size={14} color={colors.orange} />
+                  <Text style={[styles.perfValue, { color: colors.text }]}>{stats.topPerformer.accuracy}%</Text>
+                </View>
+                <Text style={[styles.perfLabel, { color: colors.textMuted }]} numberOfLines={1}>
+                  {stats.topPerformer.name.split(' ')[0]}
+                </Text>
+              </View>
+            </>
+          )}
+        </View>
+      </View>
+
       {/* Overview Stats */}
       <View style={[styles.statsBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.statItem}>
@@ -145,18 +267,62 @@ export function SquadStatusContent({
         </View>
       </View>
 
-      {/* Soldier List */}
-      <View style={styles.soldierList}>
-        {soldiers.map((soldier, index) => (
-          <SoldierRow
-            key={soldier.id}
-            soldier={soldier}
-            totalDrills={drills.length}
-            colors={colors}
-            index={index}
-          />
-        ))}
+      {/* View Toggle */}
+      <View style={[styles.viewToggle, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+        <TouchableOpacity
+          style={[
+            styles.toggleBtn,
+            viewMode === 'soldiers' && [styles.toggleBtnActive, { backgroundColor: colors.card }],
+          ]}
+          onPress={() => setViewMode('soldiers')}
+          activeOpacity={0.7}
+        >
+          <Users size={14} color={viewMode === 'soldiers' ? colors.text : colors.textMuted} />
+          <Text style={[styles.toggleText, { color: viewMode === 'soldiers' ? colors.text : colors.textMuted }]}>
+            Soldiers
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.toggleBtn,
+            viewMode === 'drills' && [styles.toggleBtnActive, { backgroundColor: colors.card }],
+          ]}
+          onPress={() => setViewMode('drills')}
+          activeOpacity={0.7}
+        >
+          <Target size={14} color={viewMode === 'drills' ? colors.text : colors.textMuted} />
+          <Text style={[styles.toggleText, { color: viewMode === 'drills' ? colors.text : colors.textMuted }]}>
+            By Drill
+          </Text>
+        </TouchableOpacity>
       </View>
+
+      {/* Content based on view mode */}
+      {viewMode === 'soldiers' ? (
+        <Animated.View entering={FadeIn.duration(200)} style={styles.soldierList}>
+          {soldiers.map((soldier, index) => (
+            <SoldierRow
+              key={soldier.id}
+              soldier={soldier}
+              totalDrills={drills.length}
+              colors={colors}
+              index={index}
+            />
+          ))}
+        </Animated.View>
+      ) : (
+        <Animated.View entering={FadeIn.duration(200)} style={styles.drillsList}>
+          {drillStats.map((drill, index) => (
+            <DrillStatsRow
+              key={drill.drillId}
+              drill={drill}
+              totalSoldiers={stats.total}
+              colors={colors}
+              index={index}
+            />
+          ))}
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -228,9 +394,17 @@ function SoldierRow({
         </View>
         {accuracy !== null && (
           <View style={styles.miniStat}>
-            <CheckCircle size={12} color={colors.textMuted} />
-            <Text style={[styles.miniStatText, { color: colors.text }]}>
+            <TrendingUp size={12} color={accuracy >= 70 ? colors.green : colors.textMuted} />
+            <Text style={[styles.miniStatText, { color: accuracy >= 70 ? colors.green : colors.text }]}>
               {accuracy}%
+            </Text>
+          </View>
+        )}
+        {soldier.bestGroup && (
+          <View style={styles.miniStat}>
+            <Crosshair size={12} color={colors.textMuted} />
+            <Text style={[styles.miniStatText, { color: colors.text }]}>
+              {soldier.bestGroup.toFixed(1)}cm
             </Text>
           </View>
         )}
@@ -258,6 +432,91 @@ function SoldierRow({
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// DRILL STATS ROW
+// ═══════════════════════════════════════════════════════════════════════════
+
+function DrillStatsRow({
+  drill,
+  totalSoldiers,
+  colors,
+  index,
+}: {
+  drill: DrillStats;
+  totalSoldiers: number;
+  colors: any;
+  index: number;
+}) {
+  const completionRate = totalSoldiers > 0 ? Math.round((drill.completedBy / totalSoldiers) * 100) : 0;
+  const isFullyCompleted = drill.completedBy === totalSoldiers && totalSoldiers > 0;
+
+  return (
+    <Animated.View
+      entering={FadeInDown.delay(index * 50).duration(200)}
+      style={[
+        styles.drillStatsCard,
+        { 
+          backgroundColor: isFullyCompleted ? colors.green + '08' : colors.card, 
+          borderColor: isFullyCompleted ? colors.green + '30' : colors.border 
+        },
+      ]}
+    >
+      <View style={styles.drillStatsHeader}>
+        <View style={[styles.drillIcon, { backgroundColor: isFullyCompleted ? colors.green + '20' : colors.secondary }]}>
+          <Target size={14} color={isFullyCompleted ? colors.green : colors.textMuted} />
+        </View>
+        <View style={styles.drillStatsInfo}>
+          <Text style={[styles.drillName, { color: colors.text }]} numberOfLines={1}>
+            {drill.name}
+          </Text>
+          <Text style={[styles.drillCompletion, { color: colors.textMuted }]}>
+            {drill.completedBy}/{totalSoldiers} soldiers ({completionRate}%)
+          </Text>
+        </View>
+        {isFullyCompleted && (
+          <CheckCircle size={18} color={colors.green} />
+        )}
+      </View>
+
+      {/* Drill stats */}
+      {drill.completedBy > 0 && (
+        <View style={styles.drillMetrics}>
+          {drill.avgAccuracy !== null && (
+            <View style={[styles.metricChip, { backgroundColor: colors.secondary }]}>
+              <TrendingUp size={12} color={drill.avgAccuracy >= 70 ? colors.green : colors.textMuted} />
+              <Text style={[styles.metricText, { color: colors.text }]}>
+                Avg: {drill.avgAccuracy}%
+              </Text>
+            </View>
+          )}
+          {drill.bestAccuracy && (
+            <View style={[styles.metricChip, { backgroundColor: colors.orange + '15' }]}>
+              <Award size={12} color={colors.orange} />
+              <Text style={[styles.metricText, { color: colors.text }]}>
+                Best: {drill.bestAccuracy.value}% ({drill.bestAccuracy.name.split(' ')[0]})
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Progress bar */}
+      <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+        <View
+          style={[
+            styles.progressFill,
+            {
+              backgroundColor: isFullyCompleted ? colors.green : colors.primary,
+              width: `${completionRate}%`,
+            },
+          ]}
+        />
+      </View>
+    </Animated.View>
+  );
+}
+
+
 const styles = StyleSheet.create({
   container: {
     gap: 12,
@@ -280,6 +539,50 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.7,
   },
+  // Team Performance Card
+  performanceCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 14,
+  },
+  performanceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  performanceTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  performanceGrid: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  perfItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+  },
+  perfValue: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  perfLabel: {
+    fontSize: 11,
+    textAlign: 'center',
+  },
+  perfDivider: {
+    width: 1,
+    height: 32,
+    marginHorizontal: 8,
+  },
+  topPerformerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  // Stats Bar
   statsBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -309,6 +612,33 @@ const styles = StyleSheet.create({
     width: 1,
     height: 20,
   },
+  // View Toggle
+  viewToggle: {
+    flexDirection: 'row',
+    padding: 4,
+    borderRadius: 10,
+  },
+  toggleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  toggleBtnActive: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  toggleText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  // Soldier List
   soldierList: {
     gap: 8,
   },
@@ -347,7 +677,8 @@ const styles = StyleSheet.create({
   },
   soldierStats: {
     flexDirection: 'row',
-    gap: 16,
+    flexWrap: 'wrap',
+    gap: 12,
   },
   miniStat: {
     flexDirection: 'row',
@@ -366,5 +697,55 @@ const styles = StyleSheet.create({
   progressFill: {
     height: '100%',
     borderRadius: 2,
+  },
+  // Drills List
+  drillsList: {
+    gap: 8,
+  },
+  drillStatsCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    gap: 10,
+  },
+  drillStatsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  drillIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  drillStatsInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  drillName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  drillCompletion: {
+    fontSize: 12,
+  },
+  drillMetrics: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  metricChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  metricText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
 });

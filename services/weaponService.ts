@@ -7,12 +7,7 @@
  * - Layer 3: Personal weapons (user-managed)
  */
 
-import { 
-  isAssignedPolicy, 
-  isCatalogPolicy, 
-  isPersonalPolicy, 
-  type WeaponPolicy 
-} from '@/constants/weaponPolicy';
+// WeaponPolicy removed - team context now controls weapon access directly
 import { supabase } from '@/lib/supabase';
 import type { WeaponCategory } from '@/types/workspace';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -686,26 +681,24 @@ export interface WeaponPickerData {
 }
 
 export interface WeaponPickerOptions {
+  /** Team context - when provided, only assigned weapons are relevant */
   teamId?: string;
   /** Filter weapons by category (from drill's weapon_category) */
   weaponCategory?: WeaponCategory | 'any' | null;
-  /** Team's weapon policy - controls which weapons are available */
-  weaponPolicy?: WeaponPolicy | null;
 }
 
 /**
  * Get all weapons for the weapon picker UI
- * Returns data organized by section, filtered by team's weapon policy
+ * Returns data organized by section
+ * 
+ * Note: When teamId is provided, the UI layer decides to show only assigned weapons.
+ * This function returns all relevant data for flexibility.
  * 
  * @param options.teamId - Team context for team weapons
  * @param options.weaponCategory - Filter by category (null or 'any' = show all)
- * @param options.weaponPolicy - Team weapon policy:
- *   - 'personal': Show all weapons (default behavior)
- *   - 'catalog': Only show team catalog weapons
- *   - 'assigned': Only show weapons assigned to current user
  */
 export async function getWeaponPickerData(options: WeaponPickerOptions = {}): Promise<WeaponPickerData> {
-  const { teamId, weaponCategory, weaponPolicy } = options;
+  const { teamId, weaponCategory } = options;
   
   // Get current user for assigned weapons
   const { data: { user } } = await supabase.auth.getUser();
@@ -716,41 +709,7 @@ export async function getWeaponPickerData(options: WeaponPickerOptions = {}): Pr
     return items.filter(item => item.category === weaponCategory);
   };
   
-  // ─────────────────────────────────────────────────────────────────────────
-  // POLICY: ASSIGNED - Only show weapons assigned to current user
-  // ─────────────────────────────────────────────────────────────────────────
-  if (isAssignedPolicy(weaponPolicy)) {
-    const assignedToMe = teamId && user 
-      ? await getAssignedWeapons(teamId, user.id) 
-      : [];
-    
-    return {
-      recentlyUsed: [],
-      assignedToMe: filterByCategory(assignedToMe),
-      myWeapons: [],
-      teamWeapons: [],
-      globalWeapons: [],
-    };
-  }
-  
-  // ─────────────────────────────────────────────────────────────────────────
-  // POLICY: CATALOG - Only show team catalog weapons
-  // ─────────────────────────────────────────────────────────────────────────
-  if (isCatalogPolicy(weaponPolicy)) {
-    const teamWeapons = teamId ? await getTeamWeapons(teamId) : [];
-    
-    return {
-      recentlyUsed: [],
-      assignedToMe: [],
-      myWeapons: [],
-      teamWeapons: filterByCategory(teamWeapons),
-      globalWeapons: [],
-    };
-  }
-  
-  // ─────────────────────────────────────────────────────────────────────────
-  // POLICY: PERSONAL (default) - Show all weapons
-  // ─────────────────────────────────────────────────────────────────────────
+  // Fetch all relevant weapon data
   const [recentlyUsed, myWeapons, teamWeapons, globalWeapons, assignedToMe] = await Promise.all([
     getRecentlyUsedWeapons(3),
     getUserWeapons(),

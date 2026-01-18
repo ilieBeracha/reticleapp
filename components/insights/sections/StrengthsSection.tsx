@@ -8,6 +8,10 @@
  * - Each card has a "Why?" button
  * - Explanations load on demand (never auto-load)
  * - Cached per insight ID
+ *
+ * SEMANTIC CLARITY (v2.0):
+ * - Grouping metrics now labeled as "Best Group" not "Grouping"
+ * - Uses context-aware thresholds from engine
  */
 
 import { useColors } from '@/hooks/ui/useColors';
@@ -28,6 +32,8 @@ interface StrengthsSectionProps {
   strengths: StrengthCard[];
   onStrengthPress?: (strength: StrengthCard) => void;
   maxVisible?: number;
+  /** Hide section header (for use inside accordion) */
+  hideHeader?: boolean;
 }
 
 // ============================================================================
@@ -228,25 +234,28 @@ export function StrengthsSection({
   strengths,
   onStrengthPress,
   maxVisible = 5,
+  hideHeader = false,
 }: StrengthsSectionProps) {
   const colors = useColors();
   const visibleStrengths = strengths.slice(0, maxVisible);
 
   return (
     <View style={styles.container}>
-      <View style={styles.sectionHeader}>
-        <View style={styles.titleRow}>
-          <View style={[styles.sectionIcon, { backgroundColor: `${colors.green}15` }]}>
-            <Shield size={14} color={colors.green} />
+      {!hideHeader && (
+        <View style={styles.sectionHeader}>
+          <View style={styles.titleRow}>
+            <View style={[styles.sectionIcon, { backgroundColor: `${colors.green}15` }]}>
+              <Shield size={14} color={colors.green} />
+            </View>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Strengths
+            </Text>
           </View>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Strengths
+          <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
+            What you can trust
           </Text>
         </View>
-        <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
-          What you can trust
-        </Text>
-      </View>
+      )}
 
       {visibleStrengths.length > 0 ? (
         <View style={styles.cardsContainer}>
@@ -265,7 +274,7 @@ export function StrengthsSection({
           )}
         </View>
       ) : (
-        <EmptyState colors={colors} />
+        !hideHeader && <EmptyState colors={colors} />
       )}
     </View>
   );

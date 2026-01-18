@@ -3,6 +3,11 @@
  *
  * Performance snapshot with horizontal metric cards.
  * Shows immediate situational awareness: "What is my current performance state?"
+ *
+ * SEMANTIC CLARITY (v2.0):
+ * - Shows new semantic metrics: overall_accuracy, typical_accuracy, best_group_median
+ * - Hides deprecated metrics (accuracy, hit_pct, median_group) to avoid duplication
+ * - Groups metrics by type: overview, engagement, grouping
  */
 
 import { useColors } from '@/hooks/ui/useColors';
@@ -14,6 +19,27 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import type { TotalsMetric } from '../insights.types';
 
 // ============================================================================
+// CONSTANTS
+// ============================================================================
+
+/**
+ * Deprecated metric IDs to hide from UI.
+ * These are kept in the engine for backward compatibility but shouldn't be shown.
+ */
+const DEPRECATED_METRIC_IDS = ['accuracy', 'hit_pct', 'median_group'];
+
+/**
+ * Priority order for metrics (lower = shown first)
+ */
+const METRIC_PRIORITY: Record<string, number> = {
+  sessions: 1,
+  shots: 2,
+  overall_accuracy: 3,
+  typical_accuracy: 4,
+  best_group_median: 5,
+};
+
+// ============================================================================
 // PROPS
 // ============================================================================
 
@@ -21,6 +47,8 @@ interface TotalsSectionProps {
   metrics: TotalsMetric[];
   onMetricPress?: (metric: TotalsMetric) => void;
   isLoading?: boolean;
+  /** If true, shows deprecated metrics (for debugging) */
+  showDeprecated?: boolean;
 }
 
 // ============================================================================
@@ -126,8 +154,20 @@ function SkeletonCard({ colors }: { colors: ReturnType<typeof useColors> }) {
 // MAIN COMPONENT
 // ============================================================================
 
-export function TotalsSection({ metrics, onMetricPress, isLoading }: TotalsSectionProps) {
+export function TotalsSection({ metrics, onMetricPress, isLoading, showDeprecated = false }: TotalsSectionProps) {
   const colors = useColors();
+
+  // Filter out deprecated metrics unless explicitly requested
+  const filteredMetrics = showDeprecated
+    ? metrics
+    : metrics.filter((m) => !DEPRECATED_METRIC_IDS.includes(m.id));
+
+  // Sort by priority
+  const sortedMetrics = [...filteredMetrics].sort((a, b) => {
+    const priorityA = METRIC_PRIORITY[a.id] ?? 99;
+    const priorityB = METRIC_PRIORITY[b.id] ?? 99;
+    return priorityA - priorityB;
+  });
 
   if (isLoading) {
     return (
@@ -148,7 +188,7 @@ export function TotalsSection({ metrics, onMetricPress, isLoading }: TotalsSecti
     );
   }
 
-  if (metrics.length === 0) {
+  if (sortedMetrics.length === 0) {
     return null;
   }
 
@@ -162,7 +202,7 @@ export function TotalsSection({ metrics, onMetricPress, isLoading }: TotalsSecti
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {metrics.map((metric) => (
+        {sortedMetrics.map((metric) => (
           <MetricCard
             key={metric.id}
             metric={metric}
