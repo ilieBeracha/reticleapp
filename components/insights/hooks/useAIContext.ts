@@ -31,7 +31,7 @@
  * ```
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import type {
   AIContextRequest,
@@ -90,22 +90,19 @@ export interface ExplanationParams {
 }
 
 export function useAIContext({ userId }: UseAIContextOptions): UseAIContextReturn {
-  // Cache: insightId -> response
-  const cacheRef = useRef<Map<string, CachedExplanation>>(new Map());
+  // Cache: insightId -> response (using state for proper reactivity)
+  const [cache, setCache] = useState<Map<string, CachedExplanation>>(new Map());
   
   // Track loading state per insight
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
   
   // Track errors per insight
   const [errors, setErrors] = useState<Map<string, string>>(new Map());
-  
-  // Force re-render when cache updates
-  const [, forceUpdate] = useState({});
 
   const getExplanation = useCallback((insightId: string): AIContextResponse | null => {
-    const cached = cacheRef.current.get(insightId);
+    const cached = cache.get(insightId);
     return cached?.response ?? null;
-  }, []);
+  }, [cache]);
 
   const isLoading = useCallback((insightId: string): boolean => {
     return loadingIds.has(insightId);
@@ -120,7 +117,7 @@ export function useAIContext({ userId }: UseAIContextOptions): UseAIContextRetur
     params: ExplanationParams
   ): Promise<AIContextResponse> => {
     // Check cache first
-    const cached = cacheRef.current.get(insightId);
+    const cached = cache.get(insightId);
     if (cached) {
       return cached.response;
     }
@@ -168,23 +165,21 @@ export function useAIContext({ userId }: UseAIContextOptions): UseAIContextRetur
         const fallback = createFallbackAIResponse(request.request_id);
         
         // Cache the fallback too (prevents retry spam)
-        cacheRef.current.set(insightId, { response: fallback, timestamp: Date.now() });
+        setCache(prev => new Map(prev).set(insightId, { response: fallback, timestamp: Date.now() }));
         setErrors(prev => new Map(prev).set(insightId, 'AI explanations not yet available'));
-        forceUpdate({});
         
         return fallback;
       }
       
       const aiResponse = data as AIContextResponse;
       
-      // Cache the response
-      cacheRef.current.set(insightId, { response: aiResponse, timestamp: Date.now() });
+      // Cache the response (state update triggers re-renders)
+      setCache(prev => new Map(prev).set(insightId, { response: aiResponse, timestamp: Date.now() }));
       
       if (!aiResponse.success) {
         setErrors(prev => new Map(prev).set(insightId, aiResponse.error || 'Unknown error'));
       }
       
-      forceUpdate({});
       return aiResponse;
       
     } catch (err) {
@@ -194,9 +189,8 @@ export function useAIContext({ userId }: UseAIContextOptions): UseAIContextRetur
       }
       const fallback = createFallbackAIResponse(request.request_id);
       
-      cacheRef.current.set(insightId, { response: fallback, timestamp: Date.now() });
+      setCache(prev => new Map(prev).set(insightId, { response: fallback, timestamp: Date.now() }));
       setErrors(prev => new Map(prev).set(insightId, 'AI explanations not yet available'));
-      forceUpdate({});
       
       return fallback;
       
@@ -207,22 +201,24 @@ export function useAIContext({ userId }: UseAIContextOptions): UseAIContextRetur
         return next;
       });
     }
-  }, [userId]);
+  }, [userId, cache]);
 
   const clearAll = useCallback(() => {
-    cacheRef.current.clear();
+    setCache(new Map());
     setErrors(new Map());
-    forceUpdate({});
   }, []);
 
   const clearOne = useCallback((insightId: string) => {
-    cacheRef.current.delete(insightId);
+    setCache(prev => {
+      const next = new Map(prev);
+      next.delete(insightId);
+      return next;
+    });
     setErrors(prev => {
       const next = new Map(prev);
       next.delete(insightId);
       return next;
     });
-    forceUpdate({});
   }, []);
 
   return {

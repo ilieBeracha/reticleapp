@@ -78,19 +78,8 @@ export function AIExplanationBlock({
     );
   }
 
-  // State: Error or Failed Guardrails
-  if (error || (response && !response.success)) {
-    return (
-      <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
-        <Text style={[styles.errorText, { color: colors.textMuted }]}>
-          Explanation unavailable for this insight.
-        </Text>
-      </View>
-    );
-  }
-
-  // State: Success
-  if (response?.success && response.explanation) {
+  // State: Has explanation (show it even if success=false - fallback still has explanation text)
+  if (response?.explanation?.text) {
     return (
       <ExplanationContent
         explanation={response.explanation}
@@ -98,6 +87,18 @@ export function AIExplanationBlock({
         colors={colors}
         compact={compact}
       />
+    );
+  }
+
+  // State: Error (no explanation available)
+  if (error || (response && !response.success)) {
+    return (
+      <View style={[styles.errorContainer, { backgroundColor: `${colors.orange}10`, borderColor: `${colors.orange}20` }]}>
+        <Ionicons name="information-circle-outline" size={14} color={colors.orange} />
+        <Text style={[styles.errorText, { color: colors.textMuted }]}>
+          {error || 'AI explanation not available. Check that ANTHROPIC_API_KEY is configured.'}
+        </Text>
+      </View>
     );
   }
 
@@ -269,13 +270,19 @@ const styles = StyleSheet.create({
 
   // Error state
   errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+    marginTop: 8,
   },
   errorText: {
+    flex: 1,
     fontSize: 12,
-    fontStyle: 'italic',
+    lineHeight: 16,
   },
 
   // Explanation content
