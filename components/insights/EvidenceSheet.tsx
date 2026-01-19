@@ -197,30 +197,44 @@ export function EvidenceSheet({ visible, context, onClose }: EvidenceSheetProps)
 
   const [sessions, setSessions] = useState<SessionWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Load sessions when context changes
   useEffect(() => {
     if (!visible || !context || context.sessionIds.length === 0) {
       setSessions([]);
       setLoading(false);
+      setError(null);
       return;
     }
 
     setLoading(true);
+    setError(null);
     async function loadSessions() {
       try {
         const loadedSessions: SessionWithDetails[] = [];
         // Load sessions in parallel (max 10)
         const sessionPromises = context!.sessionIds.slice(0, 10).map((id) =>
-          getSessionById(id).catch(() => null)
+          getSessionById(id).catch((err) => {
+            // Check for auth errors
+            if (err?.status === 401 || err?.message?.includes('401')) {
+              throw new Error('AUTH_ERROR');
+            }
+            return null;
+          })
         );
         const results = await Promise.all(sessionPromises);
         results.forEach((session) => {
           if (session) loadedSessions.push(session);
         });
         setSessions(loadedSessions);
-      } catch (e) {
+      } catch (e: any) {
         console.error('Failed to load evidence sessions:', e);
+        if (e?.message === 'AUTH_ERROR') {
+          setError('Session expired. Please close and reopen the app.');
+        } else {
+          setError('Failed to load sessions');
+        }
       } finally {
         setLoading(false);
       }
@@ -230,9 +244,12 @@ export function EvidenceSheet({ visible, context, onClose }: EvidenceSheetProps)
 
   const handleSessionPress = useCallback(
     (session: SessionWithDetails) => {
-      onClose();
+
       // Navigate to session detail
-      router.push(`/(protected)/session/${session.id}` as any);
+      router.push({
+        pathname: '/(protected)/sessionDetail',
+        params: { sessionId: session.id },
+      } as any);
     },
     [router, onClose]
   );
@@ -284,6 +301,14 @@ export function EvidenceSheet({ visible, context, onClose }: EvidenceSheetProps)
 
           {loading ? (
             <LoadingState colors={colors} />
+          ) : error ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="alert-circle-outline" size={48} color={colors.destructive || '#EF4444'} />
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>Unable to load</Text>
+              <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+                {error}
+              </Text>
+            </View>
           ) : sessions.length === 0 ? (
             <EmptyState colors={colors} />
           ) : (

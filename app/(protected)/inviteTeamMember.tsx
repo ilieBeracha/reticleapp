@@ -1,19 +1,21 @@
 import { Text } from "@/components/shared/ui/text";
+import { CreateWeaponFlow } from "@/components/weapons";
 import { useColors } from "@/hooks/ui/useColors";
 import { createInvitation } from "@/services/invitationService";
 import { updateTeam } from "@/services/teamService";
+import { getTeamWeapons, type TeamWeapon } from "@/services/weaponService";
 import { useTeamRoleFlags, useTeamStore } from "@/store/teamStore";
 import type { TeamRole } from "@/types/workspace";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from "expo-router";
+import { Crosshair, Plus } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
+  Modal,
   ScrollView,
   StyleSheet,
   Switch,
@@ -56,6 +58,13 @@ export default function InviteTeamMemberSheet() {
   const [isCreating, setIsCreating] = useState(false);
   const [createdCode, setCreatedCode] = useState<string | null>(null);
   const [squadsList, setSquadsList] = useState<string[]>([]);
+  
+  // Weapon assignment
+  const [assignWeapon, setAssignWeapon] = useState(false);
+  const [selectedWeaponId, setSelectedWeaponId] = useState<string | null>(null);
+  const [teamWeapons, setTeamWeapons] = useState<TeamWeapon[]>([]);
+  const [loadingWeapons, setLoadingWeapons] = useState(false);
+  const [showCreateWeapon, setShowCreateWeapon] = useState(false);
 
   const totalSteps = hasPreselectedTeam ? 1 : 2;
 
@@ -78,6 +87,27 @@ export default function InviteTeamMemberSheet() {
     setSquadsList(team?.squads || []);
   }, [selectedTeamId, teams]);
 
+  // Load team weapons when team changes
+  useEffect(() => {
+    if (!selectedTeamId) {
+      setTeamWeapons([]);
+      return;
+    }
+    async function loadWeapons() {
+      setLoadingWeapons(true);
+      try {
+        const weapons = await getTeamWeapons(selectedTeamId!);
+        setTeamWeapons(weapons);
+      } catch (error) {
+        console.error('Failed to load team weapons:', error);
+        setTeamWeapons([]);
+      } finally {
+        setLoadingWeapons(false);
+      }
+    }
+    loadWeapons();
+  }, [selectedTeamId]);
+
   // Computed values
   const selectedTeam = useMemo(() => teams.find(t => t.id === selectedTeamId), [teams, selectedTeamId]);
   
@@ -94,6 +124,25 @@ export default function InviteTeamMemberSheet() {
   }, [finalTeamRole, squadName, colors.primary]);
 
   // Handlers
+  const handleWeaponCreated = useCallback(async (weaponId: string) => {
+    setShowCreateWeapon(false);
+    // Refresh team weapons
+    if (selectedTeamId) {
+      setLoadingWeapons(true);
+      try {
+        const weapons = await getTeamWeapons(selectedTeamId);
+        setTeamWeapons(weapons);
+        // Auto-select the newly created weapon
+        setSelectedWeaponId(weaponId);
+      } catch (error) {
+        console.error('Failed to reload team weapons:', error);
+      } finally {
+        setLoadingWeapons(false);
+      }
+    }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }, [selectedTeamId]);
+
   const handleNext = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (step === 0 && !selectedTeamId) {
@@ -127,9 +176,15 @@ export default function InviteTeamMemberSheet() {
 
     try {
       const trimmedSquadName = squadName.trim();
-      const metadata = assignToSquad && trimmedSquadName 
-        ? { squad_id: trimmedSquadName } 
-        : undefined;
+      
+      // Build metadata with optional squad and weapon
+      const metadata: Record<string, any> = {};
+      if (assignToSquad && trimmedSquadName) {
+        metadata.squad_id = trimmedSquadName;
+      }
+      if (assignWeapon && selectedWeaponId) {
+        metadata.weapon_id = selectedWeaponId;
+      }
 
       // If assigning to a NEW squad (not in existing list), add it to team's squads
       if (assignToSquad && trimmedSquadName && !squadsList.includes(trimmedSquadName)) {
@@ -143,7 +198,13 @@ export default function InviteTeamMemberSheet() {
         loadTeams();
       }
 
-      const invitation = await createInvitation(null as any, 'member', selectedTeamId, finalTeamRole, metadata);
+      const invitation = await createInvitation(
+        null as any, 
+        'member', 
+        selectedTeamId, 
+        finalTeamRole, 
+        Object.keys(metadata).length > 0 ? metadata : undefined
+      );
       await Clipboard.setStringAsync(invitation.invite_code);
       setCreatedCode(invitation.invite_code);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -235,6 +296,8 @@ export default function InviteTeamMemberSheet() {
               setAssignToSquad(false);
               setMakeSquadCommander(false);
               setSquadName('');
+              setAssignWeapon(false);
+              setSelectedWeaponId(null);
             }}
             activeOpacity={0.8}
           >
@@ -259,17 +322,12 @@ export default function InviteTeamMemberSheet() {
   // MAIN FORM
   // ══════════════════════════════════════════════════════════════════════════
   return (
-    <View style={[styles.container, { backgroundColor: colors.card }]}>
-      <KeyboardAvoidingView 
-        style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.card }]}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
         {/* Header */}
         <View style={styles.header}>
           <View style={[styles.headerIcon, { backgroundColor: colors.primary + '15' }]}>
@@ -518,6 +576,124 @@ export default function InviteTeamMemberSheet() {
               </View>
             )}
 
+            {/* Weapon Assignment Toggle */}
+            {!isSquadCommanderOnly && (
+              <TouchableOpacity
+                style={[styles.squadToggle, { backgroundColor: colors.card, borderColor: assignWeapon ? colors.green : colors.border }]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  if (assignWeapon) {
+                    setAssignWeapon(false);
+                    setSelectedWeaponId(null);
+                  } else {
+                    setAssignWeapon(true);
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.squadToggleLeft}>
+                  <View style={[styles.squadToggleIcon, { backgroundColor: assignWeapon ? colors.green + '15' : colors.secondary }]}>
+                    <Crosshair size={18} color={assignWeapon ? colors.green : colors.text} />
+                  </View>
+                  <View>
+                    <Text style={[styles.squadToggleTitle, { color: colors.text }]}>Pre-assign Weapon</Text>
+                    <Text style={[styles.squadToggleDesc, { color: colors.textMuted }]}>
+                      {assignWeapon ? 'Select from team catalog' : 'Or let user add their own'}
+                    </Text>
+                  </View>
+                </View>
+                <Switch
+                  value={assignWeapon}
+                  onValueChange={(val) => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setAssignWeapon(val);
+                    if (!val) {
+                      setSelectedWeaponId(null);
+                    }
+                  }}
+                  trackColor={{ false: colors.border, true: colors.green + '60' }}
+                  thumbColor={assignWeapon ? colors.green : colors.card}
+                />
+              </TouchableOpacity>
+            )}
+
+            {/* Weapon Selection (when enabled) */}
+            {assignWeapon && (
+              <View style={[styles.squadSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.squadInputLabel, { color: colors.textMuted }]}>TEAM WEAPONS</Text>
+                
+                {loadingWeapons ? (
+                  <View style={styles.weaponLoadingContainer}>
+                    <ActivityIndicator size="small" color={colors.textMuted} />
+                    <Text style={[styles.weaponLoadingText, { color: colors.textMuted }]}>Loading weapons...</Text>
+                  </View>
+                ) : teamWeapons.length === 0 ? (
+                  <View style={[styles.weaponEmptyContainer, { backgroundColor: colors.secondary }]}>
+                    <Crosshair size={24} color={colors.textMuted} />
+                    <Text style={[styles.weaponEmptyText, { color: colors.textMuted }]}>No weapons in team catalog</Text>
+                    <TouchableOpacity
+                      style={[styles.addWeaponBtn, { backgroundColor: colors.green }]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setShowCreateWeapon(true);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Plus size={16} color="#fff" />
+                      <Text style={styles.addWeaponBtnText}>Add Weapon</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.weaponsList}>
+                    {teamWeapons.map((weapon) => (
+                      <TouchableOpacity
+                        key={weapon.id}
+                        style={[
+                          styles.weaponCard,
+                          {
+                            backgroundColor: selectedWeaponId === weapon.id ? colors.green + '10' : colors.background,
+                            borderColor: selectedWeaponId === weapon.id ? colors.green : colors.border,
+                          },
+                        ]}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          setSelectedWeaponId(selectedWeaponId === weapon.id ? null : weapon.id);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.weaponIconBox, { backgroundColor: selectedWeaponId === weapon.id ? colors.green + '20' : colors.secondary }]}>
+                          <Crosshair size={16} color={selectedWeaponId === weapon.id ? colors.green : colors.textMuted} />
+                        </View>
+                        <View style={styles.weaponInfo}>
+                          <Text style={[styles.weaponName, { color: colors.text }]} numberOfLines={1}>{weapon.name}</Text>
+                          {weapon.caliber && (
+                            <Text style={[styles.weaponCaliber, { color: colors.textMuted }]}>{weapon.caliber}</Text>
+                          )}
+                        </View>
+                        {selectedWeaponId === weapon.id && (
+                          <Ionicons name="checkmark-circle" size={20} color={colors.green} />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                    {/* Add weapon button */}
+                    <TouchableOpacity
+                      style={[styles.addWeaponRow, { backgroundColor: colors.background, borderColor: colors.border }]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setShowCreateWeapon(true);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.weaponIconBox, { backgroundColor: colors.secondary }]}>
+                        <Plus size={16} color={colors.textMuted} />
+                      </View>
+                      <Text style={[styles.addWeaponRowText, { color: colors.textMuted }]}>Add new weapon</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            )}
+
             {/* Summary Card */}
             <View style={[styles.summaryCard, { backgroundColor: colors.secondary }]}>
               <View style={styles.summaryRow}>
@@ -540,6 +716,17 @@ export default function InviteTeamMemberSheet() {
                   <View style={styles.summaryRow}>
                     <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Squad</Text>
                     <Text style={[styles.summaryValue, { color: colors.text }]}>{squadName}</Text>
+                  </View>
+                </>
+              )}
+              {assignWeapon && selectedWeaponId && (
+                <>
+                  <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
+                  <View style={styles.summaryRow}>
+                    <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Weapon</Text>
+                    <Text style={[styles.summaryValue, { color: colors.green }]}>
+                      {teamWeapons.find(w => w.id === selectedWeaponId)?.name || 'Selected'}
+                    </Text>
                   </View>
                 </>
               )}
@@ -607,11 +794,20 @@ export default function InviteTeamMemberSheet() {
           )}
         </View>
 
-        {/* Bottom padding */}
-        <View style={{ height: 32 }} />
-      </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+      {/* Create Weapon Modal */}
+      <Modal
+        visible={showCreateWeapon}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowCreateWeapon(false)}
+      >
+        <CreateWeaponFlow
+          teamId={selectedTeamId || undefined}
+          onComplete={handleWeaponCreated}
+          onCancel={() => setShowCreateWeapon(false)}
+        />
+      </Modal>
+    </ScrollView>
   );
 }
 
@@ -619,10 +815,8 @@ export default function InviteTeamMemberSheet() {
 // STYLES
 // ============================================================================
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  keyboardView: { flex: 1 },
-  scrollView: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20 },
+  container: {},
+  scrollContent: { flexGrow: 1, paddingHorizontal: 20, paddingBottom: 40 },
 
   // Header
   header: { alignItems: 'center', paddingTop: 20, paddingBottom: 20 },
@@ -700,6 +894,22 @@ const styles = StyleSheet.create({
   infoCard: { flexDirection: 'row', alignItems: 'flex-start', padding: 14, borderRadius: 12, gap: 10 },
   infoText: { flex: 1, fontSize: 13, lineHeight: 18 },
 
+  // Weapon Selection
+  weaponLoadingContainer: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12 },
+  weaponLoadingText: { fontSize: 13 },
+  weaponEmptyContainer: { alignItems: 'center', padding: 20, borderRadius: 10, gap: 10 },
+  weaponEmptyText: { fontSize: 14, fontWeight: '500' },
+  addWeaponBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, marginTop: 4 },
+  addWeaponBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  weaponsList: { gap: 8 },
+  weaponCard: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 10, borderWidth: 1.5, gap: 10 },
+  weaponIconBox: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  weaponInfo: { flex: 1 },
+  weaponName: { fontSize: 14, fontWeight: '600', marginBottom: 1 },
+  weaponCaliber: { fontSize: 12 },
+  addWeaponRow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 10, borderWidth: 1.5, borderStyle: 'dashed', gap: 10 },
+  addWeaponRowText: { fontSize: 14, fontWeight: '500' },
+
   // Actions (Inline)
   actionsContainer: { 
     flexDirection: 'row', 
@@ -714,7 +924,7 @@ const styles = StyleSheet.create({
   createButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
 
   // Empty State
-  emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', padding: 32, flexGrow: 1 },
   emptyIcon: { width: 100, height: 100, borderRadius: 50, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
   emptyTitle: { fontSize: 20, fontWeight: '600', marginBottom: 8 },
   emptyDesc: { fontSize: 14, textAlign: 'center', marginBottom: 24, lineHeight: 20 },
@@ -722,8 +932,8 @@ const styles = StyleSheet.create({
   emptyButtonText: { fontSize: 15, fontWeight: '600', color: '#fff' },
 
   // Success State
-  successScrollView: { flex: 1 },
-  successContainer: { alignItems: 'center', paddingHorizontal: 32, paddingTop: 20, paddingBottom: 60 },
+  successScrollView: {},
+  successContainer: { alignItems: 'center', paddingHorizontal: 32, paddingTop: 20, paddingBottom: 60, flexGrow: 1 },
   successIcon: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   successTitle: { fontSize: 20, fontWeight: '700', letterSpacing: -0.3, marginBottom: 12 },
   codeBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, borderWidth: 2, marginBottom: 8 },

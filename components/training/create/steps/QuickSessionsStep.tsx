@@ -6,14 +6,13 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import { type TrainingDrillItem, type ShootingPosition } from '@/services/drills';
+import { type TrainingDrillItem } from '@/services/drills';
 import * as Haptics from 'expo-haptics';
 import {
   ChevronDown,
   ChevronUp,
   Circle,
   Crosshair,
-  Minus,
   Plus,
   Target,
   Trash2,
@@ -22,7 +21,6 @@ import { useCallback, useState } from 'react';
 import {
   LayoutAnimation,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -48,12 +46,8 @@ interface QuickSessionsStepProps {
   onMoveSession: (index: number, direction: 'up' | 'down') => void;
 }
 
-// ============================================================================
-// CONSTANTS
-// ============================================================================
-
-const POSITIONS = ['prone', 'sitting', 'kneeling', 'standing'] as const;
-const DISTANCES = [25, 50, 100, 200, 300, 400, 500];
+// Smart defaults for quick session creation
+const DEFAULT_DISTANCE = 100;
 const DEFAULT_SHOTS = 5;
 
 // ============================================================================
@@ -121,263 +115,107 @@ function SessionCard({ session, index, total, onRemove, onMove, colors }: Sessio
 }
 
 // ============================================================================
-// ADD SESSION FORM
+// ADD SESSION FORM - Ultra minimal
 // ============================================================================
 
 interface AddSessionFormProps {
   onAdd: (session: TrainingDrillItem) => void;
   sessionCount: number;
   colors: ReturnType<typeof useColors>;
+  onCancel?: () => void;
 }
 
-function AddSessionForm({ onAdd, sessionCount, colors }: AddSessionFormProps) {
-  const [purpose, setPurpose] = useState<SessionPurpose>('grouping');
-  const [distance, setDistance] = useState(100);
-  const [shots, setShots] = useState(DEFAULT_SHOTS);
-  const [position, setPosition] = useState<string | null>(null);
+function AddSessionForm({ onAdd, colors, onCancel }: AddSessionFormProps) {
   const [customName, setCustomName] = useState('');
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showNameInput, setShowNameInput] = useState(false);
 
-  const handleAdd = useCallback(() => {
+  const handleQuickAdd = useCallback((type: SessionPurpose) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
-    const name = customName.trim() || `${purpose === 'grouping' ? 'Grouping' : 'Engagement'} ${distance}m`;
+    const name = customName.trim() || (type === 'grouping' ? 'Grouping' : 'Engagement');
 
-    // TrainingDrillItem from drillService - drill_id can be empty for quick sessions
     const newSession: TrainingDrillItem = {
       id: `quick-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-      drill_id: '', // Empty string for non-canonical quick sessions
+      drill_id: '',
       name,
       description: undefined,
-      drill_goal: purpose,
+      drill_goal: type,
       target_type: 'paper',
       config: {
-        distance_m: distance,
-        rounds: shots,
+        distance_m: DEFAULT_DISTANCE,
+        rounds: DEFAULT_SHOTS,
         time_limit_seconds: null,
-        position: (position as ShootingPosition | undefined | null) ?? null,
+        position: null,  // Any
         strings_count: 1,
       },
     };
 
     onAdd(newSession);
-
-    // Reset form
     setCustomName('');
-    setShots(DEFAULT_SHOTS);
-    setShowAdvanced(false);
-  }, [purpose, distance, shots, position, customName, onAdd]);
-
-  const adjustShots = (delta: number) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setShots(prev => Math.max(1, Math.min(50, prev + delta)));
-  };
+    setShowNameInput(false);
+  }, [customName, onAdd]);
 
   return (
-    <View style={[styles.addForm, { backgroundColor: colors.card, borderColor: colors.primary }]}>
-      <Text style={[styles.addFormTitle, { color: colors.text }]}>Add Session</Text>
-
-      {/* Purpose Selection */}
-      <View style={styles.formSection}>
-        <Text style={[styles.formLabel, { color: colors.textMuted }]}>What's the goal?</Text>
-        <View style={styles.purposeRow}>
-          <TouchableOpacity
-            style={[
-              styles.purposeBtn,
-              { backgroundColor: purpose === 'grouping' ? `${colors.blue}15` : colors.secondary },
-              purpose === 'grouping' && { borderColor: colors.blue, borderWidth: 1.5 },
-            ]}
-            onPress={() => setPurpose('grouping')}
-          >
-            <Crosshair
-              size={20}
-              color={purpose === 'grouping' ? colors.blue : colors.textMuted}
-            />
-            <Text
-              style={[
-                styles.purposeBtnText,
-                { color: purpose === 'grouping' ? colors.blue : colors.textMuted },
-              ]}
-            >
-              Grouping
-            </Text>
-            <Text style={[styles.purposeHint, { color: colors.textMuted }]}>
-              Precision focus
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.purposeBtn,
-              { backgroundColor: purpose === 'engagement' ? `${colors.orange}15` : colors.secondary },
-              purpose === 'engagement' && { borderColor: colors.orange, borderWidth: 1.5 },
-            ]}
-            onPress={() => setPurpose('engagement')}
-          >
-            <Target
-              size={20}
-              color={purpose === 'engagement' ? colors.orange : colors.textMuted}
-            />
-            <Text
-              style={[
-                styles.purposeBtnText,
-                { color: purpose === 'engagement' ? colors.orange : colors.textMuted },
-              ]}
-            >
-              Engagement
-            </Text>
-            <Text style={[styles.purposeHint, { color: colors.textMuted }]}>
-              Hit targets
-            </Text>
+    <View style={[styles.quickAddContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      {/* Optional name input */}
+      {showNameInput ? (
+        <View style={styles.nameRow}>
+          <TextInput
+            style={[styles.quickNameInput, { backgroundColor: colors.secondary, color: colors.text }]}
+            value={customName}
+            onChangeText={setCustomName}
+            placeholder="Session name (optional)"
+            placeholderTextColor={colors.textMuted}
+            autoFocus
+          />
+          <TouchableOpacity onPress={() => { setShowNameInput(false); setCustomName(''); }}>
+            <Text style={[styles.nameDone, { color: colors.textMuted }]}>×</Text>
           </TouchableOpacity>
         </View>
-      </View>
-
-      {/* Distance */}
-      <View style={styles.formSection}>
-        <Text style={[styles.formLabel, { color: colors.textMuted }]}>Distance</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.distanceRow}
+      ) : (
+        <TouchableOpacity
+          style={styles.addNameBtn}
+          onPress={() => setShowNameInput(true)}
         >
-          {DISTANCES.map((d) => (
-            <TouchableOpacity
-              key={d}
-              style={[
-                styles.distanceChip,
-                { backgroundColor: distance === d ? colors.text : colors.secondary },
-              ]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setDistance(d);
-              }}
-            >
-              <Text
-                style={[
-                  styles.distanceChipText,
-                  { color: distance === d ? colors.background : colors.textMuted },
-                ]}
-              >
-                {d}m
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Shots */}
-      <View style={styles.formSection}>
-        <Text style={[styles.formLabel, { color: colors.textMuted }]}>Shots per person</Text>
-        <View style={styles.shotsRow}>
-          <TouchableOpacity
-            style={[styles.shotsBtn, { backgroundColor: colors.secondary }]}
-            onPress={() => adjustShots(-1)}
-          >
-            <Minus size={18} color={colors.text} />
-          </TouchableOpacity>
-          <View style={[styles.shotsDisplay, { backgroundColor: colors.secondary }]}>
-            <Text style={[styles.shotsValue, { color: colors.text }]}>{shots}</Text>
-          </View>
-          <TouchableOpacity
-            style={[styles.shotsBtn, { backgroundColor: colors.secondary }]}
-            onPress={() => adjustShots(1)}
-          >
-            <Plus size={18} color={colors.text} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Advanced Toggle */}
-      <TouchableOpacity
-        style={styles.advancedToggle}
-        onPress={() => {
-          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-          setShowAdvanced(!showAdvanced);
-        }}
-      >
-        <Text style={[styles.advancedToggleText, { color: colors.textMuted }]}>
-          {showAdvanced ? 'Hide options' : 'More options'}
-        </Text>
-        {showAdvanced ? (
-          <ChevronUp size={14} color={colors.textMuted} />
-        ) : (
-          <ChevronDown size={14} color={colors.textMuted} />
-        )}
-      </TouchableOpacity>
-
-      {showAdvanced && (
-        <View style={styles.advancedSection}>
-          {/* Position */}
-          <View style={styles.formSection}>
-            <Text style={[styles.formLabel, { color: colors.textMuted }]}>Position (optional)</Text>
-            <View style={styles.positionRow}>
-              <TouchableOpacity
-                style={[
-                  styles.positionChip,
-                  { backgroundColor: position === null ? colors.text : colors.secondary },
-                ]}
-                onPress={() => setPosition(null)}
-              >
-                <Text
-                  style={[
-                    styles.positionChipText,
-                    { color: position === null ? colors.background : colors.textMuted },
-                  ]}
-                >
-                  Any
-                </Text>
-              </TouchableOpacity>
-              {POSITIONS.map((p) => (
-                <TouchableOpacity
-                  key={p}
-                  style={[
-                    styles.positionChip,
-                    { backgroundColor: position === p ? colors.text : colors.secondary },
-                  ]}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setPosition(p);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.positionChipText,
-                      { color: position === p ? colors.background : colors.textMuted },
-                    ]}
-                  >
-                    {p.charAt(0).toUpperCase() + p.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Custom Name */}
-          <View style={styles.formSection}>
-            <Text style={[styles.formLabel, { color: colors.textMuted }]}>Custom name (optional)</Text>
-            <TextInput
-              style={[
-                styles.nameInput,
-                { backgroundColor: colors.secondary, color: colors.text, borderColor: colors.border },
-              ]}
-              value={customName}
-              onChangeText={setCustomName}
-              placeholder="e.g. Warmup, Cold bore..."
-              placeholderTextColor={colors.textMuted}
-            />
-          </View>
-        </View>
+          <Text style={[styles.addNameText, { color: colors.textMuted }]}>+ Add name</Text>
+        </TouchableOpacity>
       )}
 
-      {/* Add Button */}
-      <TouchableOpacity
-        style={[styles.addBtn, { backgroundColor: colors.text }]}
-        onPress={handleAdd}
-      >
-        <Plus size={18} color={colors.background} />
-        <Text style={[styles.addBtnText, { color: colors.background }]}>Add Session</Text>
-      </TouchableOpacity>
+      {/* Two big tap targets */}
+      <View style={styles.quickAddRow}>
+        <TouchableOpacity
+          style={[styles.quickAddBtn, { backgroundColor: `${colors.blue}12`, borderColor: `${colors.blue}30` }]}
+          onPress={() => handleQuickAdd('grouping')}
+          activeOpacity={0.7}
+        >
+          <Crosshair size={20} color={colors.blue} />
+          <Text style={[styles.quickAddBtnText, { color: colors.blue }]}>Grouping</Text>
+          <Text style={[styles.quickAddHint, { color: colors.textMuted }]}>Precision</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.quickAddBtn, { backgroundColor: `${colors.orange}12`, borderColor: `${colors.orange}30` }]}
+          onPress={() => handleQuickAdd('engagement')}
+          activeOpacity={0.7}
+        >
+          <Target size={20} color={colors.orange} />
+          <Text style={[styles.quickAddBtnText, { color: colors.orange }]}>Engagement</Text>
+          <Text style={[styles.quickAddHint, { color: colors.textMuted }]}>Hit targets</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Hint */}
+      <Text style={[styles.quickAddFooter, { color: colors.textMuted }]}>
+        Tap to add · {DEFAULT_DISTANCE}m · {DEFAULT_SHOTS} shots
+      </Text>
+
+      {/* Cancel if available */}
+      {onCancel && (
+        <TouchableOpacity style={styles.quickCancelBtn} onPress={onCancel}>
+          <Text style={[styles.quickCancelText, { color: colors.textMuted }]}>Cancel</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -393,6 +231,23 @@ export function QuickSessionsStep({
   onMoveSession,
 }: QuickSessionsStepProps) {
   const colors = useColors();
+  const [showForm, setShowForm] = useState(true); // Open by default
+
+  const handleAdd = useCallback((session: TrainingDrillItem) => {
+    onAddSession(session);
+    // After adding, collapse the form
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setShowForm(false);
+  }, [onAddSession]);
+
+  const handleOpenForm = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setShowForm(true);
+  }, []);
+
+  // If no sessions, always show form
+  const formVisible = sessions.length === 0 || showForm;
 
   return (
     <View style={styles.container}>
@@ -432,12 +287,23 @@ export function QuickSessionsStep({
         </View>
       )}
 
-      {/* Add Form */}
-      <AddSessionForm
-        onAdd={onAddSession}
-        sessionCount={sessions.length}
-        colors={colors}
-      />
+      {/* Add Form OR Add Another button */}
+      {formVisible ? (
+        <AddSessionForm
+          onAdd={handleAdd}
+          sessionCount={sessions.length}
+          colors={colors}
+          onCancel={sessions.length > 0 ? () => setShowForm(false) : undefined}
+        />
+      ) : (
+        <TouchableOpacity
+          style={[styles.addAnotherBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={handleOpenForm}
+        >
+          <Plus size={16} color={colors.primary} />
+          <Text style={[styles.addAnotherText, { color: colors.primary }]}>Add another session</Text>
+        </TouchableOpacity>
+      )}
 
       {/* Empty hint */}
       {sessions.length === 0 && (
@@ -540,20 +406,153 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
 
-  // Add form
-  addForm: {
-    borderRadius: 16,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    padding: 16,
-    gap: 16,
+  // Quick add form - ultra minimal
+  quickAddContainer: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 14,
+    gap: 12,
   },
-  addFormTitle: {
-    fontSize: 16,
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  quickNameInput: {
+    flex: 1,
+    height: 36,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 14,
+  },
+  nameDone: {
+    fontSize: 22,
+    paddingHorizontal: 8,
+  },
+  addNameBtn: {
+    alignSelf: 'flex-start',
+  },
+  addNameText: {
+    fontSize: 13,
+  },
+  quickAddRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  quickAddBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 4,
+  },
+  quickAddBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  quickAddHint: {
+    fontSize: 11,
+  },
+  quickAddFooter: {
+    fontSize: 11,
+    textAlign: 'center',
+  },
+  quickCancelBtn: {
+    alignSelf: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+  },
+  quickCancelText: {
+    fontSize: 13,
+  },
+
+  // Legacy compact styles (keeping for reference)
+  compactChips: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  shotsRowCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  shotsBtnCompact: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shotsValueCompact: {
+    fontSize: 13,
     fontWeight: '700',
-    letterSpacing: -0.3,
-    marginBottom: 4,
+    minWidth: 20,
+    textAlign: 'center',
   },
+  advancedToggleCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 4,
+  },
+  advancedToggleTextCompact: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  advancedSectionCompact: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  positionChipCompact: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  positionChipTextCompact: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  nameInputCompact: {
+    height: 30,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    fontSize: 12,
+  },
+  formActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  cancelBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  cancelBtnText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  addBtnCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  addBtnTextCompact: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#fff',
+  },
+
+  // Legacy styles (keep for compatibility)
   formSection: {
     gap: 8,
   },
@@ -563,8 +562,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
-
-  // Purpose
   purposeRow: {
     flexDirection: 'row',
     gap: 10,
@@ -583,8 +580,6 @@ const styles = StyleSheet.create({
   purposeHint: {
     fontSize: 11,
   },
-
-  // Distance
   distanceRow: {
     gap: 8,
     paddingVertical: 2,
@@ -598,8 +593,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-
-  // Shots
   shotsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -674,6 +667,22 @@ const styles = StyleSheet.create({
   addBtnText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+
+  // Add another button
+  addAnotherBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
+  addAnotherText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 
   // Empty hint

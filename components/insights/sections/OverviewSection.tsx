@@ -17,25 +17,23 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
-  AlertTriangle,
-  ChevronRight,
-  Crosshair,
-  Shield,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Minus,
   Target,
   TrendingDown,
   TrendingUp,
+  Zap,
 } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import type {
   ConfidenceLevel,
-  FocusItem,
   OverviewStatus,
   TrendSummary,
-  TrustItem,
 } from '../insights.types';
 
 // ============================================================================
@@ -53,181 +51,113 @@ interface OverviewSectionProps {
   onFocusPress?: () => void;
   /** Callback when trust item is pressed */
   onTrustPress?: () => void;
-  /** Callback when "View Details" is pressed */
-  onViewDetails?: () => void;
 }
 
 // ============================================================================
-// CONFIDENCE BADGE
+// CONFIDENCE DOT
 // ============================================================================
 
-interface ConfidenceBadgeProps {
-  confidence: ConfidenceLevel;
-  colors: ReturnType<typeof useColors>;
-}
-
-function ConfidenceBadge({ confidence, colors }: ConfidenceBadgeProps) {
-  const config = {
-    high: { label: 'High', color: colors.green },
-    medium: { label: 'Med', color: colors.textMuted },
-    low: { label: 'Low', color: colors.textMuted },
-  }[confidence];
-
-  return (
-    <Text style={[styles.confidenceText, { color: config.color }]}>
-      {config.label} conf.
-    </Text>
-  );
+function ConfidenceDot({ confidence, colors }: { confidence: ConfidenceLevel; colors: ReturnType<typeof useColors> }) {
+  const color = confidence === 'high' ? colors.green : confidence === 'medium' ? colors.orange || '#F59E0B' : colors.textMuted;
+  return <View style={[styles.confDot, { backgroundColor: color }]} />;
 }
 
 // ============================================================================
-// METRIC BLOCK (Accuracy or Grouping)
+// METRIC CARD (enhanced trend display)
 // ============================================================================
 
-interface MetricBlockProps {
-  title: string;
+interface MetricCardProps {
   summary: TrendSummary;
+  label: string;
+  isGrouping?: boolean;
   onPress?: () => void;
   colors: ReturnType<typeof useColors>;
 }
 
-function MetricBlock({ title, summary, onPress, colors }: MetricBlockProps) {
+function MetricCard({ summary, label, isGrouping, onPress, colors }: MetricCardProps) {
   const isImproving = summary.direction === 'improving';
   const isDeclining = summary.direction === 'declining';
-  const statusColor = isImproving
-    ? colors.green
-    : isDeclining
-    ? colors.red
-    : colors.textMuted;
+  const isStable = summary.direction === 'stable';
+  const statusColor = isImproving ? colors.green : isDeclining ? colors.red : colors.textMuted;
+  const Icon = isImproving ? TrendingUp : isDeclining ? TrendingDown : Minus;
 
-  const DirectionIcon = isImproving
-    ? TrendingUp
-    : isDeclining
-    ? TrendingDown
-    : null;
-
-  // Format delta display
-  const deltaPrefix = summary.delta > 0 ? '+' : '';
-  const deltaDisplay = `${deltaPrefix}${summary.delta}${summary.unit}`;
-
-  // For grouping, negative delta is good (tighter groups)
-  const displayDelta = title === 'GROUPING' 
-    ? (summary.delta < 0 ? `${Math.abs(summary.delta)}${summary.unit} tighter` : `${summary.delta}${summary.unit} looser`)
-    : deltaDisplay;
+  // Format delta - for grouping, negative is good
+  const deltaAbs = Math.abs(summary.delta);
+  const deltaText = isGrouping
+    ? (summary.delta < 0 ? `-${deltaAbs}${summary.unit}` : `+${deltaAbs}${summary.unit}`)
+    : (summary.delta > 0 ? `+${summary.delta}${summary.unit}` : `${summary.delta}${summary.unit}`);
 
   return (
     <TouchableOpacity
-      style={[styles.metricBlock, { backgroundColor: colors.background }]}
+      style={[styles.metricCard, { backgroundColor: colors.card }]}
       onPress={() => {
         if (onPress) {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           onPress();
         }
       }}
-      activeOpacity={onPress ? 0.7 : 1}
+      activeOpacity={onPress ? 0.6 : 1}
       disabled={!onPress}
     >
-      <Text style={[styles.metricTitle, { color: colors.textMuted }]}>{title}</Text>
-
-      <View style={styles.metricValueRow}>
-        <Text style={[styles.metricValue, { color: colors.text }]}>
-          {summary.currentValue}
-          <Text style={[styles.metricUnit, { color: colors.textMuted }]}>
-            {summary.unit}
-          </Text>
-        </Text>
-        {DirectionIcon && summary.delta !== 0 && (
-          <View style={[styles.deltaContainer, { backgroundColor: `${statusColor}15` }]}>
-            <DirectionIcon size={12} color={statusColor} />
-            <Text style={[styles.deltaText, { color: statusColor }]}>
-              {displayDelta}
-            </Text>
-          </View>
-        )}
+      {/* Top row: Label + Confidence */}
+      <View style={styles.metricTop}>
+        <Text style={[styles.metricLabel, { color: colors.textMuted }]}>{label}</Text>
+        <ConfidenceDot confidence={summary.confidence} colors={colors} />
       </View>
 
-      <View style={styles.metricFooter}>
-        <View style={[styles.statusBadge, { backgroundColor: `${statusColor}15` }]}>
-          <Text style={[styles.statusText, { color: statusColor }]}>
-            {summary.direction.charAt(0).toUpperCase() + summary.direction.slice(1)}
+      {/* Main value */}
+      <Text style={[styles.metricValue, { color: colors.text }]}>
+        {summary.currentValue}
+        <Text style={[styles.metricUnit, { color: colors.textMuted }]}>{summary.unit}</Text>
+      </Text>
+
+      {/* Delta row */}
+      <View style={styles.metricBottom}>
+        <View style={[styles.deltaChip, { backgroundColor: `${statusColor}12` }]}>
+          <Icon size={10} color={statusColor} />
+          <Text style={[styles.deltaText, { color: statusColor }]}>
+            {isStable ? 'Stable' : deltaText}
           </Text>
         </View>
-        <ConfidenceBadge confidence={summary.confidence} colors={colors} />
       </View>
     </TouchableOpacity>
   );
 }
 
 // ============================================================================
-// FOCUS LINE
+// INSIGHT ROW (Focus or Trust - minimal)
 // ============================================================================
 
-interface FocusLineProps {
-  focusItem: FocusItem;
+interface InsightRowProps {
+  type: 'focus' | 'trust';
+  label: string;
+  detail: string;
   onPress?: () => void;
   colors: ReturnType<typeof useColors>;
 }
 
-function FocusLine({ focusItem, onPress, colors }: FocusLineProps) {
+function InsightRow({ type, label, detail, onPress, colors }: InsightRowProps) {
+  const isFocus = type === 'focus';
+  const accentColor = isFocus ? colors.orange || '#F59E0B' : colors.green;
+  const Icon = isFocus ? AlertCircle : CheckCircle2;
+
   return (
     <TouchableOpacity
-      style={styles.focusLine}
+      style={styles.insightRow}
       onPress={() => {
         if (onPress) {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           onPress();
         }
       }}
-      activeOpacity={onPress ? 0.7 : 1}
+      activeOpacity={onPress ? 0.6 : 1}
       disabled={!onPress}
     >
-      <View style={[styles.focusIcon, { backgroundColor: `${colors.red}15` }]}>
-        <Target size={12} color={colors.red} />
-      </View>
-      <View style={styles.focusContent}>
-        <Text style={[styles.focusLabel, { color: colors.textMuted }]}>FOCUS</Text>
-        <Text style={[styles.focusText, { color: colors.text }]} numberOfLines={1}>
-          {focusItem.label} — {focusItem.reason}
-        </Text>
-      </View>
-      {onPress && <ChevronRight size={14} color={colors.textMuted} />}
-    </TouchableOpacity>
-  );
-}
-
-// ============================================================================
-// TRUST LINE
-// ============================================================================
-
-interface TrustLineProps {
-  trustItem: TrustItem;
-  onPress?: () => void;
-  colors: ReturnType<typeof useColors>;
-}
-
-function TrustLine({ trustItem, onPress, colors }: TrustLineProps) {
-  return (
-    <TouchableOpacity
-      style={styles.trustLine}
-      onPress={() => {
-        if (onPress) {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          onPress();
-        }
-      }}
-      activeOpacity={onPress ? 0.7 : 1}
-      disabled={!onPress}
-    >
-      <View style={[styles.trustIcon, { backgroundColor: `${colors.green}15` }]}>
-        <Shield size={12} color={colors.green} />
-      </View>
-      <View style={styles.trustContent}>
-        <Text style={[styles.trustLabel, { color: colors.textMuted }]}>TRUST</Text>
-        <Text style={[styles.trustText, { color: colors.text }]} numberOfLines={1}>
-          {trustItem.label} — {trustItem.primaryValue}
-        </Text>
-      </View>
-      {onPress && <ChevronRight size={14} color={colors.textMuted} />}
+      <Icon size={13} color={accentColor} />
+      <Text style={[styles.insightLabel, { color: accentColor }]}>{isFocus ? 'Focus:' : 'Strong:'}</Text>
+      <Text style={[styles.insightText, { color: colors.text }]} numberOfLines={1}>
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 }
@@ -249,14 +179,11 @@ function LowDataState({ sessionCount, sessionsNeeded, colors }: LowDataStateProp
   return (
     <View style={styles.lowDataContainer}>
       <View style={[styles.lowDataHeader, { backgroundColor: `${colors.primary}10` }]}>
-        <Ionicons name="hourglass-outline" size={16} color={colors.primary} />
+        <Clock size={13} color={colors.primary} />
         <Text style={[styles.lowDataTitle, { color: colors.text }]}>
-          Building Your Baseline
+          Building baseline
         </Text>
       </View>
-      <Text style={[styles.lowDataText, { color: colors.textMuted }]}>
-        Complete {sessionsNeeded} more session{sessionsNeeded !== 1 ? 's' : ''} to unlock performance insights
-      </Text>
       <View style={[styles.progressBar, { backgroundColor: colors.background }]}>
         <View
           style={[
@@ -266,7 +193,7 @@ function LowDataState({ sessionCount, sessionsNeeded, colors }: LowDataStateProp
         />
       </View>
       <Text style={[styles.progressText, { color: colors.textMuted }]}>
-        {sessionCount} of {totalNeeded} sessions
+        {sessionsNeeded} more session{sessionsNeeded !== 1 ? 's' : ''} for insights
       </Text>
     </View>
   );
@@ -282,98 +209,75 @@ export function OverviewSection({
   onGroupingPress,
   onFocusPress,
   onTrustPress,
-  onViewDetails,
 }: OverviewSectionProps) {
   const colors = useColors();
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.card }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={[styles.headerIcon, { backgroundColor: `${colors.primary}15` }]}>
-            <Crosshair size={14} color={colors.primary} />
-          </View>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            Training Overview
-          </Text>
-        </View>
-        <Text style={[styles.sessionCount, { color: colors.textMuted }]}>
-          {status.sessionCount} session{status.sessionCount !== 1 ? 's' : ''}
-        </Text>
-      </View>
-
+    <View style={styles.container}>
       {/* Content */}
       {status.hasEnoughData ? (
         <>
-          {/* Metric Blocks */}
+          {/* Quick stats row */}
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Target size={12} color={colors.textMuted} />
+              <Text style={[styles.statValue, { color: colors.text }]}>{status.sessionCount}</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>sessions</Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.statItem}>
+              <Zap size={12} color={colors.textMuted} />
+              <Text style={[styles.statValue, { color: colors.text }]}>{status.shotCount.toLocaleString()}</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>rounds</Text>
+            </View>
+          </View>
+
+          {/* Metric Cards Row */}
           <View style={styles.metricsRow}>
             {status.accuracy && (
-              <MetricBlock
-                title="ACCURACY"
+              <MetricCard
                 summary={status.accuracy}
+                label="Accuracy"
                 onPress={onAccuracyPress}
                 colors={colors}
               />
             )}
             {status.grouping && (
-              <MetricBlock
-                title="GROUPING"
+              <MetricCard
                 summary={status.grouping}
+                label="Grouping"
+                isGrouping
                 onPress={onGroupingPress}
                 colors={colors}
               />
             )}
-            {!status.accuracy && !status.grouping && (
-              <View style={[styles.noMetricsContainer, { backgroundColor: colors.background }]}>
-                <Text style={[styles.noMetricsText, { color: colors.textMuted }]}>
-                  No trend data available yet
-                </Text>
-              </View>
-            )}
           </View>
 
-          {/* Divider */}
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-          {/* Focus & Trust Lines */}
-          {status.focusItem && (
-            <FocusLine
-              focusItem={status.focusItem}
-              onPress={onFocusPress}
-              colors={colors}
-            />
-          )}
-          {status.trustItem && (
-            <TrustLine
-              trustItem={status.trustItem}
-              onPress={onTrustPress}
-              colors={colors}
-            />
-          )}
-          {!status.focusItem && !status.trustItem && (
-            <View style={styles.noInsightsContainer}>
-              <Text style={[styles.noInsightsText, { color: colors.textMuted }]}>
-                Continue training to identify strengths and focus areas
-              </Text>
+          {/* Insights (Focus & Trust) */}
+          {(status.focusItem || status.trustItem) && (
+            <View style={[styles.insightsCard, { backgroundColor: colors.card }]}>
+              {status.focusItem && (
+                <InsightRow
+                  type="focus"
+                  label={status.focusItem.label}
+                  detail={status.focusItem.reason}
+                  onPress={onFocusPress}
+                  colors={colors}
+                />
+              )}
+              {status.focusItem && status.trustItem && (
+                <View style={[styles.insightDivider, { backgroundColor: colors.border }]} />
+              )}
+              {status.trustItem && (
+                <InsightRow
+                  type="trust"
+                  label={status.trustItem.label}
+                  detail={status.trustItem.primaryValue}
+                  onPress={onTrustPress}
+                  colors={colors}
+                />
+              )}
             </View>
-          )}
-
-          {/* View Details Button */}
-          {onViewDetails && (
-            <TouchableOpacity
-              style={[styles.viewDetailsButton, { backgroundColor: colors.background }]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                onViewDetails();
-              }}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.viewDetailsText, { color: colors.primary }]}>
-                View Details
-              </Text>
-              <ChevronRight size={14} color={colors.primary} />
-            </TouchableOpacity>
           )}
         </>
       ) : (
@@ -393,232 +297,148 @@ export function OverviewSection({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 14,
-    padding: 16,
-    gap: 14,
+    gap: 10,
+    marginTop: 8,
   },
 
-  // Header
-  header: {
+  // Stats Row
+  statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  headerIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 16,
+    paddingVertical: 4,
   },
-  headerTitle: {
-    fontSize: 16,
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  statValue: {
+    fontSize: 14,
     fontWeight: '700',
-    letterSpacing: -0.3,
   },
-  sessionCount: {
+  statLabel: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  statDivider: {
+    width: 1,
+    height: 12,
+    opacity: 0.3,
+  },
+
+  // Confidence dot
+  confDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
 
   // Metrics Row
   metricsRow: {
     flexDirection: 'row',
-    gap: 10,
-  },
-  metricBlock: {
-    flex: 1,
-    borderRadius: 10,
-    padding: 12,
-    gap: 6,
-  },
-  metricTitle: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  metricValueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 8,
   },
+  metricCard: {
+    flex: 1,
+    borderRadius: 12,
+    padding: 12,
+    gap: 4,
+  },
+  metricTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  metricLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
   metricValue: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '700',
     letterSpacing: -0.5,
   },
   metricUnit: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
   },
-  deltaContainer: {
+  metricBottom: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 6,
+    marginTop: 2,
+  },
+  deltaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   deltaText: {
     fontSize: 11,
     fontWeight: '600',
   },
-  metricFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 2,
-  },
-  statusBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  confidenceText: {
-    fontSize: 9,
-    fontWeight: '500',
-  },
 
-  // Divider
-  divider: {
-    height: 1,
-    marginVertical: 2,
-  },
-
-  // Focus Line
-  focusLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 6,
-  },
-  focusIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  focusContent: {
-    flex: 1,
-    gap: 1,
-  },
-  focusLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  focusText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-
-  // Trust Line
-  trustLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 6,
-  },
-  trustIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  trustContent: {
-    flex: 1,
-    gap: 1,
-  },
-  trustLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  trustText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-
-  // No data states
-  noMetricsContainer: {
-    flex: 1,
-    padding: 20,
+  // Insights Card
+  insightsCard: {
     borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 10,
+    gap: 0,
   },
-  noMetricsText: {
-    fontSize: 12,
-    textAlign: 'center',
+  insightDivider: {
+    height: 1,
+    marginVertical: 6,
+    opacity: 0.2,
   },
-  noInsightsContainer: {
-    paddingVertical: 8,
-  },
-  noInsightsText: {
-    fontSize: 12,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-
-  // View Details Button
-  viewDetailsButton: {
+  insightRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 4,
-    marginTop: 4,
+    gap: 6,
+    paddingVertical: 4,
   },
-  viewDetailsText: {
-    fontSize: 13,
+  insightLabel: {
+    fontSize: 12,
     fontWeight: '600',
+  },
+  insightText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '500',
   },
 
   // Low Data State
   lowDataContainer: {
-    gap: 12,
+    gap: 8,
   },
   lowDataHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
     alignSelf: 'flex-start',
   },
   lowDataTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
-  lowDataText: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
   progressBar: {
-    height: 6,
-    borderRadius: 3,
+    height: 4,
+    borderRadius: 2,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: 2,
   },
   progressText: {
     fontSize: 11,
-    textAlign: 'center',
   },
 });
 

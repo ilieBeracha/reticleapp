@@ -16,9 +16,9 @@ import * as Haptics from 'expo-haptics';
 import { AlertTriangle, ChevronRight, TrendingDown } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import type { WeaknessCard } from '../insights.types';
-import { useAIExplanations, type ExplanationParams } from '../AIExplanationProvider';
 import { AIExplanationBlock, WhyButton } from '../AIExplanationBlock';
+import { useAIExplanations, type ExplanationParams } from '../AIExplanationProvider';
+import type { WeaknessCard } from '../insights.types';
 
 // ============================================================================
 // PROPS

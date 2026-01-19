@@ -23,7 +23,7 @@ import { getRecentSessionsWithStats, type SessionWithDetails } from '@/services/
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { Clock, History } from 'lucide-react-native';
+import { ChevronRight, Clock, Crosshair, History, TrendingUp } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -37,8 +37,10 @@ import {
 } from 'react-native';
 
 import { AIExplanationProvider } from './AIExplanationProvider';
+import { ActivityChart, PerformanceChart } from './components';
+import type { ActivityDataPoint, ChartDataPoint } from './components';
 import { EvidenceSheet } from './EvidenceSheet';
-import { computeContextProfiles, computeInsights, computeOverviewStatus } from './insights.engine';
+import { applyFilters, computeContextProfiles, computeInsights, computeOverviewStatus } from './insights.engine';
 import {
   ComputedContextProfiles,
   ComputedInsights,
@@ -191,14 +193,61 @@ export function InsightsDashboard() {
   // Compute context profiles (engagement ↔ grouping connection)
   const contextProfiles: ComputedContextProfiles = useMemo(() => {
     // Apply same filters as insights
-    const filteredSessions = sessions.filter((s) => s.status === 'completed');
-    return computeContextProfiles(filteredSessions);
+    const completedSessions = sessions.filter((s) => s.status === 'completed');
+    return computeContextProfiles(completedSessions);
   }, [sessions]);
 
   // Compute overview status (for Training Overview card)
   const overviewStatus: OverviewStatus = useMemo(() => {
     return computeOverviewStatus(insights, contextProfiles);
   }, [insights, contextProfiles]);
+
+  // Apply filters to sessions for charts
+  const filteredSessions = useMemo(() => {
+    return applyFilters(sessions, filters);
+  }, [sessions, filters]);
+
+  // Compute performance chart data (accuracy + grouping over time) - with filters
+  const performanceChartData: ChartDataPoint[] = useMemo(() => {
+    const completedSessions = filteredSessions
+      .filter((s) => s.status === 'completed')
+      .sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime())
+      .slice(-15); // Last 15 sessions
+
+    return completedSessions.map((s) => ({
+      date: s.started_at,
+      accuracy: s.stats?.accuracy_pct ?? undefined,
+      grouping: s.stats?.best_dispersion_cm ?? undefined,
+    }));
+  }, [filteredSessions]);
+
+  // Compute weekly activity data - with filters
+  const weeklyActivityData: ActivityDataPoint[] = useMemo(() => {
+    const now = new Date();
+    const days = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    const result: ActivityDataPoint[] = [];
+
+    // Get last 7 days
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      const dayStart = new Date(date.setHours(0, 0, 0, 0));
+      const dayEnd = new Date(date.setHours(23, 59, 59, 999));
+
+      const daySessions = filteredSessions.filter((s) => {
+        const sessionDate = new Date(s.started_at);
+        return s.status === 'completed' && sessionDate >= dayStart && sessionDate <= dayEnd;
+      });
+
+      result.push({
+        label: days[dayStart.getDay()],
+        sessions: daySessions.length,
+        rounds: daySessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0),
+      });
+    }
+
+    return result;
+  }, [filteredSessions]);
 
   // Scroll ref for "View Details"
   const scrollViewRef = useRef<ScrollView>(null);
@@ -349,6 +398,13 @@ export function InsightsDashboard() {
     }
   }, [overviewStatus.trustItem]);
 
+  // Quick stats for compact display - shows filtered counts
+  const quickStats = useMemo(() => {
+    const totalSessions = filteredSessions.filter(s => s.status === 'completed').length;
+    const totalRounds = filteredSessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
+    return { totalSessions, totalRounds };
+  }, [filteredSessions]);
+
   // Loading state - ALL HOOKS MUST BE DEFINED BEFORE THIS EARLY RETURN
   if (loading) {
     return (
@@ -380,8 +436,13 @@ export function InsightsDashboard() {
           }
         >
           {/* Header */}
-          <View style={styles.headerRow}>
+          <View style={styles.headerSection}>
             <Text style={[styles.pageTitle, { color: colors.text }]}>Insights</Text>
+            {hasData && (
+              <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
+                {quickStats.totalSessions} sessions · {quickStats.totalRounds} rounds
+              </Text>
+            )}
           </View>
 
           {/* Filter Bar */}
@@ -394,24 +455,41 @@ export function InsightsDashboard() {
             <EmptyState colors={colors} onStartSession={goToStartSession} />
           ) : (
             <>
-              {/* 1. Training Overview Card */}
-              <View style={styles.section}>
-                <OverviewSection
-                  status={overviewStatus}
-                  onAccuracyPress={openEvidenceForOverviewAccuracy}
-                  onGroupingPress={openEvidenceForOverviewGrouping}
-                  onFocusPress={openEvidenceForFocus}
-                  onTrustPress={openEvidenceForTrust}
-                  onViewDetails={scrollToDetails}
-                />
-              </View>
+              {/* Overview - Clean metrics */}
+              <OverviewSection
+                status={overviewStatus}
+                onAccuracyPress={openEvidenceForOverviewAccuracy}
+                onGroupingPress={openEvidenceForOverviewGrouping}
+                onFocusPress={openEvidenceForFocus}
+                onTrustPress={openEvidenceForTrust}
+              />
+
+              {/* Trends Section */}
+              {performanceChartData.length >= 3 && (
+                <View style={styles.chartsSection}>
+                  <View style={styles.sectionHeader}>
+                    <TrendingUp size={13} color={colors.textMuted} />
+                    <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Trends</Text>
+                  </View>
+
+                  {/* Performance Chart */}
+                  <PerformanceChart data={performanceChartData} height={160} />
+
+                  {/* Weekly Activity */}
+                  <ActivityChart
+                    data={weeklyActivityData}
+                    height={120}
+                    title="This Week"
+                  />
+                </View>
+              )}
 
               {/* Show limited content when not enough data */}
               {!insights.hasEnoughData ? (
                 <>
-                  {/* Still show totals even with limited data */}
+                  {/* Totals in a visual grid */}
                   {insights.totals.length > 0 && (
-                    <View style={styles.section}>
+                    <View style={styles.sectionCompact}>
                       <TotalsSection
                         metrics={insights.totals}
                         onMetricPress={openEvidenceForTotals}
@@ -425,56 +503,69 @@ export function InsightsDashboard() {
                     onPress={goToSessionHistory}
                     activeOpacity={0.7}
                   >
-                    <History size={16} color={colors.text} />
-                    <Text style={[styles.linkText, { color: colors.text }]}>
-                      Session History
-                    </Text>
-                    <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                    <History size={14} color={colors.textMuted} />
+                    <Text style={[styles.linkText, { color: colors.text }]}>Session History</Text>
+                    <ChevronRight size={14} color={colors.textMuted} />
                   </TouchableOpacity>
                 </>
               ) : (
                 <>
-                  {/* 2. Top Recommendations (promoted above details) */}
-                  {insights.recommendations.length > 0 && (
-                    <View style={styles.section}>
-                      <RecommendationsSection
-                        recommendations={insights.recommendations}
-                        onRecommendationPress={openEvidenceForRecommendation}
-                        onAddToTrainingPlan={handleAddToTrainingPlan}
-                        onShowEvidence={openEvidenceForRecommendation}
-                        maxVisible={2}
-                      />
-                    </View>
-                  )}
+                  {/* Two-column layout for Recommendations + Context */}
+                  <View style={styles.dualSection}>
+                    {/* Recommendations - Primary */}
+                    {insights.recommendations.length > 0 && (
+                      <View style={styles.primaryColumn}>
+                        <RecommendationsSection
+                          recommendations={insights.recommendations}
+                          onRecommendationPress={openEvidenceForRecommendation}
+                          onAddToTrainingPlan={handleAddToTrainingPlan}
+                          onShowEvidence={openEvidenceForRecommendation}
+                          maxVisible={3}
+                        />
+                      </View>
+                    )}
+                  </View>
 
-                  {/* 3. Context Summary (compact view, expands in place) */}
+                  {/* Context Summary */}
                   {contextProfiles.profiles.length > 0 && (
-                    <View style={styles.section}>
+                    <View style={styles.sectionCompact}>
+                      <View style={styles.sectionHeader}>
+                        <Crosshair size={13} color={colors.textMuted} />
+                        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Conditions</Text>
+                      </View>
                       <ContextSummarySection
                         profiles={contextProfiles.profiles}
                         summary={contextProfiles.summary}
                         onViewEvidence={openEvidenceForContextProfile}
-                        maxVisible={5}
+                        maxVisible={4}
                       />
                     </View>
                   )}
 
-                  {/* Session history link */}
-                  <TouchableOpacity
-                    style={[styles.linkCard, { backgroundColor: colors.card }]}
-                    onPress={goToSessionHistory}
-                    activeOpacity={0.7}
-                  >
-                    <History size={16} color={colors.text} />
-                    <Text style={[styles.linkText, { color: colors.text }]}>
-                      Session History
-                    </Text>
-                    <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-                  </TouchableOpacity>
+                  {/* Inline actions */}
+                  <View style={styles.inlineActions}>
+                    <TouchableOpacity
+                      style={styles.inlineAction}
+                      onPress={goToSessionHistory}
+                      activeOpacity={0.6}
+                    >
+                      <History size={14} color={colors.textMuted} />
+                      <Text style={[styles.inlineActionText, { color: colors.textMuted }]}>History</Text>
+                    </TouchableOpacity>
+                    <View style={[styles.actionDivider, { backgroundColor: colors.border }]} />
+                    <TouchableOpacity
+                      style={styles.inlineAction}
+                      onPress={scrollToDetails}
+                      activeOpacity={0.6}
+                    >
+                      <TrendingUp size={14} color={colors.textMuted} />
+                      <Text style={[styles.inlineActionText, { color: colors.textMuted }]}>Details</Text>
+                    </TouchableOpacity>
+                  </View>
 
-                  {/* 4. Detailed Breakdown (collapsed accordion) */}
+                  {/* Detailed Breakdown - Collapsed by default */}
                   <View
-                    style={styles.section}
+                    style={styles.sectionCompact}
                     onLayout={(e) => setDetailsYOffset(e.nativeEvent.layout.y)}
                   >
                     <DetailedBreakdownSection
@@ -491,13 +582,12 @@ export function InsightsDashboard() {
             </>
           )}
 
-          {/* Data range info */}
+          {/* Data range - Subtle footer */}
           {hasData && insights.dateRange.start && (
             <View style={styles.dateRangeContainer}>
-              <Clock size={12} color={colors.textMuted} />
+              <Clock size={10} color={colors.textMuted} />
               <Text style={[styles.dateRangeText, { color: colors.textMuted }]}>
-                Data from {new Date(insights.dateRange.start).toLocaleDateString()} to{' '}
-                {new Date(insights.dateRange.end).toLocaleDateString()}
+                {new Date(insights.dateRange.start).toLocaleDateString()} – {new Date(insights.dateRange.end).toLocaleDateString()}
               </Text>
             </View>
           )}
@@ -532,75 +622,130 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 15,
-    paddingTop: Platform.OS === 'ios' ? 8 : 14,
+    paddingHorizontal: 14,
+    paddingTop: Platform.OS === 'ios' ? 6 : 12,
   },
 
   // Header
-  headerRow: {
+  headerSection: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'baseline',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   pageTitle: {
     fontSize: 22,
     fontWeight: '700',
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
   },
 
   // Sections
-  section: {
-    marginTop: 24,
+  sectionCompact: {
+    marginTop: 16,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 8,
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 
-  // Link card
+  // Charts section
+  chartsSection: {
+    marginTop: 16,
+    gap: 12,
+  },
+
+  // Dual section (side by side)
+  dualSection: {
+    marginTop: 16,
+  },
+  primaryColumn: {
+    flex: 1,
+  },
+
+  // Inline actions
+  inlineActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    gap: 16,
+  },
+  inlineAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 2,
+  },
+  inlineActionText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  actionDivider: {
+    width: 1,
+    height: 14,
+    opacity: 0.3,
+  },
+
+  // Link card (legacy)
   linkCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 10,
-    marginTop: 16,
-    gap: 8,
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 12,
+    gap: 6,
   },
   linkText: {
     flex: 1,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
   },
 
   // Empty state
   emptyContainer: {
     alignItems: 'center',
-    padding: 32,
-    borderRadius: 16,
-    marginTop: 20,
-    gap: 16,
+    padding: 28,
+    borderRadius: 14,
+    marginTop: 16,
+    gap: 14,
   },
   emptyIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: 13,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 18,
   },
   emptyButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 10,
-    marginTop: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 6,
   },
   emptyButtonText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: '#fff',
   },
@@ -608,55 +753,56 @@ const styles = StyleSheet.create({
   // Not enough data
   notEnoughContainer: {
     alignItems: 'center',
-    padding: 24,
-    borderRadius: 16,
-    marginTop: 20,
-    gap: 12,
+    padding: 20,
+    borderRadius: 14,
+    marginTop: 16,
+    gap: 10,
   },
   progressIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
   notEnoughTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   notEnoughText: {
-    fontSize: 13,
+    fontSize: 12,
     textAlign: 'center',
   },
   progressBarContainer: {
     width: '100%',
-    height: 8,
-    borderRadius: 4,
+    height: 6,
+    borderRadius: 3,
     overflow: 'hidden',
-    marginTop: 8,
+    marginTop: 6,
   },
   progressBarFill: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: 3,
   },
   progressText: {
-    fontSize: 12,
+    fontSize: 11,
   },
 
-  // Date range
+  // Date range - subtle
   dateRangeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    marginTop: 32,
+    gap: 4,
+    marginTop: 24,
+    opacity: 0.6,
   },
   dateRangeText: {
-    fontSize: 11,
+    fontSize: 10,
   },
 
   bottomSpacer: {
-    height: 100,
+    height: 80,
   },
 });
 

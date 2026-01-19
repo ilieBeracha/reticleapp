@@ -11,11 +11,14 @@ import { supabase } from '@/lib/supabase';
 import {
   deleteUserWeapon,
   getDefaultWeaponId,
+  getTeamWeapon,
   getUserWeapon,
   getWeaponStats,
   setDefaultWeaponId,
   updateUserWeapon,
+  type TeamWeapon,
   type UserWeapon,
+  type WeaponSource,
   type WeaponStats,
 } from '@/services/weaponService';
 import type { WeaponCategory } from '@/types/workspace';
@@ -31,6 +34,7 @@ import {
   Star,
   Target,
   Trash2,
+  Users,
   Zap,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
@@ -80,14 +84,32 @@ interface RecentSession {
 // MAIN COMPONENT
 // ============================================================================
 
+// Common weapon shape for display (works for both UserWeapon and TeamWeapon)
+interface DisplayWeapon {
+  id: string;
+  name: string;
+  category: WeaponCategory | null;
+  caliber: string | null;
+  notes: string | null;
+  created_at: string;
+  // Personal weapon fields (optional)
+  personal_zero_distance_m?: number | null;
+  personal_notes?: string | null;
+  // Team weapon fields (optional)
+  team_id?: string;
+  team_name?: string;
+}
+
 export default function WeaponDetailScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { weaponId } = useLocalSearchParams<{ weaponId: string }>();
+  const { weaponId, source } = useLocalSearchParams<{ weaponId: string; source?: WeaponSource }>();
+
+  const isTeamWeapon = source === 'team_assigned' || source === 'team_pool';
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [weapon, setWeapon] = useState<UserWeapon | null>(null);
+  const [weapon, setWeapon] = useState<DisplayWeapon | null>(null);
   const [stats, setStats] = useState<WeaponStats | null>(null);
   const [isDefault, setIsDefault] = useState(false);
   const [recentSessions, setRecentSessions] = useState<RecentSession[]>([]);
@@ -98,16 +120,56 @@ export default function WeaponDetailScreen() {
     if (!weaponId) return;
 
     try {
-      const [weaponData, allStats, defaultId] = await Promise.all([
-        getUserWeapon(weaponId),
-        getWeaponStats(),
-        getDefaultWeaponId(),
-      ]);
+      let weaponData: DisplayWeapon | null = null;
+
+      if (isTeamWeapon) {
+        // Fetch team weapon
+        const teamWeapon = await getTeamWeapon(weaponId);
+        if (teamWeapon) {
+          // Get team name
+          const { data: teamData } = await supabase
+            .from('teams')
+            .select('name')
+            .eq('id', teamWeapon.team_id)
+            .single();
+
+          weaponData = {
+            id: teamWeapon.id,
+            name: teamWeapon.name,
+            category: teamWeapon.category,
+            caliber: teamWeapon.caliber,
+            notes: teamWeapon.notes,
+            created_at: teamWeapon.created_at,
+            team_id: teamWeapon.team_id,
+            team_name: teamData?.name || 'Team',
+          };
+        }
+      } else {
+        // Fetch personal weapon
+        const userWeapon = await getUserWeapon(weaponId);
+        if (userWeapon) {
+          weaponData = {
+            id: userWeapon.id,
+            name: userWeapon.name,
+            category: userWeapon.category,
+            caliber: userWeapon.caliber,
+            notes: userWeapon.personal_notes,
+            created_at: userWeapon.created_at,
+            personal_zero_distance_m: userWeapon.personal_zero_distance_m,
+            personal_notes: userWeapon.personal_notes,
+          };
+        }
+      }
 
       if (!weaponData) {
         router.back();
         return;
       }
+
+      const [allStats, defaultId] = await Promise.all([
+        getWeaponStats(),
+        getDefaultWeaponId(),
+      ]);
 
       setWeapon(weaponData);
       setStats(allStats.get(weaponId) || null);
@@ -138,7 +200,7 @@ export default function WeaponDetailScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [weaponId]);
+  }, [weaponId, isTeamWeapon]);
 
   useEffect(() => {
     loadData();
@@ -259,13 +321,18 @@ export default function WeaponDetailScreen() {
             {weapon.name}
           </Text>
         </View>
-        <TouchableOpacity
-          style={[s.headerAction, { backgroundColor: isDefault ? '#f59e0b15' : 'transparent' }]}
-          onPress={handleToggleDefault}
-          activeOpacity={0.7}
-        >
-          <Star size={20} color={isDefault ? '#f59e0b' : colors.textMuted} fill={isDefault ? '#f59e0b' : 'none'} />
-        </TouchableOpacity>
+        {/* Only show default star for personal weapons */}
+        {!isTeamWeapon ? (
+          <TouchableOpacity
+            style={[s.headerAction, { backgroundColor: isDefault ? '#f59e0b15' : 'transparent' }]}
+            onPress={handleToggleDefault}
+            activeOpacity={0.7}
+          >
+            <Star size={20} color={isDefault ? '#f59e0b' : colors.textMuted} fill={isDefault ? '#f59e0b' : 'none'} />
+          </TouchableOpacity>
+        ) : (
+          <View style={s.headerAction} />
+        )}
       </View>
 
       <ScrollView
@@ -287,13 +354,24 @@ export default function WeaponDetailScreen() {
               {categoryConfig?.label || 'Weapon'}
               {weapon.caliber && ` · ${weapon.caliber}`}
             </Text>
+            {/* Team name for team weapons */}
+            {isTeamWeapon && weapon.team_name && (
+              <Text style={[s.teamName, { color: colors.textMuted }]}>{weapon.team_name}</Text>
+            )}
           </View>
-          {isDefault && (
+          {isTeamWeapon ? (
+            <View style={[s.teamBadge, { backgroundColor: source === 'team_assigned' ? '#3B82F615' : '#8B5CF615' }]}>
+              <Users size={12} color={source === 'team_assigned' ? '#3B82F6' : '#8B5CF6'} />
+              <Text style={[s.teamBadgeText, { color: source === 'team_assigned' ? '#3B82F6' : '#8B5CF6' }]}>
+                {source === 'team_assigned' ? 'Assigned' : 'Pool'}
+              </Text>
+            </View>
+          ) : isDefault ? (
             <View style={s.defaultBadge}>
               <Star size={12} color="#f59e0b" fill="#f59e0b" />
               <Text style={s.defaultText}>Default</Text>
             </View>
-          )}
+          ) : null}
         </View>
 
         {/* Stats Row */}
@@ -327,14 +405,31 @@ export default function WeaponDetailScreen() {
         <View style={s.section}>
           <Text style={[s.sectionTitle, { color: colors.text }]}>Details</Text>
           <View style={[s.detailsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {/* Zero Distance */}
-            <View style={s.detailRow}>
-              <Text style={[s.detailLabel, { color: colors.textMuted }]}>Zero Distance</Text>
-              <Text style={[s.detailValue, { color: colors.text }]}>
-                {weapon.personal_zero_distance_m ? `${weapon.personal_zero_distance_m}m` : 'Not set'}
-              </Text>
-            </View>
-            <View style={[s.detailDivider, { backgroundColor: colors.border }]} />
+            {/* Zero Distance - only for personal weapons */}
+            {!isTeamWeapon && (
+              <>
+                <View style={s.detailRow}>
+                  <Text style={[s.detailLabel, { color: colors.textMuted }]}>Zero Distance</Text>
+                  <Text style={[s.detailValue, { color: colors.text }]}>
+                    {weapon.personal_zero_distance_m ? `${weapon.personal_zero_distance_m}m` : 'Not set'}
+                  </Text>
+                </View>
+                <View style={[s.detailDivider, { backgroundColor: colors.border }]} />
+              </>
+            )}
+
+            {/* Source - for team weapons */}
+            {isTeamWeapon && (
+              <>
+                <View style={s.detailRow}>
+                  <Text style={[s.detailLabel, { color: colors.textMuted }]}>Source</Text>
+                  <Text style={[s.detailValue, { color: colors.text }]}>
+                    {source === 'team_assigned' ? 'Assigned to you' : 'Team pool'}
+                  </Text>
+                </View>
+                <View style={[s.detailDivider, { backgroundColor: colors.border }]} />
+              </>
+            )}
 
             {/* Last Used */}
             <View style={s.detailRow}>
@@ -355,18 +450,18 @@ export default function WeaponDetailScreen() {
           </View>
         </View>
 
-        {/* Notes Section */}
+        {/* Notes Section - editable only for personal weapons */}
         <View style={s.section}>
           <View style={s.sectionHeader}>
             <Text style={[s.sectionTitle, { color: colors.text }]}>Notes</Text>
-            {!editingNotes && (
+            {!isTeamWeapon && !editingNotes && (
               <TouchableOpacity onPress={() => setEditingNotes(true)} activeOpacity={0.7}>
                 <Edit3 size={16} color={colors.primary} />
               </TouchableOpacity>
             )}
           </View>
           <View style={[s.notesCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {editingNotes ? (
+            {!isTeamWeapon && editingNotes ? (
               <View style={s.notesEdit}>
                 <TextInput
                   style={[s.notesInput, { color: colors.text, borderColor: colors.border }]}
@@ -397,8 +492,8 @@ export default function WeaponDetailScreen() {
                 </View>
               </View>
             ) : (
-              <Text style={[s.notesText, { color: weapon.personal_notes ? colors.text : colors.textMuted }]}>
-                {weapon.personal_notes || 'No notes added'}
+              <Text style={[s.notesText, { color: weapon.notes ? colors.text : colors.textMuted }]}>
+                {weapon.notes || 'No notes'}
               </Text>
             )}
           </View>
@@ -437,15 +532,27 @@ export default function WeaponDetailScreen() {
           </View>
         )}
 
-        {/* Delete Button */}
-        <TouchableOpacity
-          style={[s.deleteBtn, { backgroundColor: '#ef444415', borderColor: '#ef444430' }]}
-          onPress={handleDelete}
-          activeOpacity={0.7}
-        >
-          <Trash2 size={16} color="#ef4444" />
-          <Text style={s.deleteBtnText}>Delete Weapon</Text>
-        </TouchableOpacity>
+        {/* Delete Button - only for personal weapons */}
+        {!isTeamWeapon && (
+          <TouchableOpacity
+            style={[s.deleteBtn, { backgroundColor: '#ef444415', borderColor: '#ef444430' }]}
+            onPress={handleDelete}
+            activeOpacity={0.7}
+          >
+            <Trash2 size={16} color="#ef4444" />
+            <Text style={s.deleteBtnText}>Delete Weapon</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Info for team weapons */}
+        {isTeamWeapon && (
+          <View style={[s.teamInfoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Users size={16} color={colors.textMuted} />
+            <Text style={[s.teamInfoText, { color: colors.textMuted }]}>
+              This weapon is managed by your team commander
+            </Text>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -550,6 +657,36 @@ const s = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#f59e0b',
+  },
+  teamName: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  teamBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  teamBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  teamInfoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 12,
+  },
+  teamInfoText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
   },
 
   // Stats

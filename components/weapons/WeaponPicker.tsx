@@ -24,7 +24,6 @@ import {
 } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
 import {
-  AlertCircle,
   Check,
   ChevronRight,
   Clock,
@@ -34,7 +33,7 @@ import {
   Search,
   Star,
   Users,
-  X,
+  X
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {

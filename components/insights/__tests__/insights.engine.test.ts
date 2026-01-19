@@ -1346,12 +1346,9 @@ import {
   getTopTrustItem,
 } from '../insights.engine';
 import type {
-  FocusItem,
-  OverviewStatus,
   Recommendation,
   StrengthCard,
-  TrustItem,
-  WeaknessCard,
+  WeaknessCard
 } from '../insights.types';
 
 describe('Overview Status Computation', () => {

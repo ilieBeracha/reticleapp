@@ -4,6 +4,7 @@
 
 import { useColors } from '@/hooks/ui/useColors';
 import {
+  createTeamWeapon,
   createUserWeapon,
   getGlobalWeapons,
   searchGlobalWeapons,
@@ -121,8 +122,8 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
       return;
     }
 
-    // Validate cleaning config if enabled
-    if (cleaningEnabled && !cleaningIntervalValue) {
+    // Validate cleaning config if enabled (only for personal weapons)
+    if (!teamId && cleaningEnabled && !cleaningIntervalValue) {
       setError('Please set a cleaning interval');
       return;
     }
@@ -131,23 +132,40 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
     setError(null);
 
     try {
-      const weapon = await createUserWeapon({
-        name: name.trim(),
-        base_weapon_id: selectedBase?.id,
-        category,
-        caliber: caliber.trim() || undefined,
-        personal_zero_distance_m: zeroDistance ? parseInt(zeroDistance, 10) : undefined,
-        personal_notes: notes.trim() || undefined,
-        // Cleaning routine
-        cleaning_enabled: cleaningEnabled,
-        cleaning_interval_type: cleaningEnabled ? cleaningIntervalType : undefined,
-        cleaning_interval_value: cleaningEnabled && cleaningIntervalValue
-          ? parseInt(cleaningIntervalValue, 10)
-          : undefined,
-      });
+      let weaponId: string;
+
+      if (teamId) {
+        // Create team weapon
+        const teamWeapon = await createTeamWeapon({
+          team_id: teamId,
+          name: name.trim(),
+          base_weapon_id: selectedBase?.id,
+          category,
+          caliber: caliber.trim() || undefined,
+          notes: notes.trim() || undefined,
+        });
+        weaponId = teamWeapon.id;
+      } else {
+        // Create personal weapon
+        const weapon = await createUserWeapon({
+          name: name.trim(),
+          base_weapon_id: selectedBase?.id,
+          category,
+          caliber: caliber.trim() || undefined,
+          personal_zero_distance_m: zeroDistance ? parseInt(zeroDistance, 10) : undefined,
+          personal_notes: notes.trim() || undefined,
+          // Cleaning routine
+          cleaning_enabled: cleaningEnabled,
+          cleaning_interval_type: cleaningEnabled ? cleaningIntervalType : undefined,
+          cleaning_interval_value: cleaningEnabled && cleaningIntervalValue
+            ? parseInt(cleaningIntervalValue, 10)
+            : undefined,
+        });
+        weaponId = weapon.id;
+      }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      onComplete(weapon.id);
+      onComplete(weaponId);
     } catch (err: any) {
       console.error('Failed to create weapon:', err);
       setError(err.message || 'Failed to create weapon');
@@ -155,7 +173,7 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
     } finally {
       setSubmitting(false);
     }
-  }, [name, selectedBase, category, caliber, zeroDistance, notes, cleaningEnabled, cleaningIntervalType, cleaningIntervalValue, onComplete]);
+  }, [name, selectedBase, category, caliber, zeroDistance, notes, cleaningEnabled, cleaningIntervalType, cleaningIntervalValue, onComplete, teamId]);
 
  
   if (step === 'choice') {
@@ -172,7 +190,7 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
         
         <View style={styles.content}>
           <Text style={[styles.headline, { color: colors.text }]}>
-            Add a weapon
+            {teamId ? 'Add team weapon' : 'Add a weapon'}
           </Text>
 
           <View style={styles.choiceList}>
