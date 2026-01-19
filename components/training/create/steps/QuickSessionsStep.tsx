@@ -1,18 +1,22 @@
 /**
- * QuickSessionsStep - Simple session adding (like solo createSession)
+ * QuickSessionsStep - Add sessions to training using unified SessionCreationForm
  *
- * No drill catalog, no presets, no complexity.
- * Just add sessions: purpose, distance, shots, position.
+ * Uses the same form as solo createSession for consistency.
+ * Opens SessionCreationForm in a modal when adding a session.
  */
 
+import {
+  SessionCreationForm,
+  type SessionFormValues,
+} from '@/components/session/creation';
 import { useColors } from '@/hooks/ui/useColors';
 import { type TrainingDrillItem } from '@/services/drills';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
   ChevronDown,
   ChevronUp,
   Circle,
-  Crosshair,
   Plus,
   Target,
   Trash2,
@@ -20,14 +24,15 @@ import {
 import { useCallback, useState } from 'react';
 import {
   LayoutAnimation,
+  Modal,
   Platform,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   UIManager,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -37,18 +42,12 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 // TYPES
 // ============================================================================
 
-type SessionPurpose = 'grouping' | 'engagement';
-
 interface QuickSessionsStepProps {
   sessions: TrainingDrillItem[];
   onAddSession: (session: TrainingDrillItem) => void;
   onRemoveSession: (id: string) => void;
   onMoveSession: (index: number, direction: 'up' | 'down') => void;
 }
-
-// Smart defaults for quick session creation
-const DEFAULT_DISTANCE = 100;
-const DEFAULT_SHOTS = 5;
 
 // ============================================================================
 // SESSION CARD
@@ -115,108 +114,80 @@ function SessionCard({ session, index, total, onRemove, onMove, colors }: Sessio
 }
 
 // ============================================================================
-// ADD SESSION FORM - Ultra minimal
+// ADD SESSION MODAL - Uses unified SessionCreationForm
 // ============================================================================
 
-interface AddSessionFormProps {
+interface AddSessionModalProps {
+  visible: boolean;
+  onClose: () => void;
   onAdd: (session: TrainingDrillItem) => void;
-  sessionCount: number;
-  colors: ReturnType<typeof useColors>;
-  onCancel?: () => void;
 }
 
-function AddSessionForm({ onAdd, colors, onCancel }: AddSessionFormProps) {
-  const [customName, setCustomName] = useState('');
-  const [showNameInput, setShowNameInput] = useState(false);
+function AddSessionModal({ visible, onClose, onAdd }: AddSessionModalProps) {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
 
-  const handleQuickAdd = useCallback((type: SessionPurpose) => {
+  const handleSubmit = useCallback((values: SessionFormValues) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
-    const name = customName.trim() || (type === 'grouping' ? 'Grouping' : 'Engagement');
+    // Map 'seated' to 'sitting' for ShootingPosition compatibility
+    const mapPosition = (pos: string | null): 'standing' | 'kneeling' | 'prone' | 'sitting' | null => {
+      if (!pos || pos === 'any') return null;
+      if (pos === 'seated') return 'sitting';
+      if (['standing', 'kneeling', 'prone', 'sitting'].includes(pos)) {
+        return pos as 'standing' | 'kneeling' | 'prone' | 'sitting';
+      }
+      return null;
+    };
 
     const newSession: TrainingDrillItem = {
-      id: `quick-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      id: `session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       drill_id: '',
-      name,
-      description: undefined,
-      drill_goal: type,
-      target_type: 'paper',
+      name: `${values.purpose === 'grouping' ? 'Grouping' : 'Engagement'} ${values.distance}m`,
+      description: values.notes || undefined,
+      drill_goal: values.purpose,
+      target_type: values.targetType === 'paper' || values.targetType === 'tactical' ? values.targetType : 'paper',
       config: {
-        distance_m: DEFAULT_DISTANCE,
-        rounds: DEFAULT_SHOTS,
-        time_limit_seconds: null,
-        position: null,  // Any
+        distance_m: values.distance,
+        rounds: values.shotsPlanned,
+        time_limit_seconds: values.timeLimit,
+        position: mapPosition(values.position),
         strings_count: 1,
       },
     };
 
     onAdd(newSession);
-    setCustomName('');
-    setShowNameInput(false);
-  }, [customName, onAdd]);
+    onClose();
+  }, [onAdd, onClose]);
 
   return (
-    <View style={[styles.quickAddContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      {/* Optional name input */}
-      {showNameInput ? (
-        <View style={styles.nameRow}>
-          <TextInput
-            style={[styles.quickNameInput, { backgroundColor: colors.secondary, color: colors.text }]}
-            value={customName}
-            onChangeText={setCustomName}
-            placeholder="Session name (optional)"
-            placeholderTextColor={colors.textMuted}
-            autoFocus
-          />
-          <TouchableOpacity onPress={() => { setShowNameInput(false); setCustomName(''); }}>
-            <Text style={[styles.nameDone, { color: colors.textMuted }]}>×</Text>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+        {/* Header */}
+        <View style={[styles.modalHeader, { paddingTop: insets.top + 8 }]}>
+          <TouchableOpacity
+            style={[styles.modalCloseBtn, { backgroundColor: colors.card }]}
+            onPress={onClose}
+          >
+            <Ionicons name="close" size={20} color={colors.text} />
           </TouchableOpacity>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>Add Session</Text>
+          <View style={{ width: 40 }} />
         </View>
-      ) : (
-        <TouchableOpacity
-          style={styles.addNameBtn}
-          onPress={() => setShowNameInput(true)}
-        >
-          <Text style={[styles.addNameText, { color: colors.textMuted }]}>+ Add name</Text>
-        </TouchableOpacity>
-      )}
 
-      {/* Two big tap targets */}
-      <View style={styles.quickAddRow}>
-        <TouchableOpacity
-          style={[styles.quickAddBtn, { backgroundColor: `${colors.blue}12`, borderColor: `${colors.blue}30` }]}
-          onPress={() => handleQuickAdd('grouping')}
-          activeOpacity={0.7}
-        >
-          <Crosshair size={20} color={colors.blue} />
-          <Text style={[styles.quickAddBtnText, { color: colors.blue }]}>Grouping</Text>
-          <Text style={[styles.quickAddHint, { color: colors.textMuted }]}>Precision</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.quickAddBtn, { backgroundColor: `${colors.orange}12`, borderColor: `${colors.orange}30` }]}
-          onPress={() => handleQuickAdd('engagement')}
-          activeOpacity={0.7}
-        >
-          <Target size={20} color={colors.orange} />
-          <Text style={[styles.quickAddBtnText, { color: colors.orange }]}>Engagement</Text>
-          <Text style={[styles.quickAddHint, { color: colors.textMuted }]}>Hit targets</Text>
-        </TouchableOpacity>
+        {/* Form - hide weapon (soldiers pick when they start) */}
+        <SessionCreationForm
+          onSubmit={handleSubmit}
+          submitLabel="Add Session"
+          hideWeapon
+        />
       </View>
-
-      {/* Hint */}
-      <Text style={[styles.quickAddFooter, { color: colors.textMuted }]}>
-        Tap to add · {DEFAULT_DISTANCE}m · {DEFAULT_SHOTS} shots
-      </Text>
-
-      {/* Cancel if available */}
-      {onCancel && (
-        <TouchableOpacity style={styles.quickCancelBtn} onPress={onCancel}>
-          <Text style={[styles.quickCancelText, { color: colors.textMuted }]}>Cancel</Text>
-        </TouchableOpacity>
-      )}
-    </View>
+    </Modal>
   );
 }
 
@@ -231,23 +202,17 @@ export function QuickSessionsStep({
   onMoveSession,
 }: QuickSessionsStepProps) {
   const colors = useColors();
-  const [showForm, setShowForm] = useState(true); // Open by default
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const handleAdd = useCallback((session: TrainingDrillItem) => {
-    onAddSession(session);
-    // After adding, collapse the form
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setShowForm(false);
+    onAddSession(session);
   }, [onAddSession]);
 
-  const handleOpenForm = useCallback(() => {
+  const handleOpenModal = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setShowForm(true);
+    setShowAddModal(true);
   }, []);
-
-  // If no sessions, always show form
-  const formVisible = sessions.length === 0 || showForm;
 
   return (
     <View style={styles.container}>
@@ -287,23 +252,26 @@ export function QuickSessionsStep({
         </View>
       )}
 
-      {/* Add Form OR Add Another button */}
-      {formVisible ? (
-        <AddSessionForm
-          onAdd={handleAdd}
-          sessionCount={sessions.length}
-          colors={colors}
-          onCancel={sessions.length > 0 ? () => setShowForm(false) : undefined}
-        />
-      ) : (
-        <TouchableOpacity
-          style={[styles.addAnotherBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={handleOpenForm}
-        >
-          <Plus size={16} color={colors.primary} />
-          <Text style={[styles.addAnotherText, { color: colors.primary }]}>Add another session</Text>
-        </TouchableOpacity>
-      )}
+      {/* Add Session Button */}
+      <TouchableOpacity
+        style={[
+          styles.addSessionBtn,
+          { 
+            backgroundColor: sessions.length === 0 ? colors.primary : colors.card, 
+            borderColor: sessions.length === 0 ? colors.primary : colors.border,
+          }
+        ]}
+        onPress={handleOpenModal}
+        activeOpacity={0.7}
+      >
+        <Plus size={18} color={sessions.length === 0 ? '#fff' : colors.primary} />
+        <Text style={[
+          styles.addSessionBtnText, 
+          { color: sessions.length === 0 ? '#fff' : colors.primary }
+        ]}>
+          {sessions.length === 0 ? 'Add First Session' : 'Add Another Session'}
+        </Text>
+      </TouchableOpacity>
 
       {/* Empty hint */}
       {sessions.length === 0 && (
@@ -314,6 +282,13 @@ export function QuickSessionsStep({
           </Text>
         </View>
       )}
+
+      {/* Add Session Modal */}
+      <AddSessionModal
+        visible={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onAdd={handleAdd}
+      />
     </View>
   );
 }
@@ -406,283 +381,42 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
 
-  // Quick add form - ultra minimal
-  quickAddContainer: {
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 14,
-    gap: 12,
-  },
-  nameRow: {
+  // Add Session Button
+  addSessionBtn: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  quickNameInput: {
-    flex: 1,
-    height: 36,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 14,
-  },
-  nameDone: {
-    fontSize: 22,
-    paddingHorizontal: 8,
-  },
-  addNameBtn: {
-    alignSelf: 'flex-start',
-  },
-  addNameText: {
-    fontSize: 13,
-  },
-  quickAddRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  quickAddBtn: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
+    gap: 8,
+    paddingVertical: 14,
     borderRadius: 12,
     borderWidth: 1,
-    gap: 4,
   },
-  quickAddBtnText: {
+  addSessionBtnText: {
     fontSize: 15,
     fontWeight: '600',
-    marginTop: 4,
-  },
-  quickAddHint: {
-    fontSize: 11,
-  },
-  quickAddFooter: {
-    fontSize: 11,
-    textAlign: 'center',
-  },
-  quickCancelBtn: {
-    alignSelf: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-  },
-  quickCancelText: {
-    fontSize: 13,
   },
 
-  // Legacy compact styles (keeping for reference)
-  compactChips: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  shotsRowCompact: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  shotsBtnCompact: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  shotsValueCompact: {
-    fontSize: 13,
-    fontWeight: '700',
-    minWidth: 20,
-    textAlign: 'center',
-  },
-  advancedToggleCompact: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 4,
-  },
-  advancedToggleTextCompact: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  advancedSectionCompact: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  positionChipCompact: {
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 6,
-  },
-  positionChipTextCompact: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  nameInputCompact: {
-    height: 30,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    fontSize: 12,
-  },
-  formActions: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 4,
-  },
-  cancelBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  cancelBtnText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  addBtnCompact: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  addBtnTextCompact: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#fff',
-  },
-
-  // Legacy styles (keep for compatibility)
-  formSection: {
-    gap: 8,
-  },
-  formLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-    textTransform: 'uppercase',
-  },
-  purposeRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  purposeBtn: {
+  // Modal
+  modalContainer: {
     flex: 1,
-    padding: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    gap: 6,
   },
-  purposeBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  purposeHint: {
-    fontSize: 11,
-  },
-  distanceRow: {
-    gap: 8,
-    paddingVertical: 2,
-  },
-  distanceChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  distanceChipText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  shotsRow: {
+  modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
   },
-  shotsBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+  modalCloseBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  shotsDisplay: {
-    flex: 1,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  shotsValue: {
+  modalTitle: {
     fontSize: 18,
     fontWeight: '700',
-  },
-
-  // Advanced
-  advancedToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 8,
-  },
-  advancedToggleText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  advancedSection: {
-    gap: 16,
-  },
-  positionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  positionChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  positionChipText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  nameInput: {
-    height: 44,
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    fontSize: 14,
-  },
-
-  // Add button
-  addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 48,
-    borderRadius: 12,
-    marginTop: 4,
-  },
-  addBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-
-  // Add another button
-  addAnotherBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-  },
-  addAnotherText: {
-    fontSize: 14,
-    fontWeight: '500',
   },
 
   // Empty hint

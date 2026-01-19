@@ -1,11 +1,12 @@
 /**
  * Session Creation Module
  *
- * 2-step session creation flow:
- * 1. Intent - What's my goal? (grouping/engagement)
- * 2. Details - Session configuration (weapon, distance, bullets)
+ * Unified session creation for both solo and training contexts.
  *
- * Weapon selection is a sheet within the Details step, not a separate step.
+ * Components:
+ * - SessionCreationForm: Unified form component (use this for new implementations)
+ * - SessionIntentStep: Goal selection (grouping/engagement)
+ * - SessionContextStep: Session details (weapon, distance, etc.)
  *
  * After form submission:
  * - SessionPrepView handles watch/phone selection
@@ -18,11 +19,24 @@ export * from './sessionCreation.types';
 // Constants
 export * from './sessionCreation.constants';
 
-// Hook
+// Hook (legacy - consider using SessionCreationForm directly)
 export { useSessionCreation } from './useSessionCreation';
 export type { UseSessionCreationOptions, UseSessionCreationReturn, TrainingContext } from './useSessionCreation';
 
-// Components (2 steps)
+// Unified Form Component (recommended)
+export { SessionCreationForm } from './SessionCreationForm';
+export type { 
+  SessionCreationFormProps, 
+  SessionFormValues, 
+  DrillContext,
+  TrainingContext as FormTrainingContext,
+} from './SessionCreationForm';
+
+// Modal/Sheet wrapper (drop-in replacement for StartDrillSheet)
+export { SessionCreationSheet } from './SessionCreationSheet';
+export type { SessionCreationSheetProps } from './SessionCreationSheet';
+
+// Step Components (used internally by SessionCreationForm)
 export { SessionContextStep } from './SessionContextStep';
 export { SessionIntentStep } from './SessionIntentStep';
 

@@ -27,6 +27,7 @@ import { StartDrillSheet } from '@/components/training/StartDrillSheet';
 import { WeaponAssignmentManager } from '@/components/weapons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModals } from '@/contexts/ModalContext';
+import { useTrainingRealtime } from '@/hooks/realtime';
 import { useColors } from '@/hooks/ui/useColors';
 import { useOpenWeather } from '@/hooks/useOpenWeather';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -58,6 +59,7 @@ import {
   CheckCircle2,
   MoreHorizontal,
   Play,
+  Radio,
   Smartphone,
   Target,
   Users,
@@ -81,7 +83,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const HEADER_HEIGHT = 180;
+const HEADER_HEIGHT = 140; // Reduced for faster scroll-away
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PARALLAX SCROLL CONTENT
@@ -117,6 +119,8 @@ function ParallaxScrollContent({
   isWatchConnected,
   trainingWatchPreference,
   onChangeWatchPreference,
+  // Realtime status
+  isRealtimeConnected,
 }: any) {
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scrollOffset = useScrollViewOffset(scrollRef);
@@ -129,23 +133,25 @@ function ParallaxScrollContent({
     return {
       transform: [
         {
+          // Move out of view faster - scrolls away at 1.2x speed
           translateY: interpolate(
             scrollOffset.value,
-            [-HEADER_HEIGHT, 0, HEADER_HEIGHT],
-            [-HEADER_HEIGHT / 2, 0, HEADER_HEIGHT * 0.75]
+            [-HEADER_HEIGHT, 0, HEADER_HEIGHT * 0.6],
+            [-HEADER_HEIGHT / 2, 0, HEADER_HEIGHT]
           ),
         },
         {
           scale: interpolate(
             scrollOffset.value,
             [-HEADER_HEIGHT, 0, HEADER_HEIGHT],
-            [1.5, 1, 1]
+            [1.3, 1, 0.95]
           ),
         },
       ],
+      // Fade out faster
       opacity: interpolate(
         scrollOffset.value,
-        [0, HEADER_HEIGHT * 0.8],
+        [0, HEADER_HEIGHT * 0.5],
         [1, 0]
       ),
     };
@@ -267,6 +273,16 @@ function ParallaxScrollContent({
               {format(new Date(training.scheduled_at), 'MMM d')}
             </Text>
           </View>
+
+          {/* Live sync indicator - only show when realtime is active */}
+          {isRealtimeConnected && (
+            <View style={[styles.chip, styles.chipWithIcon, { backgroundColor: colors.green + '10' }]}>
+              <Radio size={10} color={colors.green} />
+              <Text style={[styles.chipText, { color: colors.green, fontSize: 11 }]}>
+                Live
+              </Text>
+            </View>
+          )}
         </View>
       </Animated.View>
 
@@ -595,20 +611,25 @@ export default function TrainingDetailScreen() {
     canManageTraining &&
     (training?.status === 'ongoing' || training?.status === 'finished');
 
-  const loadTeamProgress = useCallback(async () => {
+  const loadTeamProgress = useCallback(async (options?: { silent?: boolean }) => {
     if (!training?.id || !canManageTraining) return;
     // Prevent duplicate loads
     if (isLoadingTeamRef.current || !isMountedRef.current) return;
 
     isLoadingTeamRef.current = true;
-    setLoadingTeamProgress(true);
+    // Only show loading indicator for user-initiated refreshes, not realtime updates
+    if (!options?.silent) {
+      setLoadingTeamProgress(true);
+    }
     try {
       const sessions = await getTrainingSessionsWithStats(training.id);
       if (isMountedRef.current) setTeamSessions(sessions);
     } catch (error) {
       console.error('[TrainingDetail] Failed to load team progress:', error);
     } finally {
-      if (isMountedRef.current) setLoadingTeamProgress(false);
+      if (isMountedRef.current && !options?.silent) {
+        setLoadingTeamProgress(false);
+      }
       // Debounce before allowing next load
       setTimeout(() => {
         isLoadingTeamRef.current = false;
@@ -619,6 +640,39 @@ export default function TrainingDetailScreen() {
   useEffect(() => {
     if (shouldLoadTeamData && !isLoadingTeamRef.current) loadTeamProgress();
   }, [shouldLoadTeamData, loadTeamProgress]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // REALTIME SUBSCRIPTIONS
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  // Subscribe to live updates for this training
+  // Automatically refetches when sessions change (new targets, completion, etc.)
+  // Enable realtime for all users when training is active
+  const shouldEnableRealtime = 
+    !!training?.id && 
+    (training?.status === 'ongoing' || training?.status === 'finished');
+
+  const { isConnected: isRealtimeConnected } = useTrainingRealtime({
+    trainingId: training?.id,
+    enabled: shouldEnableRealtime, // All users get live updates
+    onSessionUpdate: useCallback(() => {
+      // Session status changed (completed, updated, etc.)
+      console.log('[TrainingDetail] Realtime: Session updated, refreshing silently...');
+      loadTeamProgress({ silent: true });
+      refetch({ silent: true });
+    }, [loadTeamProgress, refetch]),
+    onSessionCreate: useCallback(() => {
+      // New session started in this training
+      console.log('[TrainingDetail] Realtime: New session created, refreshing silently...');
+      loadTeamProgress({ silent: true });
+    }, [loadTeamProgress]),
+    onNewTarget: useCallback(() => {
+      // Target added to any session - refresh drill progress
+      console.log('[TrainingDetail] Realtime: New target added, refreshing silently...');
+      loadTeamProgress({ silent: true });
+      refetch({ silent: true });
+    }, [loadTeamProgress, refetch]),
+  });
 
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLERS
@@ -915,6 +969,8 @@ export default function TrainingDetailScreen() {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           setShowWatchPrompt(true);
         }}
+        // Realtime status
+        isRealtimeConnected={isRealtimeConnected}
       />
 
       {/* Bottom Actions - Only show when action is needed */}
@@ -1174,7 +1230,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   phasesContainer: {
-    marginHorizontal: -6,
+    // Give drills room to breathe - timeline style
+    paddingTop: 8,
   },
   tabBar: {
     flexDirection: 'row',

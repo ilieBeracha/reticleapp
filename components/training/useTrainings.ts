@@ -10,6 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { useTeamRealtime } from '@/hooks/realtime';
 import { getRecentSessionsWithStats } from '@/services/session/queries';
 import { getTeamMembers } from '@/services/teamService';
 import { useTeamContext, useTeamPermissions, useTeamStore } from '@/store/teamStore';
@@ -119,6 +120,39 @@ export function useTrainings(): UseTrainingsReturn {
     }
     setRefreshing(false);
   }, [loadTeams, loadTeamTrainings, activeTeamId, activeTab, canManage]);
+
+  // ============================================================================
+  // REALTIME SUBSCRIPTIONS
+  // ============================================================================
+  
+  // Subscribe to team updates (trainings, members) for live updates
+  const { isConnected: realtimeConnected } = useTeamRealtime({
+    teamId: activeTeamId,
+    enabled: !!activeTeamId,
+    onTrainingCreated: useCallback(() => {
+      console.log('[useTrainings] Realtime: New training created, refreshing...');
+      if (activeTeamId) loadTeamTrainings(activeTeamId);
+    }, [activeTeamId, loadTeamTrainings]),
+    onTrainingUpdated: useCallback(() => {
+      console.log('[useTrainings] Realtime: Training updated, refreshing...');
+      if (activeTeamId) loadTeamTrainings(activeTeamId);
+    }, [activeTeamId, loadTeamTrainings]),
+    onTrainingDeleted: useCallback(() => {
+      console.log('[useTrainings] Realtime: Training deleted, refreshing...');
+      if (activeTeamId) loadTeamTrainings(activeTeamId);
+    }, [activeTeamId, loadTeamTrainings]),
+    onMemberJoined: useCallback(() => {
+      console.log('[useTrainings] Realtime: New member joined, refreshing members...');
+      if (activeTeamId && activeTab === 'team') {
+        getTeamMembers(activeTeamId).then(setMembers).catch(console.error);
+      }
+    }, [activeTeamId, activeTab]),
+  });
+
+  // Debug: Log realtime connection status
+  useEffect(() => {
+    console.log(`[useTrainings] Realtime connected: ${realtimeConnected}, teamId: ${activeTeamId}`);
+  }, [realtimeConnected, activeTeamId]);
 
   // ============================================================================
   // COMPUTED DATA

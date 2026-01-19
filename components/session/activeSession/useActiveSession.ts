@@ -31,6 +31,7 @@ import { isGroupingDrill } from '@/utils/drillGoal';
 import { isInfiniteShots } from '@/utils/drillShots';
 
 import { deriveDetectionConfig } from '@/utils/detectionSensitivity';
+import { useSessionRealtime } from '@/hooks/realtime';
 import {
   SHOT_MARKING_ENABLED,
   TIMER_INTERVAL_MS,
@@ -460,6 +461,27 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       setShowCompletionModal(true);
     }
   }, [hasDrill, drillProgress]);
+
+  // ============================================================================
+  // REALTIME SUBSCRIPTIONS
+  // Enables multi-device sync and live updates from other sources
+  // ============================================================================
+  useSessionRealtime({
+    sessionId,
+    enabled: !!sessionId && session?.status === 'active',
+    onTargetAdded: useCallback(() => {
+      // Target added from another device/source - refresh
+      console.log('[ActiveSession] Realtime: New target detected, refreshing...');
+      loadData();
+    }, [loadData]),
+    onStatusChange: useCallback((status: string) => {
+      // Session was completed/cancelled from elsewhere
+      if (status === 'completed' || status === 'cancelled') {
+        console.log('[ActiveSession] Realtime: Session ended externally');
+        loadData();
+      }
+    }, [loadData]),
+  });
 
   // ============================================================================
   // ACTIONS

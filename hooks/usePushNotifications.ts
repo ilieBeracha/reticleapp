@@ -3,13 +3,13 @@
  * Handles Expo push notification registration, token management, and listeners
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
-import Constants from 'expo-constants';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import Constants from 'expo-constants';
+import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 
 // Configure how notifications appear when app is in foreground
 Notifications.setNotificationHandler({

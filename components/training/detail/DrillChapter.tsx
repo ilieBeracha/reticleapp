@@ -1,17 +1,17 @@
 /**
  * DrillChapter Component
- * Larger drill card with preview option
- * Shows drill details, position, target type, and optional historical stats
+ * 
+ * Large, immersive drill card that fills significant vertical space.
+ * Designed for a timeline-style layout where each drill is a "chapter"
+ * in the training story.
  */
 
-import React, { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React from 'react';
+import { ActivityIndicator, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { 
   AlertCircle,
   Check, 
-  ChevronDown, 
-  ChevronUp, 
   Clock, 
   Crosshair, 
   Play, 
@@ -19,9 +19,13 @@ import {
   Ruler,
   User,
   TrendingUp,
-  BarChart3,
+  ChevronRight,
+  Zap,
 } from 'lucide-react-native';
 import type { DrillChapterProps } from './types';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const MIN_CARD_HEIGHT = SCREEN_HEIGHT * 0.28; // ~28% - allows 2 drills visible
 
 // Position labels
 const POSITION_LABELS: Record<string, string> = {
@@ -34,15 +38,17 @@ const POSITION_LABELS: Record<string, string> = {
 
 // Target type labels
 const TARGET_LABELS: Record<string, string> = {
-  paper: 'Paper Target',
-  steel: 'Steel Target',
-  ipsc: 'IPSC Target',
+  paper: 'Paper',
+  steel: 'Steel',
+  ipsc: 'IPSC',
   silhouette: 'Silhouette',
+  tactical: 'Tactical',
 };
 
 export function DrillChapter({
   drill,
   chapterNumber,
+  totalChapters,
   isCompleted,
   canStart,
   onStart,
@@ -51,7 +57,6 @@ export function DrillChapter({
   hasWeapon = true,
   similarStats,
 }: DrillChapterProps) {
-  const [expanded, setExpanded] = useState(false);
   const isGrouping = drill.drill_goal === 'grouping';
   const goalColor = isGrouping ? colors.green : '#F59E0B';
   const goalLabel = isGrouping ? 'Grouping' : 'Engagement';
@@ -59,403 +64,422 @@ export function DrillChapter({
 
   // Can only start if has weapon
   const canActuallyStart = canStart && hasWeapon;
-
-  // Completed drills have distinct muted styling
-  const completedBg = colors.textMuted + '10';
-  const completedBorder = colors.textMuted + '25';
   
-  // Position and target type from drill config
+  // Get drill values
+  const distance = drill.distance_m || drill.config?.distance_m || 25;
+  const rounds = drill.rounds_per_shooter || drill.config?.rounds || 5;
+  const timeLimit = drill.time_limit_seconds || drill.config?.time_limit_seconds;
   const position = drill.config?.position || drill.position;
   const targetType = drill.config?.target_type || drill.target_type || 'paper';
-  const isTimed = !!(drill.config?.time_limit_seconds || drill.time_limit_seconds);
+
+  // Status styling
+  const statusBg = isCompleted 
+    ? colors.green + '08' 
+    : canStart 
+      ? colors.primary + '05' 
+      : colors.card;
+  const statusBorder = isCompleted 
+    ? colors.green + '20' 
+    : canStart 
+      ? colors.primary + '15' 
+      : colors.border;
 
   return (
-    <Animated.View entering={FadeInDown.delay(chapterNumber * 80).duration(300)}>
+    <Animated.View 
+      entering={FadeInDown.delay(chapterNumber * 100).duration(400).springify()}
+      style={styles.wrapper}
+    >
       <View
         style={[
           styles.card,
           {
-            backgroundColor: isCompleted ? completedBg : colors.card,
-            borderColor: isCompleted ? completedBorder : colors.border,
-            opacity: isCompleted ? 0.7 : 1,
+            backgroundColor: statusBg,
+            borderColor: statusBorder,
+            minHeight: MIN_CARD_HEIGHT,
           },
         ]}
       >
-        {/* Header */}
-        <TouchableOpacity
-          style={styles.header}
-          onPress={() => setExpanded(!expanded)}
-          activeOpacity={0.7}
-        >
-          {/* Left: Goal badge */}
-          <View style={[styles.goalBadge, { backgroundColor: isCompleted ? colors.textMuted + '15' : goalColor + '15' }]}>
-            <GoalIcon size={14} color={isCompleted ? colors.textMuted : goalColor} strokeWidth={2} />
-          </View>
-
-          {/* Center: Title & basic info */}
-          <View style={styles.titleSection}>
-            <Text style={[styles.title, { color: isCompleted ? colors.textMuted : colors.text }]} numberOfLines={1}>
-              {drill.name}
+        {/* Chapter Header */}
+        <View style={styles.chapterHeader}>
+          <View style={styles.chapterNumberWrap}>
+            <Text style={[styles.chapterNumber, { color: colors.textMuted }]}>
+              {String(chapterNumber).padStart(2, '0')}
             </Text>
-            <View style={styles.subtitleRow}>
-              <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-                {drill.distance_m || drill.config?.distance_m}m · {drill.rounds_per_shooter || drill.config?.rounds} rds
-              </Text>
-              {position && (
-                <View style={[styles.positionTag, { backgroundColor: colors.secondary }]}>
-                  <User size={10} color={colors.textMuted} />
-                  <Text style={[styles.positionText, { color: colors.textMuted }]}>
-                    {POSITION_LABELS[position] || position}
-                  </Text>
-                </View>
-              )}
-              {isTimed && (
-                <View style={[styles.timedTag, { backgroundColor: colors.orange + '15' }]}>
-                  <Clock size={10} color={colors.orange} />
-                </View>
-              )}
-            </View>
+            <View style={[styles.chapterDivider, { backgroundColor: colors.border }]} />
+            <Text style={[styles.chapterTotal, { color: colors.textMuted }]}>
+              {String(totalChapters).padStart(2, '0')}
+            </Text>
           </View>
-
-          {/* Right: Status or expand */}
+          
+          {/* Status Badge */}
           {isCompleted ? (
-            <View style={[styles.statusBadge, { backgroundColor: colors.textMuted + '20' }]}>
-              <Check size={14} color={colors.textMuted} strokeWidth={2.5} />
+            <View style={[styles.statusBadge, { backgroundColor: colors.green + '15' }]}>
+              <Check size={12} color={colors.green} strokeWidth={2.5} />
+              <Text style={[styles.statusText, { color: colors.green }]}>Complete</Text>
+            </View>
+          ) : canStart ? (
+            <View style={[styles.statusBadge, { backgroundColor: colors.primary + '15' }]}>
+              <View style={[styles.activeDot, { backgroundColor: colors.primary }]} />
+              <Text style={[styles.statusText, { color: colors.primary }]}>Ready</Text>
             </View>
           ) : (
-            <View style={styles.expandBtn}>
-              {expanded ? (
-                <ChevronUp size={18} color={colors.textMuted} />
-              ) : (
-                <ChevronDown size={18} color={colors.textMuted} />
-              )}
+            <View style={[styles.statusBadge, { backgroundColor: colors.secondary }]}>
+              <Text style={[styles.statusText, { color: colors.textMuted }]}>Upcoming</Text>
             </View>
           )}
-        </TouchableOpacity>
+        </View>
 
-        {/* Expanded Preview */}
-        {expanded && (
-          <Animated.View entering={FadeIn.duration(200)} style={styles.preview}>
-            {/* Stats Grid */}
-            <View style={styles.statsGrid}>
-              <View style={[styles.statItem, { backgroundColor: colors.secondary }]}>
-                <Ruler size={14} color={colors.textMuted} />
-                <Text style={[styles.statValue, { color: colors.text }]}>{drill.distance_m || drill.config?.distance_m}m</Text>
-                <Text style={[styles.statLabel, { color: colors.textMuted }]}>Distance</Text>
-              </View>
-              <View style={[styles.statItem, { backgroundColor: colors.secondary }]}>
-                <Target size={14} color={colors.textMuted} />
-                <Text style={[styles.statValue, { color: colors.text }]}>{drill.rounds_per_shooter || drill.config?.rounds}</Text>
-                <Text style={[styles.statLabel, { color: colors.textMuted }]}>Rounds</Text>
-              </View>
-              {(drill.time_limit_seconds || drill.config?.time_limit_seconds) ? (
-                <View style={[styles.statItem, { backgroundColor: colors.secondary }]}>
-                  <Clock size={14} color={colors.textMuted} />
-                  <Text style={[styles.statValue, { color: colors.text }]}>{drill.time_limit_seconds || drill.config?.time_limit_seconds}s</Text>
-                  <Text style={[styles.statLabel, { color: colors.textMuted }]}>Time</Text>
-                </View>
-              ) : null}
+        {/* Main Content */}
+        <View style={styles.mainContent}>
+          {/* Drill Title & Goal */}
+          <View style={styles.titleSection}>
+            <Text 
+              style={[
+                styles.drillName, 
+                { color: isCompleted ? colors.textMuted : colors.text }
+              ]}
+              numberOfLines={2}
+            >
+              {drill.name}
+            </Text>
+            <View style={[styles.goalBadge, { backgroundColor: isCompleted ? colors.textMuted + '15' : goalColor + '15' }]}>
+              <GoalIcon size={14} color={isCompleted ? colors.textMuted : goalColor} strokeWidth={2} />
+              <Text style={[styles.goalText, { color: isCompleted ? colors.textMuted : goalColor }]}>
+                {goalLabel}
+              </Text>
             </View>
+          </View>
 
-            {/* Position & Target Row */}
-            <View style={styles.detailsRow}>
-              {position && (
-                <View style={[styles.detailChip, { backgroundColor: colors.secondary }]}>
-                  <User size={12} color={colors.textMuted} />
-                  <Text style={[styles.detailChipText, { color: colors.text }]}>
-                    {POSITION_LABELS[position] || position}
-                  </Text>
-                </View>
-              )}
-              <View style={[styles.detailChip, { backgroundColor: colors.secondary }]}>
-                <Target size={12} color={colors.textMuted} />
-                <Text style={[styles.detailChipText, { color: colors.text }]}>
+          {/* Stats Grid - Large & Prominent */}
+          <View style={styles.statsGrid}>
+            <View style={[styles.statCard, { backgroundColor: colors.background }]}>
+              <Ruler size={18} color={colors.primary} />
+              <Text style={[styles.statValue, { color: colors.text }]}>{distance}m</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Distance</Text>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: colors.background }]}>
+              <Zap size={18} color={colors.orange} />
+              <Text style={[styles.statValue, { color: colors.text }]}>{rounds}</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Rounds</Text>
+            </View>
+            {timeLimit ? (
+              <View style={[styles.statCard, { backgroundColor: colors.background }]}>
+                <Clock size={18} color={colors.blue} />
+                <Text style={[styles.statValue, { color: colors.text }]}>{timeLimit}s</Text>
+                <Text style={[styles.statLabel, { color: colors.textMuted }]}>Limit</Text>
+              </View>
+            ) : (
+              <View style={[styles.statCard, { backgroundColor: colors.background }]}>
+                <Target size={18} color={colors.textMuted} />
+                <Text style={[styles.statValue, { color: colors.text }]}>
                   {TARGET_LABELS[targetType] || targetType}
                 </Text>
+                <Text style={[styles.statLabel, { color: colors.textMuted }]}>Target</Text>
               </View>
-              <View style={[styles.detailChip, { backgroundColor: goalColor + '15' }]}>
-                <GoalIcon size={12} color={goalColor} />
-                <Text style={[styles.detailChipText, { color: goalColor }]}>{goalLabel}</Text>
+            )}
+          </View>
+
+          {/* Tags Row */}
+          <View style={styles.tagsRow}>
+            {position && (
+              <View style={[styles.tag, { backgroundColor: colors.secondary }]}>
+                <User size={12} color={colors.textMuted} />
+                <Text style={[styles.tagText, { color: colors.text }]}>
+                  {POSITION_LABELS[position] || position}
+                </Text>
               </View>
+            )}
+            {timeLimit && (
+              <View style={[styles.tag, { backgroundColor: colors.orange + '15' }]}>
+                <Clock size={12} color={colors.orange} />
+                <Text style={[styles.tagText, { color: colors.orange }]}>Timed</Text>
+              </View>
+            )}
+            <View style={[styles.tag, { backgroundColor: colors.secondary }]}>
+              <Target size={12} color={colors.textMuted} />
+              <Text style={[styles.tagText, { color: colors.text }]}>
+                {TARGET_LABELS[targetType] || targetType}
+              </Text>
             </View>
+          </View>
 
-            {/* Similar Stats (if available) */}
-            {similarStats && (
-              <View style={[styles.similarStatsCard, { backgroundColor: colors.primary + '08', borderColor: colors.primary + '20' }]}>
-                <View style={styles.similarStatsHeader}>
-                  <TrendingUp size={14} color={colors.primary} />
-                  <Text style={[styles.similarStatsTitle, { color: colors.primary }]}>Your Last Similar Session</Text>
-                </View>
-                <View style={styles.similarStatsRow}>
-                  {similarStats.accuracy !== undefined && (
-                    <View style={styles.similarStatItem}>
-                      <Text style={[styles.similarStatValue, { color: colors.text }]}>{similarStats.accuracy}%</Text>
-                      <Text style={[styles.similarStatLabel, { color: colors.textMuted }]}>Accuracy</Text>
-                    </View>
-                  )}
-                  {similarStats.bestGroup !== undefined && (
-                    <View style={styles.similarStatItem}>
-                      <Text style={[styles.similarStatValue, { color: colors.text }]}>{similarStats.bestGroup}cm</Text>
-                      <Text style={[styles.similarStatLabel, { color: colors.textMuted }]}>Best Group</Text>
-                    </View>
-                  )}
-                  {similarStats.date && (
-                    <View style={styles.similarStatItem}>
-                      <Text style={[styles.similarStatValue, { color: colors.textMuted }]}>{similarStats.date}</Text>
-                      <Text style={[styles.similarStatLabel, { color: colors.textMuted }]}>Date</Text>
-                    </View>
-                  )}
-                </View>
+          {/* Similar Stats (if available) */}
+          {similarStats && (
+            <Animated.View entering={FadeIn.delay(200)} style={[styles.historyCard, { backgroundColor: colors.primary + '08', borderColor: colors.primary + '15' }]}>
+              <View style={styles.historyHeader}>
+                <TrendingUp size={14} color={colors.primary} />
+                <Text style={[styles.historyTitle, { color: colors.primary }]}>Your Previous Best</Text>
               </View>
-            )}
+              <View style={styles.historyStats}>
+                {similarStats.accuracy !== undefined && (
+                  <View style={styles.historyStat}>
+                    <Text style={[styles.historyValue, { color: colors.text }]}>{similarStats.accuracy}%</Text>
+                    <Text style={[styles.historyLabel, { color: colors.textMuted }]}>Accuracy</Text>
+                  </View>
+                )}
+                {similarStats.bestGroup !== undefined && (
+                  <View style={styles.historyStat}>
+                    <Text style={[styles.historyValue, { color: colors.text }]}>{similarStats.bestGroup}cm</Text>
+                    <Text style={[styles.historyLabel, { color: colors.textMuted }]}>Best Group</Text>
+                  </View>
+                )}
+                {similarStats.date && (
+                  <View style={styles.historyStat}>
+                    <Text style={[styles.historyValue, { color: colors.textMuted, fontSize: 12 }]}>{similarStats.date}</Text>
+                    <Text style={[styles.historyLabel, { color: colors.textMuted }]}>Date</Text>
+                  </View>
+                )}
+              </View>
+            </Animated.View>
+          )}
+        </View>
 
-            {/* Action - show start or blocked state */}
-            {canStart && !isCompleted && (
-              hasWeapon ? (
-                <TouchableOpacity
-                  style={[styles.startBtn, { backgroundColor: colors.primary }]}
-                  onPress={onStart}
-                  disabled={isStarting}
-                >
-                  {isStarting ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <>
-                      <Play size={16} color="#fff" fill="#fff" />
-                      <Text style={styles.startText}>Start Drill</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
+        {/* Action Footer */}
+        <View style={[styles.footer, { borderTopColor: colors.border }]}>
+          {isCompleted ? (
+            <View style={styles.completedFooter}>
+              <Check size={16} color={colors.green} />
+              <Text style={[styles.completedText, { color: colors.green }]}>
+                Drill completed
+              </Text>
+            </View>
+          ) : canActuallyStart ? (
+            <TouchableOpacity
+              style={[styles.startButton, { backgroundColor: colors.primary }]}
+              onPress={onStart}
+              disabled={isStarting}
+              activeOpacity={0.8}
+            >
+              {isStarting ? (
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <View style={[styles.blockedBtn, { backgroundColor: colors.textMuted + '15' }]}>
-                  <AlertCircle size={14} color={colors.textMuted} />
-                  <Text style={[styles.blockedText, { color: colors.textMuted }]}>Assign weapon first</Text>
-                </View>
-              )
-            )}
-          </Animated.View>
-        )}
-
-        {/* Quick Start (when collapsed & can start & has weapon) */}
-        {!expanded && canStart && hasWeapon && !isCompleted && (
-          <TouchableOpacity
-            style={[styles.quickStart, { borderTopColor: colors.border }]}
-            onPress={onStart}
-            disabled={isStarting}
-          >
-            {isStarting ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <>
-                <Play size={14} color={colors.primary} fill={colors.primary} />
-                <Text style={[styles.quickStartText, { color: colors.primary }]}>Start</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        )}
+                <>
+                  <Play size={18} color="#fff" fill="#fff" />
+                  <Text style={styles.startButtonText}>Start Drill</Text>
+                  <ChevronRight size={18} color="#fff" style={{ marginLeft: 'auto' }} />
+                </>
+              )}
+            </TouchableOpacity>
+          ) : canStart && !hasWeapon ? (
+            <View style={[styles.blockedFooter, { backgroundColor: colors.orange + '10' }]}>
+              <AlertCircle size={16} color={colors.orange} />
+              <Text style={[styles.blockedText, { color: colors.orange }]}>
+                Assign weapon to start
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.upcomingFooter}>
+              <Text style={[styles.upcomingText, { color: colors.textMuted }]}>
+                Complete previous drills first
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    marginBottom: 14,
+  },
   card: {
-    borderRadius: 14,
+    borderRadius: 20,
     borderWidth: 1,
     overflow: 'hidden',
   },
-  header: {
+  chapterHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    gap: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 10,
   },
-  goalBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  titleSection: {
-    flex: 1,
-    gap: 4,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  subtitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  subtitle: {
-    fontSize: 13,
-  },
-  positionTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  positionText: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  timedTag: {
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  statusBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  expandBtn: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  preview: {
-    paddingHorizontal: 14,
-    paddingBottom: 14,
-    gap: 12,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-    padding: 10,
-    borderRadius: 10,
-    gap: 4,
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  statLabel: {
-    fontSize: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  detailsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  detailChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  detailChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  goalRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingTop: 12,
-    borderTopWidth: 1,
-  },
-  goalTag: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
-  },
-  goalText: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  goalDesc: {
-    flex: 1,
-    fontSize: 12,
-  },
-  // Similar stats card
-  similarStatsCard: {
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  similarStatsHeader: {
+  chapterNumberWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 10,
   },
-  similarStatsTitle: {
+  chapterNumber: {
+    fontSize: 24,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  chapterDivider: {
+    width: 12,
+    height: 2,
+    borderRadius: 1,
+  },
+  chapterTotal: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  statusText: {
     fontSize: 12,
     fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
-  similarStatsRow: {
+  activeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  mainContent: {
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  titleSection: {
+    gap: 8,
+  },
+  drillName: {
+    fontSize: 19,
+    fontWeight: '700',
+    lineHeight: 24,
+    letterSpacing: -0.3,
+  },
+  goalBadge: {
     flexDirection: 'row',
-    gap: 16,
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
-  similarStatItem: {
+  goalText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  statCard: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 4,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  statLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  tagText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  historyCard: {
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  historyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  historyTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  historyStats: {
+    flexDirection: 'row',
+    gap: 24,
+  },
+  historyStat: {
     alignItems: 'center',
     gap: 2,
   },
-  similarStatValue: {
-    fontSize: 15,
+  historyValue: {
+    fontSize: 18,
     fontWeight: '700',
   },
-  similarStatLabel: {
+  historyLabel: {
     fontSize: 10,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
-  startBtn: {
+  footer: {
+    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+  },
+  startButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    borderRadius: 10,
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
   },
-  startText: {
+  startButtonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
   },
-  blockedBtn: {
+  completedFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 12,
-    borderRadius: 10,
+    paddingVertical: 8,
+  },
+  completedText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  blockedFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
   },
   blockedText: {
     fontSize: 14,
     fontWeight: '600',
   },
-  quickStart: {
-    flexDirection: 'row',
+  upcomingFooter: {
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderTopWidth: 1,
+    paddingVertical: 8,
   },
-  quickStartText: {
+  upcomingText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontStyle: 'italic',
   },
 });

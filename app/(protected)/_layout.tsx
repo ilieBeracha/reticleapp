@@ -116,7 +116,7 @@ export default function ProtectedLayout() {
           name="createTraining"
           options={{
             headerShown: false,
-            presentation: "formSheet",
+            presentation: "containedModal",
             gestureEnabled: true,
             sheetGrabberVisible: true,
             contentStyle: { backgroundColor: colors.card },

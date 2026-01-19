@@ -5,6 +5,11 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 
+interface RefetchOptions {
+  /** If true, won't show loading indicator (for background/realtime updates) */
+  silent?: boolean;
+}
+
 interface UseTrainingDetailReturn {
   training: TrainingWithDetails | null;
   sessions: SessionWithDetails[];
@@ -12,7 +17,7 @@ interface UseTrainingDetailReturn {
   loading: boolean;
   loadingSessions: boolean;
   setTraining: React.Dispatch<React.SetStateAction<TrainingWithDetails | null>>;
-  refetch: () => void;
+  refetch: (options?: RefetchOptions) => void;
 }
 
 export function useTrainingDetail(
@@ -36,26 +41,26 @@ export function useTrainingDetail(
     };
   }, []);
 
-  const fetchTraining = useCallback(async (id: string) => {
+  const fetchTraining = useCallback(async (id: string, options?: RefetchOptions) => {
     if (!isMountedRef.current) return;
-    setLoading(true);
+    if (!options?.silent) setLoading(true);
     try {
       const data = await getTrainingById(id);
       if (isMountedRef.current) setTraining(data);
     } catch (error) {
       console.error('Failed to fetch training:', error);
-      if (isMountedRef.current) {
+      if (isMountedRef.current && !options?.silent) {
         Alert.alert('Error', 'Failed to load training details');
         router.back();
       }
     } finally {
-      if (isMountedRef.current) setLoading(false);
+      if (isMountedRef.current && !options?.silent) setLoading(false);
     }
   }, []);
 
-  const fetchSessions = useCallback(async (id: string) => {
+  const fetchSessions = useCallback(async (id: string, options?: RefetchOptions) => {
     if (!isMountedRef.current) return;
-    setLoadingSessions(true);
+    if (!options?.silent) setLoadingSessions(true);
     try {
       const data = await getTrainingSessions(id);
       if (isMountedRef.current) setSessions(data);
@@ -63,7 +68,7 @@ export function useTrainingDetail(
       console.error('Failed to fetch training sessions:', error);
       if (isMountedRef.current) setSessions([]);
     } finally {
-      if (isMountedRef.current) setLoadingSessions(false);
+      if (isMountedRef.current && !options?.silent) setLoadingSessions(false);
     }
   }, []);
 
@@ -78,13 +83,13 @@ export function useTrainingDetail(
     }
   }, []);
 
-  const refetch = useCallback(() => {
+  const refetch = useCallback((options?: RefetchOptions) => {
     if (!trainingId || isFetchingRef.current) return;
 
     isFetchingRef.current = true;
     Promise.all([
-      fetchTraining(trainingId),
-      fetchSessions(trainingId),
+      fetchTraining(trainingId, options),
+      fetchSessions(trainingId, options),
       fetchDrillProgress(trainingId),
     ]).finally(() => {
       setTimeout(() => {

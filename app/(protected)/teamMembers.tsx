@@ -5,6 +5,7 @@
  */
 import { BaseAvatar } from '@/components/shared/Avatar';
 import { useColors } from '@/hooks/ui/useColors';
+import { useTeamRealtime } from '@/hooks/realtime';
 import { usePermissions } from '@/hooks/usePermissions';
 import { getTeamMembers, updateTeamMemberRole } from '@/services/teamService';
 import { useTeamRoleFlags, useTeamStore } from '@/store/teamStore';
@@ -134,19 +135,41 @@ export default function TeamMembersSheet() {
   const teamSquads = team?.squads || [];
   const canInviteMembers = canManage || (isSquadCommander && mySquadId);
 
-  const loadMembers = useCallback(async () => {
+  const loadMembers = useCallback(async (options?: { silent?: boolean }) => {
     if (!teamId) return;
+    if (!options?.silent) setLoading(true);
     try {
       const data = await getTeamMembers(teamId);
       setMembers(data);
     } catch (error) {
       console.error('Failed to load members:', error);
     } finally {
-      setLoading(false);
+      if (!options?.silent) setLoading(false);
     }
   }, [teamId]);
 
   useFocusEffect(useCallback(() => { loadMembers(); }, [loadMembers]));
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // REALTIME SUBSCRIPTIONS
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  useTeamRealtime({
+    teamId,
+    enabled: !!teamId,
+    onMemberJoined: useCallback(() => {
+      console.log('[TeamMembers] Realtime: New member joined, refreshing silently...');
+      loadMembers({ silent: true });
+    }, [loadMembers]),
+    onMemberLeft: useCallback(() => {
+      console.log('[TeamMembers] Realtime: Member left, refreshing silently...');
+      loadMembers({ silent: true });
+    }, [loadMembers]),
+    onMemberUpdated: useCallback(() => {
+      console.log('[TeamMembers] Realtime: Member updated, refreshing silently...');
+      loadMembers({ silent: true });
+    }, [loadMembers]),
+  });
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
