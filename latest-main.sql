@@ -974,6 +974,8 @@ CREATE TABLE IF NOT EXISTS "public"."sessions" (
     CONSTRAINT "sessions_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'active'::"text", 'completed'::"text", 'cancelled'::"text"])))
 );
 
+ALTER TABLE ONLY "public"."sessions" REPLICA IDENTITY FULL;
+
 
 ALTER TABLE "public"."sessions" OWNER TO "postgres";
 
@@ -3033,6 +3035,8 @@ CREATE TABLE IF NOT EXISTS "public"."session_targets" (
     CONSTRAINT "session_targets_target_type_check" CHECK (("target_type" = ANY (ARRAY['paper'::"text", 'tactical'::"text"])))
 );
 
+ALTER TABLE ONLY "public"."session_targets" REPLICA IDENTITY FULL;
+
 
 ALTER TABLE "public"."session_targets" OWNER TO "postgres";
 
@@ -3219,12 +3223,17 @@ CREATE TABLE IF NOT EXISTS "public"."team_weapons" (
     "source_user_weapon_id" "uuid",
     "contributed_by" "uuid",
     "contribution_status" "text" DEFAULT 'approved'::"text",
+    "pool_available" boolean DEFAULT false,
     CONSTRAINT "team_weapons_category_check" CHECK (("category" = ANY (ARRAY['rifle'::"text", 'pistol'::"text", 'shotgun'::"text", 'carbine'::"text", 'precision_rifle'::"text", 'smg'::"text", 'other'::"text"]))),
     CONSTRAINT "team_weapons_contribution_status_check" CHECK (("contribution_status" = ANY (ARRAY['pending'::"text", 'approved'::"text", 'rejected'::"text"])))
 );
 
 
 ALTER TABLE "public"."team_weapons" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."team_weapons"."pool_available" IS 'When true, weapon is available in shared pool for all team members to use';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."training_drills" (
@@ -3447,6 +3456,41 @@ COMMENT ON COLUMN "public"."user_weapons"."sessions_since_cleaning" IS 'Sessions
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."weapon_requests" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "team_id" "uuid" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "requested_weapon_id" "uuid",
+    "weapon_category" "text",
+    "notes" "text",
+    "status" "text" DEFAULT 'pending'::"text" NOT NULL,
+    "reviewed_by" "uuid",
+    "reviewed_at" timestamp with time zone,
+    "review_notes" "text",
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    CONSTRAINT "weapon_requests_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'approved'::"text", 'rejected'::"text", 'cancelled'::"text"])))
+);
+
+
+ALTER TABLE "public"."weapon_requests" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."weapon_requests" IS 'Weapon assignment requests from team members to commanders';
+
+
+
+COMMENT ON COLUMN "public"."weapon_requests"."weapon_category" IS 'Preferred weapon category (rifle, pistol, etc.) - optional';
+
+
+
+COMMENT ON COLUMN "public"."weapon_requests"."notes" IS 'Additional notes from the requester';
+
+
+
+COMMENT ON COLUMN "public"."weapon_requests"."status" IS 'Request status: pending, approved, rejected, cancelled';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."weapons" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "name" "text" NOT NULL,
@@ -3665,6 +3709,11 @@ ALTER TABLE ONLY "public"."user_weapons"
 
 
 
+ALTER TABLE ONLY "public"."weapon_requests"
+    ADD CONSTRAINT "weapon_requests_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."weapons"
     ADD CONSTRAINT "weapons_pkey" PRIMARY KEY ("id");
 
@@ -3864,6 +3913,10 @@ CREATE INDEX "idx_team_weapons_base_weapon_id" ON "public"."team_weapons" USING 
 
 
 
+CREATE INDEX "idx_team_weapons_pool" ON "public"."team_weapons" USING "btree" ("team_id", "pool_available") WHERE (("pool_available" = true) AND ("is_active" = true));
+
+
+
 CREATE INDEX "idx_team_weapons_team_id" ON "public"."team_weapons" USING "btree" ("team_id");
 
 
@@ -3917,6 +3970,18 @@ CREATE INDEX "idx_user_weapons_team_weapon_id" ON "public"."user_weapons" USING 
 
 
 CREATE INDEX "idx_user_weapons_user_id" ON "public"."user_weapons" USING "btree" ("user_id");
+
+
+
+CREATE INDEX "idx_weapon_requests_team_status" ON "public"."weapon_requests" USING "btree" ("team_id", "status");
+
+
+
+CREATE UNIQUE INDEX "idx_weapon_requests_unique_pending" ON "public"."weapon_requests" USING "btree" ("team_id", "user_id") WHERE ("status" = 'pending'::"text");
+
+
+
+CREATE INDEX "idx_weapon_requests_user" ON "public"."weapon_requests" USING "btree" ("user_id");
 
 
 
@@ -4303,6 +4368,26 @@ ALTER TABLE ONLY "public"."user_weapons"
 
 
 
+ALTER TABLE ONLY "public"."weapon_requests"
+    ADD CONSTRAINT "weapon_requests_requested_weapon_id_fkey" FOREIGN KEY ("requested_weapon_id") REFERENCES "public"."team_weapons"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."weapon_requests"
+    ADD CONSTRAINT "weapon_requests_reviewed_by_fkey" FOREIGN KEY ("reviewed_by") REFERENCES "public"."profiles"("id");
+
+
+
+ALTER TABLE ONLY "public"."weapon_requests"
+    ADD CONSTRAINT "weapon_requests_team_id_fkey" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."weapon_requests"
+    ADD CONSTRAINT "weapon_requests_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."team_invitations"
     ADD CONSTRAINT "workspace_invitations_accepted_by_fkey" FOREIGN KEY ("accepted_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
@@ -4390,6 +4475,12 @@ CREATE POLICY "Commanders can manage standards" ON "public"."team_standards" USI
 
 
 
+CREATE POLICY "Commanders can review requests" ON "public"."weapon_requests" FOR UPDATE USING ((EXISTS ( SELECT 1
+   FROM "public"."team_members" "tm"
+  WHERE (("tm"."team_id" = "weapon_requests"."team_id") AND ("tm"."user_id" = "auth"."uid"()) AND ("tm"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text"])))))) WITH CHECK (("status" = ANY (ARRAY['approved'::"text", 'rejected'::"text"])));
+
+
+
 CREATE POLICY "Commanders can update presets" ON "public"."team_drill_presets" FOR UPDATE USING (("team_id" IN ( SELECT "team_members"."team_id"
    FROM "public"."team_members"
   WHERE (("team_members"."user_id" = "auth"."uid"()) AND ("team_members"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text"]))))));
@@ -4425,6 +4516,12 @@ CREATE POLICY "Commanders can view targets from team trainings" ON "public"."ses
      JOIN "public"."trainings" "t" ON (("t"."id" = "s"."training_id")))
      JOIN "public"."team_members" "tm" ON (("tm"."team_id" = "t"."team_id")))
   WHERE (("s"."id" = "session_targets"."session_id") AND ("tm"."user_id" = "auth"."uid"()) AND ("tm"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text", 'admin'::"text"]))))));
+
+
+
+CREATE POLICY "Commanders can view team requests" ON "public"."weapon_requests" FOR SELECT USING ((EXISTS ( SELECT 1
+   FROM "public"."team_members" "tm"
+  WHERE (("tm"."team_id" = "weapon_requests"."team_id") AND ("tm"."user_id" = "auth"."uid"()) AND ("tm"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text"]))))));
 
 
 
@@ -4566,6 +4663,16 @@ CREATE POLICY "Team members can view presets" ON "public"."team_drill_presets" F
 
 
 CREATE POLICY "Team members can view teammates" ON "public"."team_members" FOR SELECT USING (("team_id" IN ( SELECT "public"."get_my_team_ids"() AS "get_my_team_ids")));
+
+
+
+CREATE POLICY "Users can cancel own pending requests" ON "public"."weapon_requests" FOR UPDATE USING ((("auth"."uid"() = "user_id") AND ("status" = 'pending'::"text"))) WITH CHECK (("status" = 'cancelled'::"text"));
+
+
+
+CREATE POLICY "Users can create own requests" ON "public"."weapon_requests" FOR INSERT WITH CHECK ((("auth"."uid"() = "user_id") AND (EXISTS ( SELECT 1
+   FROM "public"."team_members" "tm"
+  WHERE (("tm"."team_id" = "weapon_requests"."team_id") AND ("tm"."user_id" = "auth"."uid"()))))));
 
 
 
@@ -4777,6 +4884,10 @@ CREATE POLICY "Users can view own push tokens" ON "public"."push_tokens" FOR SEL
 
 
 
+CREATE POLICY "Users can view own requests" ON "public"."weapon_requests" FOR SELECT USING (("auth"."uid"() = "user_id"));
+
+
+
 CREATE POLICY "Users can view own session features" ON "public"."session_features" FOR SELECT USING (("user_id" = "auth"."uid"()));
 
 
@@ -4926,6 +5037,9 @@ ALTER TABLE "public"."user_insight_triggers" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."user_weapons" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."weapon_requests" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."weapons" ENABLE ROW LEVEL SECURITY;
@@ -5427,6 +5541,12 @@ GRANT ALL ON TABLE "public"."user_insight_triggers" TO "service_role";
 GRANT ALL ON TABLE "public"."user_weapons" TO "anon";
 GRANT ALL ON TABLE "public"."user_weapons" TO "authenticated";
 GRANT ALL ON TABLE "public"."user_weapons" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."weapon_requests" TO "anon";
+GRANT ALL ON TABLE "public"."weapon_requests" TO "authenticated";
+GRANT ALL ON TABLE "public"."weapon_requests" TO "service_role";
 
 
 

@@ -249,6 +249,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       options: {
         redirectTo: 'retic://auth/callback',
         skipBrowserRedirect: true,
+        // Force account picker for Google (don't auto-select cached account)
+        queryParams: provider === 'google' ? { prompt: 'select_account' } : undefined,
       },
     })
 

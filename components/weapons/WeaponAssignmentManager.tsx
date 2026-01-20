@@ -503,7 +503,7 @@ export function WeaponAssignmentManager({
       <Modal
         visible={showCreateModal}
         animationType="slide"
-        presentationStyle="pageSheet"
+        presentationStyle="formSheet"
         onRequestClose={resetCreateModal}
       >
         <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>

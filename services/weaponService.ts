@@ -57,11 +57,13 @@ export interface TeamWeapon {
   created_by: string | null;
   created_at: string;
   updated_at: string;
-  // Assignment fields (new)
+  // Assignment fields
   assigned_to: string | null;
   source_user_weapon_id: string | null;
   contributed_by: string | null;
   contribution_status: 'pending' | 'approved' | 'rejected' | null;
+  // Pool availability
+  pool_available: boolean;
   // Joined
   base_weapon?: GlobalWeapon;
   assigned_user?: { id: string; full_name: string; avatar_url: string | null };
@@ -675,6 +677,7 @@ export async function markWeaponUsed(id: string): Promise<void> {
 export interface WeaponPickerData {
   recentlyUsed: UserWeapon[];
   assignedToMe: TeamWeapon[];  // Team weapons assigned to current user
+  poolWeapons: TeamWeapon[];   // Team weapons available in shared pool
   myWeapons: UserWeapon[];
   teamWeapons: TeamWeapon[];
   globalWeapons: GlobalWeapon[];
@@ -710,18 +713,21 @@ export async function getWeaponPickerData(options: WeaponPickerOptions = {}): Pr
   };
   
   // Fetch all relevant weapon data
-  const [recentlyUsed, myWeapons, teamWeapons, globalWeapons, assignedToMe] = await Promise.all([
+  const [recentlyUsed, myWeapons, teamWeapons, globalWeapons, assignedToMe, poolWeapons] = await Promise.all([
     getRecentlyUsedWeapons(3),
     getUserWeapons(),
     teamId ? getTeamWeapons(teamId) : Promise.resolve([]),
     getGlobalWeapons(),
     // Get team weapons assigned to current user
     teamId && user ? getAssignedWeapons(teamId, user.id) : Promise.resolve([]),
+    // Get pool weapons available to team members
+    teamId ? getPoolWeapons(teamId) : Promise.resolve([]),
   ]);
 
   return {
     recentlyUsed: filterByCategory(recentlyUsed),
     assignedToMe: filterByCategory(assignedToMe),
+    poolWeapons: filterByCategory(poolWeapons),
     myWeapons: filterByCategory(myWeapons),
     teamWeapons: filterByCategory(teamWeapons),
     globalWeapons: filterByCategory(globalWeapons),
@@ -1135,10 +1141,338 @@ export interface WeaponStats {
   best_dispersion_cm: number | null;
 }
 
+// ============================================================================
+// WEAPON REQUESTS (Soldier requests weapon from commander)
+// ============================================================================
+
+export type WeaponRequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+
+export interface WeaponRequest {
+  id: string;
+  team_id: string;
+  user_id: string;
+  requested_weapon_id: string | null;
+  weapon_category: WeaponCategory | null;
+  notes: string | null;
+  status: WeaponRequestStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_notes: string | null;
+  created_at: string;
+  user?: { id: string; full_name: string; avatar_url: string | null };
+  requested_weapon?: TeamWeapon;
+}
+
+export interface ArmoryOverviewData {
+  assignedWeapons: TeamWeapon[];
+  poolWeapons: TeamWeapon[];
+  unassignedWeapons: TeamWeapon[];
+  pendingRequests: WeaponRequest[];
+  pendingContributions: UserWeapon[];
+  myAssignment: TeamWeapon | null;
+  myPendingRequest: WeaponRequest | null;
+}
+
 /**
- * Get statistics for all user weapons
- * Aggregates session data per weapon
+ * Create a weapon request (soldier requests weapon from commander)
  */
+export async function createWeaponRequest(request: {
+  team_id: string;
+  weapon_category?: WeaponCategory;
+  notes?: string;
+}): Promise<WeaponRequest> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data, error } = await supabase
+    .from('weapon_requests')
+    .insert({
+      team_id: request.team_id,
+      user_id: user.id,
+      weapon_category: request.weapon_category || null,
+      notes: request.notes || null,
+      status: 'pending',
+    })
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Cancel a pending weapon request
+ */
+export async function cancelWeaponRequest(requestId: string): Promise<void> {
+  const { error } = await supabase
+    .from('weapon_requests')
+    .update({ status: 'cancelled' })
+    .eq('id', requestId)
+    .eq('status', 'pending');
+
+  if (error) throw error;
+}
+
+/**
+ * Get all pending weapon requests for a team (for commanders)
+ */
+export async function getPendingWeaponRequests(teamId: string): Promise<WeaponRequest[]> {
+  const { data, error } = await supabase
+    .from('weapon_requests')
+    .select(`
+      *,
+      user:profiles!weapon_requests_user_id_fkey(id, full_name, avatar_url),
+      requested_weapon:team_weapons(*)
+    `)
+    .eq('team_id', teamId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true });
+
+  // Return empty array if table doesn't exist yet
+  if (error) {
+    if (error.code === '42P01' || error.message?.includes('does not exist')) {
+      return [];
+    }
+    throw error;
+  }
+  return data || [];
+}
+
+/**
+ * Get current user's pending request for a team
+ */
+export async function getMyPendingRequest(teamId: string): Promise<WeaponRequest | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from('weapon_requests')
+    .select('*')
+    .eq('team_id', teamId)
+    .eq('user_id', user.id)
+    .eq('status', 'pending')
+    .maybeSingle();
+
+  // Return null if table doesn't exist yet
+  if (error) {
+    if (error.code === '42P01' || error.message?.includes('does not exist')) {
+      return null;
+    }
+    throw error;
+  }
+  return data;
+}
+
+/**
+ * Approve a weapon request and assign a weapon
+ */
+export async function approveWeaponRequest(
+  requestId: string,
+  assignWeaponId: string
+): Promise<{ request: WeaponRequest; assignment: TeamWeapon }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  // Get the request first
+  const { data: request, error: fetchError } = await supabase
+    .from('weapon_requests')
+    .select('*')
+    .eq('id', requestId)
+    .single();
+
+  if (fetchError) throw fetchError;
+  if (!request) throw new Error('Request not found');
+
+  // Check if user already has a weapon assigned and unassign it first
+  // Note: Must match the same filters as assignTeamWeapon (is_active only, no deleted_at)
+  console.log('[approveWeaponRequest] Checking existing weapon for user:', request.user_id, 'team:', request.team_id);
+  const { data: existingWeapon, error: checkError } = await supabase
+    .from('team_weapons')
+    .select('id, name')
+    .eq('team_id', request.team_id)
+    .eq('assigned_to', request.user_id)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  console.log('[approveWeaponRequest] Existing weapon check:', existingWeapon, 'error:', checkError?.message);
+
+  if (existingWeapon) {
+    // Unassign existing weapon before assigning new one
+    console.log('[approveWeaponRequest] Unassigning existing weapon:', existingWeapon.id, existingWeapon.name);
+    await unassignTeamWeapon(existingWeapon.id);
+  }
+
+  // Update request status
+  const { data: updatedRequest, error: updateError } = await supabase
+    .from('weapon_requests')
+    .update({
+      status: 'approved',
+      reviewed_by: user.id,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq('id', requestId)
+    .select('*')
+    .single();
+
+  if (updateError) throw updateError;
+
+  // Assign the weapon to the user
+  const assignment = await assignTeamWeapon(assignWeaponId, request.user_id);
+
+  return { request: updatedRequest, assignment };
+}
+
+/**
+ * Reject a weapon request
+ */
+export async function rejectWeaponRequest(
+  requestId: string,
+  reviewNotes?: string
+): Promise<WeaponRequest> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data, error } = await supabase
+    .from('weapon_requests')
+    .update({
+      status: 'rejected',
+      reviewed_by: user.id,
+      reviewed_at: new Date().toISOString(),
+      review_notes: reviewNotes || null,
+    })
+    .eq('id', requestId)
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+// ============================================================================
+// POOL WEAPONS
+// ============================================================================
+
+/**
+ * Set whether a team weapon is available in the shared pool
+ */
+export async function setWeaponPoolAvailable(
+  teamWeaponId: string,
+  poolAvailable: boolean
+): Promise<TeamWeapon> {
+  const { data, error } = await supabase
+    .from('team_weapons')
+    .update({
+      pool_available: poolAvailable,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', teamWeaponId)
+    .select('*, base_weapon:weapons(*)')
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Get all pool weapons for a team (available to all members)
+ */
+export async function getPoolWeapons(teamId: string): Promise<TeamWeapon[]> {
+  const { data, error } = await supabase
+    .from('team_weapons')
+    .select('*, base_weapon:weapons(*)')
+    .eq('team_id', teamId)
+    .eq('pool_available', true)
+    .eq('is_active', true)
+    .order('name');
+
+  // Return empty array if column doesn't exist yet
+  if (error) {
+    if (error.code === '42703' || error.message?.includes('does not exist')) {
+      return [];
+    }
+    throw error;
+  }
+  return data || [];
+}
+
+// ============================================================================
+// SOLDIER WEAPON DATA
+// ============================================================================
+
+/**
+ * Get the current user's assigned weapon in a team
+ */
+export async function getTeamWeaponForUser(teamId: string): Promise<TeamWeapon | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    console.log('[getTeamWeaponForUser] No user');
+    return null;
+  }
+
+  console.log('[getTeamWeaponForUser] Fetching for user:', user.id, 'team:', teamId);
+
+  const { data, error } = await supabase
+    .from('team_weapons')
+    .select('*, base_weapon:weapons(*)')
+    .eq('team_id', teamId)
+    .eq('assigned_to', user.id)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (error) {
+    console.log('[getTeamWeaponForUser] Error:', error.message);
+    return null;
+  }
+
+  console.log('[getTeamWeaponForUser] Result:', data ? data.name : 'null');
+  return data as TeamWeapon | null;
+}
+
+// ARMORY OVERVIEW
+// ============================================================================
+
+/**
+ * Get comprehensive armory overview data for a team
+ * Returns different data based on user role
+ */
+export async function getArmoryOverview(teamId: string): Promise<ArmoryOverviewData> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  // Parallel fetch all data
+  const [
+    allTeamWeapons,
+    pendingRequests,
+    pendingContributions,
+    myPendingRequest,
+  ] = await Promise.all([
+    getTeamWeaponsWithAssignments(teamId),
+    getPendingWeaponRequests(teamId),
+    getPendingSharedWeapons(teamId),
+    getMyPendingRequest(teamId),
+  ]);
+
+  // Categorize weapons
+  const assignedWeapons = allTeamWeapons.filter(w => w.assigned_to != null);
+  const poolWeapons = allTeamWeapons.filter(w => w.pool_available === true && w.assigned_to == null);
+  const unassignedWeapons = allTeamWeapons.filter(w => w.assigned_to == null && !w.pool_available);
+  const myAssignment = allTeamWeapons.find(w => w.assigned_to === user.id) || null;
+
+  return {
+    assignedWeapons,
+    poolWeapons,
+    unassignedWeapons,
+    pendingRequests,
+    pendingContributions: pendingContributions as UserWeapon[],
+    myAssignment,
+    myPendingRequest,
+  };
+}
+
+// ============================================================================
+// WEAPON STATISTICS
+// ============================================================================
+
 export async function getWeaponStats(): Promise<Map<string, WeaponStats>> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return new Map();

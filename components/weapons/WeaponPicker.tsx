@@ -56,7 +56,7 @@ interface WeaponSection {
   title: string;
   icon: React.ReactNode;
   data: AnyWeapon[];
-  type: 'recent' | 'assigned' | 'personal' | 'team' | 'global';
+  type: 'recent' | 'assigned' | 'pool' | 'personal' | 'team' | 'global';
 }
 
 interface WeaponPickerProps {
@@ -142,7 +142,7 @@ export function WeaponPicker({
       return result;
     }
 
-    // In team context: ONLY show assigned weapons (no personal, no team catalog)
+    // In team context: Show assigned weapons + pool weapons
     if (isTeamContext) {
       if (data.assignedToMe && data.assignedToMe.length > 0) {
         result.push({
@@ -150,6 +150,14 @@ export function WeaponPicker({
           icon: <Users size={12} color={colors.textMuted} />,
           data: data.assignedToMe,
           type: 'assigned',
+        });
+      }
+      if (data.poolWeapons && data.poolWeapons.length > 0) {
+        result.push({
+          title: 'Team Pool',
+          icon: <Users size={12} color={colors.textMuted} />,
+          data: data.poolWeapons,
+          type: 'pool',
         });
       }
       return result;
@@ -231,8 +239,12 @@ export function WeaponPicker({
         // Fallback: trigger add new flow with catalog weapon pre-selected
         onAddNew();
       }
+    } else if (type === 'assigned' || type === 'pool' || type === 'team') {
+      // Team weapons (assigned, pool) - cast to UserWeapon for callback
+      // The parent component handles team weapon IDs appropriately
+      onSelect(weapon as UserWeapon);
     } else {
-      // Personal, recent, assigned, team - all are user weapons
+      // Personal, recent - these are actual user weapons
       onSelect(weapon as UserWeapon);
     }
   }, [onSelect, onSelectCatalog, onAddNew, shouldHideAddNew]);

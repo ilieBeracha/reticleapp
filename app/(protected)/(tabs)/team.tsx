@@ -12,21 +12,38 @@ import { COLORS, PULSE_ANIMATION } from '@/components/training/trainings.constan
 import { groupTrainingsByTimeframe } from '@/components/training/trainings.helpers';
 import { styles } from '@/components/training/trainings.styles';
 import { useTrainings } from '@/components/training/useTrainings';
+import { RequestWeaponModal } from '@/components/weapons';
 import { useColors } from '@/hooks/ui/useColors';
+import {
+  cancelWeaponRequest,
+  getCategoryLabel,
+  getMyPendingRequest,
+  getPoolWeapons,
+  getTeamWeaponForUser,
+  type TeamWeapon,
+  type WeaponRequest,
+} from '@/services/weaponService';
 import type { TrainingWithDetails } from '@/types/workspace';
 import { format } from 'date-fns';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import {
     Activity,
+    AlertTriangle,
     BarChart3,
     BookOpen,
     Calendar,
     ChevronRight,
+    Clock,
+    Gift,
     Plus,
     Settings,
+    Shield,
+    ShieldCheck,
     Target,
     UserPlus,
     Users,
+    X,
     Zap,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -1356,6 +1373,68 @@ function UnifiedTeamTab({
 }: UnifiedTeamTabProps) {
   const progressPct = Math.min(100, (teamStats.totalShots / teamStats.weeklyGoal) * 100);
 
+  // Soldier weapon state
+  const [myWeapon, setMyWeapon] = useState<TeamWeapon | null>(null);
+  const [myPendingRequest, setMyPendingRequest] = useState<WeaponRequest | null>(null);
+  const [poolWeapons, setPoolWeapons] = useState<TeamWeapon[]>([]);
+  const [weaponLoading, setWeaponLoading] = useState(false);
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  // Fetch soldier weapon data (only for non-commanders)
+  useEffect(() => {
+    console.log('[SoldierWeapon] canManage:', canManage, 'activeTeamId:', activeTeamId);
+    if (canManage || !activeTeamId) {
+      console.log('[SoldierWeapon] Skipping fetch - canManage or no teamId');
+      return;
+    }
+
+    const fetchWeaponData = async () => {
+      console.log('[SoldierWeapon] Fetching weapon data...');
+      setWeaponLoading(true);
+      try {
+        const [weapon, pending, pool] = await Promise.all([
+          getTeamWeaponForUser(activeTeamId),
+          getMyPendingRequest(activeTeamId),
+          getPoolWeapons(activeTeamId),
+        ]);
+        console.log('[SoldierWeapon] Fetched - weapon:', weapon?.name, 'pending:', !!pending, 'pool:', pool.length);
+        setMyWeapon(weapon);
+        setMyPendingRequest(pending);
+        setPoolWeapons(pool);
+      } catch (err) {
+        console.error('[SoldierWeapon] Failed to fetch weapon data:', err);
+      } finally {
+        setWeaponLoading(false);
+      }
+    };
+
+    fetchWeaponData();
+  }, [canManage, activeTeamId]);
+
+  // Handle cancel request
+  const handleCancelRequest = async () => {
+    if (!myPendingRequest) return;
+    try {
+      setCancelling(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await cancelWeaponRequest(myPendingRequest.id);
+      setMyPendingRequest(null);
+    } catch (err: any) {
+      console.error('Failed to cancel request:', err);
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  // Handle request success
+  const handleRequestSuccess = async () => {
+    if (!activeTeamId) return;
+    const pending = await getMyPendingRequest(activeTeamId);
+    setMyPendingRequest(pending);
+    setShowRequestModal(false);
+  };
+
   // Navigate to training report
   const handleViewReport = useCallback((trainingId: string) => {
     router.push({
@@ -1461,6 +1540,118 @@ function UnifiedTeamTab({
           </View>
           <ChevronRight size={16} color="rgba(255,255,255,0.7)" />
         </TouchableOpacity>
+      )}
+
+      {/* ========== SOLDIER WEAPON SECTION - Only visible to soldiers ========== */}
+      {!canManage && (
+        <>
+          {/* My Weapon Assignment */}
+          <View style={soldierStyles.section}>
+            <View style={soldierStyles.sectionHeader}>
+              <ShieldCheck size={14} color={colors.primary} />
+              <Text style={[soldierStyles.sectionTitle, { color: colors.textMuted }]}>MY WEAPON</Text>
+            </View>
+
+            {weaponLoading ? (
+              <View style={[soldierStyles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <ActivityIndicator size="small" color={colors.primary} />
+              </View>
+            ) : myWeapon ? (
+              <View style={[soldierStyles.weaponCard, { backgroundColor: colors.card, borderColor: colors.primary }]}>
+                <View style={[soldierStyles.weaponBadge, { backgroundColor: colors.primary }]}>
+                  <ShieldCheck size={14} color="#fff" />
+                  <Text style={soldierStyles.weaponBadgeText}>Assigned</Text>
+                </View>
+                <Text style={[soldierStyles.weaponName, { color: colors.text }]}>{myWeapon.name}</Text>
+                <Text style={[soldierStyles.weaponMeta, { color: colors.textMuted }]}>
+                  {getCategoryLabel(myWeapon.category)}
+                  {myWeapon.caliber && ` • ${myWeapon.caliber}`}
+                </Text>
+              </View>
+            ) : (
+              <View style={[soldierStyles.noWeaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={[soldierStyles.noWeaponIcon, { backgroundColor: colors.secondary }]}>
+                  <Shield size={24} color={colors.textMuted} />
+                </View>
+                <Text style={[soldierStyles.noWeaponTitle, { color: colors.text }]}>No Weapon Assigned</Text>
+                <Text style={[soldierStyles.noWeaponHint, { color: colors.textMuted }]}>
+                  Request a weapon from your commander
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Pending Request or Request Button */}
+          {myPendingRequest ? (
+            <View style={[soldierStyles.pendingCard, { backgroundColor: colors.yellow + '10', borderColor: colors.yellow }]}>
+              <View style={soldierStyles.pendingHeader}>
+                <Clock size={14} color={colors.yellow} />
+                <Text style={[soldierStyles.pendingTitle, { color: colors.yellow }]}>Request Pending</Text>
+              </View>
+              <Text style={[soldierStyles.pendingText, { color: colors.text }]}>
+                Awaiting commander review
+              </Text>
+              {myPendingRequest.weapon_category && (
+                <Text style={[soldierStyles.pendingPreference, { color: colors.textMuted }]}>
+                  Preferred: {getCategoryLabel(myPendingRequest.weapon_category)}
+                </Text>
+              )}
+              <TouchableOpacity
+                style={[soldierStyles.cancelBtn, { borderColor: colors.destructive }]}
+                onPress={handleCancelRequest}
+                disabled={cancelling}
+              >
+                {cancelling ? (
+                  <ActivityIndicator size="small" color={colors.destructive} />
+                ) : (
+                  <>
+                    <X size={14} color={colors.destructive} />
+                    <Text style={[soldierStyles.cancelBtnText, { color: colors.destructive }]}>Cancel Request</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          ) : !myWeapon ? (
+            <TouchableOpacity
+              style={[soldierStyles.requestBtn, { backgroundColor: colors.primary }]}
+              onPress={() => setShowRequestModal(true)}
+            >
+              <Plus size={18} color="#fff" />
+              <Text style={soldierStyles.requestBtnText}>Request a Weapon</Text>
+            </TouchableOpacity>
+          ) : null}
+
+          {/* Team Pool Weapons */}
+          {poolWeapons.length > 0 && (
+            <View style={soldierStyles.section}>
+              <View style={soldierStyles.sectionHeader}>
+                <Gift size={14} color={colors.yellow} />
+                <Text style={[soldierStyles.sectionTitle, { color: colors.textMuted }]}>TEAM POOL</Text>
+                <View style={[soldierStyles.countBadge, { backgroundColor: colors.yellow }]}>
+                  <Text style={soldierStyles.countText}>{poolWeapons.length}</Text>
+                </View>
+              </View>
+              <Text style={[soldierStyles.poolHint, { color: colors.textMuted }]}>
+                Available for all team members
+              </Text>
+              {poolWeapons.map((weapon) => (
+                <View
+                  key={weapon.id}
+                  style={[soldierStyles.poolWeaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                >
+                  <Gift size={16} color={colors.yellow} />
+                  <View style={soldierStyles.poolWeaponInfo}>
+                    <Text style={[soldierStyles.poolWeaponName, { color: colors.text }]}>{weapon.name}</Text>
+                    <Text style={[soldierStyles.poolWeaponMeta, { color: colors.textMuted }]}>
+                      {getCategoryLabel(weapon.category)}
+                      {weapon.caliber && ` • ${weapon.caliber}`}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </>
       )}
 
       {/* Commander Quick Actions - Only visible to commanders */}
@@ -1696,6 +1887,14 @@ function UnifiedTeamTab({
           </View>
         </View>
       )}
+
+      {/* Request Weapon Modal - For soldiers */}
+      <RequestWeaponModal
+        visible={showRequestModal}
+        teamId={activeTeamId || ''}
+        onClose={() => setShowRequestModal(false)}
+        onSuccess={handleRequestSuccess}
+      />
     </View>
   );
 }
@@ -2036,6 +2235,166 @@ const unifiedStyles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.2,
+  },
+});
+
+// Soldier-specific styles
+const soldierStyles = StyleSheet.create({
+  section: {
+    gap: 10,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.4,
+  },
+  countBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  countText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#fff',
+  },
+
+  // Weapon Card
+  weaponCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    gap: 8,
+  },
+  weaponBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  weaponBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  weaponName: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  weaponMeta: {
+    fontSize: 14,
+  },
+
+  // No Weapon Card
+  noWeaponCard: {
+    alignItems: 'center',
+    padding: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 8,
+  },
+  noWeaponIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noWeaponTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  noWeaponHint: {
+    fontSize: 13,
+    textAlign: 'center',
+  },
+
+  // Pending Request Card
+  pendingCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 10,
+  },
+  pendingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pendingTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pendingText: {
+    fontSize: 14,
+  },
+  pendingPreference: {
+    fontSize: 12,
+  },
+  cancelBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  cancelBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  // Request Button
+  requestBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  requestBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+
+  // Pool Weapons
+  poolHint: {
+    fontSize: 12,
+    marginTop: -4,
+  },
+  poolWeaponCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 12,
+  },
+  poolWeaponInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  poolWeaponName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  poolWeaponMeta: {
+    fontSize: 13,
   },
 });
 

@@ -1,4 +1,5 @@
 import { useColors } from "@/hooks/ui/useColors";
+import { getCurrentUserId } from "@/services/authService";
 import { acceptTeamInvitation, getInvitationByCode } from "@/services/teamService";
 import { assignTeamWeapon, getTeamWeapon } from "@/services/weaponService";
 import { useTeamStore } from "@/store/teamStore";
@@ -135,11 +136,9 @@ export default function AcceptInviteSheet() {
       const weaponId = validatedInvite.details?.weapon_id;
       if (weaponId) {
         try {
-          // Get the current user ID from supabase auth
-          const { supabase } = await import('@/lib/supabase');
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            await assignTeamWeapon(weaponId, user.id);
+          const userId = await getCurrentUserId();
+          if (userId) {
+            await assignTeamWeapon(weaponId, userId);
           }
         } catch (weaponErr) {
           // Don't fail the whole join - just log the weapon assignment error

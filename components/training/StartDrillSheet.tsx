@@ -1,7 +1,7 @@
 import { CreateWeaponFlow, WeaponPicker } from '@/components/weapons';
 import { useColors } from '@/hooks/ui/useColors';
 import { useOpenWeather } from '@/hooks/useOpenWeather';
-import { supabase } from '@/lib/supabase';
+import { getCurrentUser } from '@/services/authService';
 import type { BaseSessionConfig } from '@/services/session/types';
 import { createSession } from '@/services/sessionService';
 import { getAssignedWeapons, getOrCreatePersonalProfile, getUserWeapon, type UserWeapon } from '@/services/weaponService';
@@ -72,10 +72,9 @@ export function StartDrillSheet({
 
     async function loadTeamData() {
       try {
-        const { data: authData } = await supabase.auth.getUser();
+        const user = await getCurrentUser();
         if (cancelled) return;
-        
-        const user = authData?.user;
+
         if (!user) {
           setLoadingWeapon(false);
           return;

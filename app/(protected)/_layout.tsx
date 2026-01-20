@@ -181,6 +181,16 @@ export default function ProtectedLayout() {
             sheetLargestUndimmedDetentIndex: -1,
           }}
         />
+
+        <Stack.Screen
+          name="teamArmory"
+          options={{
+            headerShown: false,
+            presentation: "card",
+            gestureEnabled: true,
+            contentStyle: { backgroundColor: colors.background },
+          }}
+        />
         
         <Stack.Screen
           name="memberPreview"

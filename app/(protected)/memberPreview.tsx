@@ -1,6 +1,7 @@
 import { BaseAvatar } from "@/components/shared/Avatar";
 import { useColors } from "@/hooks/ui/useColors";
 import { usePermissions } from "@/hooks/usePermissions";
+import { getCurrentUserId } from "@/services/authService";
 import { removeTeamMember, updateTeamMemberRole } from "@/services/teamService";
 import { useMyTeamRole, useTeamRoleFlags, useTeamStore } from "@/store/teamStore";
 import type { TeamRole } from "@/types/workspace";
@@ -57,11 +58,7 @@ export default function MemberPreviewSheet() {
 
   // Get current user ID
   useEffect(() => {
-    import('@/lib/supabase').then(({ supabase }) => {
-      supabase.auth.getUser().then(({ data }) => {
-        if (data.user) setCurrentUserId(data.user.id);
-      });
-    });
+    getCurrentUserId().then(setCurrentUserId).catch(console.error);
   }, []);
 
   // Find member from store
