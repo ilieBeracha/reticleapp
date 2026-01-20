@@ -23,7 +23,7 @@ import { getRecentSessionsWithStats, type SessionWithDetails } from '@/services/
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { ChevronRight, Clock, Crosshair, History, TrendingUp } from 'lucide-react-native';
+import { ChevronRight, Clock, Crosshair, HelpCircle, History, TrendingUp } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -35,10 +35,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 
 import { AIExplanationProvider } from './AIExplanationProvider';
-import { ActivityChart, PerformanceChart } from './components';
 import type { ActivityDataPoint, ChartDataPoint } from './components';
+import { ActivityChart, PerformanceChart } from './components';
 import { EvidenceSheet } from './EvidenceSheet';
 import { applyFilters, computeContextProfiles, computeInsights, computeOverviewStatus } from './insights.engine';
 import {
@@ -137,6 +138,52 @@ function NotEnoughDataState({ colors, currentSessions, minRequired }: NotEnoughD
       <Text style={[styles.progressText, { color: colors.textMuted }]}>
         {currentSessions} of {minRequired} sessions
       </Text>
+    </View>
+  );
+}
+
+// ============================================================================
+// SECTION HEADER WITH TOOLTIP
+// ============================================================================
+
+interface SectionHeaderWithTooltipProps {
+  title: string;
+  tooltip: string;
+  icon: React.ReactNode;
+  colors: ReturnType<typeof useColors>;
+}
+
+function SectionHeaderWithTooltip({ title, tooltip, icon, colors }: SectionHeaderWithTooltipProps) {
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  const handlePress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowTooltip(!showTooltip);
+  }, [showTooltip]);
+
+  return (
+    <View style={styles.tooltipHeaderContainer}>
+      <View style={styles.sectionHeader}>
+        {icon}
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{title}</Text>
+        <View style={{ flex: 1 }} />
+        <TouchableOpacity 
+          onPress={handlePress} 
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={[styles.helpButton, { backgroundColor: showTooltip ? `${colors.primary}15` : colors.card }]}
+        >
+          <HelpCircle size={12} color={showTooltip ? colors.primary : colors.textMuted} />
+        </TouchableOpacity>
+      </View>
+      {showTooltip && (
+        <Animated.View 
+          entering={FadeInDown.duration(200)} 
+          exiting={FadeOut.duration(150)}
+          style={[styles.tooltipBubble, { backgroundColor: colors.text }]}
+        >
+          <Text style={[styles.tooltipText, { color: colors.background }]}>{tooltip}</Text>
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -467,10 +514,12 @@ export function InsightsDashboard() {
               {/* Trends Section */}
               {performanceChartData.length >= 3 && (
                 <View style={styles.chartsSection}>
-                  <View style={styles.sectionHeader}>
-                    <TrendingUp size={13} color={colors.textMuted} />
-                    <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Trends</Text>
-                  </View>
+                  <SectionHeaderWithTooltip
+                    title="Trends"
+                    tooltip="Your accuracy and grouping performance over time. Shows your last 15 sessions to reveal patterns and improvement."
+                    icon={<TrendingUp size={13} color={colors.textMuted} />}
+                    colors={colors}
+                  />
 
                   {/* Performance Chart */}
                   <PerformanceChart data={performanceChartData} height={160} />
@@ -529,10 +578,12 @@ export function InsightsDashboard() {
                   {/* Context Summary */}
                   {contextProfiles.profiles.length > 0 && (
                     <View style={styles.sectionCompact}>
-                      <View style={styles.sectionHeader}>
-                        <Crosshair size={13} color={colors.textMuted} />
-                        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Conditions</Text>
-                      </View>
+                      <SectionHeaderWithTooltip
+                        title="Conditions"
+                        tooltip="How you perform under different conditions - distance, position, and environment. Tap any condition to see supporting sessions."
+                        icon={<Crosshair size={13} color={colors.textMuted} />}
+                        colors={colors}
+                      />
                       <ContextSummarySection
                         profiles={contextProfiles.profiles}
                         summary={contextProfiles.summary}
@@ -645,13 +696,15 @@ const styles = StyleSheet.create({
 
   // Sections
   sectionCompact: {
-    marginTop: 16,
+    marginTop: 24,
+  },
+  tooltipHeaderContainer: {
+    marginBottom: 6,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    marginBottom: 8,
   },
   sectionTitle: {
     fontSize: 12,
@@ -659,16 +712,33 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
+  helpButton: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tooltipBubble: {
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 10,
+  },
+  tooltipText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '500',
+  },
 
   // Charts section
   chartsSection: {
-    marginTop: 16,
+    marginTop: 24,
     gap: 12,
   },
 
   // Dual section (side by side)
   dualSection: {
-    marginTop: 16,
+    marginTop: 24,
   },
   primaryColumn: {
     flex: 1,

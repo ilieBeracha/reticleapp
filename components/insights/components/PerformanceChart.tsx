@@ -284,7 +284,7 @@ export function PerformanceChart({ data, height = 180 }: PerformanceChartProps) 
 const styles = StyleSheet.create({
   container: {
     borderRadius: 14,
-    padding: 14,
+    padding: 10,
     gap: 8,
   },
   legend: {

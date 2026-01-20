@@ -11,9 +11,10 @@
 import { useColors } from '@/hooks/ui/useColors';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { Clock, History } from 'lucide-react-native';
+import { Clock, History, HelpCircle } from 'lucide-react-native';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, FadeOut, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { styles } from './UnifiedHomePage.styles';
 import {
   CoachMessage,
@@ -26,6 +27,49 @@ import { WeeklyStatsCard } from './components/WeeklyStatsCard';
 import { useUnifiedHomePage } from './useUnifiedHomePage';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
+// ════════════════════════════════════════════════════════════════════════════
+// SECTION HEADER WITH TOOLTIP
+// ════════════════════════════════════════════════════════════════════════════
+
+interface SectionHeaderProps {
+  title: string;
+  tooltip: string;
+  colors: ReturnType<typeof useColors>;
+}
+
+function SectionHeader({ title, tooltip, colors }: SectionHeaderProps) {
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  const handlePress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowTooltip(!showTooltip);
+  }, [showTooltip]);
+
+  return (
+    <View style={localStyles.sectionHeaderContainer}>
+      <View style={localStyles.sectionHeader}>
+        <Text style={[localStyles.sectionTitle, { color: colors.textMuted }]}>{title}</Text>
+        <TouchableOpacity 
+          onPress={handlePress} 
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={[localStyles.helpButton, { backgroundColor: showTooltip ? `${colors.primary}15` : colors.secondary }]}
+        >
+          <HelpCircle size={12} color={showTooltip ? colors.primary : colors.textMuted} />
+        </TouchableOpacity>
+      </View>
+      {showTooltip && (
+        <Animated.View 
+          entering={FadeInDown.duration(200)} 
+          exiting={FadeOut.duration(150)}
+          style={[localStyles.tooltipBubble, { backgroundColor: colors.text, borderColor: colors.text }]}
+        >
+          <Text style={[localStyles.tooltipText, { color: colors.background }]}>{tooltip}</Text>
+        </Animated.View>
+      )}
+    </View>
+  );
+}
 
 export function UnifiedHomePage() {
   const colors = useColors();
@@ -133,7 +177,11 @@ export function UnifiedHomePage() {
         {/* ─────────────────────────────────────────────────────────────────── */}
         {/* SECTION: QUICK ACTIONS */}
         {/* ─────────────────────────────────────────────────────────────────── */}
-        <Text style={[localStyles.sectionTitle, { color: colors.textMuted }]}>QUICK ACTIONS</Text>
+        <SectionHeader
+          title="QUICK ACTIONS"
+          tooltip="Start a new session, continue an active one, or check your default weapon stats."
+          colors={colors}
+        />
         <HeroActions
           colors={colors}
           activeSession={homeState.activeSession}
@@ -150,7 +198,11 @@ export function UnifiedHomePage() {
         {/* ─────────────────────────────────────────────────────────────────── */}
         {/* SECTION: THIS WEEK */}
         {/* ─────────────────────────────────────────────────────────────────── */}
-        <Text style={[localStyles.sectionTitle, { color: colors.textMuted }]}>THIS WEEK</Text>
+        <SectionHeader
+          title="THIS WEEK"
+          tooltip="Your weekly stats including shots fired, accuracy, best group, and time spent training. Tap the card for details."
+          colors={colors}
+        />
         <DailyTip
           colors={colors}
           streak={streak}
@@ -163,7 +215,11 @@ export function UnifiedHomePage() {
         {/* ─────────────────────────────────────────────────────────────────── */}
         {/* SECTION: RECENT ACTIVITY */}
         {/* ─────────────────────────────────────────────────────────────────── */}
-        <Text style={[localStyles.sectionTitle, { color: colors.textMuted }]}>RECENT ACTIVITY</Text>
+        <SectionHeader
+          title="RECENT ACTIVITY"
+          tooltip="Your latest training sessions. Tap any session to view details, targets, and results."
+          colors={colors}
+        />
         <RecentActivitySection
           sessions={recentSessions}
           colors={colors}
@@ -208,12 +264,36 @@ export function UnifiedHomePage() {
 }
 
 const localStyles = StyleSheet.create({
+  sectionHeaderContainer: {
+    marginBottom: 12,
+    marginTop: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   sectionTitle: {
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 0.8,
-    marginBottom: 8,
-    marginTop: 6,
+  },
+  helpButton: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tooltipBubble: {
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 10,
+  },
+  tooltipText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '500',
   },
   viewAllLink: {
     flexDirection: 'row',
@@ -222,7 +302,7 @@ const localStyles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    marginTop: 4,
+    marginTop: 16,
   },
   viewAllContent: {
     flexDirection: 'row',
