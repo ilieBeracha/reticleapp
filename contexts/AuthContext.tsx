@@ -17,7 +17,7 @@ interface AuthContextType {
   profileAvatarUrl: string | null;
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
-  signInWithOAuth: (provider: 'google' | 'apple') => Promise<void>;
+  signInWithOAuth: (provider: 'google' | 'apple', forceAccountPicker?: boolean) => Promise<void>;
   signOut: () => Promise<void>;
   switchTeam: (teamId: string | null) => Promise<void>;
   switchToPersonal: () => Promise<void>;
@@ -243,14 +243,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error
   }
 
-  const signInWithOAuth = async (provider: 'google' | 'apple') => {
+  const signInWithOAuth = async (provider: 'google' | 'apple', forceAccountPicker = false) => {
+    // Build query params for Google
+    // - Default: auto-connect with cached account (no prompt)
+    // - forceAccountPicker: show account chooser (prompt: 'select_account')
+    const googleQueryParams = forceAccountPicker ? { prompt: 'select_account' } : undefined;
+
     const { data } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
         redirectTo: 'retic://auth/callback',
         skipBrowserRedirect: true,
-        // Force account picker for Google (don't auto-select cached account)
-        queryParams: provider === 'google' ? { prompt: 'select_account' } : undefined,
+        queryParams: provider === 'google' ? googleQueryParams : undefined,
       },
     })
 

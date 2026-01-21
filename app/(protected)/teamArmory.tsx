@@ -7,7 +7,9 @@
  */
 
 import { ApproveRequestModal, RequestWeaponModal } from '@/components/weapons';
+import { useWeaponRealtime, type WeaponRequestRecord } from '@/hooks/realtime';
 import { useColors } from '@/hooks/ui/useColors';
+import { notifyWeaponRequested } from '@/services/notifications';
 import {
   approveSharedWeapon,
   assignTeamWeapon,
@@ -911,8 +913,39 @@ export default function TeamArmoryScreen() {
   }, [teamId, isCommander]);
 
   useEffect(() => {
+    // Reset data when teamId changes to prevent showing stale data
+    setData(null);
+    setTeamMembers([]);
+    setLoading(true);
     loadData();
   }, [loadData]);
+
+  // Real-time updates for weapon requests and assignments
+  useWeaponRealtime({
+    teamId,
+    enabled: isCommander, // Only commanders need real-time request notifications
+    onNewRequest: useCallback(async (request: WeaponRequestRecord) => {
+      console.log('[TeamArmory] Realtime: New weapon request!');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      // Refresh data first to get full request details including user name
+      await loadData();
+      // Send notification to commander
+      if (teamId && team?.name) {
+        // Find the requester's name from the refreshed data
+        const requestData = data?.pendingRequests?.find(r => r.id === request.id);
+        const requesterName = (requestData as any)?.user?.full_name || 'A team member';
+        notifyWeaponRequested(teamId, team.name, requesterName);
+      }
+    }, [loadData, teamId, team?.name, data?.pendingRequests]),
+    onRequestChange: useCallback(() => {
+      // Any request change - refresh silently
+      loadData();
+    }, [loadData]),
+    onWeaponChange: useCallback(() => {
+      // Any weapon change (assignment, pool status) - refresh
+      loadData();
+    }, [loadData]),
+  });
 
   const handleRefresh = () => {
     setRefreshing(true);

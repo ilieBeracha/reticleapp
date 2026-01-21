@@ -221,6 +221,11 @@ interface WeaponCardProps {
 function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }: WeaponCardProps) {
   const categoryConfig = weapon.category ? getCategoryConfig(weapon.category) : null;
   const sourceConfig = getSourceConfig(weapon.source);
+  const isTeamWeapon = weapon.source !== 'personal';
+  
+  // Use blue accent for team weapons, primary for personal
+  const iconAccent = isTeamWeapon ? '#3B82F6' : colors.primary;
+  const iconBg = isTeamWeapon ? '#3B82F615' : `${colors.primary}12`;
 
   return (
     <TouchableOpacity
@@ -229,9 +234,9 @@ function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }:
       activeOpacity={0.7}
     >
       <View style={s.cardMain}>
-        {/* Category Icon */}
-        <View style={[s.cardIcon, { backgroundColor: `${colors.primary}12` }]}>
-          {getCategoryIcon(weapon.category, colors.primary)}
+        {/* Category Icon - blue accent for team weapons */}
+        <View style={[s.cardIcon, { backgroundColor: iconBg }]}>
+          {getCategoryIcon(weapon.category, iconAccent)}
         </View>
 
         {/* Info */}
@@ -247,20 +252,22 @@ function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }:
             )}
           </View>
           <View style={s.cardMetaRow}>
-            {/* Source badge */}
-            <View style={[s.sourceBadge, { backgroundColor: sourceConfig.bg }]}>
-              {getSourceIcon(weapon.source, sourceConfig.color)}
-              <Text style={[s.sourceBadgeText, { color: sourceConfig.color }]}>
-                {sourceConfig.label}
-              </Text>
-            </View>
+            {/* Source badge - only show for team weapons to reduce noise */}
+            {isTeamWeapon && (
+              <View style={[s.sourceBadge, { backgroundColor: sourceConfig.bg }]}>
+                {getSourceIcon(weapon.source, sourceConfig.color)}
+                <Text style={[s.sourceBadgeText, { color: sourceConfig.color }]}>
+                  {sourceConfig.label}
+                </Text>
+              </View>
+            )}
             <Text style={[s.cardMeta, { color: colors.textMuted }]} numberOfLines={1}>
               {categoryConfig?.label || 'Weapon'}{weapon.caliber ? ` · ${weapon.caliber}` : ''}
             </Text>
           </View>
           {/* Team name for team weapons */}
           {weapon.teamName && (
-            <Text style={[s.teamNameText, { color: colors.textMuted }]} numberOfLines={1}>
+            <Text style={[s.teamNameText, { color: sourceConfig.color }]} numberOfLines={1}>
               {weapon.teamName}
             </Text>
           )}
@@ -274,7 +281,7 @@ function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }:
         </View>
 
         {/* Actions - only show star for personal weapons */}
-        {weapon.source === 'personal' && (
+        {weapon.source === 'personal' ? (
           <TouchableOpacity
             style={[s.starBtn, { backgroundColor: isDefault ? '#f59e0b15' : 'transparent' }]}
             onPress={(e) => {
@@ -290,6 +297,11 @@ function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }:
               fill={isDefault ? '#f59e0b' : 'none'}
             />
           </TouchableOpacity>
+        ) : (
+          /* Team indicator icon for team weapons */
+          <View style={[s.teamIndicator, { backgroundColor: sourceConfig.bg }]}>
+            <Users size={12} color={sourceConfig.color} />
+          </View>
         )}
 
         <ChevronRight size={14} color={colors.border} />
@@ -793,6 +805,13 @@ const s = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  teamIndicator: {
+    width: 26,
+    height: 26,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
   },

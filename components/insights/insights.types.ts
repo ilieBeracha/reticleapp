@@ -22,6 +22,38 @@ export type DistanceFilter = 'all' | 'close' | 'medium' | 'long' | 'precision';
 
 export type DrillTypeFilter = 'all' | 'grouping' | 'engagement' | 'stress';
 
+// ============================================================================
+// ENVIRONMENTAL FILTERS (Phase 1)
+// ============================================================================
+
+/** Wind speed buckets */
+export type WindFilter = 'all' | 'calm' | 'light' | 'moderate' | 'strong';
+
+/** Time of day buckets */
+export type TimeOfDayFilter = 'all' | 'morning' | 'midday' | 'afternoon' | 'evening';
+
+/** Environment type */
+export type EnvironmentFilter = 'all' | 'indoor' | 'outdoor';
+
+/** Lighting conditions */
+export type LightingFilter = 'all' | 'day' | 'night' | 'mixed';
+
+// Wind speed definitions (m/s)
+export const WIND_BUCKETS = {
+  calm: { min: 0, max: 2, label: 'Calm (<2 m/s)' },
+  light: { min: 2, max: 5, label: 'Light (2-5 m/s)' },
+  moderate: { min: 5, max: 10, label: 'Moderate (5-10 m/s)' },
+  strong: { min: 10, max: Infinity, label: 'Strong (>10 m/s)' },
+} as const;
+
+// Time of day definitions (hours, 24h format)
+export const TIME_OF_DAY_BUCKETS = {
+  morning: { min: 5, max: 11, label: 'Morning (5-11)' },
+  midday: { min: 11, max: 14, label: 'Midday (11-14)' },
+  afternoon: { min: 14, max: 18, label: 'Afternoon (14-18)' },
+  evening: { min: 18, max: 22, label: 'Evening (18-22)' },
+} as const;
+
 export interface InsightsFilters {
   time: TimeFilter;
   weaponId: string | null;
@@ -32,6 +64,11 @@ export interface InsightsFilters {
   drillType: DrillTypeFilter;
   stressOnly: boolean; // HR threshold exceeded
   timedOnly: boolean; // Timed drills only
+  // Environmental filters (Phase 1)
+  wind: WindFilter;
+  timeOfDay: TimeOfDayFilter;
+  environment: EnvironmentFilter;
+  lighting: LightingFilter;
 }
 
 export interface FilterPreset {
@@ -51,6 +88,11 @@ export const DEFAULT_FILTERS: InsightsFilters = {
   drillType: 'all',
   stressOnly: false,
   timedOnly: false,
+  // Environmental defaults
+  wind: 'all',
+  timeOfDay: 'all',
+  environment: 'all',
+  lighting: 'all',
 };
 
 // Distance bucket definitions (in meters)

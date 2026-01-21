@@ -32,10 +32,16 @@ import {
   DISTANCE_BUCKETS,
   DistanceFilter,
   DrillTypeFilter,
+  EnvironmentFilter,
   FilterPreset,
   InsightsFilters,
+  LightingFilter,
   PositionFilter,
   TimeFilter,
+  TimeOfDayFilter,
+  TIME_OF_DAY_BUCKETS,
+  WindFilter,
+  WIND_BUCKETS,
 } from './insights.types';
 
 // ============================================================================
@@ -71,6 +77,36 @@ const DRILL_TYPE_OPTIONS: { value: DrillTypeFilter; label: string }[] = [
   { value: 'grouping', label: 'Grouping' },
   { value: 'engagement', label: 'Engagement' },
   { value: 'stress', label: 'Stress/Timed' },
+];
+
+// Environmental filter options
+const WIND_OPTIONS: { value: WindFilter; label: string }[] = [
+  { value: 'all', label: 'All Wind' },
+  { value: 'calm', label: WIND_BUCKETS.calm.label },
+  { value: 'light', label: WIND_BUCKETS.light.label },
+  { value: 'moderate', label: WIND_BUCKETS.moderate.label },
+  { value: 'strong', label: WIND_BUCKETS.strong.label },
+];
+
+const TIME_OF_DAY_OPTIONS: { value: TimeOfDayFilter; label: string }[] = [
+  { value: 'all', label: 'All Times' },
+  { value: 'morning', label: 'Morning' },
+  { value: 'midday', label: 'Midday' },
+  { value: 'afternoon', label: 'Afternoon' },
+  { value: 'evening', label: 'Evening' },
+];
+
+const ENVIRONMENT_OPTIONS: { value: EnvironmentFilter; label: string }[] = [
+  { value: 'all', label: 'All Environments' },
+  { value: 'indoor', label: 'Indoor' },
+  { value: 'outdoor', label: 'Outdoor' },
+];
+
+const LIGHTING_OPTIONS: { value: LightingFilter; label: string }[] = [
+  { value: 'all', label: 'All Lighting' },
+  { value: 'day', label: 'Daylight' },
+  { value: 'night', label: 'Night' },
+  { value: 'mixed', label: 'Mixed/Low Light' },
 ];
 
 const DEFAULT_PRESETS: FilterPreset[] = [
@@ -273,7 +309,7 @@ export function InsightsFilterBar({
   // Modal state
   const [showFilters, setShowFilters] = useState(false);
   const [activeModal, setActiveModal] = useState<
-    'position' | 'distance' | 'drillType' | 'weapon' | 'team' | null
+    'position' | 'distance' | 'drillType' | 'weapon' | 'team' | 'wind' | 'timeOfDay' | 'environment' | 'lighting' | null
   >(null);
 
   // Load filter options
@@ -326,6 +362,11 @@ export function InsightsFilterBar({
     if (filters.drillType !== 'all') count++;
     if (filters.stressOnly) count++;
     if (filters.timedOnly) count++;
+    // Environmental filters
+    if (filters.wind !== 'all') count++;
+    if (filters.timeOfDay !== 'all') count++;
+    if (filters.environment !== 'all') count++;
+    if (filters.lighting !== 'all') count++;
     return count;
   }, [filters]);
 
@@ -541,6 +582,86 @@ export function InsightsFilterBar({
             )}
           </View>
 
+          {/* Environmental Filters */}
+          <View style={styles.envSection}>
+            <Text style={[styles.envSectionLabel, { color: colors.textMuted }]}>
+              Environment
+            </Text>
+            <View style={styles.filtersGrid}>
+              <FilterChip
+                label="Wind"
+                value={
+                  filters.wind === 'all'
+                    ? null
+                    : WIND_OPTIONS.find((w) => w.value === filters.wind)?.label || null
+                }
+                placeholder="All"
+                onPress={() => setActiveModal('wind')}
+                onClear={
+                  filters.wind !== 'all'
+                    ? () => updateFilter('wind', 'all')
+                    : undefined
+                }
+                colors={colors}
+                compact
+              />
+
+              <FilterChip
+                label="Time"
+                value={
+                  filters.timeOfDay === 'all'
+                    ? null
+                    : TIME_OF_DAY_OPTIONS.find((t) => t.value === filters.timeOfDay)?.label || null
+                }
+                placeholder="All"
+                onPress={() => setActiveModal('timeOfDay')}
+                onClear={
+                  filters.timeOfDay !== 'all'
+                    ? () => updateFilter('timeOfDay', 'all')
+                    : undefined
+                }
+                colors={colors}
+                compact
+              />
+
+              <FilterChip
+                label="Location"
+                value={
+                  filters.environment === 'all'
+                    ? null
+                    : ENVIRONMENT_OPTIONS.find((e) => e.value === filters.environment)?.label || null
+                }
+                placeholder="All"
+                onPress={() => setActiveModal('environment')}
+                onClear={
+                  filters.environment !== 'all'
+                    ? () => updateFilter('environment', 'all')
+                    : undefined
+                }
+                colors={colors}
+                compact
+              />
+
+              <FilterChip
+                label="Light"
+                value={
+                  filters.lighting === 'all'
+                    ? null
+                    : LIGHTING_OPTIONS.find((l) => l.value === filters.lighting)?.label || null
+                }
+                placeholder="All"
+                onPress={() => setActiveModal('lighting')}
+                onClear={
+                  filters.lighting !== 'all'
+                    ? () => updateFilter('lighting', 'all')
+                    : undefined
+                }
+                colors={colors}
+                compact
+              />
+            </View>
+          </View>
+
           {/* Toggle Filters */}
           <View style={styles.toggleRow}>
             <TouchableOpacity
@@ -644,6 +765,15 @@ export function InsightsFilterBar({
               filters.teamId && teams.find((t) => t.id === filters.teamId)?.name,
               filters.stressOnly && 'High HR',
               filters.timedOnly && 'Timed',
+              // Environmental filters
+              filters.wind !== 'all' &&
+                WIND_OPTIONS.find((w) => w.value === filters.wind)?.label,
+              filters.timeOfDay !== 'all' &&
+                TIME_OF_DAY_OPTIONS.find((t) => t.value === filters.timeOfDay)?.label,
+              filters.environment !== 'all' &&
+                ENVIRONMENT_OPTIONS.find((e) => e.value === filters.environment)?.label,
+              filters.lighting !== 'all' &&
+                LIGHTING_OPTIONS.find((l) => l.value === filters.lighting)?.label,
             ]
               .filter(Boolean)
               .join(' · ')}
@@ -703,6 +833,47 @@ export function InsightsFilterBar({
         options={teamOptions}
         selectedValue={filters.teamId || ''}
         onSelect={(v) => updateFilter('teamId', v || null)}
+        onClose={() => setActiveModal(null)}
+        colors={colors}
+      />
+
+      {/* Environmental filter modals */}
+      <FilterModal
+        visible={activeModal === 'wind'}
+        title="Filter by Wind"
+        options={WIND_OPTIONS}
+        selectedValue={filters.wind}
+        onSelect={(v) => updateFilter('wind', v)}
+        onClose={() => setActiveModal(null)}
+        colors={colors}
+      />
+
+      <FilterModal
+        visible={activeModal === 'timeOfDay'}
+        title="Filter by Time of Day"
+        options={TIME_OF_DAY_OPTIONS}
+        selectedValue={filters.timeOfDay}
+        onSelect={(v) => updateFilter('timeOfDay', v)}
+        onClose={() => setActiveModal(null)}
+        colors={colors}
+      />
+
+      <FilterModal
+        visible={activeModal === 'environment'}
+        title="Filter by Environment"
+        options={ENVIRONMENT_OPTIONS}
+        selectedValue={filters.environment}
+        onSelect={(v) => updateFilter('environment', v)}
+        onClose={() => setActiveModal(null)}
+        colors={colors}
+      />
+
+      <FilterModal
+        visible={activeModal === 'lighting'}
+        title="Filter by Lighting"
+        options={LIGHTING_OPTIONS}
+        selectedValue={filters.lighting}
+        onSelect={(v) => updateFilter('lighting', v)}
         onClose={() => setActiveModal(null)}
         colors={colors}
       />
@@ -787,6 +958,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  
+  // Environmental section
+  envSection: {
+    gap: 6,
+  },
+  envSectionLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   filterChip: {
     flexDirection: 'row',

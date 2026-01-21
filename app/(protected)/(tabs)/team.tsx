@@ -1383,14 +1383,16 @@ function UnifiedTeamTab({
 
   // Fetch soldier weapon data (only for non-commanders)
   useEffect(() => {
-    console.log('[SoldierWeapon] canManage:', canManage, 'activeTeamId:', activeTeamId);
+    // Reset weapon data when team changes to prevent showing stale data from different team
+    setMyWeapon(null);
+    setMyPendingRequest(null);
+    setPoolWeapons([]);
+
     if (canManage || !activeTeamId) {
-      console.log('[SoldierWeapon] Skipping fetch - canManage or no teamId');
       return;
     }
 
     const fetchWeaponData = async () => {
-      console.log('[SoldierWeapon] Fetching weapon data...');
       setWeaponLoading(true);
       try {
         const [weapon, pending, pool] = await Promise.all([
@@ -1398,7 +1400,6 @@ function UnifiedTeamTab({
           getMyPendingRequest(activeTeamId),
           getPoolWeapons(activeTeamId),
         ]);
-        console.log('[SoldierWeapon] Fetched - weapon:', weapon?.name, 'pending:', !!pending, 'pool:', pool.length);
         setMyWeapon(weapon);
         setMyPendingRequest(pending);
         setPoolWeapons(pool);

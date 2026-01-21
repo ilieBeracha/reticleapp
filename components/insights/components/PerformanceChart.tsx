@@ -94,7 +94,7 @@ export function PerformanceChart({ data, height = 180 }: PerformanceChartProps) 
   // Parent ScrollView paddingHorizontal: 14, container padding: 14
   // Total: 14 + 14 = 28px each side = 56px total
   const width = screenWidth - 56;
-  const padding = { top: 20, bottom: 30, left: 36, right: 8 };
+  const padding = { top: 20, bottom: 30, left: 20, right: 8 };
 
   // Extract values
   const accuracyValues = useMemo(() => data.map((d) => d.accuracy ?? 0).filter((v) => v > 0), [data]);

@@ -10,7 +10,7 @@
 
 import { CreateWeaponFlow, WeaponPicker } from '@/components/weapons';
 import { useColors } from '@/hooks/ui/useColors';
-import { getUserWeapon, type UserWeapon } from '@/services/weaponService';
+import { getOrCreatePersonalProfile, getUserWeapon, type UserWeapon } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
 import {
   ChevronRight,
@@ -123,6 +123,7 @@ export function SessionCreationForm({
   );
   const [showWeaponPicker, setShowWeaponPicker] = useState(false);
   const [showCreateWeapon, setShowCreateWeapon] = useState(false);
+  const [convertingWeapon, setConvertingWeapon] = useState(false);
 
   // Context (step 2) - pre-filled from drill if in training context
   const [context, setContext] = useState<SessionContextState>(() => {
@@ -161,8 +162,8 @@ export function SessionCreationForm({
     };
   });
 
-  // Update weapon in context when selected
-  const handleWeaponSelect = useCallback((weapon: UserWeapon) => {
+  // Helper to set weapon in both state and context
+  const setWeaponState = useCallback((weapon: UserWeapon) => {
     setSelectedWeapon(weapon);
     setContext((prev) => ({
       ...prev,
@@ -170,8 +171,31 @@ export function SessionCreationForm({
       weaponName: weapon.name,
       weaponCategory: weapon.category || null,
     }));
-    setShowWeaponPicker(false);
   }, []);
+
+  // Update weapon in context when selected
+  const handleWeaponSelect = useCallback(async (weapon: UserWeapon) => {
+    setShowWeaponPicker(false);
+
+    // If this is a team weapon (has team_id), convert to personal profile
+    // This ensures weapon_id used in session is a user_weapon ID
+    if ('team_id' in weapon && weapon.team_id) {
+      try {
+        setConvertingWeapon(true);
+        const personalProfile = await getOrCreatePersonalProfile(weapon.id);
+        setWeaponState(personalProfile);
+      } catch (error) {
+        console.error('[SessionCreationForm] Failed to create personal profile:', error);
+        // Fallback to using the weapon directly
+        setWeaponState(weapon);
+      } finally {
+        setConvertingWeapon(false);
+      }
+    } else {
+      // Already a user weapon
+      setWeaponState(weapon);
+    }
+  }, [setWeaponState]);
 
   const handleWeaponCreatedById = useCallback(
     async (weaponId: string) => {
@@ -197,7 +221,7 @@ export function SessionCreationForm({
   // ─────────────────────────────────────────────────────────────────────────
 
   const isFromDrill = !!trainingContext?.drill;
-  const canSubmit = purpose !== null && (hideWeapon || selectedWeapon !== null);
+  const canSubmit = purpose !== null && (hideWeapon || selectedWeapon !== null) && !convertingWeapon;
 
   // Current step for non-drill flow
   const currentStep = useMemo(() => {
@@ -283,11 +307,11 @@ export function SessionCreationForm({
             {!hideWeapon && (
               <View style={styles.section}>
                 <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Weapon</Text>
-                {loadingWeapon ? (
+                {loadingWeapon || convertingWeapon ? (
                   <View style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                     <ActivityIndicator size="small" color={colors.textMuted} />
                     <Text style={[styles.weaponLoadingText, { color: colors.textMuted }]}>
-                      Loading...
+                      {convertingWeapon ? 'Setting up weapon...' : 'Loading...'}
                     </Text>
                   </View>
                 ) : selectedWeapon ? (

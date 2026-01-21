@@ -1,8 +1,8 @@
 /**
- * Context Summary Section (v2.0 - Refined Visual)
+ * Context Summary Section
  *
- * Matrix-native display of context profiles showing engagement ↔ grouping connection.
- * Clean, stats-focused design with minimal color use.
+ * Shows context profiles in a list format with expandable details.
+ * Profiles are sorted by priority: struggling first, then by confidence.
  */
 
 import { useColors } from '@/hooks/ui/useColors';
@@ -218,47 +218,51 @@ export function ContextSummarySection({
               Context Analysis
             </Text>
             <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
-              {relevantProfiles.length} context{relevantProfiles.length !== 1 ? 's' : ''}
+              {relevantProfiles.length} context{relevantProfiles.length !== 1 ? 's' : ''} tracked
             </Text>
           </View>
         </View>
+        
         <SummaryStats summary={summary} colors={colors} />
       </View>
 
-      {/* Profile rows */}
-      {visibleProfiles.length > 0 ? (
-        <View style={styles.profilesContainer}>
-          {visibleProfiles.map((profile) => (
-            <ContextProfileRow
-              key={profile.keyString}
-              profile={profile}
-              onViewEvidence={
-                onViewEvidence ? () => handleViewEvidence(profile) : undefined
-              }
-            />
-          ))}
-        </View>
-      ) : (
-        <EmptyState colors={colors} />
+      {/* Profile List */}
+      {relevantProfiles.length > 0 && (
+        <>
+          <View style={styles.profilesContainer}>
+            {visibleProfiles.map((profile) => (
+              <ContextProfileRow
+                key={profile.keyString}
+                profile={profile}
+                onViewEvidence={
+                  onViewEvidence ? () => handleViewEvidence(profile) : undefined
+                }
+              />
+            ))}
+          </View>
+          
+          {/* Expand/Collapse */}
+          {hasMore && (
+            <TouchableOpacity
+              style={[styles.expandButton, { borderColor: `${colors.border}40` }]}
+              onPress={handleToggleExpand}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.expandText, { color: colors.textMuted }]}>
+                {isExpanded ? 'Show less' : `+${hiddenCount} more`}
+              </Text>
+              {isExpanded ? (
+                <ChevronUp size={14} color={colors.textMuted} strokeWidth={2} />
+              ) : (
+                <ChevronDown size={14} color={colors.textMuted} strokeWidth={2} />
+              )}
+            </TouchableOpacity>
+          )}
+        </>
       )}
 
-      {/* Expand/Collapse */}
-      {hasMore && (
-        <TouchableOpacity
-          style={[styles.expandButton, { borderColor: `${colors.border}40` }]}
-          onPress={handleToggleExpand}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.expandText, { color: colors.textMuted }]}>
-            {isExpanded ? 'Show less' : `+${hiddenCount} more`}
-          </Text>
-          {isExpanded ? (
-            <ChevronUp size={14} color={colors.textMuted} strokeWidth={2} />
-          ) : (
-            <ChevronDown size={14} color={colors.textMuted} strokeWidth={2} />
-          )}
-        </TouchableOpacity>
-      )}
+      {/* Empty State */}
+      {relevantProfiles.length === 0 && <EmptyState colors={colors} />}
     </View>
   );
 }
@@ -283,6 +287,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    flex: 1,
   },
   sectionIcon: {
     width: 32,

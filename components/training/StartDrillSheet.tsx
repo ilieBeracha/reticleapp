@@ -150,9 +150,27 @@ export function StartDrillSheet({
     }
   };
 
-  const handleWeaponSelect = useCallback((weapon: UserWeapon) => {
-    setSelectedWeapon(weapon);
+  const handleWeaponSelect = useCallback(async (weapon: UserWeapon) => {
     setShowWeaponPicker(false);
+
+    // If this is a team weapon (has team_id), convert to personal profile
+    // This ensures weapon_id used in session is a user_weapon ID
+    if ('team_id' in weapon && weapon.team_id) {
+      try {
+        setLoadingWeapon(true);
+        const personalProfile = await getOrCreatePersonalProfile(weapon.id);
+        setSelectedWeapon(personalProfile);
+      } catch (error) {
+        console.error('[StartDrillSheet] Failed to create personal profile:', error);
+        // Fallback to using the weapon directly
+        setSelectedWeapon(weapon);
+      } finally {
+        setLoadingWeapon(false);
+      }
+    } else {
+      // Already a user weapon
+      setSelectedWeapon(weapon);
+    }
   }, []);
 
   const handleWeaponCreatedById = useCallback(async (weaponId: string) => {

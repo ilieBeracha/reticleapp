@@ -72,6 +72,7 @@ export { useTableSubscription } from './useTableSubscription';
 export { useTrainingRealtime } from './useTrainingRealtime';
 export { useSessionRealtime } from './useSessionRealtime';
 export { useTeamRealtime } from './useTeamRealtime';
+export { useWeaponRealtime } from './useWeaponRealtime';
 
 // Types
 export type {
@@ -87,3 +88,8 @@ export type {
   UseRealtimeChannelReturn,
   UseTableSubscriptionOptions,
 } from './types';
+
+export type {
+  TeamWeaponRecord,
+  WeaponRequestRecord,
+} from './useWeaponRealtime';

@@ -50,12 +50,14 @@ import {
   Recommendation,
   StrengthCard,
   ThresholdConfig,
+  TIME_OF_DAY_BUCKETS,
   TotalsMetric,
   TrendData,
   TrendDataPoint,
   TrendSummary,
   TrustItem,
-  WeaknessCard
+  WeaknessCard,
+  WIND_BUCKETS,
 } from './insights.types';
 
 // ============================================================================
@@ -408,6 +410,54 @@ export function applyFilters(
     // Timed only filter
     if (filters.timedOnly && !session.drill_config?.time_limit_seconds) {
       return false;
+    }
+
+    // ====== ENVIRONMENTAL FILTERS ======
+    
+    // Wind filter - check weather data
+    if (filters.wind !== 'all' && session.weather) {
+      const windSpeed = session.weather.wind_speed_mps;
+      if (windSpeed != null) {
+        const bucket = WIND_BUCKETS[filters.wind];
+        if (windSpeed < bucket.min || windSpeed >= bucket.max) {
+          return false;
+        }
+      } else {
+        // No wind data, exclude if filtering for specific wind
+        return false;
+      }
+    }
+    
+    // Time of day filter - based on session start time
+    if (filters.timeOfDay !== 'all') {
+      const sessionDate = new Date(session.started_at);
+      const hour = sessionDate.getHours();
+      const bucket = TIME_OF_DAY_BUCKETS[filters.timeOfDay];
+      if (hour < bucket.min || hour >= bucket.max) {
+        return false;
+      }
+    }
+    
+    // Environment filter (indoor/outdoor)
+    // Note: This requires an 'environment' field on the session
+    // For now, check drill_config or weather presence as proxy
+    if (filters.environment !== 'all') {
+      const isOutdoor = session.weather != null; // Weather data suggests outdoor
+      if (filters.environment === 'indoor' && isOutdoor) return false;
+      if (filters.environment === 'outdoor' && !isOutdoor) return false;
+    }
+    
+    // Lighting filter
+    // Infer from time of day - day (6-18), night (18-6), mixed (transition hours)
+    if (filters.lighting !== 'all') {
+      const sessionDate = new Date(session.started_at);
+      const hour = sessionDate.getHours();
+      const isDay = hour >= 6 && hour < 18;
+      const isTransition = (hour >= 5 && hour < 7) || (hour >= 17 && hour < 20);
+      
+      if (filters.lighting === 'day' && !isDay) return false;
+      if (filters.lighting === 'night' && isDay) return false;
+      if (filters.lighting === 'mixed' && !isTransition) return false;
     }
 
     return true;

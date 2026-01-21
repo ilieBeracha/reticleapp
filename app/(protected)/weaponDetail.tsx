@@ -318,8 +318,13 @@ export default function WeaponDetailScreen() {
         </TouchableOpacity>
         <View style={s.headerCenter}>
           <Text style={[s.headerTitle, { color: colors.text }]} numberOfLines={1}>
-            {weapon.name}
+            {isTeamWeapon ? 'Team Weapon' : weapon.name}
           </Text>
+          {isTeamWeapon && weapon.team_name && (
+            <Text style={[s.headerSubtitle, { color: colors.primary }]} numberOfLines={1}>
+              {weapon.team_name}
+            </Text>
+          )}
         </View>
         {/* Only show default star for personal weapons */}
         {!isTeamWeapon ? (
@@ -331,7 +336,9 @@ export default function WeaponDetailScreen() {
             <Star size={20} color={isDefault ? '#f59e0b' : colors.textMuted} fill={isDefault ? '#f59e0b' : 'none'} />
           </TouchableOpacity>
         ) : (
-          <View style={s.headerAction} />
+          <View style={[s.headerAction, { backgroundColor: '#3B82F615' }]}>
+            <Users size={18} color="#3B82F6" />
+          </View>
         )}
       </View>
 
@@ -345,8 +352,8 @@ export default function WeaponDetailScreen() {
       >
         {/* Hero Section */}
         <View style={[s.heroCard, { backgroundColor: colors.card }]}>
-          <View style={[s.heroIcon, { backgroundColor: `${colors.primary}15` }]}>
-            {getCategoryIcon(weapon.category, colors.primary, 28)}
+          <View style={[s.heroIcon, { backgroundColor: isTeamWeapon ? '#3B82F615' : `${colors.primary}15` }]}>
+            {getCategoryIcon(weapon.category, isTeamWeapon ? '#3B82F6' : colors.primary, 28)}
           </View>
           <View style={s.heroInfo}>
             <Text style={[s.heroName, { color: colors.text }]}>{weapon.name}</Text>
@@ -354,10 +361,6 @@ export default function WeaponDetailScreen() {
               {categoryConfig?.label || 'Weapon'}
               {weapon.caliber && ` · ${weapon.caliber}`}
             </Text>
-            {/* Team name for team weapons */}
-            {isTeamWeapon && weapon.team_name && (
-              <Text style={[s.teamName, { color: colors.textMuted }]}>{weapon.team_name}</Text>
-            )}
           </View>
           {isTeamWeapon ? (
             <View style={[s.teamBadge, { backgroundColor: source === 'team_assigned' ? '#3B82F615' : '#8B5CF615' }]}>
@@ -532,25 +535,69 @@ export default function WeaponDetailScreen() {
           </View>
         )}
 
-        {/* Delete Button - only for personal weapons */}
+        {/* Actions Section - Personal Weapons */}
         {!isTeamWeapon && (
-          <TouchableOpacity
-            style={[s.deleteBtn, { backgroundColor: '#ef444415', borderColor: '#ef444430' }]}
-            onPress={handleDelete}
-            activeOpacity={0.7}
-          >
-            <Trash2 size={16} color="#ef4444" />
-            <Text style={s.deleteBtnText}>Delete Weapon</Text>
-          </TouchableOpacity>
+          <View style={s.section}>
+            <Text style={[s.sectionTitle, { color: colors.text }]}>Actions</Text>
+            <View style={[s.actionsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {/* Set as Default */}
+              <TouchableOpacity
+                style={[s.actionRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
+                onPress={handleToggleDefault}
+                activeOpacity={0.7}
+              >
+                <View style={[s.actionIcon, { backgroundColor: isDefault ? '#f59e0b15' : colors.secondary }]}>
+                  <Star size={16} color={isDefault ? '#f59e0b' : colors.textMuted} fill={isDefault ? '#f59e0b' : 'none'} />
+                </View>
+                <View style={s.actionInfo}>
+                  <Text style={[s.actionTitle, { color: colors.text }]}>
+                    {isDefault ? 'Default Weapon' : 'Set as Default'}
+                  </Text>
+                  <Text style={[s.actionSubtitle, { color: colors.textMuted }]}>
+                    {isDefault ? 'This is your primary weapon' : 'Use as your primary weapon'}
+                  </Text>
+                </View>
+                {isDefault && (
+                  <View style={[s.actionBadge, { backgroundColor: '#f59e0b15' }]}>
+                    <Text style={[s.actionBadgeText, { color: '#f59e0b' }]}>Active</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              {/* Delete */}
+              <TouchableOpacity
+                style={s.actionRow}
+                onPress={handleDelete}
+                activeOpacity={0.7}
+              >
+                <View style={[s.actionIcon, { backgroundColor: '#ef444410' }]}>
+                  <Trash2 size={16} color="#ef4444" />
+                </View>
+                <View style={s.actionInfo}>
+                  <Text style={[s.actionTitle, { color: '#ef4444' }]}>Delete Weapon</Text>
+                  <Text style={[s.actionSubtitle, { color: colors.textMuted }]}>
+                    Remove from your loadout
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
         )}
 
-        {/* Info for team weapons */}
+        {/* Team Weapon Info */}
         {isTeamWeapon && (
-          <View style={[s.teamInfoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Users size={16} color={colors.textMuted} />
-            <Text style={[s.teamInfoText, { color: colors.textMuted }]}>
-              This weapon is managed by your team commander
-            </Text>
+          <View style={[s.teamInfoCard, { backgroundColor: '#3B82F608', borderColor: '#3B82F620' }]}>
+            <View style={[s.teamInfoIcon, { backgroundColor: '#3B82F615' }]}>
+              <Users size={18} color="#3B82F6" />
+            </View>
+            <View style={s.teamInfoContent}>
+              <Text style={[s.teamInfoTitle, { color: colors.text }]}>Team Managed</Text>
+              <Text style={[s.teamInfoText, { color: colors.textMuted }]}>
+                {source === 'team_assigned' 
+                  ? 'This weapon is assigned to you by your commander' 
+                  : 'This weapon is available from your team pool'}
+              </Text>
+            </View>
           </View>
         )}
       </ScrollView>
@@ -598,6 +645,11 @@ const s = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     letterSpacing: -0.2,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
   },
   headerAction: {
     width: 40,
@@ -658,10 +710,6 @@ const s = StyleSheet.create({
     fontWeight: '600',
     color: '#f59e0b',
   },
-  teamName: {
-    fontSize: 12,
-    marginTop: 2,
-  },
   teamBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -677,14 +725,13 @@ const s = StyleSheet.create({
   teamInfoCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    padding: 14,
-    borderRadius: 12,
+    gap: 14,
+    padding: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    marginTop: 12,
+    marginTop: 20,
   },
   teamInfoText: {
-    flex: 1,
     fontSize: 13,
     lineHeight: 18,
   },
@@ -838,20 +885,60 @@ const s = StyleSheet.create({
     fontSize: 11,
   },
 
-  // Delete
-  deleteBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
+  // Actions Section
+  actionsCard: {
     borderRadius: 12,
     borderWidth: 1,
-    marginTop: 12,
+    overflow: 'hidden',
   },
-  deleteBtnText: {
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    gap: 12,
+  },
+  actionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  actionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#ef4444',
+  },
+  actionSubtitle: {
+    fontSize: 12,
+  },
+  actionBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  actionBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  // Team Info
+  teamInfoIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  teamInfoContent: {
+    flex: 1,
+    gap: 4,
+  },
+  teamInfoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

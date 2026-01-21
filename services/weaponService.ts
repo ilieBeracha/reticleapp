@@ -799,25 +799,59 @@ export async function getAllAccessibleWeapons(): Promise<AccessibleWeapon[]> {
 
   const result: AccessibleWeapon[] = [];
 
+  // Create a map of team weapons for quick lookup
+  const teamWeaponMap = new Map((teamWeapons as TeamWeapon[]).map(tw => [tw.id, tw]));
+
   // Add personal weapons
+  // If a personal weapon is linked to a team weapon that's assigned to this user,
+  // show it as 'team_assigned' instead of 'personal'
   personalWeapons.forEach(w => {
+    let source: WeaponSource = 'personal';
+    let teamId: string | undefined;
+    let teamName: string | undefined;
+    let linkedTeamWeapon: TeamWeapon | undefined;
+
+    // Check if this personal weapon is linked to a team weapon
+    if (w.team_weapon_id) {
+      linkedTeamWeapon = teamWeaponMap.get(w.team_weapon_id);
+      if (linkedTeamWeapon && linkedTeamWeapon.assigned_to === user.id) {
+        // This is the user's assigned team weapon - show as team_assigned
+        source = 'team_assigned';
+        teamId = linkedTeamWeapon.team_id;
+        teamName = teamNameMap.get(linkedTeamWeapon.team_id);
+      }
+    }
+
     result.push({
       id: w.id,
       name: w.name,
       category: w.category,
       caliber: w.caliber || w.base_weapon?.caliber || null,
-      source: 'personal',
+      source,
+      teamId,
+      teamName,
       userWeapon: w,
     });
   });
 
   // Add team weapons (distinguish assigned vs pool)
+  // Only show weapons that are:
+  // 1. Assigned to the current user (team_assigned)
+  // 2. Available in the pool AND not assigned to anyone else (team_pool)
   (teamWeapons as TeamWeapon[]).forEach(tw => {
     // Skip if user already has a personal weapon linked to this team weapon
     const isLinkedToPersonal = personalWeapons.some(pw => pw.team_weapon_id === tw.id);
     if (isLinkedToPersonal) return;
 
     const isAssignedToMe = tw.assigned_to === user.id;
+    const isAssignedToSomeoneElse = tw.assigned_to != null && tw.assigned_to !== user.id;
+    const isPoolAvailable = tw.pool_available === true;
+
+    // Only include if:
+    // - Assigned to me, OR
+    // - In pool and not assigned to someone else
+    if (!isAssignedToMe && !isPoolAvailable) return;
+    if (isAssignedToSomeoneElse && !isPoolAvailable) return;
     
     result.push({
       id: tw.id,
