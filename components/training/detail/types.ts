@@ -149,3 +149,25 @@ export interface CommanderActionsSheetProps {
   trainingStatus: string;
   colors: Colors;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// READINESS CARD
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface ReadinessItem {
+  id: string;
+  label: string;
+  isComplete: boolean;
+  icon: 'drill' | 'weapon' | 'members';
+  /** Action to take when this item is tapped */
+  onPress?: () => void;
+}
+
+export interface TrainingReadinessCardProps {
+  items: ReadinessItem[];
+  colors: Colors;
+  /** Called when "Complete setup" is pressed - navigates to first incomplete item */
+  onCompleteSetup: () => void;
+  /** Whether this is a team training (affects display) */
+  isTeamTraining?: boolean;
+}

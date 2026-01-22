@@ -16,7 +16,9 @@ import {
   SquadStatusContent,
   StartTrainingSheet,
   TrainingHero,
+  TrainingReadinessCard,
   TrainingSettingsModal,
+  type ReadinessItem,
 } from '@/components/training/detail';
 import { StartDrillSheet } from '@/components/training/StartDrillSheet';
 import { useAuth } from '@/contexts/AuthContext';
@@ -103,7 +105,6 @@ function ParallaxScrollContent({
   colors,
   insets,
   onAutoCloseExpired,
-  openWeather,
   userWeapon,
   weaponChecked,
   pendingRequest,
@@ -112,6 +113,7 @@ function ParallaxScrollContent({
   onAssignWeapon,
   onRequestWeapon,
   onCancelRequest,
+  onAddDrill,
   completedCount,
   drills,
   isPlanned,
@@ -317,14 +319,63 @@ function ParallaxScrollContent({
       {/* Content based on active tab */}
       {activeTab === 'drills' ? (
         <View style={styles.drillsContainer}>
-          {/* No weapon banner - only show after weapon check complete */}
-          {isOngoing && weaponChecked && !userWeapon && (
-            <View style={[styles.noWeaponBanner, { 
-              backgroundColor: pendingRequest ? colors.blue + '10' : colors.orange + '10', 
-              borderColor: pendingRequest ? colors.blue + '25' : colors.orange + '25' 
+          {/* Training Readiness Card - Commander view for setup tracking */}
+          {canManageTraining && (isPlanned || isOngoing) && weaponChecked && (() => {
+            const isTeamTraining = !!training?.team_id;
+            const hasDrills = drills.length > 0;
+            const hasWeapon = !!userWeapon;
+
+            // Only show if there's something incomplete
+            const showCard = !hasDrills || (isTeamTraining && !hasWeapon);
+            if (!showCard) return null;
+
+            const readinessItems: ReadinessItem[] = [
+              {
+                id: 'drills',
+                label: hasDrills ? `${drills.length} drill${drills.length !== 1 ? 's' : ''} added` : 'Add drills',
+                isComplete: hasDrills,
+                icon: 'drill',
+                onPress: !hasDrills ? onAddDrill : undefined,
+              },
+            ];
+
+            // Only show weapon item for team trainings
+            if (isTeamTraining) {
+              readinessItems.push({
+                id: 'weapon',
+                label: hasWeapon ? 'Weapon assigned' : 'Assign weapon',
+                isComplete: hasWeapon,
+                icon: 'weapon',
+                onPress: !hasWeapon ? onAssignWeapon : undefined,
+              });
+            }
+
+            const handleCompleteSetup = () => {
+              // Navigate to first incomplete item
+              const firstIncomplete = readinessItems.find(i => !i.isComplete);
+              if (firstIncomplete?.onPress) {
+                firstIncomplete.onPress();
+              }
+            };
+
+            return (
+              <TrainingReadinessCard
+                items={readinessItems}
+                colors={colors}
+                onCompleteSetup={handleCompleteSetup}
+                isTeamTraining={isTeamTraining}
+              />
+            );
+          })()}
+
+          {/* No weapon banner - Soldier view only (can't manage, need to request) */}
+          {!canManageTraining && isOngoing && weaponChecked && !userWeapon && (
+            <View style={[styles.noWeaponBanner, {
+              backgroundColor: pendingRequest ? colors.blue + '10' : colors.orange + '10',
+              borderColor: pendingRequest ? colors.blue + '25' : colors.orange + '25'
             }]}>
-              <View style={[styles.noWeaponIcon, { 
-                backgroundColor: pendingRequest ? colors.blue + '20' : colors.orange + '20' 
+              <View style={[styles.noWeaponIcon, {
+                backgroundColor: pendingRequest ? colors.blue + '20' : colors.orange + '20'
               }]}>
                 {pendingRequest ? (
                   <Clock size={20} color={colors.blue} />
@@ -334,26 +385,16 @@ function ParallaxScrollContent({
               </View>
               <View style={styles.noWeaponContent}>
                 <Text style={[styles.noWeaponTitle, { color: pendingRequest ? colors.blue : colors.orange }]}>
-                  {pendingRequest ? 'Request Pending' : 'No Weapon Assigned'}
+                  {pendingRequest ? 'Request Pending' : 'Weapon Required'}
                 </Text>
                 <Text style={[styles.noWeaponHint, { color: colors.textMuted }]}>
-                  {pendingRequest 
+                  {pendingRequest
                     ? 'Waiting for commander approval'
-                    : canManageTraining 
-                      ? 'Tap to manage team weapons' 
-                      : 'Request a weapon to start drills'}
+                    : 'Request a weapon to start drills'}
                 </Text>
               </View>
               {/* Action button */}
-              {canManageTraining ? (
-                <TouchableOpacity
-                  style={[styles.noWeaponAction, { backgroundColor: colors.orange }]}
-                  onPress={onAssignWeapon}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.noWeaponActionText}>Manage</Text>
-                </TouchableOpacity>
-              ) : pendingRequest ? (
+              {pendingRequest ? (
                 <TouchableOpacity
                   style={[styles.noWeaponAction, { backgroundColor: colors.secondary }]}
                   onPress={onCancelRequest}
@@ -1142,7 +1183,6 @@ export default function TrainingDetailScreen() {
         colors={colors}
         insets={insets}
         onAutoCloseExpired={handleAutoCloseExpired}
-        openWeather={openWeather}
         userWeapon={userWeapon}
         weaponChecked={weaponChecked}
         pendingRequest={pendingRequest}
@@ -1151,6 +1191,7 @@ export default function TrainingDetailScreen() {
         onAssignWeapon={handleOpenWeaponManagement}
         onRequestWeapon={handleRequestWeapon}
         onCancelRequest={handleCancelRequest}
+        onAddDrill={handleOpenAddDrill}
         completedCount={completedCount}
         drills={drills}
         isPlanned={isPlanned}

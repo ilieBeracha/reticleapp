@@ -355,7 +355,7 @@ export function InsightsDashboard() {
     // Combine evidence from both engagement and grouping
     const sessionIds = [
       ...(profile.engagement?.evidenceIds ?? []),
-      ...(profile.grouping?.evidenceIds ?? []),
+      ...(profile.grouping?.evidenceIds ?? []), 
     ];
     // Deduplicate
     const uniqueIds = [...new Set(sessionIds)];

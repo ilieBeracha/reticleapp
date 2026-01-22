@@ -54,10 +54,10 @@ export function ExecutionPhaseContent({
           </View>
           <View style={styles.noWeaponContent}>
             <Text style={[styles.noWeaponTitle, { color: colors.orange }]}>
-              No Weapon Assigned
+              Weapon Required
             </Text>
             <Text style={[styles.noWeaponHint, { color: colors.textMuted }]}>
-              You need a weapon to start drills. Ask your commander.
+              A weapon is required to start drills
             </Text>
           </View>
         </View>

@@ -40,7 +40,7 @@ export function TeamSection({
         <View style={[styles.emptyTeam, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Calendar size={18} color={colors.textMuted} />
           <Text style={[styles.emptyTeamText, { color: colors.textMuted }]}>
-            No upcoming trainings
+            No trainings scheduled
           </Text>
           <TouchableOpacity
             style={styles.viewScheduleBtn}

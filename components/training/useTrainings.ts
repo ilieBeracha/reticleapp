@@ -220,6 +220,12 @@ export function useTrainings(): UseTrainingsReturn {
     router.push(`/(protected)/teamSettings?teamId=${activeTeamId}` as any);
   }, [activeTeamId]);
 
+  const handleOpenArmory = useCallback(() => {
+    if (!activeTeamId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push(`/(protected)/teamArmory?teamId=${activeTeamId}` as any);
+  }, [activeTeamId]);
+
   const handleTabChange = useCallback((tab: InternalTab) => {
     Haptics.selectionAsync();
     setActiveTab(tab);
@@ -263,6 +269,7 @@ export function useTrainings(): UseTrainingsReturn {
     handleTrainingPress,
     handleCreateTraining,
     handleOpenLibrary,
+    handleOpenArmory,
     handleViewMembers,
     handleInviteMember,
     handleTeamSettings,

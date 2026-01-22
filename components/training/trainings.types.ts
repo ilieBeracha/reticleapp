@@ -107,6 +107,7 @@ export interface UseTrainingsReturn {
   handleTrainingPress: (training: TrainingWithDetails) => void;
   handleCreateTraining: () => void;
   handleOpenLibrary: () => void;
+  handleOpenArmory: () => void;
   handleViewMembers: () => void;
   handleInviteMember: () => void;
   handleTeamSettings: () => void;

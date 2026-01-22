@@ -279,7 +279,7 @@ function ScheduleView({
           {upcomingTrainings.length === 0 ? (
             <View style={[scheduleStyles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Calendar size={20} color={colors.textMuted} style={{ opacity: 0.6 }} />
-              <Text style={[scheduleStyles.emptyCardText, { color: colors.textMuted }]}>No upcoming trainings</Text>
+              <Text style={[scheduleStyles.emptyCardText, { color: colors.textMuted }]}>No trainings scheduled</Text>
               {canSchedule && (
                 <TouchableOpacity
                   style={[scheduleStyles.emptyCardBtn, { backgroundColor: colors.secondary }]}
@@ -605,6 +605,7 @@ export default function TeamScreen() {
     handleTrainingPress,
     handleCreateTraining,
     handleOpenLibrary,
+    handleOpenArmory,
     handleViewMembers,
     handleInviteMember,
     handleTeamSettings,
@@ -744,6 +745,7 @@ export default function TeamScreen() {
                 onTrainingPress={handleTrainingPress}
                 onCreateTraining={handleCreateTraining}
                 onOpenLibrary={handleOpenLibrary}
+                onOpenArmory={handleOpenArmory}
                 onViewMembers={handleViewMembers}
                 onInviteMember={handleInviteMember}
                 onTeamSettings={handleTeamSettings}
@@ -1348,6 +1350,7 @@ interface UnifiedTeamTabProps {
   onTrainingPress: (training: TrainingWithDetails) => void;
   onCreateTraining: () => void;
   onOpenLibrary: () => void;
+  onOpenArmory: () => void;
   onViewMembers: () => void;
   onInviteMember: () => void;
   onTeamSettings: () => void;
@@ -1367,6 +1370,7 @@ function UnifiedTeamTab({
   onTrainingPress,
   onCreateTraining,
   onOpenLibrary,
+  onOpenArmory,
   onViewMembers,
   onInviteMember,
   onTeamSettings,
@@ -1574,9 +1578,9 @@ function UnifiedTeamTab({
                 <View style={[soldierStyles.noWeaponIcon, { backgroundColor: colors.secondary }]}>
                   <Shield size={24} color={colors.textMuted} />
                 </View>
-                <Text style={[soldierStyles.noWeaponTitle, { color: colors.text }]}>No Weapon Assigned</Text>
+                <Text style={[soldierStyles.noWeaponTitle, { color: colors.text }]}>Weapon Required</Text>
                 <Text style={[soldierStyles.noWeaponHint, { color: colors.textMuted }]}>
-                  Request a weapon from your commander
+                  Request a weapon to start training
                 </Text>
               </View>
             )}
@@ -1665,6 +1669,13 @@ function UnifiedTeamTab({
           >
             <Plus size={18} color={colors.background} strokeWidth={2.5} />
             <Text style={[unifiedStyles.primaryActionText, { color: colors.background }]}>New Training</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[unifiedStyles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={onOpenArmory}
+            activeOpacity={0.7}
+          >
+            <Shield size={18} color={colors.text} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[unifiedStyles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -1818,6 +1829,16 @@ function UnifiedTeamTab({
                 <Users size={15} color={colors.primary} />
               </View>
               <Text style={[unifiedStyles.menuItemText, { color: colors.text }]}>Members & Roles</Text>
+              <ChevronRight size={16} color={colors.border} />
+            </TouchableOpacity>
+
+            <View style={[unifiedStyles.menuDivider, { backgroundColor: colors.border }]} />
+
+            <TouchableOpacity style={unifiedStyles.menuItem} onPress={onOpenArmory} activeOpacity={0.6}>
+              <View style={[unifiedStyles.menuIcon, { backgroundColor: '#F59E0B12' }]}>
+                <Shield size={15} color="#F59E0B" />
+              </View>
+              <Text style={[unifiedStyles.menuItemText, { color: colors.text }]}>Team Armory</Text>
               <ChevronRight size={16} color={colors.border} />
             </TouchableOpacity>
 

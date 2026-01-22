@@ -398,20 +398,36 @@ function PendingContributionCard({
 function MyAssignmentCard({
   weapon,
   colors,
+  onRequestWeapon,
+  hasPendingRequest,
 }: {
   weapon: TeamWeapon | null;
   colors: ReturnType<typeof useColors>;
+  onRequestWeapon?: () => void;
+  hasPendingRequest?: boolean;
 }) {
   if (!weapon) {
     return (
       <View style={[styles.noAssignmentCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={[styles.noAssignmentIcon, { backgroundColor: colors.secondary }]}>
-          <ShieldCheck size={28} color={colors.textMuted} />
+        <View style={[styles.noAssignmentIcon, { backgroundColor: colors.primary + '15' }]}>
+          <Shield size={32} color={colors.primary} />
         </View>
-        <Text style={[styles.noAssignmentTitle, { color: colors.text }]}>No Weapon Assigned</Text>
-        <Text style={[styles.noAssignmentHint, { color: colors.textMuted }]}>
-          Request a weapon from your commander
+        <Text style={[styles.noAssignmentTitle, { color: colors.text }]}>
+          Get Ready for Training
         </Text>
+        <Text style={[styles.noAssignmentHint, { color: colors.textMuted }]}>
+          Request a weapon to participate in team drills and track your progress.
+        </Text>
+        {!hasPendingRequest && onRequestWeapon && (
+          <TouchableOpacity
+            style={[styles.noAssignmentCta, { backgroundColor: colors.primary }]}
+            onPress={onRequestWeapon}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.noAssignmentCtaText}>Request a Weapon</Text>
+            <ChevronRight size={16} color="#fff" />
+          </TouchableOpacity>
+        )}
       </View>
     );
   }
@@ -496,6 +512,7 @@ function AddWeaponModal({
 }) {
   const [step, setStep] = useState<'choose' | 'catalog' | 'custom'>('choose');
   const [catalogSearch, setCatalogSearch] = useState('');
+  const [catalogCategory, setCatalogCategory] = useState<WeaponCategory | null>(null);
   const [allCatalogWeapons, setAllCatalogWeapons] = useState<GlobalWeapon[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [selectedCatalogWeapon, setSelectedCatalogWeapon] = useState<GlobalWeapon | null>(null);
@@ -509,6 +526,7 @@ function AddWeaponModal({
   const resetModal = () => {
     setStep('choose');
     setCatalogSearch('');
+    setCatalogCategory(null);
     setSelectedCatalogWeapon(null);
     setNewWeaponName('');
     setNewWeaponCategory('rifle');
@@ -531,6 +549,9 @@ function AddWeaponModal({
   }, [allCatalogWeapons.length]);
 
   const filteredCatalog = allCatalogWeapons.filter((w) => {
+    // Category filter
+    if (catalogCategory && w.category !== catalogCategory) return false;
+    // Search filter
     if (!catalogSearch.trim()) return true;
     const q = catalogSearch.toLowerCase();
     return (
@@ -538,6 +559,24 @@ function AddWeaponModal({
       w.manufacturer?.toLowerCase().includes(q) ||
       w.caliber?.toLowerCase().includes(q)
     );
+  });
+
+  // Group weapons by manufacturer for better organization
+  const groupedByManufacturer = filteredCatalog.reduce(
+    (acc, weapon) => {
+      const key = weapon.manufacturer || 'Other';
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(weapon);
+      return acc;
+    },
+    {} as Record<string, GlobalWeapon[]>
+  );
+
+  // Sort manufacturers alphabetically, with 'Other' at the end
+  const sortedManufacturers = Object.keys(groupedByManufacturer).sort((a, b) => {
+    if (a === 'Other') return 1;
+    if (b === 'Other') return -1;
+    return a.localeCompare(b);
   });
 
   const handleSelectCatalog = (weapon: GlobalWeapon) => {
@@ -636,14 +675,16 @@ function AddWeaponModal({
 
         {step === 'catalog' && (
           <View style={styles.catalogContainer}>
+            {/* Search Bar */}
             <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Search size={18} color={colors.textMuted} />
               <TextInput
                 style={[styles.searchInput, { color: colors.text }]}
-                placeholder="Search weapons..."
+                placeholder="Search by name, manufacturer, or caliber..."
                 placeholderTextColor={colors.textMuted}
                 value={catalogSearch}
                 onChangeText={setCatalogSearch}
+                autoFocus
               />
               {catalogSearch.length > 0 && (
                 <TouchableOpacity onPress={() => setCatalogSearch('')}>
@@ -652,42 +693,136 @@ function AddWeaponModal({
               )}
             </View>
 
-            {catalogLoading ? (
-              <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
-            ) : (
-              <FlatList
-                data={filteredCatalog}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={[styles.catalogItem, { backgroundColor: colors.card, borderColor: colors.border }]}
-                    onPress={() => handleSelectCatalog(item)}
+            {/* Category Filter Chips */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.catalogFilterScroll}
+              contentContainerStyle={styles.catalogFilterContent}
+            >
+              <TouchableOpacity
+                style={[
+                  styles.catalogFilterChip,
+                  {
+                    backgroundColor: !catalogCategory ? colors.text : colors.card,
+                    borderColor: !catalogCategory ? colors.text : colors.border,
+                  },
+                ]}
+                onPress={() => setCatalogCategory(null)}
+              >
+                <Text style={[styles.catalogFilterText, { color: !catalogCategory ? colors.background : colors.text }]}>
+                  All
+                </Text>
+              </TouchableOpacity>
+              {WEAPON_CATEGORIES.map((cat) => (
+                <TouchableOpacity
+                  key={cat.value}
+                  style={[
+                    styles.catalogFilterChip,
+                    {
+                      backgroundColor: catalogCategory === cat.value ? colors.text : colors.card,
+                      borderColor: catalogCategory === cat.value ? colors.text : colors.border,
+                    },
+                  ]}
+                  onPress={() => setCatalogCategory(catalogCategory === cat.value ? null : cat.value)}
+                >
+                  <Text
+                    style={[
+                      styles.catalogFilterText,
+                      { color: catalogCategory === cat.value ? colors.background : colors.text },
+                    ]}
                   >
-                    <View style={styles.catalogInfo}>
-                      <Text style={[styles.catalogName, { color: colors.text }]}>{item.name}</Text>
-                      <Text style={[styles.catalogMeta, { color: colors.textMuted }]}>
-                        {item.manufacturer ? `${item.manufacturer} \u2022 ` : ''}
-                        {getCategoryLabel(item.category)}
-                        {item.caliber && ` \u2022 ${item.caliber}`}
-                      </Text>
-                    </View>
-                    <ChevronRight size={18} color={colors.textMuted} />
-                  </TouchableOpacity>
-                )}
-                contentContainerStyle={styles.catalogList}
-                ListEmptyComponent={
-                  <Text style={[styles.noResults, { color: colors.textMuted }]}>
-                    {catalogSearch ? `No weapons match "${catalogSearch}"` : 'No weapons in catalog'}
+                    {cat.label}
                   </Text>
-                }
-              />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* Results count */}
+            {!catalogLoading && (
+              <View style={styles.catalogResultsHeader}>
+                <Text style={[styles.catalogResultsCount, { color: colors.textMuted }]}>
+                  {filteredCatalog.length} weapon{filteredCatalog.length !== 1 ? 's' : ''} found
+                </Text>
+              </View>
             )}
 
-            <TouchableOpacity style={[styles.skipCatalog, { borderColor: colors.border }]} onPress={() => setStep('custom')}>
-              <Text style={[styles.skipCatalogText, { color: colors.textMuted }]}>
-                Can't find it? Create custom weapon →
-              </Text>
-            </TouchableOpacity>
+            {catalogLoading ? (
+              <View style={styles.catalogLoadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={[styles.catalogLoadingText, { color: colors.textMuted }]}>Loading catalog...</Text>
+              </View>
+            ) : filteredCatalog.length === 0 ? (
+              <View style={styles.catalogEmptyContainer}>
+                <View style={[styles.catalogEmptyIcon, { backgroundColor: colors.card }]}>
+                  <Search size={32} color={colors.textMuted} />
+                </View>
+                <Text style={[styles.catalogEmptyTitle, { color: colors.text }]}>
+                  {catalogSearch || catalogCategory ? 'No matches found' : 'No weapons in catalog'}
+                </Text>
+                <Text style={[styles.catalogEmptyDesc, { color: colors.textMuted }]}>
+                  {catalogSearch || catalogCategory
+                    ? 'Try adjusting your search or filters'
+                    : 'The weapon catalog is empty'}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.catalogEmptyBtn, { backgroundColor: colors.primary }]}
+                  onPress={() => setStep('custom')}
+                >
+                  <Plus size={16} color="#fff" />
+                  <Text style={styles.catalogEmptyBtnText}>Create Custom Weapon</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <ScrollView style={styles.catalogScrollView} contentContainerStyle={styles.catalogList}>
+                {sortedManufacturers.map((manufacturer) => (
+                  <View key={manufacturer} style={styles.catalogManufacturerGroup}>
+                    <Text style={[styles.catalogManufacturerTitle, { color: colors.textMuted }]}>
+                      {manufacturer.toUpperCase()}
+                    </Text>
+                    {groupedByManufacturer[manufacturer].map((item) => (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={[styles.catalogItem, { backgroundColor: colors.card, borderColor: colors.border }]}
+                        onPress={() => handleSelectCatalog(item)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.catalogItemIcon, { backgroundColor: colors.primary + '15' }]}>
+                          <Shield size={18} color={colors.primary} />
+                        </View>
+                        <View style={styles.catalogInfo}>
+                          <Text style={[styles.catalogName, { color: colors.text }]}>{item.name}</Text>
+                          <View style={styles.catalogMetaRow}>
+                            <View style={[styles.catalogCategoryBadge, { backgroundColor: colors.secondary }]}>
+                              <Text style={[styles.catalogCategoryText, { color: colors.textMuted }]}>
+                                {getCategoryLabel(item.category)}
+                              </Text>
+                            </View>
+                            {item.caliber && (
+                              <Text style={[styles.catalogCaliberText, { color: colors.textMuted }]}>
+                                {item.caliber}
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+                        <ChevronRight size={18} color={colors.textMuted} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+
+            {/* Skip to custom */}
+            {filteredCatalog.length > 0 && (
+              <TouchableOpacity
+                style={[styles.skipCatalog, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => setStep('custom')}
+              >
+                <Plus size={16} color={colors.textMuted} />
+                <Text style={[styles.skipCatalogText, { color: colors.text }]}>Create custom weapon instead</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -1256,9 +1391,9 @@ export default function TeamArmoryScreen() {
                     <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
                       <Shield size={32} color={colors.textMuted} />
                     </View>
-                    <Text style={[styles.emptyTitle, { color: colors.text }]}>No Team Weapons</Text>
+                    <Text style={[styles.emptyTitle, { color: colors.text }]}>No team weapons yet</Text>
                     <Text style={[styles.emptyHint, { color: colors.textMuted }]}>
-                      Add weapons to assign to team members
+                      Add weapons once to reuse across trainings
                     </Text>
                   </View>
                 )}
@@ -1399,11 +1534,16 @@ export default function TeamArmoryScreen() {
                 icon={<ShieldCheck size={14} color={colors.primary} />}
                 colors={colors}
               />
-              <MyAssignmentCard weapon={data?.myAssignment || null} colors={colors} />
+              <MyAssignmentCard
+                weapon={data?.myAssignment || null}
+                colors={colors}
+                onRequestWeapon={() => setShowRequestModal(true)}
+                hasPendingRequest={!!data?.myPendingRequest}
+              />
             </View>
 
             {/* My Pending Request */}
-            {data?.myPendingRequest ? (
+            {data?.myPendingRequest && (
               <View style={styles.section}>
                 <MyPendingRequestCard
                   request={data.myPendingRequest}
@@ -1412,17 +1552,7 @@ export default function TeamArmoryScreen() {
                   cancelling={cancelling}
                 />
               </View>
-            ) : !data?.myAssignment ? (
-              <View style={styles.section}>
-                <TouchableOpacity
-                  style={[styles.requestBtn, { backgroundColor: colors.primary }]}
-                  onPress={() => setShowRequestModal(true)}
-                >
-                  <Plus size={18} color="#fff" />
-                  <Text style={styles.requestBtnText}>Request a Weapon</Text>
-                </TouchableOpacity>
-              </View>
-            ) : null}
+            )}
 
             {/* Team Pool */}
             {data && data.poolWeapons.length > 0 && (
@@ -1793,7 +1923,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   noAssignmentHint: {
-    fontSize: 13,
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 16,
+  },
+  noAssignmentCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  noAssignmentCtaText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
   },
   myAssignmentCard: {
     padding: 16,
@@ -1972,20 +2120,135 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     gap: 8,
   },
+  catalogFilterScroll: {
+    maxHeight: 44,
+  },
+  catalogFilterContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  catalogFilterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  catalogFilterText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  catalogResultsHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  catalogResultsCount: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  catalogLoadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingTop: 60,
+  },
+  catalogLoadingText: {
+    fontSize: 14,
+  },
+  catalogEmptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    paddingTop: 40,
+    gap: 12,
+  },
+  catalogEmptyIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  catalogEmptyTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  catalogEmptyDesc: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  catalogEmptyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  catalogEmptyBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  catalogScrollView: {
+    flex: 1,
+  },
+  catalogManufacturerGroup: {
+    gap: 8,
+    marginBottom: 16,
+  },
+  catalogManufacturerTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginLeft: 4,
+    marginBottom: 4,
+  },
   catalogItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 14,
     borderRadius: 12,
     borderWidth: 1,
+    gap: 12,
+  },
+  catalogItemIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   catalogInfo: {
     flex: 1,
-    gap: 2,
+    gap: 4,
   },
   catalogName: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  catalogMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  catalogCategoryBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 5,
+  },
+  catalogCategoryText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  catalogCaliberText: {
+    fontSize: 12,
   },
   catalogMeta: {
     fontSize: 13,
@@ -1996,12 +2259,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   skipCatalog: {
-    padding: 16,
-    borderTopWidth: 1,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    margin: 16,
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
   },
   skipCatalogText: {
     fontSize: 14,
+    fontWeight: '500',
   },
   formContainer: {
     flex: 1,

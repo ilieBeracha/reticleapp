@@ -30,8 +30,8 @@ import { useSessionStore } from '@/store/sessionStore';
 import { isGroupingDrill } from '@/utils/drillGoal';
 import { isInfiniteShots } from '@/utils/drillShots';
 
-import { deriveDetectionConfig } from '@/utils/detectionSensitivity';
 import { useSessionRealtime } from '@/hooks/realtime';
+import { deriveDetectionConfig } from '@/utils/detectionSensitivity';
 import {
   SHOT_MARKING_ENABLED,
   TIMER_INTERVAL_MS,
@@ -684,15 +684,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
         ? 'End Execution' 
         : 'End Session';
     
-    Alert.alert(title, message, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: confirmText,
-        style: 'destructive',
-        onPress: async () => {
-          setEnding(true);
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          try {
+    
             await endSession(sessionId!);
 
             if (garminStatus === 'CONNECTED') {
@@ -739,14 +731,6 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
             }
             
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          } catch (error: any) {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-            Alert.alert('Error', error.message || 'Failed to end session');
-            setEnding(false);
-          }
-        },
-      },
-    ]);
   }, [
     sessionId,
     targets.length,
