@@ -21,7 +21,6 @@ import {
 } from '@/services/sessionService';
 import { isGroupingSession } from '@/utils/drillGoal';
 import { format, intervalToDuration } from 'date-fns';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   Activity,
@@ -216,7 +215,7 @@ export default function SessionDetailScreen() {
   // Decode weather from session (OpenWeatherMap or stored data)
   const weather: DecodedWeather | null = useMemo(() => {
     if (!session?.weather) return null;
-    
+
     const sessionWeather = session.weather as any;
     // If it's SessionWeatherData format (snake_case), convert to DecodedWeather
     if (sessionWeather.temperature_c !== undefined) {
@@ -255,8 +254,8 @@ export default function SessionDetailScreen() {
     const hasRealSteadiness = steadinessSum > 0;
 
     // Performance scores (use steadiness or inverted stress as calmness)
-    const scores = hasRealSteadiness 
-      ? shots.map((s: ShotDetail) => s.steadiness) 
+    const scores = hasRealSteadiness
+      ? shots.map((s: ShotDetail) => s.steadiness)
       : shots.map((s: ShotDetail) => Math.max(0, 100 - s.stress));
 
     const avgScore = Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length);
@@ -656,7 +655,6 @@ export default function SessionDetailScreen() {
                   </Text>
                   <Text style={[styles.statLabel, { color: colors.textMuted }]}>Best Group</Text>
                 </View>
-
               </>
             ) : (
               // ENGAGEMENT: Show hits, shots, accuracy
@@ -926,9 +924,7 @@ export default function SessionDetailScreen() {
                   insight.insight_type === 'anomaly_high' ||
                   insight.insight_type === 'achievement' ||
                   insight.tags?.includes('positive');
-                const isWarning =
-                  insight.insight_type === 'anomaly_low' ||
-                  insight.tags?.includes('negative');
+                const isWarning = insight.insight_type === 'anomaly_low' || insight.tags?.includes('negative');
 
                 const iconColor = isPositive ? colors.green : isWarning ? colors.orange : colors.primary;
                 const bgColor = isPositive
@@ -975,9 +971,7 @@ export default function SessionDetailScreen() {
                       {insight.primary_factor && (
                         <View style={styles.insightTagsRow}>
                           <View style={[styles.insightTag, { backgroundColor: bgColor }]}>
-                            <Text style={[styles.insightTagText, { color: iconColor }]}>
-                              {insight.primary_factor}
-                            </Text>
+                            <Text style={[styles.insightTagText, { color: iconColor }]}>{insight.primary_factor}</Text>
                           </View>
                           {insight.secondary_factor && (
                             <View style={[styles.insightTag, { backgroundColor: 'rgba(107,114,128,0.1)' }]}>
@@ -1445,16 +1439,6 @@ export default function SessionDetailScreen() {
           </View>
         </Animated.View>
       )}
-
-      <LinearGradient
-        style={[styles.viewFullButton, { backgroundColor: colors.indigo }]}
-        colors={[colors.ring, colors.teal]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-      >
-        <Text style={styles.viewFullButtonText}>Analyze Session</Text>
-        <ChevronRight size={18} color="#fff" />
-      </LinearGradient>
     </ScrollView>
   );
 }

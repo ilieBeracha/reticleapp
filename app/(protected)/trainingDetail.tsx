@@ -110,9 +110,11 @@ function ParallaxScrollContent({
   insets,
   onAutoCloseExpired,
   userWeapon,
+  assignedWeapon,
   weaponChecked,
   canManageTraining,
   onAssignWeapon,
+  onOpenWeaponPicker,
   poolWeapons,
   selectingPoolWeapon,
   onSelectPoolWeapon,
@@ -230,24 +232,40 @@ function ParallaxScrollContent({
           </View>
 
           {/* Weapon - only show after checked */}
-          {weaponChecked && (
-            <TouchableOpacity
-              style={[
-                styles.statusItem,
-                { backgroundColor: userWeapon ? colors.green + '12' : colors.orange + '12' },
-              ]}
-              onPress={!userWeapon && canManageTraining ? onAssignWeapon : undefined}
-              disabled={!!userWeapon || !canManageTraining}
-              activeOpacity={0.7}
-            >
-              <Text
-                style={[styles.statusText, { color: userWeapon ? colors.green : colors.orange }]}
-                numberOfLines={1}
+          {weaponChecked && (() => {
+            // Can pick weapon if training ongoing AND there are weapon options
+            const hasWeaponOptions = isOngoing && (assignedWeapon || poolWeapons.length > 0);
+            // Show picker for anyone with options (soldiers pick from assigned + pool, commanders too)
+            const canChangeWeapon = hasWeaponOptions;
+            
+            return (
+              <TouchableOpacity
+                style={[
+                  styles.statusItem,
+                  { backgroundColor: userWeapon ? colors.green + '12' : colors.orange + '12' },
+                  canChangeWeapon && { paddingRight: 6 },
+                ]}
+                onPress={
+                  canChangeWeapon ? onOpenWeaponPicker :
+                  !userWeapon && canManageTraining ? onAssignWeapon : undefined
+                }
+                disabled={!canChangeWeapon && !!userWeapon}
+                activeOpacity={0.7}
               >
-                {userWeapon ? userWeapon.name : 'No weapon'}
-              </Text>
-            </TouchableOpacity>
-          )}
+                <Text
+                  style={[styles.statusText, { color: userWeapon ? colors.green : colors.orange }]}
+                  numberOfLines={1}
+                >
+                  {userWeapon ? userWeapon.name : 'No weapon'}
+                </Text>
+                {canChangeWeapon && (
+                  <View style={[styles.statusChevron, { backgroundColor: colors.green + '20' }]}>
+                    <Text style={{ fontSize: 8, color: colors.green }}>▼</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })()}
 
           {/* Watch mode - compact */}
           {isOngoing && isWatchConnected && trainingWatchPreference !== null && (
@@ -707,9 +725,11 @@ export default function TrainingDetailScreen() {
   const [teamSessions, setTeamSessions] = useState<SessionWithDetails[]>([]);
   const [loadingTeamProgress, setLoadingTeamProgress] = useState(false);
   const [userWeapon, setUserWeapon] = useState<UserWeapon | null>(null);
+  const [assignedWeapon, setAssignedWeapon] = useState<UserWeapon | null>(null); // Original assigned weapon
   const [weaponChecked, setWeaponChecked] = useState(false);
   const [poolWeapons, setPoolWeapons] = useState<TeamWeapon[]>([]);
   const [selectingPoolWeapon, setSelectingPoolWeapon] = useState(false);
+  const [showWeaponPicker, setShowWeaponPicker] = useState(false);
   const [pendingRequest, setPendingRequest] = useState<WeaponRequest | null>(null);
   const [requestingWeapon, setRequestingWeapon] = useState(false);
 
@@ -864,7 +884,10 @@ export default function TrainingDetailScreen() {
 
           if (assigned.length > 0) {
             const profile = await getOrCreatePersonalProfile(assigned[0].id);
-            if (!cancelled && isMountedRef.current) setUserWeapon(profile);
+            if (!cancelled && isMountedRef.current) {
+              setAssignedWeapon(profile); // Store original assigned weapon
+              setUserWeapon(profile); // Also set as current weapon
+            }
           }
         }
       } catch (e) {
@@ -1140,6 +1163,29 @@ export default function TrainingDetailScreen() {
     });
   }, [training?.team_id]);
 
+  // Open weapon picker modal
+  const handleOpenWeaponPicker = useCallback(() => {
+    // Only allow changing weapon if training is ongoing and there are options
+    if (!isOngoing) return;
+    const hasOptions = assignedWeapon || poolWeapons.length > 0;
+    if (!hasOptions) {
+      // No options - inform user
+      Alert.alert('No Weapons Available', 'No weapons assigned or available in the team pool.');
+      return;
+    }
+    
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowWeaponPicker(true);
+  }, [isOngoing, assignedWeapon, poolWeapons.length]);
+
+  // Select assigned weapon
+  const handleSelectAssignedWeapon = useCallback(() => {
+    if (!assignedWeapon) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setUserWeapon(assignedWeapon);
+    setShowWeaponPicker(false);
+  }, [assignedWeapon]);
+
   // Grab a pool weapon for this session (creates tracking profile, pool stays available)
   const handleSelectPoolWeapon = useCallback(async (weapon: TeamWeapon) => {
     if (selectingPoolWeapon) return;
@@ -1150,6 +1196,7 @@ export default function TrainingDetailScreen() {
     try {
       const profile = await getOrCreatePersonalProfile(weapon.id);
       setUserWeapon(profile);
+      setShowWeaponPicker(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to grab weapon');
@@ -1275,9 +1322,11 @@ export default function TrainingDetailScreen() {
         insets={insets}
         onAutoCloseExpired={handleAutoCloseExpired}
         userWeapon={userWeapon}
+        assignedWeapon={assignedWeapon}
         weaponChecked={weaponChecked}
         canManageTraining={canManageTraining}
         onAssignWeapon={handleOpenWeaponManagement}
+        onOpenWeaponPicker={handleOpenWeaponPicker}
         poolWeapons={poolWeapons}
         selectingPoolWeapon={selectingPoolWeapon}
         onSelectPoolWeapon={handleSelectPoolWeapon}
@@ -1483,6 +1532,126 @@ export default function TrainingDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Weapon Picker Modal */}
+      <Modal
+        visible={showWeaponPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowWeaponPicker(false)}
+      >
+        <View style={styles.weaponPickerOverlay}>
+          <TouchableOpacity
+            style={styles.weaponPickerBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowWeaponPicker(false)}
+          />
+          <View style={[styles.weaponPickerSheet, { backgroundColor: colors.card }]}>
+            {/* Header */}
+            <View style={styles.weaponPickerSheetHeader}>
+              <Text style={[styles.weaponPickerSheetTitle, { color: colors.text }]}>
+                Select Weapon
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowWeaponPicker(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <X size={20} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Assigned Weapon Section */}
+            {assignedWeapon && (
+              <View style={styles.weaponPickerSection}>
+                <Text style={[styles.weaponPickerSectionTitle, { color: colors.textMuted }]}>
+                  YOUR WEAPON
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.weaponPickerOption,
+                    { borderColor: colors.border },
+                    userWeapon?.id === assignedWeapon.id && {
+                      borderColor: colors.primary,
+                      backgroundColor: colors.primary + '08',
+                    },
+                  ]}
+                  onPress={handleSelectAssignedWeapon}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.weaponPickerIcon, { backgroundColor: colors.green + '15' }]}>
+                    <Crosshair size={16} color={colors.green} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.weaponPickerOptionName, { color: colors.text }]}>
+                      {assignedWeapon.name}
+                    </Text>
+                    <Text style={[styles.weaponPickerOptionMeta, { color: colors.textMuted }]}>
+                      Assigned to you
+                    </Text>
+                  </View>
+                  {userWeapon?.id === assignedWeapon.id && (
+                    <CheckCircle2 size={18} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Pool Weapons Section */}
+            {poolWeapons.length > 0 && (
+              <View style={styles.weaponPickerSection}>
+                <Text style={[styles.weaponPickerSectionTitle, { color: colors.textMuted }]}>
+                  TEAM POOL
+                </Text>
+                {poolWeapons.map((weapon: TeamWeapon) => {
+                  const isSelected = userWeapon?.team_weapon_id === weapon.id;
+                  return (
+                    <TouchableOpacity
+                      key={weapon.id}
+                      style={[
+                        styles.weaponPickerOption,
+                        { borderColor: colors.border },
+                        isSelected && {
+                          borderColor: colors.primary,
+                          backgroundColor: colors.primary + '08',
+                        },
+                      ]}
+                      onPress={() => handleSelectPoolWeapon(weapon)}
+                      disabled={selectingPoolWeapon}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.weaponPickerIcon, { backgroundColor: colors.blue + '15' }]}>
+                        <Package size={16} color={colors.blue} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.weaponPickerOptionName, { color: colors.text }]}>
+                          {weapon.name}
+                        </Text>
+                        <Text style={[styles.weaponPickerOptionMeta, { color: colors.textMuted }]}>
+                          {weapon.caliber || 'Shared weapon'}
+                        </Text>
+                      </View>
+                      {selectingPoolWeapon ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : isSelected ? (
+                        <CheckCircle2 size={18} color={colors.primary} />
+                      ) : null}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* No options message */}
+            {!assignedWeapon && poolWeapons.length === 0 && (
+              <View style={styles.weaponPickerEmpty}>
+                <Text style={[styles.weaponPickerEmptyText, { color: colors.textMuted }]}>
+                  No weapons available
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1556,6 +1725,14 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  statusChevron: {
+    width: 14,
+    height: 14,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 2,
   },
   drillsContainer: {
     gap: 16,
@@ -1963,5 +2140,74 @@ const styles = StyleSheet.create({
   watchPromptBtnText: {
     fontSize: 15,
     fontWeight: '500',
+  },
+  // Weapon Picker Modal
+  weaponPickerOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  weaponPickerBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  weaponPickerSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 34,
+    maxHeight: '70%',
+  },
+  weaponPickerSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  weaponPickerSheetTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  weaponPickerSection: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    gap: 8,
+  },
+  weaponPickerSectionTitle: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  weaponPickerOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  weaponPickerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weaponPickerOptionName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  weaponPickerOptionMeta: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  weaponPickerEmpty: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  weaponPickerEmptyText: {
+    fontSize: 14,
   },
 });

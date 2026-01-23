@@ -1,6 +1,6 @@
 /**
  * Weapon Service
- * 
+ *
  * 3-Layer Weapon System:
  * - Layer 1: Global weapons (admin-managed catalog)
  * - Layer 2: Team weapons (commander-managed)
@@ -17,8 +17,11 @@ const DEFAULT_WEAPON_KEY = '@reticle:default_weapon_id';
 
 // Re-export for convenience - SINGLE SOURCE OF TRUTH for weapon categories
 export {
-  CATEGORY_CONFIGS, getCategoryConfig,
-  getCategoryDistances, getCategoryLabel, WEAPON_CATEGORIES
+  CATEGORY_CONFIGS,
+  getCategoryConfig,
+  getCategoryDistances,
+  getCategoryLabel,
+  WEAPON_CATEGORIES
 } from '@/constants/weaponCategories';
 export type { WeaponCategory } from '@/types/workspace';
 
@@ -127,10 +130,11 @@ export async function getWeaponById(id: string): Promise<WeaponForDetection | nu
   const userWeapon = await getUserWeapon(id);
   if (userWeapon) {
     // Parse suppressor info from team weapon or notes
-    const hasSuppressor = userWeapon.team_weapon?.suppressor_config != null ||
+    const hasSuppressor =
+      userWeapon.team_weapon?.suppressor_config != null ||
       userWeapon.personal_notes?.toLowerCase().includes('suppressor') ||
       userWeapon.personal_notes?.toLowerCase().includes('silencer');
-    
+
     return {
       id: userWeapon.id,
       name: userWeapon.name,
@@ -139,7 +143,7 @@ export async function getWeaponById(id: string): Promise<WeaponForDetection | nu
       has_suppressor: hasSuppressor,
     };
   }
-  
+
   // Try team weapon
   const teamWeapon = await getTeamWeapon(id);
   if (teamWeapon) {
@@ -151,14 +155,10 @@ export async function getWeaponById(id: string): Promise<WeaponForDetection | nu
       has_suppressor: teamWeapon.suppressor_config != null,
     };
   }
-  
+
   // Try global weapon
-  const { data: globalWeapon } = await supabase
-    .from('weapons')
-    .select('*')
-    .eq('id', id)
-    .single();
-    
+  const { data: globalWeapon } = await supabase.from('weapons').select('*').eq('id', id).single();
+
   if (globalWeapon) {
     return {
       id: globalWeapon.id,
@@ -167,7 +167,7 @@ export async function getWeaponById(id: string): Promise<WeaponForDetection | nu
       caliber: globalWeapon.caliber,
     };
   }
-  
+
   return null;
 }
 
@@ -179,11 +179,7 @@ export async function getWeaponById(id: string): Promise<WeaponForDetection | nu
  * Get all global weapons (the standard catalog)
  */
 export async function getGlobalWeapons(): Promise<GlobalWeapon[]> {
-  const { data, error } = await supabase
-    .from('weapons')
-    .select('*')
-    .order('category')
-    .order('name');
+  const { data, error } = await supabase.from('weapons').select('*').order('category').order('name');
 
   if (error) throw error;
   return data || [];
@@ -193,11 +189,7 @@ export async function getGlobalWeapons(): Promise<GlobalWeapon[]> {
  * Get global weapons by category
  */
 export async function getGlobalWeaponsByCategory(category: WeaponCategory): Promise<GlobalWeapon[]> {
-  const { data, error } = await supabase
-    .from('weapons')
-    .select('*')
-    .eq('category', category)
-    .order('name');
+  const { data, error } = await supabase.from('weapons').select('*').eq('category', category).order('name');
 
   if (error) throw error;
   return data || [];
@@ -229,11 +221,7 @@ export async function createGlobalWeapon(weapon: {
   description?: string;
   image_url?: string;
 }): Promise<GlobalWeapon> {
-  const { data, error } = await supabase
-    .from('weapons')
-    .insert(weapon)
-    .select()
-    .single();
+  const { data, error } = await supabase.from('weapons').insert(weapon).select().single();
 
   if (error) throw error;
   return data;
@@ -261,10 +249,7 @@ export async function updateGlobalWeapon(
  * Delete global weapon (admin only)
  */
 export async function deleteGlobalWeapon(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('weapons')
-    .delete()
-    .eq('id', id);
+  const { error } = await supabase.from('weapons').delete().eq('id', id);
 
   if (error) throw error;
 }
@@ -279,10 +264,12 @@ export async function deleteGlobalWeapon(id: string): Promise<void> {
 export async function getTeamWeapons(teamId: string): Promise<TeamWeapon[]> {
   const { data, error } = await supabase
     .from('team_weapons')
-    .select(`
+    .select(
+      `
       *,
       base_weapon:weapons(*)
-    `)
+    `
+    )
     .eq('team_id', teamId)
     .eq('is_active', true)
     .order('name');
@@ -297,10 +284,12 @@ export async function getTeamWeapons(teamId: string): Promise<TeamWeapon[]> {
 export async function getTeamWeapon(id: string): Promise<TeamWeapon | null> {
   const { data, error } = await supabase
     .from('team_weapons')
-    .select(`
+    .select(
+      `
       *,
       base_weapon:weapons(*)
-    `)
+    `
+    )
     .eq('id', id)
     .single();
 
@@ -326,7 +315,9 @@ export async function createTeamWeapon(weapon: {
   barrel_notes?: string;
   notes?: string;
 }): Promise<TeamWeapon> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
   const { data, error } = await supabase
@@ -335,10 +326,12 @@ export async function createTeamWeapon(weapon: {
       ...weapon,
       created_by: user.id,
     })
-    .select(`
+    .select(
+      `
       *,
       base_weapon:weapons(*)
-    `)
+    `
+    )
     .single();
 
   if (error) throw error;
@@ -356,10 +349,12 @@ export async function updateTeamWeapon(
     .from('team_weapons')
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
-    .select(`
+    .select(
+      `
       *,
       base_weapon:weapons(*)
-    `)
+    `
+    )
     .single();
 
   if (error) throw error;
@@ -382,10 +377,7 @@ export async function deleteTeamWeapon(id: string): Promise<void> {
  * Hard delete team weapon (commander only)
  */
 export async function hardDeleteTeamWeapon(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('team_weapons')
-    .delete()
-    .eq('id', id);
+  const { error } = await supabase.from('team_weapons').delete().eq('id', id);
 
   if (error) throw error;
 }
@@ -399,16 +391,20 @@ export async function hardDeleteTeamWeapon(id: string): Promise<void> {
  */
 export async function getUserWeapons(): Promise<UserWeapon[]> {
   // Get current user
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return [];
 
   const { data, error } = await supabase
     .from('user_weapons')
-    .select(`
+    .select(
+      `
       *,
       base_weapon:weapons(*),
       team_weapon:team_weapons!user_weapons_team_weapon_id_fkey(*)
-    `)
+    `
+    )
     .eq('user_id', user.id) // Explicit filter to ensure we get current user's weapons
     .order('is_favorite', { ascending: false })
     .order('last_used_at', { ascending: false, nullsFirst: false })
@@ -418,7 +414,7 @@ export async function getUserWeapons(): Promise<UserWeapon[]> {
     console.error('[getUserWeapons] Error fetching weapons:', error);
     throw error;
   }
-  
+
   console.log(`[getUserWeapons] Found ${data?.length || 0} weapons for user ${user.id}`);
   return data || [];
 }
@@ -428,16 +424,20 @@ export async function getUserWeapons(): Promise<UserWeapon[]> {
  */
 export async function getRecentlyUsedWeapons(limit = 3): Promise<UserWeapon[]> {
   // Get current user
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return [];
 
   const { data, error } = await supabase
     .from('user_weapons')
-    .select(`
+    .select(
+      `
       *,
       base_weapon:weapons(*),
       team_weapon:team_weapons!user_weapons_team_weapon_id_fkey(*)
-    `)
+    `
+    )
     .eq('user_id', user.id) // Explicit filter
     .not('last_used_at', 'is', null)
     .order('last_used_at', { ascending: false })
@@ -482,18 +482,22 @@ export async function getDefaultWeapon(options?: { personalOnly?: boolean }): Pr
   const personalOnly = options?.personalOnly ?? false;
 
   // Get current user
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return null;
 
   // Helper to build query with optional personal-only filter
   const buildQuery = () => {
     let query = supabase
       .from('user_weapons')
-      .select(`
+      .select(
+        `
         *,
         base_weapon:weapons(*),
         team_weapon:team_weapons!user_weapons_team_weapon_id_fkey(*)
-      `)
+      `
+      )
       .eq('user_id', user.id);
     if (personalOnly) {
       query = query.is('team_weapon_id', null);
@@ -504,9 +508,7 @@ export async function getDefaultWeapon(options?: { personalOnly?: boolean }): Pr
   // 1. First check for stored default weapon
   const storedDefaultId = await getDefaultWeaponId();
   if (storedDefaultId) {
-    const { data: storedDefault } = await buildQuery()
-      .eq('id', storedDefaultId)
-      .single();
+    const { data: storedDefault } = await buildQuery().eq('id', storedDefaultId).single();
 
     if (storedDefault) return storedDefault;
     // If stored default no longer exists, clear it
@@ -514,10 +516,7 @@ export async function getDefaultWeapon(options?: { personalOnly?: boolean }): Pr
   }
 
   // 2. Try to get a favorite
-  const { data: favorite } = await buildQuery()
-    .eq('is_favorite', true)
-    .limit(1)
-    .single();
+  const { data: favorite } = await buildQuery().eq('is_favorite', true).limit(1).single();
 
   if (favorite) return favorite;
 
@@ -531,10 +530,7 @@ export async function getDefaultWeapon(options?: { personalOnly?: boolean }): Pr
   if (recent) return recent;
 
   // 4. Fall back to first weapon
-  const { data: first } = await buildQuery()
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+  const { data: first } = await buildQuery().order('created_at', { ascending: false }).limit(1).single();
 
   return first || null;
 }
@@ -544,16 +540,20 @@ export async function getDefaultWeapon(options?: { personalOnly?: boolean }): Pr
  */
 export async function getUserWeapon(id: string): Promise<UserWeapon | null> {
   // Get current user
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return null;
 
   const { data, error } = await supabase
     .from('user_weapons')
-    .select(`
+    .select(
+      `
       *,
       base_weapon:weapons(*),
       team_weapon:team_weapons!user_weapons_team_weapon_id_fkey(*)
-    `)
+    `
+    )
     .eq('id', id)
     .eq('user_id', user.id) // Ensure it belongs to current user
     .single();
@@ -583,7 +583,9 @@ export async function createUserWeapon(weapon: {
   cleaning_interval_type?: CleaningIntervalType;
   cleaning_interval_value?: number;
 }): Promise<UserWeapon> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
   const { data, error } = await supabase
@@ -592,11 +594,13 @@ export async function createUserWeapon(weapon: {
       ...weapon,
       user_id: user.id,
     })
-    .select(`
+    .select(
+      `
       *,
       base_weapon:weapons(*),
       team_weapon:team_weapons!user_weapons_team_weapon_id_fkey(*)
-    `)
+    `
+    )
     .single();
 
   if (error) throw error;
@@ -614,11 +618,13 @@ export async function updateUserWeapon(
     .from('user_weapons')
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
-    .select(`
+    .select(
+      `
       *,
       base_weapon:weapons(*),
       team_weapon:team_weapons!user_weapons_team_weapon_id_fkey(*)
-    `)
+    `
+    )
     .single();
 
   if (error) throw error;
@@ -629,10 +635,7 @@ export async function updateUserWeapon(
  * Delete personal weapon
  */
 export async function deleteUserWeapon(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('user_weapons')
-    .delete()
-    .eq('id', id);
+  const { error } = await supabase.from('user_weapons').delete().eq('id', id);
 
   if (error) throw error;
 }
@@ -652,10 +655,7 @@ export async function toggleUserWeaponFavorite(id: string): Promise<UserWeapon> 
  * Mark weapon as recently used (called when starting a session)
  */
 export async function markWeaponUsed(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('user_weapons')
-    .update({ last_used_at: new Date().toISOString() })
-    .eq('id', id);
+  const { error } = await supabase.from('user_weapons').update({ last_used_at: new Date().toISOString() }).eq('id', id);
 
   if (error) throw error;
 }
@@ -666,8 +666,8 @@ export async function markWeaponUsed(id: string): Promise<void> {
 
 export interface WeaponPickerData {
   recentlyUsed: UserWeapon[];
-  assignedToMe: TeamWeapon[];  // Team weapons assigned to current user
-  poolWeapons: TeamWeapon[];   // Team weapons available in shared pool
+  assignedToMe: TeamWeapon[]; // Team weapons assigned to current user
+  poolWeapons: TeamWeapon[]; // Team weapons available in shared pool
   myWeapons: UserWeapon[];
   teamWeapons: TeamWeapon[];
   globalWeapons: GlobalWeapon[];
@@ -683,25 +683,27 @@ export interface WeaponPickerOptions {
 /**
  * Get all weapons for the weapon picker UI
  * Returns data organized by section
- * 
+ *
  * Note: When teamId is provided, the UI layer decides to show only assigned weapons.
  * This function returns all relevant data for flexibility.
- * 
+ *
  * @param options.teamId - Team context for team weapons
  * @param options.weaponCategory - Filter by category (null or 'any' = show all)
  */
 export async function getWeaponPickerData(options: WeaponPickerOptions = {}): Promise<WeaponPickerData> {
   const { teamId, weaponCategory } = options;
-  
+
   // Get current user for assigned weapons
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   // Filter helper for category
   const filterByCategory = <T extends { category?: WeaponCategory | null }>(items: T[]): T[] => {
     if (!weaponCategory || weaponCategory === 'any') return items;
-    return items.filter(item => item.category === weaponCategory);
+    return items.filter((item) => item.category === weaponCategory);
   };
-  
+
   // Fetch all relevant weapon data
   const [recentlyUsed, myWeapons, teamWeapons, globalWeapons, assignedToMe, poolWeapons] = await Promise.all([
     getRecentlyUsedWeapons(3),
@@ -717,7 +719,7 @@ export async function getWeaponPickerData(options: WeaponPickerOptions = {}): Pr
   // For solo (no teamId): only show personal weapons (exclude team weapon profiles)
   const personalFilter = <T extends { team_weapon_id?: string | null }>(items: T[]): T[] => {
     if (teamId) return items; // In team context, no filtering needed
-    return items.filter(item => !item.team_weapon_id);
+    return items.filter((item) => !item.team_weapon_id);
   };
 
   return {
@@ -729,7 +731,6 @@ export async function getWeaponPickerData(options: WeaponPickerOptions = {}): Pr
     globalWeapons: filterByCategory(globalWeapons),
   };
 }
-
 
 // ============================================================================
 // UNIFIED LOADOUT: Get all accessible weapons for the user
@@ -759,7 +760,9 @@ export interface AccessibleWeapon {
  * - Team pool weapons (team_weapons available to user's teams)
  */
 export async function getAllAccessibleWeapons(): Promise<AccessibleWeapon[]> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return [];
 
   // Get user's teams
@@ -773,8 +776,8 @@ export async function getAllAccessibleWeapons(): Promise<AccessibleWeapon[]> {
     name: tm.teams?.name ?? 'Unknown Team',
   }));
 
-  const teamIds = userTeams.map(t => t.id);
-  const teamNameMap = new Map(userTeams.map(t => [t.id, t.name]));
+  const teamIds = userTeams.map((t) => t.id);
+  const teamNameMap = new Map(userTeams.map((t) => [t.id, t.name]));
 
   // Parallel fetch all weapon sources
   const [personalWeapons, teamWeapons] = await Promise.all([
@@ -796,12 +799,12 @@ export async function getAllAccessibleWeapons(): Promise<AccessibleWeapon[]> {
   const result: AccessibleWeapon[] = [];
 
   // Create a map of team weapons for quick lookup
-  const teamWeaponMap = new Map((teamWeapons as TeamWeapon[]).map(tw => [tw.id, tw]));
+  const teamWeaponMap = new Map((teamWeapons as TeamWeapon[]).map((tw) => [tw.id, tw]));
 
   // Add personal weapons
   // If a personal weapon is linked to a team weapon that's assigned to this user,
   // show it as 'team_assigned' instead of 'personal'
-  personalWeapons.forEach(w => {
+  personalWeapons.forEach((w) => {
     let source: WeaponSource = 'personal';
     let teamId: string | undefined;
     let teamName: string | undefined;
@@ -834,9 +837,9 @@ export async function getAllAccessibleWeapons(): Promise<AccessibleWeapon[]> {
   // Only show weapons that are:
   // 1. Assigned to the current user (team_assigned)
   // 2. Available in the pool AND not assigned to anyone else (team_pool)
-  (teamWeapons as TeamWeapon[]).forEach(tw => {
+  (teamWeapons as TeamWeapon[]).forEach((tw) => {
     // Skip if user already has a personal weapon linked to this team weapon
-    const isLinkedToPersonal = personalWeapons.some(pw => pw.team_weapon_id === tw.id);
+    const isLinkedToPersonal = personalWeapons.some((pw) => pw.team_weapon_id === tw.id);
     if (isLinkedToPersonal) return;
 
     const isAssignedToMe = tw.assigned_to === user.id;
@@ -848,7 +851,7 @@ export async function getAllAccessibleWeapons(): Promise<AccessibleWeapon[]> {
     // - In pool and not assigned to someone else
     if (!isAssignedToMe && !isPoolAvailable) return;
     if (isAssignedToSomeoneElse && !isPoolAvailable) return;
-    
+
     result.push({
       id: tw.id,
       name: tw.name,
@@ -871,13 +874,10 @@ export async function getAllAccessibleWeapons(): Promise<AccessibleWeapon[]> {
 /**
  * Assign a team weapon to a user
  * Only commanders can do this
- * 
+ *
  * RULE: Each user can only have 1 weapon assigned per team
  */
-export async function assignTeamWeapon(
-  teamWeaponId: string,
-  userId: string
-): Promise<TeamWeapon> {
+export async function assignTeamWeapon(teamWeaponId: string, userId: string): Promise<TeamWeapon> {
   // First, get the team_id of this weapon
   const { data: weapon, error: fetchError } = await supabase
     .from('team_weapons')
@@ -898,7 +898,7 @@ export async function assignTeamWeapon(
     .maybeSingle();
 
   if (checkError) throw checkError;
-  
+
   if (existing) {
     throw new Error(`User already has weapon assigned: ${existing.name}`);
   }
@@ -933,10 +933,7 @@ export async function unassignTeamWeapon(teamWeaponId: string): Promise<TeamWeap
 /**
  * Get all weapons assigned to a specific user in a team
  */
-export async function getAssignedWeapons(
-  teamId: string,
-  userId: string
-): Promise<TeamWeapon[]> {
+export async function getAssignedWeapons(teamId: string, userId: string): Promise<TeamWeapon[]> {
   const { data, error } = await supabase
     .from('team_weapons')
     .select('*, base_weapon:weapons(*)')
@@ -955,11 +952,13 @@ export async function getAssignedWeapons(
 export async function getTeamWeaponsWithAssignments(teamId: string): Promise<TeamWeapon[]> {
   const { data, error } = await supabase
     .from('team_weapons')
-    .select(`
+    .select(
+      `
       *,
       base_weapon:weapons(*),
       assigned_user:profiles!team_weapons_assigned_to_fkey(id, full_name, avatar_url)
-    `)
+    `
+    )
     .eq('team_id', teamId)
     .eq('is_active', true)
     .order('name');
@@ -976,10 +975,7 @@ export async function getTeamWeaponsWithAssignments(teamId: string): Promise<Tea
  * User offers to share their personal weapon with a team
  * Status starts as 'pending' until commander approves
  */
-export async function shareWeaponWithTeam(
-  userWeaponId: string,
-  teamId: string
-): Promise<UserWeapon> {
+export async function shareWeaponWithTeam(userWeaponId: string, teamId: string): Promise<UserWeapon> {
   const { data, error } = await supabase
     .from('user_weapons')
     .update({
@@ -1077,11 +1073,13 @@ export async function withdrawSharedWeapon(userWeaponId: string): Promise<UserWe
 export async function getPendingSharedWeapons(teamId: string): Promise<UserWeapon[]> {
   const { data, error } = await supabase
     .from('user_weapons')
-    .select(`
+    .select(
+      `
       *,
       base_weapon:weapons(*),
       user:profiles!user_weapons_user_id_fkey(id, full_name, avatar_url)
-    `)
+    `
+    )
     .eq('shared_with_team_id', teamId)
     .eq('share_status', 'pending');
 
@@ -1093,7 +1091,9 @@ export async function getPendingSharedWeapons(teamId: string): Promise<UserWeapo
  * Get weapons the current user has shared with teams
  */
 export async function getMySharedWeapons(): Promise<UserWeapon[]> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
   const { data, error } = await supabase
@@ -1114,10 +1114,10 @@ export async function getMySharedWeapons(): Promise<UserWeapon[]> {
  * When a user uses a team weapon for the first time,
  * automatically create a personal profile linked to it
  */
-export async function getOrCreatePersonalProfile(
-  teamWeaponId: string
-): Promise<UserWeapon> {
-  const { data: { user } } = await supabase.auth.getUser();
+export async function getOrCreatePersonalProfile(teamWeaponId: string): Promise<UserWeapon> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
   // Check if personal profile already exists
@@ -1211,7 +1211,9 @@ export async function createWeaponRequest(request: {
   weapon_category?: WeaponCategory;
   notes?: string;
 }): Promise<WeaponRequest> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
   const { data, error } = await supabase
@@ -1249,11 +1251,13 @@ export async function cancelWeaponRequest(requestId: string): Promise<void> {
 export async function getPendingWeaponRequests(teamId: string): Promise<WeaponRequest[]> {
   const { data, error } = await supabase
     .from('weapon_requests')
-    .select(`
+    .select(
+      `
       *,
       user:profiles!weapon_requests_user_id_fkey(id, full_name, avatar_url),
       requested_weapon:team_weapons(*)
-    `)
+    `
+    )
     .eq('team_id', teamId)
     .eq('status', 'pending')
     .order('created_at', { ascending: true });
@@ -1272,7 +1276,9 @@ export async function getPendingWeaponRequests(teamId: string): Promise<WeaponRe
  * Get current user's pending request for a team
  */
 export async function getMyPendingRequest(teamId: string): Promise<WeaponRequest | null> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return null;
 
   const { data, error } = await supabase
@@ -1300,7 +1306,9 @@ export async function approveWeaponRequest(
   requestId: string,
   assignWeaponId: string
 ): Promise<{ request: WeaponRequest; assignment: TeamWeapon }> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
   // Get the request first
@@ -1355,11 +1363,10 @@ export async function approveWeaponRequest(
 /**
  * Reject a weapon request
  */
-export async function rejectWeaponRequest(
-  requestId: string,
-  reviewNotes?: string
-): Promise<WeaponRequest> {
-  const { data: { user } } = await supabase.auth.getUser();
+export async function rejectWeaponRequest(requestId: string, reviewNotes?: string): Promise<WeaponRequest> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
   const { data, error } = await supabase
@@ -1385,10 +1392,7 @@ export async function rejectWeaponRequest(
 /**
  * Set whether a team weapon is available in the shared pool
  */
-export async function setWeaponPoolAvailable(
-  teamWeaponId: string,
-  poolAvailable: boolean
-): Promise<TeamWeapon> {
+export async function setWeaponPoolAvailable(teamWeaponId: string, poolAvailable: boolean): Promise<TeamWeapon> {
   const { data, error } = await supabase
     .from('team_weapons')
     .update({
@@ -1433,7 +1437,9 @@ export async function getPoolWeapons(teamId: string): Promise<TeamWeapon[]> {
  * Get the current user's assigned weapon in a team
  */
 export async function getTeamWeaponForUser(teamId: string): Promise<TeamWeapon | null> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) {
     console.log('[getTeamWeaponForUser] No user');
     return null;
@@ -1466,16 +1472,13 @@ export async function getTeamWeaponForUser(teamId: string): Promise<TeamWeapon |
  * Returns different data based on user role
  */
 export async function getArmoryOverview(teamId: string): Promise<ArmoryOverviewData> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
   // Parallel fetch all data
-  const [
-    allTeamWeapons,
-    pendingRequests,
-    pendingContributions,
-    myPendingRequest,
-  ] = await Promise.all([
+  const [allTeamWeapons, pendingRequests, pendingContributions, myPendingRequest] = await Promise.all([
     getTeamWeaponsWithAssignments(teamId),
     getPendingWeaponRequests(teamId),
     getPendingSharedWeapons(teamId),
@@ -1483,10 +1486,10 @@ export async function getArmoryOverview(teamId: string): Promise<ArmoryOverviewD
   ]);
 
   // Categorize weapons
-  const assignedWeapons = allTeamWeapons.filter(w => w.assigned_to != null);
-  const poolWeapons = allTeamWeapons.filter(w => w.pool_available === true && w.assigned_to == null);
-  const unassignedWeapons = allTeamWeapons.filter(w => w.assigned_to == null && !w.pool_available);
-  const myAssignment = allTeamWeapons.find(w => w.assigned_to === user.id) || null;
+  const assignedWeapons = allTeamWeapons.filter((w) => w.assigned_to != null);
+  const poolWeapons = allTeamWeapons.filter((w) => w.pool_available === true && w.assigned_to == null);
+  const unassignedWeapons = allTeamWeapons.filter((w) => w.assigned_to == null && !w.pool_available);
+  const myAssignment = allTeamWeapons.find((w) => w.assigned_to === user.id) || null;
 
   return {
     assignedWeapons,
@@ -1504,18 +1507,22 @@ export async function getArmoryOverview(teamId: string): Promise<ArmoryOverviewD
 // ============================================================================
 
 export async function getWeaponStats(): Promise<Map<string, WeaponStats>> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return new Map();
 
   // Get all sessions with weapon_id for current user
   const { data: sessions, error } = await supabase
     .from('sessions')
-    .select(`
+    .select(
+      `
       id,
       weapon_id,
       started_at,
       status
-    `)
+    `
+    )
     .eq('user_id', user.id)
     .not('weapon_id', 'is', null);
 
@@ -1527,10 +1534,13 @@ export async function getWeaponStats(): Promise<Map<string, WeaponStats>> {
   if (!sessions || sessions.length === 0) return new Map();
 
   // Group sessions by weapon_id
-  const weaponSessions = new Map<string, {
-    sessions: typeof sessions;
-    lastUsed: string | null;
-  }>();
+  const weaponSessions = new Map<
+    string,
+    {
+      sessions: typeof sessions;
+      lastUsed: string | null;
+    }
+  >();
 
   sessions.forEach((session: any) => {
     const wid = session.weapon_id;
@@ -1550,11 +1560,13 @@ export async function getWeaponStats(): Promise<Map<string, WeaponStats>> {
   // Fetch target results for all sessions
   const { data: targets, error: targetsError } = await supabase
     .from('session_targets')
-    .select(`
+    .select(
+      `
       session_id,
       paper_target_results(bullets_fired, hits_total, dispersion_cm),
       tactical_target_results(bullets_fired, hits)
-    `)
+    `
+    )
     .in('session_id', sessionIds);
 
   if (targetsError) {
@@ -1568,11 +1580,14 @@ export async function getWeaponStats(): Promise<Map<string, WeaponStats>> {
   });
 
   // Aggregate stats per weapon
-  const weaponAggregates = new Map<string, {
-    rounds: number;
-    hits: number;
-    bestDispersion: number | null;
-  }>();
+  const weaponAggregates = new Map<
+    string,
+    {
+      rounds: number;
+      hits: number;
+      bestDispersion: number | null;
+    }
+  >();
 
   (targets ?? []).forEach((target: any) => {
     const weaponId = sessionToWeapon.get(target.session_id);
@@ -1623,4 +1638,3 @@ export async function getWeaponStats(): Promise<Map<string, WeaponStats>> {
 
   return statsMap;
 }
-
