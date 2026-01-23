@@ -1,6 +1,6 @@
 /**
  * Weather Display Components
- * 
+ *
  * Reusable components for displaying weather data in session views.
  * Includes both compact badge and full card variants.
  */
@@ -39,32 +39,27 @@ interface WeatherCardProps {
 // WEATHER BADGE (Compact - for lists)
 // ============================================================================
 
-export const WeatherBadge = memo(function WeatherBadge({ 
-  weather, 
-  compact = false 
-}: WeatherBadgeProps) {
+export const WeatherBadge = memo(function WeatherBadge({ weather, compact = false }: WeatherBadgeProps) {
   const colors = useColors();
-  
+
   if (!weather) return null;
-  
+
   const badgeColor = getWeatherBadgeColor(weather.conditionSeverity);
   const windInfo = getWindIndicator(weather.windImpact);
   const conditionIcon = getConditionIcon(weather.condition);
-  
+
   if (compact) {
     // Ultra-compact: just icon and temp
     return (
       <View style={[styles.badgeCompact, { backgroundColor: `${badgeColor}15` }]}>
         {conditionIcon}
         {weather.temperatureC != null && (
-          <Text style={[styles.badgeCompactText, { color: badgeColor }]}>
-            {Math.round(weather.temperatureC)}°
-          </Text>
+          <Text style={[styles.badgeCompactText, { color: badgeColor }]}>{Math.round(weather.temperatureC)}°</Text>
         )}
       </View>
     );
   }
-  
+
   return (
     <View style={[styles.badge, { backgroundColor: `${badgeColor}15` }]}>
       {conditionIcon}
@@ -92,37 +87,28 @@ export const WeatherBadge = memo(function WeatherBadge({
 // WEATHER CARD (Full - for detail pages)
 // ============================================================================
 
-export const WeatherCard = memo(function WeatherCard({ 
-  weather, 
-  units = 'metric' 
-}: WeatherCardProps) {
+export const WeatherCard = memo(function WeatherCard({ weather, units = 'metric' }: WeatherCardProps) {
   const colors = useColors();
-  
+
   if (!weather) return null;
-  
+
   const badgeColor = getWeatherBadgeColor(weather.conditionSeverity);
   const windInfo = getWindIndicator(weather.windImpact);
   const conditionIcon = getConditionIcon(weather.condition, 24);
-  
+
   // Temperature display
-  const temp = units === 'imperial' 
-    ? weather.temperatureF 
-    : weather.temperatureC;
+  const temp = units === 'imperial' ? weather.temperatureF : weather.temperatureC;
   const tempUnit = units === 'imperial' ? '°F' : '°C';
-  
+
   // Wind display
-  const windSpeed = units === 'imperial'
-    ? weather.windSpeedMph
-    : weather.windSpeedMps;
+  const windSpeed = units === 'imperial' ? weather.windSpeedMph : weather.windSpeedMps;
   const windUnit = units === 'imperial' ? 'mph' : 'm/s';
-  
+
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       {/* Header */}
       <View style={styles.cardHeader}>
-        <View style={[styles.conditionIconBg, { backgroundColor: `${badgeColor}20` }]}>
-          {conditionIcon}
-        </View>
+        <View style={[styles.conditionIconBg, { backgroundColor: `${badgeColor}20` }]}>{conditionIcon}</View>
         <View style={styles.cardHeaderContent}>
           <Text style={[styles.conditionText, { color: colors.text }]}>
             {weather.condition ? formatConditionName(weather.condition) : 'Weather Conditions'}
@@ -134,7 +120,7 @@ export const WeatherCard = memo(function WeatherCard({
           </View>
         </View>
       </View>
-      
+
       {/* Stats Grid */}
       <View style={styles.statsGrid}>
         {/* Temperature */}
@@ -146,7 +132,7 @@ export const WeatherCard = memo(function WeatherCard({
             colors={colors}
           />
         )}
-        
+
         {/* Wind */}
         {windSpeed != null && windSpeed > 0 && (
           <WeatherStat
@@ -157,7 +143,7 @@ export const WeatherCard = memo(function WeatherCard({
             highlight={weather.windImpact === 'moderate' || weather.windImpact === 'strong'}
           />
         )}
-        
+
         {/* Humidity */}
         {weather.humidity != null && (
           <WeatherStat
@@ -167,7 +153,7 @@ export const WeatherCard = memo(function WeatherCard({
             colors={colors}
           />
         )}
-        
+
         {/* Pressure */}
         {weather.pressureHpa != null && (
           <WeatherStat
@@ -178,13 +164,13 @@ export const WeatherCard = memo(function WeatherCard({
           />
         )}
       </View>
-      
+
       {/* Wind Impact Warning */}
       {(weather.windImpact === 'moderate' || weather.windImpact === 'strong') && (
         <View style={[styles.windWarning, { backgroundColor: `${windInfo.color}15` }]}>
           <Wind size={14} color={windInfo.color} />
           <Text style={[styles.windWarningText, { color: windInfo.color }]}>
-            {weather.windImpact === 'strong' 
+            {weather.windImpact === 'strong'
               ? 'Strong wind - expect significant bullet drift'
               : 'Moderate wind - adjust for drift'}
           </Text>
@@ -198,21 +184,17 @@ export const WeatherCard = memo(function WeatherCard({
 // INLINE WEATHER DISPLAY (For session summary)
 // ============================================================================
 
-export const WeatherInline = memo(function WeatherInline({ 
-  weather 
-}: { weather: DecodedWeather | null }) {
+export const WeatherInline = memo(function WeatherInline({ weather }: { weather: DecodedWeather | null }) {
   const colors = useColors();
-  
+
   if (!weather) return null;
-  
+
   const displayText = formatWeatherDisplay(weather, 'metric');
-  
+
   return (
     <View style={styles.inline}>
       <Cloud size={12} color={colors.textMuted} />
-      <Text style={[styles.inlineText, { color: colors.textMuted }]}>
-        {displayText}
-      </Text>
+      <Text style={[styles.inlineText, { color: colors.textMuted }]}>{displayText}</Text>
     </View>
   );
 });
@@ -226,10 +208,7 @@ interface WeatherStripProps {
   units?: 'metric' | 'imperial';
 }
 
-export const WeatherStrip = memo(function WeatherStrip({
-  weather,
-  units = 'metric',
-}: WeatherStripProps) {
+export const WeatherStrip = memo(function WeatherStrip({ weather, units = 'metric' }: WeatherStripProps) {
   const colors = useColors();
 
   if (!weather) return null;
@@ -257,7 +236,8 @@ export const WeatherStrip = memo(function WeatherStrip({
         <View style={styles.stripItem}>
           <Thermometer size={14} color={colors.orange} />
           <Text style={[styles.stripValue, { color: colors.text }]}>
-            {Math.round(temp)}{tempUnit}
+            {Math.round(temp)}
+            {tempUnit}
           </Text>
         </View>
       )}
@@ -270,9 +250,7 @@ export const WeatherStrip = memo(function WeatherStrip({
             {windSpeed.toFixed(0)} {windUnit}
           </Text>
           {weather.windDirection && (
-            <Text style={[styles.stripLabel, { color: colors.textMuted }]}>
-              {weather.windDirection}
-            </Text>
+            <Text style={[styles.stripLabel, { color: colors.textMuted }]}>{weather.windDirection}</Text>
           )}
         </View>
       )}
@@ -281,18 +259,14 @@ export const WeatherStrip = memo(function WeatherStrip({
       {weather.humidity != null && (
         <View style={styles.stripItem}>
           <Droplets size={14} color={colors.blue} />
-          <Text style={[styles.stripValue, { color: colors.text }]}>
-            {weather.humidity}%
-          </Text>
+          <Text style={[styles.stripValue, { color: colors.text }]}>{weather.humidity}%</Text>
         </View>
       )}
 
       {/* Wind impact indicator (if notable) */}
       {(weather.windImpact === 'moderate' || weather.windImpact === 'strong') && (
         <View style={[styles.stripWindBadge, { backgroundColor: `${windInfo.color}20` }]}>
-          <Text style={[styles.stripWindText, { color: windInfo.color }]}>
-            {windInfo.label}
-          </Text>
+          <Text style={[styles.stripWindText, { color: windInfo.color }]}>{windInfo.label}</Text>
         </View>
       )}
     </View>
@@ -313,10 +287,7 @@ interface WeatherStatProps {
 
 function WeatherStat({ icon, label, value, colors, highlight }: WeatherStatProps) {
   return (
-    <View style={[
-      styles.stat, 
-      { backgroundColor: highlight ? `${colors.orange}10` : colors.background }
-    ]}>
+    <View style={[styles.stat, { backgroundColor: highlight ? `${colors.orange}10` : colors.background }]}>
       {icon}
       <View style={styles.statContent}>
         <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
@@ -331,17 +302,17 @@ function WeatherStat({ icon, label, value, colors, highlight }: WeatherStatProps
  */
 function getConditionIcon(condition: string | null, size = 16): React.ReactNode {
   const iconProps = { size, strokeWidth: 2 };
-  
+
   // Default gray color - will be overridden by parent styling if needed
   const color = '#6B7280';
-  
+
   if (!condition) {
     return <Cloud {...iconProps} color={color} />;
   }
-  
+
   // Map conditions to icons
   const lowerCondition = condition.toLowerCase();
-  
+
   if (lowerCondition.includes('clear') || lowerCondition.includes('fair')) {
     return <Sun {...iconProps} color="#F59E0B" />;
   }
@@ -354,7 +325,7 @@ function getConditionIcon(condition: string | null, size = 16): React.ReactNode 
   if (lowerCondition.includes('cloud')) {
     return <Cloud {...iconProps} color="#9CA3AF" />;
   }
-  
+
   return <Cloud {...iconProps} color={color} />;
 }
 
@@ -402,7 +373,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  
+
   // Card (full)
   card: {
     borderRadius: 14,
@@ -479,7 +450,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     flex: 1,
   },
-  
+
   // Inline
   inline: {
     flexDirection: 'row',
@@ -526,4 +497,3 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
 });
-

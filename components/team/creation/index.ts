@@ -1,6 +1,6 @@
 /**
  * Team Creation Components
- * 
+ *
  * Components and types for team creation flow.
  */
 

@@ -1,9 +1,9 @@
-import { useColors } from "@/hooks/ui/useColors";
-import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
-import React from "react";
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { DISTANCE_QUICK_PICKS } from "./types";
+import { useColors } from '@/hooks/ui/useColors';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import React from 'react';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { DISTANCE_QUICK_PICKS } from './types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DISTANCE INPUT
@@ -22,14 +22,14 @@ export const DistanceInput = React.memo(function DistanceInput({
   disabled = false,
 }: DistanceInputProps) {
   const colors = useColors();
-  
+
   return (
     <View style={[styles.container, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '25' }]}>
       <View style={styles.header}>
-        <Ionicons name={disabled ? "lock-closed-outline" : "locate-outline"} size={18} color={colors.primary} />
+        <Ionicons name={disabled ? 'lock-closed-outline' : 'locate-outline'} size={18} color={colors.primary} />
         <Text style={[styles.title, { color: colors.text }]}>Distance to Target</Text>
       </View>
-      
+
       <View style={styles.inputRow}>
         <TextInput
           style={[styles.mainInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
@@ -48,7 +48,7 @@ export const DistanceInput = React.memo(function DistanceInput({
         />
         <Text style={[styles.unit, { color: colors.textMuted }]}>meters</Text>
       </View>
-      
+
       <View style={styles.quickPicks}>
         {DISTANCE_QUICK_PICKS.map((d) => (
           <TouchableOpacity
@@ -66,13 +66,7 @@ export const DistanceInput = React.memo(function DistanceInput({
             disabled={disabled}
             activeOpacity={0.7}
           >
-            <Text
-              style={[
-                styles.quickText,
-                { color: colors.text },
-                distance === d && styles.quickTextSelected,
-              ]}
-            >
+            <Text style={[styles.quickText, { color: colors.text }, distance === d && styles.quickTextSelected]}>
               {d}m
             </Text>
           </TouchableOpacity>
@@ -90,18 +84,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
     marginBottom: 12,
   },
   title: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   inputRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
     marginBottom: 12,
   },
@@ -111,17 +105,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 24,
-    fontWeight: "700",
-    textAlign: "center",
+    fontWeight: '700',
+    textAlign: 'center',
     borderWidth: 1,
   },
   unit: {
     fontSize: 16,
-    fontWeight: "500",
+    fontWeight: '500',
   },
   quickPicks: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
   quickChip: {
@@ -132,10 +126,9 @@ const styles = StyleSheet.create({
   },
   quickText: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   quickTextSelected: {
-    color: "#000",
+    color: '#000',
   },
 });
-

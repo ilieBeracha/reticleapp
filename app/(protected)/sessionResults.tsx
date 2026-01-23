@@ -1,6 +1,6 @@
 /**
  * Session Results Screen
- * 
+ *
  * Full-page display of session results including:
  * - Summary stats
  * - Shot timing chart (split times)
@@ -37,14 +37,7 @@ import {
   Zap,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { BarChart, LineChart } from 'react-native-gifted-charts';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -61,7 +54,7 @@ function formatDuration(ms: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   const tenths = Math.floor((ms % 1000) / 100);
-  
+
   if (minutes > 0) {
     return `${minutes}:${String(seconds).padStart(2, '0')}.${tenths}`;
   }
@@ -89,21 +82,23 @@ function calculateSplits(timestamps: number[]): number[] {
 export default function SessionResultsScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
-  const { sessionId, watchData: watchDataParam, trainingId } = useLocalSearchParams<{ 
-    sessionId: string; 
+  const {
+    sessionId,
+    watchData: watchDataParam,
+    trainingId,
+  } = useLocalSearchParams<{
+    sessionId: string;
     watchData?: string;
     trainingId?: string;
   }>();
-  
+
   const [session, setSession] = useState<SessionWithDetails | null>(null);
   const [targets, setTargets] = useState<SessionTargetWithResults[]>([]);
   const [verdict, setVerdict] = useState<SessionVerdict | null>(null);
   const [loading, setLoading] = useState(true);
-  
+
   // Parse watch data from params
-  const watchData: GarminSessionData | null = watchDataParam 
-    ? JSON.parse(watchDataParam) 
-    : null;
+  const watchData: GarminSessionData | null = watchDataParam ? JSON.parse(watchDataParam) : null;
 
   useEffect(() => {
     if (sessionId) {
@@ -201,7 +196,7 @@ export default function SessionResultsScreen() {
 
   const drill = session?.drill_config;
   const drillName = session?.drill_name || drill?.name || 'Practice Session';
-  
+
   // Decode weather from session or watch data (if available)
   const weather: DecodedWeather | null = useMemo(() => {
     // 1. First check session.weather (from OpenWeatherMap or stored data)
@@ -229,7 +224,7 @@ export default function SessionResultsScreen() {
         return sessionWeather as DecodedWeather;
       }
     }
-    
+
     // 2. Fall back to watchData weather
     const rawWeather = (watchData as any)?.weather;
     if (rawWeather) {
@@ -242,13 +237,11 @@ export default function SessionResultsScreen() {
     }
     return null;
   }, [session?.weather, watchData]);
-  
+
   // Calculate splits from timestamps
   const shotTimestamps = watchData?.shotTimestamps || [];
   const splits = calculateSplits(shotTimestamps);
-  const avgSplit = splits.length > 0 
-    ? splits.reduce((a, b) => a + b, 0) / splits.length 
-    : 0;
+  const avgSplit = splits.length > 0 ? splits.reduce((a, b) => a + b, 0) / splits.length : 0;
   const fastestSplit = splits.length > 0 ? Math.min(...splits) : 0;
   const slowestSplit = splits.length > 0 ? Math.max(...splits) : 0;
 
@@ -256,11 +249,7 @@ export default function SessionResultsScreen() {
   const splitChartData = splits.map((split, index) => ({
     value: split,
     label: `${index + 1}`,
-    frontColor: split === fastestSplit 
-      ? colors.green 
-      : split === slowestSplit 
-        ? colors.destructive 
-        : colors.primary,
+    frontColor: split === fastestSplit ? colors.green : split === slowestSplit ? colors.destructive : colors.primary,
   }));
 
   // Shot timeline data
@@ -273,10 +262,7 @@ export default function SessionResultsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity
-          style={[styles.closeBtn, { backgroundColor: colors.secondary }]}
-          onPress={handleClose}
-        >
+        <TouchableOpacity style={[styles.closeBtn, { backgroundColor: colors.secondary }]} onPress={handleClose}>
           <X size={18} color={colors.textMuted} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
@@ -285,19 +271,15 @@ export default function SessionResultsScreen() {
         <View style={{ width: 36 }} />
       </View>
 
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Success Banner */}
         <View style={[styles.successBanner, { backgroundColor: `${colors.green}15` }]}>
           <CheckCircle size={32} color={colors.green} />
-          <Text style={[styles.successTitle, { color: colors.green }]}>
-            {drillName}
-          </Text>
-          <Text style={[styles.successSubtitle, { color: colors.textMuted }]}>
-            Session recorded successfully
-          </Text>
+          <Text style={[styles.successTitle, { color: colors.green }]}>{drillName}</Text>
+          <Text style={[styles.successSubtitle, { color: colors.textMuted }]}>Session recorded successfully</Text>
         </View>
 
         {/* Standards Verdict (team sessions only) */}
@@ -317,7 +299,13 @@ export default function SessionResultsScreen() {
                 label="Accuracy"
                 value={`${targetStats.manualAccuracy}%`}
                 colors={colors}
-                valueColor={targetStats.manualAccuracy >= 70 ? colors.green : targetStats.manualAccuracy >= 50 ? colors.orange : colors.destructive}
+                valueColor={
+                  targetStats.manualAccuracy >= 70
+                    ? colors.green
+                    : targetStats.manualAccuracy >= 50
+                      ? colors.orange
+                      : colors.destructive
+                }
               />
               <StatCard
                 icon={<Target size={18} color={colors.primary} />}
@@ -386,7 +374,7 @@ export default function SessionResultsScreen() {
               colors={colors}
             />
           )}
-          
+
           {/* Always show these */}
           <StatCard
             icon={<MapPin size={18} color={colors.textMuted} />}
@@ -413,9 +401,14 @@ export default function SessionResultsScreen() {
 
         {/* Entry type indicator */}
         {(targetStats.hasManual || targetStats.hasScan || targetStats.hasGrouping) && (
-          <View style={[styles.entryTypeBadge, { 
-            backgroundColor: targetStats.hasManual ? '#3B82F615' : targetStats.hasScan ? '#8B5CF615' : '#22C55E15' 
-          }]}>
+          <View
+            style={[
+              styles.entryTypeBadge,
+              {
+                backgroundColor: targetStats.hasManual ? '#3B82F615' : targetStats.hasScan ? '#8B5CF615' : '#22C55E15',
+              },
+            ]}
+          >
             {targetStats.hasManual ? (
               <>
                 <Crosshair size={14} color="#60A5FA" />
@@ -433,9 +426,7 @@ export default function SessionResultsScreen() {
             ) : (
               <>
                 <Focus size={14} color="#22C55E" />
-                <Text style={[styles.entryTypeBadgeText, { color: '#22C55E' }]}>
-                  Grouping • Measuring consistency
-                </Text>
+                <Text style={[styles.entryTypeBadgeText, { color: '#22C55E' }]}>Grouping • Measuring consistency</Text>
               </>
             )}
           </View>
@@ -456,9 +447,7 @@ export default function SessionResultsScreen() {
         {watchData && (
           <View style={[styles.watchBadge, { backgroundColor: `${colors.green}10` }]}>
             <Watch size={16} color={colors.green} />
-            <Text style={[styles.watchBadgeText, { color: colors.green }]}>
-              Data synced from watch
-            </Text>
+            <Text style={[styles.watchBadgeText, { color: colors.green }]}>Data synced from watch</Text>
           </View>
         )}
 
@@ -469,10 +458,8 @@ export default function SessionResultsScreen() {
               <Activity size={18} color={colors.primary} />
               <Text style={[styles.chartTitle, { color: colors.text }]}>Split Times</Text>
             </View>
-            <Text style={[styles.chartSubtitle, { color: colors.textMuted }]}>
-              Time between shots (ms)
-            </Text>
-            
+            <Text style={[styles.chartSubtitle, { color: colors.textMuted }]}>Time between shots (ms)</Text>
+
             <View style={styles.chartContainer}>
               <BarChart
                 data={splitChartData}
@@ -498,23 +485,17 @@ export default function SessionResultsScreen() {
               <View style={styles.splitStatItem}>
                 <View style={[styles.splitDot, { backgroundColor: colors.green }]} />
                 <Text style={[styles.splitStatLabel, { color: colors.textMuted }]}>Fastest</Text>
-                <Text style={[styles.splitStatValue, { color: colors.text }]}>
-                  {formatSplitTime(fastestSplit)}
-                </Text>
+                <Text style={[styles.splitStatValue, { color: colors.text }]}>{formatSplitTime(fastestSplit)}</Text>
               </View>
               <View style={styles.splitStatItem}>
                 <View style={[styles.splitDot, { backgroundColor: colors.primary }]} />
                 <Text style={[styles.splitStatLabel, { color: colors.textMuted }]}>Average</Text>
-                <Text style={[styles.splitStatValue, { color: colors.text }]}>
-                  {formatSplitTime(avgSplit)}
-                </Text>
+                <Text style={[styles.splitStatValue, { color: colors.text }]}>{formatSplitTime(avgSplit)}</Text>
               </View>
               <View style={styles.splitStatItem}>
                 <View style={[styles.splitDot, { backgroundColor: colors.destructive }]} />
                 <Text style={[styles.splitStatLabel, { color: colors.textMuted }]}>Slowest</Text>
-                <Text style={[styles.splitStatValue, { color: colors.text }]}>
-                  {formatSplitTime(slowestSplit)}
-                </Text>
+                <Text style={[styles.splitStatValue, { color: colors.text }]}>{formatSplitTime(slowestSplit)}</Text>
               </View>
             </View>
           </View>
@@ -527,10 +508,8 @@ export default function SessionResultsScreen() {
               <TrendingUp size={18} color={colors.blue} />
               <Text style={[styles.chartTitle, { color: colors.text }]}>Shot Timeline</Text>
             </View>
-            <Text style={[styles.chartSubtitle, { color: colors.textMuted }]}>
-              When each shot was fired (seconds)
-            </Text>
-            
+            <Text style={[styles.chartSubtitle, { color: colors.textMuted }]}>When each shot was fired (seconds)</Text>
+
             <View style={styles.chartContainer}>
               <LineChart
                 data={timelineData}
@@ -561,26 +540,20 @@ export default function SessionResultsScreen() {
               <Heart size={18} color={colors.destructive} />
               <Text style={[styles.chartTitle, { color: colors.text }]}>Heart Rate</Text>
             </View>
-            
+
             <View style={styles.hrStats}>
               <View style={styles.hrStatItem}>
-                <Text style={[styles.hrStatValue, { color: colors.text }]}>
-                  {watchData.heartRate.avg}
-                </Text>
+                <Text style={[styles.hrStatValue, { color: colors.text }]}>{watchData.heartRate.avg}</Text>
                 <Text style={[styles.hrStatLabel, { color: colors.textMuted }]}>Avg BPM</Text>
               </View>
               <View style={[styles.hrStatDivider, { backgroundColor: colors.border }]} />
               <View style={styles.hrStatItem}>
-                <Text style={[styles.hrStatValue, { color: colors.destructive }]}>
-                  {watchData.heartRate.max}
-                </Text>
+                <Text style={[styles.hrStatValue, { color: colors.destructive }]}>{watchData.heartRate.max}</Text>
                 <Text style={[styles.hrStatLabel, { color: colors.textMuted }]}>Max BPM</Text>
               </View>
               <View style={[styles.hrStatDivider, { backgroundColor: colors.border }]} />
               <View style={styles.hrStatItem}>
-                <Text style={[styles.hrStatValue, { color: colors.green }]}>
-                  {watchData.heartRate.min}
-                </Text>
+                <Text style={[styles.hrStatValue, { color: colors.green }]}>{watchData.heartRate.min}</Text>
                 <Text style={[styles.hrStatLabel, { color: colors.textMuted }]}>Min BPM</Text>
               </View>
             </View>
@@ -593,27 +566,16 @@ export default function SessionResultsScreen() {
         {/* Raw Data (Collapsible) */}
         {watchData && (
           <View style={[styles.rawDataSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.rawDataTitle, { color: colors.textMuted }]}>
-              Raw Shot Timestamps (ms)
-            </Text>
-            <Text style={[styles.rawDataContent, { color: colors.text }]}>
-              [{shotTimestamps.join(', ')}]
-            </Text>
+            <Text style={[styles.rawDataTitle, { color: colors.textMuted }]}>Raw Shot Timestamps (ms)</Text>
+            <Text style={[styles.rawDataContent, { color: colors.text }]}>[{shotTimestamps.join(', ')}]</Text>
           </View>
         )}
       </ScrollView>
 
       {/* Bottom Actions */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
-        <TouchableOpacity
-          style={[styles.primaryBtn, { backgroundColor: colors.text }]}
-          onPress={handleGoHome}
-        >
-          <Ionicons 
-            name={session?.training_id ? "arrow-back" : "home"} 
-            size={18} 
-            color={colors.background} 
-          />
+        <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: colors.text }]} onPress={handleGoHome}>
+          <Ionicons name={session?.training_id ? 'arrow-back' : 'home'} size={18} color={colors.background} />
           <Text style={[styles.primaryBtnText, { color: colors.background }]}>
             {session?.training_id ? 'Back to Training' : 'Done'}
           </Text>
@@ -686,7 +648,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     gap: 16,
   },
-  
+
   // Success Banner
   successBanner: {
     alignItems: 'center',
@@ -702,7 +664,7 @@ const styles = StyleSheet.create({
   successSubtitle: {
     fontSize: 14,
   },
-  
+
   // Stats Grid
   statsGrid: {
     flexDirection: 'row',
@@ -726,7 +688,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textTransform: 'uppercase',
   },
-  
+
   // Info Card
   infoCard: {
     flexDirection: 'row',
@@ -748,7 +710,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 2,
   },
-  
+
   // Watch Badge
   watchBadge: {
     flexDirection: 'row',
@@ -762,7 +724,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  
+
   // Entry Type Badge
   entryTypeBadge: {
     flexDirection: 'row',
@@ -777,7 +739,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  
+
   // Chart Section
   chartSection: {
     padding: 16,
@@ -802,7 +764,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden',
   },
-  
+
   // Split Stats
   splitStats: {
     flexDirection: 'row',
@@ -828,7 +790,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  
+
   // Heart Rate
   hrStats: {
     flexDirection: 'row',
@@ -850,7 +812,7 @@ const styles = StyleSheet.create({
     width: 1,
     height: 40,
   },
-  
+
   // Raw Data
   rawDataSection: {
     padding: 14,
@@ -866,7 +828,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'monospace',
   },
-  
+
   // Bottom Bar
   bottomBar: {
     position: 'absolute',
@@ -889,4 +851,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

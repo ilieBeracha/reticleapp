@@ -1,6 +1,6 @@
 /**
  * Profile Sheet
- * 
+ *
  * Personal account settings displayed as a bottom sheet.
  */
 import { BaseAvatar } from '@/components/shared/Avatar';
@@ -14,15 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
-import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -121,7 +113,12 @@ export default function ProfileSheet() {
         <View style={[styles.menuGroup, { backgroundColor: colors.background }]}>
           {/* Notifications Toggle */}
           <View style={styles.menuItem}>
-            <View style={[styles.iconContainer, { backgroundColor: notificationsEnabled ? colors.primary : colors.textMuted }]}>
+            <View
+              style={[
+                styles.iconContainer,
+                { backgroundColor: notificationsEnabled ? colors.primary : colors.textMuted },
+              ]}
+            >
               <Ionicons name="notifications" size={18} color="#fff" />
             </View>
             <View style={styles.menuItemContent}>
@@ -162,7 +159,7 @@ export default function ProfileSheet() {
 
           {/* Appearance */}
           <View style={[styles.separator, { backgroundColor: colors.border }]} />
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.menuItem}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -175,16 +172,12 @@ export default function ProfileSheet() {
             <View style={styles.menuItemContent}>
               <Text style={[styles.menuItemText, { color: colors.text }]}>Appearance</Text>
               <Text style={[styles.menuItemSubtitle, { color: colors.textMuted }]}>
-                {THEME_OPTIONS.find(o => o.value === preference)?.label || 'System'}
+                {THEME_OPTIONS.find((o) => o.value === preference)?.label || 'System'}
               </Text>
             </View>
-            <Ionicons 
-              name={showThemeOptions ? "chevron-down" : "chevron-forward"} 
-              size={16} 
-              color={colors.textMuted} 
-            />
+            <Ionicons name={showThemeOptions ? 'chevron-down' : 'chevron-forward'} size={16} color={colors.textMuted} />
           </TouchableOpacity>
-          
+
           {/* Theme Options (expandable) */}
           {showThemeOptions && (
             <View style={[styles.themeOptionsContainer, { backgroundColor: colors.secondary }]}>
@@ -193,34 +186,24 @@ export default function ProfileSheet() {
                 return (
                   <TouchableOpacity
                     key={option.value}
-                    style={[
-                      styles.themeOption,
-                      isSelected && { backgroundColor: colors.primary + '15' },
-                    ]}
+                    style={[styles.themeOption, isSelected && { backgroundColor: colors.primary + '15' }]}
                     onPress={() => {
                       Haptics.selectionAsync();
                       setPreference(option.value);
                     }}
                   >
-                    <View style={[
-                      styles.themeOptionIcon,
-                      { backgroundColor: isSelected ? colors.primary : colors.textMuted + '30' }
-                    ]}>
-                      <Ionicons 
-                        name={option.icon} 
-                        size={16} 
-                        color={isSelected ? '#fff' : colors.textMuted} 
-                      />
+                    <View
+                      style={[
+                        styles.themeOptionIcon,
+                        { backgroundColor: isSelected ? colors.primary : colors.textMuted + '30' },
+                      ]}
+                    >
+                      <Ionicons name={option.icon} size={16} color={isSelected ? '#fff' : colors.textMuted} />
                     </View>
-                    <Text style={[
-                      styles.themeOptionText, 
-                      { color: isSelected ? colors.primary : colors.text }
-                    ]}>
+                    <Text style={[styles.themeOptionText, { color: isSelected ? colors.primary : colors.text }]}>
                       {option.label}
                     </Text>
-                    {isSelected && (
-                      <Ionicons name="checkmark" size={18} color={colors.primary} />
-                    )}
+                    {isSelected && <Ionicons name="checkmark" size={18} color={colors.primary} />}
                   </TouchableOpacity>
                 );
               })}

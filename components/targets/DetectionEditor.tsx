@@ -1,24 +1,13 @@
-import type { AnalyzeDocumentResponse, AnalyzeResponse } from "@/types/api";
-import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
-import Svg, { Circle, G, Line } from "react-native-svg";
-import ViewShot from "react-native-view-shot";
-import {
-  CANVAS_SIZE,
-  COLORS,
-  EditableDetection,
-  EditMode,
-  MARKER_RADIUS,
-} from "./types";
+import type { AnalyzeDocumentResponse, AnalyzeResponse } from '@/types/api';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Svg, { Circle, G, Line } from 'react-native-svg';
+import ViewShot from 'react-native-view-shot';
+import { CANVAS_SIZE, COLORS, EditableDetection, EditMode, MARKER_RADIUS } from './types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DETECTION EDITOR
@@ -42,7 +31,7 @@ const MIN_ZOOM = 1;
 const HISTORY_LIMIT = 50;
 
 function clamp(value: number, min: number, max: number) {
-  "worklet";
+  'worklet';
   return Math.min(max, Math.max(min, value));
 }
 
@@ -64,9 +53,7 @@ export const DetectionEditor = React.memo(function DetectionEditor({
 }: DetectionEditorProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [localDetections, setLocalDetections] = useState<EditableDetection[]>(() =>
-    cloneDetections(detections),
-  );
+  const [localDetections, setLocalDetections] = useState<EditableDetection[]>(() => cloneDetections(detections));
   const localDetectionsRef = useRef<EditableDetection[]>(localDetections);
 
   // History (undo/redo)
@@ -114,7 +101,7 @@ export const DetectionEditor = React.memo(function DetectionEditor({
       historyIndexRef.current = currentHistory.length - 1;
       updateHistoryFlags();
     },
-    [updateHistoryFlags],
+    [updateHistoryFlags]
   );
 
   const commitDetections = useCallback(
@@ -124,25 +111,21 @@ export const DetectionEditor = React.memo(function DetectionEditor({
       if (shouldPushHistory) pushHistory(next);
       if (syncParent) onDetectionsChange(next);
     },
-    [onDetectionsChange, pushHistory],
+    [onDetectionsChange, pushHistory]
   );
 
   // Calculate scale factors for coordinate mapping
   // Handles both AnalyzeResponse (uses width/height) and AnalyzeDocumentResponse (uses processed_width/height)
   const imageToCanvas = useMemo(() => {
     if (!result.metadata) return { x: 1, y: 1, offsetX: 0, offsetY: 0 };
-    
+
     // Get image dimensions - document analysis uses processed dimensions, legacy uses width/height
-    const imgWidth = 'processed_width' in result.metadata 
-      ? result.metadata.processed_width 
-      : result.metadata.width;
-    const imgHeight = 'processed_height' in result.metadata 
-      ? result.metadata.processed_height 
-      : result.metadata.height;
-    
+    const imgWidth = 'processed_width' in result.metadata ? result.metadata.processed_width : result.metadata.width;
+    const imgHeight = 'processed_height' in result.metadata ? result.metadata.processed_height : result.metadata.height;
+
     const imgAspect = imgWidth / imgHeight;
     const canvasAspect = 1; // Square canvas
-    
+
     if (imgAspect > canvasAspect) {
       // Image is wider - fit width, letterbox top/bottom
       const displayWidth = CANVAS_SIZE;
@@ -168,8 +151,8 @@ export const DetectionEditor = React.memo(function DetectionEditor({
 
   const imgDims = useMemo(() => {
     if (!result.metadata) return { width: 0, height: 0 };
-    const width = "processed_width" in result.metadata ? result.metadata.processed_width : result.metadata.width;
-    const height = "processed_height" in result.metadata ? result.metadata.processed_height : result.metadata.height;
+    const width = 'processed_width' in result.metadata ? result.metadata.processed_width : result.metadata.width;
+    const height = 'processed_height' in result.metadata ? result.metadata.processed_height : result.metadata.height;
     return { width, height };
   }, [result.metadata]);
 
@@ -184,28 +167,25 @@ export const DetectionEditor = React.memo(function DetectionEditor({
       if (imgX < 0 || imgY < 0 || imgX > imgDims.width || imgY > imgDims.height) return null;
       return { imgX, imgY };
     },
-    [imageToCanvas.offsetX, imageToCanvas.offsetY, imageToCanvas.x, imageToCanvas.y, imgDims.height, imgDims.width],
+    [imageToCanvas.offsetX, imageToCanvas.offsetY, imageToCanvas.x, imageToCanvas.y, imgDims.height, imgDims.width]
   );
 
-  const findNearestDetectionIndex = useCallback(
-    (imgX: number, imgY: number, radiusImgPx: number) => {
-      let bestIdx = -1;
-      let bestDist = Infinity;
-      const dets = localDetectionsRef.current;
-      for (let i = 0; i < dets.length; i++) {
-        const d = dets[i];
-        const dx = d.center[0] - imgX;
-        const dy = d.center[1] - imgY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestIdx = i;
-        }
+  const findNearestDetectionIndex = useCallback((imgX: number, imgY: number, radiusImgPx: number) => {
+    let bestIdx = -1;
+    let bestDist = Infinity;
+    const dets = localDetectionsRef.current;
+    for (let i = 0; i < dets.length; i++) {
+      const d = dets[i];
+      const dx = d.center[0] - imgX;
+      const dy = d.center[1] - imgY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestIdx = i;
       }
-      return bestDist <= radiusImgPx ? bestIdx : -1;
-    },
-    [],
-  );
+    }
+    return bestDist <= radiusImgPx ? bestIdx : -1;
+  }, []);
 
   const handleTapAtBaseCanvasPoint = useCallback(
     (baseX: number, baseY: number) => {
@@ -216,7 +196,7 @@ export const DetectionEditor = React.memo(function DetectionEditor({
       const tapRadiusCanvasPx = 26;
       const tapRadiusImgPx = tapRadiusCanvasPx / imageToCanvas.x;
 
-      if (editMode === "add") {
+      if (editMode === 'add') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         const newDetection: EditableDetection = {
           id: `manual-${Date.now()}`,
@@ -231,11 +211,11 @@ export const DetectionEditor = React.memo(function DetectionEditor({
 
       const nearestIdx = findNearestDetectionIndex(imgX, imgY, tapRadiusImgPx);
       if (nearestIdx === -1) {
-        if (editMode === "move") setSelectedId(null);
+        if (editMode === 'move') setSelectedId(null);
         return;
       }
 
-      if (editMode === "remove") {
+      if (editMode === 'remove') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         const next = [...localDetectionsRef.current];
         next.splice(nearestIdx, 1);
@@ -247,13 +227,7 @@ export const DetectionEditor = React.memo(function DetectionEditor({
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setSelectedId(localDetectionsRef.current[nearestIdx].id);
     },
-    [
-      baseCanvasToImage,
-      commitDetections,
-      editMode,
-      findNearestDetectionIndex,
-      imageToCanvas.x,
-    ],
+    [baseCanvasToImage, commitDetections, editMode, findNearestDetectionIndex, imageToCanvas.x]
   );
 
   // Get marker color based on confidence
@@ -266,9 +240,8 @@ export const DetectionEditor = React.memo(function DetectionEditor({
 
   // For document analysis, use rectified image (detections are in rectified coordinates)
   // For legacy analysis, use original image
-  const displayImageBase64 = 'rectified_image_base64' in result 
-    ? result.rectified_image_base64 
-    : result.original_image_base64;
+  const displayImageBase64 =
+    'rectified_image_base64' in result ? result.rectified_image_base64 : result.original_image_base64;
 
   // Zoom/pan state (applies on top of the base "contain" fit)
   const zoom = useSharedValue(1);
@@ -279,7 +252,7 @@ export const DetectionEditor = React.memo(function DetectionEditor({
   const pinchStartZoom = useSharedValue(1);
 
   const clampTranslate = useCallback(() => {
-    "worklet";
+    'worklet';
     const maxT = (CANVAS_SIZE * (zoom.value - 1)) / 2;
     translateX.value = clamp(translateX.value, -maxT, maxT);
     translateY.value = clamp(translateY.value, -maxT, maxT);
@@ -320,7 +293,7 @@ export const DetectionEditor = React.memo(function DetectionEditor({
 
   const onDragBegin = useCallback(
     (baseX: number, baseY: number) => {
-      if (editMode !== "move" || !selectedId) return;
+      if (editMode !== 'move' || !selectedId) return;
       const pt = baseCanvasToImage(baseX, baseY);
       if (!pt) return;
       const idx = localDetectionsRef.current.findIndex((d) => d.id === selectedId);
@@ -330,12 +303,12 @@ export const DetectionEditor = React.memo(function DetectionEditor({
         dy: localDetectionsRef.current[idx].center[1] - pt.imgY,
       };
     },
-    [baseCanvasToImage, editMode, selectedId],
+    [baseCanvasToImage, editMode, selectedId]
   );
 
   const onDragUpdate = useCallback(
     (baseX: number, baseY: number) => {
-      if (editMode !== "move" || !selectedId) return;
+      if (editMode !== 'move' || !selectedId) return;
       const now = Date.now();
       if (now - lastDragCommitAtRef.current < 33) return; // ~30fps max in JS
       lastDragCommitAtRef.current = now;
@@ -355,11 +328,11 @@ export const DetectionEditor = React.memo(function DetectionEditor({
       d.bbox = [imgX - 15, imgY - 15, imgX + 15, imgY + 15];
       setLocalDetections(next);
     },
-    [baseCanvasToImage, editMode, selectedId],
+    [baseCanvasToImage, editMode, selectedId]
   );
 
   const onDragEnd = useCallback(() => {
-    if (editMode !== "move" || !selectedId) return;
+    if (editMode !== 'move' || !selectedId) return;
     dragOffsetRef.current = null;
     // Commit the final position to parent + history.
     commitDetections(localDetectionsRef.current);
@@ -400,7 +373,7 @@ export const DetectionEditor = React.memo(function DetectionEditor({
         panStartX.value = translateX.value;
         panStartY.value = translateY.value;
 
-        if (editMode === "move" && selectedId && e.numberOfPointers === 1) {
+        if (editMode === 'move' && selectedId && e.numberOfPointers === 1) {
           const c = CANVAS_SIZE / 2;
           const baseX = (e.x - c - translateX.value) / zoom.value + c;
           const baseY = (e.y - c - translateY.value) / zoom.value + c;
@@ -408,7 +381,7 @@ export const DetectionEditor = React.memo(function DetectionEditor({
         }
       })
       .onUpdate((e) => {
-        if (editMode === "move" && selectedId && e.numberOfPointers === 1) {
+        if (editMode === 'move' && selectedId && e.numberOfPointers === 1) {
           const c = CANVAS_SIZE / 2;
           const baseX = (e.x - c - translateX.value) / zoom.value + c;
           const baseY = (e.y - c - translateY.value) / zoom.value + c;
@@ -422,7 +395,7 @@ export const DetectionEditor = React.memo(function DetectionEditor({
         clampTranslate();
       })
       .onEnd(() => {
-        if (editMode === "move" && selectedId) {
+        if (editMode === 'move' && selectedId) {
           runOnJS(onDragEnd)();
         }
       });
@@ -488,53 +461,35 @@ export const DetectionEditor = React.memo(function DetectionEditor({
       {/* Mode Toggle */}
       <View style={styles.modeToggle}>
         <TouchableOpacity
-          style={[styles.modeBtn, editMode === "remove" && styles.modeBtnActive]}
-          onPress={() => onModeChange("remove")}
+          style={[styles.modeBtn, editMode === 'remove' && styles.modeBtnActive]}
+          onPress={() => onModeChange('remove')}
         >
-          <Ionicons
-            name="remove-circle"
-            size={18}
-            color={editMode === "remove" ? "#000" : COLORS.textMuted}
-          />
-          <Text style={[styles.modeBtnText, editMode === "remove" && styles.modeBtnTextActive]}>
-            Remove
-          </Text>
+          <Ionicons name="remove-circle" size={18} color={editMode === 'remove' ? '#000' : COLORS.textMuted} />
+          <Text style={[styles.modeBtnText, editMode === 'remove' && styles.modeBtnTextActive]}>Remove</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.modeBtn, editMode === "add" && styles.modeBtnActive]}
-          onPress={() => onModeChange("add")}
+          style={[styles.modeBtn, editMode === 'add' && styles.modeBtnActive]}
+          onPress={() => onModeChange('add')}
         >
-          <Ionicons
-            name="add-circle"
-            size={18}
-            color={editMode === "add" ? "#000" : COLORS.textMuted}
-          />
-          <Text style={[styles.modeBtnText, editMode === "add" && styles.modeBtnTextActive]}>
-            Add
-          </Text>
+          <Ionicons name="add-circle" size={18} color={editMode === 'add' ? '#000' : COLORS.textMuted} />
+          <Text style={[styles.modeBtnText, editMode === 'add' && styles.modeBtnTextActive]}>Add</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.modeBtn, editMode === "move" && styles.modeBtnActive]}
-          onPress={() => onModeChange("move")}
+          style={[styles.modeBtn, editMode === 'move' && styles.modeBtnActive]}
+          onPress={() => onModeChange('move')}
         >
-          <Ionicons
-            name="hand-left-outline"
-            size={18}
-            color={editMode === "move" ? "#000" : COLORS.textMuted}
-          />
-          <Text style={[styles.modeBtnText, editMode === "move" && styles.modeBtnTextActive]}>
-            Move
-          </Text>
+          <Ionicons name="hand-left-outline" size={18} color={editMode === 'move' ? '#000' : COLORS.textMuted} />
+          <Text style={[styles.modeBtnText, editMode === 'move' && styles.modeBtnTextActive]}>Move</Text>
         </TouchableOpacity>
       </View>
 
       {/* Hint */}
       <Text style={styles.hint}>
-        {editMode === "add"
-          ? "Tap to add missed bullet holes • Pinch to zoom"
-          : editMode === "remove"
-            ? "Tap near a marker to remove it • Pinch to zoom"
-            : "Tap a marker to select, then drag to reposition • Pinch to zoom"}
+        {editMode === 'add'
+          ? 'Tap to add missed bullet holes • Pinch to zoom'
+          : editMode === 'remove'
+            ? 'Tap near a marker to remove it • Pinch to zoom'
+            : 'Tap a marker to select, then drag to reposition • Pinch to zoom'}
       </Text>
 
       {/* Interactive Canvas */}
@@ -543,7 +498,7 @@ export const DetectionEditor = React.memo(function DetectionEditor({
         <View style={styles.hiddenCapture} pointerEvents="none">
           <ViewShot
             ref={captureRef}
-            options={{ format: "jpg", quality: 0.9, result: "base64" }}
+            options={{ format: 'jpg', quality: 0.9, result: 'base64' }}
             style={styles.hiddenCaptureInner}
           >
             <Image
@@ -570,18 +525,27 @@ export const DetectionEditor = React.memo(function DetectionEditor({
                           strokeWidth={1}
                           opacity={0.3}
                         />
-                        <Circle
-                          cx={cx}
-                          cy={cy}
-                          r={MARKER_RADIUS}
-                          fill="none"
-                          stroke={color}
-                          strokeWidth={2.5}
-                        />
+                        <Circle cx={cx} cy={cy} r={MARKER_RADIUS} fill="none" stroke={color} strokeWidth={2.5} />
                         {detection.isManual && (
                           <>
-                            <Line x1={cx - 6} y1={cy} x2={cx + 6} y2={cy} stroke="#fff" strokeWidth={1.5} opacity={0.8} />
-                            <Line x1={cx} y1={cy - 6} x2={cx} y2={cy + 6} stroke="#fff" strokeWidth={1.5} opacity={0.8} />
+                            <Line
+                              x1={cx - 6}
+                              y1={cy}
+                              x2={cx + 6}
+                              y2={cy}
+                              stroke="#fff"
+                              strokeWidth={1.5}
+                              opacity={0.8}
+                            />
+                            <Line
+                              x1={cx}
+                              y1={cy - 6}
+                              x2={cx}
+                              y2={cy + 6}
+                              stroke="#fff"
+                              strokeWidth={1.5}
+                              opacity={0.8}
+                            />
                           </>
                         )}
                       </G>
@@ -634,18 +598,27 @@ export const DetectionEditor = React.memo(function DetectionEditor({
                             strokeWidth={1}
                             opacity={0.3}
                           />
-                          <Circle
-                            cx={cx}
-                            cy={cy}
-                            r={MARKER_RADIUS}
-                            fill="none"
-                            stroke={color}
-                            strokeWidth={2.5}
-                          />
+                          <Circle cx={cx} cy={cy} r={MARKER_RADIUS} fill="none" stroke={color} strokeWidth={2.5} />
                           {detection.isManual && (
                             <>
-                              <Line x1={cx - 6} y1={cy} x2={cx + 6} y2={cy} stroke="#fff" strokeWidth={1.5} opacity={0.8} />
-                              <Line x1={cx} y1={cy - 6} x2={cx} y2={cy + 6} stroke="#fff" strokeWidth={1.5} opacity={0.8} />
+                              <Line
+                                x1={cx - 6}
+                                y1={cy}
+                                x2={cx + 6}
+                                y2={cy}
+                                stroke="#fff"
+                                strokeWidth={1.5}
+                                opacity={0.8}
+                              />
+                              <Line
+                                x1={cx}
+                                y1={cy - 6}
+                                x2={cx}
+                                y2={cy + 6}
+                                stroke="#fff"
+                                strokeWidth={1.5}
+                                opacity={0.8}
+                              />
                             </>
                           )}
                         </G>
@@ -666,14 +639,14 @@ export const DetectionEditor = React.memo(function DetectionEditor({
               onPress={handleUndo}
               disabled={!canUndo}
             >
-              <Ionicons name="arrow-undo" size={18} color={canUndo ? "#fff" : COLORS.textDimmer} />
+              <Ionicons name="arrow-undo" size={18} color={canUndo ? '#fff' : COLORS.textDimmer} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.ctrlBtn, !canRedo && styles.ctrlBtnDisabled]}
               onPress={handleRedo}
               disabled={!canRedo}
             >
-              <Ionicons name="arrow-redo" size={18} color={canRedo ? "#fff" : COLORS.textDimmer} />
+              <Ionicons name="arrow-redo" size={18} color={canRedo ? '#fff' : COLORS.textDimmer} />
             </TouchableOpacity>
           </View>
           <View style={styles.controlsRight}>
@@ -698,7 +671,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modeToggle: {
-    flexDirection: "row",
+    flexDirection: 'row',
     backgroundColor: COLORS.cardHover,
     borderRadius: 12,
     padding: 4,
@@ -706,9 +679,9 @@ const styles = StyleSheet.create({
   },
   modeBtn: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 8,
@@ -719,25 +692,25 @@ const styles = StyleSheet.create({
   },
   modeBtnText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.textMuted,
   },
   modeBtnTextActive: {
-    color: "#000",
+    color: '#000',
   },
   hint: {
     fontSize: 13,
     color: COLORS.textDim,
-    textAlign: "center",
+    textAlign: 'center',
     marginBottom: 12,
   },
   canvasContainer: {
     width: CANVAS_SIZE,
     height: CANVAS_SIZE,
     borderRadius: 16,
-    overflow: "hidden",
-    backgroundColor: "#1a1a1a",
-    alignSelf: "center",
+    overflow: 'hidden',
+    backgroundColor: '#1a1a1a',
+    alignSelf: 'center',
   },
   gestureArea: {
     width: CANVAS_SIZE,
@@ -752,14 +725,14 @@ const styles = StyleSheet.create({
     height: CANVAS_SIZE,
   },
   svgOverlay: {
-    position: "absolute",
+    position: 'absolute',
     top: 0,
     left: 0,
     width: CANVAS_SIZE,
     height: CANVAS_SIZE,
   },
   hiddenCapture: {
-    position: "absolute",
+    position: 'absolute',
     top: 0,
     left: 0,
     width: CANVAS_SIZE,
@@ -771,30 +744,30 @@ const styles = StyleSheet.create({
     height: CANVAS_SIZE,
   },
   controlsRow: {
-    position: "absolute",
+    position: 'absolute',
     left: 10,
     right: 10,
     bottom: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    pointerEvents: "box-none",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    pointerEvents: 'box-none',
   },
   controlsLeft: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 8,
   },
   controlsRight: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 8,
   },
   ctrlBtn: {
     width: 36,
     height: 36,
     borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.55)',
     borderWidth: 1,
     borderColor: COLORS.borderLight,
   },
@@ -802,4 +775,3 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
 });
-

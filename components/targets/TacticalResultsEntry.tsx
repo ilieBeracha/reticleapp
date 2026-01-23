@@ -1,20 +1,20 @@
-import { useColors } from "@/hooks/ui/useColors";
-import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
-import { ArrowLeft, Check, Crosshair, Minus, Plus, Target, Timer } from "lucide-react-native";
-import React, { useCallback } from "react";
+import { useColors } from '@/hooks/ui/useColors';
+import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from '@/theme/colors';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { ArrowLeft, Check, Crosshair, Minus, Plus, Target, Timer } from 'lucide-react-native';
+import React, { useCallback } from 'react';
 import {
-    ActivityIndicator,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-} from "react-native";
-import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from "@/theme/colors";
-import { COLORS } from "./types";
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { COLORS } from './types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CIRCULAR STEPPER COMPONENT
@@ -56,7 +56,7 @@ const CircularStepper = React.memo(function CircularStepper({
     <View style={stepperStyles.container}>
       <Text style={stepperStyles.label}>{label}</Text>
       {sublabel && <Text style={stepperStyles.sublabel}>{sublabel}</Text>}
-      
+
       <View style={stepperStyles.row}>
         <TouchableOpacity
           style={[stepperStyles.btn, value <= 0 && stepperStyles.btnDisabled]}
@@ -68,21 +68,25 @@ const CircularStepper = React.memo(function CircularStepper({
         </TouchableOpacity>
 
         <View style={stepperStyles.valueContainer}>
-          <View style={[
-            stepperStyles.valueRing,
-            isGood && stepperStyles.valueRingGood,
-            isOkay && stepperStyles.valueRingOkay,
-            !isGood && !isOkay && value > 0 && stepperStyles.valueRingBad,
-          ]}>
+          <View
+            style={[
+              stepperStyles.valueRing,
+              isGood && stepperStyles.valueRingGood,
+              isOkay && stepperStyles.valueRingOkay,
+              !isGood && !isOkay && value > 0 && stepperStyles.valueRingBad,
+            ]}
+          >
             <Text style={stepperStyles.value}>{value}</Text>
             <Text style={stepperStyles.maxLabel}>/ {max}</Text>
           </View>
-          <Text style={[
-            stepperStyles.percentage,
-            isGood && { color: COLORS.primary },
-            isOkay && { color: COLORS.warning },
-            !isGood && !isOkay && value > 0 && { color: COLORS.danger },
-          ]}>
+          <Text
+            style={[
+              stepperStyles.percentage,
+              isGood && { color: COLORS.primary },
+              isOkay && { color: COLORS.warning },
+              !isGood && !isOkay && value > 0 && { color: COLORS.danger },
+            ]}
+          >
             {percentage}% accuracy
           </Text>
         </View>
@@ -106,9 +110,7 @@ const CircularStepper = React.memo(function CircularStepper({
             onChange(0);
           }}
         >
-          <Text style={[stepperStyles.quickText, value === 0 && stepperStyles.quickTextActive]}>
-            None
-          </Text>
+          <Text style={[stepperStyles.quickText, value === 0 && stepperStyles.quickTextActive]}>None</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[stepperStyles.quickBtn, value === Math.floor(max / 2) && stepperStyles.quickBtnActive]}
@@ -128,9 +130,7 @@ const CircularStepper = React.memo(function CircularStepper({
             onChange(max);
           }}
         >
-          <Text style={[stepperStyles.quickText, value === max && stepperStyles.quickTextActive]}>
-            All
-          </Text>
+          <Text style={[stepperStyles.quickText, value === max && stepperStyles.quickTextActive]}>All</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -139,14 +139,14 @@ const CircularStepper = React.memo(function CircularStepper({
 
 const stepperStyles = StyleSheet.create({
   container: {
-    alignItems: "center",
+    alignItems: 'center',
     paddingVertical: 8,
   },
   label: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.textMuted,
-    textTransform: "uppercase",
+    textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 4,
   },
@@ -156,8 +156,8 @@ const stepperStyles = StyleSheet.create({
     marginBottom: 16,
   },
   row: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 24,
   },
   btn: {
@@ -165,8 +165,8 @@ const stepperStyles = StyleSheet.create({
     height: 64,
     borderRadius: 32,
     backgroundColor: COLORS.card,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: COLORS.borderLight,
   },
@@ -174,7 +174,7 @@ const stepperStyles = StyleSheet.create({
     opacity: 0.4,
   },
   valueContainer: {
-    alignItems: "center",
+    alignItems: 'center',
   },
   valueRing: {
     width: 100,
@@ -183,8 +183,8 @@ const stepperStyles = StyleSheet.create({
     backgroundColor: COLORS.card,
     borderWidth: 3,
     borderColor: COLORS.borderLight,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   valueRingGood: {
     borderColor: COLORS.primary,
@@ -200,9 +200,9 @@ const stepperStyles = StyleSheet.create({
   },
   value: {
     fontSize: 36,
-    fontWeight: "700",
+    fontWeight: '700',
     color: COLORS.white,
-    fontVariant: ["tabular-nums"],
+    fontVariant: ['tabular-nums'],
   },
   maxLabel: {
     fontSize: 13,
@@ -213,10 +213,10 @@ const stepperStyles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.textMuted,
     marginTop: 10,
-    fontWeight: "500",
+    fontWeight: '500',
   },
   quickRow: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 12,
     marginTop: 20,
   },
@@ -231,7 +231,7 @@ const stepperStyles = StyleSheet.create({
   },
   quickText: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.textMuted,
   },
   quickTextActive: {
@@ -277,9 +277,12 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
   const colors = useColors();
   const hitsNum = parseInt(hits) || 0;
 
-  const handleHitsChange = useCallback((value: number) => {
-    setHits(value.toString());
-  }, [setHits]);
+  const handleHitsChange = useCallback(
+    (value: number) => {
+      setHits(value.toString());
+    },
+    [setHits]
+  );
 
   return (
     <ScrollView
@@ -329,7 +332,10 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
         </View>
         <View style={styles.timeInputContainer}>
           <TextInput
-            style={[styles.timeInput, { backgroundColor: colors.secondary, color: colors.text, borderColor: colors.border }]}
+            style={[
+              styles.timeInput,
+              { backgroundColor: colors.secondary, color: colors.text, borderColor: colors.border },
+            ]}
             value={time}
             onChangeText={setTime}
             placeholder="0.0"
@@ -344,8 +350,14 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
       {/* Stage Cleared Toggle */}
       <View style={[styles.toggleCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.toggleLeft}>
-          <View style={[styles.cardIconBox, { backgroundColor: colors.secondary }, stageCleared && { backgroundColor: colors.primary }]}>
-            <Check size={18} color={stageCleared ? "#000" : colors.textMuted} />
+          <View
+            style={[
+              styles.cardIconBox,
+              { backgroundColor: colors.secondary },
+              stageCleared && { backgroundColor: colors.primary },
+            ]}
+          >
+            <Check size={18} color={stageCleared ? '#000' : colors.textMuted} />
           </View>
           <View>
             <Text style={[styles.toggleTitle, { color: colors.text }]}>Stage Cleared</Text>
@@ -359,7 +371,7 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
             setStageCleared(val);
           }}
           trackColor={{ false: colors.border, true: colors.primary + '50' }}
-          thumbColor={stageCleared ? colors.primary : "#6B7280"}
+          thumbColor={stageCleared ? colors.primary : '#6B7280'}
         />
       </View>
 
@@ -380,12 +392,7 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
       </View>
 
       {/* Save Button */}
-      <TouchableOpacity
-        style={styles.saveButton}
-        onPress={onSave}
-        activeOpacity={0.9}
-        disabled={saving}
-      >
+      <TouchableOpacity style={styles.saveButton} onPress={onSave} activeOpacity={0.9} disabled={saving}>
         <LinearGradient
           colors={saving ? [...BUTTON_GRADIENT_DISABLED] : [...BUTTON_GRADIENT]}
           start={{ x: 0, y: 0 }}
@@ -403,7 +410,12 @@ export const TacticalResultsEntry = React.memo(function TacticalResultsEntry({
         </LinearGradient>
       </TouchableOpacity>
 
-      <TouchableOpacity style={[styles.cancelButton, { borderColor: colors.border }]} onPress={onBack} activeOpacity={0.7} disabled={saving}>
+      <TouchableOpacity
+        style={[styles.cancelButton, { borderColor: colors.border }]}
+        onPress={onBack}
+        activeOpacity={0.7}
+        disabled={saving}
+      >
         <Text style={[styles.cancelButtonText, { color: colors.textMuted }]}>Back to Setup</Text>
       </TouchableOpacity>
 
@@ -422,24 +434,24 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 24,
     marginTop: 16,
   },
   headerCenter: {
     flex: 1,
-    alignItems: "center",
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: "700",
+    fontWeight: '700',
     color: COLORS.white,
   },
   headerMeta: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
     marginTop: 4,
   },
@@ -452,8 +464,8 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: COLORS.card,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Hits Section
@@ -476,8 +488,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
   cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
     marginBottom: 14,
   },
@@ -486,8 +498,8 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 12,
     backgroundColor: `${COLORS.primary}20`,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cardIconBoxActive: {
     backgroundColor: COLORS.primary,
@@ -497,7 +509,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.white,
   },
   cardHint: {
@@ -508,8 +520,8 @@ const styles = StyleSheet.create({
 
   // Time Input
   timeInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: COLORS.cardHover,
     borderRadius: 12,
     paddingHorizontal: 16,
@@ -518,9 +530,9 @@ const styles = StyleSheet.create({
   timeInput: {
     flex: 1,
     fontSize: 24,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.white,
-    fontVariant: ["tabular-nums"],
+    fontVariant: ['tabular-nums'],
   },
   timeUnit: {
     fontSize: 14,
@@ -530,9 +542,9 @@ const styles = StyleSheet.create({
 
   // Toggle
   toggleCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: COLORS.card,
     borderRadius: 16,
     padding: 16,
@@ -541,13 +553,13 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
   toggleLeft: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
   },
   toggleTitle: {
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.white,
   },
   toggleHint: {
@@ -562,16 +574,16 @@ const styles = StyleSheet.create({
   },
   notesLabel: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.textMuted,
-    textTransform: "uppercase",
+    textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 10,
   },
   optionalLabel: {
-    fontWeight: "400",
+    fontWeight: '400',
     color: COLORS.textDim,
-    textTransform: "none",
+    textTransform: 'none',
     letterSpacing: 0,
   },
   notesInput: {
@@ -581,7 +593,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: COLORS.white,
     minHeight: 80,
-    textAlignVertical: "top",
+    textAlignVertical: 'top',
     borderWidth: 1,
     borderColor: COLORS.border,
   },
@@ -589,28 +601,28 @@ const styles = StyleSheet.create({
   // Buttons
   saveButton: {
     borderRadius: 14,
-    overflow: "hidden",
+    overflow: 'hidden',
     marginBottom: 12,
   },
   saveButtonGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     height: 54,
     gap: 10,
   },
   saveButtonText: {
     fontSize: 16,
-    fontWeight: "700",
-    color: "#fff",
+    fontWeight: '700',
+    color: '#fff',
   },
   cancelButton: {
-    alignItems: "center",
+    alignItems: 'center',
     paddingVertical: 12,
   },
   cancelButtonText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.textMuted,
   },
 });

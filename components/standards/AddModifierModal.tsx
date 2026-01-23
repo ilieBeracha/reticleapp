@@ -1,6 +1,6 @@
 /**
  * AddModifierModal
- * 
+ *
  * Create or edit a condition modifier.
  * Modern, elegant design.
  */
@@ -16,16 +16,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { Check, Clock, CloudRain, Heart, Thermometer, Wind, X, Zap } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import {
-  Alert,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 // ============================================================================
 // TYPES
@@ -127,16 +118,10 @@ const CONDITION_OPTIONS: ConditionOption[] = [
 // MAIN COMPONENT
 // ============================================================================
 
-export function AddModifierModal({
-  visible,
-  teamId,
-  editingModifier,
-  onClose,
-  onSave,
-}: AddModifierModalProps) {
+export function AddModifierModal({ visible, teamId, editingModifier, onClose, onSave }: AddModifierModalProps) {
   const colors = useColors();
   const isEditing = !!editingModifier;
-  
+
   // Form state
   const [selectedCondition, setSelectedCondition] = useState<ConditionOption | null>(null);
   const [thresholdValue, setThresholdValue] = useState('');
@@ -146,18 +131,18 @@ export function AddModifierModal({
   const [timePenalty, setTimePenalty] = useState('');
   const [customName, setCustomName] = useState('');
   const [saving, setSaving] = useState(false);
-  
+
   // Reset form when modal opens/closes
   useEffect(() => {
     if (visible) {
       if (editingModifier) {
-        const condition = CONDITION_OPTIONS.find(c => c.type === editingModifier.condition_type);
+        const condition = CONDITION_OPTIONS.find((c) => c.type === editingModifier.condition_type);
         setSelectedCondition(condition || null);
-        
+
         if (condition?.thresholdKey) {
           setThresholdValue(String(editingModifier.condition_threshold[condition.thresholdKey] || ''));
         }
-        
+
         setEffectType(editingModifier.modifier_effect_type || 'tolerance');
         setGroupingPenalty(editingModifier.grouping_penalty_cm?.toString() || '');
         setAccuracyPenalty(editingModifier.accuracy_penalty_pct?.toString() || '');
@@ -174,14 +159,14 @@ export function AddModifierModal({
       }
     }
   }, [visible, editingModifier]);
-  
+
   // Validation
   const canSave = () => {
     if (!selectedCondition) return false;
-    
+
     // If condition has threshold, it must be filled
     if (selectedCondition.thresholdKey && !thresholdValue) return false;
-    
+
     // For tolerance effect, must have at least one penalty
     if (effectType === 'tolerance') {
       const hasGrouping = groupingPenalty && Number(groupingPenalty) > 0;
@@ -189,29 +174,30 @@ export function AddModifierModal({
       const hasTime = timePenalty && Number(timePenalty) > 0;
       if (!hasGrouping && !hasAccuracy && !hasTime) return false;
     }
-    
+
     // For invalidate/override, no penalties needed
     return true;
   };
-  
+
   // Save handler
   const handleSave = async () => {
     if (!canSave() || !selectedCondition) {
-      const msg = effectType === 'tolerance' 
-        ? 'Please fill in all required fields and at least one penalty'
-        : 'Please fill in all required fields';
+      const msg =
+        effectType === 'tolerance'
+          ? 'Please fill in all required fields and at least one penalty'
+          : 'Please fill in all required fields';
       Alert.alert('Validation Error', msg);
       return;
     }
-    
+
     setSaving(true);
-    
+
     try {
       const threshold: Record<string, number> = {};
       if (selectedCondition.thresholdKey && thresholdValue) {
         threshold[selectedCondition.thresholdKey] = Number(thresholdValue);
       }
-      
+
       const input: CreateModifierInput = {
         team_id: teamId,
         condition_type: selectedCondition.type,
@@ -223,13 +209,13 @@ export function AddModifierModal({
         name: customName || selectedCondition.name,
         description: selectedCondition.description,
       };
-      
+
       if (isEditing && editingModifier) {
         await updateModifier(editingModifier.id, input);
       } else {
         await createModifier(input);
       }
-      
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onSave();
     } catch (error: any) {
@@ -238,288 +224,261 @@ export function AddModifierModal({
       setSaving(false);
     }
   };
-  
+
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Grabber */}
         <View style={[styles.grabber, { backgroundColor: colors.border }]} />
-            
-            {/* Header */}
-            <View style={styles.header}>
-              <View style={styles.headerLeft}>
-                <Text style={[styles.title, { color: colors.text }]}>
-                  {isEditing ? 'Edit Modifier' : 'New Modifier'}
-                </Text>
-                <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-                  Adjust standards for conditions
-                </Text>
-              </View>
-              <TouchableOpacity 
-                style={[styles.closeBtn, { backgroundColor: colors.secondary }]}
-                onPress={onClose}
-              >
-                <X size={18} color={colors.textMuted} />
-              </TouchableOpacity>
+
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Text style={[styles.title, { color: colors.text }]}>{isEditing ? 'Edit Modifier' : 'New Modifier'}</Text>
+            <Text style={[styles.subtitle, { color: colors.textMuted }]}>Adjust standards for conditions</Text>
+          </View>
+          <TouchableOpacity style={[styles.closeBtn, { backgroundColor: colors.secondary }]} onPress={onClose}>
+            <X size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentInner}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Condition Type - Primary Choice */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Trigger Condition</Text>
+            <View style={styles.conditionGrid}>
+              {CONDITION_OPTIONS.map((option) => {
+                const Icon = option.icon;
+                const isSelected = selectedCondition?.type === option.type;
+
+                return (
+                  <TouchableOpacity
+                    key={option.type}
+                    style={[
+                      styles.conditionCard,
+                      {
+                        backgroundColor: isSelected ? colors.orange : colors.secondary,
+                        borderColor: isSelected ? colors.orange : 'transparent',
+                      },
+                    ]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setSelectedCondition(option);
+                      if (option.defaultThreshold) {
+                        setThresholdValue(String(option.defaultThreshold));
+                      } else {
+                        setThresholdValue('');
+                      }
+                      if (!customName) {
+                        setCustomName(option.name);
+                      }
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Icon size={20} color={isSelected ? '#fff' : colors.textMuted} />
+                    <Text style={[styles.conditionName, { color: isSelected ? '#fff' : colors.text }]}>
+                      {option.name}
+                    </Text>
+                    {isSelected && (
+                      <View style={[styles.conditionCheck, { backgroundColor: 'rgba(255,255,255,0.3)' }]}>
+                        <Check size={10} color="#fff" strokeWidth={3} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-            
-            <ScrollView 
-              style={styles.content}
-              contentContainerStyle={styles.contentInner}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              {/* Condition Type - Primary Choice */}
-              <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                  Trigger Condition
-                </Text>
-                <View style={styles.conditionGrid}>
-                  {CONDITION_OPTIONS.map((option) => {
-                    const Icon = option.icon;
-                    const isSelected = selectedCondition?.type === option.type;
-                    
-                    return (
-                      <TouchableOpacity
-                        key={option.type}
-                        style={[
-                          styles.conditionCard,
-                          { 
-                            backgroundColor: isSelected ? colors.orange : colors.secondary,
-                            borderColor: isSelected ? colors.orange : 'transparent',
-                          }
-                        ]}
-                        onPress={() => {
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                          setSelectedCondition(option);
-                          if (option.defaultThreshold) {
-                            setThresholdValue(String(option.defaultThreshold));
-                          } else {
-                            setThresholdValue('');
-                          }
-                          if (!customName) {
-                            setCustomName(option.name);
-                          }
-                        }}
-                        activeOpacity={0.8}
-                      >
-                        <Icon size={20} color={isSelected ? '#fff' : colors.textMuted} />
-                        <Text style={[
-                          styles.conditionName,
-                          { color: isSelected ? '#fff' : colors.text }
-                        ]}>
-                          {option.name}
-                        </Text>
-                        {isSelected && (
-                          <View style={[styles.conditionCheck, { backgroundColor: 'rgba(255,255,255,0.3)' }]}>
-                            <Check size={10} color="#fff" strokeWidth={3} />
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-              
-              {/* Threshold (if applicable) */}
-              {selectedCondition?.thresholdKey && (
-                <View style={styles.section}>
-                  <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                    {selectedCondition.thresholdLabel}
-                  </Text>
-                  <View style={[styles.thresholdRow, { backgroundColor: colors.secondary }]}>
-                    <TextInput
-                      style={[styles.thresholdInput, { color: colors.text }]}
-                      value={thresholdValue}
-                      onChangeText={setThresholdValue}
-                      keyboardType="number-pad"
-                      placeholder={selectedCondition.thresholdPlaceholder}
-                      placeholderTextColor={colors.textMuted}
-                    />
-                    <Text style={[styles.thresholdUnit, { color: colors.textMuted }]}>
-                      {selectedCondition.thresholdKey === 'wind_kmh_gt' ? 'km/h' :
-                       selectedCondition.thresholdKey?.includes('temp') ? '°C' :
-                       selectedCondition.thresholdKey === 'shots_gt' ? 'shots' :
-                       selectedCondition.thresholdKey === 'duration_minutes_gt' ? 'min' :
-                       selectedCondition.thresholdKey === 'hr_bpm_gt' ? 'BPM' : ''}
-                    </Text>
-                  </View>
-                </View>
-              )}
-              
-              {/* Effect Type */}
-              <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Effect</Text>
-                <View style={styles.effectRow}>
-                  <TouchableOpacity
-                    style={[
-                      styles.effectCard,
-                      effectType === 'tolerance' && styles.effectCardSelected,
-                      { 
-                        backgroundColor: effectType === 'tolerance' ? colors.text : colors.secondary,
-                        borderColor: effectType === 'tolerance' ? colors.text : 'transparent',
-                      }
-                    ]}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setEffectType('tolerance');
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[
-                      styles.effectLabel,
-                      { color: effectType === 'tolerance' ? colors.background : colors.text }
-                    ]}>
-                      Tolerance
-                    </Text>
-                    <Text style={[
-                      styles.effectHint,
-                      { color: effectType === 'tolerance' ? colors.background + 'AA' : colors.textMuted }
-                    ]}>
-                      Adjust threshold
-                    </Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={[
-                      styles.effectCard,
-                      effectType === 'override' && styles.effectCardSelected,
-                      { 
-                        backgroundColor: effectType === 'override' ? colors.destructive : colors.secondary,
-                        borderColor: effectType === 'override' ? colors.destructive : 'transparent',
-                      }
-                    ]}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setEffectType('override');
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[
-                      styles.effectLabel,
-                      { color: effectType === 'override' ? '#fff' : colors.text }
-                    ]}>
-                      Force Fail
-                    </Text>
-                    <Text style={[
-                      styles.effectHint,
-                      { color: effectType === 'override' ? 'rgba(255,255,255,0.7)' : colors.textMuted }
-                    ]}>
-                      Always FAIL
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-              
-              {/* Penalties Section - Only for tolerance effect */}
-              {effectType === 'tolerance' && (
-                <View style={[styles.section, styles.penaltySection, { backgroundColor: colors.secondary }]}>
-                  <Text style={[styles.penaltySectionTitle, { color: colors.textMuted }]}>
-                    ADJUSTMENTS
-                  </Text>
-                  <Text style={[styles.penaltySectionHint, { color: colors.textMuted }]}>
-                    At least one required. Values are added/subtracted from base standard.
-                  </Text>
-                  
-                  {/* Grouping Penalty */}
-                  <View style={styles.penaltyRow}>
-                    <Text style={[styles.penaltyLabel, { color: colors.text }]}>
-                      Grouping
-                    </Text>
-                    <View style={[styles.penaltyInputRow, { backgroundColor: colors.card }]}>
-                      <Text style={[styles.penaltyPrefix, { color: colors.orange }]}>+</Text>
-                      <TextInput
-                        style={[styles.penaltyInput, { color: colors.text }]}
-                        value={groupingPenalty}
-                        onChangeText={setGroupingPenalty}
-                        keyboardType="number-pad"
-                        placeholder="0"
-                        placeholderTextColor={colors.textMuted}
-                      />
-                      <Text style={[styles.penaltySuffix, { color: colors.textMuted }]}>cm</Text>
-                    </View>
-                  </View>
-                  
-                  {/* Accuracy Penalty */}
-                  <View style={styles.penaltyRow}>
-                    <Text style={[styles.penaltyLabel, { color: colors.text }]}>
-                      Accuracy
-                    </Text>
-                    <View style={[styles.penaltyInputRow, { backgroundColor: colors.card }]}>
-                      <Text style={[styles.penaltyPrefix, { color: colors.orange }]}>−</Text>
-                      <TextInput
-                        style={[styles.penaltyInput, { color: colors.text }]}
-                        value={accuracyPenalty}
-                        onChangeText={setAccuracyPenalty}
-                        keyboardType="number-pad"
-                        placeholder="0"
-                        placeholderTextColor={colors.textMuted}
-                      />
-                      <Text style={[styles.penaltySuffix, { color: colors.textMuted }]}>%</Text>
-                    </View>
-                  </View>
-                  
-                  {/* Time Penalty */}
-                  <View style={[styles.penaltyRow, { marginBottom: 0 }]}>
-                    <Text style={[styles.penaltyLabel, { color: colors.text }]}>
-                      Time
-                    </Text>
-                    <View style={[styles.penaltyInputRow, { backgroundColor: colors.card }]}>
-                      <Text style={[styles.penaltyPrefix, { color: colors.orange }]}>+</Text>
-                      <TextInput
-                        style={[styles.penaltyInput, { color: colors.text }]}
-                        value={timePenalty}
-                        onChangeText={setTimePenalty}
-                        keyboardType="number-pad"
-                        placeholder="0"
-                        placeholderTextColor={colors.textMuted}
-                      />
-                      <Text style={[styles.penaltySuffix, { color: colors.textMuted }]}>sec</Text>
-                    </View>
-                  </View>
-                </View>
-              )}
-              
-              {/* Custom Name */}
-              <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                  Name <Text style={{ color: colors.textMuted, fontWeight: '400' }}>(optional)</Text>
-                </Text>
+          </View>
+
+          {/* Threshold (if applicable) */}
+          {selectedCondition?.thresholdKey && (
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>{selectedCondition.thresholdLabel}</Text>
+              <View style={[styles.thresholdRow, { backgroundColor: colors.secondary }]}>
                 <TextInput
-                  style={[styles.textInput, { backgroundColor: colors.secondary, color: colors.text }]}
-                  value={customName}
-                  onChangeText={setCustomName}
-                  placeholder={selectedCondition?.name || 'Modifier name'}
+                  style={[styles.thresholdInput, { color: colors.text }]}
+                  value={thresholdValue}
+                  onChangeText={setThresholdValue}
+                  keyboardType="number-pad"
+                  placeholder={selectedCondition.thresholdPlaceholder}
                   placeholderTextColor={colors.textMuted}
                 />
+                <Text style={[styles.thresholdUnit, { color: colors.textMuted }]}>
+                  {selectedCondition.thresholdKey === 'wind_kmh_gt'
+                    ? 'km/h'
+                    : selectedCondition.thresholdKey?.includes('temp')
+                      ? '°C'
+                      : selectedCondition.thresholdKey === 'shots_gt'
+                        ? 'shots'
+                        : selectedCondition.thresholdKey === 'duration_minutes_gt'
+                          ? 'min'
+                          : selectedCondition.thresholdKey === 'hr_bpm_gt'
+                            ? 'BPM'
+                            : ''}
+                </Text>
               </View>
-            </ScrollView>
-            
-            {/* Save Button */}
-            <View style={[styles.footer, { borderTopColor: colors.border }]}>
+            </View>
+          )}
+
+          {/* Effect Type */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Effect</Text>
+            <View style={styles.effectRow}>
               <TouchableOpacity
                 style={[
-                  styles.saveBtn,
-                  { backgroundColor: canSave() && !saving ? colors.orange : colors.secondary }
+                  styles.effectCard,
+                  effectType === 'tolerance' && styles.effectCardSelected,
+                  {
+                    backgroundColor: effectType === 'tolerance' ? colors.text : colors.secondary,
+                    borderColor: effectType === 'tolerance' ? colors.text : 'transparent',
+                  },
                 ]}
-                onPress={handleSave}
-                disabled={!canSave() || saving}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setEffectType('tolerance');
+                }}
                 activeOpacity={0.8}
               >
-                <Text style={[
-                  styles.saveBtnText,
-                  { color: canSave() && !saving ? '#fff' : colors.textMuted }
-                ]}>
-                  {saving ? 'Saving...' : isEditing ? 'Update Modifier' : 'Create Modifier'}
+                <Text
+                  style={[styles.effectLabel, { color: effectType === 'tolerance' ? colors.background : colors.text }]}
+                >
+                  Tolerance
+                </Text>
+                <Text
+                  style={[
+                    styles.effectHint,
+                    { color: effectType === 'tolerance' ? colors.background + 'AA' : colors.textMuted },
+                  ]}
+                >
+                  Adjust threshold
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.effectCard,
+                  effectType === 'override' && styles.effectCardSelected,
+                  {
+                    backgroundColor: effectType === 'override' ? colors.destructive : colors.secondary,
+                    borderColor: effectType === 'override' ? colors.destructive : 'transparent',
+                  },
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setEffectType('override');
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.effectLabel, { color: effectType === 'override' ? '#fff' : colors.text }]}>
+                  Force Fail
+                </Text>
+                <Text
+                  style={[
+                    styles.effectHint,
+                    { color: effectType === 'override' ? 'rgba(255,255,255,0.7)' : colors.textMuted },
+                  ]}
+                >
+                  Always FAIL
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
+
+          {/* Penalties Section - Only for tolerance effect */}
+          {effectType === 'tolerance' && (
+            <View style={[styles.section, styles.penaltySection, { backgroundColor: colors.secondary }]}>
+              <Text style={[styles.penaltySectionTitle, { color: colors.textMuted }]}>ADJUSTMENTS</Text>
+              <Text style={[styles.penaltySectionHint, { color: colors.textMuted }]}>
+                At least one required. Values are added/subtracted from base standard.
+              </Text>
+
+              {/* Grouping Penalty */}
+              <View style={styles.penaltyRow}>
+                <Text style={[styles.penaltyLabel, { color: colors.text }]}>Grouping</Text>
+                <View style={[styles.penaltyInputRow, { backgroundColor: colors.card }]}>
+                  <Text style={[styles.penaltyPrefix, { color: colors.orange }]}>+</Text>
+                  <TextInput
+                    style={[styles.penaltyInput, { color: colors.text }]}
+                    value={groupingPenalty}
+                    onChangeText={setGroupingPenalty}
+                    keyboardType="number-pad"
+                    placeholder="0"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                  <Text style={[styles.penaltySuffix, { color: colors.textMuted }]}>cm</Text>
+                </View>
+              </View>
+
+              {/* Accuracy Penalty */}
+              <View style={styles.penaltyRow}>
+                <Text style={[styles.penaltyLabel, { color: colors.text }]}>Accuracy</Text>
+                <View style={[styles.penaltyInputRow, { backgroundColor: colors.card }]}>
+                  <Text style={[styles.penaltyPrefix, { color: colors.orange }]}>−</Text>
+                  <TextInput
+                    style={[styles.penaltyInput, { color: colors.text }]}
+                    value={accuracyPenalty}
+                    onChangeText={setAccuracyPenalty}
+                    keyboardType="number-pad"
+                    placeholder="0"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                  <Text style={[styles.penaltySuffix, { color: colors.textMuted }]}>%</Text>
+                </View>
+              </View>
+
+              {/* Time Penalty */}
+              <View style={[styles.penaltyRow, { marginBottom: 0 }]}>
+                <Text style={[styles.penaltyLabel, { color: colors.text }]}>Time</Text>
+                <View style={[styles.penaltyInputRow, { backgroundColor: colors.card }]}>
+                  <Text style={[styles.penaltyPrefix, { color: colors.orange }]}>+</Text>
+                  <TextInput
+                    style={[styles.penaltyInput, { color: colors.text }]}
+                    value={timePenalty}
+                    onChangeText={setTimePenalty}
+                    keyboardType="number-pad"
+                    placeholder="0"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                  <Text style={[styles.penaltySuffix, { color: colors.textMuted }]}>sec</Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Custom Name */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Name <Text style={{ color: colors.textMuted, fontWeight: '400' }}>(optional)</Text>
+            </Text>
+            <TextInput
+              style={[styles.textInput, { backgroundColor: colors.secondary, color: colors.text }]}
+              value={customName}
+              onChangeText={setCustomName}
+              placeholder={selectedCondition?.name || 'Modifier name'}
+              placeholderTextColor={colors.textMuted}
+            />
+          </View>
+        </ScrollView>
+
+        {/* Save Button */}
+        <View style={[styles.footer, { borderTopColor: colors.border }]}>
+          <TouchableOpacity
+            style={[styles.saveBtn, { backgroundColor: canSave() && !saving ? colors.orange : colors.secondary }]}
+            onPress={handleSave}
+            disabled={!canSave() || saving}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.saveBtnText, { color: canSave() && !saving ? '#fff' : colors.textMuted }]}>
+              {saving ? 'Saving...' : isEditing ? 'Update Modifier' : 'Create Modifier'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -573,7 +532,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
-  
+
   // Sections
   section: {
     marginBottom: 24,
@@ -585,7 +544,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 12,
   },
-  
+
   // Condition Grid
   conditionGrid: {
     flexDirection: 'row',
@@ -617,7 +576,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  
+
   // Threshold
   thresholdRow: {
     flexDirection: 'row',
@@ -635,7 +594,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  
+
   // Effect Cards
   effectRow: {
     flexDirection: 'row',
@@ -658,7 +617,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  
+
   // Penalty Section
   penaltySection: {
     padding: 16,
@@ -709,7 +668,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     width: 30,
   },
-  
+
   // Text Input
   textInput: {
     borderRadius: 12,
@@ -717,7 +676,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
   },
-  
+
   // Footer
   footer: {
     paddingHorizontal: 20,

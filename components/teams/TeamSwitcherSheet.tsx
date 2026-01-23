@@ -1,6 +1,6 @@
 /**
  * Team Switcher Sheet
- * 
+ *
  * Single UX primitive for switching between teams.
  * Used in Team tab header when user has multiple teams.
  */
@@ -9,25 +9,9 @@ import { useTeamStore } from '@/store/teamStore';
 import type { TeamWithRole } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import {
-  Check,
-  ChevronDown,
-  Crown,
-  Plus,
-  Shield,
-  Target,
-  UserPlus,
-  Users,
-} from 'lucide-react-native';
+import { Check, ChevronDown, Crown, Plus, Shield, Target, UserPlus, Users } from 'lucide-react-native';
 import { useCallback } from 'react';
-import {
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -68,10 +52,10 @@ interface TeamSwitcherPillProps {
 export function TeamSwitcherPill({ onPress }: TeamSwitcherPillProps) {
   const colors = useColors();
   const { teams, activeTeamId } = useTeamStore();
-  
-  const activeTeam = teams.find(t => t.id === activeTeamId);
+
+  const activeTeam = teams.find((t) => t.id === activeTeamId);
   const teamName = activeTeam?.name || 'Select Team';
-  
+
   return (
     <TouchableOpacity
       style={[styles.pill, { backgroundColor: colors.secondary, borderColor: colors.border }]}
@@ -99,11 +83,14 @@ export function TeamSwitcherSheet({ visible, onClose }: TeamSwitcherSheetProps) 
   const insets = useSafeAreaInsets();
   const { teams, activeTeamId, setActiveTeam } = useTeamStore();
 
-  const handleSelectTeam = useCallback((team: TeamWithRole) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setActiveTeam(team.id);
-    onClose();
-  }, [setActiveTeam, onClose]);
+  const handleSelectTeam = useCallback(
+    (team: TeamWithRole) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setActiveTeam(team.id);
+      onClose();
+    },
+    [setActiveTeam, onClose]
+  );
 
   const handleCreateTeam = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -118,15 +105,10 @@ export function TeamSwitcherSheet({ visible, onClose }: TeamSwitcherSheetProps) 
   }, [onClose]);
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <TouchableOpacity style={styles.backdrop} onPress={onClose} activeOpacity={1} />
-        
+
         <View style={[styles.sheet, { backgroundColor: colors.card, paddingBottom: insets.bottom + 16 }]}>
           {/* Handle */}
           <View style={styles.handleContainer}>
@@ -148,26 +130,21 @@ export function TeamSwitcherSheet({ visible, onClose }: TeamSwitcherSheetProps) 
               return (
                 <TouchableOpacity
                   key={team.id}
-                  style={[
-                    styles.teamRow,
-                    { backgroundColor: isActive ? colors.primary + '15' : 'transparent' },
-                  ]}
+                  style={[styles.teamRow, { backgroundColor: isActive ? colors.primary + '15' : 'transparent' }]}
                   onPress={() => handleSelectTeam(team)}
                   activeOpacity={0.7}
                 >
                   <View style={[styles.teamIcon, { backgroundColor: colors.secondary }]}>
                     <Users size={18} color={colors.primary} />
                   </View>
-                  
+
                   <View style={styles.teamInfo}>
                     <Text style={[styles.teamName, { color: colors.text }]} numberOfLines={1}>
                       {team.name}
                     </Text>
                     <View style={styles.teamMeta}>
                       <RoleIcon size={10} color={roleConfig.color} />
-                      <Text style={[styles.teamRole, { color: roleConfig.color }]}>
-                        {roleConfig.label}
-                      </Text>
+                      <Text style={[styles.teamRole, { color: roleConfig.color }]}>{roleConfig.label}</Text>
                       {team.member_count && (
                         <Text style={[styles.teamMembers, { color: colors.textMuted }]}>
                           · {team.member_count} members
@@ -339,4 +316,3 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
 });
-

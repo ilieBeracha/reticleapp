@@ -13,12 +13,7 @@ import type { StartPracticeCardProps } from '../UnifiedHomePage.types';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-export function StartPracticeCard({
-  colors,
-  onPress,
-  starting,
-  lastSessionDaysAgo,
-}: StartPracticeCardProps) {
+export function StartPracticeCard({ colors, onPress, starting, lastSessionDaysAgo }: StartPracticeCardProps) {
   const subtitle = getStartPracticeSubtitle(lastSessionDaysAgo);
   const scale = useSharedValue(1);
 

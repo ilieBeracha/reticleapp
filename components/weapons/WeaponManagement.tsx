@@ -1,6 +1,6 @@
 /**
  * WeaponManagement - List, edit, delete weapons
- * 
+ *
  * Shows all user weapons with:
  * - Favorites first
  * - Last used indicator
@@ -15,20 +15,12 @@ import {
   getUserWeapons,
   toggleUserWeaponFavorite,
   updateUserWeapon,
+  WEAPON_CATEGORIES,
   type UserWeapon,
   type WeaponCategory,
-  WEAPON_CATEGORIES,
 } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
-import {
-  Check,
-  ChevronLeft,
-  Edit3,
-  Plus,
-  Star,
-  Trash2,
-  X,
-} from 'lucide-react-native';
+import { Check, ChevronLeft, Edit3, Plus, Star, Trash2, X } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -60,7 +52,7 @@ interface WeaponManagementProps {
 
 export function WeaponManagement({ onAddNew, onClose }: WeaponManagementProps) {
   const colors = useColors();
-  
+
   const [loading, setLoading] = useState(true);
   const [weapons, setWeapons] = useState<UserWeapon[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -95,40 +87,39 @@ export function WeaponManagement({ onAddNew, onClose }: WeaponManagementProps) {
   }, []);
 
   const handleDelete = useCallback((weapon: UserWeapon) => {
-    Alert.alert(
-      'Delete Weapon',
-      `Are you sure you want to delete "${weapon.name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteUserWeapon(weapon.id);
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              await loadWeapons();
-            } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to delete weapon');
-            }
-          },
+    Alert.alert('Delete Weapon', `Are you sure you want to delete "${weapon.name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteUserWeapon(weapon.id);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            await loadWeapons();
+          } catch (err: any) {
+            Alert.alert('Error', err.message || 'Failed to delete weapon');
+          }
         },
-      ]
-    );
+      },
+    ]);
   }, []);
 
-  const handleEditSave = useCallback(async (updates: Partial<UserWeapon>) => {
-    if (!editingWeapon) return;
-    
-    try {
-      await updateUserWeapon(editingWeapon.id, updates);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setEditingWeapon(null);
-      await loadWeapons();
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to update weapon');
-    }
-  }, [editingWeapon]);
+  const handleEditSave = useCallback(
+    async (updates: Partial<UserWeapon>) => {
+      if (!editingWeapon) return;
+
+      try {
+        await updateUserWeapon(editingWeapon.id, updates);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setEditingWeapon(null);
+        await loadWeapons();
+      } catch (err: any) {
+        Alert.alert('Error', err.message || 'Failed to update weapon');
+      }
+    },
+    [editingWeapon]
+  );
 
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -175,9 +166,7 @@ export function WeaponManagement({ onAddNew, onClose }: WeaponManagementProps) {
       ) : weapons.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={[styles.emptyTitle, { color: colors.text }]}>No weapons yet</Text>
-          <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-            Add your first weapon to get started
-          </Text>
+          <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>Add your first weapon to get started</Text>
         </View>
       ) : (
         <FlatList
@@ -204,11 +193,7 @@ export function WeaponManagement({ onAddNew, onClose }: WeaponManagementProps) {
         onRequestClose={() => setEditingWeapon(null)}
       >
         {editingWeapon && (
-          <EditWeaponForm
-            weapon={editingWeapon}
-            onSave={handleEditSave}
-            onCancel={() => setEditingWeapon(null)}
-          />
+          <EditWeaponForm weapon={editingWeapon} onSave={handleEditSave} onCancel={() => setEditingWeapon(null)} />
         )}
       </Modal>
     </View>
@@ -232,9 +217,7 @@ function WeaponRow({
   onToggleFavorite: () => void;
   colors: ReturnType<typeof useColors>;
 }) {
-  const lastUsed = weapon.last_used_at
-    ? formatRelativeTime(new Date(weapon.last_used_at))
-    : null;
+  const lastUsed = weapon.last_used_at ? formatRelativeTime(new Date(weapon.last_used_at)) : null;
 
   return (
     <View style={[styles.weaponRow, { borderBottomColor: colors.border }]}>
@@ -253,19 +236,11 @@ function WeaponRow({
           {weapon.name}
         </Text>
         <View style={styles.weaponMeta}>
-          <Text style={[styles.weaponCategory, { color: colors.textMuted }]}>
-            {getCategoryLabel(weapon.category)}
-          </Text>
+          <Text style={[styles.weaponCategory, { color: colors.textMuted }]}>{getCategoryLabel(weapon.category)}</Text>
           {weapon.caliber && (
-            <Text style={[styles.weaponCaliber, { color: colors.textMuted }]}>
-              • {weapon.caliber}
-            </Text>
+            <Text style={[styles.weaponCaliber, { color: colors.textMuted }]}>• {weapon.caliber}</Text>
           )}
-          {lastUsed && (
-            <Text style={[styles.weaponLastUsed, { color: colors.textMuted }]}>
-              • {lastUsed}
-            </Text>
-          )}
+          {lastUsed && <Text style={[styles.weaponLastUsed, { color: colors.textMuted }]}>• {lastUsed}</Text>}
         </View>
       </View>
 
@@ -294,13 +269,11 @@ function EditWeaponForm({
   onCancel: () => void;
 }) {
   const colors = useColors();
-  
+
   const [name, setName] = useState(weapon.name);
   const [category, setCategory] = useState<WeaponCategory | null>(weapon.category);
   const [caliber, setCaliber] = useState(weapon.caliber || '');
-  const [zeroDistance, setZeroDistance] = useState(
-    weapon.personal_zero_distance_m?.toString() || ''
-  );
+  const [zeroDistance, setZeroDistance] = useState(weapon.personal_zero_distance_m?.toString() || '');
   const [notes, setNotes] = useState(weapon.personal_notes || '');
   const [saving, setSaving] = useState(false);
 
@@ -332,16 +305,8 @@ function EditWeaponForm({
           <X size={20} color={colors.textMuted} />
         </TouchableOpacity>
         <Text style={[styles.editHeaderTitle, { color: colors.text }]}>Edit Weapon</Text>
-        <TouchableOpacity
-          style={styles.editHeaderBtn}
-          onPress={handleSave}
-          disabled={saving}
-        >
-          {saving ? (
-            <ActivityIndicator size="small" color={colors.text} />
-          ) : (
-            <Check size={20} color={colors.text} />
-          )}
+        <TouchableOpacity style={styles.editHeaderBtn} onPress={handleSave} disabled={saving}>
+          {saving ? <ActivityIndicator size="small" color={colors.text} /> : <Check size={20} color={colors.text} />}
         </TouchableOpacity>
       </View>
 
@@ -378,10 +343,7 @@ function EditWeaponForm({
                 }}
               >
                 <Text
-                  style={[
-                    styles.categoryText,
-                    { color: category === cat.value ? colors.background : colors.text },
-                  ]}
+                  style={[styles.categoryText, { color: category === cat.value ? colors.background : colors.text }]}
                 >
                   {cat.label}
                 </Text>
@@ -419,7 +381,11 @@ function EditWeaponForm({
         <View style={styles.field}>
           <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Notes</Text>
           <TextInput
-            style={[styles.input, styles.textArea, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+            style={[
+              styles.input,
+              styles.textArea,
+              { backgroundColor: colors.card, borderColor: colors.border, color: colors.text },
+            ]}
             value={notes}
             onChangeText={setNotes}
             placeholder="Personal notes..."
@@ -634,4 +600,3 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
-

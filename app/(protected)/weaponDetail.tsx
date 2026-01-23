@@ -16,10 +16,8 @@ import {
   getWeaponStats,
   setDefaultWeaponId,
   updateUserWeapon,
-  type TeamWeapon,
-  type UserWeapon,
   type WeaponSource,
-  type WeaponStats,
+  type WeaponStats
 } from '@/services/weaponService';
 import type { WeaponCategory } from '@/types/workspace';
 import { format } from 'date-fns';
@@ -127,11 +125,7 @@ export default function WeaponDetailScreen() {
         const teamWeapon = await getTeamWeapon(weaponId);
         if (teamWeapon) {
           // Get team name
-          const { data: teamData } = await supabase
-            .from('teams')
-            .select('name')
-            .eq('id', teamWeapon.team_id)
-            .single();
+          const { data: teamData } = await supabase.from('teams').select('name').eq('id', teamWeapon.team_id).single();
 
           weaponData = {
             id: teamWeapon.id,
@@ -166,10 +160,7 @@ export default function WeaponDetailScreen() {
         return;
       }
 
-      const [allStats, defaultId] = await Promise.all([
-        getWeaponStats(),
-        getDefaultWeaponId(),
-      ]);
+      const [allStats, defaultId] = await Promise.all([getWeaponStats(), getDefaultWeaponId()]);
 
       setWeapon(weaponData);
       setStats(allStats.get(weaponId) || null);
@@ -248,27 +239,23 @@ export default function WeaponDetailScreen() {
   const handleDelete = useCallback(() => {
     if (!weapon) return;
 
-    Alert.alert(
-      'Delete Weapon',
-      `Are you sure you want to delete "${weapon.name}"? This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteUserWeapon(weapon.id);
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              router.back();
-            } catch (error) {
-              console.error('Failed to delete weapon:', error);
-              Alert.alert('Error', 'Failed to delete weapon');
-            }
-          },
+    Alert.alert('Delete Weapon', `Are you sure you want to delete "${weapon.name}"? This action cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteUserWeapon(weapon.id);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            router.back();
+          } catch (error) {
+            console.error('Failed to delete weapon:', error);
+            Alert.alert('Error', 'Failed to delete weapon');
+          }
         },
-      ]
-    );
+      },
+    ]);
   }, [weapon]);
 
   const handleSessionPress = useCallback((sessionId: string) => {
@@ -346,9 +333,7 @@ export default function WeaponDetailScreen() {
         style={s.scrollView}
         contentContainerStyle={[s.scrollContent, { paddingBottom: insets.bottom + 40 }]}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
       >
         {/* Hero Section */}
         <View style={[s.heroCard, { backgroundColor: colors.card }]}>
@@ -547,7 +532,11 @@ export default function WeaponDetailScreen() {
                 activeOpacity={0.7}
               >
                 <View style={[s.actionIcon, { backgroundColor: isDefault ? '#f59e0b15' : colors.secondary }]}>
-                  <Star size={16} color={isDefault ? '#f59e0b' : colors.textMuted} fill={isDefault ? '#f59e0b' : 'none'} />
+                  <Star
+                    size={16}
+                    color={isDefault ? '#f59e0b' : colors.textMuted}
+                    fill={isDefault ? '#f59e0b' : 'none'}
+                  />
                 </View>
                 <View style={s.actionInfo}>
                   <Text style={[s.actionTitle, { color: colors.text }]}>
@@ -565,19 +554,13 @@ export default function WeaponDetailScreen() {
               </TouchableOpacity>
 
               {/* Delete */}
-              <TouchableOpacity
-                style={s.actionRow}
-                onPress={handleDelete}
-                activeOpacity={0.7}
-              >
+              <TouchableOpacity style={s.actionRow} onPress={handleDelete} activeOpacity={0.7}>
                 <View style={[s.actionIcon, { backgroundColor: '#ef444410' }]}>
                   <Trash2 size={16} color="#ef4444" />
                 </View>
                 <View style={s.actionInfo}>
                   <Text style={[s.actionTitle, { color: '#ef4444' }]}>Delete Weapon</Text>
-                  <Text style={[s.actionSubtitle, { color: colors.textMuted }]}>
-                    Remove from your loadout
-                  </Text>
+                  <Text style={[s.actionSubtitle, { color: colors.textMuted }]}>Remove from your loadout</Text>
                 </View>
               </TouchableOpacity>
             </View>
@@ -593,8 +576,8 @@ export default function WeaponDetailScreen() {
             <View style={s.teamInfoContent}>
               <Text style={[s.teamInfoTitle, { color: colors.text }]}>Team Managed</Text>
               <Text style={[s.teamInfoText, { color: colors.textMuted }]}>
-                {source === 'team_assigned' 
-                  ? 'This weapon is assigned to you by your commander' 
+                {source === 'team_assigned'
+                  ? 'This weapon is assigned to you by your commander'
                   : 'This weapon is available from your team pool'}
               </Text>
             </View>

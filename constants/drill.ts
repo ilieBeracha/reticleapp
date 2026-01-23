@@ -1,6 +1,6 @@
 /**
  * Drill Constants
- * 
+ *
  * Centralized constants for drill-related values.
  * Import these instead of using hardcoded strings.
  */
@@ -11,7 +11,7 @@
 
 /**
  * DrillGoal values - Primary classification for drills/sessions
- * 
+ *
  * - 'grouping': Measure shot consistency/dispersion (scan-only, no hit %)
  * - 'engagement': Measure accuracy/hits (scan OR manual, tracks hit %)
  */
@@ -46,7 +46,7 @@ export function isEngagementGoal(goal: string | null | undefined): boolean {
 
 /**
  * TargetType values - Physical target classification
- * 
+ *
  * - 'paper': Paper targets (scanned for grouping/accuracy analysis)
  * - 'tactical': Steel/reactive targets (manual hit entry)
  */
@@ -76,7 +76,7 @@ export function isTacticalTarget(type: string | null | undefined): boolean {
 
 /**
  * PaperType values - Classification for paper target results
- * 
+ *
  * - 'grouping': Measuring shot consistency/dispersion
  * - 'achievement': Counting hits (legacy name for engagement)
  * - 'engagement': Counting hits (preferred name)
@@ -90,11 +90,7 @@ export const PAPER_TYPE = {
 export type PaperType = (typeof PAPER_TYPE)[keyof typeof PAPER_TYPE];
 
 /** Array of all valid paper types */
-export const PAPER_TYPES: PaperType[] = [
-  PAPER_TYPE.GROUPING,
-  PAPER_TYPE.ACHIEVEMENT,
-  PAPER_TYPE.ENGAGEMENT,
-];
+export const PAPER_TYPES: PaperType[] = [PAPER_TYPE.GROUPING, PAPER_TYPE.ACHIEVEMENT, PAPER_TYPE.ENGAGEMENT];
 
 /** Helper to check if paper type is grouping */
 export function isGroupingPaper(type: string | null | undefined): boolean {
@@ -122,11 +118,7 @@ export const INPUT_METHOD = {
 export type InputMethod = (typeof INPUT_METHOD)[keyof typeof INPUT_METHOD];
 
 /** Array of all valid input methods */
-export const INPUT_METHODS: InputMethod[] = [
-  INPUT_METHOD.SCAN,
-  INPUT_METHOD.MANUAL,
-  INPUT_METHOD.WATCH,
-];
+export const INPUT_METHODS: InputMethod[] = [INPUT_METHOD.SCAN, INPUT_METHOD.MANUAL, INPUT_METHOD.WATCH];
 
 // =============================================================================
 // DEFAULT VALUES

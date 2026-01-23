@@ -1,6 +1,6 @@
-import React from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
-import { COLORS } from "./types";
+import React from 'react';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { COLORS } from './types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CUSTOM INPUT
@@ -12,7 +12,7 @@ interface CustomInputProps {
   onChangeText: (text: string) => void;
   placeholder: string;
   unit?: string;
-  keyboardType?: "default" | "number-pad" | "decimal-pad";
+  keyboardType?: 'default' | 'number-pad' | 'decimal-pad';
 }
 
 export const CustomInput = React.memo(function CustomInput({
@@ -20,7 +20,7 @@ export const CustomInput = React.memo(function CustomInput({
   onChangeText,
   placeholder,
   unit,
-  keyboardType = "number-pad",
+  keyboardType = 'number-pad',
 }: CustomInputProps) {
   return (
     <View style={styles.container}>
@@ -40,8 +40,8 @@ export const CustomInput = React.memo(function CustomInput({
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: COLORS.card,
     borderRadius: 12,
     paddingHorizontal: 16,
@@ -60,4 +60,3 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 });
-

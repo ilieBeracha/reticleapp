@@ -1,8 +1,8 @@
-import type { AnalyzeDocumentResponse, AnalyzeResponse } from "@/types/api";
-import React, { useMemo } from "react";
-import { Image, StyleSheet, View } from "react-native";
-import Svg, { Circle, G, Line } from "react-native-svg";
-import { CANVAS_SIZE, COLORS, EditableDetection, MARKER_RADIUS } from "./types";
+import type { AnalyzeDocumentResponse, AnalyzeResponse } from '@/types/api';
+import React, { useMemo } from 'react';
+import { Image, StyleSheet, View } from 'react-native';
+import Svg, { Circle, G, Line } from 'react-native-svg';
+import { CANVAS_SIZE, COLORS, EditableDetection, MARKER_RADIUS } from './types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DETECTION PREVIEW
@@ -17,26 +17,19 @@ interface DetectionPreviewProps {
   detections: EditableDetection[];
 }
 
-export const DetectionPreview = React.memo(function DetectionPreview({
-  result,
-  detections,
-}: DetectionPreviewProps) {
+export const DetectionPreview = React.memo(function DetectionPreview({ result, detections }: DetectionPreviewProps) {
   // Calculate scale factors for coordinate mapping
   // Handles both AnalyzeResponse (uses width/height) and AnalyzeDocumentResponse (uses processed_width/height)
   const scale = useMemo(() => {
     if (!result.metadata) return { x: 1, y: 1, offsetX: 0, offsetY: 0 };
-    
+
     // Get image dimensions - document analysis uses processed dimensions, legacy uses width/height
-    const imgWidth = 'processed_width' in result.metadata 
-      ? result.metadata.processed_width 
-      : result.metadata.width;
-    const imgHeight = 'processed_height' in result.metadata 
-      ? result.metadata.processed_height 
-      : result.metadata.height;
-    
+    const imgWidth = 'processed_width' in result.metadata ? result.metadata.processed_width : result.metadata.width;
+    const imgHeight = 'processed_height' in result.metadata ? result.metadata.processed_height : result.metadata.height;
+
     const imgAspect = imgWidth / imgHeight;
     const canvasAspect = 1;
-    
+
     if (imgAspect > canvasAspect) {
       const displayWidth = CANVAS_SIZE;
       const displayHeight = CANVAS_SIZE / imgAspect;
@@ -62,30 +55,30 @@ export const DetectionPreview = React.memo(function DetectionPreview({
   // This recalculates whenever user adds/removes bullets
   const maxPairData = useMemo(() => {
     if (detections.length < 2) return null;
-    
+
     let maxDistance = 0;
     let maxIndices: [number, number] = [0, 1];
-    
+
     // Find the two bullets that are furthest apart
     for (let i = 0; i < detections.length; i++) {
       for (let j = i + 1; j < detections.length; j++) {
         const dx = detections[i].center[0] - detections[j].center[0];
         const dy = detections[i].center[1] - detections[j].center[1];
         const distance = Math.sqrt(dx * dx + dy * dy);
-        
+
         if (distance > maxDistance) {
           maxDistance = distance;
           maxIndices = [i, j];
         }
       }
     }
-    
+
     // Convert pixel distance to cm using scale_info if available
     let distanceCm: number | null = null;
     if (result.scale_info?.cm_per_pixel) {
       distanceCm = maxDistance * result.scale_info.cm_per_pixel;
     }
-    
+
     return {
       indices: maxIndices,
       distancePx: maxDistance,
@@ -110,12 +103,12 @@ export const DetectionPreview = React.memo(function DetectionPreview({
   // Get max pair bullet positions for drawing the connecting line
   const maxPairPositions = useMemo(() => {
     if (!maxPairData) return null;
-    
+
     const bullet1 = detections[maxPairData.indices[0]];
     const bullet2 = detections[maxPairData.indices[1]];
-    
+
     if (!bullet1 || !bullet2) return null;
-    
+
     return {
       x1: bullet1.center[0] * scale.x + scale.offsetX,
       y1: bullet1.center[1] * scale.y + scale.offsetY,
@@ -126,9 +119,8 @@ export const DetectionPreview = React.memo(function DetectionPreview({
 
   // For document analysis, use rectified image (detections are in rectified coordinates)
   // For legacy analysis, use original image
-  const displayImageBase64 = 'rectified_image_base64' in result 
-    ? result.rectified_image_base64 
-    : result.original_image_base64;
+  const displayImageBase64 =
+    'rectified_image_base64' in result ? result.rectified_image_base64 : result.original_image_base64;
 
   return (
     <View style={styles.container}>
@@ -137,7 +129,7 @@ export const DetectionPreview = React.memo(function DetectionPreview({
         style={styles.image}
         resizeMode="contain"
       />
-      
+
       {/* Overlay markers on image */}
       <View style={styles.markersOverlay}>
         <Svg width={CANVAS_SIZE} height={CANVAS_SIZE} viewBox={`0 0 ${CANVAS_SIZE} ${CANVAS_SIZE}`}>
@@ -180,17 +172,41 @@ export const DetectionPreview = React.memo(function DetectionPreview({
                 {isMaxPair && (
                   <>
                     {/* Outer glow */}
-                    <Circle cx={cx} cy={cy} r={MARKER_RADIUS + 16} fill="none" stroke="#EF4444" strokeWidth={2} opacity={0.2} />
-                    <Circle cx={cx} cy={cy} r={MARKER_RADIUS + 12} fill="none" stroke="#EF4444" strokeWidth={2} opacity={0.4} />
+                    <Circle
+                      cx={cx}
+                      cy={cy}
+                      r={MARKER_RADIUS + 16}
+                      fill="none"
+                      stroke="#EF4444"
+                      strokeWidth={2}
+                      opacity={0.2}
+                    />
+                    <Circle
+                      cx={cx}
+                      cy={cy}
+                      r={MARKER_RADIUS + 12}
+                      fill="none"
+                      stroke="#EF4444"
+                      strokeWidth={2}
+                      opacity={0.4}
+                    />
                     {/* Main highlight ring */}
                     <Circle cx={cx} cy={cy} r={MARKER_RADIUS + 8} fill="none" stroke="#EF4444" strokeWidth={3} />
                   </>
                 )}
-                
+
                 {/* Standard marker */}
-                <Circle cx={cx} cy={cy} r={MARKER_RADIUS + 4} fill="none" stroke={color} strokeWidth={1} opacity={0.4} />
+                <Circle
+                  cx={cx}
+                  cy={cy}
+                  r={MARKER_RADIUS + 4}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth={1}
+                  opacity={0.4}
+                />
                 <Circle cx={cx} cy={cy} r={MARKER_RADIUS} fill="none" stroke={color} strokeWidth={2.5} />
-                
+
                 {/* Crosshair for manual additions */}
                 {detection.isManual && (
                   <>
@@ -212,9 +228,9 @@ const styles = StyleSheet.create({
     width: CANVAS_SIZE,
     height: CANVAS_SIZE,
     borderRadius: 16,
-    overflow: "hidden",
-    backgroundColor: "#1a1a1a",
-    alignSelf: "center",
+    overflow: 'hidden',
+    backgroundColor: '#1a1a1a',
+    alignSelf: 'center',
     marginBottom: 16,
   },
   image: {
@@ -222,11 +238,10 @@ const styles = StyleSheet.create({
     height: CANVAS_SIZE,
   },
   markersOverlay: {
-    position: "absolute",
+    position: 'absolute',
     top: 0,
     left: 0,
     width: CANVAS_SIZE,
     height: CANVAS_SIZE,
   },
 });
-

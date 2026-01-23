@@ -3,7 +3,8 @@
  * Modal for adding drills to a training
  */
 
-import React from 'react';
+import type { Drill } from '@/types/workspace';
+import { Plus, Search, Target, X } from 'lucide-react-native';
 import {
   ActivityIndicator,
   Modal,
@@ -14,8 +15,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Plus, Search, Target, X } from 'lucide-react-native';
-import type { Drill } from '@/types/workspace';
 import type { Colors } from './types';
 
 interface AddDrillModalProps {
@@ -49,12 +48,7 @@ export function AddDrillModal({
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={handleClose}
-    >
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <Text style={[styles.title, { color: colors.text }]}>Add Drill</Text>
@@ -62,7 +56,7 @@ export function AddDrillModal({
             <X size={24} color={colors.text} />
           </TouchableOpacity>
         </View>
-        
+
         <View style={[styles.searchContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Search size={18} color={colors.textMuted} />
           <TextInput
@@ -84,11 +78,8 @@ export function AddDrillModal({
             </Text>
           </View>
         ) : (
-          <ScrollView 
-            style={styles.list} 
-            contentContainerStyle={styles.listContent}
-          >
-            {filteredDrills.map(drill => (
+          <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+            {filteredDrills.map((drill) => (
               <TouchableOpacity
                 key={drill.id}
                 style={[styles.drillItem, { backgroundColor: colors.card, borderColor: colors.border }]}

@@ -6,7 +6,7 @@
  */
 
 import { ArrowRight } from 'lucide-react-native';
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   Easing,
@@ -36,10 +36,7 @@ export function ActiveSessionCard({ session, colors, onPress }: ActiveSessionCar
       false
     );
     pulseOpacity.value = withRepeat(
-      withSequence(
-        withTiming(0, { duration: 1000, easing: Easing.out(Easing.ease) }),
-        withTiming(1, { duration: 0 })
-      ),
+      withSequence(withTiming(0, { duration: 1000, easing: Easing.out(Easing.ease) }), withTiming(1, { duration: 0 })),
       -1,
       false
     );
@@ -161,4 +158,3 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
 });
-

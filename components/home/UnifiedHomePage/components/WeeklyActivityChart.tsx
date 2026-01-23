@@ -67,13 +67,7 @@ function AnimatedBar({
   return (
     <View style={s.barContainer}>
       <View style={[s.barBackground, { backgroundColor: colors.secondary }]}>
-        <Animated.View
-          style={[
-            s.bar,
-            { backgroundColor: hasSession ? color : colors.border },
-            barStyle,
-          ]}
-        />
+        <Animated.View style={[s.bar, { backgroundColor: hasSession ? color : colors.border }, barStyle]} />
       </View>
     </View>
   );
@@ -101,10 +95,7 @@ export function WeeklyActivityChart({ colors, sessionsData }: WeeklyActivityChar
         return sessionDate >= dayStart && sessionDate <= dayEnd;
       });
 
-      const totalShots = daySessions.reduce(
-        (sum, s) => sum + (s.stats?.shots_fired || 0),
-        0
-      );
+      const totalShots = daySessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
 
       return {
         day,
@@ -141,9 +132,7 @@ export function WeeklyActivityChart({ colors, sessionsData }: WeeklyActivityChar
 
       <View style={s.chartContainer}>
         {weekData.map((day, index) => {
-          const barHeight = day.shots > 0
-            ? Math.max((day.shots / maxShots) * MAX_BAR_HEIGHT, 4)
-            : 4;
+          const barHeight = day.shots > 0 ? Math.max((day.shots / maxShots) * MAX_BAR_HEIGHT, 4) : 4;
           const isToday = index === adjustedTodayIndex;
 
           return (

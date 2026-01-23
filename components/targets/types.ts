@@ -1,15 +1,15 @@
-import type { Detection } from "@/types/api";
-import { Dimensions } from "react-native";
+import type { Detection } from '@/types/api';
+import { Dimensions } from 'react-native';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TARGET TYPES
 // ═══════════════════════════════════════════════════════════════════════════
 /** Target type based on training goal */
-export type TargetType = "grouping" | "engagement";
+export type TargetType = 'grouping' | 'engagement';
 /** Input method for achievement targets */
-export type InputMethod = "scan" | "manual";
-export type Step = "form" | "camera" | "preview" | "analyzing" | "results" | "manual_entry";
-export type EditMode = "add" | "remove" | "move";
+export type InputMethod = 'scan' | 'manual';
+export type Step = 'form' | 'camera' | 'preview' | 'analyzing' | 'results' | 'manual_entry';
+export type EditMode = 'add' | 'remove' | 'move';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DETECTION TYPES
@@ -22,7 +22,7 @@ export interface EditableDetection extends Detection {
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════════
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const CANVAS_SIZE = SCREEN_WIDTH - 40;
 export const MARKER_RADIUS = 12;
@@ -36,21 +36,20 @@ export const BULLET_PRESETS = [1, 3, 5, 10];
 // COLORS - DARK ONLY (for camera/scanning views)
 // ═══════════════════════════════════════════════════════════════════════════
 export const COLORS = {
-  primary: "#10B981",
-  primaryLight: "#34D399",
-  primaryLighter: "#6EE7B7",
-  warning: "#F59E0B",
-  danger: "#EF4444",
-  info: "#3B82F6",
-  white: "#fff",
-  text: "rgba(255,255,255,0.7)",
-  textMuted: "rgba(255,255,255,0.5)",
-  textDim: "rgba(255,255,255,0.4)",
-  textDimmer: "rgba(255,255,255,0.3)",
-  background: "#0f0f0f",
-  card: "rgba(255,255,255,0.05)",
-  cardHover: "rgba(255,255,255,0.08)",
-  border: "rgba(255,255,255,0.08)",
-  borderLight: "rgba(255,255,255,0.1)",
+  primary: '#10B981',
+  primaryLight: '#34D399',
+  primaryLighter: '#6EE7B7',
+  warning: '#F59E0B',
+  danger: '#EF4444',
+  info: '#3B82F6',
+  white: '#fff',
+  text: 'rgba(255,255,255,0.7)',
+  textMuted: 'rgba(255,255,255,0.5)',
+  textDim: 'rgba(255,255,255,0.4)',
+  textDimmer: 'rgba(255,255,255,0.3)',
+  background: '#0f0f0f',
+  card: 'rgba(255,255,255,0.05)',
+  cardHover: 'rgba(255,255,255,0.08)',
+  border: 'rgba(255,255,255,0.08)',
+  borderLight: 'rgba(255,255,255,0.1)',
 } as const;
-

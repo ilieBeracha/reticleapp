@@ -25,7 +25,7 @@ export function NoTeamsEmptyState() {
   return (
     <Animated.View entering={FadeIn.duration(300)} style={styles.container}>
       {/* Icon */}
-      <Animated.View 
+      <Animated.View
         entering={FadeInUp.delay(100).duration(400)}
         style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}
       >
@@ -34,9 +34,7 @@ export function NoTeamsEmptyState() {
 
       {/* Text */}
       <Animated.View entering={FadeInUp.delay(200).duration(400)} style={styles.textContainer}>
-        <Text style={[styles.title, { color: colors.text }]}>
-          You're not in a team yet
-        </Text>
+        <Text style={[styles.title, { color: colors.text }]}>You're not in a team yet</Text>
         <Text style={[styles.description, { color: colors.textMuted }]}>
           Create your own team or join an existing one to coordinate training with others.
         </Text>
@@ -130,4 +128,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

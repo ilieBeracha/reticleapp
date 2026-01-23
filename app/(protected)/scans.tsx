@@ -1,12 +1,12 @@
-import { Colors } from "@/constants/Colors";
-import { useTheme } from "@/contexts/ThemeContext";
-import { getMyRecentPaperScans } from "@/services/sessionService";
-import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
-import * as Haptics from "expo-haptics";
-import { Image } from "expo-image";
-import { Stack, router } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import { Colors } from '@/constants/Colors';
+import { useTheme } from '@/contexts/ThemeContext';
+import { getMyRecentPaperScans } from '@/services/sessionService';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
+import { Stack, router } from 'expo-router';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -18,7 +18,7 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from "react-native";
+} from 'react-native';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -34,12 +34,12 @@ interface ScanItem {
   group_size_cm: number | null; // Max distance between any 2 bullets
 }
 
-type DistanceFilter = "all" | "cqb" | "short" | "medium" | "long" | "sniper";
+type DistanceFilter = 'all' | 'cqb' | 'short' | 'medium' | 'long' | 'sniper';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════════
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const NUM_COLUMNS = 3;
 const GRID_GAP = 2;
 const ITEM_SIZE = (SCREEN_WIDTH - GRID_GAP * (NUM_COLUMNS + 1)) / NUM_COLUMNS;
@@ -68,12 +68,12 @@ const StatBox = React.memo(function StatBox({
 // FILTER BOTTOM SHEET
 // ═══════════════════════════════════════════════════════════════════════════
 const DISTANCE_FILTERS: { key: DistanceFilter; label: string; range: string }[] = [
-  { key: "all", label: "All Distances", range: "" },
-  { key: "cqb", label: "CQB", range: "≤7m" },
-  { key: "short", label: "Short Range", range: "8-15m" },
-  { key: "medium", label: "Mid Range", range: "16-50m" },
-  { key: "long", label: "Long Range", range: "51-100m" },
-  { key: "sniper", label: "Sniper", range: ">100m" },
+  { key: 'all', label: 'All Distances', range: '' },
+  { key: 'cqb', label: 'CQB', range: '≤7m' },
+  { key: 'short', label: 'Short Range', range: '8-15m' },
+  { key: 'medium', label: 'Mid Range', range: '16-50m' },
+  { key: 'long', label: 'Long Range', range: '51-100m' },
+  { key: 'sniper', label: 'Sniper', range: '>100m' },
 ];
 
 const FilterBottomSheet = React.memo(function FilterBottomSheet({
@@ -97,10 +97,10 @@ const FilterBottomSheet = React.memo(function FilterBottomSheet({
         <View style={[styles.sheetContent, { backgroundColor: colors.card }]}>
           {/* Handle */}
           <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
-          
+
           {/* Title */}
           <Text style={[styles.sheetTitle, { color: colors.text }]}>Filters</Text>
-          
+
           {/* Distance Section */}
           <Text style={[styles.sheetSectionTitle, { color: colors.textMuted }]}>DISTANCE</Text>
           <View style={styles.sheetOptions}>
@@ -131,20 +131,20 @@ const FilterBottomSheet = React.memo(function FilterBottomSheet({
                       {f.range && <Text style={[styles.sheetOptionRange, { color: colors.textMuted }]}>{f.range}</Text>}
                     </View>
                   </View>
-                  {count > 0 && (
-                    <Text style={[styles.sheetOptionCount, { color: colors.textMuted }]}>{count}</Text>
-                  )}
+                  {count > 0 && <Text style={[styles.sheetOptionCount, { color: colors.textMuted }]}>{count}</Text>}
                 </TouchableOpacity>
               );
             })}
           </View>
-          
+
           {/* Coming Soon Section */}
           <View style={[styles.sheetComingSoon, { borderColor: colors.border }]}>
             <Ionicons name="sparkles" size={18} color={colors.textMuted} />
             <View style={styles.sheetComingSoonText}>
               <Text style={[styles.sheetComingSoonTitle, { color: colors.textMuted }]}>More filters coming soon</Text>
-              <Text style={[styles.sheetComingSoonSub, { color: colors.textMuted }]}>Date range, weapon type, target type...</Text>
+              <Text style={[styles.sheetComingSoonSub, { color: colors.textMuted }]}>
+                Date range, weapon type, target type...
+              </Text>
             </View>
           </View>
         </View>
@@ -168,18 +168,9 @@ const GridItem = React.memo(function GridItem({
   const hasImage = !!item.scanned_image_url;
 
   return (
-    <TouchableOpacity
-      style={[styles.gridItem, { backgroundColor: colors.card }]}
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
+    <TouchableOpacity style={[styles.gridItem, { backgroundColor: colors.card }]} onPress={onPress} activeOpacity={0.8}>
       {hasImage ? (
-        <Image
-          source={{ uri: item.scanned_image_url! }}
-          style={styles.gridImage}
-          contentFit="cover"
-          transition={200}
-        />
+        <Image source={{ uri: item.scanned_image_url! }} style={styles.gridImage} contentFit="cover" transition={200} />
       ) : (
         <View style={[styles.gridPlaceholder, { backgroundColor: colors.border }]}>
           <Ionicons name="disc-outline" size={32} color={colors.textMuted} />
@@ -188,14 +179,14 @@ const GridItem = React.memo(function GridItem({
 
       {/* Distance Badge */}
       {item.distance_meters && (
-        <View style={[styles.distanceBadge, { backgroundColor: "#6366F1" }]}>
+        <View style={[styles.distanceBadge, { backgroundColor: '#6366F1' }]}>
           <Text style={styles.distanceBadgeText}>{item.distance_meters}m</Text>
         </View>
       )}
 
       {/* Group Size Badge (bottom-right) */}
       {item.group_size_cm && (
-        <View style={[styles.groupBadge, { backgroundColor: "#EF4444" }]}>
+        <View style={[styles.groupBadge, { backgroundColor: '#EF4444' }]}>
           <Text style={styles.groupBadgeText}>{item.group_size_cm.toFixed(1)}cm</Text>
         </View>
       )}
@@ -224,21 +215,16 @@ const ScanDetailSheet = React.memo(function ScanDetailSheet({
   // Determine group size quality
   const getGroupQuality = (cm: number | null) => {
     if (!cm) return null;
-    if (cm <= 5) return { label: "Excellent", color: "#22C55E" };
-    if (cm <= 10) return { label: "Good", color: "#22C55E" };
-    if (cm <= 20) return { label: "Fair", color: "#F59E0B" };
-    return { label: "Wide", color: "#EF4444" };
+    if (cm <= 5) return { label: 'Excellent', color: '#22C55E' };
+    if (cm <= 10) return { label: 'Good', color: '#22C55E' };
+    if (cm <= 20) return { label: 'Fair', color: '#F59E0B' };
+    return { label: 'Wide', color: '#EF4444' };
   };
 
   const groupQuality = getGroupQuality(item.group_size_cm);
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={[styles.sheetContainer, { backgroundColor: colors.background }]}>
         {/* Header */}
         <View style={[styles.detailHeader, { borderBottomColor: colors.border }]}>
@@ -261,9 +247,7 @@ const ScanDetailSheet = React.memo(function ScanDetailSheet({
           ) : (
             <View style={[styles.detailImagePlaceholder, { backgroundColor: colors.border }]}>
               <Ionicons name="disc-outline" size={80} color={colors.textMuted} />
-              <Text style={[styles.detailNoImageText, { color: colors.textMuted }]}>
-                No image available
-              </Text>
+              <Text style={[styles.detailNoImageText, { color: colors.textMuted }]}>No image available</Text>
             </View>
           )}
         </View>
@@ -272,9 +256,9 @@ const ScanDetailSheet = React.memo(function ScanDetailSheet({
         <View style={styles.detailStats}>
           {/* Group Size - Hero Card */}
           {item.group_size_cm && (
-            <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: "#EF4444" + "40" }]}>
+            <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: '#EF4444' + '40' }]}>
               <View style={styles.heroCardHeader}>
-                <View style={[styles.heroIconContainer, { backgroundColor: "#EF4444" + "20" }]}>
+                <View style={[styles.heroIconContainer, { backgroundColor: '#EF4444' + '20' }]}>
                   <Ionicons name="analytics" size={24} color="#EF4444" />
                 </View>
                 <View>
@@ -283,17 +267,13 @@ const ScanDetailSheet = React.memo(function ScanDetailSheet({
                 </View>
               </View>
               <View style={styles.heroCardValue}>
-                <Text style={[styles.heroNumber, { color: "#EF4444" }]}>
-                  {item.group_size_cm.toFixed(1)}
-                </Text>
-                <Text style={[styles.heroUnit, { color: "#EF4444" }]}>cm</Text>
+                <Text style={[styles.heroNumber, { color: '#EF4444' }]}>{item.group_size_cm.toFixed(1)}</Text>
+                <Text style={[styles.heroUnit, { color: '#EF4444' }]}>cm</Text>
               </View>
               {groupQuality && (
-                <View style={[styles.qualityBadge, { backgroundColor: groupQuality.color + "20" }]}>
+                <View style={[styles.qualityBadge, { backgroundColor: groupQuality.color + '20' }]}>
                   <View style={[styles.qualityDot, { backgroundColor: groupQuality.color }]} />
-                  <Text style={[styles.qualityLabel, { color: groupQuality.color }]}>
-                    {groupQuality.label}
-                  </Text>
+                  <Text style={[styles.qualityLabel, { color: groupQuality.color }]}>{groupQuality.label}</Text>
                 </View>
               )}
             </View>
@@ -304,12 +284,10 @@ const ScanDetailSheet = React.memo(function ScanDetailSheet({
             {/* Distance */}
             {item.distance_meters && (
               <View style={[styles.statCard, { backgroundColor: colors.card }]}>
-                <View style={[styles.statIconContainer, { backgroundColor: colors.primary + "20" }]}>
+                <View style={[styles.statIconContainer, { backgroundColor: colors.primary + '20' }]}>
                   <Ionicons name="resize-outline" size={20} color={colors.primary} />
                 </View>
-                <Text style={[styles.statCardValue, { color: colors.text }]}>
-                  {item.distance_meters}m
-                </Text>
+                <Text style={[styles.statCardValue, { color: colors.text }]}>{item.distance_meters}m</Text>
                 <Text style={[styles.statCardLabel, { color: colors.textMuted }]}>Distance</Text>
               </View>
             )}
@@ -317,12 +295,10 @@ const ScanDetailSheet = React.memo(function ScanDetailSheet({
             {/* Shots Fired */}
             {item.shots_fired && (
               <View style={[styles.statCard, { backgroundColor: colors.card }]}>
-                <View style={[styles.statIconContainer, { backgroundColor: "#6366F1" + "20" }]}>
+                <View style={[styles.statIconContainer, { backgroundColor: '#6366F1' + '20' }]}>
                   <Ionicons name="flame-outline" size={20} color="#6366F1" />
                 </View>
-                <Text style={[styles.statCardValue, { color: colors.text }]}>
-                  {item.shots_fired}
-                </Text>
+                <Text style={[styles.statCardValue, { color: colors.text }]}>{item.shots_fired}</Text>
                 <Text style={[styles.statCardLabel, { color: colors.textMuted }]}>Shots</Text>
               </View>
             )}
@@ -330,12 +306,10 @@ const ScanDetailSheet = React.memo(function ScanDetailSheet({
             {/* Hits */}
             {item.hits != null && (
               <View style={[styles.statCard, { backgroundColor: colors.card }]}>
-                <View style={[styles.statIconContainer, { backgroundColor: "#22C55E" + "20" }]}>
+                <View style={[styles.statIconContainer, { backgroundColor: '#22C55E' + '20' }]}>
                   <Ionicons name="checkmark-circle-outline" size={20} color="#22C55E" />
                 </View>
-                <Text style={[styles.statCardValue, { color: colors.text }]}>
-                  {item.hits}
-                </Text>
+                <Text style={[styles.statCardValue, { color: colors.text }]}>{item.hits}</Text>
                 <Text style={[styles.statCardLabel, { color: colors.textMuted }]}>Hits</Text>
               </View>
             )}
@@ -343,12 +317,10 @@ const ScanDetailSheet = React.memo(function ScanDetailSheet({
             {/* Lane */}
             {item.lane_number && (
               <View style={[styles.statCard, { backgroundColor: colors.card }]}>
-                <View style={[styles.statIconContainer, { backgroundColor: "#F59E0B" + "20" }]}>
+                <View style={[styles.statIconContainer, { backgroundColor: '#F59E0B' + '20' }]}>
                   <Ionicons name="flag-outline" size={20} color="#F59E0B" />
                 </View>
-                <Text style={[styles.statCardValue, { color: colors.text }]}>
-                  {item.lane_number}
-                </Text>
+                <Text style={[styles.statCardValue, { color: colors.text }]}>{item.lane_number}</Text>
                 <Text style={[styles.statCardLabel, { color: colors.textMuted }]}>Lane</Text>
               </View>
             )}
@@ -362,11 +334,7 @@ const ScanDetailSheet = React.memo(function ScanDetailSheet({
 // ═══════════════════════════════════════════════════════════════════════════
 // EMPTY STATE COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
-const EmptyState = React.memo(function EmptyState({
-  colors,
-}: {
-  colors: typeof Colors.light;
-}) {
+const EmptyState = React.memo(function EmptyState({ colors }: { colors: typeof Colors.light }) {
   return (
     <View style={styles.emptyContainer}>
       <View style={[styles.emptyIcon, { backgroundColor: colors.card }]}>
@@ -394,7 +362,7 @@ export default function ScansPage() {
   const [selectedScan, setSelectedScan] = useState<ScanItem | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
-  const [distanceFilter, setDistanceFilter] = useState<DistanceFilter>("all");
+  const [distanceFilter, setDistanceFilter] = useState<DistanceFilter>('all');
 
   // ═══ DATA LOADING ═══
   const loadScans = useCallback(async () => {
@@ -412,7 +380,7 @@ export default function ScansPage() {
       }));
       setScans(mapped);
     } catch (err) {
-      console.error("[ScansPage] Error:", err);
+      console.error('[ScansPage] Error:', err);
     } finally {
       setLoading(false);
     }
@@ -446,39 +414,39 @@ export default function ScansPage() {
   // ═══ FILTER & STATS ═══
   // CQB: ≤7m, Short: 8-15m, Medium: 16-50m, Long: 51-100m, Sniper: >100m
   const filterCounts = useMemo(() => {
-    const cqb = scans.filter(s => s.distance_meters && s.distance_meters <= 7).length;
-    const short = scans.filter(s => s.distance_meters && s.distance_meters > 7 && s.distance_meters <= 15).length;
-    const medium = scans.filter(s => s.distance_meters && s.distance_meters > 15 && s.distance_meters <= 50).length;
-    const long = scans.filter(s => s.distance_meters && s.distance_meters > 50 && s.distance_meters <= 100).length;
-    const sniper = scans.filter(s => s.distance_meters && s.distance_meters > 100).length;
+    const cqb = scans.filter((s) => s.distance_meters && s.distance_meters <= 7).length;
+    const short = scans.filter((s) => s.distance_meters && s.distance_meters > 7 && s.distance_meters <= 15).length;
+    const medium = scans.filter((s) => s.distance_meters && s.distance_meters > 15 && s.distance_meters <= 50).length;
+    const long = scans.filter((s) => s.distance_meters && s.distance_meters > 50 && s.distance_meters <= 100).length;
+    const sniper = scans.filter((s) => s.distance_meters && s.distance_meters > 100).length;
     return { all: scans.length, cqb, short, medium, long, sniper };
   }, [scans]);
 
   const filteredScans = useMemo(() => {
-    if (distanceFilter === "all") return scans;
-    if (distanceFilter === "cqb") return scans.filter(s => s.distance_meters && s.distance_meters <= 7);
-    if (distanceFilter === "short") return scans.filter(s => s.distance_meters && s.distance_meters > 7 && s.distance_meters <= 15);
-    if (distanceFilter === "medium") return scans.filter(s => s.distance_meters && s.distance_meters > 15 && s.distance_meters <= 50);
-    if (distanceFilter === "long") return scans.filter(s => s.distance_meters && s.distance_meters > 50 && s.distance_meters <= 100);
-    if (distanceFilter === "sniper") return scans.filter(s => s.distance_meters && s.distance_meters > 100);
+    if (distanceFilter === 'all') return scans;
+    if (distanceFilter === 'cqb') return scans.filter((s) => s.distance_meters && s.distance_meters <= 7);
+    if (distanceFilter === 'short')
+      return scans.filter((s) => s.distance_meters && s.distance_meters > 7 && s.distance_meters <= 15);
+    if (distanceFilter === 'medium')
+      return scans.filter((s) => s.distance_meters && s.distance_meters > 15 && s.distance_meters <= 50);
+    if (distanceFilter === 'long')
+      return scans.filter((s) => s.distance_meters && s.distance_meters > 50 && s.distance_meters <= 100);
+    if (distanceFilter === 'sniper') return scans.filter((s) => s.distance_meters && s.distance_meters > 100);
     return scans;
   }, [scans, distanceFilter]);
 
   const stats = useMemo(() => {
     const totalScans = scans.length;
-    const distances = scans.filter(s => s.distance_meters).map(s => s.distance_meters!);
-    const avgDistance = distances.length > 0 
-      ? Math.round(distances.reduce((a, b) => a + b, 0) / distances.length) 
-      : 0;
-    
+    const distances = scans.filter((s) => s.distance_meters).map((s) => s.distance_meters!);
+    const avgDistance = distances.length > 0 ? Math.round(distances.reduce((a, b) => a + b, 0) / distances.length) : 0;
+
     // Calculate average group size (smaller = better)
-    const groupSizes = scans.filter(s => s.group_size_cm).map(s => s.group_size_cm!);
-    const avgGroupSize = groupSizes.length > 0 
-      ? (groupSizes.reduce((a, b) => a + b, 0) / groupSizes.length).toFixed(1)
-      : null;
+    const groupSizes = scans.filter((s) => s.group_size_cm).map((s) => s.group_size_cm!);
+    const avgGroupSize =
+      groupSizes.length > 0 ? (groupSizes.reduce((a, b) => a + b, 0) / groupSizes.length).toFixed(1) : null;
     const bestGroupSize = groupSizes.length > 0 ? Math.min(...groupSizes).toFixed(1) : null;
-    
-    const uniqueSessions = new Set(scans.map(s => s.session_id)).size;
+
+    const uniqueSessions = new Set(scans.map((s) => s.session_id)).size;
     return { totalScans, avgDistance, avgGroupSize, bestGroupSize, uniqueSessions };
   }, [scans]);
 
@@ -503,11 +471,7 @@ export default function ScansPage() {
 
       {/* ═══ HEADER ═══ */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.7}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>Paper Targets</Text>
@@ -518,8 +482,8 @@ export default function ScansPage() {
       <View style={[styles.statsRow, { borderBottomColor: colors.border }]}>
         <StatBox value={stats.totalScans} label="Scans" colors={colors} />
         <StatBox value={`${stats.avgDistance}m`} label="Avg Dist" colors={colors} />
-        <StatBox value={stats.avgGroupSize ? `${stats.avgGroupSize}cm` : "—"} label="Avg Group" colors={colors} />
-        <StatBox value={stats.bestGroupSize ? `${stats.bestGroupSize}cm` : "—"} label="Best" colors={colors} />
+        <StatBox value={stats.avgGroupSize ? `${stats.avgGroupSize}cm` : '—'} label="Avg Group" colors={colors} />
+        <StatBox value={stats.bestGroupSize ? `${stats.bestGroupSize}cm` : '—'} label="Best" colors={colors} />
       </View>
 
       {/* ═══ FILTER BAR ═══ */}
@@ -534,14 +498,12 @@ export default function ScansPage() {
         >
           <Ionicons name="filter" size={16} color={colors.text} />
           <Text style={[styles.filterButtonText, { color: colors.text }]}>
-            {distanceFilter === "all" ? "All" : DISTANCE_FILTERS.find(f => f.key === distanceFilter)?.label}
+            {distanceFilter === 'all' ? 'All' : DISTANCE_FILTERS.find((f) => f.key === distanceFilter)?.label}
           </Text>
-          {distanceFilter !== "all" && (
-            <View style={[styles.filterActiveDot, { backgroundColor: colors.primary }]} />
-          )}
+          {distanceFilter !== 'all' && <View style={[styles.filterActiveDot, { backgroundColor: colors.primary }]} />}
           <Ionicons name="chevron-down" size={14} color={colors.textMuted} />
         </TouchableOpacity>
-        
+
         <Text style={[styles.filterResultCount, { color: colors.textMuted }]}>
           {filteredScans.length} {filteredScans.length === 1 ? 'scan' : 'scans'}
         </Text>
@@ -565,30 +527,13 @@ export default function ScansPage() {
         contentContainerStyle={styles.gridContainer}
         columnWrapperStyle={styles.gridRow}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.text}
-          />
-        }
-        renderItem={({ item }) => (
-          <GridItem
-            item={item}
-            onPress={() => onScanPress(item)}
-            colors={colors}
-          />
-        )}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />}
+        renderItem={({ item }) => <GridItem item={item} onPress={() => onScanPress(item)} colors={colors} />}
         ListEmptyComponent={<EmptyState colors={colors} />}
       />
 
       {/* ═══ SCAN DETAIL SHEET ═══ */}
-      <ScanDetailSheet
-        item={selectedScan}
-        visible={modalVisible}
-        onClose={onCloseModal}
-        colors={colors}
-      />
+      <ScanDetailSheet item={selectedScan} visible={modalVisible} onClose={onCloseModal} colors={colors} />
     </View>
   );
 }
@@ -601,16 +546,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   centered: {
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   // Header
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingTop: Platform.OS === "ios" ? 60 : 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: Platform.OS === 'ios' ? 60 : 16,
     paddingBottom: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
@@ -618,12 +563,12 @@ const styles = StyleSheet.create({
   backButton: {
     width: 40,
     height: 40,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   headerSpacer: {
     width: 40,
@@ -631,17 +576,17 @@ const styles = StyleSheet.create({
 
   // Stats Row
   statsRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
+    flexDirection: 'row',
+    justifyContent: 'space-around',
     paddingVertical: 14,
     borderBottomWidth: 1,
   },
   statBox: {
-    alignItems: "center",
+    alignItems: 'center',
   },
   statValue: {
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   statLabel: {
     fontSize: 11,
@@ -650,16 +595,16 @@ const styles = StyleSheet.create({
 
   // Filter Bar
   filterBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderBottomWidth: 1,
   },
   filterButton: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
@@ -668,7 +613,7 @@ const styles = StyleSheet.create({
   },
   filterButtonText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   filterActiveDot: {
     width: 6,
@@ -682,31 +627,31 @@ const styles = StyleSheet.create({
   // Filter Bottom Sheet
   sheetOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
   },
   sheetContent: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
-    paddingBottom: Platform.OS === "ios" ? 40 : 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
   },
   sheetHandle: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    alignSelf: "center",
+    alignSelf: 'center',
     marginTop: 12,
     marginBottom: 20,
   },
   sheetTitle: {
     fontSize: 20,
-    fontWeight: "700",
+    fontWeight: '700',
     marginBottom: 20,
   },
   sheetSectionTitle: {
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: '700',
     letterSpacing: 1,
     marginBottom: 10,
   },
@@ -714,17 +659,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sheetOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: 14,
     paddingHorizontal: 14,
     borderRadius: 12,
     borderWidth: 1,
   },
   sheetOptionLeft: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
   },
   sheetRadio: {
@@ -732,8 +677,8 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sheetRadioInner: {
     width: 10,
@@ -742,7 +687,7 @@ const styles = StyleSheet.create({
   },
   sheetOptionLabel: {
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   sheetOptionRange: {
     fontSize: 12,
@@ -750,11 +695,11 @@ const styles = StyleSheet.create({
   },
   sheetOptionCount: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   sheetComingSoon: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
     marginTop: 20,
     paddingTop: 16,
@@ -765,7 +710,7 @@ const styles = StyleSheet.create({
   },
   sheetComingSoonTitle: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   sheetComingSoonSub: {
     fontSize: 11,
@@ -783,22 +728,22 @@ const styles = StyleSheet.create({
     width: ITEM_SIZE,
     height: ITEM_SIZE,
     marginBottom: GRID_GAP,
-    position: "relative",
+    position: 'relative',
   },
   gridImage: {
-    width: "100%",
-    height: "100%",
+    width: '100%',
+    height: '100%',
   },
   gridPlaceholder: {
-    width: "100%",
-    height: "100%",
-    alignItems: "center",
-    justifyContent: "center",
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Distance Badge
   distanceBadge: {
-    position: "absolute",
+    position: 'absolute',
     top: 6,
     left: 6,
     paddingHorizontal: 6,
@@ -806,14 +751,14 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   distanceBadgeText: {
-    color: "#fff",
+    color: '#fff',
     fontSize: 10,
-    fontWeight: "700",
+    fontWeight: '700',
   },
 
   // Group Size Badge
   groupBadge: {
-    position: "absolute",
+    position: 'absolute',
     bottom: 6,
     right: 6,
     paddingHorizontal: 6,
@@ -821,9 +766,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   groupBadgeText: {
-    color: "#fff",
+    color: '#fff',
     fontSize: 9,
-    fontWeight: "700",
+    fontWeight: '700',
   },
 
   // Full Page Scan Detail Sheet
@@ -831,10 +776,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   detailHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingTop: Platform.OS === "ios" ? 20 : 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: Platform.OS === 'ios' ? 20 : 20,
     paddingBottom: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
@@ -842,26 +787,26 @@ const styles = StyleSheet.create({
   detailCloseBtn: {
     width: 44,
     height: 44,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   detailTitle: {
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   detailImageContainer: {
-    width: "100%",
+    width: '100%',
     aspectRatio: 1,
   },
   detailImage: {
-    width: "100%",
-    height: "100%",
+    width: '100%',
+    height: '100%',
   },
   detailImagePlaceholder: {
-    width: "100%",
-    height: "100%",
-    alignItems: "center",
-    justifyContent: "center",
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 12,
   },
   detailNoImageText: {
@@ -880,8 +825,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   heroCardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
     marginBottom: 12,
   },
@@ -889,42 +834,42 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   heroCardLabel: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   heroCardHint: {
     fontSize: 11,
     marginTop: 2,
   },
   heroCardValue: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
     paddingVertical: 8,
   },
   heroNumber: {
     fontSize: 56,
-    fontWeight: "800",
+    fontWeight: '800',
   },
   heroUnit: {
     fontSize: 24,
-    fontWeight: "600",
+    fontWeight: '600',
     marginLeft: 4,
     opacity: 0.7,
   },
   qualityBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
-    alignSelf: "center",
+    alignSelf: 'center',
     marginTop: 4,
   },
   qualityDot: {
@@ -934,13 +879,13 @@ const styles = StyleSheet.create({
   },
   qualityLabel: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
   },
 
   // Stats Grid
   statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
   },
   statCard: {
@@ -948,19 +893,19 @@ const styles = StyleSheet.create({
     minWidth: (SCREEN_WIDTH - 44) / 2 - 6,
     borderRadius: 14,
     padding: 16,
-    alignItems: "center",
+    alignItems: 'center',
     gap: 8,
   },
   statIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   statCardValue: {
     fontSize: 24,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   statCardLabel: {
     fontSize: 12,
@@ -969,8 +914,8 @@ const styles = StyleSheet.create({
   // Empty State
   emptyContainer: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 60,
     paddingHorizontal: 40,
   },
@@ -978,18 +923,18 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 20,
   },
   emptyTitle: {
     fontSize: 20,
-    fontWeight: "700",
+    fontWeight: '700',
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
-    textAlign: "center",
+    textAlign: 'center',
     lineHeight: 20,
   },
 });

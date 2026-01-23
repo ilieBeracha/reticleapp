@@ -73,7 +73,9 @@ export function SessionCreationSheet({
 
         // Build drill config
         const drillConfig: DrillConfig = {
-          name: trainingContext?.drill.drillName || `${values.purpose === 'grouping' ? 'Grouping' : 'Practice'} ${values.distance}m`,
+          name:
+            trainingContext?.drill.drillName ||
+            `${values.purpose === 'grouping' ? 'Grouping' : 'Practice'} ${values.distance}m`,
           drill_goal: purposeToDrillGoal(values.purpose),
           target_type: values.targetType === 'paper' || values.targetType === 'tactical' ? values.targetType : 'paper',
           distance_m: values.distance,
@@ -123,19 +125,11 @@ export function SessionCreationSheet({
   const sheetTitle = title || (trainingContext ? 'Start Drill' : 'New Session');
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Header */}
         <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-          <TouchableOpacity
-            style={[styles.closeBtn, { backgroundColor: colors.card }]}
-            onPress={onClose}
-          >
+          <TouchableOpacity style={[styles.closeBtn, { backgroundColor: colors.card }]} onPress={onClose}>
             <Ionicons name="close" size={20} color={colors.text} />
           </TouchableOpacity>
           <Text style={[styles.title, { color: colors.text }]}>{sheetTitle}</Text>

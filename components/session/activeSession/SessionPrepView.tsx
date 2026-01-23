@@ -25,13 +25,7 @@ import {
   Zap,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -47,8 +41,8 @@ interface SessionPrepViewProps {
   session: SessionWithDetails;
   insets: { top: number; bottom: number };
   onSessionActivated: (session: SessionWithDetails) => void;
-  onBack?: () => void;  // Go back to edit session details
-  onClose: () => void;  // Cancel/close entirely
+  onBack?: () => void; // Go back to edit session details
+  onClose: () => void; // Cancel/close entirely
 }
 
 function PulsingRing({ color }: { color: string }) {
@@ -79,31 +73,21 @@ function PulsingRing({ color }: { color: string }) {
     opacity: opacity.value,
   }));
 
-  return (
-    <Animated.View
-      style={[styles.pulsingRing, animatedStyle, { borderColor: color }]}
-    />
-  );
+  return <Animated.View style={[styles.pulsingRing, animatedStyle, { borderColor: color }]} />;
 }
 
-export function SessionPrepView({
-  session,
-  insets,
-  onSessionActivated,
-  onBack,
-  onClose,
-}: SessionPrepViewProps) {
+export function SessionPrepView({ session, insets, onSessionActivated, onBack, onClose }: SessionPrepViewProps) {
   const colors = useColors();
   const isWatchConnected = useIsGarminConnected();
   const { refreshDevices } = useGarminStore();
-  
+
   const [activating, setActivating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [weapon, setWeapon] = useState<UserWeapon | null>(null);
   const [showSensitivity, setShowSensitivity] = useState(false);
   const [customSensitivity, setCustomSensitivity] = useState<number | null>(null);
   const [timeLimit, setTimeLimit] = useState<number | null>(null);
-  
+
   const drill = session.drill_config;
   const drillName = session.drill_name || drill?.name || 'Practice Session';
   const isGrouping = isGroupingGoal(drill?.drill_goal);
@@ -122,7 +106,7 @@ export function SessionPrepView({
       weapon_id: session.weapon_id,
       weapon_name: session.weapon_name,
     });
-    
+
     if (session.weapon_id) {
       getUserWeapon(session.weapon_id)
         .then((w) => {
@@ -163,7 +147,7 @@ export function SessionPrepView({
     if (activating) return;
     setActivating(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    
+
     try {
       // Store watch preferences in session metadata
       // These will be used by useActiveSession when building watch payload
@@ -180,7 +164,7 @@ export function SessionPrepView({
       if (customSensitivity !== null || isWatchConnected) {
         await updateSession(session.id, { custom_drill_config: customDrillConfig });
       }
-      
+
       const activated = await activateSession(session.id, true);
       // Pass detection config through to the activated session
       onSessionActivated({
@@ -193,13 +177,21 @@ export function SessionPrepView({
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setActivating(false);
     }
-  }, [session.id, session.drill_config, activating, onSessionActivated, customSensitivity, weaponCaliber, weaponCategory]);
+  }, [
+    session.id,
+    session.drill_config,
+    activating,
+    onSessionActivated,
+    customSensitivity,
+    weaponCaliber,
+    weaponCategory,
+  ]);
 
   const handleStartWithPhone = useCallback(async () => {
     if (activating) return;
     setActivating(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    
+
     try {
       const activated = await activateSession(session.id, false);
       onSessionActivated(activated);
@@ -228,10 +220,7 @@ export function SessionPrepView({
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity
-          style={[styles.backButton, { backgroundColor: colors.secondary }]}
-          onPress={handleBack}
-        >
+        <TouchableOpacity style={[styles.backButton, { backgroundColor: colors.secondary }]} onPress={handleBack}>
           <ChevronLeft size={20} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
@@ -239,10 +228,7 @@ export function SessionPrepView({
             Ready to Start
           </Text>
         </View>
-        <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.secondary }]}
-          onPress={handleClose}
-        >
+        <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.secondary }]} onPress={handleClose}>
           <X size={18} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
@@ -250,16 +236,14 @@ export function SessionPrepView({
       {/* Main Content */}
       <View style={styles.content}>
         {/* Drill Summary */}
-        <Animated.View 
+        <Animated.View
           entering={FadeInDown.delay(100).duration(400)}
           style={[styles.drillSummary, { backgroundColor: colors.card, borderColor: colors.border }]}
         >
-          <View style={[styles.drillIcon, { backgroundColor: isGrouping ? `${colors.primary}15` : `${colors.orange}15` }]}>
-            {isGrouping ? (
-              <Crosshair size={24} color={colors.primary} />
-            ) : (
-              <Trophy size={24} color={colors.orange} />
-            )}
+          <View
+            style={[styles.drillIcon, { backgroundColor: isGrouping ? `${colors.primary}15` : `${colors.orange}15` }]}
+          >
+            {isGrouping ? <Crosshair size={24} color={colors.primary} /> : <Trophy size={24} color={colors.orange} />}
           </View>
           <Text style={[styles.drillName, { color: colors.text }]}>{drillName}</Text>
           <View style={styles.drillMeta}>
@@ -291,12 +275,9 @@ export function SessionPrepView({
         </Animated.View>
 
         {/* Session Info Row - Weapon & Team */}
-        <Animated.View 
-          entering={FadeInDown.delay(150).duration(400)}
-          style={styles.sessionInfoRow}
-        >
+        <Animated.View entering={FadeInDown.delay(150).duration(400)} style={styles.sessionInfoRow}>
           {/* Weapon Card */}
-          {(session.weapon_id && weaponName) && (
+          {session.weapon_id && weaponName && (
             <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={[styles.infoCardIcon, { backgroundColor: `${colors.text}10` }]}>
                 <Target size={18} color={colors.text} />
@@ -330,20 +311,22 @@ export function SessionPrepView({
         </Animated.View>
 
         {/* Watch Status */}
-        <Animated.View 
+        <Animated.View
           entering={FadeInDown.delay(200).duration(400)}
           style={[styles.watchCard, { backgroundColor: colors.card, borderColor: colors.border }]}
         >
           <View style={styles.watchIconContainer}>
             {isWatchConnected && <PulsingRing color={colors.green} />}
-            <View style={[
-              styles.watchIconBg, 
-              { backgroundColor: isWatchConnected ? `${colors.green}15` : colors.secondary }
-            ]}>
+            <View
+              style={[
+                styles.watchIconBg,
+                { backgroundColor: isWatchConnected ? `${colors.green}15` : colors.secondary },
+              ]}
+            >
               <Watch size={28} color={isWatchConnected ? colors.green : colors.textMuted} />
             </View>
           </View>
-          
+
           <View style={styles.watchText}>
             <Text style={[styles.watchStatus, { color: colors.text }]}>
               {isWatchConnected ? 'Watch Connected' : 'No Watch'}
@@ -352,7 +335,7 @@ export function SessionPrepView({
               {isWatchConnected ? 'Ready to track' : 'Phone only mode'}
             </Text>
           </View>
-          
+
           {!isWatchConnected && (
             <TouchableOpacity
               style={[styles.refreshButton, { backgroundColor: colors.secondary }]}
@@ -370,7 +353,7 @@ export function SessionPrepView({
 
         {/* Shot Detection Sensitivity (only when watch connected) */}
         {isWatchConnected && (
-          <Animated.View 
+          <Animated.View
             entering={FadeInDown.delay(250).duration(400)}
             style={[styles.sensitivityCard, { backgroundColor: colors.card, borderColor: colors.border }]}
           >
@@ -383,14 +366,10 @@ export function SessionPrepView({
                 <Settings size={18} color={colors.orange} />
               </View>
               <View style={styles.sensitivityHeaderText}>
-                <Text style={[styles.sensitivityLabel, { color: colors.textMuted }]}>
-                  Shot Detection
-                </Text>
+                <Text style={[styles.sensitivityLabel, { color: colors.textMuted }]}>Shot Detection</Text>
                 <Text style={[styles.sensitivityValue, { color: colors.text }]}>
                   {currentSensitivity.toFixed(1)}G{' '}
-                  <Text style={{ color: colors.textMuted, fontWeight: '400' }}>
-                    ({detectionConfig.description})
-                  </Text>
+                  <Text style={{ color: colors.textMuted, fontWeight: '400' }}>({detectionConfig.description})</Text>
                 </Text>
               </View>
               {showSensitivity ? (
@@ -416,7 +395,7 @@ export function SessionPrepView({
                         key={preset.id}
                         style={[
                           styles.presetButton,
-                          { 
+                          {
                             backgroundColor: isSelected ? `${colors.orange}15` : colors.secondary,
                             borderColor: isSelected ? colors.orange : 'transparent',
                           },
@@ -426,15 +405,10 @@ export function SessionPrepView({
                           setCustomSensitivity(preset.value);
                         }}
                       >
-                        <Text style={[
-                          styles.presetLabel, 
-                          { color: isSelected ? colors.orange : colors.text }
-                        ]}>
+                        <Text style={[styles.presetLabel, { color: isSelected ? colors.orange : colors.text }]}>
                           {preset.label}
                         </Text>
-                        <Text style={[styles.presetValue, { color: colors.textMuted }]}>
-                          {preset.value}G
-                        </Text>
+                        <Text style={[styles.presetValue, { color: colors.textMuted }]}>{preset.value}G</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -455,10 +429,7 @@ export function SessionPrepView({
                       setCustomSensitivity(null);
                     }}
                   >
-                    <Text style={[
-                      styles.autoButtonText, 
-                      { color: isAutoSensitivity ? colors.green : colors.text }
-                    ]}>
+                    <Text style={[styles.autoButtonText, { color: isAutoSensitivity ? colors.green : colors.text }]}>
                       ✨ Auto ({weaponCaliber})
                     </Text>
                   </TouchableOpacity>
@@ -501,10 +472,7 @@ export function SessionPrepView({
                   setTimeLimit(null);
                 }}
               >
-                <Text style={[
-                  styles.timeLimitOptionText,
-                  { color: timeLimit == null ? colors.primary : colors.text }
-                ]}>
+                <Text style={[styles.timeLimitOptionText, { color: timeLimit == null ? colors.primary : colors.text }]}>
                   No limit
                 </Text>
               </TouchableOpacity>
@@ -522,10 +490,7 @@ export function SessionPrepView({
                       setTimeLimit(value);
                     }}
                   >
-                    <Text style={[
-                      styles.timeLimitOptionText,
-                      { color: isSelected ? colors.primary : colors.text }
-                    ]}>
+                    <Text style={[styles.timeLimitOptionText, { color: isSelected ? colors.primary : colors.text }]}>
                       {value}s
                     </Text>
                   </TouchableOpacity>
@@ -536,13 +501,13 @@ export function SessionPrepView({
         )}
 
         {/* Info */}
-        <Animated.View 
+        <Animated.View
           entering={FadeIn.delay(300).duration(400)}
           style={[styles.infoBox, { backgroundColor: `${colors.blue}10` }]}
         >
           <Ionicons name="information-circle" size={18} color={colors.blue} />
           <Text style={[styles.infoText, { color: colors.blue }]}>
-            {isWatchConnected 
+            {isWatchConnected
               ? 'Watch will track your shots. Tap the watch button after each shot.'
               : 'You can connect your watch later during the session.'}
           </Text>
@@ -550,7 +515,7 @@ export function SessionPrepView({
       </View>
 
       {/* Actions */}
-      <Animated.View 
+      <Animated.View
         entering={FadeInDown.delay(400).duration(400)}
         style={[styles.actions, { paddingBottom: insets.bottom + 20 }]}
       >
@@ -570,7 +535,7 @@ export function SessionPrepView({
                 </>
               )}
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={[styles.secondaryButton, { backgroundColor: colors.secondary }]}
               onPress={handleStartWithPhone}
@@ -591,9 +556,7 @@ export function SessionPrepView({
             ) : (
               <>
                 <Zap size={20} color={colors.background} />
-                <Text style={[styles.primaryButtonText, { color: colors.background }]}>
-                  Start Session
-                </Text>
+                <Text style={[styles.primaryButtonText, { color: colors.background }]}>Start Session</Text>
               </>
             )}
           </TouchableOpacity>
@@ -605,7 +568,7 @@ export function SessionPrepView({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  
+
   // Header
   header: {
     flexDirection: 'row',
@@ -637,7 +600,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -0.3,
   },
-  
+
   // Content
   content: {
     flex: 1,
@@ -645,7 +608,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     gap: 14,
   },
-  
+
   // Drill Summary
   drillSummary: {
     borderRadius: 16,
@@ -685,7 +648,7 @@ const styles = StyleSheet.create({
     height: 3,
     borderRadius: 1.5,
   },
-  
+
   // Session Info Row
   sessionInfoRow: {
     flexDirection: 'row',
@@ -725,7 +688,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 1,
   },
-  
+
   // Watch Card
   watchCard: {
     flexDirection: 'row',
@@ -773,7 +736,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  
+
   // Info Box
   infoBox: {
     flexDirection: 'row',
@@ -834,7 +797,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  
+
   // Actions
   actions: {
     paddingHorizontal: 20,
@@ -866,7 +829,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-  
+
   // Sensitivity Card
   sensitivityCard: {
     borderRadius: 14,
@@ -941,4 +904,3 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
 });
-

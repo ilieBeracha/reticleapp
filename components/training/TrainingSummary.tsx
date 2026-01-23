@@ -71,7 +71,7 @@ function calculateParticipantStats(sessions: SessionWithDetails[]): ParticipantS
         sessionCount: 1,
         completedSessions: isCompleted ? 1 : 0,
         totalDurationMin: durationMin > 0 ? durationMin : null,
-        drillName: isActive ? (session.drill_name || null) : null,
+        drillName: isActive ? session.drill_name || null : null,
         lastActivity: session.started_at,
       });
     }
@@ -91,9 +91,9 @@ function calculateParticipantStats(sessions: SessionWithDetails[]): ParticipantS
 function calculateAggregateStats(participants: ParticipantStats[]): AggregateStats {
   return {
     totalParticipants: participants.length,
-    activeNow: participants.filter(p => p.status === 'active').length,
-    completed: participants.filter(p => p.status === 'completed').length,
-    notStarted: participants.filter(p => p.status === 'not_started').length,
+    activeNow: participants.filter((p) => p.status === 'active').length,
+    completed: participants.filter((p) => p.status === 'completed').length,
+    notStarted: participants.filter((p) => p.status === 'not_started').length,
   };
 }
 
@@ -216,10 +216,7 @@ function ParticipantRow({ participant, colors, isLast }: ParticipantRowProps) {
 
   return (
     <View
-      style={[
-        styles.row,
-        !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-      ]}
+      style={[styles.row, !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}
     >
       {/* Status indicator */}
       <View style={styles.statusIndicator}>
@@ -241,17 +238,13 @@ function ParticipantRow({ participant, colors, isLast }: ParticipantRowProps) {
         </Text>
         {statusInfo && (
           <View style={[styles.statusBadge, { backgroundColor: statusInfo.bg }]}>
-            <Text style={[styles.statusText, { color: statusInfo.color }]}>
-              {statusInfo.label}
-            </Text>
+            <Text style={[styles.statusText, { color: statusInfo.color }]}>{statusInfo.label}</Text>
           </View>
         )}
       </View>
 
       {/* Duration */}
-      {duration && (
-        <Text style={[styles.duration, { color: colors.textMuted }]}>{duration}</Text>
-      )}
+      {duration && <Text style={[styles.duration, { color: colors.textMuted }]}>{duration}</Text>}
     </View>
   );
 }

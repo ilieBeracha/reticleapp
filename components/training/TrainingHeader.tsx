@@ -20,9 +20,7 @@ export function TrainingHeader({ title, description, status, colors }: TrainingH
         <Text style={[styles.statusText, { color: statusConfig.color }]}>{statusConfig.label}</Text>
       </View>
       <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-      {description && (
-        <Text style={[styles.description, { color: colors.textMuted }]}>{description}</Text>
-      )}
+      {description && <Text style={[styles.description, { color: colors.textMuted }]}>{description}</Text>}
     </View>
   );
 }

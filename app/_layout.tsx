@@ -81,18 +81,16 @@ function RootLayoutInner() {
 
 function LayoutWithLoadingOverlay({ colorScheme }: { colorScheme: 'light' | 'dark' | null }) {
   const { transitioning } = useAuth();
-  
+
   return (
     <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <BottomSheetModalProvider>
           <Slot />
           <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-          
+
           {/* Global loading overlay for auth transitions */}
-          {transitioning && (
-            <LoadingScreen overlay />
-          )}
+          {transitioning && <LoadingScreen overlay />}
         </BottomSheetModalProvider>
       </GestureHandlerRootView>
     </SafeAreaProvider>

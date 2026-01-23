@@ -1,27 +1,26 @@
 /**
  * DrillChapter Component
- * 
+ *
  * Large, immersive drill card that fills significant vertical space.
  * Designed for a timeline-style layout where each drill is a "chapter"
  * in the training story.
  */
 
-import React from 'react';
-import { ActivityIndicator, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
-import { 
+import {
   AlertCircle,
-  Check, 
-  Clock, 
-  Crosshair, 
-  Play, 
-  Target, 
-  Ruler,
-  User,
-  TrendingUp,
+  Check,
   ChevronRight,
+  Clock,
+  Crosshair,
+  Play,
+  Ruler,
+  Target,
+  TrendingUp,
+  User,
   Zap,
 } from 'lucide-react-native';
+import { ActivityIndicator, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import type { DrillChapterProps } from './types';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -64,7 +63,7 @@ export function DrillChapter({
 
   // Can only start if has weapon
   const canActuallyStart = canStart && hasWeapon;
-  
+
   // Get drill values
   const distance = drill.distance_m || drill.config?.distance_m || 25;
   const rounds = drill.rounds_per_shooter || drill.config?.rounds || 5;
@@ -73,20 +72,14 @@ export function DrillChapter({
   const targetType = drill.config?.target_type || drill.target_type || 'paper';
 
   // Status styling
-  const statusBg = isCompleted 
-    ? colors.green + '08' 
-    : canStart 
-      ? colors.primary + '05' 
-      : colors.card;
-  const statusBorder = isCompleted 
-    ? colors.green + '20' 
-    : canStart 
-      ? colors.primary + '15' 
-      : colors.border;
+  const statusBg = isCompleted ? colors.green + '08' : canStart ? colors.primary + '05' : colors.card;
+  const statusBorder = isCompleted ? colors.green + '20' : canStart ? colors.primary + '15' : colors.border;
 
   return (
-    <Animated.View 
-      entering={FadeInDown.delay(chapterNumber * 100).duration(400).springify()}
+    <Animated.View
+      entering={FadeInDown.delay(chapterNumber * 100)
+        .duration(400)
+        .springify()}
       style={styles.wrapper}
     >
       <View
@@ -110,7 +103,7 @@ export function DrillChapter({
               {String(totalChapters).padStart(2, '0')}
             </Text>
           </View>
-          
+
           {/* Status Badge */}
           {isCompleted ? (
             <View style={[styles.statusBadge, { backgroundColor: colors.green + '15' }]}>
@@ -133,20 +126,14 @@ export function DrillChapter({
         <View style={styles.mainContent}>
           {/* Drill Title & Goal */}
           <View style={styles.titleSection}>
-            <Text 
-              style={[
-                styles.drillName, 
-                { color: isCompleted ? colors.textMuted : colors.text }
-              ]}
-              numberOfLines={2}
-            >
+            <Text style={[styles.drillName, { color: isCompleted ? colors.textMuted : colors.text }]} numberOfLines={2}>
               {drill.name}
             </Text>
-            <View style={[styles.goalBadge, { backgroundColor: isCompleted ? colors.textMuted + '15' : goalColor + '15' }]}>
+            <View
+              style={[styles.goalBadge, { backgroundColor: isCompleted ? colors.textMuted + '15' : goalColor + '15' }]}
+            >
               <GoalIcon size={14} color={isCompleted ? colors.textMuted : goalColor} strokeWidth={2} />
-              <Text style={[styles.goalText, { color: isCompleted ? colors.textMuted : goalColor }]}>
-                {goalLabel}
-              </Text>
+              <Text style={[styles.goalText, { color: isCompleted ? colors.textMuted : goalColor }]}>{goalLabel}</Text>
             </View>
           </View>
 
@@ -184,9 +171,7 @@ export function DrillChapter({
             {position && (
               <View style={[styles.tag, { backgroundColor: colors.secondary }]}>
                 <User size={12} color={colors.textMuted} />
-                <Text style={[styles.tagText, { color: colors.text }]}>
-                  {POSITION_LABELS[position] || position}
-                </Text>
+                <Text style={[styles.tagText, { color: colors.text }]}>{POSITION_LABELS[position] || position}</Text>
               </View>
             )}
             {timeLimit && (
@@ -197,15 +182,19 @@ export function DrillChapter({
             )}
             <View style={[styles.tag, { backgroundColor: colors.secondary }]}>
               <Target size={12} color={colors.textMuted} />
-              <Text style={[styles.tagText, { color: colors.text }]}>
-                {TARGET_LABELS[targetType] || targetType}
-              </Text>
+              <Text style={[styles.tagText, { color: colors.text }]}>{TARGET_LABELS[targetType] || targetType}</Text>
             </View>
           </View>
 
           {/* Similar Stats (if available) */}
           {similarStats && (
-            <Animated.View entering={FadeIn.delay(200)} style={[styles.historyCard, { backgroundColor: colors.primary + '08', borderColor: colors.primary + '15' }]}>
+            <Animated.View
+              entering={FadeIn.delay(200)}
+              style={[
+                styles.historyCard,
+                { backgroundColor: colors.primary + '08', borderColor: colors.primary + '15' },
+              ]}
+            >
               <View style={styles.historyHeader}>
                 <TrendingUp size={14} color={colors.primary} />
                 <Text style={[styles.historyTitle, { color: colors.primary }]}>Your Previous Best</Text>
@@ -225,7 +214,9 @@ export function DrillChapter({
                 )}
                 {similarStats.date && (
                   <View style={styles.historyStat}>
-                    <Text style={[styles.historyValue, { color: colors.textMuted, fontSize: 12 }]}>{similarStats.date}</Text>
+                    <Text style={[styles.historyValue, { color: colors.textMuted, fontSize: 12 }]}>
+                      {similarStats.date}
+                    </Text>
                     <Text style={[styles.historyLabel, { color: colors.textMuted }]}>Date</Text>
                   </View>
                 )}
@@ -239,9 +230,7 @@ export function DrillChapter({
           {isCompleted ? (
             <View style={styles.completedFooter}>
               <Check size={16} color={colors.green} />
-              <Text style={[styles.completedText, { color: colors.green }]}>
-                Drill completed
-              </Text>
+              <Text style={[styles.completedText, { color: colors.green }]}>Drill completed</Text>
             </View>
           ) : canActuallyStart ? (
             <TouchableOpacity
@@ -263,15 +252,11 @@ export function DrillChapter({
           ) : canStart && !hasWeapon ? (
             <View style={[styles.blockedFooter, { backgroundColor: colors.orange + '10' }]}>
               <AlertCircle size={16} color={colors.orange} />
-              <Text style={[styles.blockedText, { color: colors.orange }]}>
-                Assign weapon to start
-              </Text>
+              <Text style={[styles.blockedText, { color: colors.orange }]}>Assign weapon to start</Text>
             </View>
           ) : (
             <View style={styles.upcomingFooter}>
-              <Text style={[styles.upcomingText, { color: colors.textMuted }]}>
-                Complete previous drills first
-              </Text>
+              <Text style={[styles.upcomingText, { color: colors.textMuted }]}>Complete previous drills first</Text>
             </View>
           )}
         </View>

@@ -1,11 +1,11 @@
-import { TacticalTargetFlow } from "@/components/targets";
-import { useLocalSearchParams } from "expo-router";
+import { TacticalTargetFlow } from '@/components/targets';
+import { useLocalSearchParams } from 'expo-router';
 
 /**
  * TACTICAL/GROUPING TARGET - Manual Entry
- * 
+ *
  * Route: /(protected)/tacticalTarget?sessionId=xxx&distance=25&bullets=10&isGrouping=1
- * 
+ *
  * For engagement: Shows hits counter
  * For grouping: Shows group size (cm) input
  */

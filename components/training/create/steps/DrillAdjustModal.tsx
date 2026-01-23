@@ -1,6 +1,6 @@
 /**
  * DrillAdjustModal - Quick Drill Adjustment
- * 
+ *
  * Simple modal to adjust drill parameters:
  * - Distance
  * - Rounds
@@ -11,14 +11,7 @@ import { useColors } from '@/hooks/ui/useColors';
 import * as Haptics from 'expo-haptics';
 import { Clock, MapPin, Target, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import {
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -74,19 +67,14 @@ function OptionButton({
 }) {
   return (
     <TouchableOpacity
-      style={[
-        styles.optionBtn,
-        { backgroundColor: active ? colors.text : colors.secondary },
-      ]}
+      style={[styles.optionBtn, { backgroundColor: active ? colors.text : colors.secondary }]}
       onPress={() => {
         Haptics.selectionAsync();
         onPress();
       }}
       activeOpacity={0.7}
     >
-      <Text style={[styles.optionText, { color: active ? colors.background : colors.text }]}>
-        {label}
-      </Text>
+      <Text style={[styles.optionText, { color: active ? colors.background : colors.text }]}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -95,12 +83,7 @@ function OptionButton({
 // MAIN COMPONENT
 // ============================================================================
 
-export function DrillAdjustModal({
-  visible,
-  drill,
-  onClose,
-  onSave,
-}: DrillAdjustModalProps) {
+export function DrillAdjustModal({ visible, drill, onClose, onSave }: DrillAdjustModalProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
 
@@ -138,12 +121,7 @@ export function DrillAdjustModal({
   const availableRounds = isGrouping ? ROUNDS.grouping : ROUNDS.engagement;
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
         <Animated.View
           entering={FadeInDown.duration(200)}
@@ -155,7 +133,7 @@ export function DrillAdjustModal({
             },
           ]}
         >
-          <Pressable onPress={e => e.stopPropagation()}>
+          <Pressable onPress={(e) => e.stopPropagation()}>
             {/* Handle */}
             <View style={styles.handleWrap}>
               <View style={[styles.handle, { backgroundColor: colors.border }]} />
@@ -166,9 +144,7 @@ export function DrillAdjustModal({
               <View style={styles.headerLeft}>
                 <View style={[styles.goalBadge, { backgroundColor: goalColor + '20' }]}>
                   <View style={[styles.goalDot, { backgroundColor: goalColor }]} />
-                  <Text style={[styles.goalText, { color: goalColor }]}>
-                    {isGrouping ? 'Grouping' : 'Engagement'}
-                  </Text>
+                  <Text style={[styles.goalText, { color: goalColor }]}>{isGrouping ? 'Grouping' : 'Engagement'}</Text>
                 </View>
                 <Text style={[styles.drillName, { color: colors.text }]} numberOfLines={1}>
                   {drill.name}
@@ -186,7 +162,7 @@ export function DrillAdjustModal({
                 <Text style={[styles.fieldLabel, { color: colors.text }]}>Distance</Text>
               </View>
               <View style={styles.optionsRow}>
-                {availableDistances.map(d => (
+                {availableDistances.map((d) => (
                   <OptionButton
                     key={d}
                     label={`${d}m`}
@@ -205,7 +181,7 @@ export function DrillAdjustModal({
                 <Text style={[styles.fieldLabel, { color: colors.text }]}>Rounds</Text>
               </View>
               <View style={styles.optionsRow}>
-                {availableRounds.map(r => (
+                {availableRounds.map((r) => (
                   <OptionButton
                     key={r}
                     label={String(r)}
@@ -224,7 +200,7 @@ export function DrillAdjustModal({
                 <Text style={[styles.fieldLabel, { color: colors.text }]}>Time Limit</Text>
               </View>
               <View style={styles.optionsRow}>
-                {TIME_OPTIONS.map(t => (
+                {TIME_OPTIONS.map((t) => (
                   <OptionButton
                     key={t.label}
                     label={t.label}

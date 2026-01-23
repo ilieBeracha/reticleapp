@@ -1,6 +1,6 @@
 /**
  * StandardsVerdict
- * 
+ *
  * Displays the PASS/FAIL verdict with full breakdown.
  * This is purely display - the verdict is ALREADY decided by the engine.
  */
@@ -24,14 +24,14 @@ interface StandardsVerdictProps {
 // COMPACT BADGE (for lists)
 // ============================================================================
 
-function VerdictBadge({ 
-  passed, 
+function VerdictBadge({
+  passed,
   noStandard,
   invalidated,
   overridden,
-  colors 
-}: { 
-  passed: boolean; 
+  colors,
+}: {
+  passed: boolean;
   noStandard: boolean;
   invalidated?: boolean;
   overridden?: boolean;
@@ -41,35 +41,29 @@ function VerdictBadge({
     return (
       <View style={[styles.badge, { backgroundColor: colors.secondary }]}>
         <AlertCircle size={12} color={colors.textMuted} />
-        <Text style={[styles.badgeText, { color: colors.textMuted }]}>
-          No Standard
-        </Text>
+        <Text style={[styles.badgeText, { color: colors.textMuted }]}>No Standard</Text>
       </View>
     );
   }
-  
+
   if (invalidated) {
     return (
       <View style={[styles.badge, { backgroundColor: colors.yellow + '20' }]}>
         <AlertCircle size={12} color={colors.yellow} />
-        <Text style={[styles.badgeText, { color: colors.yellow }]}>
-          INVALID
-        </Text>
+        <Text style={[styles.badgeText, { color: colors.yellow }]}>INVALID</Text>
       </View>
     );
   }
-  
+
   const Icon = passed ? CheckCircle : XCircle;
   const bgColor = passed ? colors.green + '20' : colors.red + '20';
   const textColor = passed ? colors.green : colors.red;
   const label = overridden ? 'FAIL (Override)' : passed ? 'PASS' : 'FAIL';
-  
+
   return (
     <View style={[styles.badge, { backgroundColor: bgColor }]}>
       <Icon size={12} color={textColor} />
-      <Text style={[styles.badgeText, { color: textColor }]}>
-        {label}
-      </Text>
+      <Text style={[styles.badgeText, { color: textColor }]}>{label}</Text>
     </View>
   );
 }
@@ -78,53 +72,38 @@ function VerdictBadge({
 // FULL BREAKDOWN (for detail views)
 // ============================================================================
 
-function ModifierRow({ 
-  modifier, 
+function ModifierRow({
+  modifier,
   drillGoal,
-  colors 
-}: { 
+  colors,
+}: {
   modifier: AppliedModifier;
   drillGoal: 'grouping' | 'engagement';
   colors: ReturnType<typeof useColors>;
 }) {
-  const penalty = drillGoal === 'grouping' 
-    ? `+${modifier.grouping_penalty_cm}cm`
-    : `-${modifier.accuracy_penalty_pct}%`;
-    
+  const penalty =
+    drillGoal === 'grouping' ? `+${modifier.grouping_penalty_cm}cm` : `-${modifier.accuracy_penalty_pct}%`;
+
   return (
     <View style={styles.modifierRow}>
-      <Text style={[styles.modifierName, { color: colors.textMuted }]}>
-        {modifier.name}
-      </Text>
-      <Text style={[styles.modifierPenalty, { color: colors.orange }]}>
-        {penalty}
-      </Text>
+      <Text style={[styles.modifierName, { color: colors.textMuted }]}>{modifier.name}</Text>
+      <Text style={[styles.modifierPenalty, { color: colors.orange }]}>{penalty}</Text>
     </View>
   );
 }
 
-function FullBreakdown({ 
-  verdict, 
-  colors 
-}: { 
-  verdict: SessionVerdict;
-  colors: ReturnType<typeof useColors>;
-}) {
+function FullBreakdown({ verdict, colors }: { verdict: SessionVerdict; colors: ReturnType<typeof useColors> }) {
   const [expanded, setExpanded] = useState(false);
   const breakdown = verdict.verdict_breakdown;
   const drillGoal = breakdown.base?.expected_grouping_cm !== undefined ? 'grouping' : 'engagement';
-  
+
   const Icon = verdict.passed ? CheckCircle : XCircle;
   const accentColor = verdict.passed ? colors.green : colors.red;
-  
+
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: accentColor }]}>
       {/* Header */}
-      <TouchableOpacity 
-        style={styles.cardHeader}
-        onPress={() => setExpanded(!expanded)}
-        activeOpacity={0.7}
-      >
+      <TouchableOpacity style={styles.cardHeader} onPress={() => setExpanded(!expanded)} activeOpacity={0.7}>
         <View style={styles.headerLeft}>
           <Icon size={24} color={accentColor} />
           <View>
@@ -142,78 +121,54 @@ function FullBreakdown({
           <ChevronDown size={20} color={colors.textMuted} />
         )}
       </TouchableOpacity>
-      
+
       {/* Summary Line */}
       <View style={[styles.summaryLine, { backgroundColor: colors.secondary }]}>
-        <Text style={[styles.summaryText, { color: colors.text }]}>
-          {breakdown.comparison}
-        </Text>
+        <Text style={[styles.summaryText, { color: colors.text }]}>{breakdown.comparison}</Text>
       </View>
-      
+
       {/* Expanded Details */}
       {expanded && (
         <View style={styles.details}>
           {/* Base Standard */}
           <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-              Base Standard
-            </Text>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Base Standard</Text>
             <Text style={[styles.sectionValue, { color: colors.text }]}>
-              {drillGoal === 'grouping' 
+              {drillGoal === 'grouping'
                 ? `${breakdown.base?.expected_grouping_cm}cm`
-                : `${breakdown.base?.expected_accuracy_pct}%`
-              }
+                : `${breakdown.base?.expected_accuracy_pct}%`}
             </Text>
           </View>
-          
+
           {/* Modifiers */}
           {breakdown.modifiers.length > 0 && (
             <View style={styles.section}>
-              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-                Condition Modifiers Applied
-              </Text>
+              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Condition Modifiers Applied</Text>
               {breakdown.modifiers.map((mod) => (
-                <ModifierRow 
-                  key={mod.id} 
-                  modifier={mod} 
-                  drillGoal={drillGoal}
-                  colors={colors} 
-                />
+                <ModifierRow key={mod.id} modifier={mod} drillGoal={drillGoal} colors={colors} />
               ))}
             </View>
           )}
-          
+
           {/* Effective Threshold */}
           <View style={[styles.section, styles.effectiveSection, { borderTopColor: colors.border }]}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-              Effective Threshold
-            </Text>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Effective Threshold</Text>
             <Text style={[styles.effectiveValue, { color: colors.text }]}>
-              {drillGoal === 'grouping'
-                ? `${verdict.effective_grouping_cm}cm`
-                : `${verdict.effective_accuracy_pct}%`
-              }
+              {drillGoal === 'grouping' ? `${verdict.effective_grouping_cm}cm` : `${verdict.effective_accuracy_pct}%`}
             </Text>
           </View>
-          
+
           {/* Your Result */}
           <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-              Your Result
-            </Text>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Your Result</Text>
             <Text style={[styles.resultValue, { color: accentColor }]}>
-              {drillGoal === 'grouping'
-                ? `${verdict.actual_grouping_cm}cm`
-                : `${verdict.actual_accuracy_pct}%`
-              }
+              {drillGoal === 'grouping' ? `${verdict.actual_grouping_cm}cm` : `${verdict.actual_accuracy_pct}%`}
             </Text>
           </View>
-          
+
           {/* Calculation */}
           <View style={[styles.calculation, { backgroundColor: colors.secondary }]}>
-            <Text style={[styles.calculationText, { color: colors.textMuted }]}>
-              {breakdown.calculation}
-            </Text>
+            <Text style={[styles.calculationText, { color: colors.textMuted }]}>{breakdown.calculation}</Text>
           </View>
         </View>
       )}
@@ -227,37 +182,28 @@ function FullBreakdown({
 
 export function StandardsVerdict({ verdict, compact = false }: StandardsVerdictProps) {
   const colors = useColors();
-  
+
   // No verdict stored
   if (!verdict) {
     if (compact) return null;
     return (
       <View style={[styles.badge, { backgroundColor: colors.secondary }]}>
         <AlertCircle size={12} color={colors.textMuted} />
-        <Text style={[styles.badgeText, { color: colors.textMuted }]}>
-          Not Evaluated
-        </Text>
+        <Text style={[styles.badgeText, { color: colors.textMuted }]}>Not Evaluated</Text>
       </View>
     );
   }
-  
+
   // No matching standard was found
   const noStandard = !verdict.base_standard_id;
-  
+
   // Check if overridden (from breakdown comparison text)
   const isOverridden = verdict.verdict_breakdown?.comparison?.includes('Overridden');
-  
+
   if (compact) {
-    return (
-      <VerdictBadge 
-        passed={verdict.passed} 
-        noStandard={noStandard}
-        overridden={isOverridden}
-        colors={colors} 
-      />
-    );
+    return <VerdictBadge passed={verdict.passed} noStandard={noStandard} overridden={isOverridden} colors={colors} />;
   }
-  
+
   // No standard - simple message
   if (noStandard) {
     return (
@@ -269,7 +215,7 @@ export function StandardsVerdict({ verdict, compact = false }: StandardsVerdictP
       </View>
     );
   }
-  
+
   // Full breakdown
   return <FullBreakdown verdict={verdict} colors={colors} />;
 }
@@ -294,7 +240,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  
+
   // Card (full)
   card: {
     borderRadius: 12,
@@ -321,7 +267,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
-  
+
   // Summary line
   summaryLine: {
     paddingVertical: 10,
@@ -333,7 +279,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: 'monospace',
   },
-  
+
   // Details
   details: {
     padding: 16,
@@ -364,7 +310,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
   },
-  
+
   // Modifier row
   modifierRow: {
     flexDirection: 'row',
@@ -379,7 +325,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  
+
   // Calculation
   calculation: {
     padding: 12,
@@ -390,7 +336,7 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
     textAlign: 'center',
   },
-  
+
   // No standard card
   noStandardCard: {
     flexDirection: 'row',

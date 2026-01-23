@@ -19,7 +19,7 @@ import {
 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
 interface DrillProgress {
   drillId: string;
@@ -63,12 +63,7 @@ interface DrillStats {
   bestAccuracy: { name: string; value: number } | null;
 }
 
-export function SquadStatusContent({
-  teamSessions,
-  drills,
-  drillProgress,
-  colors,
-}: SquadStatusContentProps) {
+export function SquadStatusContent({ teamSessions, drills, drillProgress, colors }: SquadStatusContentProps) {
   const [viewMode, setViewMode] = useState<'soldiers' | 'drills'>('soldiers');
 
   // Process soldier status from sessions
@@ -95,7 +90,11 @@ export function SquadStatusContent({
           totalShots: shots,
           totalHits: hits,
           bestGroup: bestGroup ?? undefined,
-          lastActivity: session.ended_at ? new Date(session.ended_at) : session.started_at ? new Date(session.started_at) : undefined,
+          lastActivity: session.ended_at
+            ? new Date(session.ended_at)
+            : session.started_at
+              ? new Date(session.started_at)
+              : undefined,
         });
       } else {
         existing.totalShots += shots;
@@ -109,7 +108,11 @@ export function SquadStatusContent({
           existing.currentDrill = session.drill_name || session.drill_config?.name;
         }
         // Update last activity
-        const sessionTime = session.ended_at ? new Date(session.ended_at) : session.started_at ? new Date(session.started_at) : null;
+        const sessionTime = session.ended_at
+          ? new Date(session.ended_at)
+          : session.started_at
+            ? new Date(session.started_at)
+            : null;
         if (sessionTime && (!existing.lastActivity || sessionTime > existing.lastActivity)) {
           existing.lastActivity = sessionTime;
         }
@@ -127,16 +130,16 @@ export function SquadStatusContent({
 
   // Per-drill statistics
   const drillStats = useMemo<DrillStats[]>(() => {
-    return drills.map(drill => {
-      const drillSessions = teamSessions.filter(s => s.drill_id === drill.id && s.status === 'completed');
-      const completedBy = new Set(drillSessions.map(s => s.user_id)).size;
-      
+    return drills.map((drill) => {
+      const drillSessions = teamSessions.filter((s) => s.drill_id === drill.id && s.status === 'completed');
+      const completedBy = new Set(drillSessions.map((s) => s.user_id)).size;
+
       // Calculate averages
       let totalAccuracy = 0;
       let accuracyCount = 0;
       let bestAccuracy: { name: string; value: number } | null = null;
-      
-      drillSessions.forEach(session => {
+
+      drillSessions.forEach((session) => {
         const shots = session.stats?.shots_fired ?? 0;
         const hits = session.stats?.hits_total ?? 0;
         if (shots > 0) {
@@ -168,16 +171,16 @@ export function SquadStatusContent({
     avgAccuracy: number | null;
     topPerformer: { name: string; accuracy: number } | null;
   }>(() => {
-    const active = soldiers.filter(s => s.status === 'active').length;
-    const completed = soldiers.filter(s => s.completedDrills === drills.length && s.completedDrills > 0).length;
+    const active = soldiers.filter((s) => s.status === 'active').length;
+    const completed = soldiers.filter((s) => s.completedDrills === drills.length && s.completedDrills > 0).length;
     const total = soldiers.length;
-    
+
     // Team averages
     let totalAccuracy = 0;
     let accuracyCount = 0;
     let topPerformer: { name: string; accuracy: number } | null = null;
-    
-    soldiers.forEach(s => {
+
+    soldiers.forEach((s) => {
       if (s.totalShots > 0) {
         const acc = Math.round((s.totalHits / s.totalShots) * 100);
         totalAccuracy += acc;
@@ -188,9 +191,9 @@ export function SquadStatusContent({
       }
     });
 
-    return { 
-      active, 
-      completed, 
+    return {
+      active,
+      completed,
       total,
       avgAccuracy: accuracyCount > 0 ? Math.round(totalAccuracy / accuracyCount) : null,
       topPerformer,
@@ -219,12 +222,19 @@ export function SquadStatusContent({
         </View>
         <View style={styles.performanceGrid}>
           <View style={styles.perfItem}>
-            <Text style={[styles.perfValue, { color: colors.text }]}>{stats.completed}/{stats.total}</Text>
+            <Text style={[styles.perfValue, { color: colors.text }]}>
+              {stats.completed}/{stats.total}
+            </Text>
             <Text style={[styles.perfLabel, { color: colors.textMuted }]}>Completed all</Text>
           </View>
           <View style={[styles.perfDivider, { backgroundColor: colors.border }]} />
           <View style={styles.perfItem}>
-            <Text style={[styles.perfValue, { color: stats.avgAccuracy && stats.avgAccuracy >= 70 ? colors.green : colors.text }]}>
+            <Text
+              style={[
+                styles.perfValue,
+                { color: stats.avgAccuracy && stats.avgAccuracy >= 70 ? colors.green : colors.text },
+              ]}
+            >
               {stats.avgAccuracy !== null ? `${stats.avgAccuracy}%` : '—'}
             </Text>
             <Text style={[styles.perfLabel, { color: colors.textMuted }]}>Team avg accuracy</Text>
@@ -301,13 +311,7 @@ export function SquadStatusContent({
       {viewMode === 'soldiers' ? (
         <Animated.View entering={FadeIn.duration(200)} style={styles.soldierList}>
           {soldiers.map((soldier, index) => (
-            <SoldierRow
-              key={soldier.id}
-              soldier={soldier}
-              totalDrills={drills.length}
-              colors={colors}
-              index={index}
-            />
+            <SoldierRow key={soldier.id} soldier={soldier} totalDrills={drills.length} colors={colors} index={index} />
           ))}
         </Animated.View>
       ) : (
@@ -344,9 +348,7 @@ function SoldierRow({
 }) {
   const isActive = soldier.status === 'active';
   const isAllDone = soldier.completedDrills === totalDrills && totalDrills > 0;
-  const accuracy = soldier.totalShots > 0 
-    ? Math.round((soldier.totalHits / soldier.totalShots) * 100) 
-    : null;
+  const accuracy = soldier.totalShots > 0 ? Math.round((soldier.totalHits / soldier.totalShots) * 100) : null;
 
   const statusColor = isActive ? colors.green : isAllDone ? colors.primary : colors.textMuted;
   const StatusIcon = isActive ? Activity : isAllDone ? CheckCircle : Circle;
@@ -356,9 +358,9 @@ function SoldierRow({
       entering={FadeInDown.delay(index * 50).duration(200)}
       style={[
         styles.soldierCard,
-        { 
-          backgroundColor: isActive ? colors.green + '08' : colors.card, 
-          borderColor: isActive ? colors.green + '30' : colors.border 
+        {
+          backgroundColor: isActive ? colors.green + '08' : colors.card,
+          borderColor: isActive ? colors.green + '30' : colors.border,
         },
       ]}
     >
@@ -388,9 +390,7 @@ function SoldierRow({
       <View style={styles.soldierStats}>
         <View style={styles.miniStat}>
           <Target size={12} color={colors.textMuted} />
-          <Text style={[styles.miniStatText, { color: colors.text }]}>
-            {soldier.totalShots}
-          </Text>
+          <Text style={[styles.miniStatText, { color: colors.text }]}>{soldier.totalShots}</Text>
         </View>
         {accuracy !== null && (
           <View style={styles.miniStat}>
@@ -403,9 +403,7 @@ function SoldierRow({
         {soldier.bestGroup && (
           <View style={styles.miniStat}>
             <Crosshair size={12} color={colors.textMuted} />
-            <Text style={[styles.miniStatText, { color: colors.text }]}>
-              {soldier.bestGroup.toFixed(1)}cm
-            </Text>
+            <Text style={[styles.miniStatText, { color: colors.text }]}>{soldier.bestGroup.toFixed(1)}cm</Text>
           </View>
         )}
         <View style={styles.miniStat}>
@@ -455,14 +453,16 @@ function DrillStatsRow({
       entering={FadeInDown.delay(index * 50).duration(200)}
       style={[
         styles.drillStatsCard,
-        { 
-          backgroundColor: isFullyCompleted ? colors.green + '08' : colors.card, 
-          borderColor: isFullyCompleted ? colors.green + '30' : colors.border 
+        {
+          backgroundColor: isFullyCompleted ? colors.green + '08' : colors.card,
+          borderColor: isFullyCompleted ? colors.green + '30' : colors.border,
         },
       ]}
     >
       <View style={styles.drillStatsHeader}>
-        <View style={[styles.drillIcon, { backgroundColor: isFullyCompleted ? colors.green + '20' : colors.secondary }]}>
+        <View
+          style={[styles.drillIcon, { backgroundColor: isFullyCompleted ? colors.green + '20' : colors.secondary }]}
+        >
           <Target size={14} color={isFullyCompleted ? colors.green : colors.textMuted} />
         </View>
         <View style={styles.drillStatsInfo}>
@@ -473,9 +473,7 @@ function DrillStatsRow({
             {drill.completedBy}/{totalSoldiers} soldiers ({completionRate}%)
           </Text>
         </View>
-        {isFullyCompleted && (
-          <CheckCircle size={18} color={colors.green} />
-        )}
+        {isFullyCompleted && <CheckCircle size={18} color={colors.green} />}
       </View>
 
       {/* Drill stats */}
@@ -484,9 +482,7 @@ function DrillStatsRow({
           {drill.avgAccuracy !== null && (
             <View style={[styles.metricChip, { backgroundColor: colors.secondary }]}>
               <TrendingUp size={12} color={drill.avgAccuracy >= 70 ? colors.green : colors.textMuted} />
-              <Text style={[styles.metricText, { color: colors.text }]}>
-                Avg: {drill.avgAccuracy}%
-              </Text>
+              <Text style={[styles.metricText, { color: colors.text }]}>Avg: {drill.avgAccuracy}%</Text>
             </View>
           )}
           {drill.bestAccuracy && (
@@ -515,7 +511,6 @@ function DrillStatsRow({
     </Animated.View>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {

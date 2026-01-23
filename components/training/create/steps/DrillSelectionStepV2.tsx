@@ -1,10 +1,10 @@
 /**
  * DrillSelectionStep V2 - Simplified Drill Selection
- * 
+ *
  * Uses the new canonical drills architecture:
  * - Canonical drills (global, read-only "verbs")
  * - Team presets (saved configurations)
- * 
+ *
  * Flow:
  * 1. Select a canonical drill
  * 2. Configure distance/rounds/etc
@@ -22,28 +22,9 @@ import type {
 } from '@/services/drills';
 import { buildTrainingDrillItem, validateDrillConfig } from '@/services/drills';
 import * as Haptics from 'expo-haptics';
-import {
-  Check,
-  Focus,
-  Plus,
-  Save,
-  Star,
-  Target,
-  Trophy,
-  X,
-  Zap
-} from 'lucide-react-native';
+import { Check, Focus, Plus, Save, Star, Target, Trophy, X, Zap } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, Layout, SlideOutLeft } from 'react-native-reanimated';
 
 // Common shooting distances (in meters)
@@ -111,12 +92,12 @@ function DrillCard({
 }) {
   const categoryConfig = drill.category ? CATEGORY_CONFIG[drill.category] : null;
   const goalColor = drill.drill_goal === 'grouping' ? '#22C55E' : '#F59E0B';
-  
+
   return (
     <TouchableOpacity
       style={[
         styles.drillCard,
-        { 
+        {
           backgroundColor: isAdded ? colors.text : colors.card,
           borderColor: isAdded ? colors.text : colors.border,
         },
@@ -129,10 +110,7 @@ function DrillCard({
     >
       <View style={[styles.goalDot, { backgroundColor: goalColor }]} />
       <View style={styles.drillCardContent}>
-        <Text 
-          style={[styles.drillName, { color: isAdded ? colors.background : colors.text }]}
-          numberOfLines={1}
-        >
+        <Text style={[styles.drillName, { color: isAdded ? colors.background : colors.text }]} numberOfLines={1}>
           {preset?.label || drill.name}
         </Text>
         <View style={styles.drillMetaRow}>
@@ -246,9 +224,7 @@ function SectionHeader({
         <Icon size={14} color={color} />
       </View>
       <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
-      {count !== undefined && (
-        <Text style={[styles.sectionCount, { color: colors.textMuted }]}>{count}</Text>
-      )}
+      {count !== undefined && <Text style={[styles.sectionCount, { color: colors.textMuted }]}>{count}</Text>}
     </View>
   );
 }
@@ -282,16 +258,14 @@ function ConfigureModal({
   const [rounds, setRounds] = useState(5);
   const [timeLimit, setTimeLimit] = useState<number | null>(null);
   const [position, setPosition] = useState<ShootingPosition | null>(null);
-  
+
   // Reset state when drill or preset changes
   useEffect(() => {
     if (drill) {
       // For fixed_shots drills, always use the canonical shot count
-      const effectiveRounds = drill.fixed_shots 
-        ? drill.default_shots 
-        : (preset?.rounds ?? drill.default_shots);
-      
-      const initialDistance = preset?.distance_m ?? (drill.allowed_distances?.[0] ?? 100);
+      const effectiveRounds = drill.fixed_shots ? drill.default_shots : (preset?.rounds ?? drill.default_shots);
+
+      const initialDistance = preset?.distance_m ?? drill.allowed_distances?.[0] ?? 100;
       setDistance(initialDistance);
       setRounds(effectiveRounds);
       setTimeLimit(preset?.time_limit_seconds ?? null);
@@ -303,18 +277,16 @@ function ConfigureModal({
 
   // Determine if drill has restricted distances
   const hasRestrictedDistances = drill?.allowed_distances && drill.allowed_distances.length > 0;
-  
+
   // Available distances: use restricted list OR common distances
-  const availableDistances = hasRestrictedDistances 
-    ? drill!.allowed_distances! 
-    : COMMON_DISTANCES;
-  
+  const availableDistances = hasRestrictedDistances ? drill!.allowed_distances! : COMMON_DISTANCES;
+
   // Check if current distance is in the available list (for "Other" state)
   const isDistanceInList = availableDistances.includes(distance);
-  
+
   // For fixed_shots, always use drill's default (enforced, not configurable)
   const effectiveRounds = drill?.fixed_shots ? drill.default_shots : rounds;
-  
+
   // Build config
   const config: DrillConfig = {
     distance_m: distance,
@@ -339,9 +311,9 @@ function ConfigureModal({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <Pressable style={[styles.modalSheet, { backgroundColor: colors.card }]} onPress={e => e.stopPropagation()}>
+        <Pressable style={[styles.modalSheet, { backgroundColor: colors.card }]} onPress={(e) => e.stopPropagation()}>
           <View style={[styles.modalGrabber, { backgroundColor: colors.border }]} />
-          
+
           {/* Header */}
           <View style={styles.modalHeader}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>{drill.name}</Text>
@@ -349,7 +321,7 @@ function ConfigureModal({
               <X size={20} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
-          
+
           {drill.description && (
             <Text style={[styles.modalDesc, { color: colors.textMuted }]}>{drill.description}</Text>
           )}
@@ -358,21 +330,21 @@ function ConfigureModal({
             {/* Distance */}
             <View style={styles.configSection}>
               <Text style={[styles.configLabel, { color: colors.text }]}>Distance</Text>
-              
+
               {/* Restricted distances info */}
               {hasRestrictedDistances && (
                 <Text style={[styles.configHint, { color: colors.textMuted }]}>
                   This drill requires specific distances
                 </Text>
               )}
-              
+
               <View style={styles.configOptions}>
                 {availableDistances.map((d) => (
                   <TouchableOpacity
                     key={d}
                     style={[
                       styles.configChip,
-                      { 
+                      {
                         backgroundColor: distance === d && !showCustomInput ? colors.text : colors.secondary,
                         borderColor: distance === d && !showCustomInput ? colors.text : colors.border,
                       },
@@ -384,21 +356,23 @@ function ConfigureModal({
                       setCustomDistance('');
                     }}
                   >
-                    <Text style={[
-                      styles.configChipText,
-                      { color: distance === d && !showCustomInput ? colors.background : colors.text }
-                    ]}>
+                    <Text
+                      style={[
+                        styles.configChipText,
+                        { color: distance === d && !showCustomInput ? colors.background : colors.text },
+                      ]}
+                    >
                       {d}m
                     </Text>
                   </TouchableOpacity>
                 ))}
-                
+
                 {/* Custom distance option (only for unrestricted drills) */}
                 {!hasRestrictedDistances && (
                   <TouchableOpacity
                     style={[
                       styles.configChip,
-                      { 
+                      {
                         backgroundColor: showCustomInput || !isDistanceInList ? colors.text : colors.secondary,
                         borderColor: showCustomInput || !isDistanceInList ? colors.text : colors.border,
                       },
@@ -408,16 +382,18 @@ function ConfigureModal({
                       setShowCustomInput(true);
                     }}
                   >
-                    <Text style={[
-                      styles.configChipText,
-                      { color: showCustomInput || !isDistanceInList ? colors.background : colors.text }
-                    ]}>
+                    <Text
+                      style={[
+                        styles.configChipText,
+                        { color: showCustomInput || !isDistanceInList ? colors.background : colors.text },
+                      ]}
+                    >
                       Other
                     </Text>
                   </TouchableOpacity>
                 )}
               </View>
-              
+
               {/* Custom distance input */}
               {showCustomInput && !hasRestrictedDistances && (
                 <View style={[styles.customInputContainer, { borderColor: colors.border }]}>
@@ -451,7 +427,7 @@ function ConfigureModal({
                       key={r}
                       style={[
                         styles.configChip,
-                        { 
+                        {
                           backgroundColor: rounds === r ? colors.text : colors.secondary,
                           borderColor: rounds === r ? colors.text : colors.border,
                         },
@@ -461,10 +437,7 @@ function ConfigureModal({
                         setRounds(r);
                       }}
                     >
-                      <Text style={[
-                        styles.configChipText,
-                        { color: rounds === r ? colors.background : colors.text }
-                      ]}>
+                      <Text style={[styles.configChipText, { color: rounds === r ? colors.background : colors.text }]}>
                         {r}
                       </Text>
                     </TouchableOpacity>
@@ -483,7 +456,7 @@ function ConfigureModal({
                       key={t ?? 'none'}
                       style={[
                         styles.configChip,
-                        { 
+                        {
                           backgroundColor: timeLimit === t ? colors.text : colors.secondary,
                           borderColor: timeLimit === t ? colors.text : colors.border,
                         },
@@ -493,10 +466,9 @@ function ConfigureModal({
                         setTimeLimit(t);
                       }}
                     >
-                      <Text style={[
-                        styles.configChipText,
-                        { color: timeLimit === t ? colors.background : colors.text }
-                      ]}>
+                      <Text
+                        style={[styles.configChipText, { color: timeLimit === t ? colors.background : colors.text }]}
+                      >
                         {t ? `${t}s` : 'None'}
                       </Text>
                     </TouchableOpacity>
@@ -515,7 +487,7 @@ function ConfigureModal({
                       key={p.value}
                       style={[
                         styles.configChip,
-                        { 
+                        {
                           backgroundColor: position === p.value ? colors.text : colors.secondary,
                           borderColor: position === p.value ? colors.text : colors.border,
                         },
@@ -525,10 +497,12 @@ function ConfigureModal({
                         setPosition(position === p.value ? null : p.value);
                       }}
                     >
-                      <Text style={[
-                        styles.configChipText,
-                        { color: position === p.value ? colors.background : colors.text }
-                      ]}>
+                      <Text
+                        style={[
+                          styles.configChipText,
+                          { color: position === p.value ? colors.background : colors.text },
+                        ]}
+                      >
                         {p.label}
                       </Text>
                     </TouchableOpacity>
@@ -550,7 +524,9 @@ function ConfigureModal({
             {validation.errors.length > 0 && (
               <View style={[styles.validationBox, { backgroundColor: colors.destructive + '15' }]}>
                 {validation.errors.map((err, i) => (
-                  <Text key={i} style={[styles.validationText, { color: colors.destructive }]}>{err}</Text>
+                  <Text key={i} style={[styles.validationText, { color: colors.destructive }]}>
+                    {err}
+                  </Text>
                 ))}
               </View>
             )}
@@ -571,17 +547,11 @@ function ConfigureModal({
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              style={[
-                styles.addBtn,
-                { backgroundColor: validation.valid ? colors.text : colors.secondary }
-              ]}
+              style={[styles.addBtn, { backgroundColor: validation.valid ? colors.text : colors.secondary }]}
               onPress={handleAdd}
               disabled={!validation.valid}
             >
-              <Text style={[
-                styles.addBtnText,
-                { color: validation.valid ? colors.background : colors.textMuted }
-              ]}>
+              <Text style={[styles.addBtnText, { color: validation.valid ? colors.background : colors.textMuted }]}>
                 Add to Training
               </Text>
             </TouchableOpacity>
@@ -608,14 +578,14 @@ export function DrillSelectionStepV2({
   canCreatePresets,
 }: DrillSelectionStepV2Props) {
   const colors = useColors();
-  
+
   // Modal state
   const [selectedDrill, setSelectedDrill] = useState<CanonicalDrill | null>(null);
   const [selectedPreset, setSelectedPreset] = useState<TeamDrillPreset | undefined>(undefined);
   const [configModalVisible, setConfigModalVisible] = useState(false);
 
   // Track which drills are already added (by drill_id)
-  const addedDrillIds = useMemo(() => new Set(drills.map(d => d.drill_id)), [drills]);
+  const addedDrillIds = useMemo(() => new Set(drills.map((d) => d.drill_id)), [drills]);
 
   // Map presets by drill_id for quick lookup
   const presetsByDrill = useMemo(() => {
@@ -658,7 +628,7 @@ export function DrillSelectionStepV2({
   const categoryOrder: DrillCategory[] = ['zeroing', 'grouping', 'speed', 'qualification'];
 
   return (
-    <ScrollView 
+    <ScrollView
       style={styles.container}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.scrollContent}
@@ -690,13 +660,7 @@ export function DrillSelectionStepV2({
       {/* Team Presets (if any) */}
       {teamPresets.length > 0 && (
         <View style={styles.section}>
-          <SectionHeader 
-            icon={Star}
-            title="Team Presets"
-            color="#F59E0B"
-            count={teamPresets.length}
-            colors={colors}
-          />
+          <SectionHeader icon={Star} title="Team Presets" color="#F59E0B" count={teamPresets.length} colors={colors} />
           <View style={styles.drillGrid}>
             {teamPresets.slice(0, 4).map((preset) => {
               const drill = preset.drill;
@@ -720,12 +684,12 @@ export function DrillSelectionStepV2({
       {categoryOrder.map((category) => {
         const categoryDrills = canonicalDrills[category] || [];
         if (categoryDrills.length === 0) return null;
-        
+
         const config = CATEGORY_CONFIG[category];
-        
+
         return (
           <View key={category} style={styles.section}>
-            <SectionHeader 
+            <SectionHeader
               icon={config.icon}
               title={config.label}
               color={config.color}
@@ -968,7 +932,7 @@ const styles = StyleSheet.create({
   modalBody: {
     paddingHorizontal: 20,
   },
-  
+
   // Config Section
   configSection: {
     marginBottom: 20,
@@ -997,7 +961,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  
+
   // Custom Input
   customInputContainer: {
     flexDirection: 'row',
@@ -1018,7 +982,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginLeft: 8,
   },
-  
+
   // Info Box (informational messages)
   infoBox: {
     padding: 12,
@@ -1029,7 +993,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
   },
-  
+
   // Validation
   validationBox: {
     padding: 12,

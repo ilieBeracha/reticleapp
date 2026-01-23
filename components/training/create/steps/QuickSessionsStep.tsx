@@ -1,37 +1,20 @@
 /**
- * QuickSessionsStep - Add sessions to training using unified SessionCreationForm
+ * QuickSessionsStep - Add sessions to training via bottom sheet
  *
- * Uses the same form as solo createSession for consistency.
- * Opens SessionCreationForm in a modal when adding a session.
+ * Shows the session list with an "Add Session" button.
+ * Tapping opens a bottom sheet with the same form as createSession.tsx
+ * (purpose toggle + SessionContextStep). On submit, closes sheet and adds to list.
  */
 
-import {
-  SessionCreationForm,
-  type SessionFormValues,
-} from '@/components/session/creation';
+import { SessionContextStep } from '@/components/session/creation';
+import type { SessionContextState, SessionPurpose } from '@/components/session/creation/sessionCreation.types';
 import { useColors } from '@/hooks/ui/useColors';
 import { type TrainingDrillItem } from '@/services/drills';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import {
-  ChevronDown,
-  ChevronUp,
-  Circle,
-  Plus,
-  Target,
-  Trash2,
-} from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Circle, Crosshair, Plus, Target, Trash2 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
-import {
-  LayoutAnimation,
-  Modal,
-  Platform,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  UIManager,
-  View,
-} from 'react-native';
+import { LayoutAnimation, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, UIManager, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -101,10 +84,7 @@ function SessionCard({ session, index, total, onRemove, onMove, colors }: Sessio
               </TouchableOpacity>
             </>
           )}
-          <TouchableOpacity
-            style={[styles.removeBtn, { backgroundColor: `${colors.red}15` }]}
-            onPress={onRemove}
-          >
+          <TouchableOpacity style={[styles.removeBtn, { backgroundColor: `${colors.red}15` }]} onPress={onRemove}>
             <Trash2 size={14} color={colors.red} />
           </TouchableOpacity>
         </View>
@@ -114,78 +94,153 @@ function SessionCard({ session, index, total, onRemove, onMove, colors }: Sessio
 }
 
 // ============================================================================
-// ADD SESSION MODAL - Uses unified SessionCreationForm
+// ADD SESSION BOTTOM SHEET
 // ============================================================================
 
-interface AddSessionModalProps {
+const DEFAULT_CONTEXT: SessionContextState = {
+  weaponId: null,
+  weaponName: null,
+  weaponCategory: null,
+  distance: 25,
+  position: 'any',
+  targetType: 'paper',
+  shotsPlanned: 5,
+  timeLimit: null,
+  stressDrill: false,
+  ammoType: null,
+  windCondition: null,
+  timeOfDay: 'day',
+  notes: '',
+};
+
+interface AddSessionSheetProps {
   visible: boolean;
   onClose: () => void;
   onAdd: (session: TrainingDrillItem) => void;
 }
 
-function AddSessionModal({ visible, onClose, onAdd }: AddSessionModalProps) {
+function AddSessionSheet({ visible, onClose, onAdd }: AddSessionSheetProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const [purpose, setPurpose] = useState<SessionPurpose>('grouping');
+  const [context, setContext] = useState<SessionContextState>(DEFAULT_CONTEXT);
 
-  const handleSubmit = useCallback((values: SessionFormValues) => {
+  const handlePurposeSelect = useCallback((p: SessionPurpose) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setPurpose(p);
+  }, []);
+
+  const handleUpdateContext = useCallback((partial: Partial<SessionContextState>) => {
+    setContext((prev) => ({ ...prev, ...partial }));
+  }, []);
+
+  const mapPosition = (pos: string | null): 'standing' | 'kneeling' | 'prone' | 'sitting' | null => {
+    if (!pos || pos === 'any') return null;
+    if (pos === 'seated') return 'sitting';
+    if (['standing', 'kneeling', 'prone', 'sitting'].includes(pos)) {
+      return pos as 'standing' | 'kneeling' | 'prone' | 'sitting';
+    }
+    return null;
+  };
+
+  const handleSubmit = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    // Map 'seated' to 'sitting' for ShootingPosition compatibility
-    const mapPosition = (pos: string | null): 'standing' | 'kneeling' | 'prone' | 'sitting' | null => {
-      if (!pos || pos === 'any') return null;
-      if (pos === 'seated') return 'sitting';
-      if (['standing', 'kneeling', 'prone', 'sitting'].includes(pos)) {
-        return pos as 'standing' | 'kneeling' | 'prone' | 'sitting';
-      }
-      return null;
-    };
 
     const newSession: TrainingDrillItem = {
       id: `session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       drill_id: '',
-      name: `${values.purpose === 'grouping' ? 'Grouping' : 'Engagement'} ${values.distance}m`,
-      description: values.notes || undefined,
-      drill_goal: values.purpose,
-      target_type: values.targetType === 'paper' || values.targetType === 'tactical' ? values.targetType : 'paper',
+      name: `${purpose === 'grouping' ? 'Grouping' : 'Engagement'} ${context.distance}m`,
+      description: context.notes || undefined,
+      drill_goal: purpose,
+      target_type: context.targetType === 'paper' || context.targetType === 'tactical' ? context.targetType : 'paper',
       config: {
-        distance_m: values.distance,
-        rounds: values.shotsPlanned,
-        time_limit_seconds: values.timeLimit,
-        position: mapPosition(values.position),
+        distance_m: context.distance,
+        rounds: context.shotsPlanned,
+        time_limit_seconds: context.timeLimit,
+        position: mapPosition(context.position),
         strings_count: 1,
       },
     };
 
     onAdd(newSession);
+    // Reset for next time
+    setContext(DEFAULT_CONTEXT);
     onClose();
-  }, [onAdd, onClose]);
+  }, [purpose, context, onAdd, onClose]);
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
-      <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={[styles.sheetContainer, { backgroundColor: colors.background }]}>
         {/* Header */}
-        <View style={[styles.modalHeader, { paddingTop: insets.top + 8 }]}>
-          <TouchableOpacity
-            style={[styles.modalCloseBtn, { backgroundColor: colors.card }]}
-            onPress={onClose}
-          >
+        <View style={styles.sheetHeader}>
+          <TouchableOpacity style={[styles.sheetCloseBtn, { backgroundColor: colors.card }]} onPress={onClose}>
             <Ionicons name="close" size={20} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>Add Session</Text>
+          <Text style={[styles.sheetTitle, { color: colors.text }]}>Add Session</Text>
           <View style={{ width: 40 }} />
         </View>
 
-        {/* Form - hide weapon (soldiers pick when they start) */}
-        <SessionCreationForm
-          onSubmit={handleSubmit}
-          submitLabel="Add Session"
-          hideWeapon
-        />
+        {/* Form */}
+        <ScrollView
+          style={styles.sheetScroll}
+          contentContainerStyle={[styles.sheetScrollContent, { paddingBottom: insets.bottom + 100 }]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Purpose Toggle */}
+          <View style={styles.purposeRow}>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Goal</Text>
+            <View style={[styles.purposeToggle, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <TouchableOpacity
+                style={[
+                  styles.purposeOption,
+                  purpose === 'grouping' && [styles.purposeOptionActive, { backgroundColor: colors.primary }],
+                ]}
+                onPress={() => handlePurposeSelect('grouping')}
+                activeOpacity={0.7}
+              >
+                <Crosshair size={16} color={purpose === 'grouping' ? '#fff' : colors.textMuted} />
+                <Text style={[styles.purposeText, { color: purpose === 'grouping' ? '#fff' : colors.text }]}>
+                  Grouping
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.purposeOption,
+                  purpose === 'engagement' && [styles.purposeOptionActive, { backgroundColor: colors.orange }],
+                ]}
+                onPress={() => handlePurposeSelect('engagement')}
+                activeOpacity={0.7}
+              >
+                <Target size={16} color={purpose === 'engagement' ? '#fff' : colors.textMuted} />
+                <Text style={[styles.purposeText, { color: purpose === 'engagement' ? '#fff' : colors.text }]}>
+                  Engagement
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Session Details */}
+          <SessionContextStep
+            purpose={purpose}
+            context={context}
+            onUpdateContext={handleUpdateContext}
+            onBack={() => {}}
+            hideWeaponSection
+          />
+        </ScrollView>
+
+        {/* Footer */}
+        <View style={[styles.sheetFooter, { backgroundColor: colors.background, paddingBottom: insets.bottom + 16 }]}>
+          <TouchableOpacity
+            style={[styles.sheetSubmitBtn, { backgroundColor: colors.text }]}
+            onPress={handleSubmit}
+            activeOpacity={0.85}
+          >
+            <Plus size={18} color={colors.background} />
+            <Text style={[styles.sheetSubmitText, { color: colors.background }]}>Add Session</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </Modal>
   );
@@ -195,23 +250,21 @@ function AddSessionModal({ visible, onClose, onAdd }: AddSessionModalProps) {
 // MAIN COMPONENT
 // ============================================================================
 
-export function QuickSessionsStep({
-  sessions,
-  onAddSession,
-  onRemoveSession,
-  onMoveSession,
-}: QuickSessionsStepProps) {
+export function QuickSessionsStep({ sessions, onAddSession, onRemoveSession, onMoveSession }: QuickSessionsStepProps) {
   const colors = useColors();
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showSheet, setShowSheet] = useState(false);
 
-  const handleAdd = useCallback((session: TrainingDrillItem) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    onAddSession(session);
-  }, [onAddSession]);
+  const handleAdd = useCallback(
+    (session: TrainingDrillItem) => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      onAddSession(session);
+    },
+    [onAddSession]
+  );
 
-  const handleOpenModal = useCallback(() => {
+  const handleOpenSheet = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setShowAddModal(true);
+    setShowSheet(true);
   }, []);
 
   return (
@@ -222,16 +275,14 @@ export function QuickSessionsStep({
           <Target size={20} color={colors.text} />
         </View>
         <View style={styles.headerText}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            What will you train?
-          </Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>What will you train?</Text>
           <Text style={[styles.headerHint, { color: colors.textMuted }]}>
             Add sessions · Everyone runs them in parallel
           </Text>
         </View>
       </View>
 
-      {/* Existing Sessions */}
+      {/* Sessions List */}
       {sessions.length > 0 && (
         <View style={styles.sessionsList}>
           {sessions.map((session, index) => (
@@ -255,20 +306,17 @@ export function QuickSessionsStep({
       {/* Add Session Button */}
       <TouchableOpacity
         style={[
-          styles.addSessionBtn,
-          { 
-            backgroundColor: sessions.length === 0 ? colors.primary : colors.card, 
+          styles.addBtn,
+          {
+            backgroundColor: sessions.length === 0 ? colors.primary : colors.card,
             borderColor: sessions.length === 0 ? colors.primary : colors.border,
-          }
+          },
         ]}
-        onPress={handleOpenModal}
+        onPress={handleOpenSheet}
         activeOpacity={0.7}
       >
         <Plus size={18} color={sessions.length === 0 ? '#fff' : colors.primary} />
-        <Text style={[
-          styles.addSessionBtnText, 
-          { color: sessions.length === 0 ? '#fff' : colors.primary }
-        ]}>
+        <Text style={[styles.addBtnText, { color: sessions.length === 0 ? '#fff' : colors.primary }]}>
           {sessions.length === 0 ? 'Add First Session' : 'Add Another Session'}
         </Text>
       </TouchableOpacity>
@@ -277,18 +325,12 @@ export function QuickSessionsStep({
       {sessions.length === 0 && (
         <View style={styles.emptyHint}>
           <Circle size={16} color={colors.textMuted} />
-          <Text style={[styles.emptyHintText, { color: colors.textMuted }]}>
-            Add at least one session to continue
-          </Text>
+          <Text style={[styles.emptyHintText, { color: colors.textMuted }]}>Add at least one session to continue</Text>
         </View>
       )}
 
-      {/* Add Session Modal */}
-      <AddSessionModal
-        visible={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onAdd={handleAdd}
-      />
+      {/* Bottom Sheet */}
+      <AddSessionSheet visible={showSheet} onClose={() => setShowSheet(false)} onAdd={handleAdd} />
     </View>
   );
 }
@@ -381,8 +423,8 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
 
-  // Add Session Button
-  addSessionBtn: {
+  // Add Button
+  addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -391,32 +433,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
   },
-  addSessionBtnText: {
+  addBtnText: {
     fontSize: 15,
     fontWeight: '600',
-  },
-
-  // Modal
-  modalContainer: {
-    flex: 1,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-  },
-  modalCloseBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
   },
 
   // Empty hint
@@ -429,6 +448,94 @@ const styles = StyleSheet.create({
   },
   emptyHintText: {
     fontSize: 13,
+  },
+
+  // Sheet
+  sheetContainer: {
+    flex: 1,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
+  sheetCloseBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  sheetScroll: {
+    flex: 1,
+  },
+  sheetScrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  sheetFooter: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(128,128,128,0.2)',
+  },
+  sheetSubmitBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 52,
+    borderRadius: 14,
+  },
+  sheetSubmitText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+
+  // Purpose Toggle (in sheet)
+  purposeRow: {
+    marginBottom: 8,
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 10,
+  },
+  purposeToggle: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 4,
+    gap: 4,
+  },
+  purposeOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 9,
+  },
+  purposeOptionActive: {
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  purposeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: -0.2,
   },
 });
 

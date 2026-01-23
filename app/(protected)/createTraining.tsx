@@ -8,13 +8,8 @@
  * Just add sessions and go.
  */
 
-import {
-  useCreateTrainingV2
-} from '@/components/training/create';
-import {
-  QuickSessionsStep,
-  TrainingDetailsStep,
-} from '@/components/training/create/steps';
+import { useCreateTrainingV2 } from '@/components/training/create';
+import { QuickSessionsStep, TrainingDetailsStep } from '@/components/training/create/steps';
 import { useColors } from '@/hooks/ui/useColors';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -200,35 +195,35 @@ export default function CreateTrainingScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {/* Step 1: Training Details */}
-      {currentStep === 1 && (
-        <Animated.View entering={FadeInDown.duration(300)}>
-          <TrainingDetailsStep
-            teams={teams}
-            selectedTeamId={selectedTeamId}
-            isTeamLocked={isTeamLocked}
-            title={title}
-            scheduledDate={scheduledDate}
-            manualStart={manualStart}
-            onSelectTeam={handleSelectTeam}
-            onTitleChange={setTitle}
-            onOpenDatePicker={() => setShowDatePicker(true)}
-            onOpenTimePicker={() => setShowTimePicker(true)}
-            onToggleManualStart={() => setManualStart(!manualStart)}
-          />
-        </Animated.View>
-      )}
+        {currentStep === 1 && (
+          <Animated.View entering={FadeInDown.duration(300)}>
+            <TrainingDetailsStep
+              teams={teams}
+              selectedTeamId={selectedTeamId}
+              isTeamLocked={isTeamLocked}
+              title={title}
+              scheduledDate={scheduledDate}
+              manualStart={manualStart}
+              onSelectTeam={handleSelectTeam}
+              onTitleChange={setTitle}
+              onOpenDatePicker={() => setShowDatePicker(true)}
+              onOpenTimePicker={() => setShowTimePicker(true)}
+              onToggleManualStart={() => setManualStart(!manualStart)}
+            />
+          </Animated.View>
+        )}
 
-      {/* Step 2: Add Sessions (Simple Flow) */}
-      {currentStep === 2 && (
-        <Animated.View entering={FadeInDown.duration(300)} style={styles.step2Container}>
-          <QuickSessionsStep
-            sessions={drills}
-            onAddSession={addDrill}
-            onRemoveSession={handleRemoveDrill}
-            onMoveSession={handleMoveDrill}
-          />
-        </Animated.View>
-      )}
+        {/* Step 2: Add Sessions (Simple Flow) */}
+        {currentStep === 2 && (
+          <Animated.View entering={FadeInDown.duration(300)} style={styles.step2Container}>
+            <QuickSessionsStep
+              sessions={drills}
+              onAddSession={addDrill}
+              onRemoveSession={handleRemoveDrill}
+              onMoveSession={handleMoveDrill}
+            />
+          </Animated.View>
+        )}
       </ScrollView>
 
       {/* Fixed Bottom Button */}
@@ -241,10 +236,7 @@ export default function CreateTrainingScreen() {
           )}
           {currentStep === 1 ? (
             <TouchableOpacity
-              style={[
-                styles.actionButton,
-                { backgroundColor: step1Complete ? colors.text : colors.secondary },
-              ]}
+              style={[styles.actionButton, { backgroundColor: step1Complete ? colors.text : colors.secondary }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 handleNextStep();
@@ -259,10 +251,7 @@ export default function CreateTrainingScreen() {
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
-              style={[
-                styles.actionButton,
-                { backgroundColor: canCreate ? colors.text : colors.secondary },
-              ]}
+              style={[styles.actionButton, { backgroundColor: canCreate ? colors.text : colors.secondary }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 handleCreate();
@@ -277,9 +266,7 @@ export default function CreateTrainingScreen() {
                   <Text style={[styles.actionText, { color: canCreate ? colors.background : colors.textMuted }]}>
                     {drills.length === 0 ? 'Add at least one session' : 'Create Training'}
                   </Text>
-                  {drills.length > 0 && (
-                    <Play size={16} color={colors.background} fill={colors.background} />
-                  )}
+                  {drills.length > 0 && <Play size={16} color={colors.background} fill={colors.background} />}
                 </>
               )}
             </TouchableOpacity>
@@ -346,7 +333,7 @@ function PickerModal({
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.pickerOverlay} onPress={onClose}>
-        <Pressable style={[styles.pickerSheet, { backgroundColor: colors.card }]} onPress={e => e.stopPropagation()}>
+        <Pressable style={[styles.pickerSheet, { backgroundColor: colors.card }]} onPress={(e) => e.stopPropagation()}>
           <View style={[styles.pickerGrabber, { backgroundColor: colors.border }]} />
           <View style={styles.pickerHeader}>
             <TouchableOpacity onPress={onClose}>

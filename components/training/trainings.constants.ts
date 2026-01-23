@@ -56,4 +56,3 @@ export const PULSE_ANIMATION = {
   maxOpacity: 1,
   duration: 800,
 } as const;
-

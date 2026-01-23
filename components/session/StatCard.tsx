@@ -13,16 +13,10 @@ interface StatCardProps {
 // ============================================================================
 // COMPONENT
 // ============================================================================
-export const StatCard = React.memo(function StatCard({
-  value,
-  label,
-  accent = false,
-}: StatCardProps) {
+export const StatCard = React.memo(function StatCard({ value, label, accent = false }: StatCardProps) {
   return (
     <View style={styles.container}>
-      <Text style={[styles.value, accent && styles.valueAccent]}>
-        {value}
-      </Text>
+      <Text style={[styles.value, accent && styles.valueAccent]}>{value}</Text>
       <Text style={styles.label}>{label}</Text>
     </View>
   );
@@ -52,4 +46,3 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 });
-

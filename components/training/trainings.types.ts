@@ -81,18 +81,18 @@ export interface UseTrainingsReturn {
   activeTeam: any | null;
   initialized: boolean;
   teamsLoading: boolean;
-  
+
   // Permissions
   canSchedule: boolean;
   canManage: boolean;
-  
+
   // Data
   activeTeamTrainings: TrainingWithDetails[];
   liveTraining: TrainingWithDetails | undefined;
   members: TeamMemberWithProfile[];
   memberStats: MemberStats;
   teamStats: TeamStats;
-  
+
   // UI state
   refreshing: boolean;
   activeTab: InternalTab;
@@ -100,7 +100,7 @@ export interface UseTrainingsReturn {
   loadingTeamTrainings: boolean;
   showSwitcher: boolean;
   roleConfig: RoleConfig | null;
-  
+
   // Actions
   onRefresh: () => Promise<void>;
   handleTabChange: (tab: InternalTab) => void;
@@ -113,4 +113,3 @@ export interface UseTrainingsReturn {
   handleTeamSettings: () => void;
   setSwitcherOpen: (open: boolean) => void;
 }
-

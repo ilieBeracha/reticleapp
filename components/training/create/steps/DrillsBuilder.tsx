@@ -1,6 +1,6 @@
 /**
  * DrillsBuilder - Custom Drill Creator
- * 
+ *
  * Clean, card-based layout matching createSession style.
  * Simplified drill creation with type, position, distance, rounds, time.
  */
@@ -10,13 +10,7 @@ import type { Drill } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { Check, Clock, MapPin, Shield, Target, User } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
 import type { TrainingDrillItem } from '../createTraining.types';
@@ -87,7 +81,7 @@ function OptionChip({
       style={[
         styles.optionChip,
         size === 'large' && styles.optionChipLarge,
-        { 
+        {
           backgroundColor: active ? colors.text : colors.card,
           borderColor: active ? colors.text : colors.border,
         },
@@ -99,11 +93,13 @@ function OptionChip({
       activeOpacity={0.7}
     >
       {active && <Check size={14} color={colors.background} strokeWidth={2.5} />}
-      <Text style={[
-        styles.optionChipText,
-        size === 'large' && styles.optionChipTextLarge,
-        { color: active ? colors.background : colors.text }
-      ]}>
+      <Text
+        style={[
+          styles.optionChipText,
+          size === 'large' && styles.optionChipTextLarge,
+          { color: active ? colors.background : colors.text },
+        ]}
+      >
         {label}
       </Text>
     </TouchableOpacity>
@@ -123,7 +119,7 @@ export function DrillsBuilder({
   onDrillIssued,
 }: DrillsBuilderProps) {
   const colors = useColors();
-  
+
   // Order state
   const [drillType, setDrillType] = useState<DrillType>('grouping');
   const [position, setPosition] = useState<Position>('prone');
@@ -135,7 +131,7 @@ export function DrillsBuilder({
   const handleIssueDrill = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     const typeLabel = drillType === 'grouping' ? 'Grouping' : 'Engagement';
-    const posLabel = POSITIONS.find(p => p.value === position)?.label || position;
+    const posLabel = POSITIONS.find((p) => p.value === position)?.label || position;
     onAddDrill({
       id: `order-${Date.now()}`,
       name: `${typeLabel} · ${posLabel} · ${distance}m`,
@@ -152,28 +148,31 @@ export function DrillsBuilder({
   }, [drillType, position, distance, rounds, timeLimit, onAddDrill, onDrillIssued]);
 
   // Issue team drill
-  const handleIssueTeamDrill = useCallback((drill: Drill) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    onAddDrill({
-      id: `drill-${drill.id}-${Date.now()}`,
-      drill_id: drill.id,
-      name: drill.name,
-      drill_goal: drill.drill_goal,
-      target_type: drill.target_type,
-      distance_m: drill.distance_m,
-      rounds_per_shooter: drill.rounds_per_shooter,
-      time_limit_seconds: drill.time_limit_seconds ?? undefined,
-      strings_count: drill.strings_count ?? 1,
-      position: drill.position as Position | undefined,
-    });
-    // Go back to selection step after issuing
-    onDrillIssued?.();
-  }, [onAddDrill, onDrillIssued]);
+  const handleIssueTeamDrill = useCallback(
+    (drill: Drill) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      onAddDrill({
+        id: `drill-${drill.id}-${Date.now()}`,
+        drill_id: drill.id,
+        name: drill.name,
+        drill_goal: drill.drill_goal,
+        target_type: drill.target_type,
+        distance_m: drill.distance_m,
+        rounds_per_shooter: drill.rounds_per_shooter,
+        time_limit_seconds: drill.time_limit_seconds ?? undefined,
+        strings_count: drill.strings_count ?? 1,
+        position: drill.position as Position | undefined,
+      });
+      // Go back to selection step after issuing
+      onDrillIssued?.();
+    },
+    [onAddDrill, onDrillIssued]
+  );
 
   // Available team drills
   const availableDrills = useMemo(() => {
-    const addedIds = new Set(drills.map(d => d.drill_id).filter(Boolean));
-    return teamDrills.filter(d => !addedIds.has(d.id));
+    const addedIds = new Set(drills.map((d) => d.drill_id).filter(Boolean));
+    return teamDrills.filter((d) => !addedIds.has(d.id));
   }, [teamDrills, drills]);
 
   // Summary for button
@@ -185,19 +184,15 @@ export function DrillsBuilder({
   }, [drillType, distance, rounds, timeLimit]);
 
   return (
-    <ScrollView 
+    <ScrollView
       style={styles.container}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.scrollContent}
     >
       {/* Header */}
       <Animated.View entering={FadeIn.duration(200)} style={styles.header}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          Create custom drill
-        </Text>
-        <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
-          Configure your drill parameters
-        </Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Create custom drill</Text>
+        <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>Configure your drill parameters</Text>
       </Animated.View>
 
       {/* Drill Type */}
@@ -239,7 +234,7 @@ export function DrillsBuilder({
           <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Position</Text>
         </View>
         <View style={styles.optionsRow}>
-          {POSITIONS.map(p => (
+          {POSITIONS.map((p) => (
             <OptionChip
               key={p.value}
               label={p.label}
@@ -258,7 +253,7 @@ export function DrillsBuilder({
           <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Distance</Text>
         </View>
         <View style={styles.optionsRow}>
-          {DISTANCES[drillType].map(d => (
+          {DISTANCES[drillType].map((d) => (
             <OptionChip
               key={d}
               label={`${d}m`}
@@ -277,14 +272,8 @@ export function DrillsBuilder({
           <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Rounds</Text>
         </View>
         <View style={styles.optionsRow}>
-          {ROUNDS[drillType].map(r => (
-            <OptionChip
-              key={r}
-              label={String(r)}
-              active={rounds === r}
-              onPress={() => setRounds(r)}
-              colors={colors}
-            />
+          {ROUNDS[drillType].map((r) => (
+            <OptionChip key={r} label={String(r)} active={rounds === r} onPress={() => setRounds(r)} colors={colors} />
           ))}
         </View>
       </Animated.View>
@@ -296,7 +285,7 @@ export function DrillsBuilder({
           <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Time Limit</Text>
         </View>
         <View style={styles.optionsRow}>
-          {TIME_OPTIONS.map(t => (
+          {TIME_OPTIONS.map((t) => (
             <OptionChip
               key={t.label}
               label={t.label}
@@ -311,9 +300,7 @@ export function DrillsBuilder({
       {/* Summary Card */}
       <Animated.View entering={FadeInDown.delay(300).duration(200)}>
         <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.summaryText, { color: colors.text }]}>
-            {orderSummary}
-          </Text>
+          <Text style={[styles.summaryText, { color: colors.text }]}>{orderSummary}</Text>
         </View>
       </Animated.View>
 
@@ -325,9 +312,7 @@ export function DrillsBuilder({
           activeOpacity={0.85}
         >
           <Check size={18} color={colors.background} strokeWidth={2.5} />
-          <Text style={[styles.addButtonText, { color: colors.background }]}>
-            Add Drill
-          </Text>
+          <Text style={[styles.addButtonText, { color: colors.background }]}>Add Drill</Text>
         </TouchableOpacity>
       </Animated.View>
 

@@ -1,6 +1,6 @@
 /**
  * Training Start Modal
- * 
+ *
  * Allows commanders to configure drill instance values (distance, shots, time)
  * before starting a training. These values override the drill defaults.
  */
@@ -11,15 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Clock, MapPin, Minus, Play, Plus, Target, Zap } from 'lucide-react-native';
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-    ActivityIndicator,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ============================================================================
@@ -92,12 +84,10 @@ function ValueStepper({
   return (
     <View style={stepperStyles.container}>
       <View style={stepperStyles.header}>
-        <View style={[stepperStyles.iconBox, { backgroundColor: colors.secondary }]}>
-          {icon}
-        </View>
+        <View style={[stepperStyles.iconBox, { backgroundColor: colors.secondary }]}>{icon}</View>
         <Text style={[stepperStyles.label, { color: colors.text }]}>{label}</Text>
       </View>
-      
+
       <View style={stepperStyles.controls}>
         <TouchableOpacity
           style={[stepperStyles.btn, { backgroundColor: colors.secondary }]}
@@ -109,12 +99,8 @@ function ValueStepper({
         </TouchableOpacity>
 
         <View style={stepperStyles.valueContainer}>
-          <Text style={[stepperStyles.value, { color: colors.text }]}>
-            {isInfinite ? '∞' : value}
-          </Text>
-          {unit && !isInfinite && (
-            <Text style={[stepperStyles.unit, { color: colors.textMuted }]}>{unit}</Text>
-          )}
+          <Text style={[stepperStyles.value, { color: colors.text }]}>{isInfinite ? '∞' : value}</Text>
+          {unit && !isInfinite && <Text style={[stepperStyles.unit, { color: colors.textMuted }]}>{unit}</Text>}
         </View>
 
         <TouchableOpacity
@@ -142,13 +128,9 @@ function ValueStepper({
                 onChange(preset);
               }}
             >
-              <Text
-                style={[
-                  stepperStyles.presetText,
-                  { color: value === preset ? colors.primary : colors.textMuted },
-                ]}
-              >
-                {preset}{unit}
+              <Text style={[stepperStyles.presetText, { color: value === preset ? colors.primary : colors.textMuted }]}>
+                {preset}
+                {unit}
               </Text>
             </TouchableOpacity>
           ))}
@@ -235,15 +217,7 @@ interface DrillConfigCardProps {
   index: number;
 }
 
-function DrillConfigCard({
-  drill,
-  overrides,
-  onUpdate,
-  expanded,
-  onToggle,
-  colors,
-  index,
-}: DrillConfigCardProps) {
+function DrillConfigCard({ drill, overrides, onUpdate, expanded, onToggle, colors, index }: DrillConfigCardProps) {
   const isGrouping = drill.drill_goal === 'grouping';
   const isPaper = drill.target_type === 'paper';
   const goalColor = isGrouping ? '#10B981' : '#93C5FD';
@@ -256,15 +230,11 @@ function DrillConfigCard({
   return (
     <View style={[cardStyles.container, { backgroundColor: colors.card, borderColor: colors.border }]}>
       {/* Header - Always visible */}
-      <TouchableOpacity
-        style={cardStyles.header}
-        onPress={onToggle}
-        activeOpacity={0.7}
-      >
+      <TouchableOpacity style={cardStyles.header} onPress={onToggle} activeOpacity={0.7}>
         <View style={[cardStyles.indexBadge, { backgroundColor: goalColor }]}>
           <Text style={cardStyles.indexText}>{index + 1}</Text>
         </View>
-        
+
         <View style={cardStyles.headerContent}>
           <Text style={[cardStyles.drillName, { color: colors.text }]} numberOfLines={1}>
             {drill.name}
@@ -279,16 +249,10 @@ function DrillConfigCard({
         </View>
 
         <View style={[cardStyles.badge, { backgroundColor: `${goalColor}15` }]}>
-          <Text style={[cardStyles.badgeText, { color: goalColor }]}>
-            {isGrouping ? 'GRP' : 'ACH'}
-          </Text>
+          <Text style={[cardStyles.badgeText, { color: goalColor }]}>{isGrouping ? 'GRP' : 'ACH'}</Text>
         </View>
 
-        <Ionicons
-          name={expanded ? 'chevron-up' : 'chevron-down'}
-          size={20}
-          color={colors.textMuted}
-        />
+        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={20} color={colors.textMuted} />
       </TouchableOpacity>
 
       {/* Expanded Config */}
@@ -415,28 +379,18 @@ const cardStyles = StyleSheet.create({
 // ============================================================================
 // MAIN MODAL
 // ============================================================================
-export function TrainingStartModal({
-  visible,
-  onClose,
-  onStart,
-  drills,
-  trainingTitle,
-}: TrainingStartModalProps) {
+export function TrainingStartModal({ visible, onClose, onStart, drills, trainingTitle }: TrainingStartModalProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  
+
   const [starting, setStarting] = useState(false);
-  const [expandedDrillId, setExpandedDrillId] = useState<string | null>(
-    drills.length > 0 ? drills[0].id : null
-  );
-  
+  const [expandedDrillId, setExpandedDrillId] = useState<string | null>(drills.length > 0 ? drills[0].id : null);
+
   // Track overrides for each drill
-  const [drillOverrides, setDrillOverrides] = useState<Map<string, DrillInstanceOverrides>>(
-    new Map()
-  );
+  const [drillOverrides, setDrillOverrides] = useState<Map<string, DrillInstanceOverrides>>(new Map());
 
   const handleUpdateDrill = useCallback((drillId: string, overrides: DrillInstanceOverrides) => {
-    setDrillOverrides(prev => {
+    setDrillOverrides((prev) => {
       const next = new Map(prev);
       next.set(drillId, overrides);
       return next;
@@ -456,21 +410,20 @@ export function TrainingStartModal({
   }, [onStart, drillOverrides]);
 
   const hasOverrides = useMemo(() => {
-    return drillOverrides.size > 0 && Array.from(drillOverrides.values()).some(o => 
-      o.distance_m !== undefined || 
-      o.rounds_per_shooter !== undefined || 
-      o.time_limit_seconds !== undefined ||
-      o.strings_count !== undefined
+    return (
+      drillOverrides.size > 0 &&
+      Array.from(drillOverrides.values()).some(
+        (o) =>
+          o.distance_m !== undefined ||
+          o.rounds_per_shooter !== undefined ||
+          o.time_limit_seconds !== undefined ||
+          o.strings_count !== undefined
+      )
     );
   }, [drillOverrides]);
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Header */}
         <View style={[styles.header, { paddingTop: insets.top + 20, borderBottomColor: colors.border }]}>
@@ -501,9 +454,7 @@ export function TrainingStartModal({
           </View>
 
           {/* Drills List */}
-          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-            DRILLS ({drills.length})
-          </Text>
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>DRILLS ({drills.length})</Text>
 
           {drills.map((drill, index) => (
             <DrillConfigCard
@@ -512,7 +463,7 @@ export function TrainingStartModal({
               overrides={drillOverrides.get(drill.id) || {}}
               onUpdate={(overrides) => handleUpdateDrill(drill.id, overrides)}
               expanded={expandedDrillId === drill.id}
-              onToggle={() => setExpandedDrillId(prev => prev === drill.id ? null : drill.id)}
+              onToggle={() => setExpandedDrillId((prev) => (prev === drill.id ? null : drill.id))}
               colors={colors}
               index={index}
             />
@@ -536,12 +487,9 @@ export function TrainingStartModal({
               Custom values will override drill defaults
             </Text>
           )}
-          
+
           <TouchableOpacity
-            style={[
-              styles.startButton,
-              { backgroundColor: drills.length > 0 ? colors.primary : colors.muted },
-            ]}
+            style={[styles.startButton, { backgroundColor: drills.length > 0 ? colors.primary : colors.muted }]}
             onPress={handleStart}
             disabled={starting || drills.length === 0}
             activeOpacity={0.8}
@@ -657,15 +605,3 @@ const styles = StyleSheet.create({
 });
 
 export default TrainingStartModal;
-
-
-
-
-
-
-
-
-
-
-
-

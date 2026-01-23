@@ -18,8 +18,6 @@ export default function IntegrationsScreen() {
     Alert.alert('Sent', 'PING sent to watch');
   };
 
-
-
   const handleToggleWatch = async (enabled: boolean) => {
     await setWatchEnabled(enabled);
     if (enabled) {
@@ -78,31 +76,40 @@ export default function IntegrationsScreen() {
             <TouchableOpacity
               onPress={handleGarminCardPress}
               activeOpacity={isConnected ? 1 : 0.7}
-              style={[styles.card, { 
-                backgroundColor: colors.card, 
-                borderColor: isConnected ? '#10B981' : isOnline ? '#3B82F6' : colors.border 
-              }]}
+              style={[
+                styles.card,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: isConnected ? '#10B981' : isOnline ? '#3B82F6' : colors.border,
+                },
+              ]}
             >
               <View style={[styles.icon, { backgroundColor: '#007CC3' }]}>
                 <Text style={styles.iconText}>G</Text>
               </View>
-              
+
               <View style={styles.info}>
-                <Text style={[styles.title, { color: colors.text }]}>
-                  {device?.name || 'Garmin'}
-                </Text>
-                <Text style={[styles.subtitle, { 
-                  color: isConnected ? '#10B981' : isOnline ? '#3B82F6' : colors.textMuted 
-                }]}>
-                  {isOnline 
-                    ? 'Open ReticleIQ app on watch' 
-                    : status + (statusReason ? ` - ${statusReason}` : '')}
+                <Text style={[styles.title, { color: colors.text }]}>{device?.name || 'Garmin'}</Text>
+                <Text
+                  style={[
+                    styles.subtitle,
+                    {
+                      color: isConnected ? '#10B981' : isOnline ? '#3B82F6' : colors.textMuted,
+                    },
+                  ]}
+                >
+                  {isOnline ? 'Open ReticleIQ app on watch' : status + (statusReason ? ` - ${statusReason}` : '')}
                 </Text>
               </View>
 
-              <View style={[styles.dot, { 
-                backgroundColor: isConnected ? '#10B981' : isOnline ? '#3B82F6' : '#666' 
-              }]} />
+              <View
+                style={[
+                  styles.dot,
+                  {
+                    backgroundColor: isConnected ? '#10B981' : isOnline ? '#3B82F6' : '#666',
+                  },
+                ]}
+              />
             </TouchableOpacity>
           </>
         )}
@@ -111,13 +118,13 @@ export default function IntegrationsScreen() {
         {watchEnabled && isConnected && (
           <>
             <Text style={[styles.label, { color: colors.textMuted, marginTop: 20 }]}>TEST MESSAGES</Text>
-            
+
             <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.buttons}>
                 <TouchableOpacity onPress={handlePing} style={styles.button}>
                   <Text style={styles.buttonText}>📡 Ping</Text>
                 </TouchableOpacity>
-              </View> 
+              </View>
             </View>
           </>
         )}
@@ -126,7 +133,7 @@ export default function IntegrationsScreen() {
         {watchEnabled && messages.length > 0 && (
           <>
             <Text style={[styles.label, { color: colors.textMuted, marginTop: 20 }]}>MESSAGES FROM WATCH</Text>
-            
+
             <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {messages.map((msg, i) => (
                 <Text key={i} style={[styles.message, { color: colors.text }]}>
@@ -156,7 +163,16 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 20 },
   label: { fontSize: 12, fontWeight: '600', marginBottom: 12, marginLeft: 4 },
-  card: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 12, borderWidth: 1, marginBottom: 10, gap: 14, flexWrap: 'wrap' },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 10,
+    gap: 14,
+    flexWrap: 'wrap',
+  },
   icon: { width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   iconText: { color: '#fff', fontSize: 20, fontWeight: '700' },
   info: { flex: 1 },

@@ -2863,6 +2863,22 @@ COMMENT ON COLUMN "public"."drills"."fixed_shots" IS 'If true, default_shots can
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."notification_history" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "title" "text" NOT NULL,
+    "body" "text" NOT NULL,
+    "type" "text" DEFAULT 'default'::"text" NOT NULL,
+    "screen" "text",
+    "reference_id" "text",
+    "read" boolean DEFAULT false NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."notification_history" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."notifications" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -3519,6 +3535,11 @@ ALTER TABLE ONLY "public"."drills"
 
 
 
+ALTER TABLE ONLY "public"."notification_history"
+    ADD CONSTRAINT "notification_history_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."notifications"
     ADD CONSTRAINT "notifications_pkey" PRIMARY KEY ("id");
 
@@ -3746,6 +3767,14 @@ CREATE INDEX "idx_drill_templates_owner" ON "public"."drill_templates" USING "bt
 
 
 CREATE INDEX "idx_drill_templates_team_id" ON "public"."drill_templates" USING "btree" ("team_id");
+
+
+
+CREATE INDEX "idx_notification_history_unread" ON "public"."notification_history" USING "btree" ("user_id", "read") WHERE ("read" = false);
+
+
+
+CREATE INDEX "idx_notification_history_user" ON "public"."notification_history" USING "btree" ("user_id", "created_at" DESC);
 
 
 
@@ -4080,6 +4109,11 @@ ALTER TABLE ONLY "public"."drill_templates"
 
 ALTER TABLE ONLY "public"."drill_templates"
     ADD CONSTRAINT "drill_templates_team_id_fkey" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."notification_history"
+    ADD CONSTRAINT "notification_history_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
 
 
@@ -4688,6 +4722,10 @@ CREATE POLICY "Users can delete own insights" ON "public"."session_insights" FOR
 
 
 
+CREATE POLICY "Users can delete own notifications" ON "public"."notification_history" FOR DELETE USING (("auth"."uid"() = "user_id"));
+
+
+
 CREATE POLICY "Users can delete own notifications" ON "public"."notifications" FOR DELETE USING (("auth"."uid"() = "user_id"));
 
 
@@ -4723,6 +4761,10 @@ CREATE POLICY "Users can insert own drill completions" ON "public"."user_drill_c
 
 
 CREATE POLICY "Users can insert own insights" ON "public"."session_insights" FOR INSERT WITH CHECK (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can insert own notifications" ON "public"."notification_history" FOR INSERT WITH CHECK (("auth"."uid"() = "user_id"));
 
 
 
@@ -4791,6 +4833,10 @@ CREATE POLICY "Users can read own weapons" ON "public"."user_weapons" FOR SELECT
 
 
 CREATE POLICY "Users can update own insights" ON "public"."session_insights" FOR UPDATE USING (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can update own notifications" ON "public"."notification_history" FOR UPDATE USING (("auth"."uid"() = "user_id"));
 
 
 
@@ -4876,6 +4922,10 @@ CREATE POLICY "Users can view own insights" ON "public"."session_insights" FOR S
 
 
 
+CREATE POLICY "Users can view own notifications" ON "public"."notification_history" FOR SELECT USING (("auth"."uid"() = "user_id"));
+
+
+
 CREATE POLICY "Users can view own notifications" ON "public"."notifications" FOR SELECT USING (("auth"."uid"() = "user_id"));
 
 
@@ -4951,6 +5001,9 @@ CREATE POLICY "Users can view training drills" ON "public"."training_drills" FOR
 
 
 ALTER TABLE "public"."drill_templates" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."notification_history" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."notifications" ENABLE ROW LEVEL SECURITY;
@@ -5403,6 +5456,12 @@ GRANT ALL ON TABLE "public"."drill_templates" TO "service_role";
 GRANT ALL ON TABLE "public"."drills" TO "anon";
 GRANT ALL ON TABLE "public"."drills" TO "authenticated";
 GRANT ALL ON TABLE "public"."drills" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."notification_history" TO "anon";
+GRANT ALL ON TABLE "public"."notification_history" TO "authenticated";
+GRANT ALL ON TABLE "public"."notification_history" TO "service_role";
 
 
 

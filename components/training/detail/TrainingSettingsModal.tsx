@@ -3,7 +3,10 @@
  * Modal for training settings like auto-close
  */
 
-import React, { useEffect, useState } from 'react';
+import { updateTraining } from '@/services/trainingService';
+import * as Haptics from 'expo-haptics';
+import { Timer, XCircle } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,18 +19,9 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Timer, XCircle } from 'lucide-react-native';
-import * as Haptics from 'expo-haptics';
-import { updateTraining } from '@/services/trainingService';
 import type { TrainingSettingsModalProps } from './types';
 
-export function TrainingSettingsModal({
-  visible,
-  onClose,
-  training,
-  onUpdate,
-  colors,
-}: TrainingSettingsModalProps) {
+export function TrainingSettingsModal({ visible, onClose, training, onUpdate, colors }: TrainingSettingsModalProps) {
   const insets = useSafeAreaInsets();
   const [saving, setSaving] = useState(false);
   const [autoCloseEnabled, setAutoCloseEnabled] = useState(!!training?.auto_close_at);
@@ -94,16 +88,11 @@ export function TrainingSettingsModal({
                 <Timer size={20} color={colors.text} />
                 <View style={styles.settingTextWrap}>
                   <Text style={[styles.settingTitle, { color: colors.text }]}>Auto-close</Text>
-                  <Text style={[styles.settingDesc, { color: colors.textMuted }]}>
-                    Automatically finish training
-                  </Text>
+                  <Text style={[styles.settingDesc, { color: colors.textMuted }]}>Automatically finish training</Text>
                 </View>
               </View>
               <TouchableOpacity
-                style={[
-                  styles.toggle,
-                  { backgroundColor: autoCloseEnabled ? colors.green : colors.secondary },
-                ]}
+                style={[styles.toggle, { backgroundColor: autoCloseEnabled ? colors.green : colors.secondary }]}
                 onPress={() => setAutoCloseEnabled(!autoCloseEnabled)}
               >
                 <View

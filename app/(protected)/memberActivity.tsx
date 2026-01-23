@@ -1,10 +1,10 @@
-import { useColors } from "@/hooks/ui/useColors";
-import { useAppContext } from "@/hooks/useAppContext";
-import { supabase } from "@/lib/supabase";
-import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useColors } from '@/hooks/ui/useColors';
+import { useAppContext } from '@/hooks/useAppContext';
+import { supabase } from '@/lib/supabase';
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 interface MemberSession {
   id: string;
@@ -33,7 +33,7 @@ export default function MemberActivityScreen() {
   const colors = useColors();
   const { activeTeamId } = useAppContext();
   const { memberId, memberName } = useLocalSearchParams<{ memberId: string; memberName: string }>();
-  
+
   const [sessions, setSessions] = useState<MemberSession[]>([]);
   const [stats, setStats] = useState<MemberStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,7 +47,8 @@ export default function MemberActivityScreen() {
       // Query sessions for this member in the active team
       const { data: sessionData, error: sessionError } = await supabase
         .from('sessions')
-        .select(`
+        .select(
+          `
           id,
           status,
           started_at,
@@ -56,7 +57,8 @@ export default function MemberActivityScreen() {
           trainings:training_id(title),
           teams:team_id(name),
           training_drills:drill_id(name)
-        `)
+        `
+        )
         .eq('user_id', memberId)
         .eq('team_id', activeTeamId)
         .order('started_at', { ascending: false })
@@ -78,11 +80,11 @@ export default function MemberActivityScreen() {
       setSessions(mappedSessions);
 
       // Calculate stats
-      const completedSessions = mappedSessions.filter(s => s.status === 'completed');
-      const activeSessions = mappedSessions.filter(s => s.status === 'active');
-      
+      const completedSessions = mappedSessions.filter((s) => s.status === 'completed');
+      const activeSessions = mappedSessions.filter((s) => s.status === 'active');
+
       let totalMinutes = 0;
-      completedSessions.forEach(s => {
+      completedSessions.forEach((s) => {
         if (s.started_at && s.ended_at) {
           const duration = new Date(s.ended_at).getTime() - new Date(s.started_at).getTime();
           totalMinutes += duration / (1000 * 60);
@@ -96,7 +98,6 @@ export default function MemberActivityScreen() {
         totalTimeMinutes: Math.round(totalMinutes),
         lastActive: mappedSessions[0]?.started_at || null,
       });
-
     } catch (error) {
       console.error('Failed to load member activity:', error);
     } finally {
@@ -128,19 +129,19 @@ export default function MemberActivityScreen() {
     const date = new Date(dateStr);
     const now = new Date();
     const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
-    
+
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
   const formatTime = (dateStr: string) => {
-    return new Date(dateStr).toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
+    return new Date(dateStr).toLocaleTimeString('en-US', {
+      hour: 'numeric',
       minute: '2-digit',
-      hour12: true 
+      hour12: true,
     });
   };
 
@@ -157,9 +158,7 @@ export default function MemberActivityScreen() {
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
-      }
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
     >
       {/* Header */}
       <View style={styles.header}>
@@ -183,8 +182,8 @@ export default function MemberActivityScreen() {
           <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Ionicons name="time-outline" size={24} color="#f59e0b" />
             <Text style={[styles.statValue, { color: colors.text }]}>
-              {stats.totalTimeMinutes < 60 
-                ? `${stats.totalTimeMinutes}m` 
+              {stats.totalTimeMinutes < 60
+                ? `${stats.totalTimeMinutes}m`
                 : `${Math.floor(stats.totalTimeMinutes / 60)}h`}
             </Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>Total Time</Text>
@@ -210,7 +209,7 @@ export default function MemberActivityScreen() {
       {/* Sessions List */}
       <View style={styles.sessionsSection}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Sessions</Text>
-        
+
         {sessions.length === 0 ? (
           <View style={[styles.emptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Ionicons name="document-text-outline" size={40} color={colors.textMuted} />
@@ -222,16 +221,25 @@ export default function MemberActivityScreen() {
         ) : (
           <View style={styles.sessionsList}>
             {sessions.map((session) => (
-              <View 
-                key={session.id} 
+              <View
+                key={session.id}
                 style={[styles.sessionCard, { backgroundColor: colors.card, borderColor: colors.border }]}
               >
                 <View style={styles.sessionHeader}>
                   <View style={styles.sessionMeta}>
-                    <View style={[
-                      styles.statusDot, 
-                      { backgroundColor: session.status === 'active' ? '#22c55e' : session.status === 'completed' ? colors.primary : colors.textMuted }
-                    ]} />
+                    <View
+                      style={[
+                        styles.statusDot,
+                        {
+                          backgroundColor:
+                            session.status === 'active'
+                              ? '#22c55e'
+                              : session.status === 'completed'
+                                ? colors.primary
+                                : colors.textMuted,
+                        },
+                      ]}
+                    />
                     <Text style={[styles.sessionDate, { color: colors.textMuted }]}>
                       {formatDate(session.started_at)} • {formatTime(session.started_at)}
                     </Text>
@@ -240,13 +248,11 @@ export default function MemberActivityScreen() {
                     {formatDuration(session.started_at, session.ended_at)}
                   </Text>
                 </View>
-                
+
                 {session.training_title && (
-                  <Text style={[styles.trainingTitle, { color: colors.text }]}>
-                    {session.training_title}
-                  </Text>
+                  <Text style={[styles.trainingTitle, { color: colors.text }]}>{session.training_title}</Text>
                 )}
-                
+
                 <View style={styles.sessionTags}>
                   {session.team_name && (
                     <View style={[styles.tag, { backgroundColor: colors.secondary }]}>
@@ -261,10 +267,10 @@ export default function MemberActivityScreen() {
                     </View>
                   )}
                   <View style={[styles.tag, { backgroundColor: colors.secondary }]}>
-                    <Ionicons 
-                      name={session.session_mode === 'group' ? 'people-outline' : 'person-outline'} 
-                      size={12} 
-                      color={colors.text} 
+                    <Ionicons
+                      name={session.session_mode === 'group' ? 'people-outline' : 'person-outline'}
+                      size={12}
+                      color={colors.text}
                     />
                     <Text style={[styles.tagText, { color: colors.text }]}>
                       {session.session_mode === 'group' ? 'Group' : 'Solo'}
@@ -289,17 +295,17 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
   subtitle: { fontSize: 15, marginTop: 4 },
 
-  statsGrid: { 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
     marginBottom: 16,
   },
-  statCard: { 
+  statCard: {
     flex: 1,
     minWidth: '45%',
-    padding: 16, 
-    borderRadius: 16, 
+    padding: 16,
+    borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     gap: 8,
@@ -339,13 +345,13 @@ const styles = StyleSheet.create({
   sessionDuration: { fontSize: 14, fontWeight: '600' },
   trainingTitle: { fontSize: 16, fontWeight: '600' },
   sessionTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tag: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 4, 
-    paddingHorizontal: 8, 
-    paddingVertical: 4, 
-    borderRadius: 6 
+  tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
   tagText: { fontSize: 12, fontWeight: '500' },
 
@@ -359,4 +365,3 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 16, fontWeight: '600', marginTop: 8 },
   emptySubtitle: { fontSize: 14, textAlign: 'center' },
 });
-

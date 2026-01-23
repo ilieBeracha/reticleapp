@@ -31,22 +31,14 @@ export function TeamTrainingCard({ training, colors, onPress }: TeamTrainingCard
 
   return (
     <AnimatedTouchable
-      style={[
-        s.card,
-        { backgroundColor: colors.card, borderColor: isLive ? colors.orange : colors.border },
-        animStyle,
-      ]}
+      style={[s.card, { backgroundColor: colors.card, borderColor: isLive ? colors.orange : colors.border }, animStyle]}
       onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       activeOpacity={1}
     >
       <View style={[s.icon, { backgroundColor: isLive ? `${colors.orange}12` : `${colors.blue}12` }]}>
-        {isLive ? (
-          <Calendar size={18} color={colors.orange} />
-        ) : (
-          <Users size={18} color={colors.blue} />
-        )}
+        {isLive ? <Calendar size={18} color={colors.orange} /> : <Users size={18} color={colors.blue} />}
       </View>
 
       <View style={s.content}>
@@ -62,9 +54,7 @@ export function TeamTrainingCard({ training, colors, onPress }: TeamTrainingCard
           </Text>
         </View>
         <View style={s.meta}>
-          <Text style={[s.teamName, { color: colors.textMuted }]}>
-            {training.team?.name || 'Team Training'}
-          </Text>
+          <Text style={[s.teamName, { color: colors.textMuted }]}>{training.team?.name || 'Team Training'}</Text>
           {drillCount > 0 && (
             <>
               <View style={[s.dot, { backgroundColor: colors.textMuted }]} />
@@ -152,4 +142,3 @@ const s = StyleSheet.create({
     fontSize: 12,
   },
 });
-

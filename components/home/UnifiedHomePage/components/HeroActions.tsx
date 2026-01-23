@@ -1,18 +1,19 @@
 /**
  * HeroActions Component
  *
- * Compact actions section:
- * - Solo Session: 50% width - start/continue practice
- * - Default Weapon: 25% - shows weapon name & rounds
- * - Weapon Stats: 25% - shows accuracy or sessions
- * - Timeline Strip: 7-day schedule with team-colored dots
+ * Split-button hero that adapts content based on priority:
+ * 1. Team training live → Main shows training, side shows "Solo"
+ * 2. Active solo session → Full-width "Continue" button
+ * 3. Idle → Full-width "Start Session" button
+ *
+ * Below: Weapon (50%) + Stats (50%) + TimelineStrip
  */
 
 import type { UserWeapon, WeaponStats } from '@/services/weaponService';
 import type { TrainingWithDetails } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { ChevronRight, Crosshair, Play, Target, Zap } from 'lucide-react-native';
+import { ChevronRight, Play, Radio, Target } from 'lucide-react-native';
 import { useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
@@ -26,17 +27,25 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import type { HomeSession } from '../../types';
-import type { Colors } from '../UnifiedHomePage.types';
+import type { Colors, HeroMode } from '../UnifiedHomePage.types';
 import { TimelineStrip } from './TimelineStrip';
 
 interface HeroActionsProps {
   colors: Colors;
+  heroMode: HeroMode;
   // Solo session
   activeSession: HomeSession | null;
   hasActiveSession: boolean;
   starting: boolean;
   onStartSession: () => void;
   onActiveSessionPress: () => void;
+  // Team training
+  activeTeamTraining: TrainingWithDetails | null;
+  isTrainingCommander: boolean;
+  hasTeams: boolean;
+  onTrainingPress: (training: any) => void;
+  // Next upcoming training (for secondary row)
+  nextUpcomingTraining: TrainingWithDetails | null;
   // Weapon data
   defaultWeapon: UserWeapon | null;
   defaultWeaponStats: WeaponStats | null;
@@ -44,7 +53,6 @@ interface HeroActionsProps {
   upcomingTrainings: TrainingWithDetails[];
 }
 
-// Format large numbers (e.g., 1500 -> 1.5k)
 const formatNumber = (num: number): string => {
   if (num >= 1000) {
     return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
@@ -56,23 +64,29 @@ const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export function HeroActions({
   colors,
+  heroMode,
   activeSession,
   hasActiveSession,
   starting,
   onStartSession,
   onActiveSessionPress,
+  activeTeamTraining,
+  isTrainingCommander,
+  hasTeams,
+  onTrainingPress,
+  nextUpcomingTraining,
   defaultWeapon,
   defaultWeaponStats,
   upcomingTrainings,
 }: HeroActionsProps) {
-  const soloScale = useSharedValue(1);
+  const mainScale = useSharedValue(1);
+  const sideScale = useSharedValue(1);
   const weaponScale = useSharedValue(1);
   const statsScale = useSharedValue(1);
   const pulseOpacity = useSharedValue(1);
 
-  // Pulse animation for live indicator
   useEffect(() => {
-    if (hasActiveSession) {
+    if (heroMode === 'team-live' || heroMode === 'solo-active') {
       pulseOpacity.value = withRepeat(
         withSequence(
           withTiming(0.4, { duration: 800, easing: Easing.inOut(Easing.ease) }),
@@ -82,10 +96,14 @@ export function HeroActions({
         true
       );
     }
-  }, [hasActiveSession]);
+  }, [heroMode]);
 
-  const soloAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: soloScale.value }],
+  const mainAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: mainScale.value }],
+  }));
+
+  const sideAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: sideScale.value }],
   }));
 
   const weaponAnimStyle = useAnimatedStyle(() => ({
@@ -100,20 +118,22 @@ export function HeroActions({
     opacity: pulseOpacity.value,
   }));
 
-  const handleSoloPressIn = () => {
-    soloScale.value = withSpring(0.97);
-  };
-  const handleSoloPressOut = () => {
-    soloScale.value = withSpring(1);
-  };
+  // ─── HANDLERS ───────────────────────────────────────────────────────────────
 
-  const handleSoloPress = () => {
+  const handleMainPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    if (hasActiveSession) {
+    if (heroMode === 'team-live' && activeTeamTraining) {
+      onTrainingPress(activeTeamTraining);
+    } else if (heroMode === 'solo-active') {
       onActiveSessionPress();
     } else {
       onStartSession();
     }
+  };
+
+  const handleSoloSidePress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onStartSession();
   };
 
   const handleWeaponPress = () => {
@@ -134,115 +154,104 @@ export function HeroActions({
     }
   };
 
+  // ─── RENDER ─────────────────────────────────────────────────────────────────
+
   return (
     <Animated.View entering={FadeInDown.duration(400)} style={s.container}>
-      {/* ─────────────────────────────────────────────────────────────────── */}
-      {/* ACTION ROW - Solo (50%) + Weapons (25%) + Stats (25%) */}
-      {/* ─────────────────────────────────────────────────────────────────── */}
-      <View style={s.actionRow}>
-        {/* Solo Session - 50% */}
-        <AnimatedTouchable
-          style={[
-            s.soloButton,
-            hasActiveSession && s.soloButtonActive,
-            soloAnimStyle,
-          ]}
-          onPress={handleSoloPress}
-          onPressIn={handleSoloPressIn}
-          onPressOut={handleSoloPressOut}
-          activeOpacity={1}
+      {/* ─── PRIMARY: Split button (main + solo side when team-live) ──── */}
+      <Animated.View
+        style={[
+          s.splitContainer,
+          heroMode === 'team-live' && (isTrainingCommander ? s.splitCommander : s.splitTeamLive),
+          heroMode === 'solo-active' && s.splitSoloActive,
+          heroMode === 'idle' && s.splitIdle,
+          mainAnimStyle,
+        ]}
+      >
+        {/* Main tappable area */}
+        <TouchableOpacity
+          style={s.mainArea}
+          onPress={handleMainPress}
+          onPressIn={() => {
+            mainScale.value = withSpring(0.97);
+          }}
+          onPressOut={() => {
+            mainScale.value = withSpring(1);
+          }}
+          activeOpacity={0.8}
           disabled={starting}
         >
-          {hasActiveSession ? (
-            <View style={s.liveIconContainer}>
-              <Animated.View style={[s.livePulse, pulseStyle]} />
-              <View style={s.soloIconLive}>
-                <Play size={11} color="#fff" fill="#fff" />
-              </View>
-            </View>
-          ) : (
-            <View style={s.soloIconDefault}>
-              <Target size={13} color="rgba(255,255,255,0.9)" strokeWidth={2} />
-            </View>
-          )}
-          <Text style={[s.soloText, hasActiveSession && s.soloTextActive]} numberOfLines={1}>
-            {hasActiveSession ? 'Continue' : 'Start Session'}
-          </Text>
-          <ChevronRight size={14} color={hasActiveSession ? '#fff' : 'rgba(255,255,255,0.5)'} />
-        </AnimatedTouchable>
-
-        {/* Default Weapon - 25% */}
-        <AnimatedTouchable
-          style={[
-            s.statCard,
-            { backgroundColor: colors.card, borderColor: colors.border },
-            weaponAnimStyle,
-          ]}
-          onPress={handleWeaponPress}
-          onPressIn={() => { weaponScale.value = withSpring(0.95); }}
-          onPressOut={() => { weaponScale.value = withSpring(1); }}
-          activeOpacity={1}
-        >
-          {defaultWeapon ? (
+          {heroMode === 'team-live' && activeTeamTraining && (
             <>
-              <View style={[s.statIcon, { backgroundColor: `${colors.indigo}15` }]}>
-                <Crosshair size={12} color={colors.indigo} />
+              <View style={s.liveIconContainer}>
+                <Animated.View
+                  style={[s.livePulse, isTrainingCommander ? s.livePulseIndigo : s.livePulseOrange, pulseStyle]}
+                />
+                <View style={[s.liveIconBadge, isTrainingCommander && s.liveIconBadgeCommander]}>
+                  <Radio size={11} color="#fff" />
+                </View>
               </View>
-              <Text style={[s.statValue, { color: colors.text }]} numberOfLines={1}>
-                {defaultWeapon.name.length > 6 ? defaultWeapon.name.slice(0, 5) + '…' : defaultWeapon.name}
-              </Text>
-              <Text style={[s.statLabel, { color: colors.textMuted }]} numberOfLines={1}>
-                {defaultWeapon.caliber || 'Weapon'}
-              </Text>
-            </>
-          ) : (
-            <>
-              <View style={[s.statIcon, { backgroundColor: `${colors.primary}15` }]}>
-                <Zap size={12} color={colors.primary} />
+              <View style={s.mainTextContainer}>
+                <Text style={s.mainLabel} numberOfLines={1}>
+                  {isTrainingCommander ? 'Your Training' : (activeTeamTraining.team?.name ?? 'Team')}
+                </Text>
+                <Text style={s.mainTitle} numberOfLines={1}>
+                  {activeTeamTraining.title || 'Live Training'}
+                </Text>
               </View>
-              <Text style={[s.statValue, { color: colors.textMuted }]}>—</Text>
-              <Text style={[s.statLabel, { color: colors.textMuted }]}>Add</Text>
+              <View style={[s.badge, isTrainingCommander ? s.badgeCommander : s.badgeLive]}>
+                <Text style={s.badgeText}>{isTrainingCommander ? 'MANAGE' : 'JOIN'}</Text>
+              </View>
+              <ChevronRight size={14} color="rgba(255,255,255,0.5)" />
             </>
           )}
-        </AnimatedTouchable>
 
-        {/* Weapon Stats - 25% */}
-        <AnimatedTouchable
-          style={[
-            s.statCard,
-            { backgroundColor: colors.card, borderColor: colors.border },
-            statsAnimStyle,
-          ]}
-          onPress={handleStatsPress}
-          onPressIn={() => { statsScale.value = withSpring(0.95); }}
-          onPressOut={() => { statsScale.value = withSpring(1); }}
-          activeOpacity={1}
-        >
-          {defaultWeaponStats ? (
+          {heroMode === 'solo-active' && (
             <>
-              <View style={[s.statIcon, { backgroundColor: `${colors.green}15` }]}>
-                <Target size={12} color={colors.green} />
+              <View style={s.liveIconContainer}>
+                <Animated.View style={[s.livePulse, s.livePulseGreen, pulseStyle]} />
+                <View style={s.soloIconLive}>
+                  <Play size={11} color="#fff" fill="#fff" />
+                </View>
               </View>
-              <Text style={[s.statValue, { color: colors.text }]}>
-                {formatNumber(defaultWeaponStats.total_rounds_fired)}
-              </Text>
-              <Text style={[s.statLabel, { color: colors.textMuted }]}>Rounds</Text>
-            </>
-          ) : (
-            <>
-              <View style={[s.statIcon, { backgroundColor: `${colors.green}15` }]}>
-                <Target size={12} color={colors.green} />
+              <View style={s.mainTextContainer}>
+                <Text style={s.mainLabel} numberOfLines={1}>
+                  Active Session
+                </Text>
+                <Text style={s.mainTitle} numberOfLines={1}>
+                  {activeSession?.drillName || 'Solo Practice'}
+                </Text>
               </View>
-              <Text style={[s.statValue, { color: colors.textMuted }]}>0</Text>
-              <Text style={[s.statLabel, { color: colors.textMuted }]}>Rounds</Text>
+              <ChevronRight size={14} color="rgba(255,255,255,0.5)" />
             </>
           )}
-        </AnimatedTouchable>
-      </View>
 
-      {/* ─────────────────────────────────────────────────────────────────── */}
-      {/* TIMELINE STRIP - 7-day schedule with team-colored dots */}
-      {/* ─────────────────────────────────────────────────────────────────── */}
+          {heroMode === 'idle' && (
+            <>
+              <View style={s.soloIconDefault}>
+                <Target size={13} color="rgba(255,255,255,0.9)" strokeWidth={2} />
+              </View>
+              <Text style={s.idleText}>Start Session</Text>
+              <ChevronRight size={14} color="rgba(255,255,255,0.5)" />
+            </>
+          )}
+        </TouchableOpacity>
+
+        {/* Solo side — attached, separated by divider (only when team-live) */}
+        {heroMode === 'team-live' && (
+          <>
+            <View style={[s.divider, isTrainingCommander ? s.dividerCommander : s.dividerOrange]} />
+            <TouchableOpacity style={s.sideArea} onPress={handleSoloSidePress} activeOpacity={0.7}>
+              <View style={s.sideIcon}>
+                <Target size={14} color="rgba(255,255,255,0.85)" strokeWidth={2} />
+              </View>
+              <Text style={s.sideLabel}>Solo</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </Animated.View>
+
+      {/* ─── TIMELINE STRIP ────────────────────────────────────────────── */}
       <TimelineStrip colors={colors} trainings={upcomingTrainings} />
     </Animated.View>
   );
@@ -254,56 +263,99 @@ const s = StyleSheet.create({
     marginBottom: 14,
   },
 
-  // Action Row - Solo (50%) + Quick Actions (25% each)
-  actionRow: {
+  // ─── SPLIT BUTTON ──────────────────────────────────────────────────────────
+  splitContainer: {
     flexDirection: 'row',
-    gap: 6,
-  },
-
-  // Solo Session Button - flex: 2 (50%)
-  soloButton: {
-    flex: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    alignItems: 'stretch',
     borderRadius: 12,
-    backgroundColor: '#1a1a1a',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
   },
-  soloButtonActive: {
+  splitTeamLive: {
+    backgroundColor: '#3d1f00',
+    borderColor: 'rgba(245,158,11,0.35)',
+  },
+  splitCommander: {
+    backgroundColor: '#1a1a3d',
+    borderColor: 'rgba(99,102,241,0.35)',
+  },
+  splitSoloActive: {
     backgroundColor: '#0d5c2e',
     borderColor: 'rgba(16,185,129,0.3)',
   },
-  soloIconDefault: {
-    width: 26,
-    height: 26,
-    borderRadius: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
+  splitIdle: {
+    backgroundColor: '#1a1a1a',
+    borderColor: 'rgba(255,255,255,0.08)',
   },
-  soloIconLive: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
+
+  // Main tappable area (flex: 1)
+  mainArea: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
-  soloText: {
+  mainTextContainer: {
+    flex: 1,
+  },
+  mainLabel: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.6)',
+    letterSpacing: 0.2,
+  },
+  mainTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: -0.3,
+    marginTop: 1,
+  },
+  idleText: {
     flex: 1,
     fontSize: 13,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.85)',
     letterSpacing: -0.2,
   },
-  soloTextActive: {
-    color: '#fff',
+
+  // Divider between main and side
+  divider: {
+    width: 1,
+    marginVertical: 8,
   },
+  dividerOrange: {
+    backgroundColor: 'rgba(245,158,11,0.3)',
+  },
+  dividerCommander: {
+    backgroundColor: 'rgba(99,102,241,0.3)',
+  },
+
+  // Solo side area (fixed width, attached)
+  sideArea: {
+    width: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+  },
+  sideIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  sideLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.7)',
+    letterSpacing: 0.2,
+  },
+
+  // ─── LIVE INDICATORS ───────────────────────────────────────────────────────
   liveIconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -313,36 +365,96 @@ const s = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
+  },
+  livePulseOrange: {
+    backgroundColor: 'rgba(245,158,11,0.35)',
+  },
+  livePulseIndigo: {
+    backgroundColor: 'rgba(99,102,241,0.35)',
+  },
+  livePulseGreen: {
     backgroundColor: 'rgba(16,185,129,0.4)',
   },
+  liveIconBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(245,158,11,0.6)',
+  },
+  liveIconBadgeCommander: {
+    backgroundColor: 'rgba(99,102,241,0.6)',
+  },
+  soloIconLive: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  soloIconDefault: {
+    width: 26,
+    height: 26,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
 
-  // Stat Cards - flex: 1 (25% each)
+  // Badges
+  badge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  badgeLive: {
+    backgroundColor: 'rgba(245,158,11,0.8)',
+  },
+  badgeCommander: {
+    backgroundColor: 'rgba(99,102,241,0.8)',
+  },
+  badgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: 0.5,
+  },
+
+  // ─── STATS ROW ─────────────────────────────────────────────────────────────
+  statsRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
   statCard: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 4,
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     borderRadius: 10,
     borderWidth: 1,
-    gap: 1,
   },
   statIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 5,
+    width: 24,
+    height: 24,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  statTextContainer: {
+    flex: 1,
   },
   statValue: {
     fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+    fontWeight: '600',
+    letterSpacing: -0.2,
   },
   statLabel: {
-    fontSize: 9,
-    fontWeight: '500',
-    letterSpacing: -0.1,
+    fontSize: 10,
+    fontWeight: '400',
+    marginTop: 1,
   },
-
 });

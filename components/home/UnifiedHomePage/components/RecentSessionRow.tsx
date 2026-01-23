@@ -70,26 +70,18 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
           <Text style={[s.title, { color: colors.text }]} numberOfLines={1}>
             {session.drillName || (isTeam ? 'Team Session' : 'Practice')}
           </Text>
-          {hasWatchData && (
-            <Heart size={12} color="#EF4444" fill="#EF4444" style={{ opacity: 0.8 }} />
-          )}
+          {hasWatchData && <Heart size={12} color="#EF4444" fill="#EF4444" style={{ opacity: 0.8 }} />}
         </View>
 
         {/* Stats row - different for grouping vs engagement */}
         <View style={s.statsRow}>
           {isGrouping ? (
             <>
-              {shots > 0 && (
-                <Text style={[s.stat, { color: colors.textMuted }]}>
-                  {shots} shots
-                </Text>
-              )}
+              {shots > 0 && <Text style={[s.stat, { color: colors.textMuted }]}>{shots} shots</Text>}
               {bestDispersion !== undefined && bestDispersion > 0 && (
                 <>
                   <View style={[s.dot, { backgroundColor: colors.textMuted }]} />
-                  <Text style={[s.stat, { color: colors.orange }]}>
-                    {bestDispersion.toFixed(1)}cm
-                  </Text>
+                  <Text style={[s.stat, { color: colors.orange }]}>{bestDispersion.toFixed(1)}cm</Text>
                 </>
               )}
             </>
@@ -103,9 +95,7 @@ export function RecentSessionRow({ session, colors, onPress }: RecentSessionRowP
               {accuracy !== undefined && accuracy > 0 && (
                 <>
                   <View style={[s.dot, { backgroundColor: colors.textMuted }]} />
-                  <Text style={[s.stat, { color: accuracy >= 70 ? colors.green : colors.textMuted }]}>
-                    {accuracy}%
-                  </Text>
+                  <Text style={[s.stat, { color: accuracy >= 70 ? colors.green : colors.textMuted }]}>{accuracy}%</Text>
                 </>
               )}
             </>

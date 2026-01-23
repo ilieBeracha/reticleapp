@@ -8,7 +8,7 @@
 import type { UserWeapon, WeaponStats } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { ChevronRight, Crosshair, TrendingDown, TrendingUp, Minus } from 'lucide-react-native';
+import { ChevronRight, Crosshair, Minus, TrendingDown, TrendingUp } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { Colors } from '../UnifiedHomePage.types';
@@ -65,9 +65,10 @@ export function WeaponPerformanceCard({ weapon, stats, colors }: WeaponPerforman
 
   const accuracy = stats.avg_accuracy_pct !== null ? `${Math.round(stats.avg_accuracy_pct)}%` : '—';
   const bestGroup = stats.best_dispersion_cm !== null ? `${stats.best_dispersion_cm.toFixed(1)}cm` : '—';
-  const rounds = stats.total_rounds_fired >= 1000
-    ? `${(stats.total_rounds_fired / 1000).toFixed(1).replace(/\.0$/, '')}k`
-    : String(stats.total_rounds_fired);
+  const rounds =
+    stats.total_rounds_fired >= 1000
+      ? `${(stats.total_rounds_fired / 1000).toFixed(1).replace(/\.0$/, '')}k`
+      : String(stats.total_rounds_fired);
 
   // Recency text
   let recency = '';

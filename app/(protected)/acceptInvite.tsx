@@ -1,15 +1,15 @@
-import { useColors } from "@/hooks/ui/useColors";
-import { getCurrentUserId } from "@/services/authService";
-import { acceptTeamInvitation, getInvitationByCode } from "@/services/teamService";
-import { assignTeamWeapon, getTeamWeapon } from "@/services/weaponService";
-import { useTeamStore } from "@/store/teamStore";
-import { useTrainingStore } from "@/store/trainingStore";
-import type { TeamInvitation, TeamRole } from "@/types/workspace";
-import { Ionicons } from "@expo/vector-icons";
+import { useColors } from '@/hooks/ui/useColors';
+import { getCurrentUserId } from '@/services/authService';
+import { acceptTeamInvitation, getInvitationByCode } from '@/services/teamService';
+import { assignTeamWeapon, getTeamWeapon } from '@/services/weaponService';
+import { useTeamStore } from '@/store/teamStore';
+import { useTrainingStore } from '@/store/trainingStore';
+import type { TeamInvitation, TeamRole } from '@/types/workspace';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { router } from "expo-router";
-import { Crosshair } from "lucide-react-native";
-import { useCallback, useEffect, useState } from "react";
+import { router } from 'expo-router';
+import { Crosshair } from 'lucide-react-native';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,26 +20,30 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from "react-native";
+} from 'react-native';
 
 /**
  * ACCEPT INVITE SHEET - Team Invitations
- * 
+ *
  * Team-First Architecture: Users join teams directly via invite code.
  */
 export default function AcceptInviteSheet() {
   const colors = useColors();
-  
-  const [inviteCode, setInviteCode] = useState("");
+
+  const [inviteCode, setInviteCode] = useState('');
   const [validatedInvite, setValidatedInvite] = useState<(TeamInvitation & { team_name?: string }) | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [isAccepting, setIsAccepting] = useState(false);
   const [isAccepted, setIsAccepted] = useState(false);
-  const [acceptedResult, setAcceptedResult] = useState<{ team_id: string; team_name: string; role: TeamRole } | null>(null);
+  const [acceptedResult, setAcceptedResult] = useState<{ team_id: string; team_name: string; role: TeamRole } | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
-  
+
   // Pre-assigned weapon info
-  const [preassignedWeapon, setPreassignedWeapon] = useState<{ id: string; name: string; caliber?: string } | null>(null);
+  const [preassignedWeapon, setPreassignedWeapon] = useState<{ id: string; name: string; caliber?: string } | null>(
+    null
+  );
 
   // Load pre-assigned weapon details when invitation is validated
   useEffect(() => {
@@ -76,7 +80,7 @@ export default function AcceptInviteSheet() {
     Promise.all([
       useTeamStore.getState().loadActiveTeam(),
       useTrainingStore.getState().loadTeamTrainings(teamId),
-    ]).catch((e) => console.warn("Post-invite refresh failed:", e));
+    ]).catch((e) => console.warn('Post-invite refresh failed:', e));
 
     router.back();
     setTimeout(() => {
@@ -86,15 +90,15 @@ export default function AcceptInviteSheet() {
 
   const handleValidate = useCallback(async () => {
     const code = inviteCode.trim().toUpperCase();
-    
+
     if (!code) {
-      setError("Please enter an invite code");
+      setError('Please enter an invite code');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return;
     }
 
     if (code.length !== 8) {
-      setError("Invite code must be 8 characters");
+      setError('Invite code must be 8 characters');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return;
     }
@@ -103,19 +107,19 @@ export default function AcceptInviteSheet() {
     setIsValidating(true);
     setError(null);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
+
     try {
       const invite = await getInvitationByCode(code);
       if (invite) {
         setValidatedInvite(invite);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
-        setError("Invalid or expired invite code");
+        setError('Invalid or expired invite code');
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     } catch (error: any) {
-      console.error("Failed to validate invite:", error);
-      setError(error.message || "Invalid or expired invite code");
+      console.error('Failed to validate invite:', error);
+      setError(error.message || 'Invalid or expired invite code');
       setValidatedInvite(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
@@ -128,10 +132,10 @@ export default function AcceptInviteSheet() {
 
     setIsAccepting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    
+
     try {
       const result = await acceptTeamInvitation(validatedInvite.invite_code);
-      
+
       // If there's a pre-assigned weapon, assign it to the new member
       const weaponId = validatedInvite.details?.weapon_id;
       if (weaponId) {
@@ -145,16 +149,16 @@ export default function AcceptInviteSheet() {
           console.warn('Failed to auto-assign weapon:', weaponErr);
         }
       }
-      
+
       await useTeamStore.getState().loadTeams();
-      
+
       setAcceptedResult(result);
       setIsAccepted(true);
       setIsAccepting(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
-      console.error("Failed to accept invitation:", error);
-      Alert.alert("Error", error.message || "Failed to join team");
+      console.error('Failed to accept invitation:', error);
+      Alert.alert('Error', error.message || 'Failed to join team');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setIsAccepting(false);
     }
@@ -162,26 +166,22 @@ export default function AcceptInviteSheet() {
 
   const handleDecline = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert(
-      "Decline Invitation",
-      "Are you sure you don't want to join this team?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Decline",
-          style: "destructive",
-          onPress: () => {
-            setInviteCode("");
-            setValidatedInvite(null);
-            setError(null);
-          },
+    Alert.alert('Decline Invitation', "Are you sure you don't want to join this team?", [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Decline',
+        style: 'destructive',
+        onPress: () => {
+          setInviteCode('');
+          setValidatedInvite(null);
+          setError(null);
         },
-      ]
-    );
+      },
+    ]);
   }, []);
 
   const handleReset = useCallback(() => {
-    setInviteCode("");
+    setInviteCode('');
     setValidatedInvite(null);
     setError(null);
     setPreassignedWeapon(null);
@@ -250,7 +250,12 @@ export default function AcceptInviteSheet() {
           {acceptedResult.team_name}
         </Text>
 
-        <View style={[styles.successBadge, { backgroundColor: getRoleColor(acceptedResult.role) + '18', borderColor: colors.border }]}>
+        <View
+          style={[
+            styles.successBadge,
+            { backgroundColor: getRoleColor(acceptedResult.role) + '18', borderColor: colors.border },
+          ]}
+        >
           <Ionicons name={getRoleIcon(acceptedResult.role)} size={16} color={getRoleColor(acceptedResult.role)} />
           <Text style={[styles.successRole, { color: getRoleColor(acceptedResult.role) }]}>
             Joined as {getRoleLabel(acceptedResult.role)}
@@ -260,9 +265,7 @@ export default function AcceptInviteSheet() {
         {preassignedWeapon && (
           <View style={[styles.successWeaponChip, { backgroundColor: colors.green + '15' }]}>
             <Crosshair size={14} color={colors.green} />
-            <Text style={[styles.successWeaponText, { color: colors.green }]}>
-              {preassignedWeapon.name} assigned
-            </Text>
+            <Text style={[styles.successWeaponText, { color: colors.green }]}>{preassignedWeapon.name} assigned</Text>
           </View>
         )}
 
@@ -289,7 +292,7 @@ export default function AcceptInviteSheet() {
   }
 
   return (
-    <ScrollView 
+    <ScrollView
       style={[styles.scrollView, { backgroundColor: colors.card }]}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
@@ -314,7 +317,7 @@ export default function AcceptInviteSheet() {
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>
           {validatedInvite ? 'Review invitation' : 'Enter invite code to get started'}
         </Text>
-        
+
         {validatedInvite && (
           <TouchableOpacity
             style={[styles.resetBtn, { backgroundColor: colors.secondary, marginTop: 12 }]}
@@ -333,10 +336,15 @@ export default function AcceptInviteSheet() {
             <Text style={[styles.inputLabel, { color: colors.text }]}>
               <Ionicons name="key-outline" size={14} color={colors.text} /> Invite Code
             </Text>
-            <View style={[styles.inputWrapper, { 
-              backgroundColor: colors.background, 
-              borderColor: error ? colors.destructive : colors.border 
-            }]}>
+            <View
+              style={[
+                styles.inputWrapper,
+                {
+                  backgroundColor: colors.background,
+                  borderColor: error ? colors.destructive : colors.border,
+                },
+              ]}
+            >
               <TextInput
                 style={[styles.input, { color: colors.text }]}
                 placeholder="e.g. ABC123XY"
@@ -353,9 +361,7 @@ export default function AcceptInviteSheet() {
                 autoFocus
               />
             </View>
-            <Text style={[styles.inputHint, { color: colors.textMuted }]}>
-              8 characters • letters and numbers
-            </Text>
+            <Text style={[styles.inputHint, { color: colors.textMuted }]}>8 characters • letters and numbers</Text>
             {error && (
               <View style={styles.errorContainer}>
                 <Ionicons name="alert-circle" size={14} color={colors.destructive} />
@@ -367,10 +373,10 @@ export default function AcceptInviteSheet() {
           <TouchableOpacity
             style={[
               styles.validateButton,
-              { 
+              {
                 backgroundColor: isValidating ? colors.secondary : colors.primary,
                 opacity: isValidating || !inviteCode.trim() ? 0.7 : 1,
-              }
+              },
             ]}
             onPress={handleValidate}
             disabled={isValidating || !inviteCode.trim()}
@@ -389,11 +395,10 @@ export default function AcceptInviteSheet() {
           <View style={[styles.helpCard, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
             <Ionicons name="help-circle-outline" size={20} color={colors.textMuted} />
             <View style={styles.helpContent}>
-              <Text style={[styles.helpTitle, { color: colors.text }]}>
-                How to get an invite code?
-              </Text>
+              <Text style={[styles.helpTitle, { color: colors.text }]}>How to get an invite code?</Text>
               <Text style={[styles.helpText, { color: colors.textMuted }]}>
-                Ask a team owner or commander to generate an invite code for you. They can share it via any messaging app.
+                Ask a team owner or commander to generate an invite code for you. They can share it via any messaging
+                app.
               </Text>
             </View>
           </View>
@@ -429,7 +434,12 @@ export default function AcceptInviteSheet() {
                 <Ionicons name="shield-outline" size={14} color={colors.textMuted} />
                 <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Role</Text>
               </View>
-              <View style={[styles.roleChip, { backgroundColor: getRoleColor(validatedInvite.role) + '18', borderColor: colors.border }]}>
+              <View
+                style={[
+                  styles.roleChip,
+                  { backgroundColor: getRoleColor(validatedInvite.role) + '18', borderColor: colors.border },
+                ]}
+              >
                 <Ionicons
                   name={getRoleIcon(validatedInvite.role)}
                   size={14}
@@ -457,7 +467,10 @@ export default function AcceptInviteSheet() {
                 <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Code</Text>
               </View>
               <Text style={[styles.detailValueMono, { color: colors.text }]}>
-                •••• {String(validatedInvite.invite_code || '').slice(-4).toUpperCase()}
+                ••••{' '}
+                {String(validatedInvite.invite_code || '')
+                  .slice(-4)
+                  .toUpperCase()}
               </Text>
             </View>
 
@@ -493,18 +506,16 @@ export default function AcceptInviteSheet() {
               activeOpacity={0.7}
             >
               <Ionicons name="close" size={18} color={colors.text} />
-              <Text style={[styles.declineButtonText, { color: colors.text }]}>
-                Decline
-              </Text>
+              <Text style={[styles.declineButtonText, { color: colors.text }]}>Decline</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[
                 styles.acceptButton,
-                { 
+                {
                   backgroundColor: isAccepting ? colors.secondary : colors.primary,
                   opacity: isAccepting ? 0.7 : 1,
-                }
+                },
               ]}
               onPress={handleAccept}
               disabled={isAccepting}

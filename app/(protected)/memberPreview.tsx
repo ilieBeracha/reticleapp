@@ -1,15 +1,15 @@
-import { BaseAvatar } from "@/components/shared/Avatar";
-import { useColors } from "@/hooks/ui/useColors";
-import { usePermissions } from "@/hooks/usePermissions";
-import { getCurrentUserId } from "@/services/authService";
-import { removeTeamMember, updateTeamMemberRole } from "@/services/teamService";
-import { useMyTeamRole, useTeamRoleFlags, useTeamStore } from "@/store/teamStore";
-import type { TeamRole } from "@/types/workspace";
-import { Ionicons } from "@expo/vector-icons";
-import { formatDistanceToNow } from "date-fns";
+import { BaseAvatar } from '@/components/shared/Avatar';
+import { useColors } from '@/hooks/ui/useColors';
+import { usePermissions } from '@/hooks/usePermissions';
+import { getCurrentUserId } from '@/services/authService';
+import { removeTeamMember, updateTeamMemberRole } from '@/services/teamService';
+import { useMyTeamRole, useTeamRoleFlags, useTeamStore } from '@/store/teamStore';
+import type { TeamRole } from '@/types/workspace';
+import { Ionicons } from '@expo/vector-icons';
+import { formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
-import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActionSheetIOS,
   ActivityIndicator,
@@ -21,7 +21,7 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from "react-native";
+} from 'react-native';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ROLE CONFIG
@@ -35,7 +35,7 @@ const ROLE_CONFIG: Record<string, { color: string; bg: string; label: string; ic
 
 /**
  * MEMBER PREVIEW - Native Form Sheet (Team-First)
- * 
+ *
  * Permission Matrix:
  * - Team Owner/Commander: Can change team role, remove from team
  * - Squad Commander: Can manage soldiers in their OWN squad only
@@ -64,7 +64,7 @@ export default function MemberPreviewSheet() {
   // Find member from store
   const member = useMemo(() => {
     if (!params.id) return null;
-    return members.find(m => m.user_id === params.id);
+    return members.find((m) => m.user_id === params.id);
   }, [params.id, members]);
 
   // Get role config
@@ -75,25 +75,23 @@ export default function MemberPreviewSheet() {
   // Permission checks using the unified permission system
   const isTargetOwner = memberRole === 'owner';
   const isTargetSelf = member?.user_id === currentUserId;
-  
+
   // Check if current user can manage this specific member
   const canManageThisMember = useMemo(() => {
     if (!member || isTargetOwner || isTargetSelf) return false;
     return permissions.canManageMember(member.user_id, memberRole, memberSquadId);
   }, [member, isTargetOwner, isTargetSelf, memberRole, memberSquadId, permissions]);
-  
+
   // Squad commander specific: Can only manage soldiers in their squad
-  const isSquadCommanderManagingSquadMember = isSquadCommander && 
-    memberRole === 'soldier' && 
-    mySquadId && 
-    memberSquadId === mySquadId;
-  
+  const isSquadCommanderManagingSquadMember =
+    isSquadCommander && memberRole === 'soldier' && mySquadId && memberSquadId === mySquadId;
+
   // Team role change: Only owners/commanders can change roles (not squad commanders)
   const canManageTeamRole = canManageTeam && !isTargetOwner && !isTargetSelf;
-  
+
   // Squad assignment: Owners, commanders, and squad commanders (for their squad)
   const canAssignSquad = canManageThisMember && (canManageTeam || isSquadCommanderManagingSquadMember);
-  
+
   // Remove from team: Owners, commanders, and squad commanders (for their squad members)
   const canRemoveFromTeam = canManageThisMember;
 
@@ -105,32 +103,31 @@ export default function MemberPreviewSheet() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push({
       pathname: '/(protected)/memberActivity',
-      params: { memberId: member.user_id, memberName: member.profile?.full_name || 'Member' }
+      params: { memberId: member.user_id, memberName: member.profile?.full_name || 'Member' },
     });
   }, [member]);
 
   const handleChangeTeamRole = useCallback(() => {
     if (!activeTeamId || !member) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
+
     const currentRole = memberRole;
-    const availableRoles = teamRoleOptions.filter(r => r !== currentRole);
-    
-    const options = [...availableRoles.map(r => {
-      if (r === 'squad_commander') return 'Squad Commander';
-      return r.charAt(0).toUpperCase() + r.slice(1);
-    }), 'Cancel'];
+    const availableRoles = teamRoleOptions.filter((r) => r !== currentRole);
+
+    const options = [
+      ...availableRoles.map((r) => {
+        if (r === 'squad_commander') return 'Squad Commander';
+        return r.charAt(0).toUpperCase() + r.slice(1);
+      }),
+      'Cancel',
+    ];
     const cancelButtonIndex = options.length - 1;
-    
+
     const handleRoleSelect = (role: TeamRole) => {
       // Squad commander requires a squad
       if (role === 'squad_commander') {
         if (teamSquads.length === 0) {
-          Alert.alert(
-            'No Squads',
-            'Create squads first before assigning a Squad Commander.',
-            [{ text: 'OK' }]
-          );
+          Alert.alert('No Squads', 'Create squads first before assigning a Squad Commander.', [{ text: 'OK' }]);
           return;
         }
         setPendingRole(role);
@@ -139,7 +136,7 @@ export default function MemberPreviewSheet() {
         updateTeamRole(role, null);
       }
     };
-    
+
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         {
@@ -160,7 +157,7 @@ export default function MemberPreviewSheet() {
         'Change Team Role',
         `Current role: ${ROLE_CONFIG[currentRole]?.label || currentRole}\n\nSelect new role:`,
         [
-          ...availableRoles.map(role => ({
+          ...availableRoles.map((role) => ({
             text: role === 'squad_commander' ? 'Squad Commander' : role.charAt(0).toUpperCase() + role.slice(1),
             onPress: () => handleRoleSelect(role),
           })),
@@ -233,9 +230,9 @@ export default function MemberPreviewSheet() {
       `Remove ${member.profile?.full_name || 'this member'} from ${activeTeam?.name || 'this team'}?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Remove', 
-          style: 'destructive', 
+        {
+          text: 'Remove',
+          style: 'destructive',
           onPress: async () => {
             try {
               setLoading(true);
@@ -248,7 +245,7 @@ export default function MemberPreviewSheet() {
               Alert.alert('Error', error.message || 'Failed to remove from team');
               setLoading(false);
             }
-          }
+          },
         },
       ]
     );
@@ -274,9 +271,7 @@ export default function MemberPreviewSheet() {
     );
   }
 
-  const joinedAt = member.joined_at
-    ? formatDistanceToNow(new Date(member.joined_at), { addSuffix: true })
-    : null;
+  const joinedAt = member.joined_at ? formatDistanceToNow(new Date(member.joined_at), { addSuffix: true }) : null;
 
   return (
     <ScrollView
@@ -300,14 +295,10 @@ export default function MemberPreviewSheet() {
           )}
         </View>
 
-        <Text style={[styles.memberName, { color: colors.text }]}>
-          {member.profile?.full_name || 'Unknown'}
-        </Text>
+        <Text style={[styles.memberName, { color: colors.text }]}>{member.profile?.full_name || 'Unknown'}</Text>
 
         {member.profile?.email && (
-          <Text style={[styles.memberEmail, { color: colors.textMuted }]}>
-            {member.profile.email}
-          </Text>
+          <Text style={[styles.memberEmail, { color: colors.textMuted }]}>{member.profile.email}</Text>
         )}
 
         {/* Role Badge */}
@@ -316,11 +307,7 @@ export default function MemberPreviewSheet() {
           <Text style={[styles.roleText, { color: roleConfig.color }]}>{roleConfig.label}</Text>
         </View>
 
-        {joinedAt && (
-          <Text style={[styles.joinedText, { color: colors.textMuted }]}>
-            Joined {joinedAt}
-          </Text>
-        )}
+        {joinedAt && <Text style={[styles.joinedText, { color: colors.textMuted }]}>Joined {joinedAt}</Text>}
       </View>
 
       {/* Team Info */}
@@ -383,20 +370,16 @@ export default function MemberPreviewSheet() {
             style={[styles.actionRow, { borderBottomColor: colors.border }]}
             onPress={() => {
               if (teamSquads.length === 0) {
-                Alert.alert(
-                  'No Squads',
-                  'Create squads first in Team Settings → Squads.',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { 
-                      text: 'Go to Settings', 
-                      onPress: () => {
-                        router.back();
-                        router.push(`/(protected)/teamSquads?teamId=${activeTeamId}` as any);
-                      }
+                Alert.alert('No Squads', 'Create squads first in Team Settings → Squads.', [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Go to Settings',
+                    onPress: () => {
+                      router.back();
+                      router.push(`/(protected)/teamSquads?teamId=${activeTeamId}` as any);
                     },
-                  ]
-                );
+                  },
+                ]);
                 return;
               }
               handleAssignSquad();
@@ -420,11 +403,7 @@ export default function MemberPreviewSheet() {
 
         {/* Remove from Team - Managers only */}
         {canRemoveFromTeam && (
-          <TouchableOpacity
-            style={styles.actionRow}
-            onPress={handleRemoveFromTeam}
-            activeOpacity={0.7}
-          >
+          <TouchableOpacity style={styles.actionRow} onPress={handleRemoveFromTeam} activeOpacity={0.7}>
             <View style={styles.actionLeft}>
               <View style={[styles.actionIcon, { backgroundColor: '#EF444420' }]}>
                 <Ionicons name="person-remove" size={18} color="#EF4444" />
@@ -440,17 +419,13 @@ export default function MemberPreviewSheet() {
       {isTargetOwner && (
         <View style={[styles.noteCard, { backgroundColor: colors.secondary }]}>
           <Ionicons name="information-circle" size={16} color={colors.textMuted} />
-          <Text style={[styles.noteText, { color: colors.textMuted }]}>
-            Team owners cannot be edited or removed
-          </Text>
+          <Text style={[styles.noteText, { color: colors.textMuted }]}>Team owners cannot be edited or removed</Text>
         </View>
       )}
       {isTargetSelf && !isTargetOwner && (
         <View style={[styles.noteCard, { backgroundColor: colors.secondary }]}>
           <Ionicons name="information-circle" size={16} color={colors.textMuted} />
-          <Text style={[styles.noteText, { color: colors.textMuted }]}>
-            You cannot modify your own role
-          </Text>
+          <Text style={[styles.noteText, { color: colors.textMuted }]}>You cannot modify your own role</Text>
         </View>
       )}
       {/* Squad commander managing member in their squad */}
@@ -463,14 +438,16 @@ export default function MemberPreviewSheet() {
         </View>
       )}
       {/* Squad commander viewing member outside their squad */}
-      {isSquadCommander && !canManageTeam && !isSquadCommanderManagingSquadMember && !isTargetSelf && memberRole === 'soldier' && (
-        <View style={[styles.noteCard, { backgroundColor: colors.secondary }]}>
-          <Ionicons name="information-circle" size={16} color={colors.textMuted} />
-          <Text style={[styles.noteText, { color: colors.textMuted }]}>
-            This soldier is not in your squad
-          </Text>
-        </View>
-      )}
+      {isSquadCommander &&
+        !canManageTeam &&
+        !isSquadCommanderManagingSquadMember &&
+        !isTargetSelf &&
+        memberRole === 'soldier' && (
+          <View style={[styles.noteCard, { backgroundColor: colors.secondary }]}>
+            <Ionicons name="information-circle" size={16} color={colors.textMuted} />
+            <Text style={[styles.noteText, { color: colors.textMuted }]}>This soldier is not in your squad</Text>
+          </View>
+        )}
 
       <View style={{ height: 40 }} />
 
@@ -486,10 +463,12 @@ export default function MemberPreviewSheet() {
       >
         <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
           <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={() => {
-              setSquadPickerVisible(false);
-              setPendingRole(null);
-            }}>
+            <TouchableOpacity
+              onPress={() => {
+                setSquadPickerVisible(false);
+                setPendingRole(null);
+              }}
+            >
               <Text style={[styles.modalCancel, { color: colors.textMuted }]}>Cancel</Text>
             </TouchableOpacity>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
@@ -503,12 +482,10 @@ export default function MemberPreviewSheet() {
             {memberSquadId && !pendingRole && (
               <View style={[styles.currentSquadBadge, { backgroundColor: colors.primary + '15' }]}>
                 <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
-                <Text style={[styles.currentSquadText, { color: colors.primary }]}>
-                  Currently in: {memberSquadId}
-                </Text>
+                <Text style={[styles.currentSquadText, { color: colors.primary }]}>Currently in: {memberSquadId}</Text>
               </View>
             )}
-            
+
             {/* Squad commander restriction note */}
             {isSquadCommander && !canManageTeam && (
               <View style={[styles.squadNote, { backgroundColor: '#F59E0B15', marginBottom: 16 }]}>
@@ -521,7 +498,7 @@ export default function MemberPreviewSheet() {
 
             {/* Squad options - filter for squad commanders */}
             {teamSquads
-              .filter(squad => {
+              .filter((squad) => {
                 // Squad commanders can only assign to their own squad
                 if (isSquadCommander && !canManageTeam) {
                   return squad === mySquadId;
@@ -535,7 +512,7 @@ export default function MemberPreviewSheet() {
                     key={squad}
                     style={[
                       styles.squadOption,
-                      { backgroundColor: colors.card, borderColor: isCurrentSquad ? colors.primary : colors.border }
+                      { backgroundColor: colors.card, borderColor: isCurrentSquad ? colors.primary : colors.border },
                     ]}
                     onPress={() => handleSquadSelect(squad)}
                     activeOpacity={0.7}
@@ -544,9 +521,7 @@ export default function MemberPreviewSheet() {
                       <Ionicons name="git-branch" size={18} color="#3B82F6" />
                     </View>
                     <Text style={[styles.squadOptionText, { color: colors.text }]}>{squad}</Text>
-                    {isCurrentSquad && (
-                      <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                    )}
+                    {isCurrentSquad && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
                   </TouchableOpacity>
                 );
               })}
@@ -554,7 +529,10 @@ export default function MemberPreviewSheet() {
             {/* Remove from squad option - only for full managers, not squad commanders */}
             {!pendingRole && memberSquadId && canManageTeam && (
               <TouchableOpacity
-                style={[styles.squadOption, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 16 }]}
+                style={[
+                  styles.squadOption,
+                  { backgroundColor: colors.card, borderColor: colors.border, marginTop: 16 },
+                ]}
                 onPress={() => handleSquadSelect(null)}
                 activeOpacity={0.7}
               >

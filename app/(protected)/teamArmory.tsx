@@ -10,6 +10,7 @@ import { ApproveRequestModal, RequestWeaponModal } from '@/components/weapons';
 import { useWeaponRealtime, type WeaponRequestRecord } from '@/hooks/realtime';
 import { useColors } from '@/hooks/ui/useColors';
 import { notifyWeaponRequested } from '@/services/notifications';
+import { getTeamMembers } from '@/services/teamService';
 import {
   approveSharedWeapon,
   assignTeamWeapon,
@@ -28,9 +29,8 @@ import {
   type UserWeapon,
   type WeaponRequest,
 } from '@/services/weaponService';
-import type { WeaponCategory } from '@/types/workspace';
-import { getTeamMembers } from '@/services/teamService';
 import { useTeamStore } from '@/store/teamStore';
+import type { WeaponCategory } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
@@ -109,23 +109,13 @@ function TabBar({
         return (
           <TouchableOpacity
             key={tab.id}
-            style={[
-              styles.tab,
-              isActive && { backgroundColor: colors.primary + '15' },
-            ]}
+            style={[styles.tab, isActive && { backgroundColor: colors.primary + '15' }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               onTabChange(tab.id);
             }}
           >
-            <Text
-              style={[
-                styles.tabLabel,
-                { color: isActive ? colors.primary : colors.textMuted },
-              ]}
-            >
-              {tab.label}
-            </Text>
+            <Text style={[styles.tabLabel, { color: isActive ? colors.primary : colors.textMuted }]}>{tab.label}</Text>
             {tab.badge !== undefined && (
               <View style={[styles.tabBadge, { backgroundColor: colors.destructive }]}>
                 <Text style={styles.tabBadgeText}>{tab.badge}</Text>
@@ -183,9 +173,7 @@ function SectionHeader({
     <View style={styles.sectionHeader}>
       <View style={styles.sectionHeaderLeft}>
         {icon}
-        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-          {title}
-        </Text>
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{title}</Text>
         {count !== undefined && count > 0 && (
           <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
             <Text style={styles.countText}>{count}</Text>
@@ -239,9 +227,7 @@ function WeaponCard({
         {showAssignedUser && weapon.assigned_user && (
           <View style={styles.assignedUserRow}>
             <User size={12} color={colors.textMuted} />
-            <Text style={[styles.assignedUserName, { color: colors.textMuted }]}>
-              {weapon.assigned_user.full_name}
-            </Text>
+            <Text style={[styles.assignedUserName, { color: colors.textMuted }]}>{weapon.assigned_user.full_name}</Text>
           </View>
         )}
       </View>
@@ -252,27 +238,18 @@ function WeaponCard({
         ) : (
           <>
             {isAssigned && onUnassign && (
-              <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: colors.muted }]}
-                onPress={onUnassign}
-              >
+              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.muted }]} onPress={onUnassign}>
                 <UserMinus size={16} color={colors.destructive} />
               </TouchableOpacity>
             )}
             {!isAssigned && onAssign && (
-              <TouchableOpacity
-                style={[styles.assignBtn, { backgroundColor: colors.primary }]}
-                onPress={onAssign}
-              >
+              <TouchableOpacity style={[styles.assignBtn, { backgroundColor: colors.primary }]} onPress={onAssign}>
                 <UserPlus size={14} color="#fff" />
                 <Text style={styles.assignBtnText}>Assign</Text>
               </TouchableOpacity>
             )}
             {isPool && onRemoveFromPool && (
-              <TouchableOpacity
-                style={[styles.poolBtn, { backgroundColor: colors.muted }]}
-                onPress={onRemoveFromPool}
-              >
+              <TouchableOpacity style={[styles.poolBtn, { backgroundColor: colors.muted }]} onPress={onRemoveFromPool}>
                 <X size={14} color={colors.textMuted} />
               </TouchableOpacity>
             )}
@@ -315,9 +292,7 @@ function PendingRequestCard({
         <Text style={[styles.requestLabel, { color: colors.yellow }]}>Weapon Request</Text>
       </View>
       <View style={styles.requestInfo}>
-        <Text style={[styles.requestUser, { color: colors.text }]}>
-          {request.user?.full_name || 'Unknown'}
-        </Text>
+        <Text style={[styles.requestUser, { color: colors.text }]}>{request.user?.full_name || 'Unknown'}</Text>
         {request.weapon_category && (
           <View style={[styles.categoryTag, { backgroundColor: colors.primary + '15' }]}>
             <Text style={[styles.categoryTagText, { color: colors.primary }]}>
@@ -361,9 +336,7 @@ function PendingContributionCard({
           {weapon.caliber && ` \u2022 ${weapon.caliber}`}
         </Text>
         {weapon.user && (
-          <Text style={[styles.contributorName, { color: colors.textMuted }]}>
-            From: {weapon.user.full_name}
-          </Text>
+          <Text style={[styles.contributorName, { color: colors.textMuted }]}>From: {weapon.user.full_name}</Text>
         )}
       </View>
       <View style={styles.contributionActions}>
@@ -371,16 +344,10 @@ function PendingContributionCard({
           <ActivityIndicator size="small" color={colors.primary} />
         ) : (
           <>
-            <TouchableOpacity
-              style={[styles.rejectSmallBtn, { backgroundColor: colors.muted }]}
-              onPress={onReject}
-            >
+            <TouchableOpacity style={[styles.rejectSmallBtn, { backgroundColor: colors.muted }]} onPress={onReject}>
               <X size={16} color={colors.destructive} />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.approveSmallBtn, { backgroundColor: colors.green }]}
-              onPress={onApprove}
-            >
+            <TouchableOpacity style={[styles.approveSmallBtn, { backgroundColor: colors.green }]} onPress={onApprove}>
               <Check size={16} color="#fff" />
               <Text style={styles.approveSmallText}>Approve</Text>
             </TouchableOpacity>
@@ -412,9 +379,7 @@ function MyAssignmentCard({
         <View style={[styles.noAssignmentIcon, { backgroundColor: colors.primary + '15' }]}>
           <Shield size={32} color={colors.primary} />
         </View>
-        <Text style={[styles.noAssignmentTitle, { color: colors.text }]}>
-          Get Ready for Training
-        </Text>
+        <Text style={[styles.noAssignmentTitle, { color: colors.text }]}>Get Ready for Training</Text>
         <Text style={[styles.noAssignmentHint, { color: colors.textMuted }]}>
           Request a weapon to participate in team drills and track your progress.
         </Text>
@@ -484,9 +449,7 @@ function MyPendingRequestCard({
         {cancelling ? (
           <ActivityIndicator size="small" color={colors.destructive} />
         ) : (
-          <Text style={[styles.cancelRequestText, { color: colors.destructive }]}>
-            Cancel Request
-          </Text>
+          <Text style={[styles.cancelRequestText, { color: colors.destructive }]}>Cancel Request</Text>
         )}
       </TouchableOpacity>
     </View>
@@ -839,7 +802,10 @@ function AddWeaponModal({
             <View style={styles.formGroup}>
               <Text style={[styles.formLabel, { color: colors.textMuted }]}>NAME *</Text>
               <TextInput
-                style={[styles.formInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+                style={[
+                  styles.formInput,
+                  { backgroundColor: colors.card, borderColor: colors.border, color: colors.text },
+                ]}
                 value={newWeaponName}
                 onChangeText={setNewWeaponName}
                 placeholder="e.g., Team Rifle #1"
@@ -865,7 +831,10 @@ function AddWeaponModal({
                       onPress={() => setNewWeaponCategory(cat.value)}
                     >
                       <Text
-                        style={[styles.categoryChipText, { color: newWeaponCategory === cat.value ? '#fff' : colors.text }]}
+                        style={[
+                          styles.categoryChipText,
+                          { color: newWeaponCategory === cat.value ? '#fff' : colors.text },
+                        ]}
                       >
                         {cat.label}
                       </Text>
@@ -878,7 +847,10 @@ function AddWeaponModal({
             <View style={styles.formGroup}>
               <Text style={[styles.formLabel, { color: colors.textMuted }]}>CALIBER</Text>
               <TextInput
-                style={[styles.formInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+                style={[
+                  styles.formInput,
+                  { backgroundColor: colors.card, borderColor: colors.border, color: colors.text },
+                ]}
                 value={newWeaponCaliber}
                 onChangeText={setNewWeaponCaliber}
                 placeholder="e.g., 7.62x51mm"
@@ -889,7 +861,10 @@ function AddWeaponModal({
             <View style={styles.formGroup}>
               <Text style={[styles.formLabel, { color: colors.textMuted }]}>SERIAL NUMBER</Text>
               <TextInput
-                style={[styles.formInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+                style={[
+                  styles.formInput,
+                  { backgroundColor: colors.card, borderColor: colors.border, color: colors.text },
+                ]}
                 value={newWeaponSerial}
                 onChangeText={setNewWeaponSerial}
                 placeholder="Optional"
@@ -960,11 +935,9 @@ function MemberPickerModal({
                 ]}
                 onPress={() => {
                   if (hasWeapon) {
-                    Alert.alert(
-                      'Already Assigned',
-                      `${item.full_name} already has "${existingWeapon}" assigned.`,
-                      [{ text: 'OK' }]
-                    );
+                    Alert.alert('Already Assigned', `${item.full_name} already has "${existingWeapon}" assigned.`, [
+                      { text: 'OK' },
+                    ]);
                   } else {
                     onSelect(item.id);
                   }
@@ -1059,19 +1032,22 @@ export default function TeamArmoryScreen() {
   useWeaponRealtime({
     teamId,
     enabled: isCommander, // Only commanders need real-time request notifications
-    onNewRequest: useCallback(async (request: WeaponRequestRecord) => {
-      console.log('[TeamArmory] Realtime: New weapon request!');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      // Refresh data first to get full request details including user name
-      await loadData();
-      // Send notification to commander
-      if (teamId && team?.name) {
-        // Find the requester's name from the refreshed data
-        const requestData = data?.pendingRequests?.find(r => r.id === request.id);
-        const requesterName = (requestData as any)?.user?.full_name || 'A team member';
-        notifyWeaponRequested(teamId, team.name, requesterName);
-      }
-    }, [loadData, teamId, team?.name, data?.pendingRequests]),
+    onNewRequest: useCallback(
+      async (request: WeaponRequestRecord) => {
+        console.log('[TeamArmory] Realtime: New weapon request!');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        // Refresh data first to get full request details including user name
+        await loadData();
+        // Send notification to commander
+        if (teamId && team?.name) {
+          // Find the requester's name from the refreshed data
+          const requestData = data?.pendingRequests?.find((r) => r.id === request.id);
+          const requesterName = (requestData as any)?.user?.full_name || 'A team member';
+          notifyWeaponRequested(teamId, team.name, requesterName);
+        }
+      },
+      [loadData, teamId, team?.name, data?.pendingRequests]
+    ),
     onRequestChange: useCallback(() => {
       // Any request change - refresh silently
       loadData();
@@ -1198,9 +1174,7 @@ export default function TeamArmoryScreen() {
 
   // Calculate which members have weapons assigned
   const membersWithWeapons = new Set<string>(
-    data?.assignedWeapons
-      .filter((w) => w.assigned_to)
-      .map((w) => w.assigned_to!) || []
+    data?.assignedWeapons.filter((w) => w.assigned_to).map((w) => w.assigned_to!) || []
   );
 
   // Calculate unassigned members (members without a weapon)
@@ -1415,14 +1389,19 @@ export default function TeamArmoryScreen() {
                     {unassignedMembers.map((member) => (
                       <View
                         key={member.id}
-                        style={[styles.memberCard, { backgroundColor: colors.card, borderColor: colors.destructive + '40' }]}
+                        style={[
+                          styles.memberCard,
+                          { backgroundColor: colors.card, borderColor: colors.destructive + '40' },
+                        ]}
                       >
                         <View style={[styles.memberCardAvatar, { backgroundColor: colors.destructive + '20' }]}>
                           <User size={20} color={colors.destructive} />
                         </View>
                         <View style={styles.memberCardInfo}>
                           <Text style={[styles.memberCardName, { color: colors.text }]}>{member.full_name}</Text>
-                          <Text style={[styles.memberCardStatus, { color: colors.destructive }]}>No weapon assigned</Text>
+                          <Text style={[styles.memberCardStatus, { color: colors.destructive }]}>
+                            No weapon assigned
+                          </Text>
                         </View>
                         {(data?.unassignedWeapons.length || 0) + (data?.poolWeapons.length || 0) > 0 && (
                           <TouchableOpacity
@@ -1563,9 +1542,7 @@ export default function TeamArmoryScreen() {
                   count={data.poolWeapons.length}
                   colors={colors}
                 />
-                <Text style={[styles.poolHint, { color: colors.textMuted }]}>
-                  Available for all team members
-                </Text>
+                <Text style={[styles.poolHint, { color: colors.textMuted }]}>Available for all team members</Text>
                 {data.poolWeapons.map((w) => (
                   <WeaponCard key={w.id} weapon={w} colors={colors} isPool />
                 ))}

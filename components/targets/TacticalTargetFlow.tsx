@@ -1,41 +1,31 @@
-import { PAPER_TYPE } from "@/constants";
-import { addTargetWithPaperResult, addTargetWithTacticalResult } from "@/services/sessionService";
-import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from "@/theme/colors";
-import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { PAPER_TYPE } from '@/constants';
+import { addTargetWithPaperResult, addTargetWithTacticalResult } from '@/services/sessionService';
+import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from '@/theme/colors';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
+import { ArrowLeft, Check, ChevronRight, Crosshair, Minus, Plus, Ruler, Target, Timer } from 'lucide-react-native';
+import React, { useCallback, useState } from 'react';
 import {
-  ArrowLeft,
-  Check,
-  ChevronRight,
-  Crosshair,
-  Minus,
-  Plus,
-  Ruler,
-  Target,
-  Timer,
-} from "lucide-react-native";
-import React, { useCallback, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { COLORS } from "./types";
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import { COLORS } from './types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DISTANCE CATEGORIES
 // ═══════════════════════════════════════════════════════════════════════════
 const DISTANCE_CATEGORIES = [
-  { label: "Close", range: "5-15m", distances: [5, 7, 10, 15] },
-  { label: "Medium", range: "25-50m", distances: [25, 35, 50] },
-  { label: "Long", range: "100m+", distances: [100, 200, 300] },
+  { label: 'Close', range: '5-15m', distances: [5, 7, 10, 15] },
+  { label: 'Medium', range: '25-50m', distances: [25, 35, 50] },
+  { label: 'Long', range: '100m+', distances: [100, 200, 300] },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -118,9 +108,7 @@ const Stepper = React.memo(function Stepper({
             disabled={disabled}
             activeOpacity={0.7}
           >
-            <Text style={[stepperStyles.quickText, value === num && stepperStyles.quickTextActive]}>
-              {num}
-            </Text>
+            <Text style={[stepperStyles.quickText, value === num && stepperStyles.quickTextActive]}>{num}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -129,36 +117,36 @@ const Stepper = React.memo(function Stepper({
 });
 
 const stepperStyles = StyleSheet.create({
-  container: { alignItems: "center" },
+  container: { alignItems: 'center' },
   label: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.textMuted,
-    textTransform: "uppercase",
+    textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 16,
   },
-  row: { flexDirection: "row", alignItems: "center", gap: 20 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 20 },
   btn: {
     width: 56,
     height: 56,
     borderRadius: 28,
     backgroundColor: COLORS.card,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: COLORS.borderLight,
   },
   btnDisabled: { opacity: 0.4 },
-  valueContainer: { alignItems: "center", minWidth: 80 },
+  valueContainer: { alignItems: 'center', minWidth: 80 },
   value: {
     fontSize: 48,
-    fontWeight: "700",
+    fontWeight: '700',
     color: COLORS.white,
-    fontVariant: ["tabular-nums"],
+    fontVariant: ['tabular-nums'],
   },
   unit: { fontSize: 14, color: COLORS.textMuted, marginTop: -4 },
-  quickRow: { flexDirection: "row", gap: 10, marginTop: 20 },
+  quickRow: { flexDirection: 'row', gap: 10, marginTop: 20 },
   quickBtn: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -166,7 +154,7 @@ const stepperStyles = StyleSheet.create({
     backgroundColor: COLORS.card,
   },
   quickBtnActive: { backgroundColor: `${COLORS.primary}30` },
-  quickText: { fontSize: 13, fontWeight: "600", color: COLORS.textMuted },
+  quickText: { fontSize: 13, fontWeight: '600', color: COLORS.textMuted },
   quickTextActive: { color: COLORS.primary },
 });
 
@@ -179,11 +167,7 @@ interface HitsStepperProps {
   bulletsFired: number;
 }
 
-const HitsStepper = React.memo(function HitsStepper({
-  value,
-  onChange,
-  bulletsFired,
-}: HitsStepperProps) {
+const HitsStepper = React.memo(function HitsStepper({ value, onChange, bulletsFired }: HitsStepperProps) {
   const handleDecrement = useCallback(() => {
     if (value > 0) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -243,7 +227,10 @@ const HitsStepper = React.memo(function HitsStepper({
             <TouchableOpacity
               key={num}
               style={[hitsStyles.quickBtn, value === num && hitsStyles.quickBtnActive]}
-              onPress={() => { Haptics.selectionAsync(); onChange(num); }}
+              onPress={() => {
+                Haptics.selectionAsync();
+                onChange(num);
+              }}
             >
               <Text style={[hitsStyles.quickText, value === num && hitsStyles.quickTextActive]}>{num}</Text>
             </TouchableOpacity>
@@ -254,29 +241,29 @@ const HitsStepper = React.memo(function HitsStepper({
 });
 
 const hitsStyles = StyleSheet.create({
-  container: { alignItems: "center", paddingVertical: 8 },
+  container: { alignItems: 'center', paddingVertical: 8 },
   label: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.textMuted,
-    textTransform: "uppercase",
+    textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 4,
   },
   sublabel: { fontSize: 13, color: COLORS.textDim, marginBottom: 16 },
-  row: { flexDirection: "row", alignItems: "center", gap: 24 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 24 },
   btn: {
     width: 64,
     height: 64,
     borderRadius: 32,
     backgroundColor: COLORS.card,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: COLORS.borderLight,
   },
   btnDisabled: { opacity: 0.4 },
-  valueContainer: { alignItems: "center" },
+  valueContainer: { alignItems: 'center' },
   valueRing: {
     width: 100,
     height: 100,
@@ -284,25 +271,25 @@ const hitsStyles = StyleSheet.create({
     backgroundColor: COLORS.card,
     borderWidth: 3,
     borderColor: COLORS.borderLight,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   valueRingGood: { borderColor: COLORS.primary, backgroundColor: `${COLORS.primary}15` },
   value: {
     fontSize: 36,
-    fontWeight: "700",
+    fontWeight: '700',
     color: COLORS.white,
-    fontVariant: ["tabular-nums"],
+    fontVariant: ['tabular-nums'],
   },
   maxLabel: { fontSize: 13, color: COLORS.textDim, marginTop: -2 },
   accuracyText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.textMuted,
     marginTop: 12,
     marginBottom: 4,
   },
-  quickRow: { flexDirection: "row", gap: 10, marginTop: 12 },
+  quickRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
   quickBtn: {
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -310,7 +297,7 @@ const hitsStyles = StyleSheet.create({
     backgroundColor: COLORS.card,
   },
   quickBtnActive: { backgroundColor: `${COLORS.primary}25` },
-  quickText: { fontSize: 13, fontWeight: "600", color: COLORS.textMuted },
+  quickText: { fontSize: 13, fontWeight: '600', color: COLORS.textMuted },
   quickTextActive: { color: COLORS.primary },
 });
 
@@ -319,7 +306,7 @@ const hitsStyles = StyleSheet.create({
 // Standalone component for logging tactical targets
 // ═══════════════════════════════════════════════════════════════════════════
 
-type FlowStep = "setup" | "results";
+type FlowStep = 'setup' | 'results';
 
 interface TacticalTargetFlowProps {
   sessionId: string;
@@ -349,7 +336,7 @@ export function TacticalTargetFlow({
   // - Grouping: enter group size (cm) + shots count
   // - Engagement: enter hits count
   // Distance and bullets come from drill config or defaults
-  const [step, setStep] = useState<FlowStep>("results");
+  const [step, setStep] = useState<FlowStep>('results');
   const [saving, setSaving] = useState(false);
 
   // Setup state
@@ -358,11 +345,11 @@ export function TacticalTargetFlow({
 
   // Results state
   const [hits, setHits] = useState(0);
-  const [groupSizeCm, setGroupSizeCm] = useState("");  // For grouping mode
-  const [groupingShots, setGroupingShots] = useState(0);  // Shots in the group (required)
-  const [time, setTime] = useState("");
+  const [groupSizeCm, setGroupSizeCm] = useState(''); // For grouping mode
+  const [groupingShots, setGroupingShots] = useState(0); // Shots in the group (required)
+  const [time, setTime] = useState('');
   const [stageCleared, setStageCleared] = useState(false);
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState('');
 
   const handleClose = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -376,21 +363,21 @@ export function TacticalTargetFlow({
   const handleContinue = useCallback(() => {
     if (distance <= 0) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert("Invalid Distance", "Please select a valid distance.");
+      Alert.alert('Invalid Distance', 'Please select a valid distance.');
       return;
     }
     if (bullets <= 0) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert("Invalid Bullets", "Please enter a valid number of bullets.");
+      Alert.alert('Invalid Bullets', 'Please enter a valid number of bullets.');
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setStep("results");
+    setStep('results');
   }, [distance, bullets]);
 
   const handleSave = useCallback(async () => {
     if (!sessionId) {
-      Alert.alert("Error", "Session ID missing");
+      Alert.alert('Error', 'Session ID missing');
       return;
     }
 
@@ -398,13 +385,13 @@ export function TacticalTargetFlow({
 
     if (isGrouping && !groupSizeCm) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert("Missing Group Size", "Please enter the group size in cm.");
+      Alert.alert('Missing Group Size', 'Please enter the group size in cm.');
       return;
     }
 
     if (isGrouping && groupingShots < 2) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Alert.alert("Missing Shots", "A group requires at least 2 shots.");
+      Alert.alert('Missing Shots', 'A group requires at least 2 shots.');
       return;
     }
 
@@ -449,17 +436,29 @@ export function TacticalTargetFlow({
         router.back();
       }
     } catch (error: any) {
-      console.error("Failed to add target:", error);
+      console.error('Failed to add target:', error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Error", error.message || "Failed to add target");
+      Alert.alert('Error', error.message || 'Failed to add target');
       setSaving(false);
     }
-  }, [sessionId, distance, bullets, hits, groupSizeCm, groupingShots, isGrouping, time, stageCleared, notes, onComplete]);
+  }, [
+    sessionId,
+    distance,
+    bullets,
+    hits,
+    groupSizeCm,
+    groupingShots,
+    isGrouping,
+    time,
+    stageCleared,
+    notes,
+    onComplete,
+  ]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // SETUP STEP
   // ═══════════════════════════════════════════════════════════════════════════
-  if (step === "setup") {
+  if (step === 'setup') {
     return (
       <ScrollView
         style={styles.scrollView}
@@ -509,12 +508,7 @@ export function TacticalTargetFlow({
                     disabled={lockDistance}
                     activeOpacity={0.7}
                   >
-                    <Text
-                      style={[
-                        styles.distanceChipText,
-                        distance === dist && styles.distanceChipTextSelected,
-                      ]}
-                    >
+                    <Text style={[styles.distanceChipText, distance === dist && styles.distanceChipTextSelected]}>
                       {dist}m
                     </Text>
                   </TouchableOpacity>
@@ -527,7 +521,7 @@ export function TacticalTargetFlow({
         {/* Bullets Stepper */}
         <View style={styles.section}>
           <Stepper
-            label={isGrouping ? "Shots in Group" : "Bullets to Fire"}
+            label={isGrouping ? 'Shots in Group' : 'Bullets to Fire'}
             value={bullets}
             onChange={lockBullets ? () => {} : setBullets}
             min={lockBullets ? bullets : 1}
@@ -564,7 +558,7 @@ export function TacticalTargetFlow({
   // ═══════════════════════════════════════════════════════════════════════════
   // Never show back button - we always skip the setup step
   const canGoBack = false;
-  
+
   return (
     <ScrollView
       style={styles.scrollView}
@@ -575,7 +569,7 @@ export function TacticalTargetFlow({
       {/* Header */}
       <View style={styles.header}>
         {canGoBack ? (
-          <TouchableOpacity onPress={() => setStep("setup")} style={styles.backBtn}>
+          <TouchableOpacity onPress={() => setStep('setup')} style={styles.backBtn}>
             <ArrowLeft size={20} color={COLORS.white} />
           </TouchableOpacity>
         ) : (
@@ -584,11 +578,7 @@ export function TacticalTargetFlow({
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Log Results</Text>
           <View style={styles.headerMeta}>
-            {isGrouping ? (
-              <Target size={14} color={COLORS.primary} />
-            ) : (
-              <Crosshair size={14} color={COLORS.primary} />
-            )}
+            {isGrouping ? <Target size={14} color={COLORS.primary} /> : <Crosshair size={14} color={COLORS.primary} />}
             <Text style={styles.headerSubtitle}>
               {isGrouping ? `Grouping • ${distance}m` : `Engagement • ${distance}m • ${bullets} shots`}
             </Text>
@@ -610,7 +600,7 @@ export function TacticalTargetFlow({
             <Text style={styles.groupingTitle}>Group Size</Text>
             <Text style={styles.groupingSublabel}>Measure shot dispersion</Text>
           </View>
-          
+
           <View style={styles.groupingInputRow}>
             <TextInput
               style={styles.groupingInput}
@@ -625,7 +615,7 @@ export function TacticalTargetFlow({
               <Text style={styles.groupingUnit}>cm</Text>
             </View>
           </View>
-          
+
           <View style={styles.groupingQuickRow}>
             {[1, 2, 3, 5, 10].map((val) => (
               <TouchableOpacity
@@ -645,7 +635,9 @@ export function TacticalTargetFlow({
 
           {/* Total Shots in Group (Required) */}
           <View style={styles.groupingShotsSection}>
-            <Text style={styles.groupingShotsLabel}>Shots in Group <Text style={{ color: COLORS.danger }}>*</Text></Text>
+            <Text style={styles.groupingShotsLabel}>
+              Shots in Group <Text style={{ color: COLORS.danger }}>*</Text>
+            </Text>
             <View style={styles.groupingShotsRow}>
               <TouchableOpacity
                 style={[styles.groupingShotsBtn, groupingShots <= 2 && styles.groupingBtnDisabled]}
@@ -683,7 +675,12 @@ export function TacticalTargetFlow({
                     setGroupingShots(val);
                   }}
                 >
-                  <Text style={[styles.groupingShotsQuickText, groupingShots === val && styles.groupingShotsQuickTextActive]}>
+                  <Text
+                    style={[
+                      styles.groupingShotsQuickText,
+                      groupingShots === val && styles.groupingShotsQuickTextActive,
+                    ]}
+                  >
                     {val}
                   </Text>
                 </TouchableOpacity>
@@ -707,50 +704,38 @@ export function TacticalTargetFlow({
             </View>
             <View style={styles.cardHeaderText}>
               <Text style={styles.cardTitle}>Engagement Time</Text>
-              <Text style={styles.cardHint}>
-                {time ? `${time}s` : 'Optional - how fast?'}
-              </Text>
+              <Text style={styles.cardHint}>{time ? `${time}s` : 'Optional - how fast?'}</Text>
             </View>
           </View>
-          
+
           {/* Time chips */}
           <View style={styles.timeChipsContainer}>
             <TouchableOpacity
-              style={[
-                styles.timeChip,
-                !time && styles.timeChipSelected,
-              ]}
+              style={[styles.timeChip, !time && styles.timeChipSelected]}
               onPress={() => {
                 Haptics.selectionAsync();
-                setTime("");
+                setTime('');
               }}
             >
-              <Text style={[styles.timeChipText, !time && styles.timeChipTextSelected]}>
-                Skip
-              </Text>
+              <Text style={[styles.timeChipText, !time && styles.timeChipTextSelected]}>Skip</Text>
             </TouchableOpacity>
             {[3, 5, 10, 15, 20, 30].map((seconds) => {
               const isSelected = time === String(seconds);
               return (
                 <TouchableOpacity
                   key={seconds}
-                  style={[
-                    styles.timeChip,
-                    isSelected && styles.timeChipSelected,
-                  ]}
+                  style={[styles.timeChip, isSelected && styles.timeChipSelected]}
                   onPress={() => {
                     Haptics.selectionAsync();
                     setTime(String(seconds));
                   }}
                 >
-                  <Text style={[styles.timeChipText, isSelected && styles.timeChipTextSelected]}>
-                    {seconds}s
-                  </Text>
+                  <Text style={[styles.timeChipText, isSelected && styles.timeChipTextSelected]}>{seconds}s</Text>
                 </TouchableOpacity>
               );
             })}
           </View>
-          
+
           {/* Custom input */}
           <View style={styles.timeCustomRow}>
             <Text style={styles.timeCustomLabel}>Custom:</Text>
@@ -773,7 +758,7 @@ export function TacticalTargetFlow({
         <View style={styles.toggleCard}>
           <View style={styles.toggleLeft}>
             <View style={[styles.cardIconBox, stageCleared && styles.cardIconBoxActive]}>
-              <Check size={18} color={stageCleared ? "#000" : COLORS.textMuted} />
+              <Check size={18} color={stageCleared ? '#000' : COLORS.textMuted} />
             </View>
             <View>
               <Text style={styles.toggleTitle}>Stage Cleared</Text>
@@ -787,7 +772,7 @@ export function TacticalTargetFlow({
               setStageCleared(val);
             }}
             trackColor={{ false: COLORS.borderLight, true: `${COLORS.primary}50` }}
-            thumbColor={stageCleared ? COLORS.primary : "#6B7280"}
+            thumbColor={stageCleared ? COLORS.primary : '#6B7280'}
           />
         </View>
       )}
@@ -801,7 +786,7 @@ export function TacticalTargetFlow({
           style={styles.notesInput}
           value={notes}
           onChangeText={setNotes}
-          placeholder={isGrouping ? "Any notes about this group..." : "Any notes about this engagement..."}
+          placeholder={isGrouping ? 'Any notes about this group...' : 'Any notes about this engagement...'}
           placeholderTextColor={COLORS.textDim}
           multiline
           numberOfLines={3}
@@ -809,12 +794,7 @@ export function TacticalTargetFlow({
       </View>
 
       {/* Save Button */}
-      <TouchableOpacity
-        style={styles.submitBtn}
-        onPress={handleSave}
-        activeOpacity={0.9}
-        disabled={saving}
-      >
+      <TouchableOpacity style={styles.submitBtn} onPress={handleSave} activeOpacity={0.9} disabled={saving}>
         <LinearGradient
           colors={saving ? [...BUTTON_GRADIENT_DISABLED] : [...BUTTON_GRADIENT]}
           start={{ x: 0, y: 0 }}
@@ -835,7 +815,7 @@ export function TacticalTargetFlow({
       {canGoBack && (
         <TouchableOpacity
           style={styles.cancelBtn}
-          onPress={() => setStep("setup")}
+          onPress={() => setStep('setup')}
           activeOpacity={0.7}
           disabled={saving}
         >
@@ -857,32 +837,32 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 24,
     marginTop: 16,
   },
-  headerLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   headerIconContainer: {
     width: 44,
     height: 44,
     borderRadius: 12,
     backgroundColor: `${COLORS.primary}20`,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  headerTitle: { fontSize: 22, fontWeight: "700", color: COLORS.white },
+  headerTitle: { fontSize: 22, fontWeight: '700', color: COLORS.white },
   headerSubtitle: { fontSize: 13, color: COLORS.textMuted, marginTop: 1 },
-  headerCenter: { flex: 1, alignItems: "center" },
-  headerMeta: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
+  headerCenter: { flex: 1, alignItems: 'center' },
+  headerMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
   closeBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
     backgroundColor: COLORS.card,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   closeBtnText: { fontSize: 18, color: COLORS.textMuted },
   backBtn: {
@@ -890,47 +870,47 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: COLORS.card,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Section
   section: { marginBottom: 24 },
   sectionTitle: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.textMuted,
     marginBottom: 12,
-    textTransform: "uppercase",
+    textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
 
   // Distance
   distanceCategory: { marginBottom: 16 },
   distanceCategoryHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
-  distanceCategoryLabel: { fontSize: 13, fontWeight: "600", color: COLORS.text },
+  distanceCategoryLabel: { fontSize: 13, fontWeight: '600', color: COLORS.text },
   distanceCategoryRange: { fontSize: 11, color: COLORS.textDim },
-  distanceChipsRow: { flexDirection: "row", gap: 8 },
+  distanceChipsRow: { flexDirection: 'row', gap: 8 },
   distanceChip: {
     flex: 1,
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderRadius: 10,
     backgroundColor: COLORS.card,
-    alignItems: "center",
+    alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: "transparent",
+    borderColor: 'transparent',
   },
   distanceChipSelected: {
     backgroundColor: `${COLORS.primary}20`,
     borderColor: COLORS.primary,
   },
-  distanceChipText: { fontSize: 14, fontWeight: "600", color: COLORS.textMuted },
+  distanceChipText: { fontSize: 14, fontWeight: '600', color: COLORS.textMuted },
   distanceChipTextSelected: { color: COLORS.white },
 
   // Hits Section
@@ -953,8 +933,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
   cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
     marginBottom: 14,
   },
@@ -963,18 +943,18 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 12,
     backgroundColor: `${COLORS.primary}20`,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cardIconBoxActive: { backgroundColor: COLORS.primary },
   cardHeaderText: { flex: 1 },
-  cardTitle: { fontSize: 15, fontWeight: "600", color: COLORS.white },
+  cardTitle: { fontSize: 15, fontWeight: '600', color: COLORS.white },
   cardHint: { fontSize: 12, color: COLORS.textDim, marginTop: 1 },
 
   // Time Input with Chips
   timeChipsContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     marginBottom: 12,
   },
@@ -989,15 +969,15 @@ const styles = StyleSheet.create({
   },
   timeChipText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.textMuted,
   },
   timeChipTextSelected: {
     color: COLORS.primary,
   },
   timeCustomRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: COLORS.cardHover,
     borderRadius: 10,
     paddingHorizontal: 12,
@@ -1011,9 +991,9 @@ const styles = StyleSheet.create({
   timeCustomInput: {
     flex: 1,
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.white,
-    fontVariant: ["tabular-nums"],
+    fontVariant: ['tabular-nums'],
   },
   timeCustomUnit: {
     fontSize: 13,
@@ -1023,9 +1003,9 @@ const styles = StyleSheet.create({
 
   // Toggle
   toggleCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: COLORS.card,
     borderRadius: 16,
     padding: 16,
@@ -1033,24 +1013,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  toggleLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
-  toggleTitle: { fontSize: 15, fontWeight: "600", color: COLORS.white },
+  toggleLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  toggleTitle: { fontSize: 15, fontWeight: '600', color: COLORS.white },
   toggleHint: { fontSize: 12, color: COLORS.textDim, marginTop: 1 },
 
   // Notes
   notesSection: { marginBottom: 24 },
   notesLabel: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.textMuted,
-    textTransform: "uppercase",
+    textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 10,
   },
   optionalLabel: {
-    fontWeight: "400",
+    fontWeight: '400',
     color: COLORS.textDim,
-    textTransform: "none",
+    textTransform: 'none',
     letterSpacing: 0,
   },
   notesInput: {
@@ -1060,7 +1040,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: COLORS.white,
     minHeight: 80,
-    textAlignVertical: "top",
+    textAlignVertical: 'top',
     borderWidth: 1,
     borderColor: COLORS.border,
   },
@@ -1073,10 +1053,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: COLORS.border,
-    alignItems: "center",
+    alignItems: 'center',
   },
   groupingHeader: {
-    alignItems: "center",
+    alignItems: 'center',
     marginBottom: 24,
   },
   groupingIconContainer: {
@@ -1084,13 +1064,13 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 16,
     backgroundColor: `${COLORS.primary}20`,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 12,
   },
   groupingTitle: {
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: '700',
     color: COLORS.white,
     marginBottom: 4,
   },
@@ -1099,8 +1079,8 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
   },
   groupingInputRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
     marginBottom: 20,
   },
@@ -1110,29 +1090,29 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardHover,
     borderRadius: 16,
     fontSize: 32,
-    fontWeight: "700",
+    fontWeight: '700',
     color: COLORS.white,
-    textAlign: "center",
-    fontVariant: ["tabular-nums"],
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
   },
   groupingUnitBox: {
     height: 64,
     paddingHorizontal: 16,
     backgroundColor: COLORS.cardHover,
     borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   groupingUnit: {
     fontSize: 20,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.textMuted,
   },
   groupingQuickRow: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 8,
-    flexWrap: "wrap",
-    justifyContent: "center",
+    flexWrap: 'wrap',
+    justifyContent: 'center',
   },
   groupingQuickBtn: {
     paddingHorizontal: 16,
@@ -1145,7 +1125,7 @@ const styles = StyleSheet.create({
   },
   groupingQuickText: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.textMuted,
   },
   groupingQuickTextActive: {
@@ -1161,17 +1141,17 @@ const styles = StyleSheet.create({
   },
   groupingShotsLabel: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.textMuted,
-    textAlign: "center",
+    textAlign: 'center',
     marginBottom: 12,
-    textTransform: "uppercase",
+    textTransform: 'uppercase',
     letterSpacing: 1,
   },
   groupingShotsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 20,
   },
   groupingShotsBtn: {
@@ -1179,23 +1159,23 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     backgroundColor: COLORS.cardHover,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   groupingBtnDisabled: {
     opacity: 0.4,
   },
   groupingShotsValue: {
     fontSize: 36,
-    fontWeight: "700",
+    fontWeight: '700',
     color: COLORS.white,
     minWidth: 60,
-    textAlign: "center",
+    textAlign: 'center',
   },
   groupingShotsQuickRow: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 8,
-    justifyContent: "center",
+    justifyContent: 'center',
     marginTop: 16,
   },
   groupingShotsQuickBtn: {
@@ -1209,7 +1189,7 @@ const styles = StyleSheet.create({
   },
   groupingShotsQuickText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.textMuted,
   },
   groupingShotsQuickTextActive: {
@@ -1217,17 +1197,17 @@ const styles = StyleSheet.create({
   },
 
   // Buttons
-  submitBtn: { borderRadius: 14, overflow: "hidden", marginBottom: 12 },
+  submitBtn: { borderRadius: 14, overflow: 'hidden', marginBottom: 12 },
   submitBtnGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     height: 54,
     gap: 10,
   },
-  submitBtnText: { fontSize: 16, fontWeight: "700", color: "#fff" },
-  cancelBtn: { alignItems: "center", paddingVertical: 12 },
-  cancelBtnText: { fontSize: 14, fontWeight: "600", color: COLORS.textMuted },
+  submitBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  cancelBtn: { alignItems: 'center', paddingVertical: 12 },
+  cancelBtnText: { fontSize: 14, fontWeight: '600', color: COLORS.textMuted },
 });
 
 export default TacticalTargetFlow;

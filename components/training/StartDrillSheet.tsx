@@ -4,7 +4,12 @@ import { useOpenWeather } from '@/hooks/useOpenWeather';
 import { getCurrentUser } from '@/services/authService';
 import type { BaseSessionConfig } from '@/services/session/types';
 import { createSession } from '@/services/sessionService';
-import { getAssignedWeapons, getOrCreatePersonalProfile, getUserWeapon, type UserWeapon } from '@/services/weaponService';
+import {
+  getAssignedWeapons,
+  getOrCreatePersonalProfile,
+  getUserWeapon,
+  type UserWeapon,
+} from '@/services/weaponService';
 import { toSessionWeatherData } from '@/services/weather';
 import { useSessionStore } from '@/store/sessionStore';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,15 +17,7 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { ChevronRight, CornerDownRight, Crosshair, Plus, Target } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface StartDrillSheetProps {
@@ -32,14 +29,7 @@ interface StartDrillSheetProps {
   initialWeapon?: UserWeapon | null;
 }
 
-export function StartDrillSheet({
-  visible,
-  onClose,
-  drill,
-  trainingId,
-  teamId,
-  initialWeapon,
-}: StartDrillSheetProps) {
+export function StartDrillSheet({ visible, onClose, drill, trainingId, teamId, initialWeapon }: StartDrillSheetProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { loadSessions } = useSessionStore();
@@ -166,17 +156,20 @@ export function StartDrillSheet({
     }
   }, []);
 
-  const handleWeaponCreatedById = useCallback(async (weaponId: string) => {
-    setShowCreateWeapon(false);
-    try {
-      const weapon = await getUserWeapon(weaponId);
-      if (weapon) {
-        handleWeaponSelect(weapon);
+  const handleWeaponCreatedById = useCallback(
+    async (weaponId: string) => {
+      setShowCreateWeapon(false);
+      try {
+        const weapon = await getUserWeapon(weaponId);
+        if (weapon) {
+          handleWeaponSelect(weapon);
+        }
+      } catch (error) {
+        console.error('[StartDrillSheet] Failed to fetch created weapon:', error);
       }
-    } catch (error) {
-      console.error('[StartDrillSheet] Failed to fetch created weapon:', error);
-    }
-  }, [handleWeaponSelect]);
+    },
+    [handleWeaponSelect]
+  );
 
   if (!visible) return null;
 
@@ -222,9 +215,7 @@ export function StartDrillSheet({
             {loadingWeapon ? (
               <View style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <ActivityIndicator size="small" color={colors.textMuted} />
-                <Text style={[styles.weaponLoadingText, { color: colors.textMuted }]}>
-                  Loading your weapon...
-                </Text>
+                <Text style={[styles.weaponLoadingText, { color: colors.textMuted }]}>Loading your weapon...</Text>
               </View>
             ) : selectedWeapon ? (
               <TouchableOpacity
@@ -268,9 +259,7 @@ export function StartDrillSheet({
         <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
           <View style={[styles.bottomBarInner, { borderTopColor: colors.border }]}>
             {!selectedWeapon && !loadingWeapon && (
-              <Text style={[styles.weaponRequiredHint, { color: colors.orange }]}>
-                Select a weapon to continue
-              </Text>
+              <Text style={[styles.weaponRequiredHint, { color: colors.orange }]}>Select a weapon to continue</Text>
             )}
             <TouchableOpacity
               style={[
@@ -297,7 +286,12 @@ export function StartDrillSheet({
         </View>
 
         {/* Weapon Picker Modal */}
-        <Modal visible={showWeaponPicker} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowWeaponPicker(false)}>
+        <Modal
+          visible={showWeaponPicker}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowWeaponPicker(false)}
+        >
           <WeaponPicker
             selectedWeaponId={selectedWeapon?.id || null}
             onSelect={handleWeaponSelect}
@@ -310,7 +304,12 @@ export function StartDrillSheet({
           />
         </Modal>
 
-        <Modal visible={showCreateWeapon} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowCreateWeapon(false)}>
+        <Modal
+          visible={showCreateWeapon}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowCreateWeapon(false)}
+        >
           <CreateWeaponFlow
             onComplete={handleWeaponCreatedById}
             onCancel={() => {

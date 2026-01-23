@@ -9,16 +9,16 @@ import { StyleSheet } from 'react-native';
 
 /**
  * Unified Home Screen
- * 
+ *
  * Route: /(protected)/(tabs)/
- * 
+ *
  * Single dashboard showing:
  * - Active session (if any)
  * - Live trainings from any team
  * - Upcoming trainings across all teams
  * - Quick actions
  * - Team overview
- * 
+ *
  * Features:
  * - Error boundary for graceful error handling
  * - Sentry integration for error tracking
@@ -84,11 +84,7 @@ class HomeErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState
           <ThemedText type="default" style={styles.errorMessage}>
             {this.state.error?.message || 'An unexpected error occurred'}
           </ThemedText>
-          <ThemedText 
-            type="link" 
-            onPress={this.handleReset}
-            style={styles.errorRetry}
-          >
+          <ThemedText type="link" onPress={this.handleReset} style={styles.errorRetry}>
             Try again
           </ThemedText>
         </ThemedView>
@@ -158,4 +154,3 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
 });
-

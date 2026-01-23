@@ -12,10 +12,7 @@ import type { CoachMessageProps } from '../UnifiedHomePage.types';
 
 export function CoachMessage({ message, colors }: CoachMessageProps) {
   return (
-    <Animated.View
-      entering={FadeInDown.duration(400).delay(100)}
-      style={s.container}
-    >
+    <Animated.View entering={FadeInDown.duration(400).delay(100)} style={s.container}>
       <View style={[s.accentLine, { backgroundColor: colors.primary }]} />
       <View style={s.content}>
         <View style={s.iconWrapper}>
@@ -59,4 +56,3 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
 });
-

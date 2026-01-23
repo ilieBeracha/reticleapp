@@ -7,13 +7,7 @@ import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { Bell } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import {
-    Image,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface HeaderProps {
   onNotificationPress?: () => void;
@@ -21,7 +15,7 @@ interface HeaderProps {
 
 /**
  * App Header Component
- * 
+ *
  * Brand header with:
  * - App icon + "Reticle" brand name
  * - Notification bell with badge
@@ -66,10 +60,7 @@ export function Header({ onNotificationPress }: HeaderProps) {
     <View style={styles.container}>
       {/* Left - Brand */}
       <View style={styles.left}>
-        <Image 
-          source={require('@/assets/images/icon.jpg')} 
-          style={styles.appIcon}
-        />
+        <Image source={require('@/assets/images/icon.jpg')} style={styles.appIcon} />
         <Text style={[styles.brandName, { color: colors.text }]}>Reticle</Text>
       </View>
 
@@ -83,17 +74,12 @@ export function Header({ onNotificationPress }: HeaderProps) {
           <Bell size={18} color={colors.text} strokeWidth={2} />
           {notificationCount > 0 && (
             <View style={[styles.badge, { backgroundColor: colors.red, borderColor: colors.background }]}>
-              <Text style={styles.badgeText}>
-                {notificationCount > 9 ? '9+' : notificationCount}
-              </Text>
+              <Text style={styles.badgeText}>{notificationCount > 9 ? '9+' : notificationCount}</Text>
             </View>
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={handleProfilePress}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity onPress={handleProfilePress} activeOpacity={0.7}>
           <BaseAvatar
             source={avatarSource ? { uri: avatarSource } : undefined}
             fallbackText={fullName?.charAt(0) || 'U'}

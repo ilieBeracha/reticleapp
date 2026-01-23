@@ -2,24 +2,24 @@
  * UnifiedHomePage Components Barrel Export
  */
 
-export { HomeHeader } from './HomeHeader';
-export { CoachMessage } from './CoachMessage';
-export { WeeklyStatsCard } from './WeeklyStatsCard';
-export { InsightsCard } from './InsightsCard';
 export { ActiveSessionCard } from './ActiveSessionCard';
-export { StartPracticeCard } from './StartPracticeCard';
-export { TeamTrainingCard } from './TeamTrainingCard';
-export { RecentSessionRow } from './RecentSessionRow';
-export { TeamSection } from './TeamSection';
-export { RecentActivitySection } from './RecentActivitySection';
+export { CoachMessage } from './CoachMessage';
+export { HomeHeader } from './HomeHeader';
+export { InsightsCard } from './InsightsCard';
 export { PersonalSection } from './PersonalSection';
+export { RecentActivitySection } from './RecentActivitySection';
+export { RecentSessionRow } from './RecentSessionRow';
+export { StartPracticeCard } from './StartPracticeCard';
+export { TeamSection } from './TeamSection';
+export { TeamTrainingCard } from './TeamTrainingCard';
+export { WeeklyStatsCard } from './WeeklyStatsCard';
 
 // New engaging components
-export { QuickActionsRow } from './QuickActionsRow';
-export { WeeklyProgressRing } from './WeeklyProgressRing';
 export { DailyTip } from './DailyTip';
-export { WeeklyActivityChart } from './WeeklyActivityChart';
 export { HeroActions } from './HeroActions';
+export { QuickActionsRow } from './QuickActionsRow';
 export { TimelineStrip } from './TimelineStrip';
 export { WeaponPerformanceCard } from './WeaponPerformanceCard';
+export { WeeklyActivityChart } from './WeeklyActivityChart';
+export { WeeklyProgressRing } from './WeeklyProgressRing';
 

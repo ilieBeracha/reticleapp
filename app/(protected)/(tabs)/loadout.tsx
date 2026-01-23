@@ -28,16 +28,7 @@ import type { WeaponCategory } from '@/types/workspace';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import {
-  ChevronRight,
-  Crosshair,
-  Plus,
-  Star,
-  Target,
-  User,
-  Users,
-  Zap,
-} from 'lucide-react-native';
+import { ChevronRight, Crosshair, Plus, Star, Target, User, Users, Zap } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -122,10 +113,10 @@ interface SourceFilterPillsProps {
 
 function SourceFilterPills({ selected, onChange, counts, colors }: SourceFilterPillsProps) {
   const filters: SourceFilter[] = ['all', 'personal', 'team_assigned', 'team_pool'];
-  
+
   // Only show filters that have weapons (except 'all' which is always shown)
-  const visibleFilters = filters.filter(f => f === 'all' || counts[f] > 0);
-  
+  const visibleFilters = filters.filter((f) => f === 'all' || counts[f] > 0);
+
   // If only personal weapons exist, don't show filters at all
   if (visibleFilters.length <= 2 && counts.personal === counts.all) {
     return null;
@@ -137,33 +128,25 @@ function SourceFilterPills({ selected, onChange, counts, colors }: SourceFilterP
         const isSelected = selected === filter;
         const config = SOURCE_FILTER_CONFIG[filter];
         const count = counts[filter];
-        
+
         return (
           <TouchableOpacity
             key={filter}
-            style={[
-              s.filterPill,
-              { backgroundColor: isSelected ? colors.primary : colors.card },
-            ]}
+            style={[s.filterPill, { backgroundColor: isSelected ? colors.primary : colors.card }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               onChange(filter);
             }}
             activeOpacity={0.7}
           >
-            <Text
-              style={[
-                s.filterPillText,
-                { color: isSelected ? '#fff' : colors.textMuted },
-              ]}
-            >
+            <Text style={[s.filterPillText, { color: isSelected ? '#fff' : colors.textMuted }]}>
               {config.shortLabel}
             </Text>
             {filter !== 'all' && count > 0 && (
-              <View style={[s.filterCount, { backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : colors.secondary }]}>
-                <Text style={[s.filterCountText, { color: isSelected ? '#fff' : colors.textMuted }]}>
-                  {count}
-                </Text>
+              <View
+                style={[s.filterCount, { backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : colors.secondary }]}
+              >
+                <Text style={[s.filterCountText, { color: isSelected ? '#fff' : colors.textMuted }]}>{count}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -222,7 +205,7 @@ function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }:
   const categoryConfig = weapon.category ? getCategoryConfig(weapon.category) : null;
   const sourceConfig = getSourceConfig(weapon.source);
   const isTeamWeapon = weapon.source !== 'personal';
-  
+
   // Use blue accent for team weapons, primary for personal
   const iconAccent = isTeamWeapon ? '#3B82F6' : colors.primary;
   const iconBg = isTeamWeapon ? '#3B82F615' : `${colors.primary}12`;
@@ -235,9 +218,7 @@ function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }:
     >
       <View style={s.cardMain}>
         {/* Category Icon - blue accent for team weapons */}
-        <View style={[s.cardIcon, { backgroundColor: iconBg }]}>
-          {getCategoryIcon(weapon.category, iconAccent)}
-        </View>
+        <View style={[s.cardIcon, { backgroundColor: iconBg }]}>{getCategoryIcon(weapon.category, iconAccent)}</View>
 
         {/* Info */}
         <View style={s.cardInfo}>
@@ -256,13 +237,12 @@ function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }:
             {isTeamWeapon && (
               <View style={[s.sourceBadge, { backgroundColor: sourceConfig.bg }]}>
                 {getSourceIcon(weapon.source, sourceConfig.color)}
-                <Text style={[s.sourceBadgeText, { color: sourceConfig.color }]}>
-                  {sourceConfig.label}
-                </Text>
+                <Text style={[s.sourceBadgeText, { color: sourceConfig.color }]}>{sourceConfig.label}</Text>
               </View>
             )}
             <Text style={[s.cardMeta, { color: colors.textMuted }]} numberOfLines={1}>
-              {categoryConfig?.label || 'Weapon'}{weapon.caliber ? ` · ${weapon.caliber}` : ''}
+              {categoryConfig?.label || 'Weapon'}
+              {weapon.caliber ? ` · ${weapon.caliber}` : ''}
             </Text>
           </View>
           {/* Team name for team weapons */}
@@ -291,11 +271,7 @@ function WeaponCard({ weapon, stats, isDefault, onPress, onSetDefault, colors }:
             }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Star
-              size={14}
-              color={isDefault ? '#f59e0b' : colors.textMuted}
-              fill={isDefault ? '#f59e0b' : 'none'}
-            />
+            <Star size={14} color={isDefault ? '#f59e0b' : colors.textMuted} fill={isDefault ? '#f59e0b' : 'none'} />
           </TouchableOpacity>
         ) : (
           /* Team indicator icon for team weapons */
@@ -365,7 +341,7 @@ export default function LoadoutScreen() {
       team_assigned: 0,
       team_pool: 0,
     };
-    weapons.forEach(w => {
+    weapons.forEach((w) => {
       counts[w.source]++;
     });
     return counts;
@@ -374,7 +350,7 @@ export default function LoadoutScreen() {
   // Filtered weapons
   const filteredWeapons = useMemo(() => {
     if (sourceFilter === 'all') return weapons;
-    return weapons.filter(w => w.source === sourceFilter);
+    return weapons.filter((w) => w.source === sourceFilter);
   }, [weapons, sourceFilter]);
 
   // Aggregate stats for filtered weapons
@@ -408,18 +384,21 @@ export default function LoadoutScreen() {
     }
   }, []);
 
-  const handleSetDefault = useCallback(async (weaponId: string) => {
-    try {
-      const newDefaultId = defaultWeaponId === weaponId ? null : weaponId;
-      await setDefaultWeaponId(newDefaultId);
-      setDefaultWeaponIdState(newDefaultId);
-      Haptics.notificationAsync(
-        newDefaultId ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning
-      );
-    } catch (error) {
-      console.error('Failed to set default weapon:', error);
-    }
-  }, [defaultWeaponId]);
+  const handleSetDefault = useCallback(
+    async (weaponId: string) => {
+      try {
+        const newDefaultId = defaultWeaponId === weaponId ? null : weaponId;
+        await setDefaultWeaponId(newDefaultId);
+        setDefaultWeaponIdState(newDefaultId);
+        Haptics.notificationAsync(
+          newDefaultId ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning
+        );
+      } catch (error) {
+        console.error('Failed to set default weapon:', error);
+      }
+    },
+    [defaultWeaponId]
+  );
 
   const handleAddWeapon = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -481,9 +460,7 @@ export default function LoadoutScreen() {
         style={s.scrollView}
         contentContainerStyle={[s.scrollContent, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
       >
         {/* Header */}
         <View style={s.header}>
@@ -508,12 +485,7 @@ export default function LoadoutScreen() {
         />
 
         {/* Source Filter Pills */}
-        <SourceFilterPills
-          selected={sourceFilter}
-          onChange={setSourceFilter}
-          counts={filterCounts}
-          colors={colors}
-        />
+        <SourceFilterPills selected={sourceFilter} onChange={setSourceFilter} counts={filterCounts} colors={colors} />
 
         {/* Section Header */}
         <View style={s.sectionHeader}>
@@ -546,20 +518,19 @@ export default function LoadoutScreen() {
               <Target size={24} color={colors.textMuted} />
             </View>
             <Text style={[s.emptyTitle, { color: colors.text }]}>
-              {sourceFilter === 'all' ? 'No weapons yet' : `No ${SOURCE_FILTER_CONFIG[sourceFilter].label.toLowerCase()} weapons`}
+              {sourceFilter === 'all'
+                ? 'No weapons yet'
+                : `No ${SOURCE_FILTER_CONFIG[sourceFilter].label.toLowerCase()} weapons`}
             </Text>
             <Text style={[s.emptySubtitle, { color: colors.textMuted }]}>
-              {sourceFilter === 'all' 
+              {sourceFilter === 'all'
                 ? 'Add your first weapon to start tracking performance'
                 : sourceFilter === 'personal'
                   ? 'Create a personal weapon to get started'
                   : 'Team weapons will appear here when available'}
             </Text>
             {sourceFilter === 'all' || sourceFilter === 'personal' ? (
-              <TouchableOpacity
-                style={[s.emptyButton, { backgroundColor: colors.primary }]}
-                onPress={handleAddWeapon}
-              >
+              <TouchableOpacity style={[s.emptyButton, { backgroundColor: colors.primary }]} onPress={handleAddWeapon}>
                 <Plus size={16} color="#fff" />
                 <Text style={s.emptyButtonText}>Add Weapon</Text>
               </TouchableOpacity>
@@ -593,10 +564,7 @@ export default function LoadoutScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowAddWeapon(false)}
       >
-        <CreateWeaponFlow
-          onComplete={handleWeaponCreated}
-          onCancel={() => setShowAddWeapon(false)}
-        />
+        <CreateWeaponFlow onComplete={handleWeaponCreated} onCancel={() => setShowAddWeapon(false)} />
       </Modal>
     </View>
   );

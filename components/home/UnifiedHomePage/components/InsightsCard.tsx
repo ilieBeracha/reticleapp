@@ -1,19 +1,10 @@
 /**
  * InsightsCard Component
- * 
+ *
  * Compact AI-powered shooter insights.
  */
 
-import { 
-  AlertTriangle,
-  Award,
-  ChevronRight,
-  Clock,
-  Sparkles, 
-  Target, 
-  TrendingUp,
-  Zap,
-} from 'lucide-react-native';
+import { AlertTriangle, Award, ChevronRight, Clock, Sparkles, Target, TrendingUp, Zap } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { Colors, WeeklyStats } from '../UnifiedHomePage.types';
 
@@ -35,8 +26,8 @@ interface Insight {
 }
 
 function generateInsight(
-  stats: WeeklyStats, 
-  streak: number, 
+  stats: WeeklyStats,
+  streak: number,
   lastSessionDaysAgo: number | null,
   colors: Colors
 ): Insight | null {
@@ -115,13 +106,7 @@ function generateInsight(
   return null;
 }
 
-export function InsightsCard({ 
-  stats, 
-  streak, 
-  lastSessionDaysAgo,
-  colors,
-  onPress,
-}: InsightsCardProps) {
+export function InsightsCard({ stats, streak, lastSessionDaysAgo, colors, onPress }: InsightsCardProps) {
   const insight = generateInsight(stats, streak, lastSessionDaysAgo, colors);
 
   if (!insight) return null;
@@ -139,36 +124,26 @@ export function InsightsCard({
   };
 
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[
-        s.card, 
-        { 
+        s.card,
+        {
           backgroundColor: bgColors[insight.type],
           borderColor: borderColors[insight.type],
-        }
+        },
       ]}
       onPress={onPress}
       activeOpacity={onPress ? 0.7 : 1}
       disabled={!onPress}
     >
-      <View style={s.iconWrap}>
-        {insight.icon}
-      </View>
-      
+      <View style={s.iconWrap}>{insight.icon}</View>
+
       <View style={s.content}>
-        <Text style={[s.text, { color: colors.text }]}>
-          {insight.text}
-        </Text>
-        {insight.highlight && (
-          <Text style={[s.highlight, { color: colors.textMuted }]}>
-            {insight.highlight}
-          </Text>
-        )}
+        <Text style={[s.text, { color: colors.text }]}>{insight.text}</Text>
+        {insight.highlight && <Text style={[s.highlight, { color: colors.textMuted }]}>{insight.highlight}</Text>}
       </View>
 
-      {onPress && (
-        <ChevronRight size={16} color={colors.textMuted} />
-      )}
+      {onPress && <ChevronRight size={16} color={colors.textMuted} />}
     </TouchableOpacity>
   );
 }

@@ -107,12 +107,8 @@ export function WeeklyProgressRing({ stats, colors, weeklyGoal = 5 }: WeeklyProg
             />
           </Svg>
           <View style={s.ringCenter}>
-            <Text style={[s.ringValue, { color: colors.text }]}>
-              {stats.sessions}
-            </Text>
-            <Text style={[s.ringLabel, { color: colors.textMuted }]}>
-              of {weeklyGoal}
-            </Text>
+            <Text style={[s.ringValue, { color: colors.text }]}>{stats.sessions}</Text>
+            <Text style={[s.ringLabel, { color: colors.textMuted }]}>of {weeklyGoal}</Text>
           </View>
         </View>
 
@@ -130,26 +126,20 @@ export function WeeklyProgressRing({ stats, colors, weeklyGoal = 5 }: WeeklyProg
           <View style={s.statsRow}>
             <View style={s.statItem}>
               <Target size={14} color={colors.indigo} />
-              <Text style={[s.statValue, { color: colors.text }]}>
-                {stats.shots.toLocaleString()}
-              </Text>
+              <Text style={[s.statValue, { color: colors.text }]}>{stats.shots.toLocaleString()}</Text>
               <Text style={[s.statLabel, { color: colors.textMuted }]}>shots</Text>
             </View>
             <View style={[s.divider, { backgroundColor: colors.border }]} />
             <View style={s.statItem}>
               <TrendingUp size={14} color={colors.green} />
-              <Text style={[s.statValue, { color: colors.text }]}>
-                {stats.accuracy}%
-              </Text>
+              <Text style={[s.statValue, { color: colors.text }]}>{stats.accuracy}%</Text>
               <Text style={[s.statLabel, { color: colors.textMuted }]}>avg</Text>
             </View>
           </View>
 
           <View style={s.progressTextRow}>
             <Text style={[s.progressText, { color: colors.textMuted }]}>
-              {isGoalMet
-                ? 'Great work this week!'
-                : `${weeklyGoal - stats.sessions} more to hit your goal`}
+              {isGoalMet ? 'Great work this week!' : `${weeklyGoal - stats.sessions} more to hit your goal`}
             </Text>
             <ChevronRight size={16} color={colors.textMuted} style={{ opacity: 0.5 }} />
           </View>

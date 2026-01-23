@@ -156,7 +156,8 @@ const TIMED_TEMPLATES: DrillTemplate[] = [
     drillType: 'timed',
     source: 'library',
     name: 'El Presidente',
-    description: 'Start facing away. Turn, engage 3 targets with 2 shots each, reload, repeat. Classic competition drill.',
+    description:
+      'Start facing away. Turn, engage 3 targets with 2 shots each, reload, repeat. Classic competition drill.',
     goal: 'Master transitions and reloads under time',
     defaults: {
       distance: 10,

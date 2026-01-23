@@ -1,4 +1,4 @@
-import { useColors } from "@/hooks/ui/useColors";
+import { useColors } from '@/hooks/ui/useColors';
 import {
   clearNotificationHistory,
   deleteNotificationFromHistory,
@@ -6,12 +6,12 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
   type NotificationHistoryItem,
-} from "@/services/notifications";
-import { Ionicons } from "@expo/vector-icons";
-import { formatDistanceToNow } from "date-fns";
+} from '@/services/notifications';
+import { Ionicons } from '@expo/vector-icons';
+import { formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
-import { router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { router } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -21,8 +21,8 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from "react-native";
-import Animated, { FadeIn, FadeInDown, Layout } from "react-native-reanimated";
+} from 'react-native';
+import Animated, { FadeIn, FadeInDown, Layout } from 'react-native-reanimated';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPE CONFIG
@@ -72,7 +72,7 @@ export default function NotificationsSheet() {
     try {
       await deleteNotificationFromHistory(id);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      setNotifications(prev => prev.filter(n => n.id !== id));
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
     } catch (error) {
       console.error('Failed to delete notification:', error);
     }
@@ -80,50 +80,44 @@ export default function NotificationsSheet() {
 
   const handleClearAll = useCallback(() => {
     if (notifications.length === 0) return;
-    
-    Alert.alert(
-      'Clear All Notifications',
-      'This will delete your entire notification history.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear All',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await clearNotificationHistory();
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              setNotifications([]);
-            } catch (error) {
-              console.error('Failed to clear notifications:', error);
-            }
-          },
+
+    Alert.alert('Clear All Notifications', 'This will delete your entire notification history.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Clear All',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await clearNotificationHistory();
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            setNotifications([]);
+          } catch (error) {
+            console.error('Failed to clear notifications:', error);
+          }
         },
-      ]
-    );
+      },
+    ]);
   }, [notifications.length]);
 
   const handleMarkAllRead = useCallback(async () => {
     await markAllNotificationsRead();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   }, []);
 
   const handleNotificationPress = useCallback(async (notification: NotificationHistoryItem) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
+
     // Mark as read
     if (!notification.read) {
       await markNotificationRead(notification.id);
-      setNotifications(prev => 
-        prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
-      );
+      setNotifications((prev) => prev.map((n) => (n.id === notification.id ? { ...n, read: true } : n)));
     }
-    
+
     // Navigate based on notification data
     const screen = notification.screen;
     const id = notification.reference_id;
-    
+
     if (screen && router.canDismiss()) {
       router.dismiss();
       setTimeout(() => {
@@ -158,7 +152,7 @@ export default function NotificationsSheet() {
     return formatDistanceToNow(date, { addSuffix: true });
   };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   if (loading) {
     return (
@@ -173,13 +167,7 @@ export default function NotificationsSheet() {
       style={[styles.scrollView, { backgroundColor: colors.card }]}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
-          tintColor={colors.primary}
-        />
-      }
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
     >
       {/* Header Row */}
       <Animated.View entering={FadeInDown.delay(50)} style={styles.headerRow}>
@@ -191,7 +179,7 @@ export default function NotificationsSheet() {
             </Text>
           )}
         </View>
-        
+
         {/* Actions */}
         {notifications.length > 0 && (
           <View style={styles.headerActions}>
@@ -221,20 +209,16 @@ export default function NotificationsSheet() {
           {notifications.map((notification, index) => {
             const config = TYPE_CONFIG[notification.type] || TYPE_CONFIG.default;
             const isUnread = !notification.read;
-            
+
             return (
-              <Animated.View
-                key={notification.id}
-                entering={FadeIn.delay(80 + index * 25)}
-                layout={Layout.springify()}
-              >
+              <Animated.View key={notification.id} entering={FadeIn.delay(80 + index * 25)} layout={Layout.springify()}>
                 <TouchableOpacity
                   style={[
                     styles.notificationItem,
-                    { 
+                    {
                       backgroundColor: colors.background,
                       borderLeftColor: isUnread ? config.color : 'transparent',
-                    }
+                    },
                   ]}
                   onPress={() => handleNotificationPress(notification)}
                   activeOpacity={0.7}
@@ -243,15 +227,12 @@ export default function NotificationsSheet() {
                   <View style={[styles.iconContainer, { backgroundColor: config.color + '15' }]}>
                     <Ionicons name={config.icon as any} size={18} color={config.color} />
                   </View>
-                  
+
                   {/* Content */}
                   <View style={styles.content}>
                     <View style={styles.topRow}>
-                      <Text 
-                        style={[
-                          styles.notificationTitle, 
-                          { color: colors.text, fontWeight: isUnread ? '600' : '500' }
-                        ]} 
+                      <Text
+                        style={[styles.notificationTitle, { color: colors.text, fontWeight: isUnread ? '600' : '500' }]}
                         numberOfLines={1}
                       >
                         {notification.title}
@@ -260,14 +241,8 @@ export default function NotificationsSheet() {
                         {getTimeLabel(notification.created_at)}
                       </Text>
                     </View>
-                    
-                    <Text 
-                      style={[
-                        styles.body, 
-                        { color: isUnread ? colors.text : colors.textMuted }
-                      ]} 
-                      numberOfLines={2}
-                    >
+
+                    <Text style={[styles.body, { color: isUnread ? colors.text : colors.textMuted }]} numberOfLines={2}>
                       {notification.body}
                     </Text>
                   </View>

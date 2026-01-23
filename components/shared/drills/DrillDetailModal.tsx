@@ -7,7 +7,7 @@ import { useColors } from '@/hooks/ui/useColors';
 import type { Drill } from '@/types/workspace';
 import { Camera, Clock, Crosshair, Hand, MapPin, RefreshCw, Trophy, X } from 'lucide-react-native';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ============================================================================
@@ -88,11 +88,7 @@ export function DrillDetailModal({ visible, onClose, drill }: DrillDetailModalPr
           {/* Hero */}
           <Animated.View entering={FadeInDown.delay(50)} style={styles.hero}>
             <View style={[styles.heroIcon, { backgroundColor: accentColor + '15' }]}>
-              {isGrouping ? (
-                <Crosshair size={36} color={accentColor} />
-              ) : (
-                <Trophy size={36} color={accentColor} />
-              )}
+              {isGrouping ? <Crosshair size={36} color={accentColor} /> : <Trophy size={36} color={accentColor} />}
             </View>
             <Text style={[styles.heroName, { color: colors.text }]}>{drill.name}</Text>
             <View style={[styles.heroBadge, { backgroundColor: accentColor + '20' }]}>

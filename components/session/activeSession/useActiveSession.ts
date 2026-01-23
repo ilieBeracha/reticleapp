@@ -1,6 +1,6 @@
 /**
  * useActiveSession Hook
- * 
+ *
  * Manages all stateful logic for the Active Session Screen.
  * Handles data loading, timer, watch integration, and actions.
  */
@@ -32,11 +32,7 @@ import { isInfiniteShots } from '@/utils/drillShots';
 
 import { useSessionRealtime } from '@/hooks/realtime';
 import { deriveDetectionConfig } from '@/utils/detectionSensitivity';
-import {
-  SHOT_MARKING_ENABLED,
-  TIMER_INTERVAL_MS,
-  VIBRATE_ON_SHOT
-} from './activeSession.constants';
+import { SHOT_MARKING_ENABLED, TIMER_INTERVAL_MS, VIBRATE_ON_SHOT } from './activeSession.constants';
 import {
   buildEndSessionMessage,
   buildWatchSessionPayload,
@@ -140,11 +136,11 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
   // Watch session start failure state
   const [watchStartFailed, setWatchStartFailed] = useState(false);
   const [watchStarting, setWatchStarting] = useState(false);
-  
+
   // Watch preview queued - watch received SESSION_START and is showing preview
   // User must tap watch to actually start the session
   const [watchPreviewQueued, setWatchPreviewQueued] = useState(false);
-  
+
   // Watch app not open - user needs to open it manually
   const [watchAppNotOpen, setWatchAppNotOpen] = useState(false);
 
@@ -173,7 +169,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
 
       // NOTE: Team sessions now also go through SessionPrepView for watch/caliber configuration
       // The prep view will handle activation when user is ready to start
-      
+
       setSession(sessionData);
       setTargets(targetsData);
       setStats(statsData);
@@ -227,10 +223,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     [drillProgress, drill, totalShots, targets.length]
   );
 
-  const defaultDistance = useMemo(
-    () => getDefaultDistance(targets, drill),
-    [targets, drill]
-  );
+  const defaultDistance = useMemo(() => getDefaultDistance(targets, drill), [targets, drill]);
 
   const drillLimitReached = isDrillLimitReached(drill, nextTargetPlan);
 
@@ -279,10 +272,10 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
   // ============================================================================
   // GARMIN INTEGRATION - Start session on watch
   // ============================================================================
-  
+
   const startWatchSessionWithRetry = useCallback(async () => {
     if (!session) return;
-    
+
     // Can only send messages when app is open (CONNECTED)
     // ONLINE means watch is reachable but app not running - can't send!
     if (garminStatus === 'ONLINE') {
@@ -293,7 +286,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       setWatchStarting(false);
       return;
     }
-    
+
     if (garminStatus !== 'CONNECTED') {
       console.log('[Garmin] Watch not reachable, status:', garminStatus);
       setWatchStartFailed(true);
@@ -301,32 +294,38 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       setWatchPreviewQueued(false);
       return;
     }
-    
+
     // App is open - can send!
     setWatchAppNotOpen(false);
 
     // Derive detection sensitivity from weapon
     // Uses caliber-specific thresholds for accurate shot detection
-    const weaponInfo = session.weapon_id ? {
-      category: session.weapon_category,
-      caliber: session.weapon_caliber,
-      // Could add suppressor detection from weapon config
-    } : undefined;
-    
+    const weaponInfo = session.weapon_id
+      ? {
+          category: session.weapon_category,
+          caliber: session.weapon_caliber,
+          // Could add suppressor detection from weapon config
+        }
+      : undefined;
+
     const detectionConfig = deriveDetectionConfig({
       category: weaponInfo?.category as any,
       caliber: weaponInfo?.caliber,
     });
-    
+
     console.log(`[Garmin] Weapon: ${weaponInfo?.caliber || 'unknown'} (${weaponInfo?.category || 'any'})`);
-    console.log(`[Garmin] Detection: ${detectionConfig.sensitivity}G, cooldown=${detectionConfig.cooldownMs}ms, profile=${detectionConfig.profile}`);
+    console.log(
+      `[Garmin] Detection: ${detectionConfig.sensitivity}G, cooldown=${detectionConfig.cooldownMs}ms, profile=${detectionConfig.profile}`
+    );
 
     const payload = buildWatchSessionPayload(session, {
       autoDetect: true,
-      weapon: weaponInfo ? {
-        category: weaponInfo.category,
-        caliber: weaponInfo.caliber,
-      } : undefined,
+      weapon: weaponInfo
+        ? {
+            category: weaponInfo.category,
+            caliber: weaponInfo.caliber,
+          }
+        : undefined,
       emkv: SHOT_MARKING_ENABLED,
       vrcv: VIBRATE_ON_SHOT,
     });
@@ -410,19 +409,22 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       // =========================================================================
       console.log('[Garmin] Auto-saving watch summary to DB...');
       try {
-        await saveWatchSessionData({
-          sessionId: sessionId!,
-          shotsRecorded: data.shotsRecorded,
-          hitsRecorded: data.shotsRecorded, // Default hits = shots
-          durationMs: data.durationMs || 0,
-          distance: data.distance,
-          completed: false, // Don't end session yet - user can review
-          splitTimes: data.splitTimes,
-          avgSplitMs: data.avgSplitMs,
-          performance: data.performance,
-          biometrics: data.biometrics,
-          steadiness: data.steadiness,
-        }, false); // false = don't end session
+        await saveWatchSessionData(
+          {
+            sessionId: sessionId!,
+            shotsRecorded: data.shotsRecorded,
+            hitsRecorded: data.shotsRecorded, // Default hits = shots
+            durationMs: data.durationMs || 0,
+            distance: data.distance,
+            completed: false, // Don't end session yet - user can review
+            splitTimes: data.splitTimes,
+            avgSplitMs: data.avgSplitMs,
+            performance: data.performance,
+            biometrics: data.biometrics,
+            steadiness: data.steadiness,
+          },
+          false
+        ); // false = don't end session
         console.log('[Garmin] Watch summary auto-saved');
       } catch (saveError) {
         console.error('[Garmin] Failed to auto-save watch data:', saveError);
@@ -484,7 +486,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
 
     const handleWatchSessionComplete = (watchSessionId: string, shotCount: number) => {
       console.log(`[ActiveSession] Watch session complete: ${watchSessionId}, shots: ${shotCount}`);
-      
+
       // Only process if this is our session
       if (watchSessionId !== sessionId) {
         console.log(`[ActiveSession] Session ID mismatch (expected: ${sessionId})`);
@@ -528,13 +530,16 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       console.log('[ActiveSession] Realtime: New target detected, refreshing...');
       loadData();
     }, [loadData]),
-    onStatusChange: useCallback((status: string) => {
-      // Session was completed/cancelled from elsewhere
-      if (status === 'completed' || status === 'cancelled') {
-        console.log('[ActiveSession] Realtime: Session ended externally');
-        loadData();
-      }
-    }, [loadData]),
+    onStatusChange: useCallback(
+      (status: string) => {
+        // Session was completed/cancelled from elsewhere
+        if (status === 'completed' || status === 'cancelled') {
+          console.log('[ActiveSession] Realtime: Session ended externally');
+          loadData();
+        }
+      },
+      [loadData]
+    ),
   });
 
   // ============================================================================
@@ -598,44 +603,58 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
         sessionId,
         distance: distance.toString(),
         ...(lockedConfig ? { locked: '1' } : {}),
-        ...(hasDrill && nextTargetPlan?.nextBullets
-          ? { bullets: String(nextTargetPlan.nextBullets) }
-          : {}),
+        ...(hasDrill && nextTargetPlan?.nextBullets ? { bullets: String(nextTargetPlan.nextBullets) } : {}),
         ...(isGrouping ? { isGrouping: '1' } : {}),
         showTimeInput: session?.watch_controlled ? '0' : '1',
       },
     });
-  }, [sessionId, defaultDistance, hasDrill, drill, nextTargetPlan, isGrouping, lockedConfig, session?.watch_controlled]);
+  }, [
+    sessionId,
+    defaultDistance,
+    hasDrill,
+    drill,
+    nextTargetPlan,
+    isGrouping,
+    lockedConfig,
+    session?.watch_controlled,
+  ]);
 
   const handleManualRoute = useCallback(() => {
     if (!canAddTarget) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
- 
+
     // For training mode, use locked config values strictly
     const distance = lockedConfig?.distance_m ?? defaultDistance;
-    
+
     router.push({
       pathname: '/(protected)/tacticalTarget',
       params: {
         sessionId,
         distance: distance.toString(),
         ...(lockedConfig ? { locked: '1' } : {}),
-        ...(hasDrill && nextTargetPlan?.nextBullets
-          ? { bullets: String(nextTargetPlan.nextBullets) }
-          : {}),
+        ...(hasDrill && nextTargetPlan?.nextBullets ? { bullets: String(nextTargetPlan.nextBullets) } : {}),
         ...(isGrouping ? { isGrouping: '1' } : {}),
         showTimeInput: session?.watch_controlled ? '0' : '1',
       },
     });
-  }, [canAddTarget, sessionId, defaultDistance, hasDrill, nextTargetPlan, isGrouping, lockedConfig, session?.watch_controlled]);
+  }, [
+    canAddTarget,
+    sessionId,
+    defaultDistance,
+    hasDrill,
+    nextTargetPlan,
+    isGrouping,
+    lockedConfig,
+    session?.watch_controlled,
+  ]);
 
   const handleScanRoute = useCallback(() => {
     if (!canAddTarget) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    
+
     const distance = lockedConfig?.distance_m ?? defaultDistance;
     const maxShots = computeMaxShots(lockedConfig, drill);
-    
+
     router.push({
       pathname: '/(protected)/scanTarget',
       params: {
@@ -676,7 +695,8 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
   const handleEndSession = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    const meetsRequirements = !!drillProgress && drillProgress.isComplete && drillProgress.meetsAccuracy && drillProgress.meetsTime;
+    const meetsRequirements =
+      !!drillProgress && drillProgress.isComplete && drillProgress.meetsAccuracy && drillProgress.meetsTime;
     const { title, message } = buildEndSessionMessage(
       hasDrill,
       drill,
@@ -788,33 +808,39 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
         ]
       );
     } else {
-      Alert.alert(
-        'No targets recorded yet',
-        'Would you like to cancel this session or keep it active?',
-        [
-          { text: 'Stay', style: 'cancel' },
-          {
-            text: 'Cancel Session',
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                const { deleteSession } = await import('@/services/sessionService');
-                await deleteSession(sessionId!);
-                await refreshSessionList(session?.team_id, loadTeamSessions, loadPersonalSessions);
-                navigateAfterSessionEnd(session?.training_id, sessionId!, null);
-              } catch (error: any) {
-                Alert.alert('Error', error.message || 'Failed to cancel session');
-              }
-            },
+      Alert.alert('No targets recorded yet', 'Would you like to cancel this session or keep it active?', [
+        { text: 'Stay', style: 'cancel' },
+        {
+          text: 'Cancel Session',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { deleteSession } = await import('@/services/sessionService');
+              await deleteSession(sessionId!);
+              await refreshSessionList(session?.team_id, loadTeamSessions, loadPersonalSessions);
+              navigateAfterSessionEnd(session?.training_id, sessionId!, null);
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to cancel session');
+            }
           },
-          {
-            text: 'Leave Active',
-            onPress: () => router.back(),
-          },
-        ]
-      );
+        },
+        {
+          text: 'Leave Active',
+          onPress: () => router.back(),
+        },
+      ]);
     }
-  }, [sessionId, session?.team_id, session?.training_id, targets.length, drill?.name, elapsedTime, loadPersonalSessions, loadTeamSessions, lastSessionData]);
+  }, [
+    sessionId,
+    session?.team_id,
+    session?.training_id,
+    targets.length,
+    drill?.name,
+    elapsedTime,
+    loadPersonalSessions,
+    loadTeamSessions,
+    lastSessionData,
+  ]);
 
   const handleContinueWithoutWatch = useCallback(async () => {
     try {
@@ -870,7 +896,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
 
     // Watch state
     watchState,
-    
+
     // Team training state (for hiding back button)
     isTeamTraining,
 
@@ -901,4 +927,3 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     canAddTarget,
   };
 }
-

@@ -28,34 +28,33 @@ import { format } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import {
-    Activity,
-    AlertTriangle,
-    BarChart3,
-    BookOpen,
-    Calendar,
-    ChevronRight,
-    Clock,
-    Gift,
-    Plus,
-    Settings,
-    Shield,
-    ShieldCheck,
-    Target,
-    UserPlus,
-    Users,
-    X,
-    Zap,
+  Activity,
+  BarChart3,
+  BookOpen,
+  Calendar,
+  ChevronRight,
+  Clock,
+  Gift,
+  Plus,
+  Settings,
+  Shield,
+  ShieldCheck,
+  Target,
+  UserPlus,
+  Users,
+  X,
+  Zap
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Animated,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -266,79 +265,76 @@ function ScheduleView({
 
       {/* UPCOMING SECTION */}
       <View style={scheduleStyles.section}>
-          <View style={scheduleStyles.sectionHeader}>
-            <View style={scheduleStyles.sectionTitleRow}>
-              <View style={[scheduleStyles.sectionDot, { backgroundColor: '#3B82F6' }]} />
-              <Text style={[scheduleStyles.sectionTitle, { color: colors.text }]}>Upcoming</Text>
-            </View>
-            {upcomingTrainings.length > 0 && (
-              <Text style={[scheduleStyles.sectionCount, { color: colors.textMuted }]}>{upcomingTrainings.length}</Text>
-            )}
+        <View style={scheduleStyles.sectionHeader}>
+          <View style={scheduleStyles.sectionTitleRow}>
+            <View style={[scheduleStyles.sectionDot, { backgroundColor: '#3B82F6' }]} />
+            <Text style={[scheduleStyles.sectionTitle, { color: colors.text }]}>Upcoming</Text>
           </View>
-
-          {upcomingTrainings.length === 0 ? (
-            <View style={[scheduleStyles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Calendar size={20} color={colors.textMuted} style={{ opacity: 0.6 }} />
-              <Text style={[scheduleStyles.emptyCardText, { color: colors.textMuted }]}>No trainings scheduled</Text>
-              {canSchedule && (
-                <TouchableOpacity
-                  style={[scheduleStyles.emptyCardBtn, { backgroundColor: colors.secondary }]}
-                  onPress={onCreateNew}
-                  activeOpacity={0.7}
-                >
-                  <Plus size={13} color={colors.text} strokeWidth={2.5} />
-                  <Text style={[scheduleStyles.emptyCardBtnText, { color: colors.text }]}>Schedule</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          ) : (
-            <View style={scheduleStyles.list}>
-              {upcomingTrainings.map((training) => {
-                const isLive = training.status === 'ongoing';
-                const statusConfig = getStatusConfig(training.status);
-
-                return (
-                  <TouchableOpacity
-                    key={training.id}
-                    style={[
-                      scheduleStyles.trainingRow,
-                      { backgroundColor: colors.card, borderColor: isLive ? COLORS.live + '40' : colors.border },
-                    ]}
-                    onPress={() => onPress(training)}
-                    activeOpacity={0.7}
-                  >
-                    {/* Time/Status indicator */}
-                    <View
-                      style={[
-                        scheduleStyles.timeIndicator,
-                        { backgroundColor: isLive ? COLORS.live : colors.secondary },
-                      ]}
-                    >
-                      {isLive && <PulseDot color="#fff" />}
-                      <Text style={[scheduleStyles.timeText, { color: isLive ? '#fff' : colors.textMuted }]}>
-                        {getTimeLabel(training)}
-                      </Text>
-                    </View>
-
-                    {/* Content */}
-                    <View style={scheduleStyles.rowContent}>
-                      <Text style={[scheduleStyles.rowTitle, { color: colors.text }]} numberOfLines={1}>
-                        {training.title}
-                      </Text>
-                      {(training.drill_count ?? 0) > 0 && (
-                        <Text style={[scheduleStyles.rowMeta, { color: colors.textMuted }]}>
-                          {training.drill_count} drill{training.drill_count !== 1 ? 's' : ''}
-                        </Text>
-                      )}
-                    </View>
-
-                    <ChevronRight size={16} color={colors.border} />
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+          {upcomingTrainings.length > 0 && (
+            <Text style={[scheduleStyles.sectionCount, { color: colors.textMuted }]}>{upcomingTrainings.length}</Text>
           )}
         </View>
+
+        {upcomingTrainings.length === 0 ? (
+          <View style={[scheduleStyles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Calendar size={20} color={colors.textMuted} style={{ opacity: 0.6 }} />
+            <Text style={[scheduleStyles.emptyCardText, { color: colors.textMuted }]}>No trainings scheduled</Text>
+            {canSchedule && (
+              <TouchableOpacity
+                style={[scheduleStyles.emptyCardBtn, { backgroundColor: colors.secondary }]}
+                onPress={onCreateNew}
+                activeOpacity={0.7}
+              >
+                <Plus size={13} color={colors.text} strokeWidth={2.5} />
+                <Text style={[scheduleStyles.emptyCardBtnText, { color: colors.text }]}>Schedule</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          <View style={scheduleStyles.list}>
+            {upcomingTrainings.map((training) => {
+              const isLive = training.status === 'ongoing';
+              const statusConfig = getStatusConfig(training.status);
+
+              return (
+                <TouchableOpacity
+                  key={training.id}
+                  style={[
+                    scheduleStyles.trainingRow,
+                    { backgroundColor: colors.card, borderColor: isLive ? COLORS.live + '40' : colors.border },
+                  ]}
+                  onPress={() => onPress(training)}
+                  activeOpacity={0.7}
+                >
+                  {/* Time/Status indicator */}
+                  <View
+                    style={[scheduleStyles.timeIndicator, { backgroundColor: isLive ? COLORS.live : colors.secondary }]}
+                  >
+                    {isLive && <PulseDot color="#fff" />}
+                    <Text style={[scheduleStyles.timeText, { color: isLive ? '#fff' : colors.textMuted }]}>
+                      {getTimeLabel(training)}
+                    </Text>
+                  </View>
+
+                  {/* Content */}
+                  <View style={scheduleStyles.rowContent}>
+                    <Text style={[scheduleStyles.rowTitle, { color: colors.text }]} numberOfLines={1}>
+                      {training.title}
+                    </Text>
+                    {(training.drill_count ?? 0) > 0 && (
+                      <Text style={[scheduleStyles.rowMeta, { color: colors.textMuted }]}>
+                        {training.drill_count} drill{training.drill_count !== 1 ? 's' : ''}
+                      </Text>
+                    )}
+                  </View>
+
+                  <ChevronRight size={16} color={colors.border} />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+      </View>
 
       {/* PAST SECTION */}
       <View style={scheduleStyles.section}>
@@ -1588,14 +1584,14 @@ function UnifiedTeamTab({
 
           {/* Pending Request or Request Button */}
           {myPendingRequest ? (
-            <View style={[soldierStyles.pendingCard, { backgroundColor: colors.yellow + '10', borderColor: colors.yellow }]}>
+            <View
+              style={[soldierStyles.pendingCard, { backgroundColor: colors.yellow + '10', borderColor: colors.yellow }]}
+            >
               <View style={soldierStyles.pendingHeader}>
                 <Clock size={14} color={colors.yellow} />
                 <Text style={[soldierStyles.pendingTitle, { color: colors.yellow }]}>Request Pending</Text>
               </View>
-              <Text style={[soldierStyles.pendingText, { color: colors.text }]}>
-                Awaiting commander review
-              </Text>
+              <Text style={[soldierStyles.pendingText, { color: colors.text }]}>Awaiting commander review</Text>
               {myPendingRequest.weapon_category && (
                 <Text style={[soldierStyles.pendingPreference, { color: colors.textMuted }]}>
                   Preferred: {getCategoryLabel(myPendingRequest.weapon_category)}
@@ -1636,9 +1632,7 @@ function UnifiedTeamTab({
                   <Text style={soldierStyles.countText}>{poolWeapons.length}</Text>
                 </View>
               </View>
-              <Text style={[soldierStyles.poolHint, { color: colors.textMuted }]}>
-                Available for all team members
-              </Text>
+              <Text style={[soldierStyles.poolHint, { color: colors.textMuted }]}>Available for all team members</Text>
               {poolWeapons.map((weapon) => (
                 <View
                   key={weapon.id}

@@ -67,13 +67,13 @@ export function getPhaseNarrativeText(
  */
 export function calculateTrainingDuration(startedAt: string | null, endedAt: string | null): string | null {
   if (!startedAt || !endedAt) return null;
-  
+
   const start = new Date(startedAt);
   const end = new Date(endedAt);
   const mins = Math.round((end.getTime() - start.getTime()) / 60000);
-  
+
   if (mins < 60) return `${mins} minutes`;
-  
+
   const hours = Math.floor(mins / 60);
   const remainingMins = mins % 60;
   return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours} hour${hours > 1 ? 's' : ''}`;
@@ -87,6 +87,6 @@ export function areAllDrillsCompleted(
   drillProgress: Array<{ drillId: string; completed: boolean }>
 ): boolean {
   if (drills.length === 0) return false;
-  const completedCount = drillProgress.filter(p => p.completed).length;
+  const completedCount = drillProgress.filter((p) => p.completed).length;
   return completedCount === drills.length;
 }

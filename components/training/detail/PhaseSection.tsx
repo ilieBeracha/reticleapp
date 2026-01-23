@@ -1,16 +1,16 @@
 /**
  * PhaseSection Component
- * 
+ *
  * Clean phase section with prominent timeline integration.
  * Designed for a spread-out, immersive training journey.
  */
 
-import React, { useState } from 'react';
+import { Check, ChevronDown, ChevronUp, Crosshair, Target, Trophy } from 'lucide-react-native';
+import { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import { Check, ChevronDown, ChevronUp, Crosshair, Target, Trophy } from 'lucide-react-native';
-import { TimelineNode } from './TimelineNode';
 import { LiveDot } from './AnimatedComponents';
+import { TimelineNode } from './TimelineNode';
 import type { PhaseSectionProps, TrainingPhase } from './types';
 
 const phaseIcons: Record<TrainingPhase, typeof Target> = {
@@ -67,17 +67,9 @@ export function PhaseSection({
             style={[
               styles.header,
               {
-                backgroundColor: isActive 
-                  ? statusColor + '08' 
-                  : isCompleted 
-                    ? colors.green + '05'
-                    : colors.card,
-                borderColor: isActive 
-                  ? statusColor + '20' 
-                  : isCompleted
-                    ? colors.green + '15'
-                    : 'transparent',
-                borderWidth: (isActive || isCompleted) ? 1 : 0,
+                backgroundColor: isActive ? statusColor + '08' : isCompleted ? colors.green + '05' : colors.card,
+                borderColor: isActive ? statusColor + '20' : isCompleted ? colors.green + '15' : 'transparent',
+                borderWidth: isActive || isCompleted ? 1 : 0,
               },
             ]}
             onPress={() => !isLocked && setExpanded(!expanded)}
@@ -92,12 +84,7 @@ export function PhaseSection({
             {/* Title & Subtitle */}
             <View style={styles.titleWrap}>
               <View style={styles.titleRow}>
-                <Text style={[
-                  styles.title, 
-                  { color: isLocked ? colors.textMuted : colors.text }
-                ]}>
-                  {title}
-                </Text>
+                <Text style={[styles.title, { color: isLocked ? colors.textMuted : colors.text }]}>{title}</Text>
                 {isCompleted && (
                   <View style={[styles.completedBadge, { backgroundColor: colors.green + '15' }]}>
                     <Check size={12} color={colors.green} strokeWidth={3} />

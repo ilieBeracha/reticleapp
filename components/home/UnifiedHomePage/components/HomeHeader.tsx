@@ -53,32 +53,17 @@ export function HomeHeader({
 
   return (
     <Animated.View entering={FadeIn.duration(300)} style={s.header}>
-      <TouchableOpacity
-        style={s.left}
-        onPress={handleAvatarPress}
-        activeOpacity={0.8}
-      >
+      <TouchableOpacity style={s.left} onPress={handleAvatarPress} activeOpacity={0.8}>
         <Animated.View style={[s.avatar, { backgroundColor: colors.secondary }, avatarAnimStyle]}>
           {avatarUrl ? (
-            <BaseAvatar
-              source={{ uri: avatarUrl }}
-              fallbackText={fallbackInitial}
-              size="sm"
-              borderWidth={0}
-            />
+            <BaseAvatar source={{ uri: avatarUrl }} fallbackText={fallbackInitial} size="sm" borderWidth={0} />
           ) : (
-            <Text style={[s.avatarText, { color: colors.text }]}>
-              {fallbackInitial}
-            </Text>
+            <Text style={[s.avatarText, { color: colors.text }]}>{fallbackInitial}</Text>
           )}
         </Animated.View>
         <View>
-          <Text style={[s.greeting, { color: colors.textMuted }]}>
-            {greeting}
-          </Text>
-          <Text style={[s.name, { color: colors.text }]}>
-            {firstName}
-          </Text>
+          <Text style={[s.greeting, { color: colors.textMuted }]}>{greeting}</Text>
+          <Text style={[s.name, { color: colors.text }]}>{firstName}</Text>
         </View>
       </TouchableOpacity>
 
@@ -93,8 +78,6 @@ export function HomeHeader({
             <Ionicons name="watch" size={15} color={colors.green} />
           </AnimatedTouchable>
         )}
-
-  
       </View>
     </Animated.View>
   );

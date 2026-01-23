@@ -3,9 +3,8 @@
  * Displays weapon assignment and team activity context
  */
 
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Crosshair, Users } from 'lucide-react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { ContextCardsProps } from './types';
 
 export function ContextCards({
@@ -16,7 +15,7 @@ export function ContextCards({
   canManageTraining,
   onAssignWeapon,
 }: ContextCardsProps) {
-  const completedSessions = teamSessions.filter(s => s.status === 'completed').length;
+  const completedSessions = teamSessions.filter((s) => s.status === 'completed').length;
 
   return (
     <View style={styles.container}>
@@ -46,9 +45,7 @@ export function ContextCards({
           </View>
           <View style={styles.info}>
             <Text style={[styles.label, { color: colors.textMuted }]}>Team Activity</Text>
-            <Text style={[styles.value, { color: colors.text }]}>
-              {completedSessions} completed sessions
-            </Text>
+            <Text style={[styles.value, { color: colors.text }]}>{completedSessions} completed sessions</Text>
           </View>
         </View>
       )}

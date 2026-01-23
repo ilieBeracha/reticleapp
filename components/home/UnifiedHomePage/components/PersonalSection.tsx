@@ -1,6 +1,6 @@
 /**
  * PersonalSection Component
- * 
+ *
  * Displays active session or start practice card, weekly stats, and insights.
  */
 
@@ -39,11 +39,7 @@ export function PersonalSection({
     <Animated.View entering={FadeInDown.duration(350).delay(50)} style={styles.section}>
       {/* Active Session or Start Practice */}
       {hasActiveSession && activeSession ? (
-        <ActiveSessionCard
-          session={activeSession}
-          colors={colors}
-          onPress={onActiveSessionPress}
-        />
+        <ActiveSessionCard session={activeSession} colors={colors} onPress={onActiveSessionPress} />
       ) : (
         <StartPracticeCard
           colors={colors}

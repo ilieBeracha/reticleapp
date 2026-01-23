@@ -1,11 +1,11 @@
 /**
  * Team Members Sheet
- * 
+ *
  * View and manage team members - native form sheet
  */
 import { BaseAvatar } from '@/components/shared/Avatar';
-import { useColors } from '@/hooks/ui/useColors';
 import { useTeamRealtime } from '@/hooks/realtime';
+import { useColors } from '@/hooks/ui/useColors';
 import { usePermissions } from '@/hooks/usePermissions';
 import { getTeamMembers, updateTeamMemberRole } from '@/services/teamService';
 import { useTeamRoleFlags, useTeamStore } from '@/store/teamStore';
@@ -50,16 +50,16 @@ function getRoleLabel(role: string | null | undefined): string {
 // MEMBER ROW
 // ─────────────────────────────────────────────────────────────────────────────
 
-function MemberRow({ 
-  member, 
-  colors, 
+function MemberRow({
+  member,
+  colors,
   onPress,
   onAssignSquad,
   canAssignSquad,
   isMySquadMember,
   showDivider,
-}: { 
-  member: TeamMemberWithProfile; 
+}: {
+  member: TeamMemberWithProfile;
   colors: ReturnType<typeof useColors>;
   onPress: () => void;
   onAssignSquad?: () => void;
@@ -85,27 +85,31 @@ function MemberRow({
         fallbackText={member.profile.full_name || member.profile.email || 'U'}
         size="sm"
       />
-      
+
       <View style={styles.memberInfo}>
         <Text style={[styles.memberName, { color: colors.text }]} numberOfLines={1}>
           {member.profile.full_name || member.profile.email?.split('@')[0] || 'Unknown'}
         </Text>
         <Text style={[styles.memberMeta, { color: colors.textMuted }]}>
-          {roleLabel}{memberSquadId ? ` · ${memberSquadId}` : ''}
+          {roleLabel}
+          {memberSquadId ? ` · ${memberSquadId}` : ''}
           {isMySquadMember && ' ✓'}
         </Text>
       </View>
-      
+
       {isSoldier && canAssignSquad && onAssignSquad && (
         <TouchableOpacity
           style={[styles.assignBtn, { borderColor: colors.border }]}
-          onPress={(e) => { e.stopPropagation(); onAssignSquad(); }}
+          onPress={(e) => {
+            e.stopPropagation();
+            onAssignSquad();
+          }}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Ionicons name="git-branch-outline" size={14} color={colors.textMuted} />
         </TouchableOpacity>
       )}
-      
+
       <Ionicons name="chevron-forward" size={16} color={colors.border} />
     </TouchableOpacity>
   );
@@ -130,30 +134,37 @@ export default function TeamMembersSheet() {
   const [selectedMember, setSelectedMember] = useState<TeamMemberWithProfile | null>(null);
   const [assigning, setAssigning] = useState(false);
 
-  const team = teams.find(t => t.id === teamId);
+  const team = teams.find((t) => t.id === teamId);
   const canManage = team?.my_role === 'owner' || team?.my_role === 'commander';
   const teamSquads = team?.squads || [];
   const canInviteMembers = canManage || (isSquadCommander && mySquadId);
 
-  const loadMembers = useCallback(async (options?: { silent?: boolean }) => {
-    if (!teamId) return;
-    if (!options?.silent) setLoading(true);
-    try {
-      const data = await getTeamMembers(teamId);
-      setMembers(data);
-    } catch (error) {
-      console.error('Failed to load members:', error);
-    } finally {
-      if (!options?.silent) setLoading(false);
-    }
-  }, [teamId]);
+  const loadMembers = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!teamId) return;
+      if (!options?.silent) setLoading(true);
+      try {
+        const data = await getTeamMembers(teamId);
+        setMembers(data);
+      } catch (error) {
+        console.error('Failed to load members:', error);
+      } finally {
+        if (!options?.silent) setLoading(false);
+      }
+    },
+    [teamId]
+  );
 
-  useFocusEffect(useCallback(() => { loadMembers(); }, [loadMembers]));
+  useFocusEffect(
+    useCallback(() => {
+      loadMembers();
+    }, [loadMembers])
+  );
 
   // ═══════════════════════════════════════════════════════════════════════════
   // REALTIME SUBSCRIPTIONS
   // ═══════════════════════════════════════════════════════════════════════════
-  
+
   useTeamRealtime({
     teamId,
     enabled: !!teamId,
@@ -187,7 +198,7 @@ export default function TeamMembersSheet() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push(`/(protected)/inviteTeamMember?teamId=${teamId}` as any);
   };
-  
+
   const handleOpenSquadAssign = (member: TeamMemberWithProfile) => {
     if (teamSquads.length === 0) {
       Alert.alert('No Squads', 'Create squads first in Team Settings.', [
@@ -200,7 +211,7 @@ export default function TeamMembersSheet() {
     setSelectedMember(member);
     setSquadModalVisible(true);
   };
-  
+
   const handleAssignToSquad = async (squadId: string | null) => {
     if (!teamId || !selectedMember) return;
     setAssigning(true);
@@ -220,17 +231,20 @@ export default function TeamMembersSheet() {
 
   const groupedMembers = useMemo(() => {
     const roleOrder: TeamRole[] = ['owner', 'commander', 'squad_commander', 'soldier'];
-    const grouped = members.reduce((acc, member) => {
-      const role = member.role?.role || 'soldier';
-      const normalizedRole = role === 'commander' ? 'commander' : role;
-      if (!acc[normalizedRole]) acc[normalizedRole] = [];
-      acc[normalizedRole].push(member);
-      return acc;
-    }, {} as Record<string, TeamMemberWithProfile[]>);
+    const grouped = members.reduce(
+      (acc, member) => {
+        const role = member.role?.role || 'soldier';
+        const normalizedRole = role === 'commander' ? 'commander' : role;
+        if (!acc[normalizedRole]) acc[normalizedRole] = [];
+        acc[normalizedRole].push(member);
+        return acc;
+      },
+      {} as Record<string, TeamMemberWithProfile[]>
+    );
 
     return roleOrder
-      .filter(role => grouped[role]?.length > 0)
-      .map(role => ({ role, label: getRoleLabel(role), members: grouped[role] || [] }));
+      .filter((role) => grouped[role]?.length > 0)
+      .map((role) => ({ role, label: getRoleLabel(role), members: grouped[role] || [] }));
   }, [members]);
 
   const currentMemberSquad = selectedMember?.role?.squad_id || selectedMember?.details?.squad_id;
@@ -245,7 +259,11 @@ export default function TeamMembersSheet() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>Members</Text>
-        {team && <Text style={[styles.subtitle, { color: colors.textMuted }]}>{team.name} · {members.length} total</Text>}
+        {team && (
+          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+            {team.name} · {members.length} total
+          </Text>
+        )}
       </View>
 
       {/* Squad Commander Note */}
@@ -259,7 +277,11 @@ export default function TeamMembersSheet() {
 
       {/* Invite */}
       {canInviteMembers && !loading && (
-        <TouchableOpacity style={[styles.inviteRow, { borderColor: colors.border }]} onPress={handleInvite} activeOpacity={0.6}>
+        <TouchableOpacity
+          style={[styles.inviteRow, { borderColor: colors.border }]}
+          onPress={handleInvite}
+          activeOpacity={0.6}
+        >
           <Ionicons name="add" size={18} color={colors.text} />
           <Text style={[styles.inviteText, { color: colors.text }]}>
             {isSquadCommander && !canManageTeam ? `Add to ${mySquadId}` : 'Add member'}
@@ -275,36 +297,42 @@ export default function TeamMembersSheet() {
       )}
 
       {/* Members */}
-      {!loading && groupedMembers.map(({ role, label, members: roleMembers }) => (
-        <View key={role} style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{label}</Text>
-            <Text style={[styles.sectionCount, { color: colors.textMuted }]}>{roleMembers.length}</Text>
+      {!loading &&
+        groupedMembers.map(({ role, label, members: roleMembers }) => (
+          <View key={role} style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{label}</Text>
+              <Text style={[styles.sectionCount, { color: colors.textMuted }]}>{roleMembers.length}</Text>
+            </View>
+
+            <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {roleMembers.map((member, idx) => {
+                const memberSquadId = member.role?.squad_id || member.details?.squad_id;
+                const memberRole = (member.role?.role || 'soldier') as TeamRole;
+                const isMySquadMember = !!(
+                  isSquadCommander &&
+                  mySquadId &&
+                  memberSquadId === mySquadId &&
+                  memberRole === 'soldier'
+                );
+                const canAssign = (canManage && memberRole === 'soldier') || isMySquadMember;
+
+                return (
+                  <MemberRow
+                    key={member.profile.id}
+                    member={member}
+                    colors={colors}
+                    onPress={() => handleMemberPress(member)}
+                    onAssignSquad={canAssign ? () => handleOpenSquadAssign(member) : undefined}
+                    canAssignSquad={canAssign}
+                    isMySquadMember={isMySquadMember}
+                    showDivider={idx < roleMembers.length - 1}
+                  />
+                );
+              })}
+            </View>
           </View>
-          
-          <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {roleMembers.map((member, idx) => {
-              const memberSquadId = member.role?.squad_id || member.details?.squad_id;
-              const memberRole = (member.role?.role || 'soldier') as TeamRole;
-              const isMySquadMember = !!(isSquadCommander && mySquadId && memberSquadId === mySquadId && memberRole === 'soldier');
-              const canAssign = (canManage && memberRole === 'soldier') || isMySquadMember;
-              
-              return (
-                <MemberRow
-                  key={member.profile.id}
-                  member={member}
-                  colors={colors}
-                  onPress={() => handleMemberPress(member)}
-                  onAssignSquad={canAssign ? () => handleOpenSquadAssign(member) : undefined}
-                  canAssignSquad={canAssign}
-                  isMySquadMember={isMySquadMember}
-                  showDivider={idx < roleMembers.length - 1}
-                />
-              );
-            })}
-          </View>
-        </View>
-      ))}
+        ))}
 
       {/* Empty */}
       {!loading && members.length === 0 && (
@@ -312,7 +340,7 @@ export default function TeamMembersSheet() {
           <Text style={[styles.emptyText, { color: colors.textMuted }]}>No members yet</Text>
         </View>
       )}
-      
+
       {/* ═══════════════════════════════════════════════════════════════════════
           SQUAD ASSIGNMENT MODAL
           ═══════════════════════════════════════════════════════════════════════ */}
@@ -320,13 +348,19 @@ export default function TeamMembersSheet() {
         visible={squadModalVisible}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => { setSquadModalVisible(false); setSelectedMember(null); }}
+        onRequestClose={() => {
+          setSquadModalVisible(false);
+          setSelectedMember(null);
+        }}
       >
         <View style={[styles.modal, { backgroundColor: colors.background }]}>
           {/* Header */}
           <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity 
-              onPress={() => { setSquadModalVisible(false); setSelectedMember(null); }}
+            <TouchableOpacity
+              onPress={() => {
+                setSquadModalVisible(false);
+                setSelectedMember(null);
+              }}
               disabled={assigning}
             >
               <Text style={[styles.modalCancel, { color: colors.textMuted }]}>Cancel</Text>
@@ -334,7 +368,7 @@ export default function TeamMembersSheet() {
             <Text style={[styles.modalTitle, { color: colors.text }]}>Assign Squad</Text>
             <View style={{ width: 50 }} />
           </View>
-          
+
           {selectedMember && (
             <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalContent}>
               {/* Selected Member */}
@@ -353,18 +387,16 @@ export default function TeamMembersSheet() {
                   </Text>
                 </View>
               </View>
-              
+
               {/* Squad Commander Note */}
               {isSquadCommander && !canManage && mySquadId && (
-                <Text style={[styles.modalNote, { color: colors.textMuted }]}>
-                  Limited to your squad: {mySquadId}
-                </Text>
+                <Text style={[styles.modalNote, { color: colors.textMuted }]}>Limited to your squad: {mySquadId}</Text>
               )}
-              
+
               {/* Squad Options */}
               <View style={[styles.squadList, { borderColor: colors.border }]}>
                 {teamSquads
-                  .filter(squad => isSquadCommander && !canManage ? squad === mySquadId : true)
+                  .filter((squad) => (isSquadCommander && !canManage ? squad === mySquadId : true))
                   .map((squad, idx, arr) => {
                     const isSelected = squad === currentMemberSquad;
                     return (
@@ -372,7 +404,10 @@ export default function TeamMembersSheet() {
                         key={squad}
                         style={[
                           styles.squadRow,
-                          idx < arr.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+                          idx < arr.length - 1 && {
+                            borderBottomWidth: StyleSheet.hairlineWidth,
+                            borderBottomColor: colors.border,
+                          },
                         ]}
                         onPress={() => !isSelected && handleAssignToSquad(squad)}
                         disabled={assigning || isSelected}
@@ -385,7 +420,7 @@ export default function TeamMembersSheet() {
                     );
                   })}
               </View>
-              
+
               {/* Remove */}
               {canManage && currentMemberSquad && (
                 <TouchableOpacity
@@ -400,7 +435,7 @@ export default function TeamMembersSheet() {
               )}
             </ScrollView>
           )}
-          
+
           {assigning && (
             <View style={styles.loadingOverlay}>
               <ActivityIndicator size="small" color={colors.text} />
@@ -426,19 +461,19 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 14, marginTop: 4 },
 
   // Note
-  note: { 
-    paddingVertical: 10, 
-    paddingHorizontal: 12, 
-    borderRadius: 8, 
+  note: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
     borderWidth: 1,
     marginBottom: 16,
   },
   noteText: { fontSize: 13 },
 
   // Invite
-  inviteRow: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
+  inviteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
     paddingVertical: 12,
     paddingHorizontal: 14,
@@ -454,7 +489,13 @@ const styles = StyleSheet.create({
 
   // Section
   section: { marginBottom: 24 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, paddingHorizontal: 2 },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    paddingHorizontal: 2,
+  },
   sectionTitle: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
   sectionCount: { fontSize: 12 },
   sectionCard: { borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
@@ -464,12 +505,12 @@ const styles = StyleSheet.create({
   memberInfo: { flex: 1, gap: 2 },
   memberName: { fontSize: 15, fontWeight: '500' },
   memberMeta: { fontSize: 12 },
-  assignBtn: { 
-    width: 28, 
-    height: 28, 
-    borderRadius: 6, 
+  assignBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
     borderWidth: 1,
-    alignItems: 'center', 
+    alignItems: 'center',
     justifyContent: 'center',
     marginRight: 4,
   },
@@ -494,7 +535,7 @@ const styles = StyleSheet.create({
   modalScroll: { flex: 1 },
   modalContent: { padding: 20 },
   modalNote: { fontSize: 12, marginBottom: 16 },
-  
+
   // Selected Member
   selectedMember: {
     flexDirection: 'row',
@@ -507,23 +548,23 @@ const styles = StyleSheet.create({
   selectedMemberInfo: { flex: 1, gap: 2 },
   selectedMemberName: { fontSize: 16, fontWeight: '600' },
   selectedMemberSquad: { fontSize: 13 },
-  
+
   // Squad List
   squadList: { borderRadius: 10, borderWidth: 1, overflow: 'hidden', marginBottom: 16 },
   squadRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10 },
   squadName: { flex: 1, fontSize: 15, fontWeight: '500' },
-  
+
   // Remove
-  removeRow: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
+  removeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
     padding: 14,
     borderRadius: 10,
     borderWidth: 1,
   },
   removeText: { fontSize: 14, fontWeight: '500', color: '#EF4444' },
-  
+
   // Loading Overlay
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,

@@ -1,13 +1,12 @@
 /**
  * TimelineNode Component
- * 
+ *
  * Large, prominent timeline node with connection line.
  * Creates a visual journey through the training phases.
  */
 
-import React from 'react';
+import { Check, Circle, Lock } from 'lucide-react-native';
 import { StyleSheet, View } from 'react-native';
-import { Check, Lock, Circle } from 'lucide-react-native';
 import { PulsingDot } from './AnimatedComponents';
 import type { TimelineNodeProps } from './types';
 
@@ -73,12 +72,7 @@ export function TimelineNode({ status, isLast, colors }: TimelineNodeProps) {
             ]}
           />
           {/* Gradient fade effect */}
-          <View 
-            style={[
-              styles.lineFade, 
-              { backgroundColor: isCompleted ? colors.green + '20' : 'transparent' }
-            ]} 
-          />
+          <View style={[styles.lineFade, { backgroundColor: isCompleted ? colors.green + '20' : 'transparent' }]} />
         </View>
       )}
     </View>

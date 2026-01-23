@@ -1,13 +1,12 @@
 /**
  * ExecutionPhaseContent Component
- * 
+ *
  * Content for the execution phase showing drills in a spread-out
  * timeline layout where each drill fills significant vertical space.
  */
 
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
 import { AlertCircle, BookOpen } from 'lucide-react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { DrillChapter } from './DrillChapter';
 import type { ExecutionPhaseContentProps } from './types';
 
@@ -32,13 +31,9 @@ export function ExecutionPhaseContent({
         <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
           <BookOpen size={32} color={colors.textMuted} />
         </View>
-        <Text style={[styles.emptyTitle, { color: colors.text }]}>
-          No Drills Scheduled
-        </Text>
+        <Text style={[styles.emptyTitle, { color: colors.text }]}>No Drills Scheduled</Text>
         <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-          {canManageTraining 
-            ? 'Use the menu (⋯) to add drills' 
-            : 'Wait for your commander to add drills'}
+          {canManageTraining ? 'Use the menu (⋯) to add drills' : 'Wait for your commander to add drills'}
         </Text>
       </View>
     );
@@ -48,17 +43,15 @@ export function ExecutionPhaseContent({
     <View style={styles.content}>
       {/* No weapon banner - prominent when ongoing */}
       {isOngoing && !hasWeapon && (
-        <View style={[styles.noWeaponBanner, { backgroundColor: colors.orange + '10', borderColor: colors.orange + '25' }]}>
+        <View
+          style={[styles.noWeaponBanner, { backgroundColor: colors.orange + '10', borderColor: colors.orange + '25' }]}
+        >
           <View style={[styles.noWeaponIcon, { backgroundColor: colors.orange + '20' }]}>
             <AlertCircle size={20} color={colors.orange} />
           </View>
           <View style={styles.noWeaponContent}>
-            <Text style={[styles.noWeaponTitle, { color: colors.orange }]}>
-              Weapon Required
-            </Text>
-            <Text style={[styles.noWeaponHint, { color: colors.textMuted }]}>
-              A weapon is required to start drills
-            </Text>
+            <Text style={[styles.noWeaponTitle, { color: colors.orange }]}>Weapon Required</Text>
+            <Text style={[styles.noWeaponHint, { color: colors.textMuted }]}>A weapon is required to start drills</Text>
           </View>
         </View>
       )}
@@ -66,15 +59,13 @@ export function ExecutionPhaseContent({
       {/* Drills - Timeline Layout */}
       <View style={styles.drillsTimeline}>
         {drills.map((drill: any, index: number) => {
-          const progress = drillProgress.find(p => p.drillId === drill.id);
+          const progress = drillProgress.find((p) => p.drillId === drill.id);
           const isCompleted = progress?.completed || false;
           const similarStats = similarStatsMap?.get(drill.id);
-          
+
           // Determine if this drill can be started
           // (only if ongoing, not completed, and previous drills are done)
-          const previousDrillsCompleted = drillProgress
-            .slice(0, index)
-            .every(p => p.completed);
+          const previousDrillsCompleted = drillProgress.slice(0, index).every((p) => p.completed);
           const canStartThisDrill = isOngoing && !isCompleted && previousDrillsCompleted;
 
           return (

@@ -90,11 +90,7 @@ export function DrillTypeSection({
 
       {/* Templates */}
       {expanded && (
-        <Animated.View
-          entering={FadeIn.duration(200)}
-          exiting={FadeOut.duration(150)}
-          style={styles.content}
-        >
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={styles.content}>
           {/* Type Description */}
           <Text style={[styles.description, { color: colors.textMuted }]}>{drillType.description}</Text>
 

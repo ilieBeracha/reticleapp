@@ -5,10 +5,8 @@
  * Presets available via header bookmark icon.
  */
 
-import {
-  SessionContextStep,
-  useSessionCreation
-} from '@/components/session/creation';
+import { CaptureModePickerInline, type CaptureMode } from '@/components/session/CaptureModePicker';
+import { SessionContextStep, useSessionCreation } from '@/components/session/creation';
 import type { Position, SessionPurpose } from '@/components/session/creation/sessionCreation.types';
 import { DrillPresetPicker, PresetForm } from '@/components/shared/drills';
 import { CreateWeaponFlow, WeaponPicker } from '@/components/weapons';
@@ -27,26 +25,17 @@ import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronRight, CornerDownRight, Crosshair, Plus, Target } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function CreateSessionScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { loadSessions } = useSessionStore();
-  
+
   // Fetch weather in background (non-blocking)
   const { weather: openWeather } = useOpenWeather({ autoFetch: true });
-  
+
   const params = useLocalSearchParams<{
     editSessionId?: string;
     weaponId?: string;
@@ -60,16 +49,18 @@ export default function CreateSessionScreen() {
     returnTo?: string;
     returnId?: string;
   }>();
-  
+
   const isEditMode = !!params.editSessionId;
   const hasReturnDestination = !!params.returnTo;
-  
+
   const [checkingSession, setCheckingSession] = useState(true);
   const [showPresetPicker, setShowPresetPicker] = useState(false);
   const [showPresetForm, setShowPresetForm] = useState(false);
   const [showWeaponPicker, setShowWeaponPicker] = useState(false);
   const [showCreateWeapon, setShowCreateWeapon] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<DrillPreset | null>(null);
+  const [captureMode, setCaptureMode] = useState<CaptureMode>('phone');
+  const [sensitivity, setSensitivity] = useState(3.5); // Default: 3.5 (standard)
 
   // Build initial state from params
   const initialState = useMemo(() => {
@@ -101,33 +92,33 @@ export default function CreateSessionScreen() {
       const checkActiveSession = async () => {
         try {
           const activeSession = await getMyActiveSession();
-          
+
           if (activeSession) {
             Alert.alert('Active Session', 'You have an active session. Continue or start fresh?', [
-                {
-                  text: 'Continue',
-                  onPress: () => {
-                    router.replace({
-                      pathname: '/(protected)/activeSession',
-                      params: { sessionId: activeSession.id },
-                    });
-                  },
+              {
+                text: 'Continue',
+                onPress: () => {
+                  router.replace({
+                    pathname: '/(protected)/activeSession',
+                    params: { sessionId: activeSession.id },
+                  });
                 },
-                {
-                  text: 'Delete & Start New',
-                  style: 'destructive',
-                  onPress: async () => {
-                    try {
-                      await deleteSession(activeSession.id);
-                      if (!cancelled) setCheckingSession(false);
-                    } catch (err) {
-                      console.error('Failed to delete session:', err);
-                      Alert.alert('Error', 'Failed to delete session');
-                      router.back();
-                    }
-                  },
+              },
+              {
+                text: 'Delete & Start New',
+                style: 'destructive',
+                onPress: async () => {
+                  try {
+                    await deleteSession(activeSession.id);
+                    if (!cancelled) setCheckingSession(false);
+                  } catch (err) {
+                    console.error('Failed to delete session:', err);
+                    Alert.alert('Error', 'Failed to delete session');
+                    router.back();
+                  }
                 },
-                { text: 'Cancel', style: 'cancel', onPress: () => router.back() },
+              },
+              { text: 'Cancel', style: 'cancel', onPress: () => router.back() },
             ]);
           } else {
             if (!cancelled) setCheckingSession(false);
@@ -136,7 +127,7 @@ export default function CreateSessionScreen() {
           if (!cancelled) setCheckingSession(false);
         }
       };
-      
+
       checkActiveSession();
       return () => {
         cancelled = true;
@@ -146,17 +137,26 @@ export default function CreateSessionScreen() {
 
   async function handleSubmit(config: BaseSessionConfig) {
     try {
-      // Attach weather data if available
+      // Attach weather data and capture mode
       const sessionWeather = toSessionWeatherData(openWeather, 'openweathermap');
-      
+      const isWatchMode = captureMode === 'watch';
+
       const finalConfig: BaseSessionConfig = {
         ...config,
         weather: sessionWeather,
+        watch_controlled: isWatchMode,
+        // Include sensitivity in drill config when using watch
+        drill_config: config.drill_config
+          ? {
+              ...config.drill_config,
+              ...(isWatchMode && { detection_sensitivity: sensitivity }),
+            }
+          : null,
       };
-      
+
       const session = await createSession(finalConfig);
       await loadSessions();
-      
+
       // Navigate to activeSession with return info
       router.replace({
         pathname: '/(protected)/activeSession',
@@ -174,88 +174,107 @@ export default function CreateSessionScreen() {
     }
   }
 
+  const handleStartPress = useCallback(() => {
+    creation.submit();
+  }, [creation]);
+
   const handleUseSavedDrill = useCallback(() => {
     setShowPresetPicker(true);
   }, []);
 
-  const handlePurposeSelect = useCallback((purpose: SessionPurpose) => {
-    creation.setPurpose(purpose);
-    setTimeout(() => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      creation.goForward();
-    }, 150);
-  }, [creation]);
+  const handlePurposeSelect = useCallback(
+    (purpose: SessionPurpose) => {
+      creation.setPurpose(purpose);
+      setTimeout(() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        creation.goForward();
+      }, 150);
+    },
+    [creation]
+  );
 
-  const handlePresetSelect = useCallback((preset: DrillPreset) => {
-    setSelectedPreset(preset);
-    setShowPresetPicker(false);
-    
-    const purposeMap: Record<string, 'grouping' | 'engagement'> = {
-      grouping: 'grouping',
-      engagement: 'engagement',
-    };
-    const purpose = purposeMap[preset.drill_goal] || 'engagement';
-    
-    creation.setPurpose(purpose);
-    creation.updateContext({
-      distance: preset.distance_m,
-      shotsPlanned: preset.rounds_per_shooter,
-      timeLimit: preset.time_limit_seconds || null,
-    });
-    
-    creation.selectPreset(preset.id);
-    creation.goForward();
-  }, [creation]);
+  const handlePresetSelect = useCallback(
+    (preset: DrillPreset) => {
+      setSelectedPreset(preset);
+      setShowPresetPicker(false);
+
+      const purposeMap: Record<string, 'grouping' | 'engagement'> = {
+        grouping: 'grouping',
+        engagement: 'engagement',
+      };
+      const purpose = purposeMap[preset.drill_goal] || 'engagement';
+
+      creation.setPurpose(purpose);
+      creation.updateContext({
+        distance: preset.distance_m,
+        shotsPlanned: preset.rounds_per_shooter,
+        timeLimit: preset.time_limit_seconds || null,
+      });
+
+      creation.selectPreset(preset.id);
+      creation.goForward();
+    },
+    [creation]
+  );
 
   const handleCreateNewPreset = useCallback(() => {
     setShowPresetPicker(false);
     setShowPresetForm(true);
   }, []);
 
-  const handlePresetCreated = useCallback((newPreset: DrillPreset) => {
-    setShowPresetForm(false);
-    handlePresetSelect(newPreset);
-  }, [handlePresetSelect]);
+  const handlePresetCreated = useCallback(
+    (newPreset: DrillPreset) => {
+      setShowPresetForm(false);
+      handlePresetSelect(newPreset);
+    },
+    [handlePresetSelect]
+  );
 
   const handleOpenWeaponPicker = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setShowWeaponPicker(true);
   }, []);
 
-  const handleWeaponSelect = useCallback((weapon: UserWeapon) => {
-    const config = weapon.category ? getCategoryConfig(weapon.category) : null;
-    const update: Partial<typeof creation.state.context> = {
-      weaponId: weapon.id,
-      weaponName: weapon.name,
-      weaponCategory: weapon.category || null,
-    };
-    if (config) {
-      update.distance = config.distances.zeroDistance;
-      update.position = config.drillDefaults.defaultPosition as Position;
-    }
-    creation.updateContext(update);
-    setShowWeaponPicker(false);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [creation]);
+  const handleWeaponSelect = useCallback(
+    (weapon: UserWeapon) => {
+      const config = weapon.category ? getCategoryConfig(weapon.category) : null;
+      const update: Partial<typeof creation.state.context> = {
+        weaponId: weapon.id,
+        weaponName: weapon.name,
+        weaponCategory: weapon.category || null,
+      };
+      if (config) {
+        update.distance = config.distances.zeroDistance;
+        update.position = config.drillDefaults.defaultPosition as Position;
+      }
+      creation.updateContext(update);
+      setShowWeaponPicker(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+    [creation]
+  );
 
   const handleAddNewWeapon = useCallback(() => {
     setShowWeaponPicker(false);
     setShowCreateWeapon(true);
   }, []);
 
-  const handleWeaponCreatedById = useCallback(async (weaponId: string) => {
-    setShowCreateWeapon(false);
-    try {
-      const { getUserWeapon } = await import('@/services/weaponService');
-      const weapon = await getUserWeapon(weaponId);
-      if (weapon) {
-        handleWeaponSelect(weapon);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  const handleWeaponCreatedById = useCallback(
+    async (weaponId: string) => {
+      setShowCreateWeapon(false);
+      try {
+        const { getUserWeapon } = await import('@/services/weaponService');
+        const weapon = await getUserWeapon(weaponId);
+        if (weapon) {
+          handleWeaponSelect(weapon);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+      } catch (error) {
+        console.error('[CreateSession] Failed to fetch created weapon:', error);
       }
-    } catch (error) {
-      console.error('[CreateSession] Failed to fetch created weapon:', error);
-    }
-  }, [handleWeaponSelect]);
+    },
+    [handleWeaponSelect]
+  );
 
   if (checkingSession) {
     return (
@@ -312,26 +331,36 @@ export default function CreateSessionScreen() {
             <TouchableOpacity
               style={[
                 styles.purposeOption,
-                creation.state.purpose === 'grouping' && [styles.purposeOptionActive, { backgroundColor: colors.primary }],
+                creation.state.purpose === 'grouping' && [
+                  styles.purposeOptionActive,
+                  { backgroundColor: colors.primary },
+                ],
               ]}
               onPress={() => handlePurposeSelect('grouping')}
               activeOpacity={0.7}
             >
               <Crosshair size={16} color={creation.state.purpose === 'grouping' ? '#fff' : colors.textMuted} />
-              <Text style={[styles.purposeText, { color: creation.state.purpose === 'grouping' ? '#fff' : colors.text }]}>
+              <Text
+                style={[styles.purposeText, { color: creation.state.purpose === 'grouping' ? '#fff' : colors.text }]}
+              >
                 Grouping
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
                 styles.purposeOption,
-                creation.state.purpose === 'engagement' && [styles.purposeOptionActive, { backgroundColor: colors.orange }],
+                creation.state.purpose === 'engagement' && [
+                  styles.purposeOptionActive,
+                  { backgroundColor: colors.orange },
+                ],
               ]}
               onPress={() => handlePurposeSelect('engagement')}
               activeOpacity={0.7}
             >
               <Target size={16} color={creation.state.purpose === 'engagement' ? '#fff' : colors.textMuted} />
-              <Text style={[styles.purposeText, { color: creation.state.purpose === 'engagement' ? '#fff' : colors.text }]}>
+              <Text
+                style={[styles.purposeText, { color: creation.state.purpose === 'engagement' ? '#fff' : colors.text }]}
+              >
                 Engagement
               </Text>
             </TouchableOpacity>
@@ -344,9 +373,7 @@ export default function CreateSessionScreen() {
           {creation.isLoadingWeapon ? (
             <View style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <ActivityIndicator size="small" color={colors.textMuted} />
-              <Text style={[styles.weaponLoadingText, { color: colors.textMuted }]}>
-                Loading your weapon...
-              </Text>
+              <Text style={[styles.weaponLoadingText, { color: colors.textMuted }]}>Loading your weapon...</Text>
             </View>
           ) : hasWeapon ? (
             <TouchableOpacity
@@ -361,9 +388,7 @@ export default function CreateSessionScreen() {
                 <Text style={[styles.weaponName, { color: colors.text }]} numberOfLines={1}>
                   {creation.state.context.weaponName}
                 </Text>
-                <Text style={[styles.weaponHint, { color: colors.textMuted }]}>
-                  Tap to change
-                </Text>
+                <Text style={[styles.weaponHint, { color: colors.textMuted }]}>Tap to change</Text>
               </View>
               <ChevronRight size={18} color={colors.textMuted} />
             </TouchableOpacity>
@@ -377,12 +402,8 @@ export default function CreateSessionScreen() {
                 <Target size={24} color={colors.primary} strokeWidth={1.5} />
               </View>
               <View style={styles.weaponEmptyContent}>
-                <Text style={[styles.weaponEmptyTitle, { color: colors.text }]}>
-                  Select a weapon
-                </Text>
-                <Text style={[styles.weaponEmptySubtitle, { color: colors.textMuted }]}>
-                  Required to start
-                </Text>
+                <Text style={[styles.weaponEmptyTitle, { color: colors.text }]}>Select a weapon</Text>
+                <Text style={[styles.weaponEmptySubtitle, { color: colors.textMuted }]}>Required to start</Text>
               </View>
               <View style={[styles.weaponSelectBtn, { backgroundColor: colors.primary }]}>
                 <Plus size={16} color="#fff" strokeWidth={2.5} />
@@ -404,15 +425,27 @@ export default function CreateSessionScreen() {
             hideWeaponSection
           />
         )}
+
+        {/* Capture Mode - only show when watch is connected */}
+        {creation.isWatchConnected && creation.state.purpose && (
+          <View style={styles.captureModeSection}>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Recording</Text>
+            <CaptureModePickerInline
+              selectedMode={captureMode}
+              onModeChange={setCaptureMode}
+              sensitivity={sensitivity}
+              onSensitivityChange={setSensitivity}
+              showSensitivity={true}
+            />
+          </View>
+        )}
       </ScrollView>
 
       {/* Fixed Bottom Button - always visible */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
         <View style={[styles.bottomBarInner, { borderTopColor: colors.border }]}>
           {!hasWeapon && creation.state.purpose && (
-            <Text style={[styles.weaponRequiredHint, { color: colors.orange }]}>
-              Select a weapon to continue
-            </Text>
+            <Text style={[styles.weaponRequiredHint, { color: colors.orange }]}>Select a weapon to continue</Text>
           )}
           <TouchableOpacity
             style={[
@@ -422,7 +455,7 @@ export default function CreateSessionScreen() {
                 opacity: canStart ? 1 : 0.5,
               },
             ]}
-            onPress={() => creation.submit()}
+            onPress={handleStartPress}
             disabled={!canStart || creation.state.isSubmitting}
             activeOpacity={0.85}
           >
@@ -575,6 +608,11 @@ const styles = StyleSheet.create({
 
   // Weapon section
   weaponSection: {
+    marginBottom: 20,
+  },
+  // Capture mode section
+  captureModeSection: {
+    marginTop: 8,
     marginBottom: 20,
   },
   sectionLabel: {

@@ -6,9 +6,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /**
  * Session History Screen
- * 
+ *
  * Route: /(protected)/sessionHistory
- * 
+ *
  * Full session history catalog with filtering, sorting, and search.
  * Accessible from the Insights tab.
  */
@@ -28,7 +28,6 @@ export default function SessionHistoryScreen() {
           headerStyle: {
             backgroundColor: Platform.OS === 'ios' ? 'transparent' : colors.background,
           },
-         
         }}
       />
       <View style={[styles.content, { paddingTop: Platform.OS === 'ios' ? insets.top + 44 : 0 }]}>
@@ -49,4 +48,3 @@ const styles = StyleSheet.create({
     marginLeft: Platform.OS === 'ios' ? 8 : 0,
   },
 });
-

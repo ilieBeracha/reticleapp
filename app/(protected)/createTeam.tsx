@@ -1,15 +1,7 @@
 import { useCreateTeamForm } from '@/hooks/team/useCreateTeamForm';
 import { useColors } from '@/hooks/ui/useColors';
 import { Ionicons } from '@expo/vector-icons';
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInRight, FadeOutLeft } from 'react-native-reanimated';
 
 /**
@@ -85,8 +77,8 @@ export default function CreateTeamSheet() {
         keyboardDismissMode="interactive"
         automaticallyAdjustKeyboardInsets
       >
-          {/* Header with Step Indicator */}
-          <View style={styles.header}>
+        {/* Header with Step Indicator */}
+        <View style={styles.header}>
           <View style={[styles.headerIcon, { backgroundColor: colors.primary + '15' }]}>
             <Ionicons name="people" size={28} color={colors.primary} />
           </View>
@@ -203,10 +195,7 @@ export default function CreateTeamSheet() {
             {/* Squad Input */}
             <View style={styles.squadInputRow}>
               <View
-                style={[
-                  styles.squadInputWrapper,
-                  { backgroundColor: colors.background, borderColor: colors.border },
-                ]}
+                style={[styles.squadInputWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}
               >
                 <TextInput
                   style={[styles.squadInput, { color: colors.text }]}
@@ -220,10 +209,7 @@ export default function CreateTeamSheet() {
                 />
               </View>
               <TouchableOpacity
-                style={[
-                  styles.addSquadBtn,
-                  { backgroundColor: newSquadName.trim() ? colors.primary : colors.muted },
-                ]}
+                style={[styles.addSquadBtn, { backgroundColor: newSquadName.trim() ? colors.primary : colors.muted }]}
                 onPress={handleAddSquad}
                 disabled={!newSquadName.trim()}
                 activeOpacity={0.7}
@@ -275,7 +261,6 @@ export default function CreateTeamSheet() {
             )}
           </Animated.View>
         )}
-
       </ScrollView>
 
       {/* Footer with Navigation - fixed at bottom */}

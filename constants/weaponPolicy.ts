@@ -1,6 +1,6 @@
 /**
  * Weapon Policy Constants
- * 
+ *
  * Centralized constants for team weapon policy configuration.
  * Import these instead of using hardcoded strings.
  */
@@ -11,7 +11,7 @@
 
 /**
  * WeaponPolicy values - Team-level weapon access configuration
- * 
+ *
  * - 'personal': Members can bring/use their own personal weapons
  * - 'catalog': Members must choose from team's weapon catalog
  * - 'assigned': Weapons are assigned by commanders (no participation without assignment)
@@ -25,11 +25,7 @@ export const WEAPON_POLICY = {
 export type WeaponPolicy = (typeof WEAPON_POLICY)[keyof typeof WEAPON_POLICY];
 
 /** Array of all valid weapon policies (for iteration/validation) */
-export const WEAPON_POLICIES: WeaponPolicy[] = [
-  WEAPON_POLICY.PERSONAL,
-  WEAPON_POLICY.CATALOG,
-  WEAPON_POLICY.ASSIGNED,
-];
+export const WEAPON_POLICIES: WeaponPolicy[] = [WEAPON_POLICY.PERSONAL, WEAPON_POLICY.CATALOG, WEAPON_POLICY.ASSIGNED];
 
 /** Default weapon policy for new teams */
 export const DEFAULT_WEAPON_POLICY: WeaponPolicy = WEAPON_POLICY.PERSONAL;

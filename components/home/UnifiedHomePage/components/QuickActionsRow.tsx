@@ -26,15 +26,7 @@ interface QuickActionsRowProps {
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-function QuickActionButton({
-  action,
-  colors,
-  index
-}: {
-  action: QuickAction;
-  colors: Colors;
-  index: number;
-}) {
+function QuickActionButton({ action, colors, index }: { action: QuickAction; colors: Colors; index: number }) {
   const scale = useSharedValue(1);
 
   const animStyle = useAnimatedStyle(() => ({
@@ -63,9 +55,7 @@ function QuickActionButton({
         onPressOut={handlePressOut}
         activeOpacity={1}
       >
-        <View style={[s.iconCircle, { backgroundColor: `${action.color}15` }]}>
-          {action.icon}
-        </View>
+        <View style={[s.iconCircle, { backgroundColor: `${action.color}15` }]}>{action.icon}</View>
         <Text style={[s.label, { color: colors.text }]} numberOfLines={1}>
           {action.label}
         </Text>
@@ -108,18 +98,9 @@ export function QuickActionsRow({ colors }: QuickActionsRowProps) {
 
   return (
     <View style={s.container}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.scrollContent}
-      >
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
         {actions.map((action, index) => (
-          <QuickActionButton
-            key={action.id}
-            action={action}
-            colors={colors}
-            index={index}
-          />
+          <QuickActionButton key={action.id} action={action} colors={colors} index={index} />
         ))}
       </ScrollView>
     </View>

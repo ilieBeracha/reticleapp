@@ -1,36 +1,21 @@
 /**
  * DrillSelectionStep - Quick Drill Selection (Step 2)
- * 
+ *
  * Shows three sections:
  * 1. Recent Drills - From last training
  * 2. Team Drills - Saved team drill templates
  * 3. Standard Templates - Quick presets
- * 
+ *
  * Single tap to add, tap added drill to adjust.
  */
 
-import { useColors } from '@/hooks/ui/useColors';
 import { STANDARD_DRILL_TEMPLATES, type StandardDrillTemplate } from '@/constants/standardDrills';
+import { useColors } from '@/hooks/ui/useColors';
 import type { Drill, TrainingDrill } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
-import {
-  Check,
-  ChevronRight,
-  Clock,
-  History,
-  Plus,
-  Shield,
-  Sparkles,
-  Target,
-} from 'lucide-react-native';
+import { Check, ChevronRight, History, Plus, Shield, Sparkles, Target } from 'lucide-react-native';
 import { useMemo } from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, Layout, SlideOutLeft } from 'react-native-reanimated';
 
 import type { TrainingDrillItem } from '../createTraining.types';
@@ -85,7 +70,7 @@ function DrillCard({
     <TouchableOpacity
       style={[
         styles.drillCard,
-        { 
+        {
           backgroundColor: isAdded ? colors.text : colors.card,
           borderColor: isAdded ? colors.text : colors.border,
         },
@@ -98,10 +83,7 @@ function DrillCard({
     >
       <View style={[styles.goalDot, { backgroundColor: goalColor }]} />
       <View style={styles.drillCardContent}>
-        <Text 
-          style={[styles.drillName, { color: isAdded ? colors.background : colors.text }]}
-          numberOfLines={1}
-        >
+        <Text style={[styles.drillName, { color: isAdded ? colors.background : colors.text }]} numberOfLines={1}>
           {name}
         </Text>
         <Text style={[styles.drillMeta, { color: isAdded ? colors.background + '99' : colors.textMuted }]}>
@@ -203,9 +185,7 @@ function SectionHeader({
     <View style={styles.sectionHeader}>
       <Icon size={16} color={colors.textMuted} />
       <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
-      {subtitle && (
-        <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>{subtitle}</Text>
-      )}
+      {subtitle && <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>{subtitle}</Text>}
     </View>
   );
 }
@@ -226,7 +206,7 @@ export function DrillSelectionStep({
   const colors = useColors();
 
   // Track which drills are already added
-  const addedIds = useMemo(() => new Set(drills.map(d => d.id)), [drills]);
+  const addedIds = useMemo(() => new Set(drills.map((d) => d.id)), [drills]);
 
   // Convert standard template to TrainingDrillItem
   const handleAddStandard = (template: StandardDrillTemplate) => {
@@ -296,7 +276,7 @@ export function DrillSelectionStep({
   const totalRounds = drills.reduce((sum, d) => sum + d.rounds_per_shooter * (d.strings_count || 1), 0);
 
   return (
-    <ScrollView 
+    <ScrollView
       style={styles.container}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.scrollContent}
@@ -328,11 +308,11 @@ export function DrillSelectionStep({
       {/* Recent Drills (from last training) */}
       {lastTrainingDrills.length > 0 && (
         <View style={styles.section}>
-          <SectionHeader 
-            icon={History} 
-            title="From Last Training" 
+          <SectionHeader
+            icon={History}
+            title="From Last Training"
             subtitle={`${lastTrainingDrills.length} drills`}
-            colors={colors} 
+            colors={colors}
           />
           <View style={styles.drillGrid}>
             {lastTrainingDrills.map((drill) => {
@@ -358,11 +338,7 @@ export function DrillSelectionStep({
       {/* Team Drills */}
       {teamDrills.length > 0 && (
         <View style={styles.section}>
-          <SectionHeader 
-            icon={Shield} 
-            title="Team Drills" 
-            colors={colors} 
-          />
+          <SectionHeader icon={Shield} title="Team Drills" colors={colors} />
           <View style={styles.drillGrid}>
             {teamDrills.slice(0, 6).map((drill) => {
               const itemId = `team-${drill.id}`;
@@ -387,9 +363,7 @@ export function DrillSelectionStep({
               onPress={onBuildCustom}
               activeOpacity={0.7}
             >
-              <Text style={[styles.viewAllText, { color: colors.text }]}>
-                View all {teamDrills.length} team drills
-              </Text>
+              <Text style={[styles.viewAllText, { color: colors.text }]}>View all {teamDrills.length} team drills</Text>
               <ChevronRight size={16} color={colors.textMuted} />
             </TouchableOpacity>
           )}
@@ -398,11 +372,7 @@ export function DrillSelectionStep({
 
       {/* Standard Templates */}
       <View style={styles.section}>
-        <SectionHeader 
-          icon={Sparkles} 
-          title="Quick Templates" 
-          colors={colors} 
-        />
+        <SectionHeader icon={Sparkles} title="Quick Templates" colors={colors} />
         <View style={styles.drillGrid}>
           {STANDARD_DRILL_TEMPLATES.slice(0, 8).map((template) => (
             <DrillCard

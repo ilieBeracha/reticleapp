@@ -9,7 +9,7 @@ import { useColors } from '@/hooks/ui/useColors';
 import type { DrillTemplate } from '@/types/drillTypes';
 import { DRILL_TYPES } from '@/types/drillTypes';
 import * as Haptics from 'expo-haptics';
-import { Award, Clock, Copy, Eye, Info, Plus, Target } from 'lucide-react-native';
+import { Award, Clock, Copy, Eye, Plus, Target } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 

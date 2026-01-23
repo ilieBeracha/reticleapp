@@ -38,7 +38,7 @@ export function getStatusConfig(status: string | null | undefined): StatusConfig
 
 /**
  * Groups trainings by timeframe (live, today, tomorrow, this week, upcoming, past)
- * 
+ *
  * Status handling:
  * - 'ongoing' → live (regardless of scheduled date)
  * - 'finished' or 'cancelled' → past (regardless of scheduled date)
@@ -57,7 +57,7 @@ export function groupTrainingsByTimeframe(trainings: TrainingWithDetails[]): Gro
   const upcoming: TrainingWithDetails[] = [];
   const past: TrainingWithDetails[] = [];
 
-  trainings.forEach(t => {
+  trainings.forEach((t) => {
     const date = new Date(t.scheduled_at);
 
     // Live trainings (ongoing status)
@@ -65,7 +65,7 @@ export function groupTrainingsByTimeframe(trainings: TrainingWithDetails[]): Gro
       live.push(t);
       return;
     }
-    
+
     // Finished or cancelled trainings always go to past
     if (t.status === 'finished' || t.status === 'cancelled' || t.status === 'completed') {
       past.push(t);
@@ -155,7 +155,7 @@ export function calculateTeamStats(trainings: TrainingWithDetails[]): TeamStats 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = addDays(weekStart, 7);
 
-  const sessionsThisWeek = trainings.filter(t => {
+  const sessionsThisWeek = trainings.filter((t) => {
     const trainingDate = new Date(t.scheduled_at);
     return trainingDate >= weekStart && trainingDate < weekEnd;
   }).length;
@@ -189,32 +189,30 @@ export function calculateTeamStatsFromSessions(
   const weekEnd = addDays(weekStart, 7);
 
   // Count trainings this week
-  const trainingsThisWeek = trainings.filter(t => {
+  const trainingsThisWeek = trainings.filter((t) => {
     const trainingDate = new Date(t.scheduled_at);
     return trainingDate >= weekStart && trainingDate < weekEnd;
   }).length;
 
   // Filter sessions from this week
-  const weekSessions = sessions.filter(s => {
+  const weekSessions = sessions.filter((s) => {
     const sessionDate = new Date(s.started_at);
     return sessionDate >= weekStart && sessionDate < weekEnd;
   });
 
   // Calculate totals
   const totalShots = weekSessions.reduce((sum, s) => sum + (s.shots_fired || 0), 0);
-  
+
   // Calculate weighted average accuracy (weighted by shots)
   let weightedAccuracy = 0;
   let totalShotsForAccuracy = 0;
-  weekSessions.forEach(s => {
+  weekSessions.forEach((s) => {
     if (s.shots_fired > 0 && s.accuracy_pct > 0) {
       weightedAccuracy += s.accuracy_pct * s.shots_fired;
       totalShotsForAccuracy += s.shots_fired;
     }
   });
-  const avgAccuracy = totalShotsForAccuracy > 0 
-    ? Math.round(weightedAccuracy / totalShotsForAccuracy) 
-    : 0;
+  const avgAccuracy = totalShotsForAccuracy > 0 ? Math.round(weightedAccuracy / totalShotsForAccuracy) : 0;
 
   return {
     sessionsThisWeek: weekSessions.length || trainingsThisWeek,
@@ -237,4 +235,3 @@ export function getInitials(fullName: string | null | undefined, email: string):
   }
   return email.charAt(0).toUpperCase();
 }
-

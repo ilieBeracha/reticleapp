@@ -2,11 +2,11 @@
  * DRILL LIBRARY SCREEN
  *
  * Browse and manage drill templates organized by type.
- * 
+ *
  * FLOW:
  * - Library Tab: Browse prebuilt templates → Duplicate to team
  * - Team Tab: View team's drills (duplicated from library)
- * 
+ *
  * To add drills to training, go to Create Training and select from team drills.
  */
 
@@ -78,9 +78,7 @@ function TeamSelectorModal({ visible, onClose, onSelect, teams, title }: TeamSel
           style={teamStyles.body}
           contentContainerStyle={[teamStyles.bodyContent, { paddingBottom: insets.bottom + 20 }]}
         >
-          <Text style={[teamStyles.subtitle, { color: colors.textMuted }]}>
-            Select a team to add the drill to:
-          </Text>
+          <Text style={[teamStyles.subtitle, { color: colors.textMuted }]}>Select a team to add the drill to:</Text>
 
           {teams.map((team, index) => (
             <Animated.View key={team.id} entering={FadeInDown.delay(index * 50)}>
@@ -193,10 +191,7 @@ export default function DrillLibraryScreen() {
   const { teams } = useTeamStore();
 
   // Filter to teams where user can create drills (owner/commander)
-  const editableTeams = useMemo(
-    () => teams.filter((t) => t.my_role === 'owner' || t.my_role === 'commander'),
-    [teams]
-  );
+  const editableTeams = useMemo(() => teams.filter((t) => t.my_role === 'owner' || t.my_role === 'commander'), [teams]);
 
   // State
   const [activeTab, setActiveTab] = useState<LibraryTab>('library');
@@ -264,9 +259,7 @@ export default function DrillLibraryScreen() {
       if (!searchQuery.trim()) return drills;
       const query = searchQuery.toLowerCase();
       return drills.filter(
-        (d) =>
-          d.name.toLowerCase().includes(query) ||
-          (d.description && d.description.toLowerCase().includes(query))
+        (d) => d.name.toLowerCase().includes(query) || (d.description && d.description.toLowerCase().includes(query))
       );
     },
     [searchQuery]
@@ -327,7 +320,6 @@ export default function DrillLibraryScreen() {
     }
   };
 
-
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     if (activeTab === 'team') {
@@ -335,7 +327,6 @@ export default function DrillLibraryScreen() {
     }
     setRefreshing(false);
   }, [activeTab]);
-
 
   // Render tab button
   const TabButton = ({
@@ -588,7 +579,9 @@ export default function DrillLibraryScreen() {
             drill_goal:
               selectedTemplate.drillType === 'grouping' || selectedTemplate.drillType === 'qualification'
                 ? 'grouping'
-                : selectedTemplate.drillType === 'timed' ? 'engagement' : 'grouping',
+                : selectedTemplate.drillType === 'timed'
+                  ? 'engagement'
+                  : 'grouping',
             target_type: selectedTemplate.drillType === 'timed' ? 'tactical' : 'paper',
             distance_m: (selectedTemplate.defaults.distance as number) || 25,
             rounds_per_shooter: (selectedTemplate.defaults.shots as number) || 5,

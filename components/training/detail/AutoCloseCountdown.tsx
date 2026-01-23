@@ -3,9 +3,9 @@
  * Countdown timer for auto-close functionality
  */
 
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
 import { Timer } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import type { AutoCloseCountdownProps } from './types';
 
 export function AutoCloseCountdown({ autoCloseAt, colors, onExpired }: AutoCloseCountdownProps) {

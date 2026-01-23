@@ -10,22 +10,9 @@ import { getMyTeams } from '@/services/teamService';
 import { getUserWeapons, type UserWeapon } from '@/services/weaponService';
 import type { TeamWithRole } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
-import {
-  Check,
-  Filter,
-  RotateCcw,
-  X,
-} from 'lucide-react-native';
+import { Check, Filter, RotateCcw, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import {
   DEFAULT_FILTERS,
@@ -84,10 +71,7 @@ interface InsightsFilterBarProps {
 // MAIN COMPONENT
 // ============================================================================
 
-export function InsightsFilterBar({
-  filters,
-  onFiltersChange,
-}: InsightsFilterBarProps) {
+export function InsightsFilterBar({ filters, onFiltersChange }: InsightsFilterBarProps) {
   const colors = useColors();
 
   // Data for filters
@@ -101,10 +85,7 @@ export function InsightsFilterBar({
   useEffect(() => {
     async function load() {
       try {
-        const [weaponsData, teamsData] = await Promise.all([
-          getUserWeapons(),
-          getMyTeams(),
-        ]);
+        const [weaponsData, teamsData] = await Promise.all([getUserWeapons(), getMyTeams()]);
         setWeapons(weaponsData);
         setTeams(teamsData);
       } catch (e) {
@@ -166,19 +147,14 @@ export function InsightsFilterBar({
     <View style={styles.container}>
       {/* Time Pills + Filter Button */}
       <View style={styles.row}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.timePills}
-        >
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timePills}>
           {TIME_OPTIONS.map((option) => (
             <TouchableOpacity
               key={option.value}
               style={[
                 styles.timePill,
                 {
-                  backgroundColor:
-                    filters.time === option.value ? colors.text : colors.card,
+                  backgroundColor: filters.time === option.value ? colors.text : colors.card,
                 },
               ]}
               onPress={() => updateFilter('time', option.value)}
@@ -188,8 +164,7 @@ export function InsightsFilterBar({
                 style={[
                   styles.timePillText,
                   {
-                    color:
-                      filters.time === option.value ? colors.background : colors.textMuted,
+                    color: filters.time === option.value ? colors.background : colors.textMuted,
                   },
                 ]}
               >
@@ -233,24 +208,20 @@ export function InsightsFilterBar({
           <Text style={[styles.summaryText, { color: colors.primary }]} numberOfLines={1}>
             {filterSummary}
           </Text>
-          <TouchableOpacity
-            onPress={resetFilters}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
+          <TouchableOpacity onPress={resetFilters} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <X size={14} color={colors.primary} />
           </TouchableOpacity>
         </TouchableOpacity>
       )}
 
       {/* Bottom Sheet */}
-      <Modal
-        visible={showSheet}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowSheet(false)}
-      >
-        <Pressable style={styles.sheetOverlay} onPress={() => setShowSheet(false)}>
-          <Pressable style={[styles.sheet, { backgroundColor: colors.card }]} onPress={(e) => e.stopPropagation()}>
+      <Modal visible={showSheet} transparent animationType="slide" onRequestClose={() => setShowSheet(false)}>
+        <View style={styles.sheetOverlay}>
+          {/* Backdrop - tapping dismisses */}
+          <Pressable style={styles.sheetBackdrop} onPress={() => setShowSheet(false)} />
+
+          {/* Sheet content - View instead of Pressable so ScrollView works */}
+          <View style={[styles.sheet, { backgroundColor: colors.card }]}>
             {/* Handle */}
             <View style={styles.sheetHandle}>
               <View style={[styles.sheetHandleBar, { backgroundColor: colors.border }]} />
@@ -278,68 +249,60 @@ export function InsightsFilterBar({
               </View>
             </View>
 
-            {/* Content */}
-            <View style={styles.sheetContentWrapper}>
-              <ScrollView
-                contentContainerStyle={styles.sheetContentInner}
-                showsVerticalScrollIndicator={false}
-              >
-                {/* Position */}
+            {/* Scrollable Content */}
+            <ScrollView style={styles.sheetScroll} contentContainerStyle={styles.sheetContentInner} showsVerticalScrollIndicator={false}>
+              {/* Position */}
+              <FilterSection
+                title="Position"
+                options={POSITION_OPTIONS}
+                selectedValue={filters.position}
+                onSelect={(v) => updateFilter('position', v as PositionFilter)}
+                colors={colors}
+              />
+
+              {/* Distance */}
+              <FilterSection
+                title="Distance"
+                options={DISTANCE_OPTIONS}
+                selectedValue={filters.distance}
+                onSelect={(v) => updateFilter('distance', v as DistanceFilter)}
+                colors={colors}
+              />
+
+              {/* Drill Type */}
+              <FilterSection
+                title="Type"
+                options={DRILL_TYPE_OPTIONS}
+                selectedValue={filters.drillType}
+                onSelect={(v) => updateFilter('drillType', v as DrillTypeFilter)}
+                colors={colors}
+              />
+
+              {/* Weapon */}
+              {weapons.length > 0 && (
                 <FilterSection
-                  title="Position"
-                  options={POSITION_OPTIONS}
-                  selectedValue={filters.position}
-                  onSelect={(v) => updateFilter('position', v as PositionFilter)}
+                  title="Weapon"
+                  options={[
+                    { value: '', label: 'All Weapons' },
+                    ...weapons.map((w) => ({ value: w.id, label: w.name })),
+                  ]}
+                  selectedValue={filters.weaponId || ''}
+                  onSelect={(v) => updateFilter('weaponId', v || null)}
                   colors={colors}
                 />
+              )}
 
-                {/* Distance */}
+              {/* Team */}
+              {teams.length > 0 && (
                 <FilterSection
-                  title="Distance"
-                  options={DISTANCE_OPTIONS}
-                  selectedValue={filters.distance}
-                  onSelect={(v) => updateFilter('distance', v as DistanceFilter)}
+                  title="Team"
+                  options={[{ value: '', label: 'All Teams' }, ...teams.map((t) => ({ value: t.id, label: t.name }))]}
+                  selectedValue={filters.teamId || ''}
+                  onSelect={(v) => updateFilter('teamId', v || null)}
                   colors={colors}
                 />
-
-                {/* Drill Type */}
-                <FilterSection
-                  title="Type"
-                  options={DRILL_TYPE_OPTIONS}
-                  selectedValue={filters.drillType}
-                  onSelect={(v) => updateFilter('drillType', v as DrillTypeFilter)}
-                  colors={colors}
-                />
-
-                {/* Weapon */}
-                {weapons.length > 0 && (
-                  <FilterSection
-                    title="Weapon"
-                    options={[
-                      { value: '', label: 'All Weapons' },
-                      ...weapons.map((w) => ({ value: w.id, label: w.name })),
-                    ]}
-                    selectedValue={filters.weaponId || ''}
-                    onSelect={(v) => updateFilter('weaponId', v || null)}
-                    colors={colors}
-                  />
-                )}
-
-                {/* Team */}
-                {teams.length > 0 && (
-                  <FilterSection
-                    title="Team"
-                    options={[
-                      { value: '', label: 'All Teams' },
-                      ...teams.map((t) => ({ value: t.id, label: t.name })),
-                    ]}
-                    selectedValue={filters.teamId || ''}
-                    onSelect={(v) => updateFilter('teamId', v || null)}
-                    colors={colors}
-                  />
-                )}
-              </ScrollView>
-            </View>
+              )}
+            </ScrollView>
 
             {/* Apply Button */}
             <View style={[styles.sheetFooter, { borderTopColor: colors.border }]}>
@@ -348,13 +311,11 @@ export function InsightsFilterBar({
                 onPress={() => setShowSheet(false)}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.applyBtnText, { color: colors.background }]}>
-                  Apply Filters
-                </Text>
+                <Text style={[styles.applyBtnText, { color: colors.background }]}>Apply Filters</Text>
               </TouchableOpacity>
             </View>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -372,13 +333,7 @@ interface FilterSectionProps {
   colors: ReturnType<typeof useColors>;
 }
 
-function FilterSection({
-  title,
-  options,
-  selectedValue,
-  onSelect,
-  colors,
-}: FilterSectionProps) {
+function FilterSection({ title, options, selectedValue, onSelect, colors }: FilterSectionProps) {
   return (
     <View style={styles.section}>
       <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{title}</Text>
@@ -386,23 +341,15 @@ function FilterSection({
         {options.map((option) => {
           const isSelected = selectedValue === option.value;
           const isAll = option.value === '' || option.value === 'all';
-          
+
           return (
             <TouchableOpacity
               key={option.value}
               style={[
                 styles.optionChip,
                 {
-                  backgroundColor: isSelected
-                    ? isAll
-                      ? colors.secondary
-                      : colors.primary + '15'
-                    : colors.background,
-                  borderColor: isSelected
-                    ? isAll
-                      ? colors.border
-                      : colors.primary
-                    : colors.border,
+                  backgroundColor: isSelected ? (isAll ? colors.secondary : colors.primary + '15') : colors.background,
+                  borderColor: isSelected ? (isAll ? colors.border : colors.primary) : colors.border,
                 },
               ]}
               onPress={() => onSelect(option.value)}
@@ -420,9 +367,7 @@ function FilterSection({
               >
                 {option.label}
               </Text>
-              {isSelected && !isAll && (
-                <Check size={14} color={colors.primary} style={{ marginLeft: 4 }} />
-              )}
+              {isSelected && !isAll && <Check size={14} color={colors.primary} style={{ marginLeft: 4 }} />}
             </TouchableOpacity>
           );
         })}
@@ -503,14 +448,16 @@ const styles = StyleSheet.create({
   // Bottom sheet
   sheetOverlay: {
     flex: 1,
-    justifyContent: 'flex-end',
+  },
+  sheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
   sheet: {
+    marginTop: 'auto',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    minHeight: 520,
-    maxHeight: '90%',
+    maxHeight: '80%',
   },
   sheetHandle: {
     alignItems: 'center',
@@ -550,9 +497,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  sheetContentWrapper: {
-    flex: 1,
-    minHeight: 320,
+  sheetScroll: {
+    flexGrow: 0,
   },
   sheetContentInner: {
     paddingHorizontal: 20,

@@ -1,9 +1,9 @@
+import { formatMaxShots } from '@/utils/drillShots';
 import { Ionicons } from '@expo/vector-icons';
 import { Crosshair, Play, Target } from 'lucide-react-native';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInRight } from 'react-native-reanimated';
 import type { ThemeColors, TrainingDrill, TrainingStatus } from './types';
-import { formatMaxShots } from '@/utils/drillShots';
 
 interface DrillCardProps {
   drill: TrainingDrill;
@@ -33,7 +33,10 @@ export function DrillCard({
       <TouchableOpacity
         style={[
           styles.card,
-          { backgroundColor: colors.background, borderColor: isCompleted ? 'rgba(147,197,253,0.4)' : canStart ? colors.text : colors.border },
+          {
+            backgroundColor: colors.background,
+            borderColor: isCompleted ? 'rgba(147,197,253,0.4)' : canStart ? colors.text : colors.border,
+          },
           canStart && styles.cardActive,
           isCompleted && styles.cardCompleted,
         ]}
@@ -57,32 +60,26 @@ export function DrillCard({
               </Text>
             )}
           </View>
-          <View style={[styles.typeIcon, { backgroundColor: isPaper ? 'rgba(147,197,253,0.12)' : 'rgba(156,163,175,0.12)' }]}>
-            {isPaper ? (
-              <Target size={18} color="#93C5FD" />
-            ) : (
-              <Crosshair size={18} color={colors.textMuted} />
-            )}
+          <View
+            style={[
+              styles.typeIcon,
+              { backgroundColor: isPaper ? 'rgba(147,197,253,0.12)' : 'rgba(156,163,175,0.12)' },
+            ]}
+          >
+            {isPaper ? <Target size={18} color="#93C5FD" /> : <Crosshair size={18} color={colors.textMuted} />}
           </View>
         </View>
 
         {/* Middle: Info */}
         <View style={styles.content}>
-          <Text
-            style={[
-              styles.name,
-              { color: colors.text },
-              isCompleted && styles.nameCompleted,
-            ]}
-            numberOfLines={1}
-          >
+          <Text style={[styles.name, { color: colors.text }, isCompleted && styles.nameCompleted]} numberOfLines={1}>
             {drill.name}
           </Text>
           <View style={styles.metaRow}>
             <Text style={[styles.meta, { color: colors.textMuted }]}>{drill.distance_m}m</Text>
             <View style={[styles.metaDot, { backgroundColor: colors.border }]} />
             <Text style={[styles.meta, { color: colors.textMuted }]}>
-              {(drill.strings_count ?? 1)} rounds •{' '}
+              {drill.strings_count ?? 1} rounds •{' '}
               {isPaper
                 ? `Scan (max ${formatMaxShots(drill.rounds_per_shooter)})`
                 : `${drill.rounds_per_shooter} shots/round`}

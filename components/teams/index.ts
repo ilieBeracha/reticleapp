@@ -1,6 +1,6 @@
 /**
  * Team Components
- * 
+ *
  * Components for team-related routes
  */
 

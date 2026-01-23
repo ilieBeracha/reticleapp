@@ -1,6 +1,6 @@
 /**
  * Weapon Policy Step Types
- * 
+ *
  * Types for the weapon policy selection component
  * used during team creation.
  */

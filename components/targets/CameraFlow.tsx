@@ -1,26 +1,17 @@
-import { Ionicons } from "@expo/vector-icons";
-import { CameraView } from "expo-camera";
-import { LinearGradient } from "expo-linear-gradient";
-import React from "react";
-import {
-    ActivityIndicator,
-    Dimensions,
-    Image,
-    Modal,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from "react-native";
-import { BUTTON_GRADIENT } from "@/theme/colors";
-import { COLORS, Step } from "./types";
+import { BUTTON_GRADIENT } from '@/theme/colors';
+import { Ionicons } from '@expo/vector-icons';
+import { CameraView } from 'expo-camera';
+import { LinearGradient } from 'expo-linear-gradient';
+import React from 'react';
+import { ActivityIndicator, Dimensions, Image, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { COLORS, Step } from './types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CAMERA FLOW
 // Full-screen modal for camera capture, preview, and analysis
 // ═══════════════════════════════════════════════════════════════════════════
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface CameraFlowProps {
   step: Step;
@@ -43,17 +34,17 @@ export const CameraFlow = React.memo(function CameraFlow({
   onRetake,
   onClose,
 }: CameraFlowProps) {
-  const isVisible = step === "camera" || step === "preview" || step === "analyzing";
+  const isVisible = step === 'camera' || step === 'preview' || step === 'analyzing';
 
   return (
     <Modal
       visible={isVisible}
       animationType="slide"
       presentationStyle="fullScreen"
-      onRequestClose={() => (step === "camera" ? onClose() : undefined)}
+      onRequestClose={() => (step === 'camera' ? onClose() : undefined)}
     >
       {/* Camera View */}
-      {step === "camera" && (
+      {step === 'camera' && (
         <View style={styles.cameraContainer}>
           <CameraView ref={cameraRef} style={styles.camera} facing="back">
             <View style={styles.cameraOverlay}>
@@ -100,11 +91,11 @@ export const CameraFlow = React.memo(function CameraFlow({
       )}
 
       {/* Preview View */}
-      {step === "preview" && capturedUri && (
+      {step === 'preview' && capturedUri && (
         <View style={styles.previewContainer}>
           <Image source={{ uri: capturedUri }} style={styles.previewImage} resizeMode="cover" />
           <LinearGradient
-            colors={["rgba(0,0,0,0.6)", "transparent", "transparent", "rgba(0,0,0,0.8)"]}
+            colors={['rgba(0,0,0,0.6)', 'transparent', 'transparent', 'rgba(0,0,0,0.8)']}
             style={styles.previewGradient}
           >
             <View style={styles.topBar}>
@@ -140,7 +131,7 @@ export const CameraFlow = React.memo(function CameraFlow({
       )}
 
       {/* Analyzing View */}
-      {step === "analyzing" && (
+      {step === 'analyzing' && (
         <View style={styles.analyzingContainer}>
           <View style={styles.analyzingContent}>
             {capturedUri && (
@@ -167,21 +158,21 @@ const styles = StyleSheet.create({
   // Camera
   cameraContainer: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: '#000',
   },
   camera: {
     flex: 1,
   },
   cameraOverlay: {
     flex: 1,
-    justifyContent: "space-between",
+    justifyContent: 'space-between',
   },
-  
+
   // Top Bar
   topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingTop: 60,
     paddingHorizontal: 20,
   },
@@ -189,25 +180,25 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontSize: 18,
-    fontWeight: "600",
-    color: "#fff",
+    fontWeight: '600',
+    color: '#fff',
   },
-  
+
   // Guide Frame
   guideFrame: {
     width: SCREEN_WIDTH - 60,
     aspectRatio: 1,
-    alignSelf: "center",
-    position: "relative",
+    alignSelf: 'center',
+    position: 'relative',
   },
   guideCorner: {
-    position: "absolute",
+    position: 'absolute',
     width: 50,
     height: 50,
     borderColor: COLORS.primary,
@@ -236,32 +227,32 @@ const styles = StyleSheet.create({
     borderBottomWidth: 3,
     borderRightWidth: 3,
   },
-  
+
   // Instructions
   instructions: {
-    alignItems: "center",
+    alignItems: 'center',
     paddingHorizontal: 20,
   },
   instructionBadge: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: 'rgba(0,0,0,0.6)',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
   },
   instructionText: {
-    color: "#fff",
+    color: '#fff',
     fontSize: 14,
-    fontWeight: "500",
+    fontWeight: '500',
   },
-  
+
   // Bottom Bar
   bottomBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 40,
     paddingBottom: 50,
   },
@@ -269,40 +260,40 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   captureBtn: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 4,
-    borderColor: "#fff",
+    borderColor: '#fff',
   },
   captureBtnInner: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
   },
-  
+
   // Preview
   previewContainer: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: '#000',
   },
   previewImage: {
     ...StyleSheet.absoluteFillObject,
-    width: "100%",
-    height: "100%",
+    width: '100%',
+    height: '100%',
   },
   previewGradient: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: "space-between",
+    justifyContent: 'space-between',
   },
   previewActions: {
     paddingHorizontal: 20,
@@ -312,84 +303,84 @@ const styles = StyleSheet.create({
   previewHint: {
     fontSize: 14,
     color: COLORS.textMuted,
-    textAlign: "center",
+    textAlign: 'center',
     marginBottom: 8,
   },
   submitBtn: {
     borderRadius: 28,
-    overflow: "hidden",
+    overflow: 'hidden',
   },
   submitBtnGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     height: 56,
     gap: 10,
   },
   submitBtnText: {
     fontSize: 17,
-    fontWeight: "700",
-    color: "#fff",
+    fontWeight: '700',
+    color: '#fff',
   },
   retakeBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
     paddingVertical: 14,
   },
   retakeBtnText: {
     fontSize: 15,
-    fontWeight: "600",
-    color: "#fff",
+    fontWeight: '600',
+    color: '#fff',
   },
-  
+
   // Analyzing
   analyzingContainer: {
     flex: 1,
     backgroundColor: COLORS.background,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   analyzingContent: {
-    alignItems: "center",
+    alignItems: 'center',
     gap: 32,
   },
   analyzingPreview: {
     width: SCREEN_WIDTH - 80,
     aspectRatio: 1,
     borderRadius: 20,
-    overflow: "hidden",
-    position: "relative",
+    overflow: 'hidden',
+    position: 'relative',
   },
   analyzingImage: {
-    width: "100%",
-    height: "100%",
+    width: '100%',
+    height: '100%',
   },
   analyzingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(16, 185, 129, 0.1)",
-    overflow: "hidden",
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    overflow: 'hidden',
   },
   scanLine: {
-    position: "absolute",
+    position: 'absolute',
     left: 0,
     right: 0,
     height: 2,
     backgroundColor: COLORS.primary,
-    top: "50%",
+    top: '50%',
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
     shadowRadius: 10,
   },
   analyzingInfo: {
-    alignItems: "center",
+    alignItems: 'center',
     gap: 16,
   },
   analyzingTitle: {
     fontSize: 22,
-    fontWeight: "700",
+    fontWeight: '700',
     color: COLORS.white,
   },
   analyzingSubtitle: {
@@ -397,4 +388,3 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
   },
 });
-

@@ -34,7 +34,7 @@ import {
   getCoachMessage,
   getGreeting,
 } from './UnifiedHomePage.helpers';
-import type { WeeklyStats } from './UnifiedHomePage.types';
+import type { HeroMode, WeeklyStats } from './UnifiedHomePage.types';
 
 export function useUnifiedHomePage() {
   // ═══════════════════════════════════════════════════════════════════════════
@@ -196,8 +196,31 @@ export function useUnifiedHomePage() {
     return weaponStatsMap.get(defaultWeapon.id) || null;
   }, [defaultWeapon, weaponStatsMap]);
 
+  // Active team training (ongoing status)
+  const activeTeamTraining = useMemo(() => {
+    return myUpcomingTrainings.find((t) => t.status === 'ongoing') ?? null;
+  }, [myUpcomingTrainings]);
+
+  // Is the current user the commander of the active team training?
+  const isTrainingCommander = !!(activeTeamTraining && user && activeTeamTraining.created_by === user.id);
+
+  // Active solo session
+  const activeSoloSession = homeState.activeSession?.origin === 'solo' ? homeState.activeSession : null;
+
+  // Hero mode priority logic
+  const heroMode: HeroMode = useMemo(() => {
+    if (activeTeamTraining) return 'team-live';
+    if (activeSoloSession) return 'solo-active';
+    return 'idle';
+  }, [activeTeamTraining, activeSoloSession]);
+
+  // Next upcoming training (planned, not ongoing) for secondary row
+  const nextUpcomingTraining = useMemo(() => {
+    return myUpcomingTrainings.find((t) => t.status === 'planned' && t.scheduled_at) ?? null;
+  }, [myUpcomingTrainings]);
+
   // UI state
-  const hasActiveSession = homeState.activeSession && homeState.activeSession.origin === 'solo';
+  const hasActiveSession = !!homeState.activeSession;
   const hasTeamContent = upcomingTrainings.length > 0 || hasTeams;
   const shouldShowLoading =
     (loadingAllSessions && allSessions.length === 0) || (!initialized && sessionsLoading);
@@ -294,6 +317,10 @@ export function useUnifiedHomePage() {
     hasActiveSession,
     hasTeamContent,
     hasTeams,
+    heroMode,
+    activeTeamTraining,
+    isTrainingCommander,
+    nextUpcomingTraining,
     allSessions, // Raw session data for charts
     defaultWeapon, // Default weapon info
     defaultWeaponStats, // Stats for default weapon

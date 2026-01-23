@@ -62,9 +62,7 @@ export function WeeklyStatsCard({ stats, streak, colors }: WeeklyStatsCardProps)
               <Text style={[s.emptyStatText, { color: colors.textMuted }]}>--</Text>
             </View>
           </View>
-          <Text style={[s.emptyMessage, { color: colors.textMuted }]}>
-            No practice sessions yet this week
-          </Text>
+          <Text style={[s.emptyMessage, { color: colors.textMuted }]}>No practice sessions yet this week</Text>
         </View>
       </AnimatedTouchable>
     );

@@ -1,6 +1,6 @@
 /**
  * StandardsManager
- * 
+ *
  * Commander UI for managing team performance standards and condition modifiers.
  * This is where doctrine is defined.
  */
@@ -12,7 +12,7 @@ import {
   getTeamModifiers,
   getTeamStandards,
   type StandardModifier,
-  type TeamStandard
+  type TeamStandard,
 } from '@/services/standards';
 import * as Haptics from 'expo-haptics';
 import {
@@ -26,7 +26,7 @@ import {
   Thermometer,
   Trash2,
   Wind,
-  Zap
+  Zap,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -56,14 +56,20 @@ interface StandardsManagerProps {
 
 function getModifierIcon(type: string) {
   switch (type) {
-    case 'weather_rain': return CloudRain;
-    case 'weather_wind': return Wind;
+    case 'weather_rain':
+      return CloudRain;
+    case 'weather_wind':
+      return Wind;
     case 'weather_cold':
-    case 'weather_hot': return Thermometer;
+    case 'weather_hot':
+      return Thermometer;
     case 'fatigue_shots':
-    case 'fatigue_time': return Clock;
-    case 'fatigue_hr': return Heart;
-    default: return Zap;
+    case 'fatigue_time':
+      return Clock;
+    case 'fatigue_hr':
+      return Heart;
+    default:
+      return Zap;
   }
 }
 
@@ -92,39 +98,36 @@ function formatModifierThreshold(type: string, threshold: Record<string, any>): 
 // STANDARD ROW
 // ============================================================================
 
-function StandardRow({ 
-  standard, 
+function StandardRow({
+  standard,
   colors,
   onEdit,
   onDelete,
-}: { 
-  standard: TeamStandard; 
+}: {
+  standard: TeamStandard;
   colors: ReturnType<typeof useColors>;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   const Icon = standard.drill_goal === 'grouping' ? Target : Crosshair;
-  
-  const expectedValue = standard.drill_goal === 'grouping'
-    ? `${standard.expected_grouping_cm}cm`
-    : `${standard.expected_accuracy_pct}%`;
-    
+
+  const expectedValue =
+    standard.drill_goal === 'grouping' ? `${standard.expected_grouping_cm}cm` : `${standard.expected_accuracy_pct}%`;
+
   return (
     <View style={[styles.row, { backgroundColor: colors.card }]}>
       <View style={[styles.rowIcon, { backgroundColor: colors.primary + '20' }]}>
         <Icon size={20} color={colors.primary} />
       </View>
-      
+
       <View style={styles.rowContent}>
-        <Text style={[styles.rowTitle, { color: colors.text }]}>
-          {standard.name}
-        </Text>
+        <Text style={[styles.rowTitle, { color: colors.text }]}>{standard.name}</Text>
         <Text style={[styles.rowMeta, { color: colors.textMuted }]}>
           {standard.distance_m}m • {standard.drill_goal} • Expected: {expectedValue}
           {standard.weapon_category && ` • ${standard.weapon_category}`}
         </Text>
       </View>
-      
+
       <View style={styles.rowActions}>
         <TouchableOpacity onPress={onEdit} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Edit2 size={18} color={colors.textMuted} />
@@ -141,19 +144,19 @@ function StandardRow({
 // MODIFIER ROW
 // ============================================================================
 
-function ModifierRow({ 
-  modifier, 
+function ModifierRow({
+  modifier,
   colors,
   onEdit,
   onDelete,
-}: { 
-  modifier: StandardModifier; 
+}: {
+  modifier: StandardModifier;
   colors: ReturnType<typeof useColors>;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   const Icon = getModifierIcon(modifier.condition_type);
-  
+
   const penaltyParts: string[] = [];
   if (modifier.grouping_penalty_cm > 0) {
     penaltyParts.push(`+${modifier.grouping_penalty_cm}cm grouping`);
@@ -164,27 +167,23 @@ function ModifierRow({
   if (modifier.time_penalty_seconds > 0) {
     penaltyParts.push(`+${modifier.time_penalty_seconds}s time`);
   }
-  
+
   const penaltyText = penaltyParts.length > 0 ? penaltyParts.join(', ') : 'No adjustment';
-  
+
   return (
     <View style={[styles.row, { backgroundColor: colors.card }]}>
       <View style={[styles.rowIcon, { backgroundColor: colors.orange + '20' }]}>
         <Icon size={20} color={colors.orange} />
       </View>
-      
+
       <View style={styles.rowContent}>
-        <Text style={[styles.rowTitle, { color: colors.text }]}>
-          {modifier.name}
-        </Text>
+        <Text style={[styles.rowTitle, { color: colors.text }]}>{modifier.name}</Text>
         <Text style={[styles.rowMeta, { color: colors.textMuted }]}>
           {formatModifierThreshold(modifier.condition_type, modifier.condition_threshold)}
         </Text>
-        <Text style={[styles.rowPenalty, { color: colors.orange }]}>
-          {penaltyText}
-        </Text>
+        <Text style={[styles.rowPenalty, { color: colors.orange }]}>{penaltyText}</Text>
       </View>
-      
+
       <View style={styles.rowActions}>
         <TouchableOpacity onPress={onEdit} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Edit2 size={18} color={colors.textMuted} />
@@ -201,12 +200,12 @@ function ModifierRow({
 // SECTION HEADER
 // ============================================================================
 
-function SectionHeader({ 
-  title, 
+function SectionHeader({
+  title,
   count,
   onAdd,
-  colors 
-}: { 
+  colors,
+}: {
   title: string;
   count: number;
   onAdd: () => void;
@@ -215,21 +214,12 @@ function SectionHeader({
   return (
     <View style={styles.sectionHeader}>
       <View style={styles.sectionTitleRow}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          {title}
-        </Text>
-        <Text style={[styles.sectionCount, { color: colors.textMuted }]}>
-          {count}
-        </Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
+        <Text style={[styles.sectionCount, { color: colors.textMuted }]}>{count}</Text>
       </View>
-      <TouchableOpacity 
-        style={[styles.addButton, { backgroundColor: colors.primary + '20' }]}
-        onPress={onAdd}
-      >
+      <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.primary + '20' }]} onPress={onAdd}>
         <Plus size={16} color={colors.primary} />
-        <Text style={[styles.addButtonText, { color: colors.primary }]}>
-          Add
-        </Text>
+        <Text style={[styles.addButtonText, { color: colors.primary }]}>Add</Text>
       </TouchableOpacity>
     </View>
   );
@@ -239,18 +229,10 @@ function SectionHeader({
 // EMPTY STATE
 // ============================================================================
 
-function EmptyState({ 
-  message, 
-  colors 
-}: { 
-  message: string;
-  colors: ReturnType<typeof useColors>;
-}) {
+function EmptyState({ message, colors }: { message: string; colors: ReturnType<typeof useColors> }) {
   return (
     <View style={[styles.empty, { backgroundColor: colors.secondary }]}>
-      <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-        {message}
-      </Text>
+      <Text style={[styles.emptyText, { color: colors.textMuted }]}>{message}</Text>
     </View>
   );
 }
@@ -261,26 +243,23 @@ function EmptyState({
 
 export function StandardsManager({ teamId }: StandardsManagerProps) {
   const colors = useColors();
-  
+
   // State
   const [standards, setStandards] = useState<TeamStandard[]>([]);
   const [modifiers, setModifiers] = useState<StandardModifier[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  
+
   // Modals
   const [showAddStandard, setShowAddStandard] = useState(false);
   const [showAddModifier, setShowAddModifier] = useState(false);
   const [editingStandard, setEditingStandard] = useState<TeamStandard | null>(null);
   const [editingModifier, setEditingModifier] = useState<StandardModifier | null>(null);
-  
+
   // Load data
   const loadData = useCallback(async () => {
     try {
-      const [standardsData, modifiersData] = await Promise.all([
-        getTeamStandards(teamId),
-        getTeamModifiers(teamId),
-      ]);
+      const [standardsData, modifiersData] = await Promise.all([getTeamStandards(teamId), getTeamModifiers(teamId)]);
       setStandards(standardsData);
       setModifiers(modifiersData);
     } catch (error) {
@@ -291,23 +270,21 @@ export function StandardsManager({ teamId }: StandardsManagerProps) {
       setRefreshing(false);
     }
   }, [teamId]);
-  
+
   useEffect(() => {
     loadData();
   }, [loadData]);
-  
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     loadData();
   }, [loadData]);
-  
+
   // Delete handlers
-  const handleDeleteStandard = useCallback((standard: TeamStandard) => {
-    Alert.alert(
-      'Delete Standard',
-      `Are you sure you want to delete "${standard.name}"?`,
-      [
+  const handleDeleteStandard = useCallback(
+    (standard: TeamStandard) => {
+      Alert.alert('Delete Standard', `Are you sure you want to delete "${standard.name}"?`, [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
@@ -322,15 +299,14 @@ export function StandardsManager({ teamId }: StandardsManagerProps) {
             }
           },
         },
-      ]
-    );
-  }, [loadData]);
-  
-  const handleDeleteModifier = useCallback((modifier: StandardModifier) => {
-    Alert.alert(
-      'Delete Modifier',
-      `Are you sure you want to delete "${modifier.name}"?`,
-      [
+      ]);
+    },
+    [loadData]
+  );
+
+  const handleDeleteModifier = useCallback(
+    (modifier: StandardModifier) => {
+      Alert.alert('Delete Modifier', `Are you sure you want to delete "${modifier.name}"?`, [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
@@ -345,10 +321,11 @@ export function StandardsManager({ teamId }: StandardsManagerProps) {
             }
           },
         },
-      ]
-    );
-  }, [loadData]);
-  
+      ]);
+    },
+    [loadData]
+  );
+
   // Loading state
   if (loading) {
     return (
@@ -357,7 +334,7 @@ export function StandardsManager({ teamId }: StandardsManagerProps) {
       </View>
     );
   }
-  
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -376,10 +353,11 @@ export function StandardsManager({ teamId }: StandardsManagerProps) {
         {/* Info Banner */}
         <View style={[styles.banner, { backgroundColor: colors.primary + '15' }]}>
           <Text style={[styles.bannerText, { color: colors.primary }]}>
-            Standards define what soldiers should achieve. Modifiers adjust expectations for conditions like weather or fatigue.
+            Standards define what soldiers should achieve. Modifiers adjust expectations for conditions like weather or
+            fatigue.
           </Text>
         </View>
-        
+
         {/* Base Standards Section */}
         <SectionHeader
           title="Base Standards"
@@ -391,10 +369,10 @@ export function StandardsManager({ teamId }: StandardsManagerProps) {
           }}
           colors={colors}
         />
-        
+
         {standards.length === 0 ? (
-          <EmptyState 
-            message="No standards defined yet. Add your first standard to start tracking performance." 
+          <EmptyState
+            message="No standards defined yet. Add your first standard to start tracking performance."
             colors={colors}
           />
         ) : (
@@ -414,7 +392,7 @@ export function StandardsManager({ teamId }: StandardsManagerProps) {
             ))}
           </View>
         )}
-        
+
         {/* Condition Modifiers Section */}
         <SectionHeader
           title="Condition Modifiers"
@@ -426,10 +404,10 @@ export function StandardsManager({ teamId }: StandardsManagerProps) {
           }}
           colors={colors}
         />
-        
+
         {modifiers.length === 0 ? (
-          <EmptyState 
-            message="No modifiers defined. Add modifiers to adjust standards for weather, fatigue, etc." 
+          <EmptyState
+            message="No modifiers defined. Add modifiers to adjust standards for weather, fatigue, etc."
             colors={colors}
           />
         ) : (
@@ -449,11 +427,11 @@ export function StandardsManager({ teamId }: StandardsManagerProps) {
             ))}
           </View>
         )}
-        
+
         {/* Spacing at bottom */}
         <View style={{ height: 40 }} />
       </ScrollView>
-      
+
       {/* Modals */}
       <AddStandardModal
         visible={showAddStandard}
@@ -469,7 +447,7 @@ export function StandardsManager({ teamId }: StandardsManagerProps) {
           loadData();
         }}
       />
-      
+
       <AddModifierModal
         visible={showAddModifier}
         teamId={teamId}
@@ -508,7 +486,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  
+
   // Banner
   banner: {
     padding: 12,
@@ -519,7 +497,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
-  
+
   // Section header
   sectionHeader: {
     flexDirection: 'row',
@@ -552,13 +530,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  
+
   // List
   list: {
     gap: 8,
     marginBottom: 24,
   },
-  
+
   // Row
   row: {
     flexDirection: 'row',
@@ -594,7 +572,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
-  
+
   // Empty
   empty: {
     padding: 20,

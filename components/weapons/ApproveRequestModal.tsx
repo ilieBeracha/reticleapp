@@ -18,7 +18,6 @@ import {
 import * as Haptics from 'expo-haptics';
 import { AlertCircle, Check, MessageSquare, Sparkles, User, X, Zap } from 'lucide-react-native';
 import { useState } from 'react';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import {
   ActivityIndicator,
   Alert,
@@ -30,6 +29,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
 interface ApproveRequestModalProps {
   visible: boolean;
@@ -138,12 +138,7 @@ export function ApproveRequestModal({
   if (!request) return null;
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={handleClose}
-    >
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
@@ -157,9 +152,7 @@ export function ApproveRequestModal({
         {showRejectForm ? (
           // Reject Form
           <View style={styles.rejectForm}>
-            <Text style={[styles.rejectTitle, { color: colors.text }]}>
-              Reject Request
-            </Text>
+            <Text style={[styles.rejectTitle, { color: colors.text }]}>Reject Request</Text>
             <Text style={[styles.rejectSubtitle, { color: colors.textMuted }]}>
               Optionally provide a reason for rejection
             </Text>
@@ -220,9 +213,7 @@ export function ApproveRequestModal({
                   <Text style={[styles.summaryName, { color: colors.text }]}>
                     {request.user?.full_name || 'Unknown'}
                   </Text>
-                  <Text style={[styles.summarySubtext, { color: colors.textMuted }]}>
-                    is requesting a weapon
-                  </Text>
+                  <Text style={[styles.summarySubtext, { color: colors.textMuted }]}>is requesting a weapon</Text>
                 </View>
               </View>
 
@@ -230,9 +221,7 @@ export function ApproveRequestModal({
                 <View style={[styles.summaryDetails, { borderTopColor: colors.border }]}>
                   {request.weapon_category && (
                     <View style={styles.summaryRow}>
-                      <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>
-                        Preference:
-                      </Text>
+                      <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Preference:</Text>
                       <View style={[styles.categoryBadge, { backgroundColor: colors.primary + '20' }]}>
                         <Text style={[styles.categoryBadgeText, { color: colors.primary }]}>
                           {getCategoryLabel(request.weapon_category)}
@@ -244,9 +233,7 @@ export function ApproveRequestModal({
                   {request.notes && (
                     <View style={styles.notesRow}>
                       <MessageSquare size={14} color={colors.textMuted} />
-                      <Text style={[styles.notesText, { color: colors.text }]}>
-                        "{request.notes}"
-                      </Text>
+                      <Text style={[styles.notesText, { color: colors.text }]}>"{request.notes}"</Text>
                     </View>
                   )}
                 </View>
@@ -261,14 +248,10 @@ export function ApproveRequestModal({
               >
                 <View style={styles.quickAssignHeader}>
                   <Zap size={16} color={colors.green} />
-                  <Text style={[styles.quickAssignLabel, { color: colors.green }]}>
-                    Perfect Match
-                  </Text>
+                  <Text style={[styles.quickAssignLabel, { color: colors.green }]}>Perfect Match</Text>
                 </View>
                 <View style={styles.quickAssignWeapon}>
-                  <Text style={[styles.quickAssignWeaponName, { color: colors.text }]}>
-                    {quickAssignWeapon.name}
-                  </Text>
+                  <Text style={[styles.quickAssignWeaponName, { color: colors.text }]}>{quickAssignWeapon.name}</Text>
                   <Text style={[styles.quickAssignWeaponMeta, { color: colors.textMuted }]}>
                     {getCategoryLabel(quickAssignWeapon.category)}
                     {quickAssignWeapon.caliber && ` • ${quickAssignWeapon.caliber}`}
@@ -307,9 +290,7 @@ export function ApproveRequestModal({
 
             {/* Weapon Selection */}
             <View style={styles.weaponSection}>
-              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-                AVAILABLE WEAPONS
-              </Text>
+              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>AVAILABLE WEAPONS</Text>
 
               <FlatList
                 data={weaponsToShow}
@@ -332,9 +313,7 @@ export function ApproveRequestModal({
                       disabled={actionLoading !== null}
                     >
                       <View style={styles.weaponInfo}>
-                        <Text style={[styles.weaponName, { color: colors.text }]}>
-                          {item.name}
-                        </Text>
+                        <Text style={[styles.weaponName, { color: colors.text }]}>{item.name}</Text>
                         <Text style={[styles.weaponMeta, { color: colors.textMuted }]}>
                           {getCategoryLabel(item.category)}
                           {item.caliber && ` \u2022 ${item.caliber}`}
@@ -354,9 +333,7 @@ export function ApproveRequestModal({
                     <View style={[styles.emptyIcon, { backgroundColor: colors.yellow + '15' }]}>
                       <AlertCircle size={24} color={colors.yellow} />
                     </View>
-                    <Text style={[styles.emptyText, { color: colors.text }]}>
-                      No weapons available
-                    </Text>
+                    <Text style={[styles.emptyText, { color: colors.text }]}>No weapons available</Text>
                     <Text style={[styles.emptyHint, { color: colors.textMuted }]}>
                       All weapons are assigned. Add more weapons to the armory or unassign an existing one.
                     </Text>
@@ -373,9 +350,7 @@ export function ApproveRequestModal({
                 disabled={actionLoading !== null}
               >
                 <X size={18} color={colors.destructive} />
-                <Text style={[styles.rejectBtnText, { color: colors.destructive }]}>
-                  Reject
-                </Text>
+                <Text style={[styles.rejectBtnText, { color: colors.destructive }]}>Reject</Text>
               </TouchableOpacity>
 
               <TouchableOpacity

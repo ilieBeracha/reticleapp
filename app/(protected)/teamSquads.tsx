@@ -1,6 +1,6 @@
 /**
  * Team Squads Management
- * 
+ *
  * Manage squad sub-groups within a team
  * - Create/edit/delete squads
  * - Assign soldiers to squads
@@ -12,7 +12,7 @@ import { useTeamStore } from '@/store/teamStore';
 import type { TeamMemberWithProfile, TeamRole } from '@/types/workspace';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -35,7 +35,7 @@ export default function TeamSquadsScreen() {
   const { teamId } = useLocalSearchParams<{ teamId: string }>();
   const { teams, loadTeams } = useTeamStore();
 
-  const team = teams.find(t => t.id === teamId);
+  const team = teams.find((t) => t.id === teamId);
   const [squads, setSquads] = useState<string[]>(team?.squads || []);
   const [members, setMembers] = useState<TeamMemberWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,7 +43,7 @@ export default function TeamSquadsScreen() {
   const [newSquadName, setNewSquadName] = useState('');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
-  
+
   // Member assignment modal state
   const [assignModalVisible, setAssignModalVisible] = useState(false);
   const [selectedSquad, setSelectedSquad] = useState<string | null>(null);
@@ -66,35 +66,41 @@ export default function TeamSquadsScreen() {
   useEffect(() => {
     loadMembers();
   }, [loadMembers]);
-  
+
   // Get soldiers that can be assigned (soldiers only, not commanders)
   const assignableSoldiers = useMemo(() => {
-    return members.filter(m => {
+    return members.filter((m) => {
       const role = m.role?.role || 'soldier';
       return role === 'soldier';
     });
   }, [members]);
-  
+
   // Get soldiers in a specific squad
-  const getSoldiersInSquad = useCallback((squadName: string) => {
-    return members.filter(m => {
-      const memberSquad = m.role?.squad_id || m.details?.squad_id;
-      return memberSquad === squadName;
-    });
-  }, [members]);
-  
+  const getSoldiersInSquad = useCallback(
+    (squadName: string) => {
+      return members.filter((m) => {
+        const memberSquad = m.role?.squad_id || m.details?.squad_id;
+        return memberSquad === squadName;
+      });
+    },
+    [members]
+  );
+
   // Get unassigned soldiers (not in any squad)
   const unassignedSoldiers = useMemo(() => {
-    return assignableSoldiers.filter(m => {
+    return assignableSoldiers.filter((m) => {
       const memberSquad = m.role?.squad_id || m.details?.squad_id;
       return !memberSquad;
     });
   }, [assignableSoldiers]);
 
   // Get member count for a squad
-  const getSquadMemberCount = useCallback((squadName: string) => {
-    return members.filter(m => m.role?.squad_id === squadName || m.details?.squad_id === squadName).length;
-  }, [members]);
+  const getSquadMemberCount = useCallback(
+    (squadName: string) => {
+      return members.filter((m) => m.role?.squad_id === squadName || m.details?.squad_id === squadName).length;
+    },
+    [members]
+  );
 
   // Add new squad
   const handleAddSquad = async () => {
@@ -193,23 +199,23 @@ export default function TeamSquadsScreen() {
     saveSquads(newSquads);
     Haptics.selectionAsync();
   };
-  
+
   // Open member assignment modal for a squad
   const handleOpenAssignModal = (squadName: string) => {
     setSelectedSquad(squadName);
     setAssignModalVisible(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
-  
+
   // Assign a member to a squad
   const handleAssignMember = async (memberId: string, targetSquad: string | null) => {
     if (!teamId) return;
-    
+
     setAssigningMemberId(memberId);
     try {
-      const member = members.find(m => m.user_id === memberId);
+      const member = members.find((m) => m.user_id === memberId);
       const currentRole = (member?.role?.role || 'soldier') as TeamRole;
-      
+
       await updateTeamMemberRole(teamId, memberId, currentRole, { squad_id: targetSquad });
       await loadMembers();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -220,21 +226,17 @@ export default function TeamSquadsScreen() {
       setAssigningMemberId(null);
     }
   };
-  
+
   // Remove member from squad
   const handleRemoveFromSquad = async (memberId: string) => {
-    Alert.alert(
-      'Remove from Squad',
-      'Remove this soldier from the squad?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: () => handleAssignMember(memberId, null),
-        },
-      ]
-    );
+    Alert.alert('Remove from Squad', 'Remove this soldier from the squad?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () => handleAssignMember(memberId, null),
+      },
+    ]);
   };
 
   if (loading) {
@@ -262,9 +264,7 @@ export default function TeamSquadsScreen() {
             <Ionicons name="git-branch" size={28} color={colors.primary} />
           </View>
           <Text style={[styles.title, { color: colors.text }]}>Squad Management</Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            Organize {team?.name} into sub-groups
-          </Text>
+          <Text style={[styles.subtitle, { color: colors.textMuted }]}>Organize {team?.name} into sub-groups</Text>
         </View>
 
         {/* Add New Squad */}
@@ -279,10 +279,7 @@ export default function TeamSquadsScreen() {
             returnKeyType="done"
           />
           <TouchableOpacity
-            style={[
-              styles.addBtn,
-              { backgroundColor: newSquadName.trim() ? colors.primary : colors.secondary },
-            ]}
+            style={[styles.addBtn, { backgroundColor: newSquadName.trim() ? colors.primary : colors.secondary }]}
             onPress={handleAddSquad}
             disabled={!newSquadName.trim() || saving}
           >
@@ -327,11 +324,7 @@ export default function TeamSquadsScreen() {
                         disabled={index === 0}
                         style={styles.reorderBtn}
                       >
-                        <Ionicons
-                          name="chevron-up"
-                          size={16}
-                          color={index === 0 ? colors.border : colors.textMuted}
-                        />
+                        <Ionicons name="chevron-up" size={16} color={index === 0 ? colors.border : colors.textMuted} />
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => handleMoveSquad(index, 'down')}
@@ -395,7 +388,7 @@ export default function TeamSquadsScreen() {
                       )}
                     </View>
                   </View>
-                  
+
                   {/* Squad Members */}
                   {squadSoldiers.length > 0 && (
                     <View style={[styles.squadMembers, { borderTopColor: colors.border }]}>
@@ -419,16 +412,14 @@ export default function TeamSquadsScreen() {
                       ))}
                     </View>
                   )}
-                  
+
                   {/* Assign Button */}
                   <TouchableOpacity
                     style={[styles.assignBtn, { borderTopColor: colors.border }]}
                     onPress={() => handleOpenAssignModal(squad)}
                   >
                     <Ionicons name="person-add-outline" size={16} color={colors.primary} />
-                    <Text style={[styles.assignBtnText, { color: colors.primary }]}>
-                      Assign Soldiers
-                    </Text>
+                    <Text style={[styles.assignBtnText, { color: colors.primary }]}>Assign Soldiers</Text>
                   </TouchableOpacity>
                 </View>
               );
@@ -441,13 +432,9 @@ export default function TeamSquadsScreen() {
           <View style={[styles.unassignedSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.unassignedHeader}>
               <Ionicons name="people-outline" size={18} color={colors.textMuted} />
-              <Text style={[styles.unassignedTitle, { color: colors.text }]}>
-                Unassigned Soldiers
-              </Text>
+              <Text style={[styles.unassignedTitle, { color: colors.text }]}>Unassigned Soldiers</Text>
               <View style={[styles.unassignedCount, { backgroundColor: colors.secondary }]}>
-                <Text style={[styles.unassignedCountText, { color: colors.text }]}>
-                  {unassignedSoldiers.length}
-                </Text>
+                <Text style={[styles.unassignedCountText, { color: colors.text }]}>{unassignedSoldiers.length}</Text>
               </View>
             </View>
             <Text style={[styles.unassignedHint, { color: colors.textMuted }]}>
@@ -460,11 +447,12 @@ export default function TeamSquadsScreen() {
         <View style={styles.helpSection}>
           <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
           <Text style={[styles.helpText, { color: colors.textMuted }]}>
-            Assign soldiers to squads using the button on each squad card. Squad commanders can manage their own squad members.
+            Assign soldiers to squads using the button on each squad card. Squad commanders can manage their own squad
+            members.
           </Text>
         </View>
       </ScrollView>
-      
+
       {/* Member Assignment Modal */}
       <Modal
         visible={assignModalVisible}
@@ -477,22 +465,18 @@ export default function TeamSquadsScreen() {
             <TouchableOpacity onPress={() => setAssignModalVisible(false)}>
               <Text style={[styles.modalCancel, { color: colors.textMuted }]}>Close</Text>
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              Assign to {selectedSquad}
-            </Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Assign to {selectedSquad}</Text>
             <View style={{ width: 50 }} />
           </View>
-          
+
           <ScrollView style={styles.modalContent}>
             {/* Current Squad Members */}
             {selectedSquad && getSoldiersInSquad(selectedSquad).length > 0 && (
               <View style={styles.modalSection}>
-                <Text style={[styles.modalSectionTitle, { color: colors.textMuted }]}>
-                  IN THIS SQUAD
-                </Text>
+                <Text style={[styles.modalSectionTitle, { color: colors.textMuted }]}>IN THIS SQUAD</Text>
                 {getSoldiersInSquad(selectedSquad).map((soldier) => (
-                  <View 
-                    key={soldier.user_id} 
+                  <View
+                    key={soldier.user_id}
                     style={[styles.modalMemberRow, { backgroundColor: colors.card, borderColor: colors.border }]}
                   >
                     <BaseAvatar
@@ -518,12 +502,10 @@ export default function TeamSquadsScreen() {
                 ))}
               </View>
             )}
-            
+
             {/* Available Soldiers */}
             <View style={styles.modalSection}>
-              <Text style={[styles.modalSectionTitle, { color: colors.textMuted }]}>
-                AVAILABLE TO ASSIGN
-              </Text>
+              <Text style={[styles.modalSectionTitle, { color: colors.textMuted }]}>AVAILABLE TO ASSIGN</Text>
               {unassignedSoldiers.length === 0 ? (
                 <View style={[styles.modalEmptyState, { backgroundColor: colors.card }]}>
                   <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
@@ -559,17 +541,15 @@ export default function TeamSquadsScreen() {
                 ))
               )}
             </View>
-            
+
             {/* Other Squads */}
-            {selectedSquad && squads.filter(s => s !== selectedSquad).length > 0 && (
+            {selectedSquad && squads.filter((s) => s !== selectedSquad).length > 0 && (
               <View style={styles.modalSection}>
-                <Text style={[styles.modalSectionTitle, { color: colors.textMuted }]}>
-                  FROM OTHER SQUADS
-                </Text>
+                <Text style={[styles.modalSectionTitle, { color: colors.textMuted }]}>FROM OTHER SQUADS</Text>
                 {squads
-                  .filter(s => s !== selectedSquad)
-                  .flatMap(squadName => 
-                    getSoldiersInSquad(squadName).map(soldier => ({
+                  .filter((s) => s !== selectedSquad)
+                  .flatMap((squadName) =>
+                    getSoldiersInSquad(squadName).map((soldier) => ({
                       ...soldier,
                       currentSquad: squadName,
                     }))
@@ -606,7 +586,7 @@ export default function TeamSquadsScreen() {
                   ))}
               </View>
             )}
-            
+
             <View style={{ height: 40 }} />
           </ScrollView>
         </View>
@@ -623,7 +603,14 @@ const styles = StyleSheet.create({
 
   // Header
   header: { alignItems: 'center', paddingVertical: 24 },
-  headerIcon: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  headerIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
   title: { fontSize: 22, fontWeight: '700', letterSpacing: -0.5 },
   subtitle: { fontSize: 14, marginTop: 4, textAlign: 'center' },
 
@@ -704,7 +691,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  
+
   // Squad Members
   squadMembers: {
     paddingHorizontal: 12,
@@ -730,7 +717,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  
+
   // Assign Button
   assignBtn: {
     flexDirection: 'row',
@@ -744,7 +731,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  
+
   // Unassigned Section
   unassignedSection: {
     marginTop: 20,
@@ -808,7 +795,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
-  
+
   // Modal
   modalContainer: { flex: 1 },
   modalHeader: {
@@ -872,4 +859,3 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
-

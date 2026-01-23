@@ -135,12 +135,7 @@ function TeamDot({ color, isPulsing, size = 9 }: { color: string; isPulsing: boo
   }));
 
   return (
-    <Animated.View
-      style={[
-        { width: size, height: size, borderRadius: size / 2, backgroundColor: color },
-        animStyle,
-      ]}
-    />
+    <Animated.View style={[{ width: size, height: size, borderRadius: size / 2, backgroundColor: color }, animStyle]} />
   );
 }
 
@@ -193,7 +188,10 @@ function DayColumn({
     <AnimatedTouchable
       style={[
         s.dayColumn,
-        isSelected && [s.dayColumnSelected, { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}30` }],
+        isSelected && [
+          s.dayColumnSelected,
+          { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}30` },
+        ],
         animStyle,
       ]}
       onPress={handlePress}
@@ -214,11 +212,13 @@ function DayColumn({
       </Text>
 
       {/* Date number */}
-      <View style={[
-        s.dateCircle,
-        day.isToday && [s.dateCircleToday, { backgroundColor: colors.primary }],
-        isSelected && !day.isToday && { backgroundColor: `${colors.primary}20` },
-      ]}>
+      <View
+        style={[
+          s.dateCircle,
+          day.isToday && [s.dateCircleToday, { backgroundColor: colors.primary }],
+          isSelected && !day.isToday && { backgroundColor: `${colors.primary}20` },
+        ]}
+      >
         <Text
           style={[
             s.dateNumber,
@@ -235,15 +235,9 @@ function DayColumn({
         {hasTrainings ? (
           <>
             {uniqueTeams.slice(0, MAX_DOTS).map((t) => (
-              <TeamDot
-                key={t.id}
-                color={getTeamColor(t.team?.id)}
-                isPulsing={t.status === 'ongoing'}
-              />
+              <TeamDot key={t.id} color={getTeamColor(t.team?.id)} isPulsing={t.status === 'ongoing'} />
             ))}
-            {overflow > 0 && (
-              <Text style={[s.overflowText, { color: colors.textMuted }]}>+{overflow}</Text>
-            )}
+            {overflow > 0 && <Text style={[s.overflowText, { color: colors.textMuted }]}>+{overflow}</Text>}
           </>
         ) : (
           <View style={s.dotPlaceholder} />
@@ -253,13 +247,7 @@ function DayColumn({
   );
 }
 
-function ExpandedTrainingItem({
-  training,
-  colors,
-}: {
-  training: TrainingWithDetails;
-  colors: Colors;
-}) {
+function ExpandedTrainingItem({ training, colors }: { training: TrainingWithDetails; colors: Colors }) {
   const teamColor = getTeamColor(training.team?.id);
   const isLive = training.status === 'ongoing';
   const timeStr = formatTrainingTime(training);
@@ -311,21 +299,26 @@ function ExpandedTrainingItem({
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function TimelineStrip({ colors, trainings }: TimelineStripProps) {
-  const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(null);
-
   const days = useMemo(() => buildDayData(trainings), [trainings]);
 
-  const hasAnyTrainings = days.some((d) => d.trainings.length > 0);
-  if (!hasAnyTrainings) return null;
+  // Auto-expand today if there's a live training
+  const liveDayIndex = useMemo(
+    () => days.findIndex((d) => d.trainings.some((t) => t.status === 'ongoing')),
+    [days]
+  );
+  const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(liveDayIndex >= 0 ? liveDayIndex : null);
 
   const handleDayPress = useCallback((index: number) => {
     setSelectedDayIndex((prev) => (prev === index ? null : index));
   }, []);
 
-  const handleGoToTeam = () => {
+  const handleGoToTeam = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push('/(protected)/(tabs)/team');
-  };
+  }, []);
+
+  const hasAnyTrainings = days.some((d) => d.trainings.length > 0);
+  if (!hasAnyTrainings) return null;
 
   const selectedDay = selectedDayIndex !== null ? days[selectedDayIndex] : null;
 
@@ -336,9 +329,9 @@ export function TimelineStrip({ colors, trainings }: TimelineStripProps) {
     >
       {/* Header */}
       <View style={s.header}>
-        <Text style={[s.headerTitle, { color: colors.textMuted }]}>UPCOMING</Text>
+        <Text style={[s.headerTitle, { color: colors.textMuted }]}>SCHEDULE</Text>
         <TouchableOpacity onPress={handleGoToTeam} activeOpacity={0.7} style={s.headerLink}>
-          <Text style={[s.headerLinkText, { color: colors.primary }]}>Team tab</Text>
+          <Text style={[s.headerLinkText, { color: colors.primary }]}>Team</Text>
           <ChevronRight size={12} color={colors.primary} />
         </TouchableOpacity>
       </View>
@@ -359,16 +352,9 @@ export function TimelineStrip({ colors, trainings }: TimelineStripProps) {
 
       {/* Expanded Panel */}
       {selectedDay && selectedDay.trainings.length > 0 && (
-        <Animated.View
-          entering={FadeInDown.duration(200)}
-          style={[s.expandedPanel, { borderTopColor: colors.border }]}
-        >
+        <Animated.View entering={FadeInDown.duration(200)} style={[s.expandedPanel, { borderTopColor: colors.border }]}>
           {selectedDay.trainings.map((training) => (
-            <ExpandedTrainingItem
-              key={training.id}
-              training={training}
-              colors={colors}
-            />
+            <ExpandedTrainingItem key={training.id} training={training} colors={colors} />
           ))}
         </Animated.View>
       )}

@@ -1,9 +1,9 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { Appearance } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { Appearance } from 'react-native';
 
-type ThemeMode = "light" | "dark";
-type ThemePreference = "light" | "dark" | "system";
+type ThemeMode = 'light' | 'dark';
+type ThemePreference = 'light' | 'dark' | 'system';
 
 interface ThemeContextType {
   theme: ThemeMode;
@@ -13,24 +13,24 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
-const THEME_PREFERENCE_KEY = "@app_theme_preference";
+const THEME_PREFERENCE_KEY = '@app_theme_preference';
 
 function getSystemTheme(): ThemeMode {
   const scheme = Appearance.getColorScheme();
-  return scheme === "dark" ? "dark" : "light";
+  return scheme === 'dark' ? 'dark' : 'light';
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [preference, setPreferenceState] = useState<ThemePreference>("system");
+  const [preference, setPreferenceState] = useState<ThemePreference>('system');
   const [theme, setTheme] = useState<ThemeMode>(getSystemTheme);
 
   // Load saved preference on mount
   useEffect(() => {
     AsyncStorage.getItem(THEME_PREFERENCE_KEY)
       .then((saved) => {
-        if (saved === "light" || saved === "dark" || saved === "system") {
+        if (saved === 'light' || saved === 'dark' || saved === 'system') {
           setPreferenceState(saved);
-          if (saved !== "system") {
+          if (saved !== 'system') {
             setTheme(saved);
           }
         }
@@ -41,8 +41,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // Listen for system theme changes (only applies when preference is "system")
   useEffect(() => {
     const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-      if (preference === "system") {
-        setTheme(colorScheme === "dark" ? "dark" : "light");
+      if (preference === 'system') {
+        setTheme(colorScheme === 'dark' ? 'dark' : 'light');
       }
     });
     return () => subscription.remove();
@@ -52,8 +52,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const setPreference = useCallback((pref: ThemePreference) => {
     setPreferenceState(pref);
     AsyncStorage.setItem(THEME_PREFERENCE_KEY, pref).catch(() => {});
-    
-    if (pref === "system") {
+
+    if (pref === 'system') {
       setTheme(getSystemTheme());
     } else {
       setTheme(pref);
@@ -64,7 +64,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     <ThemeContext.Provider
       value={{
         theme,
-        isDark: theme === "dark",
+        isDark: theme === 'dark',
         preference,
         setPreference,
       }}
@@ -77,7 +77,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 export function useTheme() {
   const context = useContext(ThemeContext);
   if (context === undefined) {
-    throw new Error("useTheme must be used within a ThemeProvider");
+    throw new Error('useTheme must be used within a ThemeProvider');
   }
   return context;
 }

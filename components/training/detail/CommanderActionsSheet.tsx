@@ -3,12 +3,11 @@
  * Action menu for training commanders
  */
 
-import React from 'react';
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { CheckCircle2, Plus, Settings, Target, XCircle } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { CheckCircle2, Plus, Settings, Target, XCircle } from 'lucide-react-native';
+import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { CommanderActionsSheetProps } from './types';
 
 export function CommanderActionsSheet({

@@ -21,8 +21,8 @@ export const AUTO_DETECT_ENABLED = true;
 export const SHOT_SENSITIVITY_DEFAULT = 3.5; // G-force threshold (2.5-4.5 range)
 
 // New watch features
-export const SHOT_MARKING_ENABLED = false;   // emkv - shot marking feature
-export const VIBRATE_ON_SHOT = true;         // vrcv - vibrate on shot detection
+export const SHOT_MARKING_ENABLED = false; // emkv - shot marking feature
+export const VIBRATE_ON_SHOT = true; // vrcv - vibrate on shot detection
 
 // ============================================================================
 // COLORS
@@ -68,4 +68,3 @@ export const ACCURACY_THRESHOLDS = {
   high: 70,
   medium: 50,
 } as const;
-

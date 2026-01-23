@@ -3,12 +3,11 @@
  * Confirmation sheet for starting a training
  */
 
-import React from 'react';
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Play } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { Play } from 'lucide-react-native';
+import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StartTrainingSheetProps } from './types';
 
 export function StartTrainingSheet({ visible, onClose, onStart, colors }: StartTrainingSheetProps) {
@@ -46,9 +45,8 @@ export function StartTrainingSheet({ visible, onClose, onStart, colors }: StartT
             </View>
             <Text style={[styles.title, { color: colors.text }]}>Start Training?</Text>
             <Text style={[styles.description, { color: colors.textMuted }]}>
-              This will set the status to{' '}
-              <Text style={{ color: colors.green, fontWeight: '700' }}>LIVE</Text> and notify all
-              assigned team members.
+              This will set the status to <Text style={{ color: colors.green, fontWeight: '700' }}>LIVE</Text> and
+              notify all assigned team members.
             </Text>
           </View>
 

@@ -1,6 +1,6 @@
 /**
  * RecentActivitySection Component
- * 
+ *
  * Displays list of recent sessions with dividers or empty state placeholder.
  */
 
@@ -11,26 +11,15 @@ import { styles } from '../UnifiedHomePage.styles';
 import type { RecentActivitySectionProps } from '../UnifiedHomePage.types';
 import { RecentSessionRow } from './RecentSessionRow';
 
-export function RecentActivitySection({ 
-  sessions, 
-  colors, 
-  onSessionPress 
-}: RecentActivitySectionProps) {
+export function RecentActivitySection({ sessions, colors, onSessionPress }: RecentActivitySectionProps) {
   return (
     <Animated.View entering={FadeIn.delay(150)} style={styles.section}>
-      
       {sessions.length > 0 ? (
         <View style={[styles.recentList, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {sessions.map((session, idx) => (
             <View key={session.id}>
-              <RecentSessionRow 
-                session={session} 
-                colors={colors} 
-                onPress={() => onSessionPress(session)}
-              />
-              {idx < sessions.length - 1 && (
-                <View style={[styles.recentDivider, { backgroundColor: colors.border }]} />
-              )}
+              <RecentSessionRow session={session} colors={colors} onPress={() => onSessionPress(session)} />
+              {idx < sessions.length - 1 && <View style={[styles.recentDivider, { backgroundColor: colors.border }]} />}
             </View>
           ))}
         </View>

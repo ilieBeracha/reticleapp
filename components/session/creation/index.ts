@@ -21,15 +21,14 @@ export * from './sessionCreation.constants';
 
 // Hook (legacy - consider using SessionCreationForm directly)
 export { useSessionCreation } from './useSessionCreation';
-export type { UseSessionCreationOptions, UseSessionCreationReturn, TrainingContext } from './useSessionCreation';
+export type { TrainingContext, UseSessionCreationOptions, UseSessionCreationReturn } from './useSessionCreation';
 
 // Unified Form Component (recommended)
 export { SessionCreationForm } from './SessionCreationForm';
-export type { 
-  SessionCreationFormProps, 
-  SessionFormValues, 
+export type {
   DrillContext,
-  TrainingContext as FormTrainingContext,
+  TrainingContext as FormTrainingContext, SessionCreationFormProps,
+  SessionFormValues
 } from './SessionCreationForm';
 
 // Modal/Sheet wrapper (drop-in replacement for StartDrillSheet)
@@ -43,4 +42,3 @@ export { SessionIntentStep } from './SessionIntentStep';
 // Note: SessionWeaponStep is still available but no longer used as a separate step
 // Weapon selection is now integrated as a sheet in the Details step
 export { SessionWeaponStep } from './SessionWeaponStep';
-

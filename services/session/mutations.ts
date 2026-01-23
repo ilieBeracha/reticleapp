@@ -149,18 +149,17 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
     }
 
     // No active session yet: if this training has drills, require selecting a drill
-    if (!config.drill_id) {
+    // (unless user provided a custom drill_config — that's a custom session within the training)
+    if (!config.drill_id && !hasCustomConfig) {
       const { count, error: drillsCountError } = await supabase
         .from('training_drills')
         .select('*', { count: 'exact', head: true })
         .eq('training_id', config.training_id);
 
-      // If we can't determine drill count, fail safe by allowing session creation.
-      // (UI should still route users through drill selection.)
       if (!drillsCountError && (count ?? 0) > 0) {
         throw new Error('This training uses drills. Start your session from a specific drill.');
       }
-    } else {
+    } else if (config.drill_id) {
       // Validate drill belongs to training (prevents mixing drills across trainings)
       const { data: drillRow, error: drillError } = await supabase
         .from('training_drills')

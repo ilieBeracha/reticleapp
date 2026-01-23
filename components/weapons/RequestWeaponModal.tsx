@@ -9,11 +9,7 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import {
-  createWeaponRequest,
-  WEAPON_CATEGORIES,
-  type WeaponCategory,
-} from '@/services/weaponService';
+import { createWeaponRequest, WEAPON_CATEGORIES, type WeaponCategory } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
 import { ArrowRight, CheckCircle2, Clock, Send, Shield, X } from 'lucide-react-native';
 import { useState } from 'react';
@@ -39,12 +35,7 @@ interface RequestWeaponModalProps {
   onSuccess: () => void;
 }
 
-export function RequestWeaponModal({
-  visible,
-  teamId,
-  onClose,
-  onSuccess,
-}: RequestWeaponModalProps) {
+export function RequestWeaponModal({ visible, teamId, onClose, onSuccess }: RequestWeaponModalProps) {
   const colors = useColors();
 
   const [selectedCategory, setSelectedCategory] = useState<WeaponCategory | null>(null);
@@ -67,10 +58,7 @@ export function RequestWeaponModal({
       handleClose();
     } catch (err: any) {
       console.error('Failed to submit request:', err);
-      Alert.alert(
-        'Request Failed',
-        err.message || 'Could not submit weapon request. Please try again.'
-      );
+      Alert.alert('Request Failed', err.message || 'Could not submit weapon request. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -83,12 +71,7 @@ export function RequestWeaponModal({
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={handleClose}
-    >
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: colors.background }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -115,57 +98,42 @@ export function RequestWeaponModal({
             <View style={[styles.heroIcon, { backgroundColor: colors.primary + '15' }]}>
               <Shield size={28} color={colors.primary} />
             </View>
-            <Text style={[styles.heroTitle, { color: colors.text }]}>
-              Get Ready for Training
-            </Text>
+            <Text style={[styles.heroTitle, { color: colors.text }]}>Get Ready for Training</Text>
             <Text style={[styles.heroSubtitle, { color: colors.textMuted }]}>
               Request a weapon assignment from your commander to start participating in drills.
             </Text>
           </Animated.View>
 
           {/* What Happens Next */}
-          <Animated.View
-            entering={FadeInDown.duration(300).delay(200)}
-            style={styles.stepsContainer}
-          >
-            <Text style={[styles.stepsTitle, { color: colors.textMuted }]}>
-              WHAT HAPPENS NEXT
-            </Text>
+          <Animated.View entering={FadeInDown.duration(300).delay(200)} style={styles.stepsContainer}>
+            <Text style={[styles.stepsTitle, { color: colors.textMuted }]}>WHAT HAPPENS NEXT</Text>
             <View style={styles.stepsList}>
               <View style={styles.stepItem}>
                 <View style={[styles.stepIcon, { backgroundColor: colors.primary + '15' }]}>
                   <Send size={14} color={colors.primary} />
                 </View>
-                <Text style={[styles.stepText, { color: colors.text }]}>
-                  Your request is sent to the commander
-                </Text>
+                <Text style={[styles.stepText, { color: colors.text }]}>Your request is sent to the commander</Text>
               </View>
               <View style={[styles.stepConnector, { backgroundColor: colors.border }]} />
               <View style={styles.stepItem}>
                 <View style={[styles.stepIcon, { backgroundColor: colors.yellow + '15' }]}>
                   <Clock size={14} color={colors.yellow} />
                 </View>
-                <Text style={[styles.stepText, { color: colors.text }]}>
-                  Commander reviews and assigns a weapon
-                </Text>
+                <Text style={[styles.stepText, { color: colors.text }]}>Commander reviews and assigns a weapon</Text>
               </View>
               <View style={[styles.stepConnector, { backgroundColor: colors.border }]} />
               <View style={styles.stepItem}>
                 <View style={[styles.stepIcon, { backgroundColor: colors.green + '15' }]}>
                   <CheckCircle2 size={14} color={colors.green} />
                 </View>
-                <Text style={[styles.stepText, { color: colors.text }]}>
-                  You're ready to start training!
-                </Text>
+                <Text style={[styles.stepText, { color: colors.text }]}>You're ready to start training!</Text>
               </View>
             </View>
           </Animated.View>
 
           {/* Category Selection */}
           <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-              PREFERRED CATEGORY (OPTIONAL)
-            </Text>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>PREFERRED CATEGORY (OPTIONAL)</Text>
             <View style={styles.categoryGrid}>
               {WEAPON_CATEGORIES.map((cat) => {
                 const isSelected = selectedCategory === cat.value;
@@ -185,12 +153,7 @@ export function RequestWeaponModal({
                     }}
                     disabled={submitting}
                   >
-                    <Text
-                      style={[
-                        styles.categoryLabel,
-                        { color: isSelected ? '#fff' : colors.text },
-                      ]}
-                    >
+                    <Text style={[styles.categoryLabel, { color: isSelected ? '#fff' : colors.text }]}>
                       {cat.label}
                     </Text>
                   </TouchableOpacity>
@@ -201,9 +164,7 @@ export function RequestWeaponModal({
 
           {/* Notes */}
           <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-              ADDITIONAL NOTES (OPTIONAL)
-            </Text>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>ADDITIONAL NOTES (OPTIONAL)</Text>
             <TextInput
               style={[
                 styles.notesInput,
@@ -228,11 +189,7 @@ export function RequestWeaponModal({
         {/* Submit Button */}
         <View style={[styles.footer, { borderTopColor: colors.border }]}>
           <TouchableOpacity
-            style={[
-              styles.submitBtn,
-              { backgroundColor: colors.primary },
-              submitting && styles.submitBtnDisabled,
-            ]}
+            style={[styles.submitBtn, { backgroundColor: colors.primary }, submitting && styles.submitBtnDisabled]}
             onPress={handleSubmit}
             disabled={submitting}
             activeOpacity={0.8}

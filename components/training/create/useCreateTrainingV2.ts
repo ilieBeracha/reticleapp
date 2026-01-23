@@ -4,7 +4,7 @@
  * Simplified 2-step flow using new canonical drills architecture:
  * 1. Training Details - Team, name, schedule
  * 2. Select & Configure Drills - Canonical drills + team presets
- * 
+ *
  * Key changes from V1:
  * - Uses canonical drills (global, read-only)
  * - Uses team presets (saved configurations)
@@ -18,26 +18,21 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Keyboard } from 'react-native';
 
 import {
-  getAllDrills,
+  createTeamPreset,
   getDrillsGroupedByCategory,
   getTeamPresets,
-  createTeamPreset,
-  buildTrainingDrillItem,
   type CanonicalDrill,
-  type TeamDrillPreset,
-  type TrainingDrillItem,
-  type DrillConfig,
   type DrillCategory,
+  type DrillConfig,
+  type TeamDrillPreset,
+  type TrainingDrillItem
 } from '@/services/drills';
-import { createTraining, getLastTrainingDrills } from '@/services/trainingService';
+import { createTraining } from '@/services/trainingService';
 import { useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
 import type { TeamWithRole } from '@/types/workspace';
 
-import {
-  createDefaultScheduledDate,
-  isStep1Complete,
-} from './createTraining.helpers';
+import { createDefaultScheduledDate, isStep1Complete } from './createTraining.helpers';
 
 // ============================================================================
 // TYPES
@@ -162,7 +157,7 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
   // COMPUTED VALUES
   // ============================================================================
 
-  const selectedTeam = teams.find(t => t.id === selectedTeamId);
+  const selectedTeam = teams.find((t) => t.id === selectedTeamId);
   const canCreatePresets = selectedTeam?.my_role === 'owner' || selectedTeam?.my_role === 'commander';
 
   const step1Complete = isStep1Complete(selectedTeamId, title);
@@ -185,9 +180,7 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
   // Load team presets when team changes
   useEffect(() => {
     if (selectedTeamId) {
-      getTeamPresets(selectedTeamId)
-        .then(setTeamPresets)
-        .catch(console.error);
+      getTeamPresets(selectedTeamId).then(setTeamPresets).catch(console.error);
     } else {
       setTeamPresets([]);
     }
@@ -197,22 +190,25 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
   // HANDLERS
   // ============================================================================
 
-  const handleSelectTeam = useCallback((teamId: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (teamId !== selectedTeamId) {
-      setDrills([]); // Clear drills when switching teams
-    }
-    setSelectedTeamId(teamId);
-  }, [selectedTeamId]);
+  const handleSelectTeam = useCallback(
+    (teamId: string) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (teamId !== selectedTeamId) {
+        setDrills([]); // Clear drills when switching teams
+      }
+      setSelectedTeamId(teamId);
+    },
+    [selectedTeamId]
+  );
 
   const handleRemoveDrill = useCallback((drillId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setDrills(prev => prev.filter(d => d.id !== drillId));
+    setDrills((prev) => prev.filter((d) => d.id !== drillId));
   }, []);
 
   const handleMoveDrill = useCallback((index: number, direction: 'up' | 'down') => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setDrills(prev => {
+    setDrills((prev) => {
       const arr = [...prev];
       const newIndex = direction === 'up' ? index - 1 : index + 1;
       if (newIndex < 0 || newIndex >= arr.length) return arr;
@@ -223,12 +219,12 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
 
   const addDrill = useCallback((drill: TrainingDrillItem) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setDrills(prev => [...prev, drill]);
+    setDrills((prev) => [...prev, drill]);
   }, []);
 
   const handleNextStep = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
+
     if (currentStep === 1) {
       // Validate step 1 before moving to step 2
       if (!step1Complete) {
@@ -267,7 +263,7 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
 
   const handleUpdateDrill = useCallback((updated: TrainingDrillItem) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setDrills(prev => prev.map(d => d.id === updated.id ? updated : d));
+    setDrills((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
     setAdjustModalVisible(false);
     setAdjustingDrill(null);
   }, []);
@@ -276,29 +272,32 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
   // SAVE PRESET
   // ============================================================================
 
-  const handleSavePreset = useCallback(async (drillId: string, config: DrillConfig, label?: string) => {
-    if (!selectedTeamId || !canCreatePresets) return;
+  const handleSavePreset = useCallback(
+    async (drillId: string, config: DrillConfig, label?: string) => {
+      if (!selectedTeamId || !canCreatePresets) return;
 
-    try {
-      const preset = await createTeamPreset({
-        team_id: selectedTeamId,
-        drill_id: drillId,
-        label: label || null,
-        distance_m: config.distance_m,
-        rounds: config.rounds,
-        time_limit_seconds: config.time_limit_seconds,
-        position: config.position,
-        strings_count: config.strings_count,
-      });
+      try {
+        const preset = await createTeamPreset({
+          team_id: selectedTeamId,
+          drill_id: drillId,
+          label: label || null,
+          distance_m: config.distance_m,
+          rounds: config.rounds,
+          time_limit_seconds: config.time_limit_seconds,
+          position: config.position,
+          strings_count: config.strings_count,
+        });
 
-      setTeamPresets(prev => [preset, ...prev]);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Saved', 'Configuration saved as team preset');
-    } catch (error: any) {
-      console.error('[CreateTraining] Failed to save preset:', error);
-      Alert.alert('Error', error?.message || 'Failed to save preset');
-    }
-  }, [selectedTeamId, canCreatePresets]);
+        setTeamPresets((prev) => [preset, ...prev]);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert('Saved', 'Configuration saved as team preset');
+      } catch (error: any) {
+        console.error('[CreateTraining] Failed to save preset:', error);
+        Alert.alert('Error', error?.message || 'Failed to save preset');
+      }
+    },
+    [selectedTeamId, canCreatePresets]
+  );
 
   // ============================================================================
   // CREATE TRAINING
@@ -331,9 +330,9 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
       }
 
       // Convert TrainingDrillItem (V2) to the format expected by createTraining
-      // Note: drill_id is NOT passed because canonical drills use string IDs, 
+      // Note: drill_id is NOT passed because canonical drills use string IDs,
       // but training_drills.drill_id expects UUIDs (from old drill_templates)
-      const drillsPayload = drills.map(d => ({
+      const drillsPayload = drills.map((d) => ({
         // Don't pass drill_id - canonical drills use string IDs, DB expects UUID
         name: d.name || 'Drill',
         description: d.description || undefined,
@@ -369,10 +368,7 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
 
       // Refresh stores
       try {
-        await Promise.all([
-          loadTeamTrainings(selectedTeamId),
-          loadMyUpcomingTrainings(),
-        ]);
+        await Promise.all([loadTeamTrainings(selectedTeamId), loadMyUpcomingTrainings()]);
       } catch (refreshError) {
         console.error('[CreateTrainingV2] Failed to refresh stores:', refreshError);
       }

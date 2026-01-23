@@ -1,30 +1,16 @@
 /**
  * AddStandardModal
- * 
+ *
  * Create or edit a performance standard.
  * Modern, elegant design.
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import {
-  createStandard,
-  updateStandard,
-  type CreateStandardInput,
-  type TeamStandard
-} from '@/services/standards';
+import { createStandard, updateStandard, type CreateStandardInput, type TeamStandard } from '@/services/standards';
 import * as Haptics from 'expo-haptics';
 import { Check, Crosshair, Target, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import {
-  Alert,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 // ============================================================================
 // TYPES
@@ -55,16 +41,10 @@ const COMMON_DISTANCES = [25, 50, 100, 200, 300, 400, 500];
 // MAIN COMPONENT
 // ============================================================================
 
-export function AddStandardModal({
-  visible,
-  teamId,
-  editingStandard,
-  onClose,
-  onSave,
-}: AddStandardModalProps) {
+export function AddStandardModal({ visible, teamId, editingStandard, onClose, onSave }: AddStandardModalProps) {
   const colors = useColors();
   const isEditing = !!editingStandard;
-  
+
   // Form state
   const [nameSuffix, setNameSuffix] = useState(''); // User-editable part
   const [description, setDescription] = useState('');
@@ -78,13 +58,13 @@ export function AddStandardModal({
   const [expectedAccuracyPct, setExpectedAccuracyPct] = useState('');
   const [expectedTimeSeconds, setExpectedTimeSeconds] = useState('');
   const [saving, setSaving] = useState(false);
-  
+
   // Auto-computed distance prefix (always in sync)
   const distancePrefix = useRange ? `${distanceM}-${distanceMaxM}m` : `${distanceM}m`;
-  
+
   // Full name combines prefix + suffix
   const fullName = nameSuffix ? `${distancePrefix} ${nameSuffix}` : distancePrefix;
-  
+
   // Reset form when modal opens/closes
   useEffect(() => {
     if (visible) {
@@ -120,7 +100,7 @@ export function AddStandardModal({
       }
     }
   }, [visible, editingStandard]);
-  
+
   // Auto-generate suffix based on weapon and goal (only if suffix is empty)
   useEffect(() => {
     if (!isEditing && !nameSuffix) {
@@ -129,42 +109,42 @@ export function AddStandardModal({
       setNameSuffix(`${weapon}${goal}`);
     }
   }, [weaponCategory, drillGoal, isEditing, nameSuffix]);
-  
+
   // Check if distance is in common list
   const isDistanceInList = COMMON_DISTANCES.includes(Number(distanceM));
-  
+
   // Display string for distance
   const distanceDisplay = useRange ? `${distanceM}–${distanceMaxM}m` : `${distanceM}m`;
-  
+
   // Validation
   const canSave = () => {
     if (!fullName.trim()) return false;
     if (!distanceM || isNaN(Number(distanceM))) return false;
-    
+
     // If using range, validate max distance
     if (useRange) {
       if (!distanceMaxM || isNaN(Number(distanceMaxM))) return false;
       if (Number(distanceMaxM) <= Number(distanceM)) return false; // Max must be > min
     }
-    
+
     if (drillGoal === 'grouping') {
       if (!expectedGroupingCm || isNaN(Number(expectedGroupingCm))) return false;
     } else {
       if (!expectedAccuracyPct || isNaN(Number(expectedAccuracyPct))) return false;
     }
-    
+
     return true;
   };
-  
+
   // Save handler
   const handleSave = async () => {
     if (!canSave()) {
       Alert.alert('Validation Error', 'Please fill in all required fields');
       return;
     }
-    
+
     setSaving(true);
-    
+
     try {
       // Build description with range info if applicable
       let finalDescription = description.trim();
@@ -172,7 +152,7 @@ export function AddStandardModal({
         const rangeNote = `Distance range: ${distanceM}-${distanceMaxM}m`;
         finalDescription = finalDescription ? `${rangeNote}. ${finalDescription}` : rangeNote;
       }
-      
+
       const input: CreateStandardInput = {
         team_id: teamId,
         name: fullName.trim(),
@@ -184,13 +164,13 @@ export function AddStandardModal({
         expected_accuracy_pct: drillGoal === 'engagement' ? Number(expectedAccuracyPct) : null,
         expected_time_seconds: expectedTimeSeconds ? Number(expectedTimeSeconds) : null,
       };
-      
+
       if (isEditing && editingStandard) {
         await updateStandard(editingStandard.id, input);
       } else {
         await createStandard(input);
       }
-      
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onSave();
     } catch (error: any) {
@@ -199,427 +179,384 @@ export function AddStandardModal({
       setSaving(false);
     }
   };
-  
+
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Grabber */}
         <View style={[styles.grabber, { backgroundColor: colors.border }]} />
-            
-            {/* Header */}
-            <View style={styles.header}>
-              <View style={styles.headerLeft}>
-                <Text style={[styles.title, { color: colors.text }]}>
-                  {isEditing ? 'Edit Standard' : 'New Standard'}
-                </Text>
-                <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-                  Define performance expectations
-                </Text>
-              </View>
-              <TouchableOpacity 
-                style={[styles.closeBtn, { backgroundColor: colors.secondary }]}
-                onPress={onClose}
+
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Text style={[styles.title, { color: colors.text }]}>{isEditing ? 'Edit Standard' : 'New Standard'}</Text>
+            <Text style={[styles.subtitle, { color: colors.textMuted }]}>Define performance expectations</Text>
+          </View>
+          <TouchableOpacity style={[styles.closeBtn, { backgroundColor: colors.secondary }]} onPress={onClose}>
+            <X size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentInner}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Drill Goal - Primary Choice */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, styles.sectionTitleStandalone, { color: colors.text }]}>Type</Text>
+            <View style={styles.goalRow}>
+              <TouchableOpacity
+                style={[
+                  styles.goalCard,
+                  drillGoal === 'grouping' && styles.goalCardSelected,
+                  {
+                    backgroundColor: drillGoal === 'grouping' ? colors.text : colors.secondary,
+                    borderColor: drillGoal === 'grouping' ? colors.text : 'transparent',
+                  },
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setDrillGoal('grouping');
+                }}
+                activeOpacity={0.8}
               >
-                <X size={18} color={colors.textMuted} />
+                <Target size={22} color={drillGoal === 'grouping' ? colors.background : colors.text} />
+                <Text style={[styles.goalLabel, { color: drillGoal === 'grouping' ? colors.background : colors.text }]}>
+                  Grouping
+                </Text>
+                <Text
+                  style={[
+                    styles.goalHint,
+                    { color: drillGoal === 'grouping' ? colors.background + 'AA' : colors.textMuted },
+                  ]}
+                >
+                  Measure dispersion
+                </Text>
+                {drillGoal === 'grouping' && (
+                  <View style={[styles.goalCheck, { backgroundColor: colors.background }]}>
+                    <Check size={12} color={colors.text} strokeWidth={3} />
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.goalCard,
+                  drillGoal === 'engagement' && styles.goalCardSelected,
+                  {
+                    backgroundColor: drillGoal === 'engagement' ? colors.text : colors.secondary,
+                    borderColor: drillGoal === 'engagement' ? colors.text : 'transparent',
+                  },
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setDrillGoal('engagement');
+                }}
+                activeOpacity={0.8}
+              >
+                <Crosshair size={22} color={drillGoal === 'engagement' ? colors.background : colors.text} />
+                <Text
+                  style={[styles.goalLabel, { color: drillGoal === 'engagement' ? colors.background : colors.text }]}
+                >
+                  Engagement
+                </Text>
+                <Text
+                  style={[
+                    styles.goalHint,
+                    { color: drillGoal === 'engagement' ? colors.background + 'AA' : colors.textMuted },
+                  ]}
+                >
+                  Measure accuracy %
+                </Text>
+                {drillGoal === 'engagement' && (
+                  <View style={[styles.goalCheck, { backgroundColor: colors.background }]}>
+                    <Check size={12} color={colors.text} strokeWidth={3} />
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
-            
-            <ScrollView 
-              style={styles.content}
-              contentContainerStyle={styles.contentInner}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              {/* Drill Goal - Primary Choice */}
-              <View style={styles.section}>
-                <Text style={[styles.sectionTitle, styles.sectionTitleStandalone, { color: colors.text }]}>
-                  Type
-                </Text>
-                <View style={styles.goalRow}>
-                  <TouchableOpacity
-                    style={[
-                      styles.goalCard,
-                      drillGoal === 'grouping' && styles.goalCardSelected,
-                      { 
-                        backgroundColor: drillGoal === 'grouping' ? colors.text : colors.secondary,
-                        borderColor: drillGoal === 'grouping' ? colors.text : 'transparent',
-                      }
-                    ]}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setDrillGoal('grouping');
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Target size={22} color={drillGoal === 'grouping' ? colors.background : colors.text} />
-                    <Text style={[
-                      styles.goalLabel,
-                      { color: drillGoal === 'grouping' ? colors.background : colors.text }
-                    ]}>
-                      Grouping
-                    </Text>
-                    <Text style={[
-                      styles.goalHint,
-                      { color: drillGoal === 'grouping' ? colors.background + 'AA' : colors.textMuted }
-                    ]}>
-                      Measure dispersion
-                    </Text>
-                    {drillGoal === 'grouping' && (
-                      <View style={[styles.goalCheck, { backgroundColor: colors.background }]}>
-                        <Check size={12} color={colors.text} strokeWidth={3} />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={[
-                      styles.goalCard,
-                      drillGoal === 'engagement' && styles.goalCardSelected,
-                      { 
-                        backgroundColor: drillGoal === 'engagement' ? colors.text : colors.secondary,
-                        borderColor: drillGoal === 'engagement' ? colors.text : 'transparent',
-                      }
-                    ]}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setDrillGoal('engagement');
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Crosshair size={22} color={drillGoal === 'engagement' ? colors.background : colors.text} />
-                    <Text style={[
-                      styles.goalLabel,
-                      { color: drillGoal === 'engagement' ? colors.background : colors.text }
-                    ]}>
-                      Engagement
-                    </Text>
-                    <Text style={[
-                      styles.goalHint,
-                      { color: drillGoal === 'engagement' ? colors.background + 'AA' : colors.textMuted }
-                    ]}>
-                      Measure accuracy %
-                    </Text>
-                    {drillGoal === 'engagement' && (
-                      <View style={[styles.goalCheck, { backgroundColor: colors.background }]}>
-                        <Check size={12} color={colors.text} strokeWidth={3} />
-                      </View>
-                    )}
-                  </TouchableOpacity>
+          </View>
+
+          {/* Distance */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionHeaderLeft}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Distance</Text>
+                <View style={[styles.distanceBadge, { backgroundColor: colors.primary + '15' }]}>
+                  <Text style={[styles.distanceBadgeText, { color: colors.primary }]}>{distanceDisplay}</Text>
                 </View>
               </View>
-              
-              {/* Distance */}
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <View style={styles.sectionHeaderLeft}>
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Distance</Text>
-                    <View style={[styles.distanceBadge, { backgroundColor: colors.primary + '15' }]}>
-                      <Text style={[styles.distanceBadgeText, { color: colors.primary }]}>
-                        {distanceDisplay}
-                      </Text>
-                    </View>
-                  </View>
-                  
-                  {/* Compact Range Toggle */}
-                  <View style={[styles.rangeTogglePill, { backgroundColor: colors.secondary }]}>
-                    <TouchableOpacity
-                      style={[
-                        styles.rangeTogglePillOption,
-                        !useRange && { backgroundColor: colors.text }
-                      ]}
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setUseRange(false);
-                      }}
-                    >
-                      <Text style={[
-                        styles.rangeTogglePillText,
-                        { color: !useRange ? colors.background : colors.textMuted }
-                      ]}>
-                        Fixed
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.rangeTogglePillOption,
-                        useRange && { backgroundColor: colors.text }
-                      ]}
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setUseRange(true);
-                      }}
-                    >
-                      <Text style={[
-                        styles.rangeTogglePillText,
-                        { color: useRange ? colors.background : colors.textMuted }
-                      ]}>
-                        Range
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-                
-                {/* Range Inputs - Compact */}
-                {useRange ? (
-                  <View style={styles.rangeInputRow}>
-                    <View style={[styles.rangeInputBox, { backgroundColor: colors.secondary }]}>
-                      <TextInput
-                        style={[styles.rangeInput, { color: colors.text }]}
-                        value={distanceM}
-                        onChangeText={setDistanceM}
-                        keyboardType="number-pad"
-                        placeholder="100"
-                        placeholderTextColor={colors.textMuted}
-                      />
-                      <Text style={[styles.rangeInputUnit, { color: colors.textMuted }]}>m</Text>
-                    </View>
-                    <Text style={[styles.rangeSeparator, { color: colors.textMuted }]}>–</Text>
-                    <View style={[styles.rangeInputBox, { backgroundColor: colors.secondary }]}>
-                      <TextInput
-                        style={[styles.rangeInput, { color: colors.text }]}
-                        value={distanceMaxM}
-                        onChangeText={setDistanceMaxM}
-                        keyboardType="number-pad"
-                        placeholder="200"
-                        placeholderTextColor={colors.textMuted}
-                      />
-                      <Text style={[styles.rangeInputUnit, { color: colors.textMuted }]}>m</Text>
-                    </View>
-                  </View>
-                ) : (
-                  <>
-                    <ScrollView 
-                      horizontal 
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.distanceScroller}
-                    >
-                      {COMMON_DISTANCES.map((d) => {
-                        const isSelected = distanceM === String(d) && !showCustomDistance;
-                        return (
-                          <TouchableOpacity
-                            key={d}
-                            style={[
-                              styles.distanceChip,
-                              { 
-                                backgroundColor: isSelected ? colors.text : 'transparent',
-                                borderColor: isSelected ? colors.text : colors.border,
-                              }
-                            ]}
-                            onPress={() => {
-                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                              setDistanceM(String(d));
-                              setShowCustomDistance(false);
-                            }}
-                            activeOpacity={0.7}
-                          >
-                            <Text style={[
-                              styles.distanceChipValue,
-                              { color: isSelected ? colors.background : colors.text }
-                            ]}>
-                              {d}
-                            </Text>
-                            <Text style={[
-                              styles.distanceChipUnit,
-                              { color: isSelected ? colors.background + 'AA' : colors.textMuted }
-                            ]}>
-                              m
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                      
-                      {/* Custom */}
-                      <TouchableOpacity
-                        style={[
-                          styles.distanceChip,
-                          styles.distanceChipCustom,
-                          { 
-                            backgroundColor: (showCustomDistance || !isDistanceInList) ? colors.text : 'transparent',
-                            borderColor: (showCustomDistance || !isDistanceInList) ? colors.text : colors.border,
-                            borderStyle: 'dashed',
-                          }
-                        ]}
-                        onPress={() => {
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                          setShowCustomDistance(true);
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[
-                          styles.distanceChipValue,
-                          { color: (showCustomDistance || !isDistanceInList) ? colors.background : colors.textMuted }
-                        ]}>
-                          {(showCustomDistance || !isDistanceInList) ? distanceM : '···'}
-                        </Text>
-                      </TouchableOpacity>
-                    </ScrollView>
-                    
-                    {/* Custom Input */}
-                    {showCustomDistance && (
-                      <View style={[styles.customInputRow, { backgroundColor: colors.secondary }]}>
-                        <TextInput
-                          style={[styles.customInput, { color: colors.text }]}
-                          value={distanceM}
-                          onChangeText={setDistanceM}
-                          keyboardType="number-pad"
-                          placeholder="Enter distance"
-                          placeholderTextColor={colors.textMuted}
-                          autoFocus
-                        />
-                        <Text style={[styles.customInputUnit, { color: colors.textMuted }]}>meters</Text>
-                      </View>
-                    )}
-                  </>
-                )}
+
+              {/* Compact Range Toggle */}
+              <View style={[styles.rangeTogglePill, { backgroundColor: colors.secondary }]}>
+                <TouchableOpacity
+                  style={[styles.rangeTogglePillOption, !useRange && { backgroundColor: colors.text }]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setUseRange(false);
+                  }}
+                >
+                  <Text
+                    style={[styles.rangeTogglePillText, { color: !useRange ? colors.background : colors.textMuted }]}
+                  >
+                    Fixed
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.rangeTogglePillOption, useRange && { backgroundColor: colors.text }]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setUseRange(true);
+                  }}
+                >
+                  <Text
+                    style={[styles.rangeTogglePillText, { color: useRange ? colors.background : colors.textMuted }]}
+                  >
+                    Range
+                  </Text>
+                </TouchableOpacity>
               </View>
-              
-              {/* Weapon Category */}
-              <View style={styles.section}>
-                <Text style={[styles.sectionTitle, styles.sectionTitleStandalone, { color: colors.text }]}>Weapon</Text>
-                <View style={styles.weaponRow}>
-                  {WEAPON_CATEGORIES.map((w) => {
-                    const isSelected = weaponCategory === w.value;
+            </View>
+
+            {/* Range Inputs - Compact */}
+            {useRange ? (
+              <View style={styles.rangeInputRow}>
+                <View style={[styles.rangeInputBox, { backgroundColor: colors.secondary }]}>
+                  <TextInput
+                    style={[styles.rangeInput, { color: colors.text }]}
+                    value={distanceM}
+                    onChangeText={setDistanceM}
+                    keyboardType="number-pad"
+                    placeholder="100"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                  <Text style={[styles.rangeInputUnit, { color: colors.textMuted }]}>m</Text>
+                </View>
+                <Text style={[styles.rangeSeparator, { color: colors.textMuted }]}>–</Text>
+                <View style={[styles.rangeInputBox, { backgroundColor: colors.secondary }]}>
+                  <TextInput
+                    style={[styles.rangeInput, { color: colors.text }]}
+                    value={distanceMaxM}
+                    onChangeText={setDistanceMaxM}
+                    keyboardType="number-pad"
+                    placeholder="200"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                  <Text style={[styles.rangeInputUnit, { color: colors.textMuted }]}>m</Text>
+                </View>
+              </View>
+            ) : (
+              <>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.distanceScroller}
+                >
+                  {COMMON_DISTANCES.map((d) => {
+                    const isSelected = distanceM === String(d) && !showCustomDistance;
                     return (
                       <TouchableOpacity
-                        key={w.label}
+                        key={d}
                         style={[
-                          styles.weaponChip,
-                          { 
+                          styles.distanceChip,
+                          {
                             backgroundColor: isSelected ? colors.text : 'transparent',
                             borderColor: isSelected ? colors.text : colors.border,
-                          }
+                          },
                         ]}
                         onPress={() => {
                           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                          setWeaponCategory(w.value);
+                          setDistanceM(String(d));
+                          setShowCustomDistance(false);
                         }}
                         activeOpacity={0.7}
                       >
-                        <Text style={[
-                          styles.weaponChipText,
-                          { color: isSelected ? colors.background : colors.text }
-                        ]}>
-                          {w.label}
+                        <Text
+                          style={[styles.distanceChipValue, { color: isSelected ? colors.background : colors.text }]}
+                        >
+                          {d}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.distanceChipUnit,
+                            { color: isSelected ? colors.background + 'AA' : colors.textMuted },
+                          ]}
+                        >
+                          m
                         </Text>
                       </TouchableOpacity>
                     );
                   })}
-                </View>
-              </View>
-              
-              {/* Expected Value - The Key Metric */}
-              <View style={[styles.section, styles.metricSection, { backgroundColor: colors.secondary }]}>
-                <Text style={[styles.metricLabel, { color: colors.textMuted }]}>
-                  {drillGoal === 'grouping' ? 'MAX GROUPING' : 'MIN ACCURACY'}
-                </Text>
-                <View style={styles.metricInputRow}>
-                  <TextInput
-                    style={[styles.metricInput, { color: colors.text }]}
-                    value={drillGoal === 'grouping' ? expectedGroupingCm : expectedAccuracyPct}
-                    onChangeText={drillGoal === 'grouping' ? setExpectedGroupingCm : setExpectedAccuracyPct}
-                    keyboardType="numeric"
-                    placeholder={drillGoal === 'grouping' ? '8' : '80'}
-                    placeholderTextColor={colors.textMuted}
-                  />
-                  <Text style={[styles.metricUnit, { color: colors.text }]}>
-                    {drillGoal === 'grouping' ? 'cm' : '%'}
-                  </Text>
-                </View>
-                <Text style={[styles.metricHint, { color: colors.textMuted }]}>
-                  {drillGoal === 'grouping' 
-                    ? 'Shots must group within this diameter'
-                    : 'Shooter must achieve at least this hit rate'
-                  }
-                </Text>
-              </View>
-              
-              {/* Time Limit (Optional) */}
-              <View style={styles.section}>
-                <Text style={[styles.sectionTitle, styles.sectionTitleStandalone, { color: colors.text }]}>
-                  Time Limit <Text style={{ color: colors.textMuted, fontWeight: '400' }}>(optional)</Text>
-                </Text>
-                <View style={[styles.timeInputRow, { backgroundColor: colors.secondary }]}>
-                  <TextInput
-                    style={[styles.timeInput, { color: colors.text }]}
-                    value={expectedTimeSeconds}
-                    onChangeText={setExpectedTimeSeconds}
-                    keyboardType="number-pad"
-                    placeholder="No limit"
-                    placeholderTextColor={colors.textMuted}
-                  />
-                  {expectedTimeSeconds && (
-                    <Text style={[styles.timeUnit, { color: colors.textMuted }]}>seconds</Text>
-                  )}
-                </View>
-              </View>
-              
-              {/* Name - Distance prefix (auto) + editable suffix */}
-              <View style={styles.section}>
-                <Text style={[styles.sectionTitle, styles.sectionTitleStandalone, { color: colors.text }]}>Name</Text>
-                <View style={[styles.nameInputRow, { backgroundColor: colors.secondary }]}>
-                  <View style={[styles.namePrefix, { backgroundColor: colors.primary + '20' }]}>
-                    <Text style={[styles.namePrefixText, { color: colors.primary }]}>
-                      {distancePrefix}
+
+                  {/* Custom */}
+                  <TouchableOpacity
+                    style={[
+                      styles.distanceChip,
+                      styles.distanceChipCustom,
+                      {
+                        backgroundColor: showCustomDistance || !isDistanceInList ? colors.text : 'transparent',
+                        borderColor: showCustomDistance || !isDistanceInList ? colors.text : colors.border,
+                        borderStyle: 'dashed',
+                      },
+                    ]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setShowCustomDistance(true);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.distanceChipValue,
+                        { color: showCustomDistance || !isDistanceInList ? colors.background : colors.textMuted },
+                      ]}
+                    >
+                      {showCustomDistance || !isDistanceInList ? distanceM : '···'}
                     </Text>
+                  </TouchableOpacity>
+                </ScrollView>
+
+                {/* Custom Input */}
+                {showCustomDistance && (
+                  <View style={[styles.customInputRow, { backgroundColor: colors.secondary }]}>
+                    <TextInput
+                      style={[styles.customInput, { color: colors.text }]}
+                      value={distanceM}
+                      onChangeText={setDistanceM}
+                      keyboardType="number-pad"
+                      placeholder="Enter distance"
+                      placeholderTextColor={colors.textMuted}
+                      autoFocus
+                    />
+                    <Text style={[styles.customInputUnit, { color: colors.textMuted }]}>meters</Text>
                   </View>
-                  <TextInput
-                    style={[styles.nameSuffixInput, { color: colors.text }]}
-                    value={nameSuffix}
-                    onChangeText={setNameSuffix}
-                    placeholder="Rifle Grouping"
-                    placeholderTextColor={colors.textMuted}
-                  />
-                </View>
-                <Text style={[styles.namePreview, { color: colors.textMuted }]}>
-                  Preview: {fullName}
-                </Text>
-              </View>
-              
-              <View style={styles.section}>
-                <Text style={[styles.sectionTitle, styles.sectionTitleStandalone, { color: colors.text }]}>
-                  Notes <Text style={{ color: colors.textMuted, fontWeight: '400' }}>(optional)</Text>
-                </Text>
-                <TextInput
-                  style={[
-                    styles.textInput, 
-                    styles.textArea,
-                    { backgroundColor: colors.secondary, color: colors.text }
-                  ]}
-                  value={description}
-                  onChangeText={setDescription}
-                  placeholder="Additional context for this standard"
-                  placeholderTextColor={colors.textMuted}
-                  multiline
-                  numberOfLines={2}
-                />
-              </View>
-            </ScrollView>
-            
-            {/* Save Button */}
-            <View style={[styles.footer, { borderTopColor: colors.border }]}>
-              <TouchableOpacity
-                style={[
-                  styles.saveBtn,
-                  { backgroundColor: canSave() && !saving ? colors.text : colors.secondary }
-                ]}
-                onPress={handleSave}
-                disabled={!canSave() || saving}
-                activeOpacity={0.8}
-              >
-                <Text style={[
-                  styles.saveBtnText,
-                  { color: canSave() && !saving ? colors.background : colors.textMuted }
-                ]}>
-                  {saving ? 'Saving...' : isEditing ? 'Update Standard' : 'Create Standard'}
-                </Text>
-              </TouchableOpacity>
+                )}
+              </>
+            )}
+          </View>
+
+          {/* Weapon Category */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, styles.sectionTitleStandalone, { color: colors.text }]}>Weapon</Text>
+            <View style={styles.weaponRow}>
+              {WEAPON_CATEGORIES.map((w) => {
+                const isSelected = weaponCategory === w.value;
+                return (
+                  <TouchableOpacity
+                    key={w.label}
+                    style={[
+                      styles.weaponChip,
+                      {
+                        backgroundColor: isSelected ? colors.text : 'transparent',
+                        borderColor: isSelected ? colors.text : colors.border,
+                      },
+                    ]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setWeaponCategory(w.value);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.weaponChipText, { color: isSelected ? colors.background : colors.text }]}>
+                      {w.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
+
+          {/* Expected Value - The Key Metric */}
+          <View style={[styles.section, styles.metricSection, { backgroundColor: colors.secondary }]}>
+            <Text style={[styles.metricLabel, { color: colors.textMuted }]}>
+              {drillGoal === 'grouping' ? 'MAX GROUPING' : 'MIN ACCURACY'}
+            </Text>
+            <View style={styles.metricInputRow}>
+              <TextInput
+                style={[styles.metricInput, { color: colors.text }]}
+                value={drillGoal === 'grouping' ? expectedGroupingCm : expectedAccuracyPct}
+                onChangeText={drillGoal === 'grouping' ? setExpectedGroupingCm : setExpectedAccuracyPct}
+                keyboardType="numeric"
+                placeholder={drillGoal === 'grouping' ? '8' : '80'}
+                placeholderTextColor={colors.textMuted}
+              />
+              <Text style={[styles.metricUnit, { color: colors.text }]}>{drillGoal === 'grouping' ? 'cm' : '%'}</Text>
+            </View>
+            <Text style={[styles.metricHint, { color: colors.textMuted }]}>
+              {drillGoal === 'grouping'
+                ? 'Shots must group within this diameter'
+                : 'Shooter must achieve at least this hit rate'}
+            </Text>
+          </View>
+
+          {/* Time Limit (Optional) */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, styles.sectionTitleStandalone, { color: colors.text }]}>
+              Time Limit <Text style={{ color: colors.textMuted, fontWeight: '400' }}>(optional)</Text>
+            </Text>
+            <View style={[styles.timeInputRow, { backgroundColor: colors.secondary }]}>
+              <TextInput
+                style={[styles.timeInput, { color: colors.text }]}
+                value={expectedTimeSeconds}
+                onChangeText={setExpectedTimeSeconds}
+                keyboardType="number-pad"
+                placeholder="No limit"
+                placeholderTextColor={colors.textMuted}
+              />
+              {expectedTimeSeconds && <Text style={[styles.timeUnit, { color: colors.textMuted }]}>seconds</Text>}
+            </View>
+          </View>
+
+          {/* Name - Distance prefix (auto) + editable suffix */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, styles.sectionTitleStandalone, { color: colors.text }]}>Name</Text>
+            <View style={[styles.nameInputRow, { backgroundColor: colors.secondary }]}>
+              <View style={[styles.namePrefix, { backgroundColor: colors.primary + '20' }]}>
+                <Text style={[styles.namePrefixText, { color: colors.primary }]}>{distancePrefix}</Text>
+              </View>
+              <TextInput
+                style={[styles.nameSuffixInput, { color: colors.text }]}
+                value={nameSuffix}
+                onChangeText={setNameSuffix}
+                placeholder="Rifle Grouping"
+                placeholderTextColor={colors.textMuted}
+              />
+            </View>
+            <Text style={[styles.namePreview, { color: colors.textMuted }]}>Preview: {fullName}</Text>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, styles.sectionTitleStandalone, { color: colors.text }]}>
+              Notes <Text style={{ color: colors.textMuted, fontWeight: '400' }}>(optional)</Text>
+            </Text>
+            <TextInput
+              style={[styles.textInput, styles.textArea, { backgroundColor: colors.secondary, color: colors.text }]}
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Additional context for this standard"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              numberOfLines={2}
+            />
+          </View>
+        </ScrollView>
+
+        {/* Save Button */}
+        <View style={[styles.footer, { borderTopColor: colors.border }]}>
+          <TouchableOpacity
+            style={[styles.saveBtn, { backgroundColor: canSave() && !saving ? colors.text : colors.secondary }]}
+            onPress={handleSave}
+            disabled={!canSave() || saving}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.saveBtnText, { color: canSave() && !saving ? colors.background : colors.textMuted }]}>
+              {saving ? 'Saving...' : isEditing ? 'Update Standard' : 'Create Standard'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -673,7 +610,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
-  
+
   // Sections
   section: {
     marginBottom: 24,
@@ -693,7 +630,7 @@ const styles = StyleSheet.create({
   sectionTitleStandalone: {
     marginBottom: 12,
   },
-  
+
   // Goal Cards
   goalRow: {
     flexDirection: 'row',
@@ -728,7 +665,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  
+
   // Distance
   sectionHeaderLeft: {
     flexDirection: 'row',
@@ -744,7 +681,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
-  
+
   // Compact Range Toggle Pill
   rangeTogglePill: {
     flexDirection: 'row',
@@ -760,7 +697,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  
+
   // Compact Range Inputs
   rangeInputRow: {
     flexDirection: 'row',
@@ -789,7 +726,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  
+
   distanceScroller: {
     gap: 10,
     paddingVertical: 2,
@@ -831,7 +768,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  
+
   // Weapon
   weaponRow: {
     flexDirection: 'row',
@@ -847,7 +784,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  
+
   // Metric (Primary Value)
   metricSection: {
     padding: 20,
@@ -879,7 +816,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 8,
   },
-  
+
   // Time
   timeInputRow: {
     flexDirection: 'row',
@@ -897,7 +834,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  
+
   // Text Inputs
   textInput: {
     borderRadius: 12,
@@ -909,7 +846,7 @@ const styles = StyleSheet.create({
     minHeight: 70,
     textAlignVertical: 'top',
   },
-  
+
   // Name input with prefix
   nameInputRow: {
     flexDirection: 'row',
@@ -938,7 +875,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontStyle: 'italic',
   },
-  
+
   // Footer
   footer: {
     paddingHorizontal: 20,

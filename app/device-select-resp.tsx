@@ -9,7 +9,7 @@ export default function DeviceSelectResp() {
 
   useEffect(() => {
     const run = async () => {
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 500));
       await refreshDevices();
       setDone(true);
     };
@@ -17,7 +17,7 @@ export default function DeviceSelectResp() {
   }, []);
 
   if (done) return <Redirect href="/(protected)/(tabs)" />;
-  
+
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
       <ActivityIndicator size="large" color="#007CC3" />

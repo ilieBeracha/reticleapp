@@ -3,7 +3,7 @@
  * Reusable animated UI elements
  */
 
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -28,18 +28,12 @@ export function PulsingDot({ size = 12, color }: PulsingDotProps) {
 
   useEffect(() => {
     scale.value = withRepeat(
-      withSequence(
-        withTiming(1.3, { duration: 600 }),
-        withTiming(1, { duration: 600 })
-      ),
+      withSequence(withTiming(1.3, { duration: 600 }), withTiming(1, { duration: 600 })),
       -1,
       false
     );
     opacity.value = withRepeat(
-      withSequence(
-        withTiming(0.5, { duration: 600 }),
-        withTiming(1, { duration: 600 })
-      ),
+      withSequence(withTiming(0.5, { duration: 600 }), withTiming(1, { duration: 600 })),
       -1,
       false
     );
@@ -87,9 +81,7 @@ export function LiveDot({ size = 6 }: LiveDotProps) {
   return (
     <View style={{ width: size, height: size }}>
       <View style={[styles.liveDotBase, { width: size, height: size, borderRadius: size / 2 }]} />
-      <Animated.View
-        style={[styles.liveDotPulse, { width: size, height: size, borderRadius: size / 2 }, style]}
-      />
+      <Animated.View style={[styles.liveDotPulse, { width: size, height: size, borderRadius: size / 2 }, style]} />
     </View>
   );
 }

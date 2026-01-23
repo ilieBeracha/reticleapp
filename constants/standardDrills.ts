@@ -1,6 +1,6 @@
 /**
  * Standard Drill Templates
- * 
+ *
  * Universal templates available for quick selection in training creation.
  * These are not saved to database - they're inline configurations.
  */
@@ -180,12 +180,12 @@ export const STANDARD_DRILL_TEMPLATES: StandardDrillTemplate[] = [
  * Get standard templates by category
  */
 export function getTemplatesByCategory(category: StandardDrillTemplate['category']): StandardDrillTemplate[] {
-  return STANDARD_DRILL_TEMPLATES.filter(t => t.category === category);
+  return STANDARD_DRILL_TEMPLATES.filter((t) => t.category === category);
 }
 
 /**
  * Get a specific template by ID
  */
 export function getTemplateById(id: string): StandardDrillTemplate | undefined {
-  return STANDARD_DRILL_TEMPLATES.find(t => t.id === id);
+  return STANDARD_DRILL_TEMPLATES.find((t) => t.id === id);
 }

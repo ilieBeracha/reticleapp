@@ -17,7 +17,12 @@ import { useTeamContext, useTeamPermissions, useTeamStore } from '@/store/teamSt
 import { useTrainingStore } from '@/store/trainingStore';
 import type { TeamMemberWithProfile, TrainingWithDetails } from '@/types/workspace';
 
-import { calculateMemberStats, calculateTeamStatsFromSessions, getRoleConfig, type SessionStatsData } from './trainings.helpers';
+import {
+  calculateMemberStats,
+  calculateTeamStatsFromSessions,
+  getRoleConfig,
+  type SessionStatsData,
+} from './trainings.helpers';
 import type { InternalTab, UseTrainingsReturn } from './trainings.types';
 
 export function useTrainings(): UseTrainingsReturn {
@@ -62,9 +67,7 @@ export function useTrainings(): UseTrainingsReturn {
   useFocusEffect(
     useCallback(() => {
       if (activeTeamId && activeTab === 'team') {
-        getTeamMembers(activeTeamId)
-          .then(setMembers)
-          .catch(console.error);
+        getTeamMembers(activeTeamId).then(setMembers).catch(console.error);
       }
     }, [activeTeamId, activeTab])
   );
@@ -76,7 +79,7 @@ export function useTrainings(): UseTrainingsReturn {
         getRecentSessionsWithStats({ days: 7, limit: 100, teamId: activeTeamId })
           .then((sessions) => {
             // Extract stats data for calculation
-            const statsData: SessionStatsData[] = sessions.map(s => ({
+            const statsData: SessionStatsData[] = sessions.map((s) => ({
               shots_fired: s.stats?.shots_fired ?? 0,
               accuracy_pct: s.stats?.accuracy_pct ?? 0,
               started_at: s.started_at,
@@ -106,7 +109,7 @@ export function useTrainings(): UseTrainingsReturn {
         if (canManage) {
           try {
             const sessions = await getRecentSessionsWithStats({ days: 7, limit: 100, teamId: activeTeamId });
-            const statsData: SessionStatsData[] = sessions.map(s => ({
+            const statsData: SessionStatsData[] = sessions.map((s) => ({
               shots_fired: s.stats?.shots_fired ?? 0,
               accuracy_pct: s.stats?.accuracy_pct ?? 0,
               started_at: s.started_at,
@@ -124,7 +127,7 @@ export function useTrainings(): UseTrainingsReturn {
   // ============================================================================
   // REALTIME SUBSCRIPTIONS
   // ============================================================================
-  
+
   // Subscribe to team updates (trainings, members) for live updates
   const { isConnected: realtimeConnected } = useTeamRealtime({
     teamId: activeTeamId,
@@ -161,12 +164,12 @@ export function useTrainings(): UseTrainingsReturn {
   // Filter trainings for active team
   const activeTeamTrainings = useMemo(() => {
     if (!activeTeamId) return [];
-    return teamTrainings.filter(t => t.team_id === activeTeamId);
+    return teamTrainings.filter((t) => t.team_id === activeTeamId);
   }, [teamTrainings, activeTeamId]);
 
   // Live training detection
   const liveTraining = useMemo(() => {
-    return activeTeamTrainings.find(t => t.status === 'ongoing');
+    return activeTeamTrainings.find((t) => t.status === 'ongoing');
   }, [activeTeamTrainings]);
 
   // Member stats
@@ -276,4 +279,3 @@ export function useTrainings(): UseTrainingsReturn {
     setSwitcherOpen,
   };
 }
-

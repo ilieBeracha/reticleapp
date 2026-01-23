@@ -1,6 +1,6 @@
 /**
  * ParticipantInsights
- * 
+ *
  * Comprehensive participant results view for commanders.
  * Provides meaningful insights, rankings, and actionable data.
  */
@@ -26,12 +26,7 @@ import {
   Zap,
 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
-import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -87,31 +82,29 @@ interface ParticipantInsightsProps {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function calculateConsistency(results: DrillResult[]): number | null {
-  const accuracies = results
-    .filter(r => r.completed && r.accuracy !== null)
-    .map(r => r.accuracy!);
-  
+  const accuracies = results.filter((r) => r.completed && r.accuracy !== null).map((r) => r.accuracy!);
+
   if (accuracies.length < 2) return null;
-  
+
   const avg = accuracies.reduce((a, b) => a + b, 0) / accuracies.length;
   const variance = accuracies.reduce((sum, acc) => sum + Math.pow(acc - avg, 2), 0) / accuracies.length;
   const stdDev = Math.sqrt(variance);
-  
+
   // Lower std dev = more consistent = higher score
   // Max consistency (100) when stdDev = 0, drops as variance increases
   return Math.max(0, Math.round(100 - stdDev * 2));
 }
 
 function getPerformanceTrend(results: DrillResult[]): 'improving' | 'declining' | 'stable' | null {
-  const orderedResults = results.filter(r => r.completed && r.accuracy !== null);
+  const orderedResults = results.filter((r) => r.completed && r.accuracy !== null);
   if (orderedResults.length < 2) return null;
-  
+
   const firstHalf = orderedResults.slice(0, Math.ceil(orderedResults.length / 2));
   const secondHalf = orderedResults.slice(Math.ceil(orderedResults.length / 2));
-  
+
   const firstAvg = firstHalf.reduce((sum, r) => sum + (r.accuracy || 0), 0) / firstHalf.length;
   const secondAvg = secondHalf.reduce((sum, r) => sum + (r.accuracy || 0), 0) / secondHalf.length;
-  
+
   const diff = secondAvg - firstAvg;
   if (diff > 5) return 'improving';
   if (diff < -5) return 'declining';
@@ -122,21 +115,15 @@ function getPerformanceTrend(results: DrillResult[]): 'improving' | 'declining' 
 // SUB-COMPONENTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-function InsightCard({ 
-  insight, 
-  colors 
-}: { 
-  insight: TeamInsight; 
-  colors: ReturnType<typeof useColors>;
-}) {
+function InsightCard({ insight, colors }: { insight: TeamInsight; colors: ReturnType<typeof useColors> }) {
   const config = {
     positive: { bg: colors.green + '15', color: colors.green, icon: Trophy },
     warning: { bg: colors.orange + '15', color: colors.orange, icon: AlertTriangle },
     info: { bg: colors.blue + '15', color: colors.blue, icon: Eye },
   };
-  
+
   const { bg, color, icon: Icon } = config[insight.type];
-  
+
   return (
     <View style={[styles.insightCard, { backgroundColor: bg }]}>
       <Icon size={16} color={color} />
@@ -164,21 +151,21 @@ function LeaderboardItem({
   onToggle: () => void;
 }) {
   const trend = useMemo(() => getPerformanceTrend(participant.drillResults), [participant.drillResults]);
-  
+
   const rankConfig = {
     1: { icon: Crown, color: '#FFD700', bg: '#FFD70020' },
     2: { icon: Medal, color: '#C0C0C0', bg: '#C0C0C020' },
     3: { icon: Award, color: '#CD7F32', bg: '#CD7F3220' },
   };
-  
+
   const RankIcon = rankConfig[rank as keyof typeof rankConfig]?.icon || User;
   const rankColor = rankConfig[rank as keyof typeof rankConfig]?.color || colors.textMuted;
   const rankBg = rankConfig[rank as keyof typeof rankConfig]?.bg || colors.secondary;
-  
+
   const completionRate = Math.min(100, Math.round((participant.drillsCompleted / totalDrills) * 100));
-  const hasGrouping = participant.drillResults.some(r => r.drillGoal === 'grouping');
-  const hasEngagement = participant.drillResults.some(r => r.drillGoal === 'engagement');
-  
+  const hasGrouping = participant.drillResults.some((r) => r.drillGoal === 'grouping');
+  const hasEngagement = participant.drillResults.some((r) => r.drillGoal === 'engagement');
+
   return (
     <Animated.View entering={FadeInDown.delay(rank * 50).duration(300)}>
       <TouchableOpacity
@@ -192,13 +179,13 @@ function LeaderboardItem({
             <RankIcon size={14} color={rankColor} />
             {rank > 3 && <Text style={[styles.rankNumber, { color: colors.textMuted }]}>#{rank}</Text>}
           </View>
-          
+
           <View style={[styles.avatar, { backgroundColor: colors.secondary }]}>
             <Text style={[styles.avatarText, { color: colors.text }]}>
               {participant.userName.charAt(0).toUpperCase()}
             </Text>
           </View>
-          
+
           <View style={styles.participantInfo}>
             <View style={styles.nameRow}>
               <Text style={[styles.participantName, { color: colors.text }]} numberOfLines={1}>
@@ -211,17 +198,23 @@ function LeaderboardItem({
               {participant.drillsCompleted}/{totalDrills} drills • {participant.totalShots} shots
             </Text>
           </View>
-          
+
           <View style={styles.statsColumn}>
             {participant.accuracy !== null && (
               <View style={styles.statBadge}>
-                <Text style={[
-                  styles.statValue,
-                  { 
-                    color: participant.accuracy >= 80 ? colors.green : 
-                           participant.accuracy >= 60 ? colors.text : colors.orange 
-                  }
-                ]}>
+                <Text
+                  style={[
+                    styles.statValue,
+                    {
+                      color:
+                        participant.accuracy >= 80
+                          ? colors.green
+                          : participant.accuracy >= 60
+                            ? colors.text
+                            : colors.orange,
+                    },
+                  ]}
+                >
                   {participant.accuracy}%
                 </Text>
                 <Text style={[styles.statLabel, { color: colors.textMuted }]}>accuracy</Text>
@@ -236,14 +229,14 @@ function LeaderboardItem({
               </View>
             )}
           </View>
-          
+
           {isExpanded ? (
             <ChevronUp size={18} color={colors.textMuted} />
           ) : (
             <ChevronDown size={18} color={colors.textMuted} />
           )}
         </View>
-        
+
         {/* Expanded Drill Breakdown */}
         {isExpanded && (
           <Animated.View entering={FadeIn.duration(200)} style={styles.drillBreakdown}>
@@ -252,9 +245,7 @@ function LeaderboardItem({
               {participant.consistencyScore !== null && (
                 <View style={styles.quickStat}>
                   <Focus size={12} color={colors.textMuted} />
-                  <Text style={[styles.quickStatValue, { color: colors.text }]}>
-                    {participant.consistencyScore}%
-                  </Text>
+                  <Text style={[styles.quickStatValue, { color: colors.text }]}>{participant.consistencyScore}%</Text>
                   <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>consistency</Text>
                 </View>
               )}
@@ -269,56 +260,48 @@ function LeaderboardItem({
               )}
               <View style={styles.quickStat}>
                 <Target size={12} color={colors.textMuted} />
-                <Text style={[styles.quickStatValue, { color: colors.text }]}>
-                  {completionRate}%
-                </Text>
+                <Text style={[styles.quickStatValue, { color: colors.text }]}>{completionRate}%</Text>
                 <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>completion</Text>
               </View>
             </View>
-            
+
             {/* Drill Results */}
             <View style={styles.drillsList}>
               {participant.drillResults.map((result, idx) => {
                 const isGrouping = result.drillGoal === 'grouping';
                 const goalColor = isGrouping ? colors.green : '#F59E0B';
-                
+
                 let resultDisplay = '—';
                 let resultColor = colors.textMuted;
-                
+
                 if (result.completed) {
                   if (isGrouping && result.dispersion !== null) {
                     resultDisplay = `${result.dispersion.toFixed(1)}cm`;
-                    resultColor = result.dispersion <= 5 ? colors.green : 
-                                  result.dispersion <= 10 ? colors.text : colors.orange;
+                    resultColor =
+                      result.dispersion <= 5 ? colors.green : result.dispersion <= 10 ? colors.text : colors.orange;
                   } else if (!isGrouping && result.accuracy !== null) {
                     resultDisplay = `${result.accuracy}%`;
-                    resultColor = result.accuracy >= 80 ? colors.green : 
-                                  result.accuracy >= 60 ? colors.text : colors.orange;
+                    resultColor =
+                      result.accuracy >= 80 ? colors.green : result.accuracy >= 60 ? colors.text : colors.orange;
                   } else if (result.shots > 0) {
                     resultDisplay = `${result.hits}/${result.shots}`;
                     resultColor = colors.text;
                   }
                 }
-                
+
                 return (
                   <View key={`${result.drillId}-${idx}`} style={styles.drillRow}>
                     <View style={[styles.drillDot, { backgroundColor: goalColor }]} />
-                    <View style={[
-                      styles.drillStatus,
-                      { backgroundColor: result.completed ? colors.green : colors.border }
-                    ]} />
-                    <Text 
-                      style={[
-                        styles.drillName, 
-                        { color: result.completed ? colors.text : colors.textMuted }
-                      ]} 
+                    <View
+                      style={[styles.drillStatus, { backgroundColor: result.completed ? colors.green : colors.border }]}
+                    />
+                    <Text
+                      style={[styles.drillName, { color: result.completed ? colors.text : colors.textMuted }]}
                       numberOfLines={1}
                     >
                       {result.drillName}
                     </Text>
-                    <Text style={[styles.drillResult, { color: resultColor }]}>
-                      {resultDisplay}
-                    </Text>
+                    <Text style={[styles.drillResult, { color: resultColor }]}>{resultDisplay}</Text>
                   </View>
                 );
               })}
@@ -340,26 +323,25 @@ function TeamSummaryStats({
   colors: ReturnType<typeof useColors>;
 }) {
   const stats = useMemo(() => {
-    const withAccuracy = participants.filter(p => p.accuracy !== null);
-    const avgAccuracy = withAccuracy.length > 0
-      ? Math.round(withAccuracy.reduce((sum, p) => sum + (p.accuracy || 0), 0) / withAccuracy.length)
-      : null;
-    
+    const withAccuracy = participants.filter((p) => p.accuracy !== null);
+    const avgAccuracy =
+      withAccuracy.length > 0
+        ? Math.round(withAccuracy.reduce((sum, p) => sum + (p.accuracy || 0), 0) / withAccuracy.length)
+        : null;
+
     const totalShots = participants.reduce((sum, p) => sum + p.totalShots, 0);
     const totalHits = participants.reduce((sum, p) => sum + p.totalHits, 0);
     const teamAccuracy = totalShots > 0 ? Math.round((totalHits / totalShots) * 100) : null;
-    
-    const fullCompletion = participants.filter(p => p.drillsCompleted === totalDrills).length;
+
+    const fullCompletion = participants.filter((p) => p.drillsCompleted === totalDrills).length;
     const completionRate = Math.round((fullCompletion / participants.length) * 100);
-    
-    const dispersions = participants
-      .filter(p => p.bestDispersion !== null)
-      .map(p => p.bestDispersion!);
+
+    const dispersions = participants.filter((p) => p.bestDispersion !== null).map((p) => p.bestDispersion!);
     const bestTeamDispersion = dispersions.length > 0 ? Math.min(...dispersions) : null;
-    
+
     return { avgAccuracy, teamAccuracy, totalShots, totalHits, fullCompletion, completionRate, bestTeamDispersion };
   }, [participants, totalDrills]);
-  
+
   return (
     <View style={[styles.summaryStats, { backgroundColor: colors.card }]}>
       <Text style={[styles.summaryTitle, { color: colors.text }]}>Team Performance</Text>
@@ -372,10 +354,7 @@ function TeamSummaryStats({
         {stats.teamAccuracy !== null && (
           <View style={styles.statBox}>
             <Target size={16} color={stats.teamAccuracy >= 70 ? colors.green : colors.orange} />
-            <Text style={[
-              styles.statBoxValue, 
-              { color: stats.teamAccuracy >= 70 ? colors.green : colors.orange }
-            ]}>
+            <Text style={[styles.statBoxValue, { color: stats.teamAccuracy >= 70 ? colors.green : colors.orange }]}>
               {stats.teamAccuracy}%
             </Text>
             <Text style={[styles.statBoxLabel, { color: colors.textMuted }]}>Team Accuracy</Text>
@@ -389,9 +368,7 @@ function TeamSummaryStats({
         {stats.bestTeamDispersion !== null && (
           <View style={styles.statBox}>
             <Focus size={16} color={colors.green} />
-            <Text style={[styles.statBoxValue, { color: colors.green }]}>
-              {stats.bestTeamDispersion.toFixed(1)}cm
-            </Text>
+            <Text style={[styles.statBoxValue, { color: colors.green }]}>{stats.bestTeamDispersion.toFixed(1)}cm</Text>
             <Text style={[styles.statBoxLabel, { color: colors.textMuted }]}>Best Group</Text>
           </View>
         )}
@@ -409,49 +386,46 @@ function TeamSummaryStats({
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 
-export function ParticipantInsights({
-  teamSessions,
-  drills,
-}: ParticipantInsightsProps) {
+export function ParticipantInsights({ teamSessions, drills }: ParticipantInsightsProps) {
   const colors = useColors();
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
-  
+
   // Process participant data - GROUP BY TRAINING DRILL (only drills in this training)
   const participants = useMemo<ParticipantData[]>(() => {
     if (!teamSessions.length || !drills.length) return [];
-    
+
     // Create a set of valid drill IDs from the training
-    const trainingDrillIds = new Set(drills.map(d => d.id));
-    
+    const trainingDrillIds = new Set(drills.map((d) => d.id));
+
     const userMap = new Map<string, ParticipantData>();
-    
+
     // First pass: group sessions by user and drill (only for training drills)
     const userDrillMap = new Map<string, Map<string, SessionWithDetails[]>>();
-    
+
     teamSessions.forEach((session) => {
       const userId = session.user_id;
       const drillId = session.drill_id;
-      
+
       // Only include sessions for drills that are part of this training
       if (!drillId || !trainingDrillIds.has(drillId)) return;
-      
+
       if (!userDrillMap.has(userId)) {
         userDrillMap.set(userId, new Map());
       }
-      
+
       const userDrills = userDrillMap.get(userId)!;
       if (!userDrills.has(drillId)) {
         userDrills.set(drillId, []);
       }
       userDrills.get(drillId)!.push(session);
     });
-    
+
     // Second pass: aggregate per user-drill combination
     userDrillMap.forEach((drillSessions, userId) => {
       // Get user name from first session
       const firstSession = Array.from(drillSessions.values())[0]?.[0];
       const userName = firstSession?.user_full_name || 'Unknown';
-      
+
       if (!userMap.has(userId)) {
         userMap.set(userId, {
           userId,
@@ -466,69 +440,70 @@ export function ParticipantInsights({
           consistencyScore: null,
         });
       }
-      
+
       const participant = userMap.get(userId)!;
       const completedDrillIds = new Set<string>();
-      
+
       // Process each drill (aggregating all sessions for that drill)
       drillSessions.forEach((sessions, drillId) => {
         // Get drill info from training drills
-        const drill = drills.find(d => d.id === drillId);
+        const drill = drills.find((d) => d.id === drillId);
         if (!drill) return; // Skip if drill not in training
-        
+
         const drillName = drill.name;
         const drillGoal = (drill.drill_goal || 'engagement') as 'grouping' | 'engagement';
         const isGrouping = drillGoal === 'grouping';
-        
+
         // Aggregate stats from all sessions for this drill
         let totalDrillShots = 0;
         let totalDrillHits = 0;
         let bestDrillDispersion: number | null = null;
         let totalDuration = 0;
         let hasCompleted = false;
-        
+
         sessions.forEach((session) => {
           const shots = session.stats?.shots_fired ?? 0;
           const hits = session.stats?.hits_total ?? 0;
           const dispersion = session.stats?.best_dispersion_cm ?? null;
-          const duration = session.started_at && session.ended_at
-            ? Math.round((new Date(session.ended_at).getTime() - new Date(session.started_at).getTime()) / 1000)
-            : 0;
-          
+          const duration =
+            session.started_at && session.ended_at
+              ? Math.round((new Date(session.ended_at).getTime() - new Date(session.started_at).getTime()) / 1000)
+              : 0;
+
           totalDrillShots += shots;
           totalDrillHits += hits;
           totalDuration += duration;
-          
+
           if (session.status === 'completed') {
             hasCompleted = true;
           }
-          
+
           if (dispersion !== null) {
             if (bestDrillDispersion === null || dispersion < bestDrillDispersion) {
               bestDrillDispersion = dispersion;
             }
           }
         });
-        
+
         // Add to participant totals (engagement only for accuracy)
         if (!isGrouping) {
           participant.totalShots += totalDrillShots;
           participant.totalHits += totalDrillHits;
         }
-        
+
         // Track best dispersion for grouping
         if (isGrouping && bestDrillDispersion !== null) {
           if (participant.bestDispersion === null || bestDrillDispersion < participant.bestDispersion) {
             participant.bestDispersion = bestDrillDispersion;
           }
         }
-        
+
         // Count completed drills (only once per drill, only training drills)
         if (hasCompleted && !completedDrillIds.has(drillId)) {
           completedDrillIds.add(drillId);
           participant.drillsCompleted++;
         }
-        
+
         // Add ONE drill result (aggregated)
         participant.drillResults.push({
           drillId,
@@ -543,31 +518,31 @@ export function ParticipantInsights({
         });
       });
     });
-    
+
     // Calculate derived stats
     userMap.forEach((p) => {
       // Overall accuracy (engagement only)
       if (p.totalShots > 0) {
         p.accuracy = Math.round((p.totalHits / p.totalShots) * 100);
       }
-      
+
       // Consistency score
       p.consistencyScore = calculateConsistency(p.drillResults);
-      
+
       // Average time per drill
-      const durations = p.drillResults.filter(r => r.duration !== null).map(r => r.duration!);
+      const durations = p.drillResults.filter((r) => r.duration !== null).map((r) => r.duration!);
       if (durations.length > 0) {
         p.avgTimePerDrill = Math.round(durations.reduce((a, b) => a + b, 0) / durations.length);
       }
-      
+
       // Sort by drill order
       p.drillResults.sort((a, b) => {
-        const aIdx = drills.findIndex(d => d.id === a.drillId);
-        const bIdx = drills.findIndex(d => d.id === b.drillId);
+        const aIdx = drills.findIndex((d) => d.id === a.drillId);
+        const bIdx = drills.findIndex((d) => d.id === b.drillId);
         return aIdx - bIdx;
       });
     });
-    
+
     // Sort by: completed drills > accuracy > name
     return Array.from(userMap.values()).sort((a, b) => {
       if (b.drillsCompleted !== a.drillsCompleted) return b.drillsCompleted - a.drillsCompleted;
@@ -575,13 +550,13 @@ export function ParticipantInsights({
       return a.userName.localeCompare(b.userName);
     });
   }, [teamSessions, drills]);
-  
+
   // Generate team insights
   const insights = useMemo<TeamInsight[]>(() => {
     if (participants.length === 0) return [];
-    
+
     const result: TeamInsight[] = [];
-    
+
     // Find top performer
     const topPerformer = participants[0];
     if (topPerformer && topPerformer.accuracy !== null && topPerformer.accuracy >= 70) {
@@ -592,9 +567,9 @@ export function ParticipantInsights({
         userId: topPerformer.userId,
       });
     }
-    
+
     // Find most consistent
-    const withConsistency = participants.filter(p => p.consistencyScore !== null);
+    const withConsistency = participants.filter((p) => p.consistencyScore !== null);
     if (withConsistency.length > 0) {
       const mostConsistent = withConsistency.sort((a, b) => (b.consistencyScore ?? 0) - (a.consistencyScore ?? 0))[0];
       if (mostConsistent.consistencyScore && mostConsistent.consistencyScore >= 80) {
@@ -606,24 +581,25 @@ export function ParticipantInsights({
         });
       }
     }
-    
+
     // Find struggling participants
-    const struggling = participants.filter(p => 
-      (p.accuracy !== null && p.accuracy < 50) || 
-      (p.drillsCompleted < drills.length / 2)
+    const struggling = participants.filter(
+      (p) => (p.accuracy !== null && p.accuracy < 50) || p.drillsCompleted < drills.length / 2
     );
     if (struggling.length > 0) {
       result.push({
         type: 'warning',
         title: `${struggling.length} participant${struggling.length > 1 ? 's' : ''} may need support`,
-        description: struggling.map(p => p.userName).join(', ') + ' - consider follow-up training',
+        description: struggling.map((p) => p.userName).join(', ') + ' - consider follow-up training',
       });
     }
-    
+
     // Best grouping (if any)
-    const withGrouping = participants.filter(p => p.bestDispersion !== null);
+    const withGrouping = participants.filter((p) => p.bestDispersion !== null);
     if (withGrouping.length > 0) {
-      const bestGrouper = withGrouping.sort((a, b) => (a.bestDispersion ?? Infinity) - (b.bestDispersion ?? Infinity))[0];
+      const bestGrouper = withGrouping.sort(
+        (a, b) => (a.bestDispersion ?? Infinity) - (b.bestDispersion ?? Infinity)
+      )[0];
       if (bestGrouper.bestDispersion !== null && bestGrouper.bestDispersion <= 5) {
         result.push({
           type: 'positive',
@@ -633,40 +609,34 @@ export function ParticipantInsights({
         });
       }
     }
-    
+
     // Incomplete participants
-    const incomplete = participants.filter(p => p.drillsCompleted < drills.length);
+    const incomplete = participants.filter((p) => p.drillsCompleted < drills.length);
     if (incomplete.length > 0 && incomplete.length <= 3) {
       result.push({
         type: 'info',
         title: `${incomplete.length} did not complete all drills`,
-        description: incomplete.map(p => `${p.userName} (${p.drillsCompleted}/${drills.length})`).join(', '),
+        description: incomplete.map((p) => `${p.userName} (${p.drillsCompleted}/${drills.length})`).join(', '),
       });
     }
-    
+
     return result;
   }, [participants, drills.length]);
-  
+
   if (participants.length === 0) {
     return (
       <View style={[styles.emptyContainer, { backgroundColor: colors.card }]}>
         <Users size={32} color={colors.textMuted} />
-        <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-          No participant data available
-        </Text>
+        <Text style={[styles.emptyText, { color: colors.textMuted }]}>No participant data available</Text>
       </View>
     );
   }
-  
+
   return (
     <View style={styles.container}>
       {/* Team Summary */}
-      <TeamSummaryStats
-        participants={participants}
-        totalDrills={drills.length}
-        colors={colors}
-      />
-      
+      <TeamSummaryStats participants={participants} totalDrills={drills.length} colors={colors} />
+
       {/* Insights */}
       {insights.length > 0 && (
         <View style={styles.insightsSection}>
@@ -678,17 +648,15 @@ export function ParticipantInsights({
           </View>
         </View>
       )}
-      
+
       {/* Leaderboard */}
       <View style={styles.leaderboardSection}>
         <View style={styles.sectionHeader}>
           <Trophy size={16} color={colors.textMuted} />
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Rankings</Text>
-          <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
-            {participants.length} participants
-          </Text>
+          <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>{participants.length} participants</Text>
         </View>
-        
+
         <View style={styles.leaderboardList}>
           {participants.map((participant, idx) => (
             <LeaderboardItem
@@ -698,9 +666,7 @@ export function ParticipantInsights({
               totalDrills={drills.length}
               colors={colors}
               isExpanded={expandedUserId === participant.userId}
-              onToggle={() => setExpandedUserId(
-                expandedUserId === participant.userId ? null : participant.userId
-              )}
+              onToggle={() => setExpandedUserId(expandedUserId === participant.userId ? null : participant.userId)}
             />
           ))}
         </View>
@@ -717,7 +683,7 @@ const styles = StyleSheet.create({
   container: {
     gap: 16,
   },
-  
+
   // Empty state
   emptyContainer: {
     padding: 32,
@@ -728,7 +694,7 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
   },
-  
+
   // Summary stats
   summaryStats: {
     padding: 16,
@@ -758,7 +724,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: 'center',
   },
-  
+
   // Insights
   insightsSection: {
     gap: 10,
@@ -789,7 +755,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
   },
-  
+
   // Leaderboard
   leaderboardSection: {
     gap: 12,
@@ -806,7 +772,7 @@ const styles = StyleSheet.create({
   leaderboardList: {
     gap: 8,
   },
-  
+
   // Participant card
   participantCard: {
     borderRadius: 12,
@@ -872,7 +838,7 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 10,
   },
-  
+
   // Drill breakdown
   drillBreakdown: {
     paddingHorizontal: 14,

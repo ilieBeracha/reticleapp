@@ -14,10 +14,7 @@ import * as Haptics from 'expo-haptics';
 import { Lightbulb, Sparkles } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, {
-  FadeIn,
-  FadeOut,
-} from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import type { Colors } from '../UnifiedHomePage.types';
 
 const DAILY_TIP_CACHE_KEY = 'daily_tip_cache';
@@ -52,7 +49,8 @@ const FALLBACK_TIPS: PersonalizedTip[] = [
   },
   {
     title: 'Natural Point of Aim',
-    content: 'Close your eyes, assume your stance, open them. If you\'re not on target, adjust your feet, not your arms.',
+    content:
+      "Close your eyes, assume your stance, open them. If you're not on target, adjust your feet, not your arms.",
     category: 'fundamentals',
     personalized: false,
   },
@@ -87,13 +85,15 @@ function getInitialTip(streak: number, accuracy: number, sessionsThisWeek: numbe
 
   // Personalized tip selection based on stats
   if (streak >= 5) {
-    return FALLBACK_TIPS.find(t => t.title === 'Mental Focus') || FALLBACK_TIPS[dayOfYear % FALLBACK_TIPS.length];
+    return FALLBACK_TIPS.find((t) => t.title === 'Mental Focus') || FALLBACK_TIPS[dayOfYear % FALLBACK_TIPS.length];
   }
   if (accuracy < 50 && sessionsThisWeek > 0) {
-    return FALLBACK_TIPS.find(t => t.title === 'Trigger Press') || FALLBACK_TIPS[dayOfYear % FALLBACK_TIPS.length];
+    return FALLBACK_TIPS.find((t) => t.title === 'Trigger Press') || FALLBACK_TIPS[dayOfYear % FALLBACK_TIPS.length];
   }
   if (sessionsThisWeek === 0) {
-    return FALLBACK_TIPS.find(t => t.title === 'Deliberate Practice') || FALLBACK_TIPS[dayOfYear % FALLBACK_TIPS.length];
+    return (
+      FALLBACK_TIPS.find((t) => t.title === 'Deliberate Practice') || FALLBACK_TIPS[dayOfYear % FALLBACK_TIPS.length]
+    );
   }
 
   return FALLBACK_TIPS[dayOfYear % FALLBACK_TIPS.length];
@@ -109,15 +109,15 @@ async function getCachedTip(userId: string): Promise<PersonalizedTip | null> {
   try {
     const cached = await AsyncStorage.getItem(DAILY_TIP_CACHE_KEY);
     if (!cached) return null;
-    
+
     const data: CachedTip = JSON.parse(cached);
     const today = format(new Date(), 'yyyy-MM-dd');
-    
+
     // Check if cache is from today and for the same user
     if (data.date === today && data.userId === userId) {
       return data.tip;
     }
-    
+
     return null;
   } catch (error) {
     console.error('Failed to get cached tip:', error);
@@ -141,21 +141,21 @@ async function cacheTip(userId: string, tip: PersonalizedTip): Promise<void> {
 export function DailyTip({ colors, streak, accuracy, sessionsThisWeek, totalSessions = 0 }: DailyTipProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [currentTip, setCurrentTip] = useState<PersonalizedTip>(() => 
+  const [currentTip, setCurrentTip] = useState<PersonalizedTip>(() =>
     getInitialTip(streak, accuracy, sessionsThisWeek)
   );
 
   // Fetch personalized tip on mount - cached per day
   useEffect(() => {
     let mounted = true;
-    
+
     const loadTip = async () => {
       // If no user or not enough sessions, use fallback
       if (!user?.id || totalSessions < 3) {
         setLoading(false);
         return;
       }
-      
+
       // Check cache first
       const cachedTip = await getCachedTip(user.id);
       if (cachedTip) {
@@ -165,7 +165,7 @@ export function DailyTip({ colors, streak, accuracy, sessionsThisWeek, totalSess
         }
         return;
       }
-      
+
       // No cache - fetch new tip from AI
       try {
         const tip = await getPersonalizedDailyTip(user.id, {
@@ -174,7 +174,7 @@ export function DailyTip({ colors, streak, accuracy, sessionsThisWeek, totalSess
           sessionsThisWeek,
           totalSessions,
         });
-        
+
         if (mounted) {
           setCurrentTip(tip);
           // Cache the tip for today
@@ -190,7 +190,7 @@ export function DailyTip({ colors, streak, accuracy, sessionsThisWeek, totalSess
     };
 
     loadTip();
-    
+
     return () => {
       mounted = false;
     };
@@ -213,23 +213,15 @@ export function DailyTip({ colors, streak, accuracy, sessionsThisWeek, totalSess
   const tipColor = categoryColors[currentTip.category] || colors.primary;
 
   return (
-    <Animated.View
-      entering={FadeIn.duration(400)}
-      exiting={FadeOut.duration(200)}
-      style={s.container}
-    >
-      <TouchableOpacity 
+    <Animated.View entering={FadeIn.duration(400)} exiting={FadeOut.duration(200)} style={s.container}>
+      <TouchableOpacity
         activeOpacity={0.7}
         onPress={handleToggle}
         style={[s.card, { backgroundColor: `${tipColor}08`, borderColor: `${tipColor}20` }]}
       >
         <View style={s.header}>
           <View style={[s.iconBg, { backgroundColor: `${tipColor}15` }]}>
-            {loading ? (
-              <ActivityIndicator size={12} color={tipColor} />
-            ) : (
-              <Lightbulb size={12} color={tipColor} />
-            )}
+            {loading ? <ActivityIndicator size={12} color={tipColor} /> : <Lightbulb size={12} color={tipColor} />}
           </View>
           <View style={s.titleContainer}>
             <Text style={[s.title, { color: colors.text }]} numberOfLines={1}>
@@ -243,16 +235,12 @@ export function DailyTip({ colors, streak, accuracy, sessionsThisWeek, totalSess
             </View>
           )}
         </View>
-        
+
         {expanded && (
           <Animated.View entering={FadeIn.duration(200)} style={s.expandedContent}>
-            <Text style={[s.content, { color: colors.text }]}>
-              {currentTip.content}
-            </Text>
+            <Text style={[s.content, { color: colors.text }]}>{currentTip.content}</Text>
             {currentTip.personalized && currentTip.based_on && (
-              <Text style={[s.basedOn, { color: colors.textMuted }]}>
-                Based on: {currentTip.based_on}
-              </Text>
+              <Text style={[s.basedOn, { color: colors.textMuted }]}>Based on: {currentTip.based_on}</Text>
             )}
           </Animated.View>
         )}

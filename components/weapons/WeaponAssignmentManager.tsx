@@ -1,6 +1,6 @@
 /**
  * WeaponAssignmentManager - For commanders to manage team weapon assignments
- * 
+ *
  * Features:
  * - View all team weapons with current assignments
  * - Add new team weapons
@@ -71,13 +71,9 @@ interface PendingWeapon extends UserWeapon {
 // MAIN COMPONENT
 // ============================================================================
 
-export function WeaponAssignmentManager({
-  teamId,
-  teamMembers,
-  onClose,
-}: WeaponAssignmentManagerProps) {
+export function WeaponAssignmentManager({ teamId, teamMembers, onClose }: WeaponAssignmentManagerProps) {
   const colors = useColors();
-  
+
   const [loading, setLoading] = useState(true);
   const [teamWeapons, setTeamWeapons] = useState<TeamWeapon[]>([]);
   const [pendingWeapons, setPendingWeapons] = useState<PendingWeapon[]>([]);
@@ -91,7 +87,7 @@ export function WeaponAssignmentManager({
   const [allCatalogWeapons, setAllCatalogWeapons] = useState<GlobalWeapon[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [selectedCatalogWeapon, setSelectedCatalogWeapon] = useState<GlobalWeapon | null>(null);
-  
+
   // Create form state
   const [newWeaponName, setNewWeaponName] = useState('');
   const [newWeaponCategory, setNewWeaponCategory] = useState<WeaponCategory>('rifle');
@@ -151,18 +147,21 @@ export function WeaponAssignmentManager({
     }
   }, []);
 
-  const handleApprove = useCallback(async (userWeaponId: string) => {
-    try {
-      setActionLoading(userWeaponId);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      await approveSharedWeapon(userWeaponId, teamId);
-      await loadData();
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to approve weapon');
-    } finally {
-      setActionLoading(null);
-    }
-  }, [teamId]);
+  const handleApprove = useCallback(
+    async (userWeaponId: string) => {
+      try {
+        setActionLoading(userWeaponId);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        await approveSharedWeapon(userWeaponId, teamId);
+        await loadData();
+      } catch (err: any) {
+        Alert.alert('Error', err.message || 'Failed to approve weapon');
+      } finally {
+        setActionLoading(null);
+      }
+    },
+    [teamId]
+  );
 
   const handleReject = useCallback(async (userWeaponId: string) => {
     try {
@@ -206,13 +205,13 @@ export function WeaponAssignmentManager({
   }, [allCatalogWeapons.length]);
 
   // Filter catalog weapons locally
-  const filteredCatalogWeapons = allCatalogWeapons.filter(weapon => {
+  const filteredCatalogWeapons = allCatalogWeapons.filter((weapon) => {
     if (!catalogSearch.trim()) return true;
     const query = catalogSearch.toLowerCase();
     return (
       weapon.name.toLowerCase().includes(query) ||
-      (weapon.manufacturer?.toLowerCase().includes(query)) ||
-      (weapon.caliber?.toLowerCase().includes(query)) ||
+      weapon.manufacturer?.toLowerCase().includes(query) ||
+      weapon.caliber?.toLowerCase().includes(query) ||
       weapon.category.toLowerCase().includes(query)
     );
   });
@@ -262,7 +261,7 @@ export function WeaponAssignmentManager({
   const renderWeaponItem = ({ item }: { item: TeamWeapon }) => {
     const isLoading = actionLoading === item.id;
     const assignedUser = item.assigned_user;
-    
+
     return (
       <View style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.weaponInfo}>
@@ -271,7 +270,7 @@ export function WeaponAssignmentManager({
             {getCategoryLabel(item.category)} {item.caliber && `• ${item.caliber}`}
           </Text>
         </View>
-        
+
         <View style={styles.assignmentArea}>
           {isLoading ? (
             <ActivityIndicator size="small" color={colors.primary} />
@@ -279,9 +278,7 @@ export function WeaponAssignmentManager({
             <View style={styles.assignedRow}>
               <View style={styles.assignedUser}>
                 <User size={14} color={colors.textMuted} />
-                <Text style={[styles.assignedName, { color: colors.text }]}>
-                  {assignedUser.full_name}
-                </Text>
+                <Text style={[styles.assignedName, { color: colors.text }]}>{assignedUser.full_name}</Text>
               </View>
               <TouchableOpacity
                 style={[styles.actionBtn, { backgroundColor: colors.muted }]}
@@ -306,26 +303,24 @@ export function WeaponAssignmentManager({
 
   const renderPendingItem = ({ item }: { item: PendingWeapon }) => {
     const isLoading = actionLoading === item.id;
-    
+
     return (
       <View style={[styles.pendingCard, { backgroundColor: colors.card, borderColor: colors.yellow }]}>
         <View style={styles.pendingHeader}>
           <AlertTriangle size={16} color={colors.yellow} />
           <Text style={[styles.pendingLabel, { color: colors.yellow }]}>Pending Approval</Text>
         </View>
-        
+
         <View style={styles.weaponInfo}>
           <Text style={[styles.weaponName, { color: colors.text }]}>{item.name}</Text>
           <Text style={[styles.weaponMeta, { color: colors.textMuted }]}>
             {getCategoryLabel(item.category)} {item.caliber && `• ${item.caliber}`}
           </Text>
           {item.user && (
-            <Text style={[styles.contributorName, { color: colors.textMuted }]}>
-              From: {item.user.full_name}
-            </Text>
+            <Text style={[styles.contributorName, { color: colors.textMuted }]}>From: {item.user.full_name}</Text>
           )}
         </View>
-        
+
         <View style={styles.pendingActions}>
           {isLoading ? (
             <ActivityIndicator size="small" color={colors.primary} />
@@ -353,27 +348,27 @@ export function WeaponAssignmentManager({
 
   // Get which users already have weapons assigned
   const usersWithWeapons = new Map<string, string>();
-  teamWeapons.forEach(w => {
+  teamWeapons.forEach((w) => {
     if (w.assigned_to) {
       usersWithWeapons.set(w.assigned_to, w.name);
     }
   });
 
-  const renderMemberItem = ({ item }: { item: typeof teamMembers[0] }) => {
+  const renderMemberItem = ({ item }: { item: (typeof teamMembers)[0] }) => {
     if (!selectedWeapon) return null;
-    
+
     const existingWeapon = usersWithWeapons.get(item.id);
     const hasWeapon = !!existingWeapon;
-    
+
     return (
       <TouchableOpacity
         style={[
-          styles.memberItem, 
-          { 
-            backgroundColor: colors.card, 
+          styles.memberItem,
+          {
+            backgroundColor: colors.card,
             borderColor: hasWeapon ? colors.border : colors.border,
             opacity: hasWeapon ? 0.5 : 1,
-          }
+          },
         ]}
         onPress={() => {
           if (hasWeapon) {
@@ -392,11 +387,7 @@ export function WeaponAssignmentManager({
           <Text style={[styles.memberName, { color: hasWeapon ? colors.textMuted : colors.text }]}>
             {item.full_name}
           </Text>
-          {hasWeapon && (
-            <Text style={[styles.memberWeapon, { color: colors.textMuted }]}>
-              Has: {existingWeapon}
-            </Text>
-          )}
+          {hasWeapon && <Text style={[styles.memberWeapon, { color: colors.textMuted }]}>Has: {existingWeapon}</Text>}
         </View>
         {!hasWeapon && <ChevronRight size={18} color={colors.textMuted} />}
       </TouchableOpacity>
@@ -411,16 +402,14 @@ export function WeaponAssignmentManager({
           <TouchableOpacity onPress={() => setSelectedWeapon(null)}>
             <X size={20} color={colors.textMuted} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            Assign {selectedWeapon.name}
-          </Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Assign {selectedWeapon.name}</Text>
           <View style={{ width: 20 }} />
         </View>
-        
+
         <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
           Select a team member (1 weapon per member)
         </Text>
-        
+
         <FlatList
           data={teamMembers}
           keyExtractor={(item) => item.id}
@@ -461,21 +450,17 @@ export function WeaponAssignmentManager({
         <FlatList
           data={[
             ...(pendingWeapons.length > 0 ? [{ type: 'header' as const, title: 'Pending Requests' }] : []),
-            ...pendingWeapons.map(w => ({ type: 'pending' as const, data: w })),
+            ...pendingWeapons.map((w) => ({ type: 'pending' as const, data: w })),
             { type: 'header' as const, title: 'Team Weapons' },
-            ...teamWeapons.map(w => ({ type: 'weapon' as const, data: w })),
+            ...teamWeapons.map((w) => ({ type: 'weapon' as const, data: w })),
           ]}
-          keyExtractor={(item, index) => 
-            item.type === 'header' ? `header-${index}` : (item.data as any).id
-          }
+          keyExtractor={(item, index) => (item.type === 'header' ? `header-${index}` : (item.data as any).id)}
           renderItem={({ item }) => {
             if (item.type === 'header') {
               return (
                 <View style={styles.sectionHeader}>
                   <Users size={14} color={colors.textMuted} />
-                  <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-                    {item.title}
-                  </Text>
+                  <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{item.title}</Text>
                 </View>
               );
             }
@@ -488,12 +473,8 @@ export function WeaponAssignmentManager({
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Users size={48} color={colors.textMuted} style={{ opacity: 0.5 }} />
-              <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-                No team weapons yet
-              </Text>
-              <Text style={[styles.emptyHint, { color: colors.textMuted }]}>
-                Tap "Add Team Weapon" to get started
-              </Text>
+              <Text style={[styles.emptyText, { color: colors.textMuted }]}>No team weapons yet</Text>
+              <Text style={[styles.emptyHint, { color: colors.textMuted }]}>Tap "Add Team Weapon" to get started</Text>
             </View>
           }
         />
@@ -600,7 +581,9 @@ export function WeaponAssignmentManager({
                       <View style={styles.catalogInfo}>
                         <Text style={[styles.catalogName, { color: colors.text }]}>{item.name}</Text>
                         <Text style={[styles.catalogMeta, { color: colors.textMuted }]}>
-                          {item.manufacturer ? `${item.manufacturer} • ` : ''}{getCategoryLabel(item.category)}{item.caliber && ` • ${item.caliber}`}
+                          {item.manufacturer ? `${item.manufacturer} • ` : ''}
+                          {getCategoryLabel(item.category)}
+                          {item.caliber && ` • ${item.caliber}`}
                         </Text>
                       </View>
                       <ChevronRight size={18} color={colors.textMuted} />
@@ -613,9 +596,7 @@ export function WeaponAssignmentManager({
                         No weapons match "{catalogSearch}"
                       </Text>
                     ) : allCatalogWeapons.length === 0 ? (
-                      <Text style={[styles.noResults, { color: colors.textMuted }]}>
-                        No weapons in catalog yet
-                      </Text>
+                      <Text style={[styles.noResults, { color: colors.textMuted }]}>No weapons in catalog yet</Text>
                     ) : null
                   }
                 />
@@ -646,7 +627,10 @@ export function WeaponAssignmentManager({
               <View style={styles.formGroup}>
                 <Text style={[styles.formLabel, { color: colors.textMuted }]}>NAME *</Text>
                 <TextInput
-                  style={[styles.formInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+                  style={[
+                    styles.formInput,
+                    { backgroundColor: colors.card, borderColor: colors.border, color: colors.text },
+                  ]}
                   value={newWeaponName}
                   onChangeText={setNewWeaponName}
                   placeholder="e.g., Team Rifle #1"
@@ -664,17 +648,19 @@ export function WeaponAssignmentManager({
                         key={cat.value}
                         style={[
                           styles.categoryChip,
-                          { 
+                          {
                             backgroundColor: newWeaponCategory === cat.value ? colors.primary : colors.card,
                             borderColor: newWeaponCategory === cat.value ? colors.primary : colors.border,
-                          }
+                          },
                         ]}
                         onPress={() => setNewWeaponCategory(cat.value)}
                       >
-                        <Text style={[
-                          styles.categoryChipText,
-                          { color: newWeaponCategory === cat.value ? '#fff' : colors.text }
-                        ]}>
+                        <Text
+                          style={[
+                            styles.categoryChipText,
+                            { color: newWeaponCategory === cat.value ? '#fff' : colors.text },
+                          ]}
+                        >
                           {cat.label}
                         </Text>
                       </TouchableOpacity>
@@ -686,7 +672,10 @@ export function WeaponAssignmentManager({
               <View style={styles.formGroup}>
                 <Text style={[styles.formLabel, { color: colors.textMuted }]}>CALIBER</Text>
                 <TextInput
-                  style={[styles.formInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+                  style={[
+                    styles.formInput,
+                    { backgroundColor: colors.card, borderColor: colors.border, color: colors.text },
+                  ]}
                   value={newWeaponCaliber}
                   onChangeText={setNewWeaponCaliber}
                   placeholder="e.g., 7.62x51mm"
@@ -697,7 +686,10 @@ export function WeaponAssignmentManager({
               <View style={styles.formGroup}>
                 <Text style={[styles.formLabel, { color: colors.textMuted }]}>SERIAL NUMBER</Text>
                 <TextInput
-                  style={[styles.formInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+                  style={[
+                    styles.formInput,
+                    { backgroundColor: colors.card, borderColor: colors.border, color: colors.text },
+                  ]}
                   value={newWeaponSerial}
                   onChangeText={setNewWeaponSerial}
                   placeholder="Optional"
@@ -895,7 +887,7 @@ const styles = StyleSheet.create({
   emptyHint: {
     fontSize: 13,
   },
-  
+
   // Add Weapon Button
   addWeaponBtn: {
     flexDirection: 'row',
@@ -1077,4 +1069,3 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
-

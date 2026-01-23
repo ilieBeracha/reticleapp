@@ -11,18 +11,19 @@
 import { useColors } from '@/hooks/ui/useColors';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { Clock, History, HelpCircle } from 'lucide-react-native';
+import { Clock, HelpCircle, History } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, FadeOut, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeOut,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import { styles } from './UnifiedHomePage.styles';
-import {
-  CoachMessage,
-  DailyTip,
-  HeroActions,
-  HomeHeader,
-  RecentActivitySection,
-} from './components';
+import { CoachMessage, DailyTip, HeroActions, HomeHeader, RecentActivitySection } from './components';
 import { WeeklyStatsCard } from './components/WeeklyStatsCard';
 import { useUnifiedHomePage } from './useUnifiedHomePage';
 
@@ -50,8 +51,8 @@ function SectionHeader({ title, tooltip, colors }: SectionHeaderProps) {
     <View style={localStyles.sectionHeaderContainer}>
       <View style={localStyles.sectionHeader}>
         <Text style={[localStyles.sectionTitle, { color: colors.textMuted }]}>{title}</Text>
-        <TouchableOpacity 
-          onPress={handlePress} 
+        <TouchableOpacity
+          onPress={handlePress}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           style={[localStyles.helpButton, { backgroundColor: showTooltip ? `${colors.primary}15` : colors.secondary }]}
         >
@@ -59,8 +60,8 @@ function SectionHeader({ title, tooltip, colors }: SectionHeaderProps) {
         </TouchableOpacity>
       </View>
       {showTooltip && (
-        <Animated.View 
-          entering={FadeInDown.duration(200)} 
+        <Animated.View
+          entering={FadeInDown.duration(200)}
           exiting={FadeOut.duration(150)}
           style={[localStyles.tooltipBubble, { backgroundColor: colors.text, borderColor: colors.text }]}
         >
@@ -115,6 +116,11 @@ export function UnifiedHomePage() {
     recentSessions,
     myUpcomingTrainings,
     hasActiveSession,
+    hasTeams,
+    heroMode,
+    activeTeamTraining,
+    isTrainingCommander,
+    nextUpcomingTraining,
     allSessions,
     defaultWeapon,
     defaultWeaponStats,
@@ -124,6 +130,7 @@ export function UnifiedHomePage() {
     handleStartSession,
     handleActiveSessionPress,
     handleSessionPress,
+    handleTrainingPress,
   } = useUnifiedHomePage();
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -183,11 +190,17 @@ export function UnifiedHomePage() {
         />
         <HeroActions
           colors={colors}
+          heroMode={heroMode}
           activeSession={homeState.activeSession}
           hasActiveSession={!!hasActiveSession}
           starting={starting}
           onStartSession={handleStartSession}
           onActiveSessionPress={handleActiveSessionPress}
+          activeTeamTraining={activeTeamTraining}
+          isTrainingCommander={isTrainingCommander}
+          hasTeams={hasTeams}
+          onTrainingPress={handleTrainingPress}
+          nextUpcomingTraining={nextUpcomingTraining}
           defaultWeapon={defaultWeapon}
           defaultWeaponStats={defaultWeaponStats}
           upcomingTrainings={myUpcomingTrainings}
@@ -218,18 +231,18 @@ export function UnifiedHomePage() {
           tooltip="Your latest training sessions. Tap any session to view details, targets, and results."
           colors={colors}
         />
-        <RecentActivitySection
-          sessions={recentSessions}
-          colors={colors}
-          onSessionPress={handleSessionPress}
-        />
+        <RecentActivitySection sessions={recentSessions} colors={colors} onSessionPress={handleSessionPress} />
 
         {/* ─────────────────────────────────────────────────────────────────── */}
         {/* VIEW ALL SESSIONS LINK */}
         {/* ─────────────────────────────────────────────────────────────────── */}
         <Animated.View entering={FadeIn.delay(200)}>
           <AnimatedTouchable
-            style={[localStyles.viewAllLink, { backgroundColor: colors.card, borderColor: colors.border }, viewAllAnimStyle]}
+            style={[
+              localStyles.viewAllLink,
+              { backgroundColor: colors.card, borderColor: colors.border },
+              viewAllAnimStyle,
+            ]}
             onPress={handleViewAllPress}
             onPressIn={handleViewAllPressIn}
             onPressOut={handleViewAllPressOut}
@@ -333,4 +346,3 @@ const localStyles = StyleSheet.create({
 });
 
 export default UnifiedHomePage;
-

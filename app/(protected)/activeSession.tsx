@@ -1,21 +1,15 @@
 /**
  * Active Session Screen
- * 
+ *
  * Clean, refined design matching the training detail screen.
  * Inline action buttons instead of FAB.
  */
 
-import { PAPER_TYPE, TARGET_TYPE } from '@/constants';
-import { isPaperTarget, isGroupingPaper } from '@/constants/drill';
 import { TargetCard } from '@/components/session/TargetCard';
 import { WeatherStrip } from '@/components/session/WeatherDisplay';
-import {
-  COLORS,
-  formatTime,
-  SessionPrepView,
-  styles,
-  useActiveSession,
-} from '@/components/session/activeSession';
+import { COLORS, formatTime, SessionPrepView, styles, useActiveSession } from '@/components/session/activeSession';
+import { PAPER_TYPE } from '@/constants';
+import { isGroupingPaper, isPaperTarget } from '@/constants/drill';
 import { useColors } from '@/hooks/ui/useColors';
 import { useOpenWeather } from '@/hooks/useOpenWeather';
 import { isGroupingSession } from '@/utils/drillGoal';
@@ -33,10 +27,9 @@ import {
   Square,
   Target,
   Trophy,
-  Users,
   Watch,
   X,
-  Zap,
+  Zap
 } from 'lucide-react-native';
 import { useCallback } from 'react';
 import {
@@ -63,13 +56,13 @@ function HeroTarget({
 }) {
   const isPaper = isPaperTarget(target.target_type);
   const paperResult = target.paper_result;
-  
+
   const imageUrl = paperResult?.scanned_image_url;
   const hasImage = !!imageUrl;
-  
+
   const isScanned = isPaper && !!paperResult?.scanned_image_url;
   const isGrouping = isPaper && isGroupingPaper(paperResult?.paper_type);
-  
+
   const distance = target.distance_m;
   const dispersion = paperResult?.dispersion_cm;
   const hits = paperResult?.hits_total ?? target.tactical_result?.hits ?? 0;
@@ -90,7 +83,7 @@ function HeroTarget({
           <Target size={32} color={colors.textMuted} />
         </View>
       )}
-      
+
       {/* Top badges: Distance + Type */}
       <View style={localStyles.heroBadgeRow}>
         {distance && (
@@ -102,14 +95,11 @@ function HeroTarget({
           <Text style={localStyles.heroTypeText}>{typeLabel}</Text>
         </View>
       </View>
-      
+
       {/* Bottom: Key metric only */}
       <View style={localStyles.heroOverlay}>
         <Text style={localStyles.heroMetricValue}>
-          {isGrouping && dispersion != null 
-            ? `${dispersion.toFixed(1)}cm` 
-            : `${hits} ${isScanned ? 'holes' : 'hits'}`
-          }
+          {isGrouping && dispersion != null ? `${dispersion.toFixed(1)}cm` : `${hits} ${isScanned ? 'holes' : 'hits'}`}
         </Text>
         <Text style={localStyles.heroMetricLabel}>
           {isGrouping ? 'group size' : isScanned ? 'detected' : 'recorded'}
@@ -119,13 +109,7 @@ function HeroTarget({
   );
 }
 
-function CompactStats({
-  targets,
-  colors,
-}: {
-  targets: any[];
-  colors: ReturnType<typeof useColors>;
-}) {
+function CompactStats({ targets, colors }: { targets: any[]; colors: ReturnType<typeof useColors> }) {
   let manualShots = 0;
   let manualHits = 0;
   let scannedHoles = 0;
@@ -170,23 +154,27 @@ function CompactStats({
         <Text style={[localStyles.compactStatValue, { color: colors.text }]}>{totalTargets}</Text>
         <Text style={[localStyles.compactStatLabel, { color: colors.textMuted }]}>targets</Text>
       </View>
-      
+
       <View style={[localStyles.compactStatDivider, { backgroundColor: colors.border }]} />
-      
+
       {hasManual ? (
         <>
           <View style={localStyles.compactStatItem}>
-            <Text style={[
-              localStyles.compactStatValue, 
-              { color: manualAccuracy >= 70 ? '#22C55E' : manualAccuracy >= 50 ? '#F59E0B' : colors.text }
-            ]}>
+            <Text
+              style={[
+                localStyles.compactStatValue,
+                { color: manualAccuracy >= 70 ? '#22C55E' : manualAccuracy >= 50 ? '#F59E0B' : colors.text },
+              ]}
+            >
               {manualAccuracy}%
             </Text>
             <Text style={[localStyles.compactStatLabel, { color: colors.textMuted }]}>accuracy</Text>
           </View>
           <View style={[localStyles.compactStatDivider, { backgroundColor: colors.border }]} />
           <View style={localStyles.compactStatItem}>
-            <Text style={[localStyles.compactStatValue, { color: colors.text }]}>{manualHits}/{manualShots}</Text>
+            <Text style={[localStyles.compactStatValue, { color: colors.text }]}>
+              {manualHits}/{manualShots}
+            </Text>
             <Text style={[localStyles.compactStatLabel, { color: colors.textMuted }]}>hits</Text>
           </View>
         </>
@@ -275,9 +263,7 @@ export default function ActiveSessionScreen() {
           <Target size={28} color={colors.textMuted} />
         </View>
         <Text style={[styles.emptyTitle, { color: colors.text }]}>Ready to shoot</Text>
-        <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
-          Add your first target to get started
-        </Text>
+        <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>Add your first target to get started</Text>
       </View>
     ),
     [colors]
@@ -294,7 +280,7 @@ export default function ActiveSessionScreen() {
   if (!session || (session.status !== 'active' && session.status !== 'pending')) {
     const isCompleted = session?.status === 'completed';
     const hasTraining = !!session?.training_id;
-    
+
     return (
       <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
         <View style={[styles.statusIcon, { backgroundColor: colors.secondary }]}>
@@ -307,29 +293,27 @@ export default function ActiveSessionScreen() {
         <Text style={[styles.statusTitle, { color: colors.text }]}>
           {isCompleted ? 'Session Completed' : 'Session not found'}
         </Text>
-        
+
         {/* Clear exit buttons based on context */}
         <View style={localStyles.exitButtonsWrap}>
           {hasTraining && session?.training_id ? (
             <>
               <TouchableOpacity
                 style={[localStyles.exitPrimaryBtn, { backgroundColor: colors.text }]}
-                onPress={() => router.replace({
-                  pathname: '/(protected)/trainingDetail',
-                  params: { id: session.training_id },
-                })}
+                onPress={() =>
+                  router.replace({
+                    pathname: '/(protected)/trainingDetail',
+                    params: { id: session.training_id },
+                  })
+                }
               >
-                <Text style={[localStyles.exitPrimaryText, { color: colors.background }]}>
-                  Return to Training
-                </Text>
+                <Text style={[localStyles.exitPrimaryText, { color: colors.background }]}>Return to Training</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={localStyles.exitSecondaryBtn}
                 onPress={() => router.replace('/(protected)/(tabs)')}
               >
-                <Text style={[localStyles.exitSecondaryText, { color: colors.textMuted }]}>
-                  Exit to Home
-                </Text>
+                <Text style={[localStyles.exitSecondaryText, { color: colors.textMuted }]}>Exit to Home</Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -355,20 +339,24 @@ export default function ActiveSessionScreen() {
         onSessionActivated={(activated) => {
           handleRefresh();
         }}
-        onBack={isTeamTraining ? undefined : () => {
-          // Only solo sessions can go back to edit
-          router.replace({
-            pathname: '/(protected)/createSession',
-            params: {
-              editSessionId: session.id,
-              weaponId: session.weapon_id || '',
-              weaponName: session.weapon_name || '',
-              purpose: session.drill_config?.drill_goal || PAPER_TYPE.GROUPING,
-              distance: String(session.drill_config?.distance_m || 25),
-              shots: String(session.drill_config?.rounds_per_shooter || 5),
-            },
-          });
-        }}
+        onBack={
+          isTeamTraining
+            ? undefined
+            : () => {
+                // Only solo sessions can go back to edit
+                router.replace({
+                  pathname: '/(protected)/createSession',
+                  params: {
+                    editSessionId: session.id,
+                    weaponId: session.weapon_id || '',
+                    weaponName: session.weapon_name || '',
+                    purpose: session.drill_config?.drill_goal || PAPER_TYPE.GROUPING,
+                    distance: String(session.drill_config?.distance_m || 25),
+                    shots: String(session.drill_config?.rounds_per_shooter || 5),
+                  },
+                });
+              }
+        }
         onClose={handleClose}
       />
     );
@@ -394,7 +382,15 @@ export default function ActiveSessionScreen() {
     }
 
     if (watchState.watchStarting) {
-      return <WatchStartingView colors={colors} insets={insets} drillName={drillName} onClose={handleClose} isTeamTraining={isTeamTraining} />;
+      return (
+        <WatchStartingView
+          colors={colors}
+          insets={insets}
+          drillName={drillName}
+          onClose={handleClose}
+          isTeamTraining={isTeamTraining}
+        />
+      );
     }
 
     if (watchState.watchAppNotOpen) {
@@ -455,7 +451,7 @@ export default function ActiveSessionScreen() {
   if (isTeamTraining) {
     const isGrouping = isGroupingSession(session);
     const drillComplete = drillProgress?.isComplete && drillProgress?.meetsAccuracy;
-    
+
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Minimal header - no close button */}
@@ -509,7 +505,9 @@ export default function ActiveSessionScreen() {
               </View>
               <View style={localStyles.trainingParam}>
                 <Zap size={14} color={colors.textMuted} />
-                <Text style={[localStyles.trainingParamText, { color: colors.text }]}>{drill?.rounds_per_shooter || 5} shots</Text>
+                <Text style={[localStyles.trainingParamText, { color: colors.text }]}>
+                  {drill?.rounds_per_shooter || 5} shots
+                </Text>
               </View>
             </View>
 
@@ -590,7 +588,9 @@ export default function ActiveSessionScreen() {
         )}
 
         {/* Bottom action - End Execution */}
-        <View style={[localStyles.bottomBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
+        <View
+          style={[localStyles.bottomBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}
+        >
           <TouchableOpacity
             style={[
               localStyles.endBtn,
@@ -703,7 +703,10 @@ export default function ActiveSessionScreen() {
               <Text style={[localStyles.actionBtnText, { color: colors.background }]}>Scan</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[localStyles.actionBtn, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}
+              style={[
+                localStyles.actionBtn,
+                { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+              ]}
               onPress={handleManualRoute}
             >
               <Crosshair size={18} color={colors.text} />
@@ -754,8 +757,7 @@ export default function ActiveSessionScreen() {
                 style={[
                   localStyles.endBtnText,
                   {
-                    color:
-                      drillProgress?.isComplete && drillProgress?.meetsAccuracy ? colors.background : colors.text,
+                    color: drillProgress?.isComplete && drillProgress?.meetsAccuracy ? colors.background : colors.text,
                   },
                 ]}
               >
@@ -802,7 +804,7 @@ function WatchFailedView({
         <View style={[localStyles.watchIconLarge, { backgroundColor: colors.secondary }]}>
           <Watch size={56} color={colors.textMuted} strokeWidth={1.5} />
         </View>
-        
+
         <Text style={[localStyles.calmTitle, { color: colors.text }]}>Watch Not Responding</Text>
         <Text style={[localStyles.calmSubtitle, { color: colors.textMuted }]}>
           No worries — you can continue on your phone
@@ -858,9 +860,7 @@ function WatchStartingView({ colors, insets, drillName, onClose, isTeamTraining 
           <Watch size={56} color={colors.textMuted} strokeWidth={1.5} />
         </View>
         <Text style={[localStyles.calmTitle, { color: colors.text }]}>Connecting to Watch</Text>
-        <Text style={[localStyles.calmSubtitle, { color: colors.textMuted }]}>
-          Just a moment...
-        </Text>
+        <Text style={[localStyles.calmSubtitle, { color: colors.textMuted }]}>Just a moment...</Text>
         <ActivityIndicator size="small" color={colors.textMuted} style={{ marginTop: 24 }} />
       </View>
     </View>
@@ -902,15 +902,14 @@ function WatchPreviewQueuedView({
         <View style={[localStyles.watchIconLarge, { backgroundColor: watchAppNotOpen ? '#F59E0B15' : '#10B98115' }]}>
           <Watch size={56} color={watchAppNotOpen ? '#F59E0B' : '#10B981'} strokeWidth={1.5} />
         </View>
-        
+
         <Text style={[localStyles.calmTitle, { color: colors.text }]}>
           {watchAppNotOpen ? 'Open Watch App' : 'Tap Watch to Start'}
         </Text>
         <Text style={[localStyles.calmSubtitle, { color: colors.textMuted, paddingHorizontal: 40 }]}>
-          {watchAppNotOpen 
+          {watchAppNotOpen
             ? 'Open ReticleIQ on your Garmin and tap to begin'
-            : 'Session is ready. Tap your watch when you\'re in position.'
-          }
+            : "Session is ready. Tap your watch when you're in position."}
         </Text>
 
         {drill && (
@@ -932,9 +931,7 @@ function WatchPreviewQueuedView({
 
         <View style={{ marginTop: 40, alignItems: 'center' }}>
           <ActivityIndicator size="small" color={colors.textMuted} />
-          <Text style={[{ fontSize: 12, marginTop: 8 }, { color: colors.textMuted }]}>
-            Waiting...
-          </Text>
+          <Text style={[{ fontSize: 12, marginTop: 8 }, { color: colors.textMuted }]}>Waiting...</Text>
         </View>
       </View>
 
@@ -944,9 +941,7 @@ function WatchPreviewQueuedView({
           onPress={onContinueWithoutWatch}
           disabled={ending}
         >
-          <Text style={[localStyles.subtleBtnText, { color: colors.textMuted }]}>
-            Use Phone Instead
-          </Text>
+          <Text style={[localStyles.subtleBtnText, { color: colors.textMuted }]}>Use Phone Instead</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -988,13 +983,13 @@ function WatchWaitingView({
       </View>
 
       <View style={styles.watchWaitingContainer}>
-        <View style={[localStyles.watchIconLarge, { backgroundColor: isWatchConnected ? '#10B98115' : colors.secondary }]}>
+        <View
+          style={[localStyles.watchIconLarge, { backgroundColor: isWatchConnected ? '#10B98115' : colors.secondary }]}
+        >
           <Watch size={56} color={isWatchConnected ? '#10B981' : colors.textMuted} strokeWidth={1.5} />
         </View>
-        
-        <Text style={[localStyles.calmTitle, { color: colors.text }]}>
-          Session Running on Watch
-        </Text>
+
+        <Text style={[localStyles.calmTitle, { color: colors.text }]}>Session Running on Watch</Text>
         <Text style={[localStyles.calmSubtitle, { color: colors.textMuted }]}>
           Focus on your shooting. Check your wrist for time.
         </Text>
@@ -1019,9 +1014,7 @@ function WatchWaitingView({
           {ending ? (
             <ActivityIndicator size="small" color={colors.textMuted} />
           ) : (
-            <Text style={[localStyles.subtleBtnText, { color: colors.textMuted }]}>
-              End Session from Phone
-            </Text>
+            <Text style={[localStyles.subtleBtnText, { color: colors.textMuted }]}>End Session from Phone</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -1029,12 +1022,23 @@ function WatchWaitingView({
   );
 }
 
-function DrillBanner({ colors, drill, drillProgress, targets, isGroupingDrill, isTacticalDrill, weaponName, isLocked }: any) {
+function DrillBanner({
+  colors,
+  drill,
+  drillProgress,
+  targets,
+  isGroupingDrill,
+  isTacticalDrill,
+  weaponName,
+  isLocked,
+}: any) {
   return (
     <View style={styles.drillBanner}>
       <View style={[styles.drillBannerInner, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.drillInfoRow}>
-          <View style={[styles.drillTypeIcon, { backgroundColor: isLocked ? colors.primary + '20' : colors.secondary }]}>
+          <View
+            style={[styles.drillTypeIcon, { backgroundColor: isLocked ? colors.primary + '20' : colors.secondary }]}
+          >
             {isLocked ? (
               <Lock size={16} color={colors.primary} />
             ) : isGroupingDrill ? (
@@ -1075,9 +1079,7 @@ function DrillBanner({ colors, drill, drillProgress, targets, isGroupingDrill, i
               {drill.time_limit_seconds && (
                 <View style={styles.drillReqItem}>
                   <Clock size={12} color={drillProgress?.overTime ? COLORS.error : colors.textMuted} />
-                  <Text
-                    style={[styles.drillReqText, { color: drillProgress?.overTime ? COLORS.error : colors.text }]}
-                  >
+                  <Text style={[styles.drillReqText, { color: drillProgress?.overTime ? COLORS.error : colors.text }]}>
                     {formatTime(drill.time_limit_seconds)}
                   </Text>
                 </View>
@@ -1246,42 +1248,42 @@ const localStyles = StyleSheet.create({
   pulseIndicator: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pulseText: { fontSize: 14, fontWeight: '500' },
 
-  statusBadge: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 6, 
-    paddingHorizontal: 10, 
-    paddingVertical: 6, 
-    borderRadius: 20 
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusText: { fontSize: 12, fontWeight: '600' },
-  watchIconLarge: { 
-    width: 100, 
-    height: 100, 
-    borderRadius: 50, 
-    alignItems: 'center', 
-    justifyContent: 'center' 
+  watchIconLarge: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   calmTitle: { fontSize: 22, fontWeight: '700', marginTop: 28, letterSpacing: -0.3 },
   calmSubtitle: { fontSize: 15, marginTop: 8, textAlign: 'center', lineHeight: 22 },
-  drillChip: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 8, 
-    paddingHorizontal: 16, 
-    paddingVertical: 10, 
-    borderRadius: 20, 
-    marginTop: 28 
+  drillChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginTop: 28,
   },
   drillChipText: { fontSize: 14, fontWeight: '600' },
   drillChipDivider: { width: 1, height: 14 },
-  subtleBtn: { 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    height: 44, 
-    borderRadius: 10, 
-    borderWidth: 1 
+  subtleBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1,
   },
   subtleBtnText: { fontSize: 14, fontWeight: '500' },
   failedActions: { width: '100%', paddingHorizontal: 32 },
@@ -1294,7 +1296,7 @@ const localStyles = StyleSheet.create({
     borderRadius: 12,
   },
   primaryBtnText: { fontSize: 16, fontWeight: '600' },
-  
+
   // Training mode badge (for solo sessions showing training context)
   trainingBadge: {
     flexDirection: 'row',
@@ -1311,12 +1313,12 @@ const localStyles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  
+
   // ═══════════════════════════════════════════════════════════════════════════
   // TEAM TRAINING FOCUSED UI STYLES
   // Clean, tight, no distractions - execution mode
   // ═══════════════════════════════════════════════════════════════════════════
-  
+
   trainingFocusCard: {
     paddingHorizontal: 16,
     marginBottom: 16,
@@ -1373,7 +1375,7 @@ const localStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  
+
   // Training single action button
   trainingActionWrap: {
     paddingHorizontal: 16,
@@ -1401,7 +1403,7 @@ const localStyles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
   },
-  
+
   // Training previous targets list
   trainingPrevList: {
     flex: 1,
@@ -1413,7 +1415,7 @@ const localStyles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 10,
   },
-  
+
   // Exit buttons for completed/not found sessions
   exitButtonsWrap: {
     marginTop: 24,

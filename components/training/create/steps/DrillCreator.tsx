@@ -1,6 +1,6 @@
 /**
  * DrillCreator - Unified drill creation and configuration
- * 
+ *
  * Two modes:
  * 1. Start from library drill → Modify → Add/Save
  * 2. Start from scratch → Configure → Add/Save
@@ -166,7 +166,7 @@ export function DrillCreator({
   };
 
   // Filter drills (handle both 'engagement' filter and legacy 'achievement' DB values)
-  const filteredDrills = teamDrills.filter(drill => {
+  const filteredDrills = teamDrills.filter((drill) => {
     if (activeFilter === 'engagement' && drill.drill_goal !== 'engagement') return false;
     if (activeFilter === 'grouping' && drill.drill_goal !== 'grouping') return false;
     if (searchQuery) {
@@ -177,14 +177,14 @@ export function DrillCreator({
 
   const counts = {
     all: teamDrills.length,
-    grouping: teamDrills.filter(d => d.drill_goal === 'grouping').length,
-    engagement: teamDrills.filter(d => d.drill_goal === 'engagement').length,
-  };  
+    grouping: teamDrills.filter((d) => d.drill_goal === 'grouping').length,
+    engagement: teamDrills.filter((d) => d.drill_goal === 'engagement').length,
+  };
 
   // Handle add/save
   const handleConfirm = useCallback(async () => {
     const inputMethod = drillGoal === 'grouping' ? 'scan' : 'manual';
-    
+
     const config: NewDrillInstanceConfig = {
       distance_m: distance,
       rounds_per_shooter: shots,
@@ -197,15 +197,18 @@ export function DrillCreator({
     if (saveToLibrary && canSaveToLibrary) {
       setSaving(true);
       try {
-        await onSaveAndAdd({
-          name: name.trim() || 'New Drill',
-          drill_goal: drillGoal,
-          target_type: targetType,
-          distance_m: distance,
-          rounds_per_shooter: shots,
-          time_limit_seconds: timeLimit || undefined,
-          strings_count: strings,
-        }, config);
+        await onSaveAndAdd(
+          {
+            name: name.trim() || 'New Drill',
+            drill_goal: drillGoal,
+            target_type: targetType,
+            distance_m: distance,
+            rounds_per_shooter: shots,
+            time_limit_seconds: timeLimit || undefined,
+            strings_count: strings,
+          },
+          config
+        );
         onClose();
       } finally {
         setSaving(false);
@@ -226,24 +229,34 @@ export function DrillCreator({
         strings_count: strings,
         weapon_category: weaponCategory || undefined,
       };
-      
+
       onAddToTraining(drill);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onClose();
     }
-  }, [name, drillGoal, targetType, distance, shots, timeLimit, strings, weaponCategory, saveToLibrary, baseDrill, canSaveToLibrary, onAddToTraining, onSaveAndAdd, onClose]);
+  }, [
+    name,
+    drillGoal,
+    targetType,
+    distance,
+    shots,
+    timeLimit,
+    strings,
+    weaponCategory,
+    saveToLibrary,
+    baseDrill,
+    canSaveToLibrary,
+    onAddToTraining,
+    onSaveAndAdd,
+    onClose,
+  ]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: colors.background }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -368,9 +381,7 @@ function SelectStep({
         </View>
         <View style={styles.scratchContent}>
           <Text style={[styles.scratchTitle, { color: colors.text }]}>Start from Scratch</Text>
-          <Text style={[styles.scratchSubtitle, { color: colors.textMuted }]}>
-            Create a completely new drill
-          </Text>
+          <Text style={[styles.scratchSubtitle, { color: colors.textMuted }]}>Create a completely new drill</Text>
         </View>
         <ArrowRight size={18} color={colors.textMuted} />
       </TouchableOpacity>
@@ -401,12 +412,15 @@ function SelectStep({
 
       {/* Filters */}
       <View style={styles.filters}>
-        {(['all', 'grouping', 'engagement'] as const).map(filter => {
+        {(['all', 'grouping', 'engagement'] as const).map((filter) => {
           const isActive = activeFilter === filter;
-          const color = filter === 'grouping' ? GOAL_COLORS.grouping 
-            : filter === 'engagement' ? GOAL_COLORS.engagement 
-            : colors.text;
-          
+          const color =
+            filter === 'grouping'
+              ? GOAL_COLORS.grouping
+              : filter === 'engagement'
+                ? GOAL_COLORS.engagement
+                : colors.text;
+
           return (
             <TouchableOpacity
               key={filter}
@@ -422,14 +436,8 @@ function SelectStep({
                 onFilterChange(filter);
               }}
             >
-              <Text
-                style={[
-                  styles.filterText,
-                  { color: isActive ? color : colors.textMuted },
-                ]}
-              >
-                {filter === 'all' ? 'All' : filter === 'grouping' ? 'Grouping' : 'Achievement'}
-                {' '}({counts[filter]})
+              <Text style={[styles.filterText, { color: isActive ? color : colors.textMuted }]}>
+                {filter === 'all' ? 'All' : filter === 'grouping' ? 'Grouping' : 'Achievement'} ({counts[filter]})
               </Text>
             </TouchableOpacity>
           );
@@ -456,7 +464,8 @@ function SelectStep({
               <View style={[styles.drillIndicator, { backgroundColor: goalColor }]} />
               <View style={styles.drillContent}>
                 <Text style={[styles.drillName, { color: colors.text }]} numberOfLines={1}>
-                  {item.icon ? `${item.icon} ` : ''}{item.name}
+                  {item.icon ? `${item.icon} ` : ''}
+                  {item.name}
                 </Text>
                 <View style={styles.drillMeta}>
                   <View style={[styles.metaTag, { backgroundColor: colors.secondary }]}>
@@ -574,9 +583,7 @@ function ConfigureStep({
         {/* Base Drill Indicator */}
         {baseDrill && (
           <View style={[styles.baseIndicator, { backgroundColor: `${goalColor}15`, borderColor: goalColor }]}>
-            <Text style={[styles.baseText, { color: goalColor }]}>
-              Based on: {baseDrill.name}
-            </Text>
+            <Text style={[styles.baseText, { color: goalColor }]}>Based on: {baseDrill.name}</Text>
           </View>
         )}
 
@@ -596,7 +603,7 @@ function ConfigureStep({
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Goal</Text>
           <View style={styles.goalRow}>
-            {(['grouping', 'engagement'] as DrillGoal[]).map(goal => {
+            {(['grouping', 'engagement'] as DrillGoal[]).map((goal) => {
               const isSelected = drillGoal === goal || (goal === 'engagement' && drillGoal === 'engagement');
               const color = GOAL_COLORS[goal];
               return (
@@ -630,11 +637,11 @@ function ConfigureStep({
         </View>
 
         {/* Target Type (only for engagement) */}
-        {(drillGoal === 'engagement') && (
+        {drillGoal === 'engagement' && (
           <View style={styles.section}>
             <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Target Type</Text>
             <View style={styles.chipRow}>
-              {(['paper', 'tactical'] as const).map(type => {
+              {(['paper', 'tactical'] as const).map((type) => {
                 const isSelected = targetType === type;
                 return (
                   <TouchableOpacity
@@ -669,7 +676,7 @@ function ConfigureStep({
             <Text style={[styles.sectionValue, { color: colors.text }]}>{distance}m</Text>
           </View>
           <View style={styles.chipRow}>
-            {DISTANCE_PRESETS.map(val => (
+            {DISTANCE_PRESETS.map((val) => (
               <TouchableOpacity
                 key={val}
                 style={[
@@ -721,7 +728,7 @@ function ConfigureStep({
             <Text style={[styles.sectionValue, { color: colors.text }]}>{shots}</Text>
           </View>
           <View style={styles.chipRow}>
-            {SHOTS_PRESETS.map(val => (
+            {SHOTS_PRESETS.map((val) => (
               <TouchableOpacity
                 key={val}
                 style={[
@@ -738,10 +745,7 @@ function ConfigureStep({
                 }}
               >
                 <Text
-                  style={[
-                    styles.chipText,
-                    { color: shots === val && !customShots ? colors.background : colors.text },
-                  ]}
+                  style={[styles.chipText, { color: shots === val && !customShots ? colors.background : colors.text }]}
                 >
                   {val}
                 </Text>
@@ -773,7 +777,7 @@ function ConfigureStep({
             <Text style={[styles.sectionValue, { color: colors.text }]}>{strings}x</Text>
           </View>
           <View style={styles.chipRow}>
-            {STRINGS_PRESETS.map(val => (
+            {STRINGS_PRESETS.map((val) => (
               <TouchableOpacity
                 key={val}
                 style={[
@@ -801,9 +805,7 @@ function ConfigureStep({
           <View style={styles.sectionHeader}>
             <Clock size={14} color={colors.textMuted} />
             <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Time Limit</Text>
-            <Text style={[styles.sectionValue, { color: colors.text }]}>
-              {timeLimit ? `${timeLimit}s` : 'None'}
-            </Text>
+            <Text style={[styles.sectionValue, { color: colors.text }]}>{timeLimit ? `${timeLimit}s` : 'None'}</Text>
           </View>
           <View style={styles.chipRow}>
             {TIME_PRESETS.map((val, i) => (
@@ -835,9 +837,7 @@ function ConfigureStep({
             <Crosshair size={14} color={colors.textMuted} />
             <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Weapon Category</Text>
           </View>
-          <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
-            Filter which weapons can be used
-          </Text>
+          <Text style={[styles.sectionHint, { color: colors.textMuted }]}>Filter which weapons can be used</Text>
           <View style={styles.chipRow}>
             <TouchableOpacity
               style={[
@@ -856,7 +856,7 @@ function ConfigureStep({
                 Any
               </Text>
             </TouchableOpacity>
-            {WEAPON_CATEGORIES.map(cat => (
+            {WEAPON_CATEGORIES.map((cat) => (
               <TouchableOpacity
                 key={cat.value}
                 style={[
@@ -872,10 +872,7 @@ function ConfigureStep({
                 }}
               >
                 <Text
-                  style={[
-                    styles.chipText,
-                    { color: weaponCategory === cat.value ? colors.background : colors.text },
-                  ]}
+                  style={[styles.chipText, { color: weaponCategory === cat.value ? colors.background : colors.text }]}
                 >
                   {cat.label}
                 </Text>
@@ -898,9 +895,7 @@ function ConfigureStep({
           {weaponCategory && (
             <View style={styles.summaryRow}>
               <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Weapon:</Text>
-              <Text style={[styles.summaryValue, { color: colors.text }]}>
-                {getCategoryLabel(weaponCategory)}
-              </Text>
+              <Text style={[styles.summaryValue, { color: colors.text }]}>{getCategoryLabel(weaponCategory)}</Text>
             </View>
           )}
         </View>
@@ -923,7 +918,15 @@ function ConfigureStep({
                 Add this drill to your team's collection
               </Text>
             </View>
-            <View style={[styles.checkbox, { borderColor: saveToLibrary ? colors.text : colors.border, backgroundColor: saveToLibrary ? colors.text : 'transparent' }]}>
+            <View
+              style={[
+                styles.checkbox,
+                {
+                  borderColor: saveToLibrary ? colors.text : colors.border,
+                  backgroundColor: saveToLibrary ? colors.text : 'transparent',
+                },
+              ]}
+            >
               {saveToLibrary && <Check size={12} color={colors.background} strokeWidth={3} />}
             </View>
           </TouchableOpacity>
@@ -1283,4 +1286,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

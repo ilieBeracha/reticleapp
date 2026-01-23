@@ -27,9 +27,7 @@ export function SessionsSection({ sessions, loading, colors }: SessionsSectionPr
             <SessionCard key={session.id} session={session} colors={colors} />
           ))}
           {sessions.length > 5 && (
-            <Text style={[styles.more, { color: colors.textMuted }]}>
-              +{sessions.length - 5} more sessions
-            </Text>
+            <Text style={[styles.more, { color: colors.textMuted }]}>+{sessions.length - 5} more sessions</Text>
           )}
         </View>
       )}

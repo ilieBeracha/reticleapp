@@ -12,30 +12,13 @@ import { CreateWeaponFlow, WeaponPicker } from '@/components/weapons';
 import { useColors } from '@/hooks/ui/useColors';
 import { getOrCreatePersonalProfile, getUserWeapon, type UserWeapon } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
-import {
-  ChevronRight,
-  Crosshair,
-  Plus,
-  Target,
-} from 'lucide-react-native';
+import { ChevronRight, Crosshair, Plus, Target } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SessionContextStep } from './SessionContextStep';
 import { SessionIntentStep } from './SessionIntentStep';
-import type {
-  Position,
-  SessionContextState,
-  SessionPurpose,
-} from './sessionCreation.types';
+import type { Position, SessionContextState, SessionPurpose } from './sessionCreation.types';
 
 // ============================================================================
 // TYPES
@@ -113,14 +96,10 @@ export function SessionCreationForm({
   // ─────────────────────────────────────────────────────────────────────────
 
   // Purpose (step 1) - pre-filled from drill if in training context
-  const [purpose, setPurpose] = useState<SessionPurpose | null>(
-    trainingContext?.drill.drillGoal || null
-  );
+  const [purpose, setPurpose] = useState<SessionPurpose | null>(trainingContext?.drill.drillGoal || null);
 
   // Weapon
-  const [selectedWeapon, setSelectedWeapon] = useState<UserWeapon | null>(
-    initialWeapon || null
-  );
+  const [selectedWeapon, setSelectedWeapon] = useState<UserWeapon | null>(initialWeapon || null);
   const [showWeaponPicker, setShowWeaponPicker] = useState(false);
   const [showCreateWeapon, setShowCreateWeapon] = useState(false);
   const [convertingWeapon, setConvertingWeapon] = useState(false);
@@ -174,28 +153,31 @@ export function SessionCreationForm({
   }, []);
 
   // Update weapon in context when selected
-  const handleWeaponSelect = useCallback(async (weapon: UserWeapon) => {
-    setShowWeaponPicker(false);
+  const handleWeaponSelect = useCallback(
+    async (weapon: UserWeapon) => {
+      setShowWeaponPicker(false);
 
-    // If this is a team weapon (has team_id), convert to personal profile
-    // This ensures weapon_id used in session is a user_weapon ID
-    if ('team_id' in weapon && weapon.team_id) {
-      try {
-        setConvertingWeapon(true);
-        const personalProfile = await getOrCreatePersonalProfile(weapon.id);
-        setWeaponState(personalProfile);
-      } catch (error) {
-        console.error('[SessionCreationForm] Failed to create personal profile:', error);
-        // Fallback to using the weapon directly
+      // If this is a team weapon (has team_id), convert to personal profile
+      // This ensures weapon_id used in session is a user_weapon ID
+      if ('team_id' in weapon && weapon.team_id) {
+        try {
+          setConvertingWeapon(true);
+          const personalProfile = await getOrCreatePersonalProfile(weapon.id);
+          setWeaponState(personalProfile);
+        } catch (error) {
+          console.error('[SessionCreationForm] Failed to create personal profile:', error);
+          // Fallback to using the weapon directly
+          setWeaponState(weapon);
+        } finally {
+          setConvertingWeapon(false);
+        }
+      } else {
+        // Already a user weapon
         setWeaponState(weapon);
-      } finally {
-        setConvertingWeapon(false);
       }
-    } else {
-      // Already a user weapon
-      setWeaponState(weapon);
-    }
-  }, [setWeaponState]);
+    },
+    [setWeaponState]
+  );
 
   const handleWeaponCreatedById = useCallback(
     async (weaponId: string) => {
@@ -279,14 +261,10 @@ export function SessionCreationForm({
               <Target size={24} color={colors.primary} />
             </View>
             <View style={styles.drillInfo}>
-              <Text style={[styles.drillName, { color: colors.text }]}>
-                {trainingContext.drill.drillName}
-              </Text>
+              <Text style={[styles.drillName, { color: colors.text }]}>{trainingContext.drill.drillName}</Text>
               <Text style={[styles.drillMeta, { color: colors.textMuted }]}>
                 {trainingContext.drill.distanceM}m • {trainingContext.drill.roundsPerShooter} rounds
-                {trainingContext.drill.timeLimitSeconds
-                  ? ` • ${trainingContext.drill.timeLimitSeconds}s`
-                  : ''}
+                {trainingContext.drill.timeLimitSeconds ? ` • ${trainingContext.drill.timeLimitSeconds}s` : ''}
               </Text>
             </View>
           </View>
@@ -294,10 +272,7 @@ export function SessionCreationForm({
 
         {/* Step 1: Intent (only if not from drill) */}
         {currentStep === 'intent' && (
-          <SessionIntentStep
-            selectedPurpose={purpose}
-            onSelectPurpose={handlePurposeSelect}
-          />
+          <SessionIntentStep selectedPurpose={purpose} onSelectPurpose={handlePurposeSelect} />
         )}
 
         {/* Step 2: Context */}
@@ -323,9 +298,7 @@ export function SessionCreationForm({
                       <Crosshair size={20} color={colors.primary} />
                     </View>
                     <View style={styles.weaponInfo}>
-                      <Text style={[styles.weaponName, { color: colors.text }]}>
-                        {selectedWeapon.name}
-                      </Text>
+                      <Text style={[styles.weaponName, { color: colors.text }]}>{selectedWeapon.name}</Text>
                       {selectedWeapon.category && (
                         <Text style={[styles.weaponCategory, { color: colors.textMuted }]}>
                           {selectedWeapon.category}
@@ -342,9 +315,7 @@ export function SessionCreationForm({
                     <View style={[styles.weaponEmptyIcon, { backgroundColor: colors.secondary }]}>
                       <Plus size={20} color={colors.textMuted} />
                     </View>
-                    <Text style={[styles.weaponEmptyText, { color: colors.textMuted }]}>
-                      Select Weapon
-                    </Text>
+                    <Text style={[styles.weaponEmptyText, { color: colors.textMuted }]}>Select Weapon</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -379,9 +350,7 @@ export function SessionCreationForm({
           {isSubmitting ? (
             <ActivityIndicator color={colors.background} />
           ) : (
-            <Text style={[styles.submitBtnText, { color: colors.background }]}>
-              {submitLabel}
-            </Text>
+            <Text style={[styles.submitBtnText, { color: colors.background }]}>{submitLabel}</Text>
           )}
         </TouchableOpacity>
       </View>

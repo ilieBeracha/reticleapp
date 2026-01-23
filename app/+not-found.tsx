@@ -6,7 +6,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 /**
  * Not Found Screen
- * 
+ *
  * Catches any unmatched routes and provides a way back to the app.
  */
 export default function NotFoundScreen() {
@@ -22,9 +22,7 @@ export default function NotFoundScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Ionicons name="alert-circle-outline" size={64} color={colors.textMuted} />
         <Text style={[styles.title, { color: colors.text }]}>Page not found</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          This screen doesn't exist.
-        </Text>
+        <Text style={[styles.subtitle, { color: colors.textMuted }]}>This screen doesn't exist.</Text>
         <Link href="/" style={[styles.link, { color: colors.primary }]}>
           Go home
         </Link>
@@ -55,4 +53,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

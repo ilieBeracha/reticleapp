@@ -1,10 +1,10 @@
 /**
  * WeaponPicker - Select a weapon for a session
- * 
+ *
  * Design: Clean, monochrome, Apple-inspired
  * - Typography-first, minimal decoration
  * - Category indicated subtly, not with loud colors
- * 
+ *
  * Supports weapon policy enforcement:
  * - personal: Show all weapons (default)
  * - catalog: Only team catalog weapons
@@ -23,28 +23,9 @@ import {
   type WeaponPickerData,
 } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
-import {
-  Check,
-  ChevronRight,
-  Clock,
-  Crosshair,
-  Lock,
-  Plus,
-  Search,
-  Star,
-  Users,
-  X
-} from 'lucide-react-native';
+import { Check, ChevronRight, Clock, Crosshair, Lock, Plus, Search, Star, Users, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  SectionList,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
-} from 'react-native';
+import { ActivityIndicator, SectionList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 // ============================================================================
 // TYPES
@@ -96,7 +77,7 @@ export function WeaponPicker({
 
   // In team context, only show assigned weapons (no personal weapons, no add new)
   const isTeamContext = !!teamId;
-  
+
   // Hide add new button in team context
   const shouldHideAddNew = useMemo(() => {
     return hideAddNew || isTeamContext;
@@ -110,8 +91,8 @@ export function WeaponPicker({
     try {
       setLoading(true);
       setError(null);
-      const weaponData = await getWeaponPickerData({ 
-        teamId, 
+      const weaponData = await getWeaponPickerData({
+        teamId,
         weaponCategory,
       });
       setData(weaponData);
@@ -171,10 +152,10 @@ export function WeaponPicker({
         data: data.recentlyUsed,
         type: 'recent',
       });
-      data.recentlyUsed.forEach(w => usedIds.add(w.id));
+      data.recentlyUsed.forEach((w) => usedIds.add(w.id));
     }
 
-    const myWeaponsFiltered = data.myWeapons.filter(w => !usedIds.has(w.id));
+    const myWeaponsFiltered = data.myWeapons.filter((w) => !usedIds.has(w.id));
     if (myWeaponsFiltered.length > 0) {
       result.push({
         title: 'My Weapons',
@@ -190,40 +171,44 @@ export function WeaponPicker({
   const filteredSections = useCallback((): WeaponSection[] => {
     const allSections = sections();
     if (!searchQuery.trim()) return allSections;
-    
+
     const query = searchQuery.toLowerCase();
     return allSections
-      .map(section => ({
+      .map((section) => ({
         ...section,
-        data: section.data.filter(weapon => 
-          weapon.name.toLowerCase().includes(query) ||
-          (weapon.caliber && weapon.caliber.toLowerCase().includes(query)) ||
-          ('manufacturer' in weapon && weapon.manufacturer?.toLowerCase().includes(query))
+        data: section.data.filter(
+          (weapon) =>
+            weapon.name.toLowerCase().includes(query) ||
+            (weapon.caliber && weapon.caliber.toLowerCase().includes(query)) ||
+            ('manufacturer' in weapon && weapon.manufacturer?.toLowerCase().includes(query))
         ),
       }))
-      .filter(section => section.data.length > 0);
+      .filter((section) => section.data.length > 0);
   }, [sections, searchQuery]);
 
-  const handleSelectWeapon = useCallback((weapon: AnyWeapon, type: WeaponSection['type']) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  const handleSelectWeapon = useCallback(
+    (weapon: AnyWeapon, type: WeaponSection['type']) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    if (type === 'global') {
-      // Catalog weapons need to be created as user weapons first
-      if (onSelectCatalog) {
-        onSelectCatalog(weapon as GlobalWeapon);
-      } else if (onAddNew && !shouldHideAddNew) {
-        // Fallback: trigger add new flow with catalog weapon pre-selected
-        onAddNew();
+      if (type === 'global') {
+        // Catalog weapons need to be created as user weapons first
+        if (onSelectCatalog) {
+          onSelectCatalog(weapon as GlobalWeapon);
+        } else if (onAddNew && !shouldHideAddNew) {
+          // Fallback: trigger add new flow with catalog weapon pre-selected
+          onAddNew();
+        }
+      } else if (type === 'assigned' || type === 'pool' || type === 'team') {
+        // Team weapons (assigned, pool) - cast to UserWeapon for callback
+        // The parent component handles team weapon IDs appropriately
+        onSelect(weapon as UserWeapon);
+      } else {
+        // Personal, recent - these are actual user weapons
+        onSelect(weapon as UserWeapon);
       }
-    } else if (type === 'assigned' || type === 'pool' || type === 'team') {
-      // Team weapons (assigned, pool) - cast to UserWeapon for callback
-      // The parent component handles team weapon IDs appropriately
-      onSelect(weapon as UserWeapon);
-    } else {
-      // Personal, recent - these are actual user weapons
-      onSelect(weapon as UserWeapon);
-    }
-  }, [onSelect, onSelectCatalog, onAddNew, shouldHideAddNew]);
+    },
+    [onSelect, onSelectCatalog, onAddNew, shouldHideAddNew]
+  );
 
   const handleShowCatalog = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -253,7 +238,7 @@ export function WeaponPicker({
         hint: 'Try a different search',
       };
     }
-    
+
     // Team context: Only assigned weapons allowed
     if (isTeamContext) {
       return {
@@ -262,7 +247,7 @@ export function WeaponPicker({
         hint: 'Ask your commander to assign you a weapon',
       };
     }
-    
+
     return {
       icon: <Crosshair size={28} color={colors.textMuted} />,
       title: 'No weapons yet',
@@ -272,9 +257,6 @@ export function WeaponPicker({
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-    
-   
-
       {/* Search */}
       <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Search size={18} color={colors.textMuted} />
@@ -293,17 +275,15 @@ export function WeaponPicker({
       </View>
 
       {/* Action buttons based on view - hidden when policy restricts or hideAddNew is true */}
-      {!shouldHideAddNew && (
-        showCatalog ? (
+      {!shouldHideAddNew &&
+        (showCatalog ? (
           <TouchableOpacity
             style={[styles.addNewBtn, { backgroundColor: colors.card }]}
             onPress={handleCreateCustom}
             activeOpacity={0.7}
           >
             <Plus size={16} color={colors.text} strokeWidth={2} />
-            <Text style={[styles.addText, { color: colors.text }]}>
-              Create Custom Weapon
-            </Text>
+            <Text style={[styles.addText, { color: colors.text }]}>Create Custom Weapon</Text>
             <ChevronRight size={14} color={colors.textMuted} />
           </TouchableOpacity>
         ) : (
@@ -313,13 +293,10 @@ export function WeaponPicker({
             activeOpacity={0.7}
           >
             <Plus size={16} color={colors.background} strokeWidth={2} />
-            <Text style={[styles.addText, { color: colors.background }]}>
-              Add New Weapon
-            </Text>
+            <Text style={[styles.addText, { color: colors.background }]}>Add New Weapon</Text>
             <ChevronRight size={14} color={colors.background + '80'} />
           </TouchableOpacity>
-        )
-      )}
+        ))}
 
       {/* Content */}
       {loading ? (
@@ -329,10 +306,7 @@ export function WeaponPicker({
       ) : error ? (
         <View style={styles.error}>
           <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
-          <TouchableOpacity 
-            style={[styles.retryBtn, { backgroundColor: colors.card }]}
-            onPress={loadWeapons}
-          >
+          <TouchableOpacity style={[styles.retryBtn, { backgroundColor: colors.card }]} onPress={loadWeapons}>
             <Text style={[styles.retryText, { color: colors.text }]}>Try Again</Text>
           </TouchableOpacity>
         </View>
@@ -343,9 +317,7 @@ export function WeaponPicker({
           renderSectionHeader={({ section }) => (
             <View style={[styles.sectionHeader, { backgroundColor: colors.background }]}>
               {section.icon}
-              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-                {section.title}
-              </Text>
+              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{section.title}</Text>
             </View>
           )}
           renderItem={({ item, section }) => (
@@ -357,24 +329,16 @@ export function WeaponPicker({
               colors={colors}
             />
           )}
-          ListEmptyComponent={
-            (() => {
-              const emptyContent = getEmptyStateContent();
-              return (
-                <View style={styles.emptyState}>
-                  <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
-                    {emptyContent.icon}
-                  </View>
-                  <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                    {emptyContent.title}
-                  </Text>
-                  <Text style={[styles.emptyHint, { color: colors.textMuted }]}>
-                    {emptyContent.hint}
-                  </Text>
-                </View>
-              );
-            })()
-          }
+          ListEmptyComponent={(() => {
+            const emptyContent = getEmptyStateContent();
+            return (
+              <View style={styles.emptyState}>
+                <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>{emptyContent.icon}</View>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>{emptyContent.title}</Text>
+                <Text style={[styles.emptyHint, { color: colors.textMuted }]}>{emptyContent.hint}</Text>
+              </View>
+            );
+          })()}
           contentContainerStyle={styles.listContent}
           stickySectionHeadersEnabled
           showsVerticalScrollIndicator={false}
@@ -428,20 +392,12 @@ function WeaponCard({
     >
       <View style={styles.weaponContent}>
         <View style={styles.weaponNameRow}>
-          <Text
-            style={[styles.weaponName, { color: colors.text }]}
-            numberOfLines={1}
-          >
+          <Text style={[styles.weaponName, { color: colors.text }]} numberOfLines={1}>
             {weapon.name}
           </Text>
-          {isFavorite && (
-            <Star size={12} color={colors.textMuted} fill={colors.textMuted} />
-          )}
+          {isFavorite && <Star size={12} color={colors.textMuted} fill={colors.textMuted} />}
         </View>
-        <Text
-          style={[styles.weaponSubtitle, { color: colors.textMuted }]}
-          numberOfLines={1}
-        >
+        <Text style={[styles.weaponSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
           {getSubtitle()}
         </Text>
       </View>

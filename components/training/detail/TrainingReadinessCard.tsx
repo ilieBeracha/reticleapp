@@ -16,10 +16,9 @@
  * └─────────────────────────────────────┘
  */
 
-import React from 'react';
+import { AlertCircle, Check, ChevronRight, Shield, Target, Users } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { AlertCircle, Check, ChevronRight, Target, Shield, Users } from 'lucide-react-native';
 import type { Colors } from './types';
 
 export interface ReadinessItem {
@@ -46,34 +45,19 @@ const ICONS = {
   members: Users,
 };
 
-function ReadinessRow({
-  item,
-  colors,
-  isLast
-}: {
-  item: ReadinessItem;
-  colors: Colors;
-  isLast: boolean;
-}) {
+function ReadinessRow({ item, colors, isLast }: { item: ReadinessItem; colors: Colors; isLast: boolean }) {
   const Icon = ICONS[item.icon];
   const isComplete = item.isComplete;
 
   const content = (
-    <View
-      style={[
-        styles.row,
-        !isLast && { borderBottomWidth: 1, borderBottomColor: colors.border },
-      ]}
-    >
+    <View style={[styles.row, !isLast && { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
       {/* Status indicator */}
       <View
         style={[
           styles.statusIcon,
           {
-            backgroundColor: isComplete
-              ? colors.green + '15'
-              : colors.orange + '15'
-          }
+            backgroundColor: isComplete ? colors.green + '15' : colors.orange + '15',
+          },
         ]}
       >
         {isComplete ? (
@@ -97,7 +81,7 @@ function ReadinessRow({
               color: isComplete ? colors.textMuted : colors.text,
               textDecorationLine: isComplete ? 'line-through' : 'none',
               opacity: isComplete ? 0.7 : 1,
-            }
+            },
           ]}
         >
           {item.label}
@@ -105,9 +89,7 @@ function ReadinessRow({
       </View>
 
       {/* Action indicator for incomplete items */}
-      {!isComplete && item.onPress && (
-        <ChevronRight size={16} color={colors.textMuted} style={{ opacity: 0.5 }} />
-      )}
+      {!isComplete && item.onPress && <ChevronRight size={16} color={colors.textMuted} style={{ opacity: 0.5 }} />}
     </View>
   );
 
@@ -122,12 +104,8 @@ function ReadinessRow({
   return content;
 }
 
-export function TrainingReadinessCard({
-  items,
-  colors,
-  onCompleteSetup,
-}: TrainingReadinessCardProps) {
-  const incompleteCount = items.filter(i => !i.isComplete).length;
+export function TrainingReadinessCard({ items, colors, onCompleteSetup }: TrainingReadinessCardProps) {
+  const incompleteCount = items.filter((i) => !i.isComplete).length;
   const isReady = incompleteCount === 0;
   const totalCount = items.length;
   const completeCount = totalCount - incompleteCount;
@@ -145,7 +123,7 @@ export function TrainingReadinessCard({
         {
           backgroundColor: colors.card,
           borderColor: colors.orange + '30',
-        }
+        },
       ]}
     >
       {/* Header */}
@@ -163,12 +141,7 @@ export function TrainingReadinessCard({
       {/* Checklist */}
       <View style={[styles.checklist, { borderColor: colors.border }]}>
         {items.map((item, index) => (
-          <ReadinessRow
-            key={item.id}
-            item={item}
-            colors={colors}
-            isLast={index === items.length - 1}
-          />
+          <ReadinessRow key={item.id} item={item} colors={colors} isLast={index === items.length - 1} />
         ))}
       </View>
 

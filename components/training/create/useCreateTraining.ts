@@ -3,7 +3,7 @@
  *
  * Manages all stateful logic for the Create Training Screen.
  * Handles form state, drill management, and submission.
- * 
+ *
  * 3-Step Flow:
  * 1. Training Details - Team, name, schedule
  * 2. Quick Selection - Recent drills, team drills, templates
@@ -21,12 +21,7 @@ import { useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
 import type { Drill, DrillInstanceConfig, TrainingDrill } from '@/types/workspace';
 
-import {
-  createDefaultScheduledDate,
-  isStep1Complete,
-  isStep2Complete,
-  moveDrill,
-} from './createTraining.helpers';
+import { createDefaultScheduledDate, isStep1Complete, isStep2Complete, moveDrill } from './createTraining.helpers';
 import type {
   DrillModalMode,
   NewDrillInstanceConfig,
@@ -94,7 +89,7 @@ export function useCreateTraining({ teamIdParam }: UseCreateTrainingParams): Use
   // COMPUTED VALUES
   // ============================================================================
 
-  const selectedTeam = teams.find(t => t.id === selectedTeamId);
+  const selectedTeam = teams.find((t) => t.id === selectedTeamId);
   const canCreateDrills = selectedTeam?.my_role === 'owner' || selectedTeam?.my_role === 'commander';
   const needsTeamSelection = !selectedTeamId && teams.length > 1 && !isTeamLocked;
 
@@ -110,7 +105,7 @@ export function useCreateTraining({ teamIdParam }: UseCreateTrainingParams): Use
     if (selectedTeamId) {
       // Load team's saved drills
       getTeamDrills(selectedTeamId).then(setTeamDrills).catch(console.error);
-      
+
       // Load drills from last training (for "repeat" feature)
       getLastTrainingDrills(selectedTeamId).then(setLastTrainingDrills).catch(console.error);
     } else {
@@ -123,27 +118,30 @@ export function useCreateTraining({ teamIdParam }: UseCreateTrainingParams): Use
   // HANDLERS
   // ============================================================================
 
-  const handleSelectTeam = useCallback((teamId: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (teamId !== selectedTeamId) {
-      setDrills([]); // Clear drills when switching teams
-    }
-    setSelectedTeamId(teamId);
-  }, [selectedTeamId]);
+  const handleSelectTeam = useCallback(
+    (teamId: string) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (teamId !== selectedTeamId) {
+        setDrills([]); // Clear drills when switching teams
+      }
+      setSelectedTeamId(teamId);
+    },
+    [selectedTeamId]
+  );
 
   const handleRemoveDrill = useCallback((drillId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setDrills(prev => prev.filter(d => d.id !== drillId));
+    setDrills((prev) => prev.filter((d) => d.id !== drillId));
   }, []);
 
   const handleMoveDrill = useCallback((index: number, direction: 'up' | 'down') => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setDrills(prev => moveDrill(prev, index, direction));
+    setDrills((prev) => moveDrill(prev, index, direction));
   }, []);
 
   const addDrill = useCallback((drill: TrainingDrillItem) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setDrills(prev => [...prev, drill]);
+    setDrills((prev) => [...prev, drill]);
   }, []);
 
   const handleSelectDrill = useCallback((drill: Drill) => {
@@ -173,67 +171,73 @@ export function useCreateTraining({ teamIdParam }: UseCreateTrainingParams): Use
     setSelectedDrill(null);
   }, []);
 
-  const handleConfigureConfirm = useCallback((config: DrillInstanceConfig | NewDrillInstanceConfig) => {
-    if (!selectedDrill) return;
+  const handleConfigureConfirm = useCallback(
+    (config: DrillInstanceConfig | NewDrillInstanceConfig) => {
+      if (!selectedDrill) return;
 
-    // Support both old DrillInstanceConfig and new NewDrillInstanceConfig
-    const baseTrainingDrill = drillToTrainingInput(selectedDrill, config);
+      // Support both old DrillInstanceConfig and new NewDrillInstanceConfig
+      const baseTrainingDrill = drillToTrainingInput(selectedDrill, config);
 
-    // Add weapon_category if present in new config format
-    const trainingDrill = {
-      ...baseTrainingDrill,
-      weapon_category: 'weapon_category' in config ? config.weapon_category : null,
-    };
+      // Add weapon_category if present in new config format
+      const trainingDrill = {
+        ...baseTrainingDrill,
+        weapon_category: 'weapon_category' in config ? config.weapon_category : null,
+      };
 
-    setDrills(prev => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        ...trainingDrill,
-      } as TrainingDrillItem,
-    ]);
-    setDrillModalVisible(false);
-    setSelectedDrill(null);
-  }, [selectedDrill]);
-
-  const handleQuickDrillSave = useCallback(async (payload: QuickDrillPayload) => {
-    if (!selectedTeamId || !canCreateDrills || savingDrill) return;
-
-    setSavingDrill(true);
-    try {
-      const created = await createDrill(selectedTeamId, {
-        name: payload.draft.name,
-        drill_goal: payload.draft.drill_goal,
-        target_type: payload.draft.drill_goal === 'grouping' ? 'paper' : payload.draft.target_type,
-        distance_m: payload.instance.distance_m,
-        rounds_per_shooter: payload.instance.rounds_per_shooter,
-        time_limit_seconds: payload.instance.time_limit_seconds ?? undefined,
-        strings_count: payload.instance.strings_count ?? undefined,
-      });
-
-      setTeamDrills(prev => [created, ...prev]);
-
-      const trainingDrill = drillToTrainingInput(created, payload.instance);
-      setDrills(prev => [
+      setDrills((prev) => [
         ...prev,
         {
           id: Date.now().toString(),
           ...trainingDrill,
-        },
+        } as TrainingDrillItem,
       ]);
-
       setDrillModalVisible(false);
-    } catch (error: any) {
-      console.error('Failed to create quick drill:', error);
-      Alert.alert('Error', error?.message || 'Failed to create drill');
-    } finally {
-      setSavingDrill(false);
-    }
-  }, [selectedTeamId, canCreateDrills, savingDrill]);
+      setSelectedDrill(null);
+    },
+    [selectedDrill]
+  );
+
+  const handleQuickDrillSave = useCallback(
+    async (payload: QuickDrillPayload) => {
+      if (!selectedTeamId || !canCreateDrills || savingDrill) return;
+
+      setSavingDrill(true);
+      try {
+        const created = await createDrill(selectedTeamId, {
+          name: payload.draft.name,
+          drill_goal: payload.draft.drill_goal,
+          target_type: payload.draft.drill_goal === 'grouping' ? 'paper' : payload.draft.target_type,
+          distance_m: payload.instance.distance_m,
+          rounds_per_shooter: payload.instance.rounds_per_shooter,
+          time_limit_seconds: payload.instance.time_limit_seconds ?? undefined,
+          strings_count: payload.instance.strings_count ?? undefined,
+        });
+
+        setTeamDrills((prev) => [created, ...prev]);
+
+        const trainingDrill = drillToTrainingInput(created, payload.instance);
+        setDrills((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            ...trainingDrill,
+          },
+        ]);
+
+        setDrillModalVisible(false);
+      } catch (error: any) {
+        console.error('Failed to create quick drill:', error);
+        Alert.alert('Error', error?.message || 'Failed to create drill');
+      } finally {
+        setSavingDrill(false);
+      }
+    },
+    [selectedTeamId, canCreateDrills, savingDrill]
+  );
 
   const handleNextStep = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
+
     if (currentStep === 1) {
       // Validate step 1 before moving to step 2
       if (!step1Complete) {
@@ -289,7 +293,7 @@ export function useCreateTraining({ teamIdParam }: UseCreateTrainingParams): Use
 
   const handleUpdateDrill = useCallback((updated: TrainingDrillItem) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setDrills(prev => prev.map(d => d.id === updated.id ? updated : d));
+    setDrills((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
   }, []);
 
   const handleCreate = useCallback(async () => {
@@ -339,10 +343,7 @@ export function useCreateTraining({ teamIdParam }: UseCreateTrainingParams): Use
 
       // Refresh stores and wait for completion
       try {
-        await Promise.all([
-          loadTeamTrainings(selectedTeamId),
-          loadMyUpcomingTrainings(),
-        ]);
+        await Promise.all([loadTeamTrainings(selectedTeamId), loadMyUpcomingTrainings()]);
         console.log('[CreateTraining] Stores refreshed successfully');
       } catch (refreshError) {
         console.error('[CreateTraining] Failed to refresh stores:', refreshError);
@@ -429,4 +430,3 @@ export function useCreateTraining({ teamIdParam }: UseCreateTrainingParams): Use
     handleGoToCustom,
   };
 }
-
