@@ -20,4 +20,6 @@ export { WeeklyProgressRing } from './WeeklyProgressRing';
 export { DailyTip } from './DailyTip';
 export { WeeklyActivityChart } from './WeeklyActivityChart';
 export { HeroActions } from './HeroActions';
+export { TimelineStrip } from './TimelineStrip';
+export { WeaponPerformanceCard } from './WeaponPerformanceCard';
 

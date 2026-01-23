@@ -291,63 +291,84 @@ export default function CreateTrainingScreen() {
           MODALS
       ═══════════════════════════════════════════════════════════════════ */}
 
-      {/* Date Picker */}
-      {showDatePicker && (
-        <Modal visible transparent animationType="slide" onRequestClose={() => setShowDatePicker(false)}>
-          <Pressable style={styles.pickerOverlay} onPress={() => setShowDatePicker(false)}>
-            <Pressable style={[styles.pickerSheet, { backgroundColor: colors.card }]} onPress={e => e.stopPropagation()}>
-              <View style={[styles.pickerGrabber, { backgroundColor: colors.border }]} />
-              <View style={styles.pickerHeader}>
-                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text style={[styles.pickerCancel, { color: colors.textMuted }]}>Cancel</Text>
-                </TouchableOpacity>
-                <Text style={[styles.pickerTitle, { color: colors.text }]}>Select Date</Text>
-                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text style={[styles.pickerDone, { color: colors.text }]}>Done</Text>
-                </TouchableOpacity>
-              </View>
-              <DateTimePicker
-                value={scheduledDate}
-                mode="date"
-                display="spinner"
-                onChange={(_, date) => date && setScheduledDate(date)}
-                minimumDate={new Date()}
-                style={styles.picker}
-              />
-              <View style={{ height: insets.bottom }} />
-            </Pressable>
-          </Pressable>
-        </Modal>
-      )}
-
-      {/* Time Picker */}
-      {showTimePicker && (
-        <Modal visible transparent animationType="slide" onRequestClose={() => setShowTimePicker(false)}>
-          <Pressable style={styles.pickerOverlay} onPress={() => setShowTimePicker(false)}>
-            <Pressable style={[styles.pickerSheet, { backgroundColor: colors.card }]} onPress={e => e.stopPropagation()}>
-              <View style={[styles.pickerGrabber, { backgroundColor: colors.border }]} />
-              <View style={styles.pickerHeader}>
-                <TouchableOpacity onPress={() => setShowTimePicker(false)}>
-                  <Text style={[styles.pickerCancel, { color: colors.textMuted }]}>Cancel</Text>
-                </TouchableOpacity>
-                <Text style={[styles.pickerTitle, { color: colors.text }]}>Select Time</Text>
-                <TouchableOpacity onPress={() => setShowTimePicker(false)}>
-                  <Text style={[styles.pickerDone, { color: colors.text }]}>Done</Text>
-                </TouchableOpacity>
-              </View>
-              <DateTimePicker
-                value={scheduledDate}
-                mode="time"
-                display="spinner"
-                onChange={(_, date) => date && setScheduledDate(date)}
-                style={styles.picker}
-              />
-              <View style={{ height: insets.bottom }} />
-            </Pressable>
-          </Pressable>
-        </Modal>
-      )}
+      <PickerModal
+        visible={showDatePicker}
+        onClose={() => setShowDatePicker(false)}
+        title="Select Date"
+        mode="date"
+        value={scheduledDate}
+        onChange={setScheduledDate}
+        minimumDate={new Date()}
+        colors={colors}
+        bottomInset={insets.bottom}
+      />
+      <PickerModal
+        visible={showTimePicker}
+        onClose={() => setShowTimePicker(false)}
+        title="Select Time"
+        mode="time"
+        value={scheduledDate}
+        onChange={setScheduledDate}
+        colors={colors}
+        bottomInset={insets.bottom}
+      />
     </View>
+  );
+}
+
+// ============================================================================
+// PICKER MODAL
+// ============================================================================
+
+function PickerModal({
+  visible,
+  onClose,
+  title,
+  mode,
+  value,
+  onChange,
+  minimumDate,
+  colors,
+  bottomInset,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  mode: 'date' | 'time';
+  value: Date;
+  onChange: (date: Date) => void;
+  minimumDate?: Date;
+  colors: ReturnType<typeof useColors>;
+  bottomInset: number;
+}) {
+  if (!visible) return null;
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.pickerOverlay} onPress={onClose}>
+        <Pressable style={[styles.pickerSheet, { backgroundColor: colors.card }]} onPress={e => e.stopPropagation()}>
+          <View style={[styles.pickerGrabber, { backgroundColor: colors.border }]} />
+          <View style={styles.pickerHeader}>
+            <TouchableOpacity onPress={onClose}>
+              <Text style={[styles.pickerCancel, { color: colors.textMuted }]}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[styles.pickerTitle, { color: colors.text }]}>{title}</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Text style={[styles.pickerDone, { color: colors.text }]}>Done</Text>
+            </TouchableOpacity>
+          </View>
+          <DateTimePicker
+            value={value}
+            mode={mode}
+            display="spinner"
+            onChange={(_, date) => date && onChange(date)}
+            minimumDate={minimumDate}
+            style={styles.picker}
+          />
+          <View style={{ height: bottomInset }} />
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 

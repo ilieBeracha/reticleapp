@@ -116,43 +116,32 @@ export function useTrainingActions({
     }
   }, [training, setTraining, onTrainingUpdated]);
 
-  // Core finish logic - no confirmation dialog
   const executeFinishTraining = useCallback(async () => {
-    if (!training) {
-      console.log('[TrainingActions] No training to finish');
-      return;
-    }
-    
+    if (!training) return;
+
     setActionLoading(true);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      console.log('[TrainingActions] Calling finishTraining...');
       const result = await finishTraining(training.id);
-      console.log('[TrainingActions] finishTraining result:', result);
-      
+
       if (!result) {
-        console.log('[TrainingActions] Training not found');
         Alert.alert('Not Found', 'Training was not found. It may have been deleted.');
         setActionLoading(false);
         return;
       }
-      
-      // Only update local state if API succeeded
+
       setTraining((prev) => (prev ? { ...prev, status: 'finished' } : null));
       onTrainingUpdated?.();
-      // Refresh store so home page updates
       loadMyUpcomingTrainings().catch(() => {});
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      console.log('[TrainingActions] Finish complete');
-      
-      // Navigate to Training Report for debrief
+
       router.replace({
         pathname: '/(protected)/trainingReport',
         params: { trainingId: training.id },
       });
     } catch (error: any) {
       console.error('[TrainingActions] Finish failed:', error);
-      const message = error.message?.includes('permission') 
+      const message = error.message?.includes('permission')
         ? 'Only the training creator or team commanders can complete this training.'
         : error.message || 'Failed to finish training';
       Alert.alert('Cannot Complete', message);
@@ -161,14 +150,8 @@ export function useTrainingActions({
     }
   }, [training, setTraining, onTrainingUpdated, loadMyUpcomingTrainings]);
 
-  // With confirmation dialog - for manual "Finish Training" buttons
   const handleFinishTraining = useCallback(() => {
-    if (!training) {
-      console.log('[TrainingActions] No training to finish');
-      return;
-    }
-
-    console.log('[TrainingActions] Showing finish confirmation for:', training.id);
+    if (!training) return;
 
     Alert.alert('Finish Training', 'Mark this training as completed? You\'ll be taken to the debrief report.', [
       { text: 'Cancel', style: 'cancel' },

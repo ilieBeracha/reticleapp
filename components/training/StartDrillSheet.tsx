@@ -10,13 +10,12 @@ import { useSessionStore } from '@/store/sessionStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { ChevronRight, Crosshair, Plus, Target } from 'lucide-react-native';
+import { ChevronRight, CornerDownRight, Crosshair, Plus, Target } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Modal,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -49,14 +48,13 @@ export function StartDrillSheet({
   const [selectedWeapon, setSelectedWeapon] = useState<UserWeapon | null>(null);
   const [loadingWeapon, setLoadingWeapon] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const [showWeaponPicker, setShowWeaponPicker] = useState(false);
   const [showCreateWeapon, setShowCreateWeapon] = useState(false);
 
-  // Auto-load assigned weapon and team weapon policy
   useEffect(() => {
     if (!visible) return;
-    
+
     if (initialWeapon) {
       setSelectedWeapon(initialWeapon);
       setLoadingWeapon(false);
@@ -80,7 +78,6 @@ export function StartDrillSheet({
           return;
         }
 
-        // Get user's assigned weapon from team
         const assignedWeapons = await getAssignedWeapons(teamId!, user.id);
         if (cancelled) return;
 
@@ -105,13 +102,13 @@ export function StartDrillSheet({
 
   const handleStart = async () => {
     if (!selectedWeapon) return;
-    
+
     setIsSubmitting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
       const sessionWeather = toSessionWeatherData(openWeather, 'openweathermap');
-      
+
       const config: BaseSessionConfig = {
         weapon_id: selectedWeapon.id,
         weather: sessionWeather,
@@ -128,14 +125,14 @@ export function StartDrillSheet({
         },
         session_mode: 'solo',
         watch_controlled: false,
-        start_as_pending: true,
+        start_as_pending: false,
       };
 
       const session = await createSession(config);
       await loadSessions();
-      
+
       onClose();
-      
+
       router.push({
         pathname: '/(protected)/activeSession',
         params: {
@@ -153,8 +150,6 @@ export function StartDrillSheet({
   const handleWeaponSelect = useCallback(async (weapon: UserWeapon) => {
     setShowWeaponPicker(false);
 
-    // If this is a team weapon (has team_id), convert to personal profile
-    // This ensures weapon_id used in session is a user_weapon ID
     if ('team_id' in weapon && weapon.team_id) {
       try {
         setLoadingWeapon(true);
@@ -162,13 +157,11 @@ export function StartDrillSheet({
         setSelectedWeapon(personalProfile);
       } catch (error) {
         console.error('[StartDrillSheet] Failed to create personal profile:', error);
-        // Fallback to using the weapon directly
         setSelectedWeapon(weapon);
       } finally {
         setLoadingWeapon(false);
       }
     } else {
-      // Already a user weapon
       setSelectedWeapon(weapon);
     }
   }, []);
@@ -190,113 +183,120 @@ export function StartDrillSheet({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}>
-          {/* Header */}
-          <View style={styles.sheetHeader}>
-            <TouchableOpacity onPress={onClose} style={[styles.sheetCloseBtn, { backgroundColor: colors.card }]}>
-              <Ionicons name="close" size={20} color={colors.text} />
-            </TouchableOpacity>
-            <Text style={[styles.sheetTitle, { color: colors.text }]}>Start Drill</Text>
-            <View style={{ width: 40 }} />
+        {/* Header */}
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+          <TouchableOpacity
+            style={[styles.headerButton, { backgroundColor: colors.card }]}
+            onPress={onClose}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="close" size={18} color={colors.text} />
+          </TouchableOpacity>
+          <View style={styles.headerCenter}>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Start Drill</Text>
           </View>
+          <View style={{ width: 36 }} />
+        </View>
 
-          {/* Drill Hero */}
-          <View style={[styles.drillHero, { backgroundColor: colors.card }]}>
-            <View style={[styles.drillHeroIcon, { backgroundColor: colors.primary + '15' }]}>
-              <Target size={32} color={colors.primary} />
+        {/* Content */}
+        <View style={styles.content}>
+          {/* Drill info - compact */}
+          <View style={[styles.drillCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.drillIcon, { backgroundColor: `${colors.primary}15` }]}>
+              <Target size={20} color={colors.primary} />
             </View>
-            <Text style={[styles.drillHeroTitle, { color: colors.text }]}>{drill?.name || 'Training Drill'}</Text>
-            <View style={styles.drillHeroBadge}>
-              <Text style={[styles.drillHeroBadgeText, { color: colors.textMuted }]}>
-                {drill?.distance_m}m • {drill?.rounds_per_shooter} shots
+            <View style={styles.drillInfo}>
+              <Text style={[styles.drillName, { color: colors.text }]} numberOfLines={1}>
+                {drill?.name || 'Training Drill'}
+              </Text>
+              <Text style={[styles.drillMeta, { color: colors.textMuted }]}>
+                {drill?.distance_m}m · {drill?.rounds_per_shooter} shots
+                {drill?.time_limit_seconds ? ` · ${drill.time_limit_seconds}s` : ''}
               </Text>
             </View>
           </View>
 
-          {/* Weapon Selector */}
-          <View style={styles.sectionContainer}>
+          {/* Weapon selector */}
+          <View style={styles.weaponSection}>
             <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Weapon</Text>
             {loadingWeapon ? (
               <View style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <ActivityIndicator size="small" color={colors.textMuted} />
-                <Text style={[styles.weaponLoadingText, { color: colors.textMuted }]}>Assigning weapon...</Text>
+                <Text style={[styles.weaponLoadingText, { color: colors.textMuted }]}>
+                  Loading your weapon...
+                </Text>
               </View>
             ) : selectedWeapon ? (
               <TouchableOpacity
-                style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.primary }]}
+                style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}
                 onPress={() => setShowWeaponPicker(true)}
+                activeOpacity={0.7}
               >
-                <View style={[styles.weaponIcon, { backgroundColor: colors.primary + '15' }]}>
-                  <Crosshair size={20} color={colors.primary} />
+                <View style={[styles.weaponIcon, { backgroundColor: `${colors.primary}15` }]}>
+                  <Crosshair size={20} color={colors.primary} strokeWidth={1.5} />
                 </View>
                 <View style={styles.weaponInfo}>
-                  <Text style={[styles.weaponName, { color: colors.text }]}>{selectedWeapon.name}</Text>
-                  <Text style={[styles.weaponHint, { color: colors.textMuted }]}>Ready to use</Text>
+                  <Text style={[styles.weaponName, { color: colors.text }]} numberOfLines={1}>
+                    {selectedWeapon.name}
+                  </Text>
+                  <Text style={[styles.weaponHint, { color: colors.textMuted }]}>Tap to change</Text>
                 </View>
                 <ChevronRight size={18} color={colors.textMuted} />
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
-                style={[styles.weaponEmptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                style={[styles.weaponEmptyCard, { backgroundColor: colors.card, borderColor: colors.primary }]}
                 onPress={() => setShowWeaponPicker(true)}
+                activeOpacity={0.7}
               >
-                <View style={[styles.weaponEmptyIcon, { backgroundColor: colors.secondary }]}>
-                  <Plus size={20} color={colors.textMuted} />
+                <View style={[styles.weaponEmptyIcon, { backgroundColor: `${colors.primary}10` }]}>
+                  <Target size={24} color={colors.primary} strokeWidth={1.5} />
                 </View>
-                <Text style={[styles.weaponEmptyTitle, { color: colors.textMuted }]}>Select Weapon</Text>
+                <View style={styles.weaponEmptyContent}>
+                  <Text style={[styles.weaponEmptyTitle, { color: colors.text }]}>Select a weapon</Text>
+                  <Text style={[styles.weaponEmptySubtitle, { color: colors.textMuted }]}>Required to start</Text>
+                </View>
+                <View style={[styles.weaponSelectBtn, { backgroundColor: colors.primary }]}>
+                  <Plus size={16} color="#fff" strokeWidth={2.5} />
+                </View>
               </TouchableOpacity>
             )}
           </View>
+        </View>
 
-          {/* Quick Settings (Read only / display) */}
-          <View style={styles.specsRow}>
-            <View style={[styles.specItem, { backgroundColor: colors.card }]}>
-              <Text style={[styles.specLabel, { color: colors.textMuted }]}>DISTANCE</Text>
-              <Text style={[styles.specValue, { color: colors.text }]}>{drill?.distance_m}m</Text>
-            </View>
-            <View style={[styles.specItem, { backgroundColor: colors.card }]}>
-              <Text style={[styles.specLabel, { color: colors.textMuted }]}>ROUNDS</Text>
-              <Text style={[styles.specValue, { color: colors.text }]}>{drill?.rounds_per_shooter}</Text>
-            </View>
-            {drill?.time_limit_seconds && (
-              <View style={[styles.specItem, { backgroundColor: colors.card }]}>
-                <Text style={[styles.specLabel, { color: colors.textMuted }]}>TIME</Text>
-                <Text style={[styles.specValue, { color: colors.text }]}>{drill.time_limit_seconds}s</Text>
-              </View>
-            )}
-          </View>
-        </ScrollView>
-
-      {/* Footer Action */}
-      <View style={[styles.sheetFooter, { backgroundColor: colors.background, paddingBottom: insets.bottom + 16 }]}>
-        <TouchableOpacity
-          style={[
-            styles.startButton, 
-            { 
-              backgroundColor: selectedWeapon ? colors.text : colors.secondary, 
-              opacity: selectedWeapon ? 1 : 0.6 
-            }
-          ]}
-          onPress={handleStart}
-          disabled={!selectedWeapon || isSubmitting || loadingWeapon}
-        >
-          {isSubmitting ? (
-            <ActivityIndicator color={colors.background} />
-          ) : (
-            <>
-              <Target size={20} color={colors.background} />
-              <Text style={[styles.startButtonText, { color: colors.background }]}>
-                Continue to Setup
+        {/* Bottom button */}
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
+          <View style={[styles.bottomBarInner, { borderTopColor: colors.border }]}>
+            {!selectedWeapon && !loadingWeapon && (
+              <Text style={[styles.weaponRequiredHint, { color: colors.orange }]}>
+                Select a weapon to continue
               </Text>
-            </>
-          )}
-        </TouchableOpacity>
-        <Text style={[styles.setupHint, { color: colors.textMuted }]}>
-          Configure watch & detection in next step
-        </Text>
-      </View>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.button,
+                {
+                  backgroundColor: selectedWeapon ? colors.primary : colors.secondary,
+                  opacity: selectedWeapon ? 1 : 0.5,
+                },
+              ]}
+              onPress={handleStart}
+              disabled={!selectedWeapon || isSubmitting || loadingWeapon}
+              activeOpacity={0.85}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <CornerDownRight size={18} color="#fff" fill="#fff" />
+                  <Text style={styles.buttonText}>Start Session</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
 
-        {/* Modals */}
+        {/* Weapon Picker Modal */}
         <Modal visible={showWeaponPicker} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowWeaponPicker(false)}>
           <WeaponPicker
             selectedWeaponId={selectedWeapon?.id || null}
@@ -309,7 +309,7 @@ export function StartDrillSheet({
             teamId={teamId}
           />
         </Modal>
-        
+
         <Modal visible={showCreateWeapon} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowCreateWeapon(false)}>
           <CreateWeaponFlow
             onComplete={handleWeaponCreatedById}
@@ -328,62 +328,76 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  sheetHeader: {
+
+  // Header
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  headerButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+  },
+
+  // Content
+  content: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+
+  // Drill card
+  drillCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 10,
     marginBottom: 24,
   },
-  sheetTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  sheetCloseBtn: {
+  drillIcon: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  drillHero: {
-    alignItems: 'center',
-    padding: 24,
-    borderRadius: 20,
-    marginBottom: 24,
+  drillInfo: {
+    flex: 1,
+    gap: 2,
   },
-  drillHeroIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  drillHeroTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  drillHeroBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: 'rgba(128,128,128,0.1)',
-  },
-  drillHeroBadgeText: {
-    fontSize: 13,
+  drillName: {
+    fontSize: 15,
     fontWeight: '600',
+    letterSpacing: -0.3,
   },
-  sectionContainer: {
-    marginBottom: 24,
+  drillMeta: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+
+  // Weapon section
+  weaponSection: {
+    marginBottom: 20,
   },
   sectionLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -392,15 +406,15 @@ const styles = StyleSheet.create({
   weaponCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 14,
+    padding: 12,
+    borderRadius: 12,
     borderWidth: 1,
-    gap: 12,
+    gap: 10,
   },
   weaponIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -409,80 +423,81 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   weaponName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     letterSpacing: -0.3,
   },
   weaponHint: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
   },
   weaponLoadingText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
   },
   weaponEmptyCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 14,
+    padding: 12,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    gap: 12,
+    gap: 10,
   },
   weaponEmptyIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  weaponEmptyContent: {
+    flex: 1,
+    gap: 2,
+  },
   weaponEmptyTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     letterSpacing: -0.2,
   },
-  specsRow: {
-    flexDirection: 'row',
-    gap: 12,
+  weaponEmptySubtitle: {
+    fontSize: 11,
+    fontWeight: '500',
   },
-  specItem: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 12,
+  weaponSelectBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  specLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  specValue: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  sheetFooter: {
+
+  // Bottom bar
+  bottomBar: {
     paddingHorizontal: 20,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(128,128,128,0.1)',
   },
-  startButton: {
-    height: 52,
-    borderRadius: 14,
+  bottomBarInner: {
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  button: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 8,
+    height: 52,
+    borderRadius: 14,
   },
-  startButtonText: {
+  buttonText: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#fff',
+    letterSpacing: -0.2,
   },
-  setupHint: {
+  weaponRequiredHint: {
     fontSize: 12,
+    fontWeight: '500',
     textAlign: 'center',
-    marginTop: 10,
+    marginBottom: 10,
   },
 });

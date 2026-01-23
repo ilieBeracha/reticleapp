@@ -41,11 +41,13 @@ import {
   notifyWeaponRequestRejected,
 } from '@/services/notifications';
 import {
-  cancelWeaponRequest,
   createWeaponRequest,
+  cancelWeaponRequest,
   getAssignedWeapons,
   getMyPendingRequest,
   getOrCreatePersonalProfile,
+  getPoolWeapons,
+  type TeamWeapon,
   type UserWeapon,
   type WeaponRequest,
 } from '@/services/weaponService';
@@ -63,7 +65,9 @@ import {
   BookOpen,
   CheckCircle2,
   Clock,
+  Crosshair,
   MoreHorizontal,
+  Package,
   Play,
   Radio,
   Send,
@@ -107,10 +111,13 @@ function ParallaxScrollContent({
   onAutoCloseExpired,
   userWeapon,
   weaponChecked,
-  pendingRequest,
-  requestingWeapon,
   canManageTraining,
   onAssignWeapon,
+  poolWeapons,
+  selectingPoolWeapon,
+  onSelectPoolWeapon,
+  pendingRequest,
+  requestingWeapon,
   onRequestWeapon,
   onCancelRequest,
   onAddDrill,
@@ -368,43 +375,80 @@ function ParallaxScrollContent({
             );
           })()}
 
-          {/* No weapon banner - Soldier view only (can't manage, need to request) */}
+          {/* No assigned weapon - show pool picker or blocked message */}
           {!canManageTraining && isOngoing && weaponChecked && !userWeapon && (
-            <View style={[styles.noWeaponBanner, {
-              backgroundColor: pendingRequest ? colors.blue + '10' : colors.orange + '10',
-              borderColor: pendingRequest ? colors.blue + '25' : colors.orange + '25'
-            }]}>
-              <View style={[styles.noWeaponIcon, {
-                backgroundColor: pendingRequest ? colors.blue + '20' : colors.orange + '20'
-              }]}>
-                {pendingRequest ? (
-                  <Clock size={20} color={colors.blue} />
-                ) : (
-                  <AlertCircle size={20} color={colors.orange} />
-                )}
+            poolWeapons.length > 0 ? (
+              <View style={[styles.weaponPickerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={styles.weaponPickerHeader}>
+                  <Package size={16} color={colors.text} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.weaponPickerTitle, { color: colors.text }]}>
+                      Grab a Weapon
+                    </Text>
+                    <Text style={[styles.weaponPickerHint, { color: colors.textMuted }]}>
+                      Pick from team pool to start your drills
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.poolSection}>
+                  {poolWeapons.map((weapon: any) => (
+                    <TouchableOpacity
+                      key={weapon.id}
+                      style={[styles.poolWeaponRow, { borderColor: colors.border }]}
+                      onPress={() => onSelectPoolWeapon(weapon)}
+                      disabled={selectingPoolWeapon}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.poolWeaponIcon, { backgroundColor: colors.primary + '12' }]}>
+                        <Crosshair size={14} color={colors.primary} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.poolWeaponName, { color: colors.text }]} numberOfLines={1}>
+                          {weapon.name}
+                        </Text>
+                        {weapon.caliber && (
+                          <Text style={[styles.poolWeaponMeta, { color: colors.textMuted }]}>
+                            {weapon.caliber}
+                          </Text>
+                        )}
+                      </View>
+                      {selectingPoolWeapon ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : (
+                        <Text style={[styles.poolWeaponAction, { color: colors.primary }]}>Grab</Text>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
-              <View style={styles.noWeaponContent}>
-                <Text style={[styles.noWeaponTitle, { color: pendingRequest ? colors.blue : colors.orange }]}>
-                  {pendingRequest ? 'Request Pending' : 'Weapon Required'}
-                </Text>
-                <Text style={[styles.noWeaponHint, { color: colors.textMuted }]}>
-                  {pendingRequest
-                    ? 'Waiting for commander approval'
-                    : 'Request a weapon to start drills'}
-                </Text>
-              </View>
-              {/* Action button */}
-              {pendingRequest ? (
+            ) : pendingRequest ? (
+              <View style={[styles.noWeaponBanner, { backgroundColor: colors.blue + '08', borderColor: colors.blue + '20' }]}>
+                <Clock size={18} color={colors.blue} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.noWeaponTitle, { color: colors.blue }]}>Request pending</Text>
+                  <Text style={[styles.noWeaponHint, { color: colors.textMuted }]}>
+                    Waiting for commander to assign you a weapon
+                  </Text>
+                </View>
                 <TouchableOpacity
-                  style={[styles.noWeaponAction, { backgroundColor: colors.secondary }]}
                   onPress={onCancelRequest}
-                  activeOpacity={0.7}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  <X size={14} color={colors.textMuted} />
+                  <X size={16} color={colors.textMuted} />
                 </TouchableOpacity>
-              ) : (
+              </View>
+            ) : (
+              <View style={[styles.noWeaponBanner, { backgroundColor: colors.orange + '08', borderColor: colors.orange + '20' }]}>
+                <AlertCircle size={18} color={colors.orange} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.noWeaponTitle, { color: colors.orange }]}>No weapon assigned</Text>
+                  <Text style={[styles.noWeaponHint, { color: colors.textMuted }]}>
+                    Request a weapon from your commander
+                  </Text>
+                </View>
                 <TouchableOpacity
-                  style={[styles.noWeaponAction, { backgroundColor: colors.primary }]}
+                  style={[styles.requestButton, { backgroundColor: colors.primary }]}
                   onPress={onRequestWeapon}
                   disabled={requestingWeapon}
                   activeOpacity={0.7}
@@ -412,11 +456,14 @@ function ParallaxScrollContent({
                   {requestingWeapon ? (
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
-                    <Send size={14} color="#fff" />
+                    <>
+                      <Send size={13} color="#fff" />
+                      <Text style={styles.requestButtonText}>Request</Text>
+                    </>
                   )}
                 </TouchableOpacity>
-              )}
-            </View>
+              </View>
+            )
           )}
 
           {/* Empty State */}
@@ -513,47 +560,104 @@ function ParallaxScrollContent({
             </View>
           )}
 
-          {/* Training Summary - shown when finished with insights */}
-          {isFinished && completedCount > 0 && (
-            <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.green + '30' }]}>
-              {/* Header */}
-              <View style={styles.summaryHeader}>
-                <View style={[styles.summaryIcon, { backgroundColor: colors.green + '15' }]}>
-                  <Trophy size={20} color={colors.green} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.summaryTitle, { color: colors.text }]}>Training Complete</Text>
-                  <Text style={[styles.summarySubtitle, { color: colors.textMuted }]}>
-                    {completedCount} of {drills.length} drills · {format(new Date(training.scheduled_at), 'MMM d')}
-                  </Text>
-                </View>
-              </View>
+          {/* Round Summary - prominent post-training performance card */}
+          {isFinished && completedCount > 0 && (() => {
+            // Aggregate stats from all completed sessions
+            const completedSessions = teamSessions.filter((s: any) => s.status === 'completed' && s.stats);
+            const totalShots = completedSessions.reduce((sum: number, s: any) => sum + (s.stats?.shots_fired || 0), 0);
+            const totalHits = completedSessions.reduce((sum: number, s: any) => sum + (s.stats?.hits_total || 0), 0);
+            const avgAccuracy = totalShots > 0 ? Math.round((totalHits / totalShots) * 100) : 0;
+            const bestGroupCm = completedSessions
+              .map((s: any) => s.stats?.best_dispersion_cm)
+              .filter((v: any): v is number => v !== null && v !== undefined && v > 0);
+            const bestGroup = bestGroupCm.length > 0 ? Math.min(...bestGroupCm) : null;
 
-              {/* Quick Stats */}
-              <View style={[styles.insightsRow, { borderTopColor: colors.border }]}>
-                <View style={styles.insightItem}>
-                  <Text style={[styles.insightValue, { color: colors.text }]}>
-                    {Math.round((completedCount / drills.length) * 100)}%
-                  </Text>
-                  <Text style={[styles.insightLabel, { color: colors.textMuted }]}>Completion</Text>
+            // Total training time
+            const totalTimeMs = completedSessions.reduce((sum: number, s: any) => {
+              if (!s.started_at || !s.ended_at) return sum;
+              return sum + (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime());
+            }, 0);
+            const totalMinutes = Math.round(totalTimeMs / 60000);
+            const timeDisplay = totalMinutes >= 60
+              ? `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`
+              : totalMinutes > 0 ? `${totalMinutes}m` : '—';
+
+            // Generate a contextual insight
+            let insight: string | null = null;
+            if (avgAccuracy >= 80) {
+              insight = `Outstanding accuracy at ${avgAccuracy}% — well above average for this drill set.`;
+            } else if (bestGroup !== null && bestGroup < 5) {
+              insight = `Tight grouping at ${bestGroup.toFixed(1)}cm — excellent precision work.`;
+            } else if (completedCount === drills.length) {
+              insight = `All ${drills.length} drills completed — full training execution.`;
+            } else if (totalShots > 50) {
+              insight = `${totalShots} rounds fired across ${completedSessions.length} sessions — solid volume.`;
+            }
+
+            // Headline: show accuracy if we have shots, otherwise show completion
+            const headline = totalShots > 0
+              ? `${avgAccuracy}% Hit Rate`
+              : `${completedCount}/${drills.length} Complete`;
+
+            return (
+              <View style={[styles.roundSummaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                {/* Trophy accent */}
+                <View style={[styles.roundSummaryAccent, { backgroundColor: colors.green + '12' }]}>
+                  <Trophy size={18} color={colors.green} />
                 </View>
-                <View style={[styles.insightDivider, { backgroundColor: colors.border }]} />
-                <View style={styles.insightItem}>
-                  <Text style={[styles.insightValue, { color: colors.text }]}>
-                    {teamSessions.length}
-                  </Text>
-                  <Text style={[styles.insightLabel, { color: colors.textMuted }]}>Sessions</Text>
+
+                {/* Headline */}
+                <Text style={[styles.roundSummaryHeadline, { color: colors.text }]}>
+                  {headline}
+                </Text>
+                <Text style={[styles.roundSummarySubtitle, { color: colors.textMuted }]}>
+                  {completedCount}/{drills.length} drills · {format(new Date(training.scheduled_at), 'MMM d')}
+                </Text>
+
+                {/* Metrics Row */}
+                <View style={[styles.roundMetricsRow, { borderTopColor: colors.border }]}>
+                  <View style={styles.roundMetric}>
+                    <Text style={[styles.roundMetricValue, { color: colors.text }]}>
+                      {totalShots || '—'}
+                    </Text>
+                    <Text style={[styles.roundMetricLabel, { color: colors.textMuted }]}>Shots</Text>
+                  </View>
+                  <View style={[styles.roundMetricDivider, { backgroundColor: colors.border }]} />
+                  <View style={styles.roundMetric}>
+                    <Text style={[styles.roundMetricValue, { color: colors.text }]}>
+                      {bestGroup !== null ? `${bestGroup.toFixed(1)}` : '—'}
+                    </Text>
+                    <Text style={[styles.roundMetricLabel, { color: colors.textMuted }]}>
+                      {bestGroup !== null ? 'Best (cm)' : 'Group'}
+                    </Text>
+                  </View>
+                  <View style={[styles.roundMetricDivider, { backgroundColor: colors.border }]} />
+                  <View style={styles.roundMetric}>
+                    <Text style={[styles.roundMetricValue, { color: colors.text }]}>
+                      {timeDisplay}
+                    </Text>
+                    <Text style={[styles.roundMetricLabel, { color: colors.textMuted }]}>Time</Text>
+                  </View>
+                  <View style={[styles.roundMetricDivider, { backgroundColor: colors.border }]} />
+                  <View style={styles.roundMetric}>
+                    <Text style={[styles.roundMetricValue, { color: colors.text }]}>
+                      {new Set(teamSessions.map((s: any) => s.user_id)).size || 1}
+                    </Text>
+                    <Text style={[styles.roundMetricLabel, { color: colors.textMuted }]}>Shooters</Text>
+                  </View>
                 </View>
-                <View style={[styles.insightDivider, { backgroundColor: colors.border }]} />
-                <View style={styles.insightItem}>
-                  <Text style={[styles.insightValue, { color: colors.text }]}>
-                    {new Set(teamSessions.map((s: any) => s.user_id)).size || 1}
-                  </Text>
-                  <Text style={[styles.insightLabel, { color: colors.textMuted }]}>Shooters</Text>
-                </View>
+
+                {/* Insight Callout */}
+                {insight && (
+                  <View style={[styles.roundInsight, { backgroundColor: colors.primary + '08' }]}>
+                    <Text style={[styles.roundInsightText, { color: colors.primary }]}>
+                      {insight}
+                    </Text>
+                  </View>
+                )}
               </View>
-            </View>
-          )}
+            );
+          })()}
         </View>
       ) : (
         <View style={styles.squadContainer}>
@@ -604,6 +708,8 @@ export default function TrainingDetailScreen() {
   const [loadingTeamProgress, setLoadingTeamProgress] = useState(false);
   const [userWeapon, setUserWeapon] = useState<UserWeapon | null>(null);
   const [weaponChecked, setWeaponChecked] = useState(false);
+  const [poolWeapons, setPoolWeapons] = useState<TeamWeapon[]>([]);
+  const [selectingPoolWeapon, setSelectingPoolWeapon] = useState(false);
   const [pendingRequest, setPendingRequest] = useState<WeaponRequest | null>(null);
   const [requestingWeapon, setRequestingWeapon] = useState(false);
 
@@ -677,18 +783,6 @@ export default function TrainingDetailScreen() {
   const isFinished = training?.status === 'finished';
 
 
-  // Group Sessions by Drill
-  const sessionsByDrill = useMemo(() => {
-    const map = new Map<string, SessionWithDetails[]>();
-    teamSessions.forEach((s) => {
-      if (s.drill_id) {
-        if (!map.has(s.drill_id)) map.set(s.drill_id, []);
-        map.get(s.drill_id)?.push(s);
-      }
-    });
-    return map;
-  }, [teamSessions]);
-
   // Filtered drills for add drill modal
   const filteredDrills = useMemo(() => {
     if (!drillSearch.trim()) return availableDrills;
@@ -747,39 +841,39 @@ export default function TrainingDetailScreen() {
   // DATA LOADING
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // Load user's assigned weapon and pending request for this training's team
+  // Load user's assigned weapon, pool weapons, and pending request for this training's team
   useEffect(() => {
     if (!training?.team_id || !session?.user?.id) {
-      // No team = no team weapon needed, mark as checked
       if (training && !training.team_id) setWeaponChecked(true);
       return;
     }
     if (!isMountedRef.current) return;
 
     let cancelled = false;
-    async function loadWeaponAndRequest() {
+    async function loadWeapons() {
       try {
-        // Load both in parallel
-        const [assigned, pending] = await Promise.all([
+        const [assigned, pool, myRequest] = await Promise.all([
           getAssignedWeapons(training!.team_id!, session!.user!.id),
+          getPoolWeapons(training!.team_id!),
           getMyPendingRequest(training!.team_id!),
         ]);
-        
+
         if (!cancelled && isMountedRef.current) {
-          setPendingRequest(pending);
-          
+          setPoolWeapons(pool);
+          setPendingRequest(myRequest);
+
           if (assigned.length > 0) {
             const profile = await getOrCreatePersonalProfile(assigned[0].id);
             if (!cancelled && isMountedRef.current) setUserWeapon(profile);
           }
         }
       } catch (e) {
-        console.error('Failed to load weapon/request', e);
+        console.error('Failed to load weapons', e);
       } finally {
         if (!cancelled && isMountedRef.current) setWeaponChecked(true);
       }
     }
-    loadWeaponAndRequest();
+    loadWeapons();
     return () => {
       cancelled = true;
     };
@@ -854,44 +948,32 @@ export default function TrainingDetailScreen() {
     }, [loadTeamProgress, refetch]),
   });
 
-  // Subscribe to weapon request/assignment updates
+  // Subscribe to weapon assignment updates (commander assigns weapon while user is on screen)
   useWeaponRealtime({
     teamId: training?.team_id,
     userId: session?.user?.id,
-    enabled: !!training?.team_id && !userWeapon, // Only when user doesn't have weapon yet
+    enabled: !!training?.team_id && !userWeapon,
     onRequestApproved: useCallback(async () => {
-      console.log('[TrainingDetail] Realtime: Weapon request approved!');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setPendingRequest(null);
-      // Reload weapon - it should be assigned now
       if (training?.team_id && session?.user?.id) {
         const assigned = await getAssignedWeapons(training.team_id, session.user.id);
         if (assigned.length > 0) {
           const profile = await getOrCreatePersonalProfile(assigned[0].id);
           setUserWeapon(profile);
-          // Send notification
           notifyWeaponRequestApproved(training.team_id, assigned[0].name);
         }
       }
     }, [training?.team_id, session?.user?.id]),
     onRequestRejected: useCallback(() => {
-      console.log('[TrainingDetail] Realtime: Weapon request rejected');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      setPendingRequest(null);
-      // Send notification
       if (training?.team_id) {
         notifyWeaponRequestRejected(training.team_id);
       }
-      Alert.alert('Request Declined', 'Your weapon request was not approved. Contact your commander for details.');
     }, [training?.team_id]),
     onWeaponAssigned: useCallback(async (weapon: TeamWeaponRecord) => {
-      console.log('[TrainingDetail] Realtime: Weapon assigned!', weapon.name);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Convert to personal profile
       const profile = await getOrCreatePersonalProfile(weapon.id);
       setUserWeapon(profile);
-      setPendingRequest(null);
-      // Send notification
       if (training?.team_id && training?.team?.name) {
         notifyWeaponAssigned(training.team_id, weapon.name, training.team.name);
       }
@@ -902,10 +984,9 @@ export default function TrainingDetailScreen() {
   // HANDLERS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // Internal function to actually start the drill with a given watch preference
-  // skipPrepView: explicitly passed to handle first-drill case (state hasn't updated yet)
+  // Start a drill directly with given watch preference
   const startDrillWithPreference = useCallback(
-    async (drill: any, useWatch: boolean, skipPrepView: boolean = false) => {
+    async (drill: any, useWatch: boolean, _skipPrepView: boolean = false) => {
       if (!userWeapon) {
         setSelectedDrillToStart(drill);
         return;
@@ -914,10 +995,6 @@ export default function TrainingDetailScreen() {
       setQuickStartingDrillId(drill.id);
       try {
         const sessionWeather = toSessionWeatherData(openWeather, 'openweathermap');
-
-        // For team training: skip SessionPrepView when preference is set
-        // Use explicit skipPrepView param (handles first drill when state hasn't updated)
-        const shouldSkipPrepView = skipPrepView || (!!training?.team_id && trainingWatchPreference !== null);
 
         const config: BaseSessionConfig = {
           weapon_id: userWeapon.id,
@@ -935,8 +1012,7 @@ export default function TrainingDetailScreen() {
           },
           session_mode: 'solo',
           watch_controlled: useWatch,
-          // Skip SessionPrepView for team sessions with watch preference set
-          start_as_pending: !shouldSkipPrepView,
+          start_as_pending: false,
         };
 
         const newSession = await createSession(config);
@@ -957,7 +1033,7 @@ export default function TrainingDetailScreen() {
         setQuickStartingDrillId(null);
       }
     },
-    [userWeapon, training?.team_id, training?.id, openWeather, loadSessions, trainingWatchPreference]
+    [userWeapon, training?.team_id, training?.id, openWeather, loadSessions]
   );
 
   const handleStartDrill = useCallback(
@@ -1064,40 +1140,55 @@ export default function TrainingDetailScreen() {
     });
   }, [training?.team_id]);
 
-  // Request a weapon (for soldiers)
+  // Grab a pool weapon for this session (creates tracking profile, pool stays available)
+  const handleSelectPoolWeapon = useCallback(async (weapon: TeamWeapon) => {
+    if (selectingPoolWeapon) return;
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setSelectingPoolWeapon(true);
+
+    try {
+      const profile = await getOrCreatePersonalProfile(weapon.id);
+      setUserWeapon(profile);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to grab weapon');
+    } finally {
+      setSelectingPoolWeapon(false);
+    }
+  }, [selectingPoolWeapon]);
+
   const handleRequestWeapon = useCallback(async () => {
     if (!training?.team_id || requestingWeapon) return;
-    
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
     setRequestingWeapon(true);
-    
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
     try {
       const request = await createWeaponRequest({
         team_id: training.team_id,
-        notes: `Requested for training: ${training.title}`,
+        notes: 'Requesting weapon for training',
       });
       setPendingRequest(request);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to request weapon');
+      Alert.alert('Error', error.message || 'Failed to send request');
     } finally {
       setRequestingWeapon(false);
     }
-  }, [training?.team_id, training?.title, requestingWeapon]);
+  }, [training?.team_id, requestingWeapon]);
 
-  // Cancel weapon request
   const handleCancelRequest = useCallback(async () => {
-    if (!pendingRequest?.id) return;
-    
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
+    if (!pendingRequest) return;
+
     try {
       await cancelWeaponRequest(pendingRequest.id);
       setPendingRequest(null);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to cancel request');
     }
-  }, [pendingRequest?.id]);
+  }, [pendingRequest]);
 
   const handleAutoCloseExpired = useCallback(() => {
     if (canManageTraining) {
@@ -1185,10 +1276,13 @@ export default function TrainingDetailScreen() {
         onAutoCloseExpired={handleAutoCloseExpired}
         userWeapon={userWeapon}
         weaponChecked={weaponChecked}
-        pendingRequest={pendingRequest}
-        requestingWeapon={requestingWeapon}
         canManageTraining={canManageTraining}
         onAssignWeapon={handleOpenWeaponManagement}
+        poolWeapons={poolWeapons}
+        selectingPoolWeapon={selectingPoolWeapon}
+        onSelectPoolWeapon={handleSelectPoolWeapon}
+        pendingRequest={pendingRequest}
+        requestingWeapon={requestingWeapon}
         onRequestWeapon={handleRequestWeapon}
         onCancelRequest={handleCancelRequest}
         onAddDrill={handleOpenAddDrill}
@@ -1523,45 +1617,102 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  noWeaponBanner: {
+  // Weapon Picker Card (soldier without weapon)
+  weaponPickerCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  weaponPickerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
+    gap: 10,
+    padding: 14,
   },
-  noWeaponIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  noWeaponContent: {
-    flex: 1,
-    gap: 4,
-  },
-  noWeaponTitle: {
+  weaponPickerTitle: {
     fontSize: 15,
     fontWeight: '700',
+    letterSpacing: -0.2,
   },
-  noWeaponHint: {
-    fontSize: 13,
-    lineHeight: 18,
+  weaponPickerHint: {
+    fontSize: 12,
+    marginTop: 2,
   },
-  noWeaponAction: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+  poolSection: {
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+    gap: 6,
+  },
+  poolLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 4,
+    marginBottom: 2,
+  },
+  poolLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+  },
+  poolWeaponRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  poolWeaponIcon: {
+    width: 32,
+    height: 32,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 40,
   },
-  noWeaponActionText: {
-    color: '#fff',
-    fontSize: 13,
+  poolWeaponName: {
+    fontSize: 14,
     fontWeight: '600',
+    letterSpacing: -0.1,
+  },
+  poolWeaponMeta: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  poolWeaponAction: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  // No weapon available banner
+  noWeaponBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  noWeaponTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  noWeaponHint: {
+    fontSize: 12,
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  requestButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  requestButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
   },
   emptyDrills: {
     alignItems: 'center',
@@ -1587,56 +1738,71 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
-  summaryCard: {
-    padding: 16,
+  // Round Summary Card
+  roundSummaryCard: {
+    alignItems: 'center',
+    padding: 20,
     borderRadius: 16,
     borderWidth: 1,
     marginTop: 8,
+    gap: 4,
   },
-  summaryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  summaryIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+  roundSummaryAccent: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 8,
   },
-  summaryTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+  roundSummaryHeadline: {
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
-  summarySubtitle: {
+  roundSummarySubtitle: {
     fontSize: 13,
-    marginTop: 2,
+    marginBottom: 4,
   },
-  insightsRow: {
+  roundMetricsRow: {
     flexDirection: 'row',
+    alignSelf: 'stretch',
     marginTop: 16,
     paddingTop: 16,
     borderTopWidth: 1,
   },
-  insightItem: {
+  roundMetric: {
     flex: 1,
     alignItems: 'center',
+    gap: 2,
   },
-  insightValue: {
-    fontSize: 20,
+  roundMetricValue: {
+    fontSize: 18,
     fontWeight: '700',
+    letterSpacing: -0.3,
   },
-  insightLabel: {
-    fontSize: 11,
-    marginTop: 2,
+  roundMetricLabel: {
+    fontSize: 10,
+    fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
-  insightDivider: {
+  roundMetricDivider: {
     width: 1,
-    height: 32,
+    height: 28,
     alignSelf: 'center',
+  },
+  roundInsight: {
+    alignSelf: 'stretch',
+    marginTop: 14,
+    padding: 12,
+    borderRadius: 10,
+  },
+  roundInsightText: {
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 18,
+    textAlign: 'center',
   },
   tabBar: {
     flexDirection: 'row',

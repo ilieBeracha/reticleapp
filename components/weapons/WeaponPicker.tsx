@@ -163,7 +163,7 @@ export function WeaponPicker({
       return result;
     }
 
-    // Non-team view: show recent, assigned, my weapons, team (no catalog)
+    // Solo view: only show personal weapons (no team weapons)
     if (data.recentlyUsed.length > 0) {
       result.push({
         title: 'Recent',
@@ -174,19 +174,6 @@ export function WeaponPicker({
       data.recentlyUsed.forEach(w => usedIds.add(w.id));
     }
 
-    if (data.assignedToMe && data.assignedToMe.length > 0) {
-      const assignedFiltered = data.assignedToMe.filter(w => !usedIds.has(w.id));
-      if (assignedFiltered.length > 0) {
-        result.push({
-          title: 'Assigned',
-          icon: <Users size={12} color={colors.textMuted} />,
-          data: assignedFiltered,
-          type: 'assigned',
-        });
-        assignedFiltered.forEach(w => usedIds.add(w.id));
-      }
-    }
-
     const myWeaponsFiltered = data.myWeapons.filter(w => !usedIds.has(w.id));
     if (myWeaponsFiltered.length > 0) {
       result.push({
@@ -194,17 +181,6 @@ export function WeaponPicker({
         icon: <Star size={12} color={colors.textMuted} />,
         data: myWeaponsFiltered,
         type: 'personal',
-      });
-      myWeaponsFiltered.forEach(w => usedIds.add(w.id));
-    }
-
-    const teamWeaponsFiltered = data.teamWeapons.filter(w => !usedIds.has(w.id));
-    if (teamWeaponsFiltered.length > 0) {
-      result.push({
-        title: 'Team',
-        icon: <Users size={12} color={colors.textMuted} />,
-        data: teamWeaponsFiltered,
-        type: 'team',
       });
     }
 

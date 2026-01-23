@@ -21,7 +21,7 @@ import {
   DailyTip,
   HeroActions,
   HomeHeader,
-  RecentActivitySection
+  RecentActivitySection,
 } from './components';
 import { WeeklyStatsCard } from './components/WeeklyStatsCard';
 import { useUnifiedHomePage } from './useUnifiedHomePage';
@@ -113,7 +113,7 @@ export function UnifiedHomePage() {
     lastSessionDaysAgo,
     coachMessage,
     recentSessions,
-    todayTrainings,
+    myUpcomingTrainings,
     hasActiveSession,
     allSessions,
     defaultWeapon,
@@ -124,7 +124,6 @@ export function UnifiedHomePage() {
     handleStartSession,
     handleActiveSessionPress,
     handleSessionPress,
-    handleTrainingPress,
   } = useUnifiedHomePage();
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -191,8 +190,7 @@ export function UnifiedHomePage() {
           onActiveSessionPress={handleActiveSessionPress}
           defaultWeapon={defaultWeapon}
           defaultWeaponStats={defaultWeaponStats}
-          todayTrainings={todayTrainings}
-          onTrainingPress={handleTrainingPress}
+          upcomingTrainings={myUpcomingTrainings}
         />
 
         {/* ─────────────────────────────────────────────────────────────────── */}

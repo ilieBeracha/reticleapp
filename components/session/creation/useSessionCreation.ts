@@ -158,7 +158,7 @@ export function useSessionCreation(
     
     async function loadDefaultWeapon() {
       try {
-        const weapon = await getDefaultWeapon();
+        const weapon = await getDefaultWeapon({ personalOnly: true });
         if (weapon && !cancelled) {
           setState(s => ({
             ...s,
@@ -414,9 +414,9 @@ export function useSessionCreation(
       drill_id: trainingContext?.drillId || null, // Only for training_drills
       drill_config: drillConfig,
       session_mode: 'solo',
-      watch_controlled: false, // Set in SessionPrepView after form
+      watch_controlled: false,
       notes: context.notes || undefined,
-      start_as_pending: true,
+      start_as_pending: false,
     };
   }, [state, trainingContext]);
   

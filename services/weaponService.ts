@@ -478,23 +478,34 @@ export async function setDefaultWeaponId(weaponId: string | null): Promise<void>
  * Get the user's default weapon for auto-selection
  * Priority: 1. Stored default, 2. Favorite weapon, 3. Most recently used, 4. First weapon
  */
-export async function getDefaultWeapon(): Promise<UserWeapon | null> {
+export async function getDefaultWeapon(options?: { personalOnly?: boolean }): Promise<UserWeapon | null> {
+  const personalOnly = options?.personalOnly ?? false;
+
   // Get current user
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  // 1. First check for stored default weapon
-  const storedDefaultId = await getDefaultWeaponId();
-  if (storedDefaultId) {
-    const { data: storedDefault } = await supabase
+  // Helper to build query with optional personal-only filter
+  const buildQuery = () => {
+    let query = supabase
       .from('user_weapons')
       .select(`
         *,
         base_weapon:weapons(*),
         team_weapon:team_weapons!user_weapons_team_weapon_id_fkey(*)
       `)
+      .eq('user_id', user.id);
+    if (personalOnly) {
+      query = query.is('team_weapon_id', null);
+    }
+    return query;
+  };
+
+  // 1. First check for stored default weapon
+  const storedDefaultId = await getDefaultWeaponId();
+  if (storedDefaultId) {
+    const { data: storedDefault } = await buildQuery()
       .eq('id', storedDefaultId)
-      .eq('user_id', user.id)
       .single();
 
     if (storedDefault) return storedDefault;
@@ -503,14 +514,7 @@ export async function getDefaultWeapon(): Promise<UserWeapon | null> {
   }
 
   // 2. Try to get a favorite
-  const { data: favorite } = await supabase
-    .from('user_weapons')
-    .select(`
-      *,
-      base_weapon:weapons(*),
-      team_weapon:team_weapons!user_weapons_team_weapon_id_fkey(*)
-    `)
-    .eq('user_id', user.id)
+  const { data: favorite } = await buildQuery()
     .eq('is_favorite', true)
     .limit(1)
     .single();
@@ -518,14 +522,7 @@ export async function getDefaultWeapon(): Promise<UserWeapon | null> {
   if (favorite) return favorite;
 
   // 3. Then try most recently used
-  const { data: recent } = await supabase
-    .from('user_weapons')
-    .select(`
-      *,
-      base_weapon:weapons(*),
-      team_weapon:team_weapons!user_weapons_team_weapon_id_fkey(*)
-    `)
-    .eq('user_id', user.id)
+  const { data: recent } = await buildQuery()
     .not('last_used_at', 'is', null)
     .order('last_used_at', { ascending: false })
     .limit(1)
@@ -534,14 +531,7 @@ export async function getDefaultWeapon(): Promise<UserWeapon | null> {
   if (recent) return recent;
 
   // 4. Fall back to first weapon
-  const { data: first } = await supabase
-    .from('user_weapons')
-    .select(`
-      *,
-      base_weapon:weapons(*),
-      team_weapon:team_weapons!user_weapons_team_weapon_id_fkey(*)
-    `)
-    .eq('user_id', user.id)
+  const { data: first } = await buildQuery()
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
@@ -724,11 +714,17 @@ export async function getWeaponPickerData(options: WeaponPickerOptions = {}): Pr
     teamId ? getPoolWeapons(teamId) : Promise.resolve([]),
   ]);
 
+  // For solo (no teamId): only show personal weapons (exclude team weapon profiles)
+  const personalFilter = <T extends { team_weapon_id?: string | null }>(items: T[]): T[] => {
+    if (teamId) return items; // In team context, no filtering needed
+    return items.filter(item => !item.team_weapon_id);
+  };
+
   return {
-    recentlyUsed: filterByCategory(recentlyUsed),
+    recentlyUsed: personalFilter(filterByCategory(recentlyUsed)),
     assignedToMe: filterByCategory(assignedToMe),
     poolWeapons: filterByCategory(poolWeapons),
-    myWeapons: filterByCategory(myWeapons),
+    myWeapons: personalFilter(filterByCategory(myWeapons)),
     teamWeapons: filterByCategory(teamWeapons),
     globalWeapons: filterByCategory(globalWeapons),
   };

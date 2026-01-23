@@ -5,13 +5,14 @@
  * - Solo Session: 50% width - start/continue practice
  * - Default Weapon: 25% - shows weapon name & rounds
  * - Weapon Stats: 25% - shows accuracy or sessions
- * - Today's Reminders: Passive display of today's trainings (not interactive)
+ * - Timeline Strip: 7-day schedule with team-colored dots
  */
 
 import type { UserWeapon, WeaponStats } from '@/services/weaponService';
+import type { TrainingWithDetails } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { Bell, ChevronRight, Crosshair, Play, Target, Zap } from 'lucide-react-native';
+import { ChevronRight, Crosshair, Play, Target, Zap } from 'lucide-react-native';
 import { useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
@@ -26,15 +27,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import type { HomeSession } from '../../types';
 import type { Colors } from '../UnifiedHomePage.types';
-
-interface TodayTraining {
-  id: string;
-  title: string;
-  status: string;
-  scheduled_date?: string;
-  scheduled_at?: string;
-  team?: { name: string } | null;
-}
+import { TimelineStrip } from './TimelineStrip';
 
 interface HeroActionsProps {
   colors: Colors;
@@ -47,9 +40,8 @@ interface HeroActionsProps {
   // Weapon data
   defaultWeapon: UserWeapon | null;
   defaultWeaponStats: WeaponStats | null;
-  // Team - passive reminders only
-  todayTrainings: TodayTraining[];
-  onTrainingPress: (training: TodayTraining) => void; // Keep for backwards compat but won't use
+  // Upcoming trainings for timeline
+  upcomingTrainings: TrainingWithDetails[];
 }
 
 // Format large numbers (e.g., 1500 -> 1.5k)
@@ -71,8 +63,7 @@ export function HeroActions({
   onActiveSessionPress,
   defaultWeapon,
   defaultWeaponStats,
-  todayTrainings,
-  onTrainingPress,
+  upcomingTrainings,
 }: HeroActionsProps) {
   const soloScale = useSharedValue(1);
   const weaponScale = useSharedValue(1);
@@ -81,7 +72,7 @@ export function HeroActions({
 
   // Pulse animation for live indicator
   useEffect(() => {
-    if (hasActiveSession || todayTrainings.some((t) => t.status === 'ongoing')) {
+    if (hasActiveSession) {
       pulseOpacity.value = withRepeat(
         withSequence(
           withTiming(0.4, { duration: 800, easing: Easing.inOut(Easing.ease) }),
@@ -91,7 +82,7 @@ export function HeroActions({
         true
       );
     }
-  }, [hasActiveSession, todayTrainings]);
+  }, [hasActiveSession]);
 
   const soloAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: soloScale.value }],
@@ -142,22 +133,6 @@ export function HeroActions({
       router.push('/(protected)/(tabs)/loadout' as any);
     }
   };
-
-  // Navigate to Team tab for full schedule
-  const handleGoToTeam = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/(protected)/(tabs)/team');
-  };
-
-  // Format time from scheduled_date or scheduled_at
-  const formatTime = (training: TodayTraining) => {
-    const dateString = training.scheduled_at || training.scheduled_date;
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  const hasTodayTrainings = todayTrainings.length > 0;
 
   return (
     <Animated.View entering={FadeInDown.duration(400)} style={s.container}>
@@ -266,66 +241,9 @@ export function HeroActions({
       </View>
 
       {/* ─────────────────────────────────────────────────────────────────── */}
-      {/* TODAY'S REMINDERS - Passive display (not interactive cards) */}
+      {/* TIMELINE STRIP - 7-day schedule with team-colored dots */}
       {/* ─────────────────────────────────────────────────────────────────── */}
-      {hasTodayTrainings && (
-        <View style={[s.reminderSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={s.reminderHeader}>
-            <View style={s.reminderTitleRow}>
-              <Bell size={12} color={colors.textMuted} />
-              <Text style={[s.reminderTitle, { color: colors.textMuted }]}>REMINDERS</Text>
-            </View>
-            <TouchableOpacity onPress={handleGoToTeam} activeOpacity={0.7} style={s.viewInTeamBtn}>
-              <Text style={[s.viewInTeamText, { color: colors.primary }]}>Team tab</Text>
-              <ChevronRight size={12} color={colors.primary} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={s.reminderContent}>
-            {todayTrainings.slice(0, 2).map((training, index) => {
-              const isLive = training.status === 'ongoing';
-              
-              return (
-                <View
-                  key={training.id}
-                  style={[
-                    s.reminderItem,
-                    isLive && [s.reminderItemLive, { borderColor: `${colors.orange}30` }],
-                    index < Math.min(todayTrainings.length, 2) - 1 && { marginBottom: 4 },
-                  ]}
-                >
-                  {isLive ? (
-                    <View style={[s.liveIndicator, { backgroundColor: colors.orange }]}>
-                      <Animated.View style={[s.liveDot, pulseStyle]} />
-                    </View>
-                  ) : (
-                    <View style={[s.timeIndicator, { backgroundColor: colors.secondary }]}>
-                      <Text style={[s.timeText, { color: colors.textMuted }]}>
-                        {formatTime(training)}
-                      </Text>
-                    </View>
-                  )}
-                  <View style={s.reminderInfo}>
-                    <Text style={[s.reminderText, { color: colors.text }]} numberOfLines={1}>
-                      {training.title}
-                    </Text>
-                    {training.team?.name && (
-                      <Text style={[s.reminderTeam, { color: colors.textMuted }]} numberOfLines={1}>
-                        {training.team.name}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-              );
-            })}
-            {todayTrainings.length > 2 && (
-              <Text style={[s.moreRemindersText, { color: colors.textMuted }]}>
-                +{todayTrainings.length - 2} more
-              </Text>
-            )}
-          </View>
-        </View>
-      )}
+      <TimelineStrip colors={colors} trainings={upcomingTrainings} />
     </Animated.View>
   );
 }
@@ -427,99 +345,4 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-  // Reminder Section (Passive, non-interactive)
-  reminderSection: {
-    borderRadius: 10,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  reminderHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  reminderTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  reminderTitle: {
-    fontSize: 9,
-    fontWeight: '600',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-  },
-  viewInTeamBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  viewInTeamText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-
-  // Reminder Items (non-interactive)
-  reminderContent: {
-    paddingHorizontal: 8,
-    paddingBottom: 8,
-  },
-  reminderItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 4,
-    borderRadius: 6,
-  },
-  reminderItemLive: {
-    backgroundColor: 'rgba(249, 115, 22, 0.06)',
-    borderWidth: 1,
-    paddingVertical: 6,
-    paddingHorizontal: 6,
-  },
-  liveIndicator: {
-    width: 38,
-    height: 18,
-    borderRadius: 5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#fff',
-  },
-  timeIndicator: {
-    minWidth: 38,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 5,
-    alignItems: 'center',
-  },
-  timeText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  reminderInfo: {
-    flex: 1,
-  },
-  reminderText: {
-    fontSize: 12,
-    fontWeight: '500',
-    letterSpacing: -0.1,
-  },
-  reminderTeam: {
-    fontSize: 10,
-    marginTop: 1,
-  },
-  moreRemindersText: {
-    fontSize: 10,
-    fontWeight: '500',
-    textAlign: 'center',
-    marginTop: 4,
-  },
 });

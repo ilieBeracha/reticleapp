@@ -1,17 +1,13 @@
 /**
- * CREATE SESSION - 2-Step Flow
+ * CREATE SESSION - Single Page
  *
- * 1. Intent - What's my goal? (grouping/engagement)
- * 2. Details - Session configuration (weapon, distance, bullets)
- *
- * Weapon selection is a sheet within the Details step, not a separate step.
- * If user has no weapons, they can create one from the weapon picker.
+ * All configuration in one view: purpose toggle, weapon, drill details.
+ * Presets available via header bookmark icon.
  */
 
 import {
   SessionContextStep,
-  SessionIntentStep,
-  useSessionCreation,
+  useSessionCreation
 } from '@/components/session/creation';
 import type { Position, SessionPurpose } from '@/components/session/creation/sessionCreation.types';
 import { DrillPresetPicker, PresetForm } from '@/components/shared/drills';
@@ -29,7 +25,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, ChevronRight, CornerDownRight, Crosshair, Plus, Target } from 'lucide-react-native';
+import { ChevronRight, CornerDownRight, Crosshair, Plus, Target } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -41,7 +37,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function CreateSessionScreen() {
@@ -270,95 +265,37 @@ export default function CreateSessionScreen() {
     );
   }
 
-  // 2 steps: intent → context → submit
-  const isLastStep = creation.state.step === 'context';
   const hasWeapon = creation.state.context.weaponId !== null;
-  const canContinue =
-    creation.state.step === 'intent'
-      ? creation.state.purpose !== null
-      : creation.state.step === 'context'
-      ? hasWeapon && creation.state.context.distance > 0 && creation.state.context.shotsPlanned > 0
-      : false;
-
-  const handleButtonPress = () => {
-    if (isLastStep) {
-      creation.submit();
-    } else {
-      creation.goForward();
-    }
-  };
-
-  const effectiveStep = creation.state.step === 'intent' ? 1 : 2;
-  const stepLabels = ['Goal', 'Details'];
+  const canStart =
+    creation.state.purpose !== null &&
+    hasWeapon &&
+    creation.state.context.distance > 0 &&
+    creation.state.context.shotsPlanned > 0;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Fixed Header */}
+      {/* Header */}
       <View style={[styles.headerContainer, { paddingTop: insets.top + 8 }]}>
         <View style={styles.header}>
           <TouchableOpacity
             style={[styles.headerButton, { backgroundColor: colors.card }]}
-            onPress={effectiveStep > 1 ? creation.goBack : () => router.back()}
+            onPress={() => router.back()}
             activeOpacity={0.7}
           >
-            {effectiveStep > 1 ? (
-              <ChevronLeft size={18} color={colors.text} />
-            ) : (
-              <Ionicons name="close" size={18} color={colors.text} />
-            )}
+            <Ionicons name="close" size={18} color={colors.text} />
           </TouchableOpacity>
 
           <View style={styles.headerCenter}>
             <Text style={[styles.headerTitle, { color: colors.text }]}>New Session</Text>
-            <Text style={[styles.headerStep, { color: colors.textMuted }]}>
-              Step {effectiveStep} of 2
-            </Text>
           </View>
 
-          <View style={styles.headerButtonPlaceholder} />
-        </View>
-
-        {/* Progress indicator */}
-        <View style={styles.progressContainer}>
-          {stepLabels.map((label, idx) => {
-            const isActive = effectiveStep === idx + 1;
-            const isComplete = effectiveStep > idx + 1;
-            return (
-              <View key={label} style={styles.progressStep}>
-                <View 
-                  style={[
-                    styles.progressDot,
-                    { 
-                      backgroundColor: isActive || isComplete ? colors.primary : colors.border,
-                    },
-                    isActive && styles.progressDotActive,
-                  ]} 
-                />
-                <Text
-                  style={[
-                    styles.progressLabel,
-                    { 
-                      color: isActive ? colors.text : colors.textMuted,
-                      fontWeight: isActive ? '600' : '400',
-                    },
-                  ]}
-                >
-                  {label}
-                </Text>
-              </View>
-            );
-          })}
-          <View style={[styles.progressLine, { backgroundColor: colors.border }]}>
-            <View 
-              style={[
-                styles.progressLineFill, 
-                { 
-                  backgroundColor: colors.primary,
-                  width: effectiveStep > 1 ? '100%' : '0%',
-                }
-              ]} 
-            />
-          </View>
+          <TouchableOpacity
+            style={[styles.headerButton, { backgroundColor: colors.card }]}
+            onPress={handleUseSavedDrill}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="bookmark-outline" size={16} color={colors.text} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -368,127 +305,138 @@ export default function CreateSessionScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-
-      {creation.state.step === 'intent' && (
-        <SessionIntentStep
-          selectedPurpose={creation.state.purpose}
-          onSelectPurpose={handlePurposeSelect}
-          onUseSavedDrill={handleUseSavedDrill}
-        />
-      )}
-
-      {creation.state.step === 'context' && (
-        <>
-          <View style={styles.step2Header}>
-            <Text style={[styles.step2Title, { color: colors.text }]}>
-              Session details
-            </Text>
+        {/* Purpose toggle - inline */}
+        <View style={styles.purposeRow}>
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Goal</Text>
+          <View style={[styles.purposeToggle, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TouchableOpacity
+              style={[
+                styles.purposeOption,
+                creation.state.purpose === 'grouping' && [styles.purposeOptionActive, { backgroundColor: colors.primary }],
+              ]}
+              onPress={() => handlePurposeSelect('grouping')}
+              activeOpacity={0.7}
+            >
+              <Crosshair size={16} color={creation.state.purpose === 'grouping' ? '#fff' : colors.textMuted} />
+              <Text style={[styles.purposeText, { color: creation.state.purpose === 'grouping' ? '#fff' : colors.text }]}>
+                Grouping
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.purposeOption,
+                creation.state.purpose === 'engagement' && [styles.purposeOptionActive, { backgroundColor: colors.orange }],
+              ]}
+              onPress={() => handlePurposeSelect('engagement')}
+              activeOpacity={0.7}
+            >
+              <Target size={16} color={creation.state.purpose === 'engagement' ? '#fff' : colors.textMuted} />
+              <Text style={[styles.purposeText, { color: creation.state.purpose === 'engagement' ? '#fff' : colors.text }]}>
+                Engagement
+              </Text>
+            </TouchableOpacity>
           </View>
+        </View>
 
-          <View style={styles.weaponSection}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Weapon</Text>
-            {creation.isLoadingWeapon ? (
-              <View style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <ActivityIndicator size="small" color={colors.textMuted} />
-                <Text style={[styles.weaponLoadingText, { color: colors.textMuted }]}>
-                  Loading your weapon...
+        {/* Weapon selector */}
+        <View style={styles.weaponSection}>
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Weapon</Text>
+          {creation.isLoadingWeapon ? (
+            <View style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <ActivityIndicator size="small" color={colors.textMuted} />
+              <Text style={[styles.weaponLoadingText, { color: colors.textMuted }]}>
+                Loading your weapon...
+              </Text>
+            </View>
+          ) : hasWeapon ? (
+            <TouchableOpacity
+              style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={handleOpenWeaponPicker}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.weaponIcon, { backgroundColor: `${colors.primary}15` }]}>
+                <Crosshair size={20} color={colors.primary} strokeWidth={1.5} />
+              </View>
+              <View style={styles.weaponInfo}>
+                <Text style={[styles.weaponName, { color: colors.text }]} numberOfLines={1}>
+                  {creation.state.context.weaponName}
+                </Text>
+                <Text style={[styles.weaponHint, { color: colors.textMuted }]}>
+                  Tap to change
                 </Text>
               </View>
-            ) : hasWeapon ? (
-              <TouchableOpacity
-                style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={handleOpenWeaponPicker}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.weaponIcon, { backgroundColor: `${colors.primary}15` }]}>
-                  <Crosshair size={20} color={colors.primary} strokeWidth={1.5} />
-                </View>
-                <View style={styles.weaponInfo}>
-                  <Text style={[styles.weaponName, { color: colors.text }]} numberOfLines={1}>
-                    {creation.state.context.weaponName}
-                  </Text>
-                  <Text style={[styles.weaponHint, { color: colors.textMuted }]}>
-                    Tap to change
-                  </Text>
-                </View>
-                <ChevronRight size={18} color={colors.textMuted} />
-              </TouchableOpacity>
-            ) : (
-              <Animated.View entering={FadeIn.duration(200)}>
-                <TouchableOpacity
-                  style={[styles.weaponEmptyCard, { backgroundColor: colors.card, borderColor: colors.primary }]}
-                  onPress={handleOpenWeaponPicker}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.weaponEmptyIcon, { backgroundColor: `${colors.primary}10` }]}>
-                    <Target size={24} color={colors.primary} strokeWidth={1.5} />
-                  </View>
-                  <View style={styles.weaponEmptyContent}>
-                    <Text style={[styles.weaponEmptyTitle, { color: colors.text }]}>
-                      Select a weapon
-                    </Text>
-                    <Text style={[styles.weaponEmptySubtitle, { color: colors.textMuted }]}>
-                      Required to start session
-                    </Text>
-                  </View>
-                  <View style={[styles.weaponSelectBtn, { backgroundColor: colors.primary }]}>
-                    <Plus size={16} color="#fff" strokeWidth={2.5} />
-                  </View>
-                </TouchableOpacity>
-              </Animated.View>
-            )}
-          </View>
+              <ChevronRight size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.weaponEmptyCard, { backgroundColor: colors.card, borderColor: colors.primary }]}
+              onPress={handleOpenWeaponPicker}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.weaponEmptyIcon, { backgroundColor: `${colors.primary}10` }]}>
+                <Target size={24} color={colors.primary} strokeWidth={1.5} />
+              </View>
+              <View style={styles.weaponEmptyContent}>
+                <Text style={[styles.weaponEmptyTitle, { color: colors.text }]}>
+                  Select a weapon
+                </Text>
+                <Text style={[styles.weaponEmptySubtitle, { color: colors.textMuted }]}>
+                  Required to start
+                </Text>
+              </View>
+              <View style={[styles.weaponSelectBtn, { backgroundColor: colors.primary }]}>
+                <Plus size={16} color="#fff" strokeWidth={2.5} />
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
 
+        {/* Drill details (always visible) */}
+        {creation.state.purpose && (
           <SessionContextStep
-            purpose={creation.state.purpose!}
+            purpose={creation.state.purpose}
             context={creation.state.context}
             onUpdateContext={creation.updateContext}
-            onBack={creation.goBack}
+            onBack={() => {}}
             weaponCategory={selectedPreset?.weapon_category as any}
             selectedDrillId={creation.state.selectedDrillId}
             onDrillChange={creation.setDrill}
             hideWeaponSection
           />
-        </>
-      )}
-
+        )}
       </ScrollView>
 
-      {/* Fixed Bottom Button */}
-      {isLastStep && (
-        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
-          <View style={[styles.bottomBarInner, { borderTopColor: colors.border }]}>
-            {!hasWeapon && (
-              <Text style={[styles.weaponRequiredHint, { color: colors.orange }]}>
-                Select a weapon to continue
-              </Text>
+      {/* Fixed Bottom Button - always visible */}
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
+        <View style={[styles.bottomBarInner, { borderTopColor: colors.border }]}>
+          {!hasWeapon && creation.state.purpose && (
+            <Text style={[styles.weaponRequiredHint, { color: colors.orange }]}>
+              Select a weapon to continue
+            </Text>
+          )}
+          <TouchableOpacity
+            style={[
+              styles.button,
+              {
+                backgroundColor: canStart ? colors.primary : colors.secondary,
+                opacity: canStart ? 1 : 0.5,
+              },
+            ]}
+            onPress={() => creation.submit()}
+            disabled={!canStart || creation.state.isSubmitting}
+            activeOpacity={0.85}
+          >
+            {creation.state.isSubmitting ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <CornerDownRight size={18} color="#fff" fill="#fff" />
+                <Text style={styles.buttonText}>Start Session</Text>
+              </>
             )}
-            <TouchableOpacity
-              style={[
-                styles.button,
-                { 
-                  backgroundColor: canContinue ? colors.primary : colors.secondary,
-                  opacity: canContinue ? 1 : 0.5,
-                },
-              ]}
-              onPress={handleButtonPress}
-              disabled={!canContinue || creation.state.isSubmitting}
-              activeOpacity={0.85}
-            >
-              {creation.state.isSubmitting ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <CornerDownRight size={18} color="#fff" fill="#fff" />
-                  <Text style={styles.buttonText}>
-                    Start Session
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
         </View>
-      )}
+      </View>
 
       <Modal
         visible={showPresetPicker}
@@ -555,17 +503,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  
-  // Header Container (fixed at top)
+
+  // Header
   headerContainer: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 8,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
   },
   headerButton: {
     width: 36,
@@ -573,9 +520,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  headerButtonPlaceholder: {
-    width: 36,
   },
   headerCenter: {
     flex: 1,
@@ -586,52 +530,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: -0.3,
   },
-  headerStep: {
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  
-  // Progress indicator
-  progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    position: 'relative',
-    paddingHorizontal: 20,
-  },
-  progressStep: {
-    alignItems: 'center',
-    gap: 6,
-    zIndex: 1,
-  },
-  progressDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  progressDotActive: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  progressLabel: {
-    fontSize: 11,
-    letterSpacing: 0.2,
-  },
-  progressLine: {
-    position: 'absolute',
-    left: 40,
-    right: 40,
-    top: 5,
-    height: 2,
-    borderRadius: 1,
-  },
-  progressLineFill: {
-    height: '100%',
-    borderRadius: 1,
-  },
-  
+
   // ScrollView
   scrollView: {
     flex: 1,
@@ -639,17 +538,39 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
+    paddingTop: 12,
   },
 
-  // Step 2 header
-  step2Header: {
-    marginBottom: 20,
-    paddingTop: 4,
+  // Purpose toggle
+  purposeRow: {
+    marginBottom: 24,
   },
-  step2Title: {
-    fontSize: 22,
-    fontWeight: '700',
-    letterSpacing: -0.5,
+  purposeToggle: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 4,
+    gap: 4,
+  },
+  purposeOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 9,
+  },
+  purposeOptionActive: {
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  purposeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: -0.2,
   },
 
   // Weapon section
@@ -695,7 +616,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
   },
-  
+
   // Weapon empty state
   weaponEmptyCard: {
     flexDirection: 'row',
@@ -733,19 +654,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  
+
   // Loading
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  
-  // Bottom Bar (fixed)
+
+  // Bottom Bar
   bottomBar: {
     position: 'absolute',
     bottom: 0,

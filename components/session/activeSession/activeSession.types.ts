@@ -126,7 +126,7 @@ export interface UseActiveSessionReturn {
   handleManualRoute: () => void;
   handleScanRoute: () => void;
   handleTargetPress: (target: SessionTargetWithResults) => void;
-  handleEndSession: () => Promise<void>;
+  handleEndSession: () => void;
   handleClose: () => void;
   handleCompleteDrill: () => Promise<void>;
   handleFixResults: () => void;

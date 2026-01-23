@@ -140,22 +140,6 @@ export function useUnifiedHomePage() {
       .slice(0, 3);
   }, [myUpcomingTrainings, allSessions]);
 
-  // Today's trainings only (for hero section)
-  const todayTrainings = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    return myUpcomingTrainings
-      .filter((t) => {
-        if (t.status === 'ongoing') return true; // Always show ongoing
-        const trainingDate = new Date(t.scheduled_at || t.created_at || '');
-        return trainingDate >= today && trainingDate < tomorrow;
-      })
-      .filter((t) => !allSessions.some((s) => s.training_id === t.id && s.status === 'active'));
-  }, [myUpcomingTrainings, allSessions]);
-
   const homeState = useHomeState({
     sessions: allSessions,
     upcomingTrainings,
@@ -306,7 +290,7 @@ export function useUnifiedHomePage() {
     coachMessage,
     recentSessions,
     upcomingTrainings,
-    todayTrainings, // Today's team events only
+    myUpcomingTrainings, // Full list for timeline strip
     hasActiveSession,
     hasTeamContent,
     hasTeams,
