@@ -1,6 +1,6 @@
 /**
  * Session Creation Types
- * 
+ *
  * Based on the 6-step mental model:
  * 1. Intent - What am I going to do?
  * 2. Context - Under what conditions?
@@ -8,7 +8,7 @@
  * 4. Execution - Shooting in progress
  * 5. Results - What actually happened?
  * 6. Review - Does this look right?
- * 
+ *
  * This file covers steps 1-3 (pre-shooting configuration)
  */
 
@@ -20,9 +20,9 @@
  * Session purpose - answers "What am I going to do?"
  * Each purpose maps to different default configurations
  */
-export type SessionPurpose = 
-  | 'grouping'      // Measure shot dispersion / consistency
-  | 'engagement'    // Hit targets / zone-based scoring
+export type SessionPurpose =
+  | 'grouping' // Measure shot dispersion / consistency
+  | 'engagement'; // Hit targets / zone-based scoring
 
 export interface PurposeOption {
   id: SessionPurpose;
@@ -36,11 +36,11 @@ export interface PurposeOption {
 /**
  * Source of drill configuration
  */
-export type DrillSource = 
-  | 'quick'    // Use purpose defaults (one-tap start)
-  | 'preset'   // Load from saved personal preset
-  | 'library'  // Load from curated drill library
-  | 'custom';  // Configure manually
+export type DrillSource =
+  | 'quick' // Use purpose defaults (one-tap start)
+  | 'preset' // Load from saved personal preset
+  | 'library' // Load from curated drill library
+  | 'custom'; // Configure manually
 
 // ============================================================================
 // STEP 2: CONTEXT - "Under what conditions?"
@@ -57,12 +57,12 @@ export interface SessionContextState {
   /** Weapon category - shapes the entire experience */
   weaponCategory: string | null;
   distance: number;
-  
+
   // Common
   position: Position;
   targetType: TargetType;
   shotsPlanned: number;
-  
+
   // Optional (advanced)
   timeLimit: number | null;
   stressDrill: boolean;
@@ -89,21 +89,21 @@ export type InputMethod = 'scan' | 'manual';
 export interface SessionCreationState {
   // Current step
   step: CreationStep;
-  
+
   // Step 1: Intent
   purpose: SessionPurpose | null;
   drillSource: DrillSource | null;
   selectedPresetId: string | null;
   selectedLibraryId: string | null;
-  
+
   // Category Drill - When selected, session MUST follow this drill
   selectedDrillId: string | null;
   /** True when a drill is selected and requirements are locked */
   isDrillLocked: boolean;
-  
+
   // Step 2: Context
   context: SessionContextState;
-  
+
   // Submission
   isSubmitting: boolean;
 }
@@ -139,4 +139,3 @@ export const DEFAULT_CREATION_STATE: SessionCreationState = {
   context: DEFAULT_CONTEXT,
   isSubmitting: false,
 };
-

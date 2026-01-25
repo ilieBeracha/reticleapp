@@ -1,3 +1,4 @@
+import { supabase } from '@/lib/supabase';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
@@ -31,6 +32,20 @@ export interface ScheduleNotificationOptions {
   body: string;
   data?: NotificationData;
   trigger?: Notifications.NotificationTriggerInput;
+  /** If true, don't save to history (for scheduled reminders) */
+  skipHistory?: boolean;
+}
+
+export interface NotificationHistoryItem {
+  id: string;
+  user_id: string;
+  title: string;
+  body: string;
+  type: string;
+  screen: string | null;
+  reference_id: string | null;
+  read: boolean;
+  created_at: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -124,7 +139,14 @@ export async function scheduleNotification({
   body,
   data,
   trigger,
+  skipHistory = false,
 }: ScheduleNotificationOptions): Promise<string> {
+  // Save to history if it's an immediate notification (not scheduled for future)
+  const isImmediate = !trigger || trigger === null;
+  if (isImmediate && !skipHistory) {
+    await saveNotificationToHistory(title, body, data);
+  }
+
   return Notifications.scheduleNotificationAsync({
     content: { title, body, data: data || {}, sound: true },
     trigger: trigger || null,
@@ -149,6 +171,127 @@ export async function setBadgeCount(count: number): Promise<void> {
 
 export async function clearDeliveredNotifications(): Promise<void> {
   await Notifications.dismissAllNotificationsAsync();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NOTIFICATION HISTORY (DATABASE)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Save a notification to the history database
+ */
+async function saveNotificationToHistory(
+  title: string,
+  body: string,
+  data?: NotificationData
+): Promise<void> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    await supabase.from('notification_history').insert({
+      user_id: user.id,
+      title,
+      body,
+      type: data?.type || 'default',
+      screen: data?.screen || null,
+      reference_id: data?.id || null,
+    });
+  } catch (error) {
+    console.error('[Notifications] Failed to save to history:', error);
+  }
+}
+
+/**
+ * Get notification history for current user
+ */
+export async function getNotificationHistory(
+  limit = 50
+): Promise<NotificationHistoryItem[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from('notification_history')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error('[Notifications] Failed to get history:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+/**
+ * Get unread notification count
+ */
+export async function getUnreadCount(): Promise<number> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return 0;
+
+  const { count, error } = await supabase
+    .from('notification_history')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .eq('read', false);
+
+  if (error) {
+    console.error('[Notifications] Failed to get unread count:', error);
+    return 0;
+  }
+
+  return count || 0;
+}
+
+/**
+ * Mark a notification as read
+ */
+export async function markNotificationRead(notificationId: string): Promise<void> {
+  await supabase
+    .from('notification_history')
+    .update({ read: true })
+    .eq('id', notificationId);
+}
+
+/**
+ * Mark all notifications as read
+ */
+export async function markAllNotificationsRead(): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  await supabase
+    .from('notification_history')
+    .update({ read: true })
+    .eq('user_id', user.id)
+    .eq('read', false);
+}
+
+/**
+ * Delete a notification from history
+ */
+export async function deleteNotificationFromHistory(notificationId: string): Promise<void> {
+  await supabase
+    .from('notification_history')
+    .delete()
+    .eq('id', notificationId);
+}
+
+/**
+ * Clear all notification history
+ */
+export async function clearNotificationHistory(): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  await supabase
+    .from('notification_history')
+    .delete()
+    .eq('user_id', user.id);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -352,6 +495,89 @@ export async function notifyTrainingSessionStarted(
     title: 'Training Session Started',
     body: `${memberName} started their session in ${trainingName}`,
     data: { type: 'training', screen: 'trainingDetail', id: trainingId },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WEAPONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Notify commander when a soldier requests a weapon
+ * Called for: Team commanders/owners
+ */
+export async function notifyWeaponRequested(
+  teamId: string,
+  teamName: string,
+  soldierName: string,
+  trainingId?: string
+): Promise<string> {
+  return scheduleNotification({
+    title: 'Weapon Request',
+    body: `${soldierName} is requesting a weapon${trainingId ? ' during training' : ` in ${teamName}`}`,
+    data: trainingId
+      ? { type: 'training', screen: 'trainingDetail', id: trainingId }
+      : { type: 'team', screen: 'teamArmory', id: teamId },
+  });
+}
+
+/**
+ * Notify soldier when their weapon request is approved
+ * Called for: The soldier who made the request
+ */
+export async function notifyWeaponRequestApproved(
+  teamId: string,
+  weaponName: string
+): Promise<string> {
+  return scheduleNotification({
+    title: 'Weapon Request Approved',
+    body: `Your request was approved. ${weaponName} has been assigned to you.`,
+    data: { type: 'team', screen: 'teamArmory', id: teamId },
+  });
+}
+
+/**
+ * Notify soldier when their weapon request is rejected
+ * Called for: The soldier who made the request
+ */
+export async function notifyWeaponRequestRejected(
+  teamId: string
+): Promise<string> {
+  return scheduleNotification({
+    title: 'Weapon Request Declined',
+    body: 'Your weapon request was not approved. Contact your commander.',
+    data: { type: 'team', screen: 'teamArmory', id: teamId },
+  });
+}
+
+/**
+ * Notify soldier when a weapon is assigned to them
+ * Called for: The soldier receiving the weapon
+ */
+export async function notifyWeaponAssigned(
+  teamId: string,
+  weaponName: string,
+  teamName: string
+): Promise<string> {
+  return scheduleNotification({
+    title: 'Weapon Assigned',
+    body: `${weaponName} has been assigned to you in ${teamName}`,
+    data: { type: 'team', screen: 'teamArmory', id: teamId },
+  });
+}
+
+/**
+ * Notify soldier when a weapon is unassigned from them
+ * Called for: The soldier losing the weapon
+ */
+export async function notifyWeaponUnassigned(
+  teamId: string,
+  weaponName: string
+): Promise<string> {
+  return scheduleNotification({
+    title: 'Weapon Unassigned',
+    body: `${weaponName} has been unassigned from you`,
+    data: { type: 'team', screen: 'teamArmory', id: teamId },
   });
 }
 

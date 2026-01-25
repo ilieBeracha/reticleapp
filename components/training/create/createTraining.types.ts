@@ -2,7 +2,14 @@
  * Type definitions for Create Training Screen
  */
 
-import type { CreateTrainingDrillInput, Drill, DrillGoal, DrillInstanceConfig, TargetType, WeaponCategory } from '@/types/workspace';
+import type {
+  CreateTrainingDrillInput,
+  Drill,
+  DrillGoal,
+  DrillInstanceConfig,
+  TargetType,
+  WeaponCategory,
+} from '@/types/workspace';
 
 // ============================================================================
 // DRILL FORM DATA (inlined from UnifiedDrillModal)
@@ -72,7 +79,7 @@ export interface UseCreateTrainingReturn {
   isTeamLocked: boolean;
   needsTeamSelection: boolean;
   canCreateDrills: boolean;
-  
+
   // Form state
   title: string;
   setTitle: (title: string) => void;
@@ -81,7 +88,7 @@ export interface UseCreateTrainingReturn {
   manualStart: boolean;
   setManualStart: (manual: boolean) => void;
   drills: TrainingDrillItem[];
-  
+
   // UI state
   showDatePicker: boolean;
   setShowDatePicker: (show: boolean) => void;
@@ -89,24 +96,24 @@ export interface UseCreateTrainingReturn {
   setShowTimePicker: (show: boolean) => void;
   submitting: boolean;
   currentStep: WizardStep;
-  
+
   // Drill modal state
   teamDrills: Drill[];
   selectedDrill: Drill | null;
   drillModalVisible: boolean;
   drillModalMode: DrillModalMode;
   savingDrill: boolean;
-  
+
   // Step 2 - Quick Selection state
   lastTrainingDrills: any[]; // TrainingDrill[]
   adjustingDrill: TrainingDrillItem | null;
   adjustModalVisible: boolean;
-  
+
   // Validation
   step1Complete: boolean;
   step2Complete: boolean;
   canCreate: boolean;
-  
+
   // Actions
   handleSelectTeam: (teamId: string) => void;
   handleRemoveDrill: (drillId: string) => void;
@@ -120,11 +127,10 @@ export interface UseCreateTrainingReturn {
   handleNextStep: () => void;
   handleBackStep: () => void;
   handleCreate: () => Promise<void>;
-  
+
   // Step 2 - Quick Selection actions
   handleAdjustDrill: (drill: TrainingDrillItem) => void;
   handleCloseAdjustModal: () => void;
   handleUpdateDrill: (updated: TrainingDrillItem) => void;
   handleGoToCustom: () => void;
 }
-

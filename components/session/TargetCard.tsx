@@ -15,20 +15,17 @@ interface TargetCardProps {
 // ============================================================================
 // COMPONENT
 // ============================================================================
-export const TargetCard = React.memo(function TargetCard({
-  target,
-  index,
-  onPress,
-}: TargetCardProps) {
+export const TargetCard = React.memo(function TargetCard({ target, index, onPress }: TargetCardProps) {
   const isPaper = target.target_type === 'paper';
-  
+
   // Determine target purpose: grouping (consistency) vs achievement (accuracy)
   const isGroupingTarget = isPaper && target.paper_result?.paper_type === 'grouping';
-  const isEngagementTarget = isPaper && (target.paper_result?.paper_type === 'achievement' || target.paper_result?.paper_type === 'engagement');
+  const isEngagementTarget =
+    isPaper && (target.paper_result?.paper_type === 'achievement' || target.paper_result?.paper_type === 'engagement');
 
   // Check if this was scanned (AI detection) vs manual entry
   const isScanned = isPaper && !!target.paper_result?.scanned_image_url;
-  
+
   // Extract results
   let hits = 0;
   let shots = 0;
@@ -111,15 +108,24 @@ export const TargetCard = React.memo(function TargetCard({
           )}
           {/* Entry method indicator */}
           <View style={[styles.entryTag, isScanned ? styles.entryTagScan : styles.entryTagManual]}>
-            <Ionicons name={isScanned ? "scan" : "create"} size={10} color="#fff" />
+            <Ionicons name={isScanned ? 'scan' : 'create'} size={10} color="#fff" />
           </View>
         </View>
 
         {/* Meta line */}
         <View style={styles.meta}>
           {/* Target type badge */}
-          <Text style={[styles.typeTag, isGroupingTarget ? styles.typeTagGrouping : (isEngagementTarget ? styles.typeTagEngagement : styles.typeTagTactical)]}>
-            {isGroupingTarget ? 'Grouping' : (isPaper ? 'Engagement' : 'Tactical')}
+          <Text
+            style={[
+              styles.typeTag,
+              isGroupingTarget
+                ? styles.typeTagGrouping
+                : isEngagementTarget
+                  ? styles.typeTagEngagement
+                  : styles.typeTagTactical,
+            ]}
+          >
+            {isGroupingTarget ? 'Grouping' : isPaper ? 'Engagement' : 'Tactical'}
           </Text>
           {/* Entry method for achievement/tactical */}
           {!isGroupingTarget && isPaper && (
@@ -139,7 +145,9 @@ export const TargetCard = React.memo(function TargetCard({
           {notesSnippet && (
             <>
               <View style={styles.dot} />
-              <Text style={styles.metaText} numberOfLines={1}>{notesSnippet}</Text>
+              <Text style={styles.metaText} numberOfLines={1}>
+                {notesSnippet}
+              </Text>
             </>
           )}
         </View>
@@ -311,4 +319,3 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.3)',
   },
 });
-

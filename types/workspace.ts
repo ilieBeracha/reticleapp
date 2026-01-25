@@ -3,6 +3,8 @@
 // Users create and manage teams directly
 // =====================================================
 
+import type { WeaponPolicy } from '@/constants/weaponPolicy';
+
 export type TeamRole = 'owner' | 'commander' | 'squad_commander' | 'soldier';
 
 // TEAM (Primary Entity)
@@ -12,6 +14,7 @@ export interface Team {
   description?: string | null;
   team_type?: TeamType | null;
   squads?: string[];  // Array of squad names (e.g. ["Alpha", "Bravo", "Charlie"])
+  weapon_policy?: WeaponPolicy | null;  // Team weapon access policy
   created_by: string;
   created_at: string;
   updated_at: string;

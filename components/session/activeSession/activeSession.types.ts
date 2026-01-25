@@ -77,15 +77,15 @@ export interface UseActiveSessionReturn {
   session: SessionWithDetails | null;
   targets: SessionTargetWithResults[];
   stats: SessionStats | null;
-  
+
   // Loading states
   loading: boolean;
   refreshing: boolean;
   ending: boolean;
-  
+
   // Timer
   elapsedTime: number;
-  
+
   // Computed values
   drill: SessionWithDetails['drill_config'] | null;
   hasDrill: boolean;
@@ -97,27 +97,27 @@ export interface UseActiveSessionReturn {
   defaultDistance: number;
   drillLimitReached: boolean;
   score: SessionScore | null;
-  
+
   // Drill type flags
   isGrouping: boolean;
   isEngagement: boolean;
   isPaperDrill: boolean;
   isTacticalDrill: boolean;
-  
+
   // Watch state
   watchState: WatchState;
-  
+
   // Team training state (for hiding back button)
   isTeamTraining: boolean;
-  
+
   // Session mode - controls what user can modify
   sessionMode: SessionMode;
   canEditDrill: boolean;
   lockedConfig: SessionWithDetails['drill_config'] | null;
-  
+
   // Completion modal
   showCompletionModal: boolean;
-  
+
   // Actions
   loadData: () => Promise<void>;
   handleRefresh: () => void;
@@ -126,14 +126,13 @@ export interface UseActiveSessionReturn {
   handleManualRoute: () => void;
   handleScanRoute: () => void;
   handleTargetPress: (target: SessionTargetWithResults) => void;
-  handleEndSession: () => Promise<void>;
+  handleEndSession: () => void;
   handleClose: () => void;
   handleCompleteDrill: () => Promise<void>;
   handleFixResults: () => void;
   handleContinueWithoutWatch: () => Promise<void>;
   handleRetryWatchConnection: () => void;
-  
+
   // Route helpers
   canAddTarget: boolean;
 }
-

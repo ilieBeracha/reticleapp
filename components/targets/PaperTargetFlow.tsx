@@ -1,27 +1,22 @@
+import { useOpenWeather } from '@/hooks/useOpenWeather';
 import {
   shouldSubmitForTraining,
   submitTrainingData,
   TrainingDataPayload,
   uploadScannedTargetImage,
-} from "@/services/detectionService";
-import { addTargetWithPaperResult, PaperType, endSession } from "@/services/sessionService";
-import { useDetectionStore } from "@/store/detectionStore";
-import { finiteShotsOrNull, INFINITE_SHOTS_SENTINEL } from "@/utils/drillShots";
-import { useOpenWeather } from "@/hooks/useOpenWeather";
-import type { DecodedWeather } from "@/services/session/watchTypes";
-import { CameraView, useCameraPermissions } from "expo-camera";
-import * as Haptics from "expo-haptics";
-import * as ImagePicker from "expo-image-picker";
-import { router } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Alert,
-  StyleSheet,
-  View
-} from "react-native";
-import { CameraFlow } from "./CameraFlow";
-import { ResultCard } from "./ResultCard";
-import { COLORS, EditableDetection, Step, TargetType } from "./types";
+} from '@/services/detectionService';
+import { addTargetWithPaperResult, endSession, PaperType } from '@/services/sessionService';
+import { useDetectionStore } from '@/store/detectionStore';
+import { finiteShotsOrNull, INFINITE_SHOTS_SENTINEL } from '@/utils/drillShots';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, StyleSheet, View } from 'react-native';
+import { CameraFlow } from './CameraFlow';
+import { ResultCard } from './ResultCard';
+import { COLORS, EditableDetection, Step, TargetType } from './types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PAPER TARGET FLOW
@@ -35,7 +30,7 @@ interface PaperTargetFlowProps {
   /** Drill cap for scan targets (max shots). Use `undefined` for infinite. */
   defaultMaxShots?: number;
   lockDistance?: boolean;
-  paperType?: PaperType;  // grouping (dispersion) or achievement (hit %)
+  paperType?: PaperType; // grouping (dispersion) or achievement (hit %)
   autoFinishSession?: boolean;
   onComplete?: () => void;
   onCancel?: () => void;
@@ -56,31 +51,24 @@ export function PaperTargetFlow({
   const cameraRef = useRef<CameraView>(null);
 
   // Detection store
-  const {
-    result,
-    analyze,
-    setImage,
-    startCapture,
-    reset: resetDetection,
-    setError,
-  } = useDetectionStore();
+  const { result, analyze, setImage, startCapture, reset: resetDetection, setError } = useDetectionStore();
 
   // Weather
   const { weather: openWeather } = useOpenWeather({ autoFetch: true });
 
   // State
-  const [step, setStep] = useState<Step>("camera");
+  const [step, setStep] = useState<Step>('camera');
   const [saving, setSaving] = useState(false);
   const [capturedUri, setCapturedUri] = useState<string | null>(null);
   const [editedDetections, setEditedDetections] = useState<EditableDetection[]>([]);
-  
+
   // Configurable values
   const [distance, setDistance] = useState(defaultDistance);
   const [maxShots] = useState(defaultMaxShots ?? INFINITE_SHOTS_SENTINEL);
 
   // Paper settings - use prop value
   const paperType = propPaperType;
-  const [paperNotes] = useState("");
+  const [paperNotes] = useState('');
 
   // Auto-start camera on mount
   useEffect(() => {
@@ -88,11 +76,9 @@ export function PaperTargetFlow({
       if (!permission?.granted) {
         const { granted } = await requestPermission();
         if (!granted) {
-          Alert.alert(
-            "Camera Permission",
-            "Camera access is required to scan paper targets.",
-            [{ text: "OK", onPress: handleClose }]
-          );
+          Alert.alert('Camera Permission', 'Camera access is required to scan paper targets.', [
+            { text: 'OK', onPress: handleClose },
+          ]);
           return;
         }
       }
@@ -114,7 +100,7 @@ export function PaperTargetFlow({
   // Camera handlers
   const handlePickImage = useCallback(async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
+      mediaTypes: ['images'],
       allowsEditing: false,
       quality: 0.9,
     });
@@ -122,7 +108,7 @@ export function PaperTargetFlow({
     if (!result.canceled && result.assets[0]?.uri) {
       setCapturedUri(result.assets[0].uri);
       setImage(result.assets[0].uri);
-      setStep("preview");
+      setStep('preview');
     }
   }, [setImage]);
 
@@ -140,19 +126,19 @@ export function PaperTargetFlow({
       if (photo?.uri) {
         setCapturedUri(photo.uri);
         setImage(photo.uri);
-        setStep("preview");
+        setStep('preview');
       }
     } catch (err: any) {
-      console.error("Capture failed:", err);
+      console.error('Capture failed:', err);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setError(err.message || "Failed to capture photo");
-      Alert.alert("Error", "Failed to capture photo");
+      setError(err.message || 'Failed to capture photo');
+      Alert.alert('Error', 'Failed to capture photo');
     }
   }, [setImage, setError]);
 
   const handleSubmitPhoto = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setStep("analyzing");
+    setStep('analyzing');
 
     const analysisResult = await analyze();
 
@@ -165,12 +151,12 @@ export function PaperTargetFlow({
       setEditedDetections(initialDetections);
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setStep("results");
+      setStep('results');
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Analysis Failed", "Could not analyze the image. Please try again.", [
-        { text: "Retake", onPress: () => setStep("camera") },
-        { text: "Cancel", onPress: handleClose },
+      Alert.alert('Analysis Failed', 'Could not analyze the image. Please try again.', [
+        { text: 'Retake', onPress: () => setStep('camera') },
+        { text: 'Cancel', onPress: handleClose },
       ]);
     }
   }, [analyze, handleClose]);
@@ -179,14 +165,14 @@ export function PaperTargetFlow({
     setCapturedUri(null);
     setEditedDetections([]);
     resetDetection();
-    setStep("camera");
+    setStep('camera');
   }, [resetDetection]);
 
   // Save handler
   const savePaperTarget = useCallback(
     async (finalDetections: EditableDetection[], editedImageBase64?: string, actualShotsDeclared?: number | null) => {
       if (!sessionId) {
-        Alert.alert("Error", "Session ID missing");
+        Alert.alert('Error', 'Session ID missing');
         return;
       }
 
@@ -194,9 +180,7 @@ export function PaperTargetFlow({
 
       try {
         const detectionCount = finalDetections.length;
-        const rawHighConfHits = finalDetections.filter(
-          (d) => d.isManual || d.confidence >= 0.6
-        ).length;
+        const rawHighConfHits = finalDetections.filter((d) => d.isManual || d.confidence >= 0.6).length;
         // For scanned targets: detected holes = bullets fired = hits
         // High-confidence hits are already counted from detection
         const highConfHits = rawHighConfHits;
@@ -227,10 +211,10 @@ export function PaperTargetFlow({
         // Upload image to Supabase Storage instead of storing base64 in DB
         let scannedImageUrl: string | null = null;
         if (finalImageBase64) {
-          console.log("[PaperTargetFlow] Uploading scanned target image to storage...");
+          console.log('[PaperTargetFlow] Uploading scanned target image to storage...');
           scannedImageUrl = await uploadScannedTargetImage(finalImageBase64, sessionId);
           if (!scannedImageUrl) {
-            console.warn("[PaperTargetFlow] Failed to upload image, saving without image");
+            console.warn('[PaperTargetFlow] Failed to upload image, saving without image');
           }
         }
 
@@ -258,19 +242,19 @@ export function PaperTargetFlow({
 
         if (trainingData && shouldSubmitForTraining(trainingData as TrainingDataPayload)) {
           submitTrainingData(trainingData as TrainingDataPayload)
-            .then((res) => console.log("[Training] Submitted:", res.message))
-            .catch((err) => console.log("[Training] Failed:", err));
+            .then((res) => console.log('[Training] Submitted:', res.message))
+            .catch((err) => console.log('[Training] Failed:', err));
         }
 
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         resetDetection();
-        
+
         if (autoFinishSession) {
           try {
             await endSession(sessionId);
-            console.log("[PaperTargetFlow] Session auto-finished");
+            console.log('[PaperTargetFlow] Session auto-finished');
           } catch (e) {
-            console.error("[PaperTargetFlow] Failed to auto-finish session:", e);
+            console.error('[PaperTargetFlow] Failed to auto-finish session:', e);
           }
         }
 
@@ -280,9 +264,9 @@ export function PaperTargetFlow({
           router.back();
         }
       } catch (error: any) {
-        console.error("Failed to add paper target:", error);
+        console.error('Failed to add paper target:', error);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert("Error", error.message || "Failed to add target");
+        Alert.alert('Error', error.message || 'Failed to add target');
         setSaving(false);
       }
     },
@@ -290,7 +274,7 @@ export function PaperTargetFlow({
   );
 
   // Results view
-  if (step === "results" && result) {
+  if (step === 'results' && result) {
     return (
       <ResultCard
         result={result}

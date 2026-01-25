@@ -20,15 +20,15 @@ export type DrillDifficulty = 'beginner' | 'intermediate' | 'advanced' | 'expert
 
 /** Drill type categories */
 export type DrillType =
-  | 'zeroing'      // Confirm/adjust zero
-  | 'grouping'     // Measure consistency
+  | 'zeroing' // Confirm/adjust zero
+  | 'grouping' // Measure consistency
   | 'qualification' // Standard qual course
-  | 'speed'        // Timed drills
-  | 'accuracy'     // Precision shooting
-  | 'transition'   // Multiple targets
-  | 'movement'     // Shoot & move
-  | 'stress'       // Under physical stress
-  | 'diagnostic'   // Identify issues
+  | 'speed' // Timed drills
+  | 'accuracy' // Precision shooting
+  | 'transition' // Multiple targets
+  | 'movement' // Shoot & move
+  | 'stress' // Under physical stress
+  | 'diagnostic' // Identify issues
   | 'competition'; // Match-style drills
 
 /** Result evaluation */
@@ -250,11 +250,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       'Measure distance from POA',
     ],
     safetyNotes: ['Ensure range is clear'],
-    tips: [
-      'This tests your true zero',
-      'Track cold bore shots over time',
-      'Note temperature and conditions',
-    ],
+    tips: ['This tests your true zero', 'Track cold bore shots over time', 'Note temperature and conditions'],
     isStandard: true,
     source: 'Sniper Training',
     tags: ['cold-bore', 'diagnostic', 'single-shot'],
@@ -296,11 +292,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Good', color: '#3B82F6', criteria: { dispersionCm: 3.5 } },
       { name: 'Acceptable', color: '#F59E0B', criteria: { dispersionCm: 5.0 } },
     ],
-    instructions: [
-      'Fire 3 rounds at the target center',
-      'Focus on fundamentals',
-      'Measure extreme spread',
-    ],
+    instructions: ['Fire 3 rounds at the target center', 'Focus on fundamentals', 'Measure extreme spread'],
     safetyNotes: ['Clear chamber when done'],
     tips: ['3-shot groups are quick but less statistically valid'],
     isStandard: true,
@@ -348,11 +340,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       'Measure extreme spread (ES) of group',
     ],
     safetyNotes: ['Clear chamber when done'],
-    tips: [
-      'Consistent breathing rhythm',
-      'Same trigger press every time',
-      'Don\'t chase your shots',
-    ],
+    tips: ['Consistent breathing rhythm', 'Same trigger press every time', "Don't chase your shots"],
     isStandard: true,
     source: 'Standard Marksmanship',
     tags: ['grouping', 'fundamentals', 'benchmark'],
@@ -391,15 +379,9 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Good', color: '#3B82F6', criteria: { dispersionCm: 5.0 } },
       { name: 'Average', color: '#F59E0B', criteria: { dispersionCm: 7.0 } },
     ],
-    instructions: [
-      'Fire rounds maintaining focus throughout',
-      'This tests consistency over more rounds',
-    ],
+    instructions: ['Fire rounds maintaining focus throughout', 'This tests consistency over more rounds'],
     safetyNotes: [],
-    tips: [
-      '10-shot groups are more statistically valid',
-      'Watch for fatigue affecting later shots',
-    ],
+    tips: ['10-shot groups are more statistically valid', 'Watch for fatigue affecting later shots'],
     isStandard: true,
     tags: ['grouping', 'endurance', 'benchmark'],
     category: 'precision_rifle',
@@ -440,12 +422,9 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Sharpshooter', color: '#3B82F6', criteria: { accuracyPct: 85 } },
       { name: 'Qualified', color: '#F59E0B', criteria: { accuracyPct: 70 } },
     ],
-    instructions: [
-      'Fire rounds one at a time',
-      'Focus on sight alignment and trigger press',
-    ],
+    instructions: ['Fire rounds one at a time', 'Focus on sight alignment and trigger press'],
     safetyNotes: ['Finger off trigger until on target'],
-    tips: ['Don\'t rush - this is about precision'],
+    tips: ["Don't rush - this is about precision"],
     isStandard: true,
     tags: ['fundamentals', 'accuracy', 'slow-fire'],
     category: 'pistol',
@@ -483,11 +462,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Expert', color: '#3B82F6', criteria: { accuracyPct: 85 } },
       { name: 'Sharpshooter', color: '#F59E0B', criteria: { accuracyPct: 75 } },
     ],
-    instructions: [
-      'Fire rounds at bullseye target',
-      'Score based on ring value',
-      'Take your time for each shot',
-    ],
+    instructions: ['Fire rounds at bullseye target', 'Score based on ring value', 'Take your time for each shot'],
     safetyNotes: [],
     tips: ['Consistent sight picture is key', 'Focus on trigger control'],
     isStandard: true,
@@ -532,16 +507,9 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Expert', color: '#3B82F6', criteria: { timeSeconds: 2.5, accuracyPct: 100 } },
       { name: 'Qualified', color: '#F59E0B', criteria: { timeSeconds: 3.5, accuracyPct: 100 } },
     ],
-    instructions: [
-      'On signal, engage target',
-      'All shots must hit',
-      'Time stops on last shot',
-    ],
+    instructions: ['On signal, engage target', 'All shots must hit', 'Time stops on last shot'],
     safetyNotes: ['Safe draw technique', 'Finger indexed until on target'],
-    tips: [
-      'Speed comes from efficiency, not rushing',
-      'Smooth is fast',
-    ],
+    tips: ['Speed comes from efficiency, not rushing', 'Smooth is fast'],
     isStandard: true,
     tags: ['speed', 'classic'],
     category: 'pistol',
@@ -578,10 +546,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Expert', color: '#10B981', criteria: { timeSeconds: 1.0, accuracyPct: 100 } },
       { name: 'Good', color: '#3B82F6', criteria: { timeSeconds: 1.5, accuracyPct: 90 } },
     ],
-    instructions: [
-      'Fire controlled pairs',
-      'Maintain consistent split times',
-    ],
+    instructions: ['Fire controlled pairs', 'Maintain consistent split times'],
     safetyNotes: [],
     tips: ['Same cadence every time builds consistency'],
     isStandard: true,
@@ -622,10 +587,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Expert', color: '#3B82F6', criteria: { timeSeconds: 2.5, accuracyPct: 100 } },
       { name: 'Qualified', color: '#F59E0B', criteria: { timeSeconds: 3.0, accuracyPct: 100 } },
     ],
-    instructions: [
-      'From draw, fire 6 rounds to chest',
-      'All hits must be in A-zone',
-    ],
+    instructions: ['From draw, fire 6 rounds to chest', 'All hits must be in A-zone'],
     safetyNotes: ['Practice safe draw'],
     tips: ['Focus on recoil management', 'Let the sights settle briefly'],
     isStandard: true,
@@ -666,10 +628,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Expert', color: '#10B981', criteria: { timeSeconds: 2.0, accuracyPct: 100 } },
       { name: 'Qualified', color: '#3B82F6', criteria: { timeSeconds: 2.5, accuracyPct: 100 } },
     ],
-    instructions: [
-      'Fire 2 rounds to body',
-      'Transition to head, fire 1 round',
-    ],
+    instructions: ['Fire 2 rounds to body', 'Transition to head, fire 1 round'],
     safetyNotes: [],
     tips: ['The head shot requires a pause to aim'],
     isStandard: true,
@@ -710,10 +669,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Expert', color: '#10B981', criteria: { timeSeconds: 1.0, accuracyPct: 100 } },
       { name: 'Good', color: '#3B82F6', criteria: { timeSeconds: 1.5, accuracyPct: 100 } },
     ],
-    instructions: [
-      'Start with hands at sides',
-      'On signal, draw and fire one round',
-    ],
+    instructions: ['Start with hands at sides', 'On signal, draw and fire one round'],
     safetyNotes: ['Safe draw technique'],
     tips: ['Smooth draw wins'],
     isStandard: true,
@@ -757,12 +713,9 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Good', color: '#3B82F6', criteria: { timeSeconds: 4.5, accuracyPct: 100 } },
       { name: 'Qualified', color: '#F59E0B', criteria: { timeSeconds: 6.0, accuracyPct: 100 } },
     ],
-    instructions: [
-      'Engage 3 targets, 2 rounds each',
-      'Smooth transitions between targets',
-    ],
+    instructions: ['Engage 3 targets, 2 rounds each', 'Smooth transitions between targets'],
     safetyNotes: ['Muzzle discipline during transitions'],
-    tips: ['Eyes lead the gun', 'Don\'t outrun your sights'],
+    tips: ['Eyes lead the gun', "Don't outrun your sights"],
     isStandard: true,
     tags: ['transition', 'multiple-targets'],
     category: 'pistol',
@@ -845,11 +798,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Expert', color: '#10B981', criteria: { timeSeconds: 4.0 } },
       { name: 'Good', color: '#3B82F6', criteria: { timeSeconds: 6.0 } },
     ],
-    instructions: [
-      'Fire 2 rounds',
-      'Perform reload',
-      'Fire 2 more rounds',
-    ],
+    instructions: ['Fire 2 rounds', 'Perform reload', 'Fire 2 more rounds'],
     safetyNotes: ['Safe magazine handling'],
     tips: ['Index the magazine consistently', 'Eyes stay on target'],
     isStandard: true,
@@ -937,13 +886,9 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Good', color: '#3B82F6', criteria: { timeSeconds: 8.0, accuracyPct: 90 } },
       { name: 'Qualified', color: '#F59E0B', criteria: { timeSeconds: 10.0, accuracyPct: 80 } },
     ],
-    instructions: [
-      'On signal, fire all rounds',
-      'Must complete within time limit',
-      'Accuracy still counts',
-    ],
+    instructions: ['On signal, fire all rounds', 'Must complete within time limit', 'Accuracy still counts'],
     safetyNotes: [],
-    tips: ['Don\'t rush the first shot', 'Smooth trigger press under pressure'],
+    tips: ["Don't rush the first shot", 'Smooth trigger press under pressure'],
     isStandard: true,
     tags: ['stress', 'timed', 'accuracy'],
     category: 'any',
@@ -984,10 +929,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Sharpshooter', color: '#3B82F6', criteria: { accuracyPct: 80 } },
       { name: 'Qualified', color: '#F59E0B', criteria: { accuracyPct: 70 } },
     ],
-    instructions: [
-      'Fire 5 rounds at each stage',
-      'Score based on accuracy percentage',
-    ],
+    instructions: ['Fire 5 rounds at each stage', 'Score based on accuracy percentage'],
     safetyNotes: [],
     tips: ['Take your time', 'Focus on fundamentals'],
     isStandard: true,
@@ -1027,11 +969,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Expert', color: '#10B981', criteria: { dispersionCm: 5.0 } },
       { name: 'Qualified', color: '#3B82F6', criteria: { dispersionCm: 8.0 } },
     ],
-    instructions: [
-      'Confirm zero before starting',
-      'Apply proper elevation adjustment',
-      'Account for wind',
-    ],
+    instructions: ['Confirm zero before starting', 'Apply proper elevation adjustment', 'Account for wind'],
     safetyNotes: [],
     tips: ['Wind becomes more significant at distance'],
     isStandard: true,
@@ -1072,11 +1010,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Good', color: '#3B82F6', criteria: { dispersionCm: 5.0 } },
       { name: 'Work Needed', color: '#F59E0B', criteria: { dispersionCm: 8.0 } },
     ],
-    instructions: [
-      'Fire slowly and deliberately',
-      'Focus ONLY on trigger press',
-      'Analyze shot pattern for issues',
-    ],
+    instructions: ['Fire slowly and deliberately', 'Focus ONLY on trigger press', 'Analyze shot pattern for issues'],
     safetyNotes: [],
     tips: [
       'Shots low-left (right-handed): likely jerking trigger',
@@ -1157,10 +1091,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Perfect', color: '#10B981', criteria: { dispersionCm: 0.5 } },
       { name: 'Excellent', color: '#3B82F6', criteria: { dispersionCm: 1.0 } },
     ],
-    instructions: [
-      'Use maximum stability',
-      'All shots must be through essentially the same hole',
-    ],
+    instructions: ['Use maximum stability', 'All shots must be through essentially the same hole'],
     safetyNotes: [],
     tips: ['Tests rifle capability and shooter fundamentals'],
     isStandard: true,
@@ -1197,11 +1128,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
     },
     passFailCriteria: null,
     scoringTiers: [],
-    instructions: [
-      'Fire at large paper target',
-      'Measure pattern spread',
-      'Note POI vs POA',
-    ],
+    instructions: ['Fire at large paper target', 'Measure pattern spread', 'Note POI vs POA'],
     safetyNotes: [],
     tips: ['Different chokes = different patterns', 'Test your defensive load'],
     isStandard: true,
@@ -1241,11 +1168,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Good', color: '#3B82F6', criteria: { dispersionCm: 12.0 } },
       { name: 'Acceptable', color: '#F59E0B', criteria: { dispersionCm: 15.0 } },
     ],
-    instructions: [
-      'Use rifled slugs or sabot rounds',
-      'Fire at designated target',
-      'Measure group size',
-    ],
+    instructions: ['Use rifled slugs or sabot rounds', 'Fire at designated target', 'Measure group size'],
     safetyNotes: ['Know your load'],
     tips: ['Slugs are affected by barrel type'],
     isStandard: true,
@@ -1328,11 +1251,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Expert', color: '#10B981', criteria: { timeSeconds: 12.0 } },
       { name: 'Good', color: '#3B82F6', criteria: { timeSeconds: 16.0 } },
     ],
-    instructions: [
-      'Fire 4 rounds',
-      'Reload 4 shells',
-      'Fire 4 more rounds',
-    ],
+    instructions: ['Fire 4 rounds', 'Reload 4 shells', 'Fire 4 more rounds'],
     safetyNotes: ['Safe shell handling'],
     tips: ['Consistent loading technique is key'],
     isStandard: true,
@@ -1375,11 +1294,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Expert', color: '#10B981', criteria: { timeSeconds: 6.0, accuracyPct: 100 } },
       { name: 'Good', color: '#3B82F6', criteria: { timeSeconds: 8.0, accuracyPct: 80 } },
     ],
-    instructions: [
-      'Start at 15m',
-      'Advance toward target while firing',
-      'Stop at 5m mark',
-    ],
+    instructions: ['Start at 15m', 'Advance toward target while firing', 'Stop at 5m mark'],
     safetyNotes: ['Safe movement with loaded weapon', 'Muzzle downrange'],
     tips: ['Shoot when both feet planted or in smooth gait'],
     isStandard: true,
@@ -1418,10 +1333,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Expert', color: '#10B981', criteria: { accuracyPct: 100 } },
       { name: 'Good', color: '#3B82F6', criteria: { accuracyPct: 75 } },
     ],
-    instructions: [
-      'Move laterally while engaging',
-      '4 rounds moving left, 4 moving right',
-    ],
+    instructions: ['Move laterally while engaging', '4 rounds moving left, 4 moving right'],
     safetyNotes: ['Watch footing', 'Keep muzzle pointed safely'],
     tips: ['Small steps maintain stability'],
     isStandard: true,
@@ -1460,11 +1372,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Expert', color: '#10B981', criteria: { accuracyPct: 100, timeSeconds: 6.0 } },
       { name: 'Good', color: '#3B82F6', criteria: { accuracyPct: 75 } },
     ],
-    instructions: [
-      'Start at 5m',
-      'Move backward while engaging',
-      'End at 15m',
-    ],
+    instructions: ['Start at 5m', 'Move backward while engaging', 'End at 15m'],
     safetyNotes: ['Watch footing', 'Be aware of obstacles behind'],
     tips: ['Glance back periodically', 'Smaller steps = better stability'],
     isStandard: true,
@@ -1506,11 +1414,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Expert', color: '#10B981', criteria: { accuracyPct: 95, timeSeconds: 120 } },
       { name: 'Good', color: '#3B82F6', criteria: { accuracyPct: 85, timeSeconds: 150 } },
     ],
-    instructions: [
-      '3 rounds prone',
-      '3 rounds seated',
-      '3 rounds standing',
-    ],
+    instructions: ['3 rounds prone', '3 rounds seated', '3 rounds standing'],
     safetyNotes: ['Safe transitions between positions'],
     tips: ['Build stable positions quickly'],
     isStandard: true,
@@ -1594,10 +1498,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Expert', color: '#10B981', criteria: { accuracyPct: 100 } },
       { name: 'Good', color: '#3B82F6', criteria: { accuracyPct: 90 } },
     ],
-    instructions: [
-      'Assume kneeling position',
-      'Fire rounds at target',
-    ],
+    instructions: ['Assume kneeling position', 'Fire rounds at target'],
     safetyNotes: [],
     tips: ['Plant the elbow on the knee for stability'],
     isStandard: true,
@@ -1638,10 +1539,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Master', color: '#3B82F6', criteria: { timeSeconds: 15.0, accuracyPct: 90 } },
       { name: 'A Class', color: '#F59E0B', criteria: { timeSeconds: 20.0, accuracyPct: 85 } },
     ],
-    instructions: [
-      'Engage all targets as per stage design',
-      'Score = points minus time penalties',
-    ],
+    instructions: ['Engage all targets as per stage design', 'Score = points minus time penalties'],
     safetyNotes: ['180 rule', 'Finger off trigger during movement'],
     tips: ['Plan your stage before starting'],
     isStandard: true,
@@ -1679,10 +1577,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Expert', color: '#10B981', criteria: { accuracyPct: 100 } },
       { name: 'Good', color: '#3B82F6', criteria: { accuracyPct: 80 } },
     ],
-    instructions: [
-      'Engage targets within time limit',
-      'Score = total hits',
-    ],
+    instructions: ['Engage targets within time limit', 'Score = total hits'],
     safetyNotes: [],
     tips: ['Know your DOPE', 'Wind reading is critical'],
     isStandard: true,
@@ -1720,10 +1615,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Expert', color: '#10B981', criteria: { timeSeconds: 30.0, accuracyPct: 95 } },
       { name: 'Good', color: '#3B82F6', criteria: { timeSeconds: 45.0, accuracyPct: 85 } },
     ],
-    instructions: [
-      'Engage targets with appropriate weapon',
-      'Manage transitions between platforms',
-    ],
+    instructions: ['Engage targets with appropriate weapon', 'Manage transitions between platforms'],
     safetyNotes: ['Safe weapon transitions', 'Proper gun grounding'],
     tips: ['Smooth transitions win matches'],
     isStandard: true,
@@ -1761,10 +1653,7 @@ export const ALL_DRILLS: CategoryDrill[] = [
       { name: 'Expert', color: '#10B981', criteria: { timeSeconds: 15.0, accuracyPct: 100 } },
       { name: 'Sharpshooter', color: '#3B82F6', criteria: { timeSeconds: 20.0, accuracyPct: 90 } },
     ],
-    instructions: [
-      'Use cover when available',
-      'Engage threats in tactical priority',
-    ],
+    instructions: ['Use cover when available', 'Engage threats in tactical priority'],
     safetyNotes: ['Use cover properly'],
     tips: ['Pie the corners', 'Reload behind cover'],
     isStandard: true,
@@ -1785,36 +1674,26 @@ export const ALL_DRILLS: CategoryDrill[] = [
 // LEGACY EXPORTS - For backwards compatibility
 // ============================================================================
 
-export const PRECISION_RIFLE_DRILLS = ALL_DRILLS.filter(d =>
-  d.recommendedCategories.includes('precision_rifle')
-);
+export const PRECISION_RIFLE_DRILLS = ALL_DRILLS.filter((d) => d.recommendedCategories.includes('precision_rifle'));
 
-export const PISTOL_DRILLS = ALL_DRILLS.filter(d =>
-  d.recommendedCategories.includes('pistol')
-);
+export const PISTOL_DRILLS = ALL_DRILLS.filter((d) => d.recommendedCategories.includes('pistol'));
 
-export const CARBINE_DRILLS = ALL_DRILLS.filter(d =>
-  d.recommendedCategories.includes('carbine')
-);
+export const CARBINE_DRILLS = ALL_DRILLS.filter((d) => d.recommendedCategories.includes('carbine'));
 
-export const SHOTGUN_DRILLS = ALL_DRILLS.filter(d =>
-  d.recommendedCategories.includes('shotgun')
-);
+export const SHOTGUN_DRILLS = ALL_DRILLS.filter((d) => d.recommendedCategories.includes('shotgun'));
 
-export const RIFLE_DRILLS = ALL_DRILLS.filter(d =>
-  d.recommendedCategories.includes('rifle')
-);
+export const RIFLE_DRILLS = ALL_DRILLS.filter((d) => d.recommendedCategories.includes('rifle'));
 
 // ============================================================================
 // ALL DRILLS BY CATEGORY - Now uses recommendedCategories
 // ============================================================================
 
 export const DRILLS_BY_CATEGORY: Record<WeaponCategory, CategoryDrill[]> = {
-  precision_rifle: ALL_DRILLS.filter(d => d.recommendedCategories.includes('precision_rifle')),
-  rifle: ALL_DRILLS.filter(d => d.recommendedCategories.includes('rifle')),
-  carbine: ALL_DRILLS.filter(d => d.recommendedCategories.includes('carbine')),
-  pistol: ALL_DRILLS.filter(d => d.recommendedCategories.includes('pistol')),
-  shotgun: ALL_DRILLS.filter(d => d.recommendedCategories.includes('shotgun')),
+  precision_rifle: ALL_DRILLS.filter((d) => d.recommendedCategories.includes('precision_rifle')),
+  rifle: ALL_DRILLS.filter((d) => d.recommendedCategories.includes('rifle')),
+  carbine: ALL_DRILLS.filter((d) => d.recommendedCategories.includes('carbine')),
+  pistol: ALL_DRILLS.filter((d) => d.recommendedCategories.includes('pistol')),
+  shotgun: ALL_DRILLS.filter((d) => d.recommendedCategories.includes('shotgun')),
   any: ALL_DRILLS, // Any category can use all drills
 };
 
@@ -1834,42 +1713,34 @@ export function getCategoryDrills(category: WeaponCategory): CategoryDrill[] {
  */
 export function getDrillsForCategory(category: WeaponCategory): CategoryDrill[] {
   if (category === 'any') return ALL_DRILLS;
-  return ALL_DRILLS.filter(d => d.recommendedCategories.includes(category));
+  return ALL_DRILLS.filter((d) => d.recommendedCategories.includes(category));
 }
 
 /**
  * Get drills by type within a category
  */
-export function getDrillsByType(
-  category: WeaponCategory,
-  type: DrillType
-): CategoryDrill[] {
-  return getCategoryDrills(category).filter(d => d.type === type);
+export function getDrillsByType(category: WeaponCategory, type: DrillType): CategoryDrill[] {
+  return getCategoryDrills(category).filter((d) => d.type === type);
 }
 
 /**
  * Get drills by difficulty
  */
-export function getDrillsByDifficulty(
-  category: WeaponCategory,
-  difficulty: DrillDifficulty
-): CategoryDrill[] {
-  return getCategoryDrills(category).filter(d => d.difficulty === difficulty);
+export function getDrillsByDifficulty(category: WeaponCategory, difficulty: DrillDifficulty): CategoryDrill[] {
+  return getCategoryDrills(category).filter((d) => d.difficulty === difficulty);
 }
 
 /**
  * Get a specific drill by ID
  */
 export function getDrillById(drillId: string): CategoryDrill | null {
-  return ALL_DRILLS.find(d => d.id === drillId) || null;
+  return ALL_DRILLS.find((d) => d.id === drillId) || null;
 }
 
 /**
  * Group drills by type for display
  */
-export function groupDrillsByType(
-  category: WeaponCategory
-): Record<DrillType, CategoryDrill[]> {
+export function groupDrillsByType(category: WeaponCategory): Record<DrillType, CategoryDrill[]> {
   const drills = getCategoryDrills(category);
   const grouped: Partial<Record<DrillType, CategoryDrill[]>> = {};
 

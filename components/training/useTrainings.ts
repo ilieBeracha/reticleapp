@@ -5,18 +5,25 @@
  * Handles team context, data loading, and navigation.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { useTeamRealtime } from '@/hooks/realtime';
+import { getRecentSessionsWithStats } from '@/services/session/queries';
 import { getTeamMembers } from '@/services/teamService';
 import { useTeamContext, useTeamPermissions, useTeamStore } from '@/store/teamStore';
 import { useTrainingStore } from '@/store/trainingStore';
 import type { TeamMemberWithProfile, TrainingWithDetails } from '@/types/workspace';
 
+import {
+  calculateMemberStats,
+  calculateTeamStatsFromSessions,
+  getRoleConfig,
+  type SessionStatsData,
+} from './trainings.helpers';
 import type { InternalTab, UseTrainingsReturn } from './trainings.types';
-import { calculateMemberStats, calculateTeamStats, getRoleConfig } from './trainings.helpers';
 
 export function useTrainings(): UseTrainingsReturn {
   // Team context - single source of truth
@@ -30,6 +37,7 @@ export function useTrainings(): UseTrainingsReturn {
   const [activeTab, setActiveTab] = useState<InternalTab>('calendar');
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [members, setMembers] = useState<TeamMemberWithProfile[]>([]);
+  const [sessionStats, setSessionStats] = useState<SessionStatsData[]>([]);
 
   // Reset tab to calendar when switching teams
   useEffect(() => {
@@ -55,15 +63,32 @@ export function useTrainings(): UseTrainingsReturn {
     }, [activeTeamId, loadTeamTrainings])
   );
 
-  // Load team members for stats (Manage tab) and team view (Team tab for soldiers)
+  // Load team members (for unified Team tab - visible to all roles)
   useFocusEffect(
     useCallback(() => {
-      if (activeTeamId && (activeTab === 'manage' || activeTab === 'team')) {
-        getTeamMembers(activeTeamId)
-          .then(setMembers)
-          .catch(console.error);
+      if (activeTeamId && activeTab === 'team') {
+        getTeamMembers(activeTeamId).then(setMembers).catch(console.error);
       }
     }, [activeTeamId, activeTab])
+  );
+
+  // Load session stats for team (for commanders - "This Week" section in Team tab)
+  useFocusEffect(
+    useCallback(() => {
+      if (activeTeamId && activeTab === 'team' && canManage) {
+        getRecentSessionsWithStats({ days: 7, limit: 100, teamId: activeTeamId })
+          .then((sessions) => {
+            // Extract stats data for calculation
+            const statsData: SessionStatsData[] = sessions.map((s) => ({
+              shots_fired: s.stats?.shots_fired ?? 0,
+              accuracy_pct: s.stats?.accuracy_pct ?? 0,
+              started_at: s.started_at,
+            }));
+            setSessionStats(statsData);
+          })
+          .catch(console.error);
+      }
+    }, [activeTeamId, activeTab, canManage])
   );
 
   const onRefresh = useCallback(async () => {
@@ -72,17 +97,65 @@ export function useTrainings(): UseTrainingsReturn {
     await loadTeams();
     if (activeTeamId) {
       await loadTeamTrainings(activeTeamId);
-      if (activeTab === 'manage' || activeTab === 'team') {
+      // Load members for unified Team tab (visible to all roles)
+      if (activeTab === 'team') {
         try {
           const membersData = await getTeamMembers(activeTeamId);
           setMembers(membersData);
         } catch (e) {
           console.error(e);
         }
+        // Refresh session stats for commanders
+        if (canManage) {
+          try {
+            const sessions = await getRecentSessionsWithStats({ days: 7, limit: 100, teamId: activeTeamId });
+            const statsData: SessionStatsData[] = sessions.map((s) => ({
+              shots_fired: s.stats?.shots_fired ?? 0,
+              accuracy_pct: s.stats?.accuracy_pct ?? 0,
+              started_at: s.started_at,
+            }));
+            setSessionStats(statsData);
+          } catch (e) {
+            console.error(e);
+          }
+        }
       }
     }
     setRefreshing(false);
-  }, [loadTeams, loadTeamTrainings, activeTeamId, activeTab]);
+  }, [loadTeams, loadTeamTrainings, activeTeamId, activeTab, canManage]);
+
+  // ============================================================================
+  // REALTIME SUBSCRIPTIONS
+  // ============================================================================
+
+  // Subscribe to team updates (trainings, members) for live updates
+  const { isConnected: realtimeConnected } = useTeamRealtime({
+    teamId: activeTeamId,
+    enabled: !!activeTeamId,
+    onTrainingCreated: useCallback(() => {
+      console.log('[useTrainings] Realtime: New training created, refreshing...');
+      if (activeTeamId) loadTeamTrainings(activeTeamId);
+    }, [activeTeamId, loadTeamTrainings]),
+    onTrainingUpdated: useCallback(() => {
+      console.log('[useTrainings] Realtime: Training updated, refreshing...');
+      if (activeTeamId) loadTeamTrainings(activeTeamId);
+    }, [activeTeamId, loadTeamTrainings]),
+    onTrainingDeleted: useCallback(() => {
+      console.log('[useTrainings] Realtime: Training deleted, refreshing...');
+      if (activeTeamId) loadTeamTrainings(activeTeamId);
+    }, [activeTeamId, loadTeamTrainings]),
+    onMemberJoined: useCallback(() => {
+      console.log('[useTrainings] Realtime: New member joined, refreshing members...');
+      if (activeTeamId && activeTab === 'team') {
+        getTeamMembers(activeTeamId).then(setMembers).catch(console.error);
+      }
+    }, [activeTeamId, activeTab]),
+  });
+
+  // Debug: Log realtime connection status
+  useEffect(() => {
+    console.log(`[useTrainings] Realtime connected: ${realtimeConnected}, teamId: ${activeTeamId}`);
+  }, [realtimeConnected, activeTeamId]);
 
   // ============================================================================
   // COMPUTED DATA
@@ -91,19 +164,22 @@ export function useTrainings(): UseTrainingsReturn {
   // Filter trainings for active team
   const activeTeamTrainings = useMemo(() => {
     if (!activeTeamId) return [];
-    return teamTrainings.filter(t => t.team_id === activeTeamId);
+    return teamTrainings.filter((t) => t.team_id === activeTeamId);
   }, [teamTrainings, activeTeamId]);
 
   // Live training detection
   const liveTraining = useMemo(() => {
-    return activeTeamTrainings.find(t => t.status === 'ongoing');
+    return activeTeamTrainings.find((t) => t.status === 'ongoing');
   }, [activeTeamTrainings]);
 
   // Member stats
   const memberStats = useMemo(() => calculateMemberStats(members), [members]);
 
-  // Team stats (this week)
-  const teamStats = useMemo(() => calculateTeamStats(activeTeamTrainings), [activeTeamTrainings]);
+  // Team stats (this week) - uses real session data when available
+  const teamStats = useMemo(
+    () => calculateTeamStatsFromSessions(activeTeamTrainings, sessionStats),
+    [activeTeamTrainings, sessionStats]
+  );
 
   // UI computed values - show switcher when user has any teams (allows switching/viewing team options)
   const showSwitcher = teamState !== 'no_teams';
@@ -145,6 +221,12 @@ export function useTrainings(): UseTrainingsReturn {
     if (!activeTeamId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(`/(protected)/teamSettings?teamId=${activeTeamId}` as any);
+  }, [activeTeamId]);
+
+  const handleOpenArmory = useCallback(() => {
+    if (!activeTeamId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push(`/(protected)/teamArmory?teamId=${activeTeamId}` as any);
   }, [activeTeamId]);
 
   const handleTabChange = useCallback((tab: InternalTab) => {
@@ -190,10 +272,10 @@ export function useTrainings(): UseTrainingsReturn {
     handleTrainingPress,
     handleCreateTraining,
     handleOpenLibrary,
+    handleOpenArmory,
     handleViewMembers,
     handleInviteMember,
     handleTeamSettings,
     setSwitcherOpen,
   };
 }
-

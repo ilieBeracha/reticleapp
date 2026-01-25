@@ -1,19 +1,12 @@
-import { useColors } from "@/hooks/ui/useColors";
-import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from "@/theme/colors";
-import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
-import { Camera, Edit3, Focus, Target, Trophy, X } from "lucide-react-native";
-import React, { useCallback } from "react";
-import {
-    ActivityIndicator,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from "react-native";
-import { COLORS, InputMethod, TargetType } from "./types";
+import { useColors } from '@/hooks/ui/useColors';
+import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from '@/theme/colors';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Camera, Edit3, Focus, Target, Trophy, X } from 'lucide-react-native';
+import React, { useCallback } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { COLORS, InputMethod, TargetType } from './types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TARGET FORM
@@ -41,29 +34,35 @@ export const TargetForm = React.memo(function TargetForm({
 }: TargetFormProps) {
   const colors = useColors();
 
-  const handleTargetTypeChange = useCallback((type: TargetType) => {
-    Haptics.selectionAsync();
-    onTargetTypeChange(type);
-  }, [onTargetTypeChange]);
+  const handleTargetTypeChange = useCallback(
+    (type: TargetType) => {
+      Haptics.selectionAsync();
+      onTargetTypeChange(type);
+    },
+    [onTargetTypeChange]
+  );
 
-  const handleInputMethodChange = useCallback((method: InputMethod) => {
-    Haptics.selectionAsync();
-    onInputMethodChange(method);
-  }, [onInputMethodChange]);
+  const handleInputMethodChange = useCallback(
+    (method: InputMethod) => {
+      Haptics.selectionAsync();
+      onInputMethodChange(method);
+    },
+    [onInputMethodChange]
+  );
 
   // Determine button text based on selection
   const getButtonText = () => {
-    if (targetType === "grouping") {
-      return "Scan Target";
+    if (targetType === 'grouping') {
+      return 'Scan Target';
     }
-    if (inputMethod === "scan") {
-      return "Scan Target";
+    if (inputMethod === 'scan') {
+      return 'Scan Target';
     }
-    return "Enter Results";
+    return 'Enter Results';
   };
 
   const getButtonIcon = () => {
-    if (targetType === "grouping" || inputMethod === "scan") {
+    if (targetType === 'grouping' || inputMethod === 'scan') {
       return <Camera size={20} color="#fff" />;
     }
     return <Edit3 size={20} color="#fff" />;
@@ -99,23 +98,25 @@ export const TargetForm = React.memo(function TargetForm({
           {/* Grouping Target */}
           <TouchableOpacity
             style={[
-              styles.typeCard, 
+              styles.typeCard,
               { backgroundColor: colors.card, borderColor: 'transparent' },
-              targetType === "grouping" && styles.typeCardSelected
+              targetType === 'grouping' && styles.typeCardSelected,
             ]}
-            onPress={() => handleTargetTypeChange("grouping")}
+            onPress={() => handleTargetTypeChange('grouping')}
             activeOpacity={0.8}
           >
-            <View style={[styles.typeIconBox, targetType === "grouping" && styles.typeIconBoxSelected]}>
-              <Focus size={22} color={targetType === "grouping" ? "#000" : colors.textMuted} />
+            <View style={[styles.typeIconBox, targetType === 'grouping' && styles.typeIconBoxSelected]}>
+              <Focus size={22} color={targetType === 'grouping' ? '#000' : colors.textMuted} />
             </View>
             <View style={styles.typeContent}>
-              <Text style={[styles.typeText, { color: colors.text }, targetType === "grouping" && styles.typeTextSelected]}>
+              <Text
+                style={[styles.typeText, { color: colors.text }, targetType === 'grouping' && styles.typeTextSelected]}
+              >
                 Grouping
               </Text>
               <Text style={[styles.typeHint, { color: colors.textMuted }]}>Measure shot consistency</Text>
             </View>
-            {targetType === "grouping" && (
+            {targetType === 'grouping' && (
               <View style={styles.typeCheck}>
                 <Ionicons name="checkmark" size={14} color="#000" />
               </View>
@@ -125,23 +126,29 @@ export const TargetForm = React.memo(function TargetForm({
           {/* Achievement Target */}
           <TouchableOpacity
             style={[
-              styles.typeCard, 
+              styles.typeCard,
               { backgroundColor: colors.card, borderColor: 'transparent' },
-              targetType === "engagement" && styles.typeCardSelected
+              targetType === 'engagement' && styles.typeCardSelected,
             ]}
-            onPress={() => handleTargetTypeChange("engagement")}
+            onPress={() => handleTargetTypeChange('engagement')}
             activeOpacity={0.8}
           >
-            <View style={[styles.typeIconBox, targetType === "engagement" && styles.typeIconBoxSelected]}>
-              <Trophy size={22} color={targetType === "engagement" ? "#000" : colors.textMuted} />
+            <View style={[styles.typeIconBox, targetType === 'engagement' && styles.typeIconBoxSelected]}>
+              <Trophy size={22} color={targetType === 'engagement' ? '#000' : colors.textMuted} />
             </View>
             <View style={styles.typeContent}>
-              <Text style={[styles.typeText, { color: colors.text }, targetType === "engagement" && styles.typeTextSelected]}>
+              <Text
+                style={[
+                  styles.typeText,
+                  { color: colors.text },
+                  targetType === 'engagement' && styles.typeTextSelected,
+                ]}
+              >
                 Achievement
               </Text>
               <Text style={[styles.typeHint, { color: colors.textMuted }]}>Track hits & accuracy</Text>
             </View>
-            {targetType === "engagement" && (
+            {targetType === 'engagement' && (
               <View style={styles.typeCheck}>
                 <Ionicons name="checkmark" size={14} color="#000" />
               </View>
@@ -151,9 +158,11 @@ export const TargetForm = React.memo(function TargetForm({
       </View>
 
       {/* Grouping - Scan Only CTA */}
-      {targetType === "grouping" && (
+      {targetType === 'grouping' && (
         <View style={styles.infoSection}>
-          <View style={[styles.infoCard, { backgroundColor: `${colors.primary}08`, borderColor: `${colors.primary}25` }]}>
+          <View
+            style={[styles.infoCard, { backgroundColor: `${colors.primary}08`, borderColor: `${colors.primary}25` }]}
+          >
             <View style={[styles.infoIconRing, { backgroundColor: `${colors.primary}15` }]}>
               <View style={[styles.infoIconInner, { backgroundColor: `${colors.primary}20` }]}>
                 <Focus size={32} color={colors.primary} />
@@ -161,8 +170,8 @@ export const TargetForm = React.memo(function TargetForm({
             </View>
             <Text style={[styles.infoTitle, { color: colors.text }]}>Measure Your Grouping</Text>
             <Text style={[styles.infoDesc, { color: colors.textMuted }]}>
-              Scan your paper target to measure shot dispersion and consistency. 
-              No hit percentage—just pure grouping analysis.
+              Scan your paper target to measure shot dispersion and consistency. No hit percentage—just pure grouping
+              analysis.
             </Text>
             <View style={styles.infoFeatures}>
               <View style={styles.infoFeature}>
@@ -179,7 +188,7 @@ export const TargetForm = React.memo(function TargetForm({
       )}
 
       {/* Achievement - Input Method Selection */}
-      {targetType === "engagement" && (
+      {targetType === 'engagement' && (
         <>
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Input Method</Text>
@@ -189,15 +198,21 @@ export const TargetForm = React.memo(function TargetForm({
                 style={[
                   styles.methodCard,
                   { backgroundColor: colors.card, borderColor: 'transparent' },
-                  inputMethod === "scan" && styles.methodCardSelected
+                  inputMethod === 'scan' && styles.methodCardSelected,
                 ]}
-                onPress={() => handleInputMethodChange("scan")}
+                onPress={() => handleInputMethodChange('scan')}
                 activeOpacity={0.8}
               >
-                <View style={[styles.methodIconBox, inputMethod === "scan" && styles.methodIconBoxSelected]}>
-                  <Camera size={20} color={inputMethod === "scan" ? "#000" : colors.textMuted} />
+                <View style={[styles.methodIconBox, inputMethod === 'scan' && styles.methodIconBoxSelected]}>
+                  <Camera size={20} color={inputMethod === 'scan' ? '#000' : colors.textMuted} />
                 </View>
-                <Text style={[styles.methodText, { color: colors.text }, inputMethod === "scan" && styles.methodTextSelected]}>
+                <Text
+                  style={[
+                    styles.methodText,
+                    { color: colors.text },
+                    inputMethod === 'scan' && styles.methodTextSelected,
+                  ]}
+                >
                   Scan
                 </Text>
                 <Text style={[styles.methodHint, { color: colors.textMuted }]}>AI detection</Text>
@@ -208,15 +223,21 @@ export const TargetForm = React.memo(function TargetForm({
                 style={[
                   styles.methodCard,
                   { backgroundColor: colors.card, borderColor: 'transparent' },
-                  inputMethod === "manual" && styles.methodCardSelected
+                  inputMethod === 'manual' && styles.methodCardSelected,
                 ]}
-                onPress={() => handleInputMethodChange("manual")}
+                onPress={() => handleInputMethodChange('manual')}
                 activeOpacity={0.8}
               >
-                <View style={[styles.methodIconBox, inputMethod === "manual" && styles.methodIconBoxSelected]}>
-                  <Edit3 size={20} color={inputMethod === "manual" ? "#000" : colors.textMuted} />
+                <View style={[styles.methodIconBox, inputMethod === 'manual' && styles.methodIconBoxSelected]}>
+                  <Edit3 size={20} color={inputMethod === 'manual' ? '#000' : colors.textMuted} />
                 </View>
-                <Text style={[styles.methodText, { color: colors.text }, inputMethod === "manual" && styles.methodTextSelected]}>
+                <Text
+                  style={[
+                    styles.methodText,
+                    { color: colors.text },
+                    inputMethod === 'manual' && styles.methodTextSelected,
+                  ]}
+                >
                   Manual
                 </Text>
                 <Text style={[styles.methodHint, { color: colors.textMuted }]}>Enter counts</Text>
@@ -226,10 +247,12 @@ export const TargetForm = React.memo(function TargetForm({
 
           {/* Achievement Info Card */}
           <View style={styles.infoSection}>
-            <View style={[styles.infoCard, { backgroundColor: `${colors.primary}08`, borderColor: `${colors.primary}25` }]}>
+            <View
+              style={[styles.infoCard, { backgroundColor: `${colors.primary}08`, borderColor: `${colors.primary}25` }]}
+            >
               <View style={[styles.infoIconRing, { backgroundColor: `${colors.primary}15` }]}>
                 <View style={[styles.infoIconInner, { backgroundColor: `${colors.primary}20` }]}>
-                  {inputMethod === "scan" ? (
+                  {inputMethod === 'scan' ? (
                     <Camera size={32} color={colors.primary} />
                   ) : (
                     <Edit3 size={32} color={colors.primary} />
@@ -237,13 +260,12 @@ export const TargetForm = React.memo(function TargetForm({
                 </View>
               </View>
               <Text style={[styles.infoTitle, { color: colors.text }]}>
-                {inputMethod === "scan" ? "Scan Your Target" : "Enter Your Results"}
+                {inputMethod === 'scan' ? 'Scan Your Target' : 'Enter Your Results'}
               </Text>
               <Text style={[styles.infoDesc, { color: colors.textMuted }]}>
-                {inputMethod === "scan" 
-                  ? "AI will detect bullet holes and calculate your hit percentage automatically."
-                  : "Manually enter the number of bullets fired and hits to track your accuracy."
-                }
+                {inputMethod === 'scan'
+                  ? 'AI will detect bullet holes and calculate your hit percentage automatically.'
+                  : 'Manually enter the number of bullets fired and hits to track your accuracy.'}
               </Text>
               <View style={styles.infoFeatures}>
                 <View style={styles.infoFeature}>
@@ -261,12 +283,7 @@ export const TargetForm = React.memo(function TargetForm({
       )}
 
       {/* Submit Button */}
-      <TouchableOpacity 
-        style={styles.submitBtn} 
-        onPress={onSubmit} 
-        activeOpacity={0.9} 
-        disabled={saving}
-      >
+      <TouchableOpacity style={styles.submitBtn} onPress={onSubmit} activeOpacity={0.9} disabled={saving}>
         <LinearGradient
           colors={saving ? [...BUTTON_GRADIENT_DISABLED] : [...BUTTON_GRADIENT]}
           start={{ x: 0, y: 0 }}
@@ -287,7 +304,7 @@ export const TargetForm = React.memo(function TargetForm({
       <TouchableOpacity style={styles.cancelBtn} onPress={onClose} activeOpacity={0.7}>
         <Text style={[styles.cancelBtnText, { color: colors.textMuted }]}>Cancel</Text>
       </TouchableOpacity>
-      
+
       <View style={{ height: 20 }} />
     </ScrollView>
   );
@@ -306,26 +323,26 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 16,
   },
   headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
   },
   headerIconContainer: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 22,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   headerSubtitle: {
     fontSize: 13,
@@ -335,8 +352,8 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Section
@@ -345,9 +362,9 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     marginBottom: 12,
-    textTransform: "uppercase",
+    textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
 
@@ -356,8 +373,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   typeCard: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: 14,
     padding: 14,
     gap: 12,
@@ -372,8 +389,8 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 12,
     backgroundColor: COLORS.cardHover,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   typeIconBoxSelected: {
     backgroundColor: COLORS.primary,
@@ -383,7 +400,7 @@ const styles = StyleSheet.create({
   },
   typeText: {
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   typeTextSelected: {
     color: COLORS.white,
@@ -397,18 +414,18 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     backgroundColor: COLORS.primary,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Input Method Cards (for Achievement)
   methodRow: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 10,
   },
   methodCard: {
     flex: 1,
-    alignItems: "center",
+    alignItems: 'center',
     borderRadius: 14,
     padding: 16,
     gap: 8,
@@ -423,15 +440,15 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 10,
     backgroundColor: COLORS.cardHover,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   methodIconBoxSelected: {
     backgroundColor: COLORS.primary,
   },
   methodText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   methodTextSelected: {
     color: COLORS.white,
@@ -445,7 +462,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   infoCard: {
-    alignItems: "center",
+    alignItems: 'center',
     borderRadius: 20,
     padding: 28,
     borderWidth: 1,
@@ -454,35 +471,35 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 16,
   },
   infoIconInner: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   infoTitle: {
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: '700',
     marginBottom: 8,
   },
   infoDesc: {
     fontSize: 14,
-    textAlign: "center",
+    textAlign: 'center',
     lineHeight: 20,
     marginBottom: 16,
   },
   infoFeatures: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 20,
   },
   infoFeature: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
   },
   infoFeatureText: {
@@ -492,27 +509,27 @@ const styles = StyleSheet.create({
   // Buttons
   submitBtn: {
     borderRadius: 14,
-    overflow: "hidden",
+    overflow: 'hidden',
     marginBottom: 12,
   },
   submitBtnGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     height: 54,
     gap: 10,
   },
   submitBtnText: {
     fontSize: 16,
-    fontWeight: "700",
-    color: "#fff",
+    fontWeight: '700',
+    color: '#fff',
   },
   cancelBtn: {
-    alignItems: "center",
+    alignItems: 'center',
     paddingVertical: 12,
   },
   cancelBtnText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
   },
 });

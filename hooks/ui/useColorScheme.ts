@@ -1,7 +1,14 @@
+import { useTheme } from "@/contexts/ThemeContext";
+
 /**
  * useColorScheme hook
  * 
- * Re-exports React Native's useColorScheme for consistent import paths.
- * Can be extended later with custom theme logic if needed.
+ * Returns the current color scheme based on user preference.
+ * Respects user's choice of light/dark/system from ThemeContext.
+ * 
+ * @returns 'light' | 'dark'
  */
-export { useColorScheme } from 'react-native';
+export function useColorScheme() {
+  const { theme } = useTheme();
+  return theme;
+}

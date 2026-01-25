@@ -3,10 +3,9 @@
  * Sharp, elegant hero with bold title and minimal status
  */
 
-import React from 'react';
+import { CheckCircle2, Clock, XCircle, Zap } from 'lucide-react-native';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
-import { CheckCircle2, Clock, XCircle, Zap } from 'lucide-react-native';
 import { LiveDot } from './AnimatedComponents';
 import { AutoCloseCountdown } from './AutoCloseCountdown';
 import type { TrainingHeroProps } from './types';
@@ -60,15 +59,10 @@ export function TrainingHero({ training, colors, onAutoCloseExpired }: TrainingH
       />
 
       {/* Status Tag */}
-      <Animated.View
-        entering={FadeInRight.duration(400).delay(100)}
-        style={styles.statusRow}
-      >
+      <Animated.View entering={FadeInRight.duration(400).delay(100)} style={styles.statusRow}>
         {status.showDot && <LiveDot size={6} />}
         {!status.showDot && <status.Icon size={12} color={status.accentColor} strokeWidth={2.5} />}
-        <Text style={[styles.statusLabel, { color: status.accentColor }]}>
-          {status.label}
-        </Text>
+        <Text style={[styles.statusLabel, { color: status.accentColor }]}>{status.label}</Text>
       </Animated.View>
 
       {/* Title */}
@@ -82,11 +76,7 @@ export function TrainingHero({ training, colors, onAutoCloseExpired }: TrainingH
 
       {/* Auto-close countdown */}
       {isOngoing && training.auto_close_at && (
-        <AutoCloseCountdown
-          autoCloseAt={training.auto_close_at}
-          colors={colors}
-          onExpired={onAutoCloseExpired}
-        />
+        <AutoCloseCountdown autoCloseAt={training.auto_close_at} colors={colors} onExpired={onAutoCloseExpired} />
       )}
     </View>
   );

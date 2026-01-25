@@ -1,3 +1,4 @@
+import type { DashboardFeature } from '@/components/insights/insights.types';
 import { SESSION_STATUS } from '@/constants';
 import { supabase } from '@/lib/supabase';
 import { withQueryTiming } from '@/services/_shared/instrumentation';
@@ -408,9 +409,10 @@ export async function getRecentSessionsWithStats(
     const dateThresholdISO = dateThreshold.toISOString();
 
     // Build base query with date filter
+    // Use SESSION_SELECT_WITH_WEAPON to include weapon info for filtering
     let query = supabase
       .from('sessions')
-      .select(SESSION_SELECT_MINIMAL)
+      .select(SESSION_SELECT_WITH_WEAPON)
       .or(`started_at.gte.${dateThresholdISO},status.eq.active`)
       .order('started_at', { ascending: false })
       .limit(limit);
@@ -541,6 +543,72 @@ export async function getRecentSessionsWithStats(
             },
       };
     });
+  });
+}
+
+/**
+ * Get lightweight dashboard features from session_features table.
+ * Single-table query, no joins — used by InsightsDashboard for fast rendering.
+ */
+export async function getDashboardFeatures(options: {
+  userId: string;
+  days?: number;
+  limit?: number;
+}): Promise<DashboardFeature[]> {
+  return withQueryTiming('sessions.getDashboardFeatures', async () => {
+    const { userId, days = 365, limit = 500 } = options;
+
+    const dateThreshold = new Date();
+    dateThreshold.setDate(dateThreshold.getDate() - days);
+    const dateThresholdISO = dateThreshold.toISOString();
+
+    const { data, error } = await supabase
+      .from('session_features')
+      .select(
+        `session_id,
+        user_id,
+        team_id,
+        created_at,
+        shots,
+        hits,
+        accuracy_pct,
+        best_grouping_cm,
+        distance_m,
+        position,
+        weapon_id,
+        weapon_category,
+        drill_goal,
+        target_type,
+        is_timed,
+        has_weather,
+        weather_wind_speed_mps`
+      )
+      .eq('user_id', userId)
+      .gte('created_at', dateThresholdISO)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+
+    return (data ?? []).map((row: any) => ({
+      session_id: row.session_id,
+      user_id: row.user_id,
+      team_id: row.team_id ?? null,
+      created_at: row.created_at,
+      shots: row.shots ?? 0,
+      hits: row.hits ?? 0,
+      accuracy_pct: row.accuracy_pct ?? null,
+      best_grouping_cm: row.best_grouping_cm ?? null,
+      distance_m: row.distance_m ?? null,
+      position: row.position ?? null,
+      weapon_id: row.weapon_id ?? null,
+      weapon_category: row.weapon_category ?? null,
+      drill_goal: row.drill_goal ?? null,
+      target_type: row.target_type ?? null,
+      is_timed: row.is_timed ?? false,
+      has_weather: row.has_weather ?? false,
+      weather_wind_speed_mps: row.weather_wind_speed_mps ?? null,
+    }));
   });
 }
 

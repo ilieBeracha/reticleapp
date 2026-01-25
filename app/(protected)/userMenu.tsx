@@ -1,23 +1,16 @@
 import { BaseAvatar } from '@/components/shared/Avatar';
 import { useAuth } from '@/contexts/AuthContext';
-import { useColors } from "@/hooks/ui/useColors";
+import { useColors } from '@/hooks/ui/useColors';
 import { useTeamStore } from '@/store/teamStore';
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { router } from "expo-router";
-import { useCallback } from "react";
-import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
-} from "react-native";
+import { router } from 'expo-router';
+import { useCallback } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 /**
  * User Menu - Native Form Sheet
- * 
+ *
  * Quick access to account actions.
  */
 export default function UserMenuSheet() {
@@ -26,33 +19,26 @@ export default function UserMenuSheet() {
   const { teams } = useTeamStore();
 
   const avatarUri = profileAvatarUrl ?? user?.user_metadata?.avatar_url;
-  const fallbackInitial = user?.email?.charAt(0)?.toUpperCase() ?? "?";
-  const displayName = profileFullName ||
-                      user?.user_metadata?.full_name || 
-                      user?.email?.split('@')[0] || 
-                      'User';
+  const fallbackInitial = user?.email?.charAt(0)?.toUpperCase() ?? '?';
+  const displayName = profileFullName || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
   const email = user?.email || '';
 
   const handleSignOut = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(
-      "Log Out",
-      "Are you sure you want to log out?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Log Out",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await signOut();
-            } catch (error) {
-              console.error('Sign out error:', error);
-            }
-          },
+    Alert.alert('Log Out', 'Are you sure you want to log out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Log Out',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await signOut();
+          } catch (error) {
+            console.error('Sign out error:', error);
+          }
         },
-      ]
-    );
+      },
+    ]);
   }, [signOut]);
 
   const handleProfile = useCallback(() => {
@@ -68,61 +54,55 @@ export default function UserMenuSheet() {
   }, []);
 
   return (
-    <ScrollView 
-      style={styles.scrollView}
+    <ScrollView
+      style={[styles.scrollView, { backgroundColor: colors.card }]}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
     >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Account</Text>
-        </View>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={[styles.title, { color: colors.text }]}>Account</Text>
+      </View>
 
-        {/* Profile Card */}
-        <TouchableOpacity 
-          style={[styles.profileCard, { backgroundColor: colors.card }]}
-          onPress={handleProfile}
-          activeOpacity={0.7}
-        >
-          <BaseAvatar
-            source={avatarUri ? { uri: avatarUri } : undefined}
-            fallbackText={fallbackInitial}
-            size="lg"
-            borderWidth={0}
-          />
-          <View style={styles.userInfo}>
-            <Text style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
-              {displayName}
-            </Text>
-            <Text style={[styles.userEmail, { color: colors.textMuted }]} numberOfLines={1}>
-              {email}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-        </TouchableOpacity>
-
-        {/* Menu Items */}
-        <View style={[styles.menuGroup, { backgroundColor: colors.card }]}>
-          <MenuItem
-            icon="people-outline"
-            label="Your Teams"
-            subtitle={teams.length > 0 ? `${teams.length} team${teams.length !== 1 ? 's' : ''}` : 'None yet'}
-            onPress={handleTeams}
-            colors={colors}
-            showChevron
-          />
+      {/* Profile Card */}
+      <TouchableOpacity
+        style={[styles.profileCard, { backgroundColor: colors.card }]}
+        onPress={handleProfile}
+        activeOpacity={0.7}
+      >
+        <BaseAvatar
+          source={avatarUri ? { uri: avatarUri } : undefined}
+          fallbackText={fallbackInitial}
+          size="lg"
+          borderWidth={0}
+        />
+        <View style={styles.userInfo}>
+          <Text style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
+            {displayName}
+          </Text>
+          <Text style={[styles.userEmail, { color: colors.textMuted }]} numberOfLines={1}>
+            {email}
+          </Text>
         </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+      </TouchableOpacity>
 
-        {/* Logout */}
-        <View style={[styles.menuGroup, { backgroundColor: colors.card }]}>
-          <MenuItem
-            icon="log-out-outline"
-            label="Log Out"
-            onPress={handleSignOut}
-            colors={colors}
-            destructive
-          />
-        </View>
+      {/* Menu Items */}
+      <View style={[styles.menuGroup, { backgroundColor: colors.card }]}>
+        <MenuItem
+          icon="people-outline"
+          label="Your Teams"
+          subtitle={teams.length > 0 ? `${teams.length} team${teams.length !== 1 ? 's' : ''}` : 'None yet'}
+          onPress={handleTeams}
+          colors={colors}
+          showChevron
+        />
+      </View>
+
+      {/* Logout */}
+      <View style={[styles.menuGroup, { backgroundColor: colors.card }]}>
+        <MenuItem icon="log-out-outline" label="Log Out" onPress={handleSignOut} colors={colors} destructive />
+      </View>
     </ScrollView>
   );
 }
@@ -141,7 +121,7 @@ function MenuItem({
   label: string;
   subtitle?: string;
   onPress: () => void;
-  colors: ReturnType<typeof import("@/hooks/ui/useColors").useColors>;
+  colors: ReturnType<typeof import('@/hooks/ui/useColors').useColors>;
   showChevron?: boolean;
   destructive?: boolean;
 }) {
@@ -149,22 +129,15 @@ function MenuItem({
   const textColor = destructive ? colors.destructive : colors.text;
 
   return (
-    <TouchableOpacity   
-      onPress={onPress}
-      style={styles.menuItem}
-    >
+    <TouchableOpacity onPress={onPress} style={styles.menuItem}>
       <View style={[styles.iconContainer, { backgroundColor: iconBgColor }]}>
         <Ionicons name={icon} size={18} color="#fff" />
       </View>
       <View style={styles.menuItemContent}>
         <Text style={[styles.menuItemText, { color: textColor }]}>{label}</Text>
-        {subtitle && (
-          <Text style={[styles.menuItemSubtitle, { color: colors.textMuted }]}>{subtitle}</Text>
-        )}
+        {subtitle && <Text style={[styles.menuItemSubtitle, { color: colors.textMuted }]}>{subtitle}</Text>}
       </View>
-      {showChevron && (
-        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-      )}
+      {showChevron && <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />}
     </TouchableOpacity>
   );
 }

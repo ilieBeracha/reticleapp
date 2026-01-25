@@ -1,6 +1,6 @@
 /**
  * PresetForm - Create or edit drill presets
- * 
+ *
  * Allows setting:
  * - Name
  * - Drill goal (grouping/achievement/zeroing/physical)
@@ -18,12 +18,7 @@ import {
 } from '@/services/presetService';
 import { WEAPON_CATEGORIES, type WeaponCategory } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
-import {
-  Check,
-  ChevronLeft,
-  Crosshair,
-  Target
-} from 'lucide-react-native';
+import { Check, ChevronLeft, Crosshair, Target } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -70,19 +65,19 @@ const TARGET_TYPES = [
 export function PresetForm({ preset, onComplete, onCancel }: PresetFormProps) {
   const colors = useColors();
   const isEditing = !!preset;
-  
+
   // Form state
   const [name, setName] = useState(preset?.name || '');
   const [drillGoal, setDrillGoal] = useState<DrillGoal>(preset?.drill_goal || 'grouping');
   const [targetType, setTargetType] = useState<'paper' | 'tactical'>(preset?.target_type || 'paper');
   const [weaponCategory, setWeaponCategory] = useState<WeaponCategory | null>(
-    preset?.weapon_category as WeaponCategory || null
+    (preset?.weapon_category as WeaponCategory) || null
   );
   const [distance, setDistance] = useState(preset?.distance_m?.toString() || '25');
   const [shots, setShots] = useState(preset?.rounds_per_shooter?.toString() || '5');
   const [timeLimit, setTimeLimit] = useState(preset?.time_limit_seconds?.toString() || '');
   const [description, setDescription] = useState(preset?.description || '');
-  
+
   const [saving, setSaving] = useState(false);
 
   const handleSave = useCallback(async () => {
@@ -91,22 +86,22 @@ export function PresetForm({ preset, onComplete, onCancel }: PresetFormProps) {
       Alert.alert('Error', 'Name is required');
       return;
     }
-    
+
     const distanceNum = parseInt(distance, 10);
     const shotsNum = parseInt(shots, 10);
-    
+
     if (isNaN(distanceNum) || distanceNum <= 0) {
       Alert.alert('Error', 'Distance must be a positive number');
       return;
     }
-    
+
     if (isNaN(shotsNum) || shotsNum <= 0) {
       Alert.alert('Error', 'Shots must be a positive number');
       return;
     }
 
     setSaving(true);
-    
+
     try {
       const input: CreatePresetInput = {
         name: name.trim(),
@@ -120,13 +115,13 @@ export function PresetForm({ preset, onComplete, onCancel }: PresetFormProps) {
       };
 
       let result: DrillPreset;
-      
+
       if (isEditing && preset) {
         result = await updatePreset(preset.id, input);
       } else {
         result = await createPreset(input);
       }
-      
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onComplete(result);
     } catch (err: any) {
@@ -135,7 +130,19 @@ export function PresetForm({ preset, onComplete, onCancel }: PresetFormProps) {
     } finally {
       setSaving(false);
     }
-  }, [name, description, drillGoal, targetType, weaponCategory, distance, shots, timeLimit, isEditing, preset, onComplete]);
+  }, [
+    name,
+    description,
+    drillGoal,
+    targetType,
+    weaponCategory,
+    distance,
+    shots,
+    timeLimit,
+    isEditing,
+    preset,
+    onComplete,
+  ]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -151,19 +158,9 @@ export function PresetForm({ preset, onComplete, onCancel }: PresetFormProps) {
         <TouchableOpacity style={styles.headerBtn} onPress={onCancel}>
           <ChevronLeft size={22} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          {isEditing ? 'Edit Preset' : 'New Preset'}
-        </Text>
-        <TouchableOpacity
-          style={styles.headerBtn}
-          onPress={handleSave}
-          disabled={saving}
-        >
-          {saving ? (
-            <ActivityIndicator size="small" color={colors.text} />
-          ) : (
-            <Check size={20} color={colors.text} />
-          )}
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{isEditing ? 'Edit Preset' : 'New Preset'}</Text>
+        <TouchableOpacity style={styles.headerBtn} onPress={handleSave} disabled={saving}>
+          {saving ? <ActivityIndicator size="small" color={colors.text} /> : <Check size={20} color={colors.text} />}
         </TouchableOpacity>
       </View>
 
@@ -191,22 +188,14 @@ export function PresetForm({ preset, onComplete, onCancel }: PresetFormProps) {
               return (
                 <TouchableOpacity
                   key={goal.value}
-                  style={[
-                    styles.goalChip,
-                    { backgroundColor: isSelected ? colors.text : colors.card },
-                  ]}
+                  style={[styles.goalChip, { backgroundColor: isSelected ? colors.text : colors.card }]}
                   onPress={() => {
                     Haptics.selectionAsync();
                     setDrillGoal(goal.value);
                   }}
                 >
                   <Icon size={14} color={isSelected ? colors.background : colors.text} />
-                  <Text
-                    style={[
-                      styles.goalText,
-                      { color: isSelected ? colors.background : colors.text },
-                    ]}
-                  >
+                  <Text style={[styles.goalText, { color: isSelected ? colors.background : colors.text }]}>
                     {goal.label}
                   </Text>
                 </TouchableOpacity>
@@ -224,21 +213,13 @@ export function PresetForm({ preset, onComplete, onCancel }: PresetFormProps) {
               return (
                 <TouchableOpacity
                   key={type.value}
-                  style={[
-                    styles.chip,
-                    { backgroundColor: isSelected ? colors.text : colors.card },
-                  ]}
+                  style={[styles.chip, { backgroundColor: isSelected ? colors.text : colors.card }]}
                   onPress={() => {
                     Haptics.selectionAsync();
                     setTargetType(type.value);
                   }}
                 >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      { color: isSelected ? colors.background : colors.text },
-                    ]}
-                  >
+                  <Text style={[styles.chipText, { color: isSelected ? colors.background : colors.text }]}>
                     {type.label}
                   </Text>
                 </TouchableOpacity>
@@ -249,29 +230,17 @@ export function PresetForm({ preset, onComplete, onCancel }: PresetFormProps) {
 
         {/* Weapon Category */}
         <View style={styles.field}>
-          <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>
-            Weapon Category (optional)
-          </Text>
-          <Text style={[styles.fieldHint, { color: colors.textMuted }]}>
-            Filter weapons when starting this drill
-          </Text>
+          <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Weapon Category (optional)</Text>
+          <Text style={[styles.fieldHint, { color: colors.textMuted }]}>Filter weapons when starting this drill</Text>
           <View style={styles.chipRow}>
             <TouchableOpacity
-              style={[
-                styles.chip,
-                { backgroundColor: weaponCategory === null ? colors.text : colors.card },
-              ]}
+              style={[styles.chip, { backgroundColor: weaponCategory === null ? colors.text : colors.card }]}
               onPress={() => {
                 Haptics.selectionAsync();
                 setWeaponCategory(null);
               }}
             >
-              <Text
-                style={[
-                  styles.chipText,
-                  { color: weaponCategory === null ? colors.background : colors.text },
-                ]}
-              >
+              <Text style={[styles.chipText, { color: weaponCategory === null ? colors.background : colors.text }]}>
                 Any
               </Text>
             </TouchableOpacity>
@@ -280,21 +249,13 @@ export function PresetForm({ preset, onComplete, onCancel }: PresetFormProps) {
               return (
                 <TouchableOpacity
                   key={cat.value}
-                  style={[
-                    styles.chip,
-                    { backgroundColor: isSelected ? colors.text : colors.card },
-                  ]}
+                  style={[styles.chip, { backgroundColor: isSelected ? colors.text : colors.card }]}
                   onPress={() => {
                     Haptics.selectionAsync();
                     setWeaponCategory(cat.value);
                   }}
                 >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      { color: isSelected ? colors.background : colors.text },
-                    ]}
-                  >
+                  <Text style={[styles.chipText, { color: isSelected ? colors.background : colors.text }]}>
                     {cat.label}
                   </Text>
                 </TouchableOpacity>
@@ -346,7 +307,11 @@ export function PresetForm({ preset, onComplete, onCancel }: PresetFormProps) {
         <View style={styles.field}>
           <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Description</Text>
           <TextInput
-            style={[styles.input, styles.textArea, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+            style={[
+              styles.input,
+              styles.textArea,
+              { backgroundColor: colors.card, borderColor: colors.border, color: colors.text },
+            ]}
             value={description}
             onChangeText={setDescription}
             placeholder="Optional notes about this drill..."
@@ -485,4 +450,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

@@ -63,9 +63,7 @@ export function TrainingActions({
           activeOpacity={0.8}
         >
           <Ionicons name="checkmark" size={18} color="#fff" />
-          <Text style={styles.primaryText}>
-            {actionLoading ? 'Finishing...' : 'Mark as Completed'}
-          </Text>
+          <Text style={styles.primaryText}>{actionLoading ? 'Finishing...' : 'Mark as Completed'}</Text>
         </TouchableOpacity>
       )}
     </View>

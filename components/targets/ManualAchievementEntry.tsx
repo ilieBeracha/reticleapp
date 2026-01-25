@@ -1,27 +1,20 @@
-import { useColors } from "@/hooks/ui/useColors";
-import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from "@/theme/colors";
-import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
-import { ArrowLeft, Minus, Plus, Trophy } from "lucide-react-native";
-import React, { useCallback, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { COLORS } from "./types";
+import { useColors } from '@/hooks/ui/useColors';
+import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from '@/theme/colors';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { ArrowLeft, Minus, Plus, Trophy } from 'lucide-react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { COLORS } from './types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DISTANCE CATEGORIES (for optional distance selection)
 // ═══════════════════════════════════════════════════════════════════════════
 const DISTANCE_CATEGORIES = [
-  { label: "Close", range: "5-15m", distances: [5, 7, 10, 15] },
-  { label: "Medium", range: "25-50m", distances: [25, 35, 50] },
-  { label: "Long", range: "100m+", distances: [100, 200, 300] },
+  { label: 'Close', range: '5-15m', distances: [5, 7, 10, 15] },
+  { label: 'Medium', range: '25-50m', distances: [25, 35, 50] },
+  { label: 'Long', range: '100m+', distances: [100, 200, 300] },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -49,7 +42,7 @@ const Stepper = React.memo(function Stepper({
   percentageOf,
 }: StepperProps) {
   const colors = useColors();
-  
+
   const handleDecrement = useCallback(() => {
     if (value > min) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -80,13 +73,13 @@ const Stepper = React.memo(function Stepper({
     <View style={styles.stepperContainer}>
       <Text style={[styles.stepperLabel, { color: colors.textMuted }]}>{label}</Text>
       {sublabel && <Text style={[styles.stepperSublabel, { color: colors.textMuted }]}>{sublabel}</Text>}
-      
+
       <View style={styles.stepperRow}>
         <TouchableOpacity
           style={[
-            styles.stepperBtn, 
+            styles.stepperBtn,
             { backgroundColor: colors.card, borderColor: colors.border },
-            value <= min && styles.stepperBtnDisabled
+            value <= min && styles.stepperBtnDisabled,
           ]}
           onPress={handleDecrement}
           disabled={value <= min}
@@ -96,31 +89,32 @@ const Stepper = React.memo(function Stepper({
         </TouchableOpacity>
 
         <View style={styles.stepperValueContainer}>
-          <View style={[
-            styles.stepperValueRing,
-            { backgroundColor: colors.card, borderColor: colors.border },
-            showPercentage && percentage !== null && {
-              borderColor: getPercentageColor(),
-              backgroundColor: `${getPercentageColor()}15`,
-            },
-          ]}>
+          <View
+            style={[
+              styles.stepperValueRing,
+              { backgroundColor: colors.card, borderColor: colors.border },
+              showPercentage &&
+                percentage !== null && {
+                  borderColor: getPercentageColor(),
+                  backgroundColor: `${getPercentageColor()}15`,
+                },
+            ]}
+          >
             <Text style={[styles.stepperValue, { color: colors.text }]}>{value}</Text>
             {showPercentage && percentageOf && (
               <Text style={[styles.stepperMax, { color: colors.textMuted }]}>/ {percentageOf}</Text>
             )}
           </View>
           {percentage !== null && (
-            <Text style={[styles.stepperPercentage, { color: getPercentageColor() }]}>
-              {percentage}% accuracy
-            </Text>
+            <Text style={[styles.stepperPercentage, { color: getPercentageColor() }]}>{percentage}% accuracy</Text>
           )}
         </View>
 
         <TouchableOpacity
           style={[
-            styles.stepperBtn, 
+            styles.stepperBtn,
             { backgroundColor: colors.card, borderColor: colors.border },
-            value >= max && styles.stepperBtnDisabled
+            value >= max && styles.stepperBtnDisabled,
           ]}
           onPress={handleIncrement}
           disabled={value >= max}
@@ -135,21 +129,48 @@ const Stepper = React.memo(function Stepper({
         <View style={styles.quickRow}>
           <TouchableOpacity
             style={[styles.quickBtn, { backgroundColor: colors.card }, value === 0 && styles.quickBtnActive]}
-            onPress={() => { Haptics.selectionAsync(); onChange(0); }}
+            onPress={() => {
+              Haptics.selectionAsync();
+              onChange(0);
+            }}
           >
-            <Text style={[styles.quickText, { color: colors.textMuted }, value === 0 && styles.quickTextActive]}>None</Text>
+            <Text style={[styles.quickText, { color: colors.textMuted }, value === 0 && styles.quickTextActive]}>
+              None
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.quickBtn, { backgroundColor: colors.card }, value === Math.floor(percentageOf / 2) && styles.quickBtnActive]}
-            onPress={() => { Haptics.selectionAsync(); onChange(Math.floor(percentageOf / 2)); }}
+            style={[
+              styles.quickBtn,
+              { backgroundColor: colors.card },
+              value === Math.floor(percentageOf / 2) && styles.quickBtnActive,
+            ]}
+            onPress={() => {
+              Haptics.selectionAsync();
+              onChange(Math.floor(percentageOf / 2));
+            }}
           >
-            <Text style={[styles.quickText, { color: colors.textMuted }, value === Math.floor(percentageOf / 2) && styles.quickTextActive]}>Half</Text>
+            <Text
+              style={[
+                styles.quickText,
+                { color: colors.textMuted },
+                value === Math.floor(percentageOf / 2) && styles.quickTextActive,
+              ]}
+            >
+              Half
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.quickBtn, { backgroundColor: colors.card }, value === percentageOf && styles.quickBtnActive]}
-            onPress={() => { Haptics.selectionAsync(); onChange(percentageOf); }}
+            onPress={() => {
+              Haptics.selectionAsync();
+              onChange(percentageOf);
+            }}
           >
-            <Text style={[styles.quickText, { color: colors.textMuted }, value === percentageOf && styles.quickTextActive]}>All</Text>
+            <Text
+              style={[styles.quickText, { color: colors.textMuted }, value === percentageOf && styles.quickTextActive]}
+            >
+              All
+            </Text>
           </TouchableOpacity>
         </View>
       )}
@@ -184,7 +205,7 @@ export const ManualAchievementEntry = React.memo(function ManualAchievementEntry
   lockBullets = false,
 }: ManualAchievementEntryProps) {
   const colors = useColors();
-  
+
   // State
   const initialBullets = Math.max(1, Math.min(defaultBullets ?? 5, maxBullets));
   const [bulletsFired, setBulletsFired] = useState(initialBullets);
@@ -192,17 +213,23 @@ export const ManualAchievementEntry = React.memo(function ManualAchievementEntry
   const [distance, setDistance] = useState(defaultDistance);
 
   // Keep hits <= bulletsFired
-  const handleBulletsChange = useCallback((value: number) => {
-    if (lockBullets) return;
-    setBulletsFired(value);
-    if (hits > value) {
-      setHits(value);
-    }
-  }, [hits, lockBullets]);
+  const handleBulletsChange = useCallback(
+    (value: number) => {
+      if (lockBullets) return;
+      setBulletsFired(value);
+      if (hits > value) {
+        setHits(value);
+      }
+    },
+    [hits, lockBullets]
+  );
 
-  const handleHitsChange = useCallback((value: number) => {
-    setHits(Math.min(value, bulletsFired));
-  }, [bulletsFired]);
+  const handleHitsChange = useCallback(
+    (value: number) => {
+      setHits(Math.min(value, bulletsFired));
+    },
+    [bulletsFired]
+  );
 
   const handleSave = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -227,9 +254,7 @@ export const ManualAchievementEntry = React.memo(function ManualAchievementEntry
           <Text style={[styles.headerTitle, { color: colors.text }]}>Manual Entry</Text>
           <View style={styles.headerMeta}>
             <Trophy size={14} color={colors.primary} />
-            <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
-              Achievement Target
-            </Text>
+            <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>Achievement Target</Text>
           </View>
         </View>
         <View style={{ width: 40 }} />
@@ -292,22 +317,24 @@ export const ManualAchievementEntry = React.memo(function ManualAchievementEntry
             <TouchableOpacity
               key={num}
               style={[
-                styles.bulletsQuickBtn, 
+                styles.bulletsQuickBtn,
                 { backgroundColor: colors.secondary },
-                bulletsFired === num && styles.bulletsQuickBtnActive
+                bulletsFired === num && styles.bulletsQuickBtnActive,
               ]}
-              onPress={() => { 
+              onPress={() => {
                 if (lockBullets) return;
-                Haptics.selectionAsync(); 
-                handleBulletsChange(Math.min(num, maxBullets)); 
+                Haptics.selectionAsync();
+                handleBulletsChange(Math.min(num, maxBullets));
               }}
               disabled={lockBullets}
             >
-              <Text style={[
-                styles.bulletsQuickText, 
-                { color: colors.textMuted },
-                bulletsFired === num && styles.bulletsQuickTextActive
-              ]}>
+              <Text
+                style={[
+                  styles.bulletsQuickText,
+                  { color: colors.textMuted },
+                  bulletsFired === num && styles.bulletsQuickTextActive,
+                ]}
+              >
                 {num}
               </Text>
             </TouchableOpacity>
@@ -330,7 +357,9 @@ export const ManualAchievementEntry = React.memo(function ManualAchievementEntry
       </View>
 
       {/* Summary Card */}
-      <View style={[styles.summaryCard, { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}20` }]}>
+      <View
+        style={[styles.summaryCard, { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}20` }]}
+      >
         <View style={styles.summaryRow}>
           <View style={styles.summaryItem}>
             <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Distance</Text>
@@ -355,12 +384,7 @@ export const ManualAchievementEntry = React.memo(function ManualAchievementEntry
       </View>
 
       {/* Save Button */}
-      <TouchableOpacity
-        style={styles.saveButton}
-        onPress={handleSave}
-        activeOpacity={0.9}
-        disabled={saving}
-      >
+      <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.9} disabled={saving}>
         <LinearGradient
           colors={saving ? [...BUTTON_GRADIENT_DISABLED] : [...BUTTON_GRADIENT]}
           start={{ x: 0, y: 0 }}
@@ -400,23 +424,23 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 24,
     marginTop: 16,
   },
   headerCenter: {
     flex: 1,
-    alignItems: "center",
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   headerMeta: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
     marginTop: 4,
   },
@@ -427,8 +451,8 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Section
@@ -437,9 +461,9 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     marginBottom: 12,
-    textTransform: "uppercase",
+    textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
 
@@ -448,20 +472,20 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   distanceCategoryHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
   distanceCategoryLabel: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   distanceCategoryRange: {
     fontSize: 11,
   },
   distanceChipsRow: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 8,
   },
   distanceChip: {
@@ -469,7 +493,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderRadius: 10,
-    alignItems: "center",
+    alignItems: 'center',
     borderWidth: 1.5,
   },
   distanceChipSelected: {
@@ -478,7 +502,7 @@ const styles = StyleSheet.create({
   },
   distanceChipText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   distanceChipTextSelected: {
     color: COLORS.white,
@@ -492,13 +516,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   stepperContainer: {
-    alignItems: "center",
+    alignItems: 'center',
     paddingVertical: 8,
   },
   stepperLabel: {
     fontSize: 12,
-    fontWeight: "600",
-    textTransform: "uppercase",
+    fontWeight: '600',
+    textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 4,
   },
@@ -507,36 +531,36 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   stepperRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 24,
   },
   stepperBtn: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
   },
   stepperBtnDisabled: {
     opacity: 0.4,
   },
   stepperValueContainer: {
-    alignItems: "center",
+    alignItems: 'center',
   },
   stepperValueRing: {
     width: 100,
     height: 100,
     borderRadius: 50,
     borderWidth: 3,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   stepperValue: {
     fontSize: 36,
-    fontWeight: "700",
-    fontVariant: ["tabular-nums"],
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
   },
   stepperMax: {
     fontSize: 13,
@@ -545,12 +569,12 @@ const styles = StyleSheet.create({
   stepperPercentage: {
     fontSize: 13,
     marginTop: 10,
-    fontWeight: "500",
+    fontWeight: '500',
   },
 
   // Quick select
   quickRow: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 12,
     marginTop: 20,
   },
@@ -564,7 +588,7 @@ const styles = StyleSheet.create({
   },
   quickText: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   quickTextActive: {
     color: COLORS.primary,
@@ -572,8 +596,8 @@ const styles = StyleSheet.create({
 
   // Bullets quick select
   bulletsQuickRow: {
-    flexDirection: "row",
-    justifyContent: "center",
+    flexDirection: 'row',
+    justifyContent: 'center',
     gap: 10,
     marginTop: 16,
   },
@@ -587,7 +611,7 @@ const styles = StyleSheet.create({
   },
   bulletsQuickText: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   bulletsQuickTextActive: {
     color: COLORS.primary,
@@ -601,12 +625,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   summaryRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   summaryItem: {
     flex: 1,
-    alignItems: "center",
+    alignItems: 'center',
   },
   summaryDivider: {
     width: 1,
@@ -615,39 +639,39 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 10,
-    textTransform: "uppercase",
+    textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   summaryValue: {
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: '700',
     marginTop: 2,
   },
 
   // Buttons
   saveButton: {
     borderRadius: 14,
-    overflow: "hidden",
+    overflow: 'hidden',
     marginBottom: 12,
   },
   saveButtonGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     height: 54,
     gap: 10,
   },
   saveButtonText: {
     fontSize: 16,
-    fontWeight: "700",
-    color: "#fff",
+    fontWeight: '700',
+    color: '#fff',
   },
   cancelButton: {
-    alignItems: "center",
+    alignItems: 'center',
     paddingVertical: 12,
   },
   cancelButtonText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
   },
 });

@@ -1,9 +1,9 @@
 /**
  * Training Report Screen
- * 
+ *
  * Debrief screen after training execution.
  * Primary action: RETURN TO TRAINING (not Home)
- * 
+ *
  * This is the canonical debrief flow:
  * Training → Execute → Session Complete → Training Report → Return to Training
  */
@@ -12,8 +12,9 @@ import { ParticipantInsights } from '@/components/training/ParticipantInsights';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { usePermissions } from '@/hooks/usePermissions';
-import { getTrainingById } from '@/services/trainingService';
 import { getTrainingSessionsWithStats, SessionWithDetails } from '@/services/sessionService';
+import { getSessionVerdict, SessionVerdict } from '@/services/standards';
+import { getTrainingById } from '@/services/trainingService';
 import { useTeamStore } from '@/store/teamStore';
 import { format, formatDistanceToNow } from 'date-fns';
 import * as Haptics from 'expo-haptics';
@@ -127,9 +128,7 @@ function TrainingOverviewCard({
             <>
               <View style={[styles.metaDot, { backgroundColor: colors.border }]} />
               <Users size={14} color={colors.textMuted} />
-              <Text style={[styles.metaText, { color: colors.textMuted }]}>
-                {training.team.name}
-              </Text>
+              <Text style={[styles.metaText, { color: colors.textMuted }]}>{training.team.name}</Text>
             </>
           )}
         </View>
@@ -137,16 +136,12 @@ function TrainingOverviewCard({
         {/* Quick Stats */}
         <View style={[styles.quickStats, { borderTopColor: colors.border }]}>
           <View style={styles.quickStat}>
-            <Text style={[styles.quickStatValue, { color: colors.text }]}>
-              {training.drills.length}
-            </Text>
+            <Text style={[styles.quickStatValue, { color: colors.text }]}>{training.drills.length}</Text>
             <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>Drills</Text>
           </View>
           <View style={[styles.quickStatDivider, { backgroundColor: colors.border }]} />
           <View style={styles.quickStat}>
-            <Text style={[styles.quickStatValue, { color: colors.text }]}>
-              {sessionCount}
-            </Text>
+            <Text style={[styles.quickStatValue, { color: colors.text }]}>{sessionCount}</Text>
             <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>Sessions</Text>
           </View>
           {duration && (
@@ -178,10 +173,7 @@ function AccessDenied({ colors }: { colors: ReturnType<typeof useColors> }) {
       <Text style={[styles.accessDesc, { color: colors.textMuted }]}>
         Training reports are only available to commanders and team owners.
       </Text>
-      <TouchableOpacity
-        style={[styles.accessBtn, { backgroundColor: colors.card }]}
-        onPress={() => router.back()}
-      >
+      <TouchableOpacity style={[styles.accessBtn, { backgroundColor: colors.card }]} onPress={() => router.back()}>
         <Text style={[styles.accessBtnText, { color: colors.text }]}>Go Back</Text>
       </TouchableOpacity>
     </View>
@@ -202,6 +194,7 @@ export default function TrainingReportScreen() {
 
   const [training, setTraining] = useState<TrainingWithDrills | null>(null);
   const [sessions, setSessions] = useState<SessionWithDetails[]>([]);
+  const [verdicts, setVerdicts] = useState<Map<string, SessionVerdict>>(new Map());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -236,6 +229,19 @@ export default function TrainingReportScreen() {
         setTraining(trainingData as TrainingWithDrills);
         setSessions(sessionsData);
         setError(null);
+
+        // Fetch verdicts for all sessions
+        const verdictPromises = sessionsData.map((s: SessionWithDetails) =>
+          getSessionVerdict(s.id)
+            .then((v) => [s.id, v] as const)
+            .catch(() => [s.id, null] as const)
+        );
+        const verdictResults = await Promise.all(verdictPromises);
+        const verdictMap = new Map<string, SessionVerdict>();
+        for (const [id, verdict] of verdictResults) {
+          if (verdict) verdictMap.set(id, verdict);
+        }
+        setVerdicts(verdictMap);
       }
     } catch (err: any) {
       console.error('[TrainingReport] Failed to load:', err);
@@ -260,8 +266,8 @@ export default function TrainingReportScreen() {
   const generateReportText = useCallback(() => {
     if (!training || sessions.length === 0) return '';
 
-    const uniqueUsers = new Set(sessions.map(s => s.user_id));
-    const completedSessions = sessions.filter(s => s.status === 'completed');
+    const uniqueUsers = new Set(sessions.map((s) => s.user_id));
+    const completedSessions = sessions.filter((s) => s.status === 'completed');
     const totalShots = sessions.reduce((sum, s) => sum + (s.stats?.shots_fired || 0), 0);
     const totalHits = sessions.reduce((sum, s) => sum + (s.stats?.hits_total || 0), 0);
     const avgAccuracy = totalShots > 0 ? Math.round((totalHits / totalShots) * 100) : 0;
@@ -284,7 +290,7 @@ Generated by ReticleIQ`;
   const handleShare = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const reportText = generateReportText();
-    
+
     if (!reportText) {
       Alert.alert('No Data', 'No report data available to share.');
       return;
@@ -305,10 +311,7 @@ Generated by ReticleIQ`;
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-          <TouchableOpacity
-            style={[styles.headerBtn, { backgroundColor: colors.card }]}
-            onPress={() => router.back()}
-          >
+          <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.card }]} onPress={() => router.back()}>
             <ArrowLeft size={20} color={colors.text} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Report</Text>
@@ -316,9 +319,7 @@ Generated by ReticleIQ`;
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textMuted }]}>
-            Loading report...
-          </Text>
+          <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading report...</Text>
         </View>
       </View>
     );
@@ -329,10 +330,7 @@ Generated by ReticleIQ`;
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-          <TouchableOpacity
-            style={[styles.headerBtn, { backgroundColor: colors.card }]}
-            onPress={() => router.back()}
-          >
+          <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.card }]} onPress={() => router.back()}>
             <ArrowLeft size={20} color={colors.text} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Report</Text>
@@ -340,13 +338,8 @@ Generated by ReticleIQ`;
         </View>
         <View style={styles.errorContainer}>
           <AlertCircle size={48} color={colors.textMuted} />
-          <Text style={[styles.errorTitle, { color: colors.text }]}>
-            {error || 'Training not found'}
-          </Text>
-          <TouchableOpacity
-            style={[styles.errorBtn, { backgroundColor: colors.card }]}
-            onPress={() => router.back()}
-          >
+          <Text style={[styles.errorTitle, { color: colors.text }]}>{error || 'Training not found'}</Text>
+          <TouchableOpacity style={[styles.errorBtn, { backgroundColor: colors.card }]} onPress={() => router.back()}>
             <Text style={[styles.errorBtnText, { color: colors.text }]}>Go Back</Text>
           </TouchableOpacity>
         </View>
@@ -359,10 +352,7 @@ Generated by ReticleIQ`;
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-          <TouchableOpacity
-            style={[styles.headerBtn, { backgroundColor: colors.card }]}
-            onPress={() => router.back()}
-          >
+          <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.card }]} onPress={() => router.back()}>
             <ArrowLeft size={20} color={colors.text} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Report</Text>
@@ -380,21 +370,13 @@ Generated by ReticleIQ`;
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity
-          style={[styles.headerBtn, { backgroundColor: colors.card }]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.back();
-          }}
-        >
-          <ArrowLeft size={20} color={colors.text} />
-        </TouchableOpacity>
-        
+        <View style={{ width: 40 }} />
+
         <View style={styles.headerCenter}>
           <FileText size={16} color={colors.primary} />
           <Text style={[styles.headerTitle, { color: colors.text }]}>Training Report</Text>
         </View>
-        
+
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={[styles.headerBtn, { backgroundColor: colors.card }]}
@@ -408,10 +390,7 @@ Generated by ReticleIQ`;
             )}
           </TouchableOpacity>
           {hasSessions && (
-            <TouchableOpacity
-              style={[styles.headerBtn, { backgroundColor: colors.card }]}
-              onPress={handleShare}
-            >
+            <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.card }]} onPress={handleShare}>
               <Share2 size={18} color={colors.text} />
             </TouchableOpacity>
           )}
@@ -422,16 +401,10 @@ Generated by ReticleIQ`;
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 140 }]}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.text} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.text} />}
       >
         {/* Training Overview */}
-        <TrainingOverviewCard
-          training={training}
-          sessionCount={sessions.length}
-          colors={colors}
-        />
+        <TrainingOverviewCard training={training} sessionCount={sessions.length} colors={colors} />
 
         {/* No Sessions State */}
         {!hasSessions && (
@@ -443,26 +416,126 @@ Generated by ReticleIQ`;
               <Text style={[styles.emptyTitle, { color: colors.text }]}>No Participant Data</Text>
               <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
                 {training.status === 'planned'
-                  ? 'This training hasn\'t started yet.'
+                  ? "This training hasn't started yet."
                   : 'No sessions have been recorded for this training.'}
               </Text>
             </View>
           </Animated.View>
         )}
 
+        {/* Standards Verdicts - only show if there are verdicts with actual standards */}
+        {(() => {
+          const evaluatedVerdicts = Array.from(verdicts.entries()).filter(([_, v]) => v.base_standard_id);
+          if (!hasSessions || evaluatedVerdicts.length === 0) return null;
+
+          const passedCount = evaluatedVerdicts.filter(([_, v]) => v.passed).length;
+          const failedCount = evaluatedVerdicts.length - passedCount;
+          const passRate = Math.round((passedCount / evaluatedVerdicts.length) * 100);
+
+          return (
+            <Animated.View entering={FadeIn.delay(50).duration(300)} style={styles.insightsSection}>
+              <View style={styles.sectionHeader}>
+                <CheckCircle2 size={16} color={colors.textMuted} />
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Performance Standards</Text>
+              </View>
+
+              {/* Summary Card */}
+              <View style={[styles.standardsSummary, { backgroundColor: colors.card }]}>
+                <View style={styles.standardsSummaryRow}>
+                  <View style={styles.standardsStat}>
+                    <Text style={[styles.standardsStatValue, { color: colors.green }]}>{passedCount}</Text>
+                    <Text style={[styles.standardsStatLabel, { color: colors.textMuted }]}>Passed</Text>
+                  </View>
+                  <View style={[styles.standardsDivider, { backgroundColor: colors.border }]} />
+                  <View style={styles.standardsStat}>
+                    <Text style={[styles.standardsStatValue, { color: colors.red }]}>{failedCount}</Text>
+                    <Text style={[styles.standardsStatLabel, { color: colors.textMuted }]}>Failed</Text>
+                  </View>
+                  <View style={[styles.standardsDivider, { backgroundColor: colors.border }]} />
+                  <View style={styles.standardsStat}>
+                    <Text style={[styles.standardsStatValue, { color: passRate >= 50 ? colors.green : colors.red }]}>
+                      {passRate}%
+                    </Text>
+                    <Text style={[styles.standardsStatLabel, { color: colors.textMuted }]}>Pass Rate</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Individual Verdicts */}
+              <View style={styles.verdictsGrid}>
+                {evaluatedVerdicts.map(([sessionId, verdict]) => {
+                  const session = sessions.find((s) => s.id === sessionId);
+                  const participantName = session?.user_full_name || 'Unknown';
+                  const drillName = session?.drill_name || session?.drill_config?.name || 'Unknown Drill';
+
+                  return (
+                    <View
+                      key={sessionId}
+                      style={[
+                        styles.verdictCard,
+                        {
+                          backgroundColor: colors.card,
+                          borderLeftColor: verdict.passed ? colors.green : colors.red,
+                        },
+                      ]}
+                    >
+                      <View style={styles.verdictCardHeader}>
+                        <View style={styles.verdictCardInfo}>
+                          <Text style={[styles.verdictCardName, { color: colors.text }]} numberOfLines={1}>
+                            {participantName}
+                          </Text>
+                          <Text style={[styles.verdictCardDrill, { color: colors.textMuted }]} numberOfLines={1}>
+                            {drillName}
+                          </Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.verdictBadge,
+                            { backgroundColor: verdict.passed ? colors.green + '20' : colors.red + '20' },
+                          ]}
+                        >
+                          {verdict.passed ? (
+                            <CheckCircle2 size={14} color={colors.green} />
+                          ) : (
+                            <XCircle size={14} color={colors.red} />
+                          )}
+                          <Text
+                            style={[styles.verdictBadgeText, { color: verdict.passed ? colors.green : colors.red }]}
+                          >
+                            {verdict.passed ? 'PASS' : 'FAIL'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Metrics Row */}
+                      <View style={styles.verdictMetrics}>
+                        {verdict.effective_grouping_cm && (
+                          <Text style={[styles.verdictMetric, { color: colors.textMuted }]}>
+                            {verdict.actual_grouping_cm}cm / {verdict.effective_grouping_cm}cm
+                          </Text>
+                        )}
+                        {verdict.effective_accuracy_pct && (
+                          <Text style={[styles.verdictMetric, { color: colors.textMuted }]}>
+                            {verdict.actual_accuracy_pct}% / {verdict.effective_accuracy_pct}%
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </Animated.View>
+          );
+        })()}
+
         {/* Participant Insights */}
         {hasSessions && (
           <Animated.View entering={FadeIn.delay(100).duration(300)} style={styles.insightsSection}>
             <View style={styles.sectionHeader}>
               <Trophy size={16} color={colors.textMuted} />
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Participant Performance
-              </Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Participant Performance</Text>
             </View>
-            <ParticipantInsights
-              teamSessions={sessions}
-              drills={training.drills}
-            />
+            <ParticipantInsights teamSessions={sessions} drills={training.drills} />
           </Animated.View>
         )}
 
@@ -479,6 +552,10 @@ Generated by ReticleIQ`;
           style={[styles.primaryBtn, { backgroundColor: colors.text }]}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            // Use dismissAll + replace to clear any stacked screens
+            if (router.canDismiss()) {
+              router.dismissAll();
+            }
             router.replace({
               pathname: '/(protected)/trainingDetail',
               params: { id: training.id },
@@ -487,9 +564,7 @@ Generated by ReticleIQ`;
           activeOpacity={0.85}
         >
           <ArrowRight size={18} color={colors.background} />
-          <Text style={[styles.primaryBtnText, { color: colors.background }]}>
-            Return to Training
-          </Text>
+          <Text style={[styles.primaryBtnText, { color: colors.background }]}>Return to Training</Text>
         </TouchableOpacity>
 
         {/* Secondary: Exit to Home (small, subtle) */}
@@ -497,14 +572,16 @@ Generated by ReticleIQ`;
           style={styles.secondaryBtn}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            // Clear stack and go to home
+            if (router.canDismiss()) {
+              router.dismissAll();
+            }
             router.replace('/(protected)/(tabs)');
           }}
           activeOpacity={0.6}
         >
           <Home size={14} color={colors.textMuted} />
-          <Text style={[styles.secondaryBtnText, { color: colors.textMuted }]}>
-            Exit to Home
-          </Text>
+          <Text style={[styles.secondaryBtnText, { color: colors.textMuted }]}>Exit to Home</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -519,7 +596,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  
+
   // Header
   header: {
     flexDirection: 'row',
@@ -550,7 +627,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  
+
   // Scroll
   scroll: {
     flex: 1,
@@ -559,7 +636,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     gap: 20,
   },
-  
+
   // Overview Card
   overviewCard: {
     padding: 16,
@@ -621,7 +698,7 @@ const styles = StyleSheet.create({
     width: 1,
     height: 28,
   },
-  
+
   // Insights Section
   insightsSection: {
     gap: 12,
@@ -635,7 +712,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  
+
   // Empty State
   emptyState: {
     padding: 32,
@@ -660,7 +737,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-  
+
   // Loading
   loadingContainer: {
     flex: 1,
@@ -671,7 +748,7 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 14,
   },
-  
+
   // Error
   errorContainer: {
     flex: 1,
@@ -694,7 +771,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-  
+
   // Access Denied
   accessDenied: {
     flex: 1,
@@ -730,14 +807,90 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-  
+
+  // Standards Summary
+  standardsSummary: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  standardsSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  standardsStat: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  standardsStatValue: {
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  standardsStatLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  standardsDivider: {
+    width: 1,
+    height: 32,
+  },
+
+  // Verdicts Grid
+  verdictsGrid: {
+    gap: 8,
+  },
+  verdictCard: {
+    borderRadius: 10,
+    padding: 12,
+    borderLeftWidth: 3,
+  },
+  verdictCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  verdictCardInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  verdictCardName: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  verdictCardDrill: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  verdictBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  verdictBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  verdictMetrics: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  verdictMetric: {
+    fontSize: 11,
+  },
+
   // Footer
   footer: {
     fontSize: 12,
     textAlign: 'center',
     paddingTop: 16,
   },
-  
+
   // Bottom Actions
   bottomActions: {
     position: 'absolute',

@@ -1,14 +1,16 @@
 /**
  * PhaseSection Component
- * Collapsible phase section with timeline integration
+ *
+ * Clean phase section with prominent timeline integration.
+ * Designed for a spread-out, immersive training journey.
  */
 
-import React, { useState } from 'react';
+import { Check, ChevronDown, ChevronUp, Crosshair, Target, Trophy } from 'lucide-react-native';
+import { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import { Check, ChevronRight, Crosshair, Target, Trophy } from 'lucide-react-native';
-import { TimelineNode } from './TimelineNode';
 import { LiveDot } from './AnimatedComponents';
+import { TimelineNode } from './TimelineNode';
 import type { PhaseSectionProps, TrainingPhase } from './types';
 
 const phaseIcons: Record<TrainingPhase, typeof Target> = {
@@ -30,6 +32,7 @@ export function PhaseSection({
   const [expanded, setExpanded] = useState(defaultExpanded && status !== 'locked');
   const isLocked = status === 'locked';
   const isActive = status === 'active';
+  const isCompleted = status === 'completed';
 
   const PhaseIcon = phaseIcons[phase];
 
@@ -54,42 +57,42 @@ export function PhaseSection({
     <Animated.View entering={FadeInDown.duration(300)} style={styles.section}>
       {/* Timeline + Content Row */}
       <View style={styles.row}>
-        {/* Timeline Column */}
+        {/* Timeline Column - More Prominent */}
         <TimelineNode status={status} isLast={isLast} colors={colors} />
 
         {/* Content Column */}
         <View style={styles.content}>
-          {/* Phase Header */}
+          {/* Phase Header - Larger & More Prominent */}
           <TouchableOpacity
             style={[
               styles.header,
               {
-                backgroundColor: isActive ? statusColor + '10' : colors.card,
-                borderColor: isActive ? statusColor + '30' : 'transparent',
-                borderWidth: isActive ? 1 : 0,
+                backgroundColor: isActive ? statusColor + '08' : isCompleted ? colors.green + '05' : colors.card,
+                borderColor: isActive ? statusColor + '20' : isCompleted ? colors.green + '15' : 'transparent',
+                borderWidth: isActive || isCompleted ? 1 : 0,
               },
             ]}
             onPress={() => !isLocked && setExpanded(!expanded)}
             activeOpacity={isLocked ? 1 : 0.7}
             disabled={isLocked}
           >
-            <View style={[styles.iconWrap, { backgroundColor: statusColor + '15' }]}>
-              <PhaseIcon size={16} color={statusColor} />
+            {/* Icon - Larger */}
+            <View style={[styles.iconWrap, { backgroundColor: statusColor + '12' }]}>
+              <PhaseIcon size={20} color={statusColor} />
             </View>
 
+            {/* Title & Subtitle */}
             <View style={styles.titleWrap}>
               <View style={styles.titleRow}>
-                <Text style={[styles.title, { color: isLocked ? colors.textMuted : colors.text }]}>
-                  {title}
-                </Text>
-                {status === 'completed' && (
-                  <View style={[styles.completedBadge, { backgroundColor: colors.green + '20' }]}>
-                    <Check size={10} color={colors.green} strokeWidth={3} />
+                <Text style={[styles.title, { color: isLocked ? colors.textMuted : colors.text }]}>{title}</Text>
+                {isCompleted && (
+                  <View style={[styles.completedBadge, { backgroundColor: colors.green + '15' }]}>
+                    <Check size={12} color={colors.green} strokeWidth={3} />
                   </View>
                 )}
-                {status === 'active' && (
-                  <View style={[styles.activeBadge, { backgroundColor: colors.primary + '20' }]}>
-                    <LiveDot size={5} />
+                {isActive && (
+                  <View style={[styles.activeBadge, { backgroundColor: colors.primary + '15' }]}>
+                    <LiveDot size={6} />
                     <Text style={[styles.activeBadgeText, { color: colors.primary }]}>Active</Text>
                   </View>
                 )}
@@ -97,16 +100,19 @@ export function PhaseSection({
               <Text style={[styles.subtitle, { color: colors.textMuted }]}>{subtitle}</Text>
             </View>
 
+            {/* Expand/Collapse */}
             {!isLocked && (
-              <ChevronRight
-                size={18}
-                color={colors.textMuted}
-                style={{ transform: [{ rotate: expanded ? '90deg' : '0deg' }] }}
-              />
+              <View style={[styles.expandBtn, { backgroundColor: colors.secondary }]}>
+                {expanded ? (
+                  <ChevronUp size={18} color={colors.textMuted} />
+                ) : (
+                  <ChevronDown size={18} color={colors.textMuted} />
+                )}
+              </View>
             )}
           </TouchableOpacity>
 
-          {/* Phase Content */}
+          {/* Phase Content - More Spacing */}
           {expanded && !isLocked && children && (
             <Animated.View entering={FadeIn.duration(200)} style={styles.children}>
               {children}
@@ -120,26 +126,26 @@ export function PhaseSection({
 
 const styles = StyleSheet.create({
   section: {
-    marginBottom: 0,
+    marginBottom: 8,
   },
   row: {
     flexDirection: 'row',
   },
   content: {
     flex: 1,
-    paddingBottom: 20,
+    paddingBottom: 24,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    gap: 10,
+    padding: 16,
+    borderRadius: 16,
+    gap: 14,
   },
   iconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -149,39 +155,47 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   title: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '700',
+    letterSpacing: -0.3,
   },
   subtitle: {
-    fontSize: 13,
-    marginTop: 3,
-    opacity: 0.7,
+    fontSize: 14,
+    marginTop: 4,
+    lineHeight: 20,
   },
   completedBadge: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
   activeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   activeBadgeText: {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
+  expandBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   children: {
-    marginTop: 14,
+    marginTop: 20,
   },
 });

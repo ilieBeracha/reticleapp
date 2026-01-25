@@ -2,7 +2,7 @@
 // Bottom sheet for email OTP authentication
 
 import { useColors } from "@/hooks/ui/useColors";
-import { supabase } from "@/lib/supabase";
+import { signInWithOtp, verifyOtp } from "@/services/authService";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import {
@@ -36,14 +36,7 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
-        options: {
-          shouldCreateUser: true,
-        },
-      });
-
-      if (error) throw error;
+      await signInWithOtp(email);
 
       Alert.alert(
         "Check Your Email",
@@ -66,13 +59,7 @@ export function EmailOTPSheet({ visible, onClose }: EmailOTPSheetProps) {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({
-        email: email.trim(),
-        token: otp.trim(),
-        type: "email",
-      });
-
-      if (error) throw error;
+      await verifyOtp(email, otp);
 
       // Success - auth context will handle navigation
       onClose();

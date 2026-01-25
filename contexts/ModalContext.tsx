@@ -1,11 +1,11 @@
 /**
  * Modal Context
- * 
+ *
  * Now simplified for native form sheet navigation pattern.
  * Provides selected items and callbacks for data coordination.
  * Sheet refs have been removed - use router.push() instead.
- * 
- * OPTIMIZED: 
+ *
+ * OPTIMIZED:
  * - Callback refs prevent re-renders when updating callbacks
  * - Stable setter functions via useCallback
  * - Getter functions to access current callback values
@@ -24,7 +24,11 @@ interface ModalContextType {
   setSelectedMember: (member: TeamMemberWithProfile | null) => void;
   selectedTraining: TrainingWithDetails | null;
   setSelectedTraining: (training: TrainingWithDetails | null) => void;
-  
+
+  // Action triggers - call these to trigger actions from anywhere
+  openCreateSession: () => void;
+  setOpenCreateSession: (callback: (() => void) | null) => void;
+
   // Callback getters - call these to get current callback and invoke
   getOnSessionCreated: () => (() => void) | null;
   getOnTeamCreated: () => (() => void) | null;
@@ -33,7 +37,7 @@ interface ModalContextType {
   getOnWorkspaceCreated: () => (() => void) | null;
   getOnTrainingCreated: () => (() => void) | null;
   getOnTrainingUpdated: () => (() => void) | null;
-  
+
   // Legacy callback accessors for backward compatibility
   onSessionCreated: (() => void) | null;
   onTeamCreated: (() => void) | null;
@@ -42,7 +46,7 @@ interface ModalContextType {
   onWorkspaceCreated: (() => void) | null;
   onTrainingCreated: (() => void) | null;
   onTrainingUpdated: (() => void) | null;
-  
+
   // Callback setters - stable functions
   setOnSessionCreated: (callback: (() => void) | null) => void;
   setOnTeamCreated: (callback: (() => void) | null) => void;
@@ -60,7 +64,10 @@ export function ModalProvider({ children }: { children: ReactNode }) {
   const [selectedTeam, setSelectedTeam] = useState<TeamWithMemberCount | null>(null);
   const [selectedMember, setSelectedMember] = useState<TeamMemberWithProfile | null>(null);
   const [selectedTraining, setSelectedTraining] = useState<TrainingWithDetails | null>(null);
-  
+
+  // Action trigger refs - stable functions callable from anywhere
+  const openCreateSessionRef = useRef<(() => void) | null>(null);
+
   // Callback refs - updating these doesn't cause re-renders
   const onSessionCreatedRef = useRef<(() => void) | null>(null);
   const onTeamCreatedRef = useRef<(() => void) | null>(null);
@@ -69,6 +76,15 @@ export function ModalProvider({ children }: { children: ReactNode }) {
   const onWorkspaceCreatedRef = useRef<(() => void) | null>(null);
   const onTrainingCreatedRef = useRef<(() => void) | null>(null);
   const onTrainingUpdatedRef = useRef<(() => void) | null>(null);
+
+  // Action trigger setter and callable
+  const setOpenCreateSession = useCallback((cb: (() => void) | null) => {
+    openCreateSessionRef.current = cb;
+  }, []);
+
+  const openCreateSession = useCallback(() => {
+    openCreateSessionRef.current?.();
+  }, []);
 
   // Stable setter functions
   const setOnSessionCreated = useCallback((cb: (() => void) | null) => {
@@ -103,64 +119,83 @@ export function ModalProvider({ children }: { children: ReactNode }) {
   const getOnTrainingUpdated = useCallback(() => onTrainingUpdatedRef.current, []);
 
   // Memoize the context value to prevent unnecessary re-renders
-  const value = useMemo<ModalContextType>(() => ({
-    // Selected items
-    selectedTeam,
-    setSelectedTeam,
-    selectedMember,
-    setSelectedMember,
-    selectedTraining,
-    setSelectedTraining,
-    // Getters for accessing current callback
-    getOnSessionCreated,
-    getOnTeamCreated,
-    getOnMemberInvited,
-    getOnInviteAccepted,
-    getOnWorkspaceCreated,
-    getOnTrainingCreated,
-    getOnTrainingUpdated,
-    // Legacy direct access (reads from refs at access time)
-    get onSessionCreated() { return onSessionCreatedRef.current; },
-    get onTeamCreated() { return onTeamCreatedRef.current; },
-    get onMemberInvited() { return onMemberInvitedRef.current; },
-    get onInviteAccepted() { return onInviteAcceptedRef.current; },
-    get onWorkspaceCreated() { return onWorkspaceCreatedRef.current; },
-    get onTrainingCreated() { return onTrainingCreatedRef.current; },
-    get onTrainingUpdated() { return onTrainingUpdatedRef.current; },
-    // Stable setters
-    setOnSessionCreated,
-    setOnTeamCreated,
-    setOnMemberInvited,
-    setOnInviteAccepted,
-    setOnWorkspaceCreated,
-    setOnTrainingCreated,
-    setOnTrainingUpdated,
-  }), [
-    selectedTeam,
-    selectedMember,
-    selectedTraining,
-    // All other values are stable refs/callbacks
-    getOnSessionCreated,
-    getOnTeamCreated,
-    getOnMemberInvited,
-    getOnInviteAccepted,
-    getOnWorkspaceCreated,
-    getOnTrainingCreated,
-    getOnTrainingUpdated,
-    setOnSessionCreated,
-    setOnTeamCreated,
-    setOnMemberInvited,
-    setOnInviteAccepted,
-    setOnWorkspaceCreated,
-    setOnTrainingCreated,
-    setOnTrainingUpdated,
-  ]);
-
-  return (
-    <ModalContext.Provider value={value}>
-      {children}
-    </ModalContext.Provider>
+  const value = useMemo<ModalContextType>(
+    () => ({
+      // Selected items
+      selectedTeam,
+      setSelectedTeam,
+      selectedMember,
+      setSelectedMember,
+      selectedTraining,
+      setSelectedTraining,
+      // Action triggers - callable from anywhere
+      openCreateSession,
+      setOpenCreateSession,
+      // Getters for accessing current callback
+      getOnSessionCreated,
+      getOnTeamCreated,
+      getOnMemberInvited,
+      getOnInviteAccepted,
+      getOnWorkspaceCreated,
+      getOnTrainingCreated,
+      getOnTrainingUpdated,
+      // Legacy direct access (reads from refs at access time)
+      get onSessionCreated() {
+        return onSessionCreatedRef.current;
+      },
+      get onTeamCreated() {
+        return onTeamCreatedRef.current;
+      },
+      get onMemberInvited() {
+        return onMemberInvitedRef.current;
+      },
+      get onInviteAccepted() {
+        return onInviteAcceptedRef.current;
+      },
+      get onWorkspaceCreated() {
+        return onWorkspaceCreatedRef.current;
+      },
+      get onTrainingCreated() {
+        return onTrainingCreatedRef.current;
+      },
+      get onTrainingUpdated() {
+        return onTrainingUpdatedRef.current;
+      },
+      // Stable setters
+      setOnSessionCreated,
+      setOnTeamCreated,
+      setOnMemberInvited,
+      setOnInviteAccepted,
+      setOnWorkspaceCreated,
+      setOnTrainingCreated,
+      setOnTrainingUpdated,
+    }),
+    [
+      selectedTeam,
+      selectedMember,
+      selectedTraining,
+      // Action triggers
+      openCreateSession,
+      setOpenCreateSession,
+      // All other values are stable refs/callbacks
+      getOnSessionCreated,
+      getOnTeamCreated,
+      getOnMemberInvited,
+      getOnInviteAccepted,
+      getOnWorkspaceCreated,
+      getOnTrainingCreated,
+      getOnTrainingUpdated,
+      setOnSessionCreated,
+      setOnTeamCreated,
+      setOnMemberInvited,
+      setOnInviteAccepted,
+      setOnWorkspaceCreated,
+      setOnTrainingCreated,
+      setOnTrainingUpdated,
+    ]
   );
+
+  return <ModalContext.Provider value={value}>{children}</ModalContext.Provider>;
 }
 
 export function useModals() {

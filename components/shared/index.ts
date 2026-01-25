@@ -1,6 +1,6 @@
 /**
  * Shared Components
- * 
+ *
  * Components used across multiple routes
  */
 

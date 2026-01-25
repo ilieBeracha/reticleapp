@@ -21,7 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SHEET_HEIGHT = SCREEN_HEIGHT * 0.85;
-const IMAGE_HEIGHT = SHEET_HEIGHT * 0.40; // 40% of modal height
+const IMAGE_HEIGHT = SHEET_HEIGHT * 0.4; // 40% of modal height
 
 // ============================================================================
 // TYPES
@@ -70,7 +70,7 @@ export const TargetDetailModal = React.memo(function TargetDetailModal({
   const insets = useSafeAreaInsets();
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
-  
+
   // Animation
   const translateY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -107,7 +107,7 @@ export const TargetDetailModal = React.memo(function TargetDetailModal({
       // Reset image state when opening
       setImageLoading(true);
       setImageError(false);
-      
+
       // Animate in
       Animated.parallel([
         Animated.spring(translateY, {
@@ -147,17 +147,19 @@ export const TargetDetailModal = React.memo(function TargetDetailModal({
   const isPaper = target.target_type === 'paper';
   const paperResult = target.paper_result;
   const tacticalResult = target.tactical_result;
-  
+
   // Determine target purpose
   const isGroupingTarget = isPaper && paperResult?.paper_type === 'grouping';
   const isEngagementTarget = isPaper && paperResult?.paper_type === 'engagement';
-  
+
   // Get display label for target type
-  const targetTypeLabel = isGroupingTarget 
-    ? 'Grouping' 
-    : isEngagementTarget 
-        ? 'Engagement' 
-      : (isPaper ? 'Paper' : 'Tactical');
+  const targetTypeLabel = isGroupingTarget
+    ? 'Grouping'
+    : isEngagementTarget
+      ? 'Engagement'
+      : isPaper
+        ? 'Paper'
+        : 'Tactical';
 
   // Calculate stats
   let hits = 0;
@@ -172,17 +174,11 @@ export const TargetDetailModal = React.memo(function TargetDetailModal({
   }
 
   // Only calculate accuracy for achievement/tactical targets
-  const accuracy = (!isGroupingTarget && shots > 0) ? Math.round((hits / shots) * 100) : 0;
+  const accuracy = !isGroupingTarget && shots > 0 ? Math.round((hits / shots) * 100) : 0;
   const hasImage = isPaper && paperResult?.scanned_image_url;
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      statusBarTranslucent
-      onRequestClose={closeSheet}
-    >
+    <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={closeSheet}>
       {/* Backdrop */}
       <TouchableWithoutFeedback onPress={closeSheet}>
         <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]} />
@@ -300,7 +296,12 @@ export const TargetDetailModal = React.memo(function TargetDetailModal({
           </View>
           <View style={[styles.quickStatDivider, { backgroundColor: colors.border }]} />
           <View style={styles.quickStatItem}>
-            <Text style={[styles.quickStatValue, { color: accuracy >= 80 ? colors.primary : accuracy >= 50 ? '#F59E0B' : '#EF4444' }]}>
+            <Text
+              style={[
+                styles.quickStatValue,
+                { color: accuracy >= 80 ? colors.primary : accuracy >= 50 ? '#F59E0B' : '#EF4444' },
+              ]}
+            >
               {accuracy}%
             </Text>
             <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>Accuracy</Text>
@@ -328,30 +329,40 @@ export const TargetDetailModal = React.memo(function TargetDetailModal({
           <View style={styles.resultsSection}>
             <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>DETAILED RESULTS</Text>
             <View style={[styles.resultsCard, { backgroundColor: colors.card }]}>
-              <ResultRow label="Shots Fired" value={shots} labelColor={colors.textMuted} defaultValueColor={colors.text} />
+              <ResultRow
+                label="Shots Fired"
+                value={shots}
+                labelColor={colors.textMuted}
+                defaultValueColor={colors.text}
+              />
               <ResultRow label="Hits" value={hits} valueColor={colors.primary} labelColor={colors.textMuted} />
               {isPaper && paperResult?.hits_inside_scoring != null && (
-                <ResultRow label="Inside Scoring Zone" value={paperResult.hits_inside_scoring} labelColor={colors.textMuted} defaultValueColor={colors.text} />
+                <ResultRow
+                  label="Inside Scoring Zone"
+                  value={paperResult.hits_inside_scoring}
+                  labelColor={colors.textMuted}
+                  defaultValueColor={colors.text}
+                />
               )}
               {isPaper && paperResult?.dispersion_cm != null && (
-                <ResultRow 
-                  label="Group Size" 
-                  value={`${paperResult.dispersion_cm.toFixed(1)} cm`} 
+                <ResultRow
+                  label="Group Size"
+                  value={`${paperResult.dispersion_cm.toFixed(1)} cm`}
                   valueColor="#EF4444"
                   labelColor={colors.textMuted}
                 />
               )}
               {isPaper && paperResult?.offset_right_cm != null && (
-                <ResultRow 
-                  label="Horizontal Offset" 
+                <ResultRow
+                  label="Horizontal Offset"
                   value={`${paperResult.offset_right_cm > 0 ? '+' : ''}${paperResult.offset_right_cm.toFixed(1)} cm`}
                   labelColor={colors.textMuted}
                   defaultValueColor={colors.text}
                 />
               )}
               {isPaper && paperResult?.offset_up_cm != null && (
-                <ResultRow 
-                  label="Vertical Offset" 
+                <ResultRow
+                  label="Vertical Offset"
                   value={`${paperResult.offset_up_cm > 0 ? '+' : ''}${paperResult.offset_up_cm.toFixed(1)} cm`}
                   labelColor={colors.textMuted}
                   defaultValueColor={colors.text}
@@ -366,7 +377,12 @@ export const TargetDetailModal = React.memo(function TargetDetailModal({
                     labelColor={colors.textMuted}
                   />
                   {tacticalResult.time_seconds && (
-                    <ResultRow label="Engagement Time" value={`${tacticalResult.time_seconds}s`} labelColor={colors.textMuted} defaultValueColor={colors.text} />
+                    <ResultRow
+                      label="Engagement Time"
+                      value={`${tacticalResult.time_seconds}s`}
+                      labelColor={colors.textMuted}
+                      defaultValueColor={colors.text}
+                    />
                   )}
                 </>
               )}

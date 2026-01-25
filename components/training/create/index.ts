@@ -14,6 +14,8 @@ export * from './createTraining.helpers';
 // Styles
 export { styles } from './createTraining.styles';
 
-// Hook
+// Hook (legacy)
 export { useCreateTraining } from './useCreateTraining';
 
+// Hook V2 (new canonical drills architecture)
+export { useCreateTrainingV2 } from './useCreateTrainingV2';

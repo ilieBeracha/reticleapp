@@ -1,71 +1,116 @@
 /**
  * StartPracticeCard Component
- * 
- * Clean, elegant call-to-action to start a new session.
+ *
+ * Prominent, elegant call-to-action to start a new session.
+ * Features subtle gradient effect and micro-animations.
  */
 
-import { ChevronRight, Target } from 'lucide-react-native';
+import { ArrowRight, Target } from 'lucide-react-native';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { getStartPracticeSubtitle } from '../UnifiedHomePage.helpers';
 import type { StartPracticeCardProps } from '../UnifiedHomePage.types';
 
-export function StartPracticeCard({ 
-  colors, 
-  onPress, 
-  starting, 
-  lastSessionDaysAgo 
-}: StartPracticeCardProps) {
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
+export function StartPracticeCard({ colors, onPress, starting, lastSessionDaysAgo }: StartPracticeCardProps) {
   const subtitle = getStartPracticeSubtitle(lastSessionDaysAgo);
+  const scale = useSharedValue(1);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.97);
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1);
+  };
 
   return (
-    <TouchableOpacity
-      style={[cardStyles.container, { backgroundColor: colors.card }]}
+    <AnimatedTouchable
+      style={[s.container, { backgroundColor: colors.primary }, animStyle]}
       onPress={onPress}
-      activeOpacity={0.85}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={1}
       disabled={starting}
     >
-      <View style={[cardStyles.icon, { backgroundColor: colors.secondary }]}>
-        <Target size={20} color={colors.text} />
-      </View>
-      
-      <View style={cardStyles.text}>
-        <Text style={[cardStyles.title, { color: colors.text }]}>Start Session</Text>
-        <Text style={[cardStyles.hint, { color: colors.textMuted }]}>{subtitle}</Text>
+      <View style={s.iconContainer}>
+        <View style={s.icon}>
+          <Target size={22} color="#fff" strokeWidth={2.5} />
+        </View>
       </View>
 
-      {starting ? (
-        <ActivityIndicator size="small" color={colors.textMuted} />
-      ) : (
-        <ChevronRight size={20} color={colors.textMuted} />
-      )}
-    </TouchableOpacity>
+      <View style={s.content}>
+        <Text style={s.title}>Start Session</Text>
+        <Text style={s.subtitle}>{subtitle}</Text>
+      </View>
+
+      <View style={s.action}>
+        {starting ? (
+          <ActivityIndicator size="small" color="rgba(255,255,255,0.8)" />
+        ) : (
+          <View style={s.arrowContainer}>
+            <ArrowRight size={18} color="#fff" strokeWidth={2.5} />
+          </View>
+        )}
+      </View>
+    </AnimatedTouchable>
   );
 }
 
-const cardStyles = StyleSheet.create({
+const s = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 14,
-    gap: 12,
+    padding: 16,
+    borderRadius: 16,
+    gap: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  iconContainer: {
+    position: 'relative',
   },
   icon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  text: {
+  content: {
     flex: 1,
   },
   title: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: -0.3,
   },
-  hint: {
+  subtitle: {
     fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
     marginTop: 2,
+    fontWeight: '500',
+  },
+  action: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  arrowContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

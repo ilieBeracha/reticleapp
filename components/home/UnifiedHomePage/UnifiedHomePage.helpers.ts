@@ -1,12 +1,12 @@
 /**
  * UnifiedHomePage Helpers
- * 
+ *
  * Pure functions for the unified home page.
  * No side effects, state, or React dependencies.
  */
 
-import type { CoachMessageContext, WeeklyStats } from './UnifiedHomePage.types';
 import type { SessionWithDetails } from '@/services/session/types';
+import type { CoachMessageContext, WeeklyStats } from './UnifiedHomePage.types';
 
 /**
  * Get contextual coach message based on user state
@@ -18,24 +18,24 @@ export function getCoachMessage(context: CoachMessageContext): string {
     return "You have a session in progress. Let's finish what you started.";
   }
   if (sessions === 0) {
-    return "Ready to get some rounds downrange? Start your first session today.";
+    return 'Ready to get some rounds downrange? Start your first session today.';
   }
   if (streak >= 5) {
     return `${streak} day streak! You're building serious discipline.`;
   }
   if (accuracy >= 90) {
-    return "Outstanding accuracy this week. Keep pushing your limits.";
+    return 'Outstanding accuracy this week. Keep pushing your limits.';
   }
   if (accuracy >= 75) {
-    return "Solid performance. Consistency is building.";
+    return 'Solid performance. Consistency is building.';
   }
   if (hasUpcoming) {
-    return "You have training scheduled. Stay sharp.";
+    return 'You have training scheduled. Stay sharp.';
   }
   if (sessions < 3) {
-    return "Build momentum with regular practice. Every session counts.";
+    return 'Build momentum with regular practice. Every session counts.';
   }
-  return "Keep the rhythm going. Your skills sharpen with each session.";
+  return 'Keep the rhythm going. Your skills sharpen with each session.';
 }
 
 /**
@@ -141,7 +141,7 @@ export function calculateStreak(completedSessions: SessionWithDetails[]): number
     const checkDate = new Date(today);
     checkDate.setDate(checkDate.getDate() - i);
     const key = `${checkDate.getFullYear()}-${checkDate.getMonth()}-${checkDate.getDate()}`;
-    
+
     if (sessionDates.has(key)) {
       count++;
     } else if (i > 0) {
@@ -157,9 +157,8 @@ export function calculateStreak(completedSessions: SessionWithDetails[]): number
  */
 export function calculateLastSessionDaysAgo(completedSessions: SessionWithDetails[]): number | null {
   if (completedSessions.length === 0) return null;
-  
+
   const last = completedSessions[0];
   const lastDate = new Date(last.ended_at || last.started_at || '');
   return Math.floor((Date.now() - lastDate.getTime()) / 86400000);
 }
-

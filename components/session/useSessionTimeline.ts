@@ -1,6 +1,6 @@
 /**
  * useSessionTimeline Hook
- * 
+ *
  * Fetches timeline data for a session from the database.
  * Used to display biometric data, shot details, and performance insights.
  */
@@ -19,9 +19,7 @@ interface UseSessionTimelineReturn {
   refetch: () => Promise<void>;
 }
 
-export function useSessionTimeline({
-  sessionId,
-}: UseSessionTimelineOptions): UseSessionTimelineReturn {
+export function useSessionTimeline({ sessionId }: UseSessionTimelineOptions): UseSessionTimelineReturn {
   const [timeline, setTimeline] = useState<SessionTimeline | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);

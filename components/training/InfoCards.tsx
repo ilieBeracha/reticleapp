@@ -11,21 +11,15 @@ interface InfoCardsProps {
 export function InfoCards({ training, colors }: InfoCardsProps) {
   const isOngoing = training.status === 'ongoing';
   const isFinished = training.status === 'finished';
-  
+
   // Calculate duration if we have start and end times
-  const duration = training.started_at && training.ended_at
-    ? formatDuration(training.started_at, training.ended_at)
-    : null;
+  const duration =
+    training.started_at && training.ended_at ? formatDuration(training.started_at, training.ended_at) : null;
 
   return (
     <View style={styles.container}>
-      <InfoCard
-        icon="calendar-outline"
-        label="Date"
-        value={formatDate(training.scheduled_at)}
-        colors={colors}
-      />
-      
+      <InfoCard icon="calendar-outline" label="Date" value={formatDate(training.scheduled_at)} colors={colors} />
+
       {/* Show actual start time if training started, otherwise scheduled time */}
       {training.started_at ? (
         <InfoCard
@@ -43,7 +37,7 @@ export function InfoCards({ training, colors }: InfoCardsProps) {
           colors={colors}
         />
       )}
-      
+
       {/* Show end time or duration if finished */}
       {isFinished && training.ended_at && (
         <InfoCard
@@ -54,14 +48,7 @@ export function InfoCards({ training, colors }: InfoCardsProps) {
         />
       )}
 
-      {training.team && (
-        <InfoCard
-          icon="people-outline"
-          label="Team"
-          value={training.team.name}
-          colors={colors}
-        />
-      )}
+      {training.team && <InfoCard icon="people-outline" label="Team" value={training.team.name} colors={colors} />}
     </View>
   );
 }
@@ -76,19 +63,19 @@ interface InfoCardProps {
 
 function InfoCard({ icon, label, value, colors, highlight }: InfoCardProps) {
   return (
-    <View style={[
-      styles.card, 
-      { backgroundColor: colors.background, borderColor: highlight ? '#22C55E' : colors.border },
-      highlight && styles.cardHighlight
-    ]}>
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: colors.background, borderColor: highlight ? '#22C55E' : colors.border },
+        highlight && styles.cardHighlight,
+      ]}
+    >
       <Ionicons name={icon} size={20} color={highlight ? '#22C55E' : colors.primary} />
       <View style={styles.content}>
         <Text style={[styles.label, { color: colors.textMuted }]}>{label}</Text>
         <Text style={[styles.value, { color: highlight ? '#22C55E' : colors.text }]}>{value}</Text>
       </View>
-      {highlight && (
-        <View style={styles.liveDot} />
-      )}
+      {highlight && <View style={styles.liveDot} />}
     </View>
   );
 }

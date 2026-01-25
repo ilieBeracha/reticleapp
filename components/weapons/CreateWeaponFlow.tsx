@@ -4,6 +4,7 @@
 
 import { useColors } from '@/hooks/ui/useColors';
 import {
+  createTeamWeapon,
   createUserWeapon,
   getGlobalWeapons,
   searchGlobalWeapons,
@@ -13,17 +14,7 @@ import {
   type WeaponCategory,
 } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
-import {
-  AlertCircle,
-  Bell,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  Search,
-  Sparkles,
-  X,
-} from 'lucide-react-native';
+import { AlertCircle, Bell, Check, ChevronLeft, ChevronRight, Plus, Search, Sparkles, X } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -48,15 +39,15 @@ interface CreateWeaponFlowProps {
 
 export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponFlowProps) {
   const colors = useColors();
-  
+
   const [step, setStep] = useState<FlowStep>('choice');
   const [selectedBase, setSelectedBase] = useState<GlobalWeapon | null>(null);
-  
+
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<GlobalWeapon[]>([]);
   const [allWeapons, setAllWeapons] = useState<GlobalWeapon[]>([]);
   const [searching, setSearching] = useState(false);
-  
+
   const [name, setName] = useState('');
   const [category, setCategory] = useState<WeaponCategory>('precision_rifle');
   const [caliber, setCaliber] = useState('');
@@ -87,7 +78,7 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
 
   useEffect(() => {
     if (step !== 'search') return;
-    
+
     const timer = setTimeout(async () => {
       if (searchQuery.trim()) {
         setSearching(true);
@@ -121,8 +112,8 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
       return;
     }
 
-    // Validate cleaning config if enabled
-    if (cleaningEnabled && !cleaningIntervalValue) {
+    // Validate cleaning config if enabled (only for personal weapons)
+    if (!teamId && cleaningEnabled && !cleaningIntervalValue) {
       setError('Please set a cleaning interval');
       return;
     }
@@ -131,23 +122,39 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
     setError(null);
 
     try {
-      const weapon = await createUserWeapon({
-        name: name.trim(),
-        base_weapon_id: selectedBase?.id,
-        category,
-        caliber: caliber.trim() || undefined,
-        personal_zero_distance_m: zeroDistance ? parseInt(zeroDistance, 10) : undefined,
-        personal_notes: notes.trim() || undefined,
-        // Cleaning routine
-        cleaning_enabled: cleaningEnabled,
-        cleaning_interval_type: cleaningEnabled ? cleaningIntervalType : undefined,
-        cleaning_interval_value: cleaningEnabled && cleaningIntervalValue
-          ? parseInt(cleaningIntervalValue, 10)
-          : undefined,
-      });
+      let weaponId: string;
+
+      if (teamId) {
+        // Create team weapon
+        const teamWeapon = await createTeamWeapon({
+          team_id: teamId,
+          name: name.trim(),
+          base_weapon_id: selectedBase?.id,
+          category,
+          caliber: caliber.trim() || undefined,
+          notes: notes.trim() || undefined,
+        });
+        weaponId = teamWeapon.id;
+      } else {
+        // Create personal weapon
+        const weapon = await createUserWeapon({
+          name: name.trim(),
+          base_weapon_id: selectedBase?.id,
+          category,
+          caliber: caliber.trim() || undefined,
+          personal_zero_distance_m: zeroDistance ? parseInt(zeroDistance, 10) : undefined,
+          personal_notes: notes.trim() || undefined,
+          // Cleaning routine
+          cleaning_enabled: cleaningEnabled,
+          cleaning_interval_type: cleaningEnabled ? cleaningIntervalType : undefined,
+          cleaning_interval_value:
+            cleaningEnabled && cleaningIntervalValue ? parseInt(cleaningIntervalValue, 10) : undefined,
+        });
+        weaponId = weapon.id;
+      }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      onComplete(weapon.id);
+      onComplete(weaponId);
     } catch (err: any) {
       console.error('Failed to create weapon:', err);
       setError(err.message || 'Failed to create weapon');
@@ -155,25 +162,31 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
     } finally {
       setSubmitting(false);
     }
-  }, [name, selectedBase, category, caliber, zeroDistance, notes, cleaningEnabled, cleaningIntervalType, cleaningIntervalValue, onComplete]);
+  }, [
+    name,
+    selectedBase,
+    category,
+    caliber,
+    zeroDistance,
+    notes,
+    cleaningEnabled,
+    cleaningIntervalType,
+    cleaningIntervalValue,
+    onComplete,
+    teamId,
+  ]);
 
- 
   if (step === 'choice') {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.choiceHeader}>
-          <TouchableOpacity 
-            style={[styles.closeBtn, { backgroundColor: colors.secondary }]} 
-            onPress={onCancel}
-          >
+          <TouchableOpacity style={[styles.closeBtn, { backgroundColor: colors.secondary }]} onPress={onCancel}>
             <X size={20} color={colors.text} />
           </TouchableOpacity>
         </View>
-        
+
         <View style={styles.content}>
-          <Text style={[styles.headline, { color: colors.text }]}>
-            Add a weapon
-          </Text>
+          <Text style={[styles.headline, { color: colors.text }]}>{teamId ? 'Add team weapon' : 'Add a weapon'}</Text>
 
           <View style={styles.choiceList}>
             {/* From Catalog - Primary */}
@@ -189,9 +202,7 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
                 <Search size={16} color={colors.background} />
               </View>
               <View style={styles.choiceText}>
-                <Text style={[styles.choiceTitle, { color: colors.background }]}>
-                  From Catalog
-                </Text>
+                <Text style={[styles.choiceTitle, { color: colors.background }]}>From Catalog</Text>
                 <Text style={[styles.choiceDesc, { color: colors.background + 'AA' }]}>
                   M40, SR-25, Tikka, and more
                 </Text>
@@ -212,12 +223,8 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
                 <Plus size={16} color={colors.textMuted} />
               </View>
               <View style={styles.choiceText}>
-                <Text style={[styles.choiceTitle, { color: colors.text }]}>
-                  Create Custom
-                </Text>
-                <Text style={[styles.choiceDesc, { color: colors.textMuted }]}>
-                  For rare or modified weapons
-                </Text>
+                <Text style={[styles.choiceTitle, { color: colors.text }]}>Create Custom</Text>
+                <Text style={[styles.choiceDesc, { color: colors.textMuted }]}>For rare or modified weapons</Text>
               </View>
               <ChevronRight size={16} color={colors.muted} />
             </TouchableOpacity>
@@ -230,17 +237,12 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
   // ─────────────────────────────────────────────────────────────────────────
   // STEP 2a: Search Catalog
   // ─────────────────────────────────────────────────────────────────────────
-  
+
   if (step === 'search') {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Header 
-          title="Select Base" 
-          onClose={onCancel} 
-          onBack={() => setStep('choice')}
-          colors={colors} 
-        />
-        
+        <Header title="Select Base" onClose={onCancel} onBack={() => setStep('choice')} colors={colors} />
+
         <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Search size={18} color={colors.textMuted} />
           <TextInput
@@ -269,9 +271,7 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
                   {item.manufacturer} • {item.caliber}
                 </Text>
               </View>
-              {item.is_verified && (
-                <Check size={16} color={colors.text} />
-              )}
+              {item.is_verified && <Check size={16} color={colors.text} />}
             </TouchableOpacity>
           )}
           ListEmptyComponent={
@@ -289,16 +289,11 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
 
   if (step === 'custom') {
     return (
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: colors.background }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <Header 
-          title="Custom Weapon" 
-          onClose={onCancel} 
-          onBack={() => setStep('choice')}
-          colors={colors} 
-        />
+        <Header title="Custom Weapon" onClose={onCancel} onBack={() => setStep('choice')} colors={colors} />
 
         <ScrollView style={styles.formScroll} contentContainerStyle={styles.formContent}>
           <View style={[styles.notice, { backgroundColor: colors.secondary }]}>
@@ -325,19 +320,13 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
                 return (
                   <TouchableOpacity
                     key={cat.value}
-                    style={[
-                      styles.categoryChip,
-                      { backgroundColor: isSelected ? colors.text : colors.card },
-                    ]}
+                    style={[styles.categoryChip, { backgroundColor: isSelected ? colors.text : colors.card }]}
                     onPress={() => {
                       Haptics.selectionAsync();
                       setCategory(cat.value);
                     }}
                   >
-                    <Text style={[
-                      styles.categoryText,
-                      { color: isSelected ? colors.background : colors.text }
-                    ]}>
+                    <Text style={[styles.categoryText, { color: isSelected ? colors.background : colors.text }]}>
                       {cat.label}
                     </Text>
                   </TouchableOpacity>
@@ -369,7 +358,11 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
 
           <FormField label="Notes" colors={colors}>
             <TextInput
-              style={[styles.input, styles.textArea, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+              style={[
+                styles.input,
+                styles.textArea,
+                { backgroundColor: colors.card, borderColor: colors.border, color: colors.text },
+              ]}
               placeholder="Optional notes..."
               placeholderTextColor={colors.textMuted}
               value={notes}
@@ -390,9 +383,7 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
             colors={colors}
           />
 
-          {error && (
-            <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
-          )}
+          {error && <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>}
         </ScrollView>
 
         <View style={[styles.footer, { borderTopColor: colors.border }]}>
@@ -404,9 +395,7 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
             {submitting ? (
               <ActivityIndicator size="small" color={colors.background} />
             ) : (
-              <Text style={[styles.submitText, { color: colors.background }]}>
-                Create Weapon
-              </Text>
+              <Text style={[styles.submitText, { color: colors.background }]}>Create Weapon</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -415,18 +404,18 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
   }
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Header 
-        title="Customize" 
-        onClose={onCancel} 
+      <Header
+        title="Customize"
+        onClose={onCancel}
         onBack={() => {
           setSelectedBase(null);
           setStep('search');
         }}
-        colors={colors} 
+        colors={colors}
       />
 
       <ScrollView style={styles.formScroll} contentContainerStyle={styles.formContent}>
@@ -476,7 +465,11 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
 
         <FormField label="Personal Notes" colors={colors}>
           <TextInput
-            style={[styles.input, styles.textArea, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+            style={[
+              styles.input,
+              styles.textArea,
+              { backgroundColor: colors.card, borderColor: colors.border, color: colors.text },
+            ]}
             placeholder="Zero confirmed date, suppressor notes..."
             placeholderTextColor={colors.textMuted}
             value={notes}
@@ -497,9 +490,7 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
           colors={colors}
         />
 
-        {error && (
-          <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
-        )}
+        {error && <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>}
       </ScrollView>
 
       <View style={[styles.footer, { borderTopColor: colors.border }]}>
@@ -511,9 +502,7 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
           {submitting ? (
             <ActivityIndicator size="small" color={colors.background} />
           ) : (
-            <Text style={[styles.submitText, { color: colors.background }]}>
-              Add Weapon
-            </Text>
+            <Text style={[styles.submitText, { color: colors.background }]}>Add Weapon</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -521,14 +510,14 @@ export function CreateWeaponFlow({ onComplete, onCancel, teamId }: CreateWeaponF
   );
 }
 
-function Header({ 
-  title, 
-  onClose, 
+function Header({
+  title,
+  onClose,
   onBack,
-  colors 
-}: { 
-  title: string; 
-  onClose: () => void; 
+  colors,
+}: {
+  title: string;
+  onClose: () => void;
   onBack?: () => void;
   colors: ReturnType<typeof useColors>;
 }) {
@@ -553,7 +542,7 @@ function FormField({
   label,
   required,
   children,
-  colors
+  colors,
 }: {
   label: string;
   required?: boolean;
@@ -612,25 +601,14 @@ function CleaningRoutineSection({
           <Bell size={16} color={enabled ? colors.background : colors.textMuted} />
         </View>
         <View style={styles.cleaningToggleText}>
-          <Text style={[styles.cleaningToggleTitle, { color: colors.text }]}>
-            Cleaning Reminders
-          </Text>
+          <Text style={[styles.cleaningToggleTitle, { color: colors.text }]}>Cleaning Reminders</Text>
           <Text style={[styles.cleaningToggleDesc, { color: colors.textMuted }]}>
             Get notified when maintenance is due
           </Text>
         </View>
-        <View
-          style={[
-            styles.toggleSwitch,
-            { backgroundColor: enabled ? colors.text : colors.secondary },
-          ]}
-        >
+        <View style={[styles.toggleSwitch, { backgroundColor: enabled ? colors.text : colors.secondary }]}>
           <View
-            style={[
-              styles.toggleKnob,
-              { backgroundColor: colors.background },
-              enabled && styles.toggleKnobActive,
-            ]}
+            style={[styles.toggleKnob, { backgroundColor: colors.background }, enabled && styles.toggleKnobActive]}
           />
         </View>
       </TouchableOpacity>
@@ -639,9 +617,7 @@ function CleaningRoutineSection({
       {enabled && (
         <View style={[styles.cleaningConfig, { backgroundColor: colors.card }]}>
           {/* Interval Type Selector */}
-          <Text style={[styles.cleaningConfigLabel, { color: colors.textMuted }]}>
-            Remind me after
-          </Text>
+          <Text style={[styles.cleaningConfigLabel, { color: colors.textMuted }]}>Remind me after</Text>
           <View style={styles.intervalTypeRow}>
             {CLEANING_INTERVALS.map((interval) => {
               const isSelected = intervalType === interval.type;
@@ -660,12 +636,7 @@ function CleaningRoutineSection({
                     onIntervalTypeChange(interval.type);
                   }}
                 >
-                  <Text
-                    style={[
-                      styles.intervalChipText,
-                      { color: isSelected ? colors.background : colors.text },
-                    ]}
-                  >
+                  <Text style={[styles.intervalChipText, { color: isSelected ? colors.background : colors.text }]}>
                     {interval.label}
                   </Text>
                 </TouchableOpacity>
@@ -687,17 +658,15 @@ function CleaningRoutineSection({
               keyboardType="number-pad"
               maxLength={5}
             />
-            <Text style={[styles.intervalHint, { color: colors.textMuted }]}>
-              {selectedInterval.hint}
-            </Text>
+            <Text style={[styles.intervalHint, { color: colors.textMuted }]}>{selectedInterval.hint}</Text>
           </View>
 
           {/* Smart hint */}
           <View style={[styles.cleaningHint, { backgroundColor: colors.background }]}>
             <Sparkles size={14} color={colors.textMuted} />
             <Text style={[styles.cleaningHintText, { color: colors.textMuted }]}>
-              {intervalType === 'rounds' && 'We\'ll track bullets automatically from sessions'}
-              {intervalType === 'sessions' && 'We\'ll count each completed session'}
+              {intervalType === 'rounds' && "We'll track bullets automatically from sessions"}
+              {intervalType === 'sessions' && "We'll count each completed session"}
               {intervalType === 'days' && 'Calendar-based reminder from last cleaning'}
             </Text>
           </View>

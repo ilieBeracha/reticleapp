@@ -1,6 +1,6 @@
 /**
  * SaveDrillPrompt - Modal asking if user wants to save a custom drill as a template
- * 
+ *
  * Shown after a session ends that used an inline drill_config (custom drill).
  * User can choose to save it for future reuse or dismiss.
  */
@@ -29,7 +29,7 @@ export function SaveDrillPrompt({ visible, drillName, onSave, onDismiss }: SaveD
 
   const handleSave = async () => {
     if (!name.trim()) return;
-    
+
     setSaving(true);
     try {
       await onSave(name.trim());
@@ -39,12 +39,7 @@ export function SaveDrillPrompt({ visible, drillName, onSave, onDismiss }: SaveD
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onDismiss}
-    >
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
       <View className="flex-1 bg-black/70 justify-center items-center px-6">
         <View className="bg-neutral-900 rounded-2xl w-full max-w-sm overflow-hidden border border-neutral-700">
           {/* Header */}
@@ -52,9 +47,7 @@ export function SaveDrillPrompt({ visible, drillName, onSave, onDismiss }: SaveD
             <View className="w-16 h-16 rounded-full bg-blue-500/20 items-center justify-center mb-4">
               <Ionicons name="bookmark-outline" size={32} color="#3B82F6" />
             </View>
-            <Text className="text-white text-xl font-semibold text-center mb-2">
-              Save This Drill?
-            </Text>
+            <Text className="text-white text-xl font-semibold text-center mb-2">Save This Drill?</Text>
             <Text className="text-neutral-400 text-center text-sm">
               Save this drill to use it again in future sessions
             </Text>
@@ -75,11 +68,7 @@ export function SaveDrillPrompt({ visible, drillName, onSave, onDismiss }: SaveD
 
           {/* Buttons */}
           <View className="flex-row border-t border-neutral-700">
-            <Pressable
-              onPress={onDismiss}
-              disabled={saving}
-              className="flex-1 py-4 items-center active:bg-neutral-800"
-            >
+            <Pressable onPress={onDismiss} disabled={saving} className="flex-1 py-4 items-center active:bg-neutral-800">
               <Text className="text-neutral-400 font-medium">Not Now</Text>
             </Pressable>
             <View className="w-px bg-neutral-700" />
@@ -102,4 +91,3 @@ export function SaveDrillPrompt({ visible, drillName, onSave, onDismiss }: SaveD
     </Modal>
   );
 }
-

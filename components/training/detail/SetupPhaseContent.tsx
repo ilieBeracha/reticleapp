@@ -3,11 +3,10 @@
  * Shows weapon assignment and team readiness - horizontal spread layout
  */
 
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Check, Crosshair, Users } from 'lucide-react-native';
 import type { SessionWithDetails } from '@/services/sessionService';
 import type { UserWeapon } from '@/services/weaponService';
+import { Check, Crosshair, Users } from 'lucide-react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { Colors } from './types';
 
 interface SetupPhaseContentProps {
@@ -27,7 +26,7 @@ export function SetupPhaseContent({
   canManageTraining,
   onAssignWeapon,
 }: SetupPhaseContentProps) {
-  const completedSessions = teamSessions.filter(s => s.status === 'completed').length;
+  const completedSessions = teamSessions.filter((s) => s.status === 'completed').length;
   const isReady = !!userWeapon;
   const isOngoing = training.status === 'ongoing';
   const showTeamProgress = training.team_id && isOngoing && completedSessions > 0;
@@ -62,9 +61,7 @@ export function SetupPhaseContent({
               <Users size={14} color={colors.textMuted} />
             </View>
             <View style={styles.itemContent}>
-              <Text style={[styles.itemValue, { color: colors.text }]}>
-                {completedSessions} done
-              </Text>
+              <Text style={[styles.itemValue, { color: colors.text }]}>{completedSessions} done</Text>
             </View>
           </View>
         )}

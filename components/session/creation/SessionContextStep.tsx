@@ -13,23 +13,11 @@ import { useColors } from '@/hooks/ui/useColors';
 import type { DrillGoal, DrillPreset } from '@/services/presetService';
 import type { WeaponCategory } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
-import {
-  Bookmark,
-  ChevronDown,
-  ChevronRight,
-  ChevronUp,
-  Edit3,
-  X,
-} from 'lucide-react-native';
+import { Bookmark, ChevronDown, ChevronRight, ChevronUp, Edit3, X } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Alert, Modal, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CategoryDrillPicker } from '../CategoryDrillPicker';
-import {
-  DISTANCE_PRESETS,
-  POSITION_OPTIONS,
-  SHOTS_PRESETS,
-  TIME_PRESETS,
-} from './sessionCreation.constants';
+import { DISTANCE_PRESETS, POSITION_OPTIONS, SHOTS_PRESETS, TIME_PRESETS } from './sessionCreation.constants';
 import type { Position, SessionContextState, SessionPurpose } from './sessionCreation.types';
 
 // ============================================================================
@@ -96,24 +84,27 @@ function PillPicker({
                 editing && { opacity: 0.5 },
               ]}
               disabled={editing}
-              onPress={() => { Haptics.selectionAsync(); onSelect(opt); setEditing(false); }}
+              onPress={() => {
+                Haptics.selectionAsync();
+                onSelect(opt);
+                setEditing(false);
+              }}
             >
               <Text style={[styles.pillText, { color: active ? colors.background : colors.text }]}>
-                {opt}{customSuffix}
+                {opt}
+                {customSuffix}
               </Text>
             </TouchableOpacity>
           );
         })}
       </View>
-      
+
       {/* Custom input - pushed to the right */}
-      {allowCustom && (
-        editing ? (
-          <View style={[
-            styles.pill,
-            styles.pillInputContainer,
-            { backgroundColor: colors.card, borderColor: colors.text }
-          ]}>
+      {allowCustom &&
+        (editing ? (
+          <View
+            style={[styles.pill, styles.pillInputContainer, { backgroundColor: colors.card, borderColor: colors.text }]}
+          >
             <TextInput
               ref={inputRef}
               style={[styles.pillInputText, { color: colors.text }]}
@@ -125,24 +116,21 @@ function PillPicker({
               autoFocus
               selectTextOnFocus
             />
-            {customSuffix ? (
-              <Text style={[styles.pillInputSuffix, { color: colors.text }]}>{customSuffix}</Text>
-            ) : null}
+            {customSuffix ? <Text style={[styles.pillInputSuffix, { color: colors.text }]}>{customSuffix}</Text> : null}
           </View>
         ) : (
           <TouchableOpacity
-            style={[
-              styles.pill,
-              { backgroundColor: isCustom ? colors.text : colors.card },
-            ]}
-            onPress={() => { setCustomText(String(selected)); setEditing(true); }}
+            style={[styles.pill, { backgroundColor: isCustom ? colors.text : colors.card }]}
+            onPress={() => {
+              setCustomText(String(selected));
+              setEditing(true);
+            }}
           >
             <Text style={[styles.pillText, { color: isCustom ? colors.background : colors.text }]}>
               {isCustom ? `${selected}${customSuffix}` : 'Other'}
             </Text>
           </TouchableOpacity>
-        )
-      )}
+        ))}
     </View>
   );
 }
@@ -168,8 +156,7 @@ function TimePillPicker({
   const [editing, setEditing] = useState(false);
   const [customText, setCustomText] = useState(String(selected));
 
-  const formatTime = (s: number) => 
-    s < 60 ? `${s}s` : `${Math.floor(s / 60)}m`;
+  const formatTime = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}m`);
 
   const handleCustomSubmit = () => {
     const num = parseInt(customText, 10);
@@ -186,11 +173,12 @@ function TimePillPicker({
           return (
             <TouchableOpacity
               key={String(opt)}
-              style={[
-                styles.pill,
-                { backgroundColor: active ? colors.text : colors.card },
-              ]}
-              onPress={() => { Haptics.selectionAsync(); onSelect(opt); setEditing(false); }}
+              style={[styles.pill, { backgroundColor: active ? colors.text : colors.card }]}
+              onPress={() => {
+                Haptics.selectionAsync();
+                onSelect(opt);
+                setEditing(false);
+              }}
             >
               <Text style={[styles.pillText, { color: active ? colors.background : colors.text }]}>
                 {formatTime(opt)}
@@ -199,15 +187,13 @@ function TimePillPicker({
           );
         })}
       </View>
-      
+
       {/* Custom input - pushed to the right */}
-      {allowCustom && (
-        editing ? (
-          <View style={[
-            styles.pill,
-            styles.pillInputContainer,
-            { backgroundColor: colors.card, borderColor: colors.text }
-          ]}>
+      {allowCustom &&
+        (editing ? (
+          <View
+            style={[styles.pill, styles.pillInputContainer, { backgroundColor: colors.card, borderColor: colors.text }]}
+          >
             <TextInput
               ref={inputRef}
               style={[styles.pillInputText, { color: colors.text }]}
@@ -223,18 +209,17 @@ function TimePillPicker({
           </View>
         ) : (
           <TouchableOpacity
-            style={[
-              styles.pill,
-              { backgroundColor: isCustom ? colors.text : colors.card },
-            ]}
-            onPress={() => { setCustomText(String(selected)); setEditing(true); }}
+            style={[styles.pill, { backgroundColor: isCustom ? colors.text : colors.card }]}
+            onPress={() => {
+              setCustomText(String(selected));
+              setEditing(true);
+            }}
           >
             <Text style={[styles.pillText, { color: isCustom ? colors.background : colors.text }]}>
               {isCustom ? formatTime(selected) : 'Other'}
             </Text>
           </TouchableOpacity>
-        )
-      )}
+        ))}
     </View>
   );
 }
@@ -258,7 +243,7 @@ export function SessionContextStep({
   const [showPresetForm, setShowPresetForm] = useState(false);
   const [isEditingDrill, setIsEditingDrill] = useState(false);
 
-  const selectedDrill = useMemo(() => selectedDrillId ? getDrillById(selectedDrillId) : null, [selectedDrillId]);
+  const selectedDrill = useMemo(() => (selectedDrillId ? getDrillById(selectedDrillId) : null), [selectedDrillId]);
 
   // Check if drill params have been modified
   const isDrillModified = useMemo(() => {
@@ -271,7 +256,10 @@ export function SessionContextStep({
   }, [selectedDrill, context.distance, context.shotsPlanned, context.timeLimit]);
 
   const effectiveCategory = (context.weaponCategory || weaponCategory) as WeaponCategory | null;
-  const categoryConfig = useMemo(() => effectiveCategory ? getCategoryConfig(effectiveCategory) : null, [effectiveCategory]);
+  const categoryConfig = useMemo(
+    () => (effectiveCategory ? getCategoryConfig(effectiveCategory) : null),
+    [effectiveCategory]
+  );
 
   const distancePresets = useMemo(() => {
     if (effectiveCategory) return getCategoryDistances(effectiveCategory);
@@ -288,20 +276,23 @@ export function SessionContextStep({
     return POSITION_OPTIONS;
   }, [categoryConfig]);
 
-  const handleDrillSelect = useCallback((drill: CategoryDrill) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // Use defaults if available, fall back to legacy fields
-    const defaults = drill.defaults || {};
-    onUpdateContext({
-      distance: defaults.distance ?? drill.distances[0],
-      shotsPlanned: defaults.rounds ?? drill.rounds,
-      position: (defaults.position ?? drill.positions[0]) as Position,
-      timeLimit: defaults.timeLimit !== undefined ? defaults.timeLimit : drill.totalTimeLimit,
-      targetType: drill.targetType,
-    });
-    onDrillChange?.(drill.id);
-    setShowDrillPicker(false);
-  }, [onUpdateContext, onDrillChange]);
+  const handleDrillSelect = useCallback(
+    (drill: CategoryDrill) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      // Use defaults if available, fall back to legacy fields
+      const defaults = drill.defaults || {};
+      onUpdateContext({
+        distance: defaults.distance ?? drill.distances[0],
+        shotsPlanned: defaults.rounds ?? drill.rounds,
+        position: (defaults.position ?? drill.positions[0]) as Position,
+        timeLimit: defaults.timeLimit !== undefined ? defaults.timeLimit : drill.totalTimeLimit,
+        targetType: drill.targetType,
+      });
+      onDrillChange?.(drill.id);
+      setShowDrillPicker(false);
+    },
+    [onUpdateContext, onDrillChange]
+  );
 
   const formatTime = (s: number | null) => (s === null ? 'None' : s < 60 ? `${s}s` : `${Math.floor(s / 60)}m`);
 
@@ -359,12 +350,13 @@ export function SessionContextStep({
       {/* Drill Toggle */}
       <TouchableOpacity
         style={styles.drillRow}
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowDrillPicker(true); }}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setShowDrillPicker(true);
+        }}
         activeOpacity={0.6}
       >
-        <Text style={[styles.drillLabel, { color: colors.textMuted }]}>
-          {selectedDrill ? 'Drill' : 'Use a drill?'}
-        </Text>
+        <Text style={[styles.drillLabel, { color: colors.textMuted }]}>{selectedDrill ? 'Drill' : 'Use a drill?'}</Text>
         {selectedDrill ? (
           <View style={styles.drillSelected}>
             <Text style={[styles.drillName, { color: colors.text }]}>
@@ -455,7 +447,8 @@ export function SessionContextStep({
           {!isEditingDrill && (
             <View style={styles.drillSummary}>
               <Text style={[styles.drillSummaryText, { color: colors.textMuted }]}>
-                {context.distance}m{purpose !== 'grouping' ? ` • ${context.shotsPlanned} bullets` : ''}{context.timeLimit ? ` • ${formatTime(context.timeLimit)}` : ''}
+                {context.distance}m{purpose !== 'grouping' ? ` • ${context.shotsPlanned} bullets` : ''}
+                {context.timeLimit ? ` • ${formatTime(context.timeLimit)}` : ''}
               </Text>
             </View>
           )}
@@ -498,11 +491,11 @@ export function SessionContextStep({
                 return (
                   <TouchableOpacity
                     key={opt.value}
-                    style={[
-                      styles.pill,
-                      { backgroundColor: active ? colors.text : colors.card },
-                    ]}
-                    onPress={() => { Haptics.selectionAsync(); onUpdateContext({ position: opt.value }); }}
+                    style={[styles.pill, { backgroundColor: active ? colors.text : colors.card }]}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      onUpdateContext({ position: opt.value });
+                    }}
                   >
                     <Text style={[styles.pillText, { color: active ? colors.background : colors.text }]}>
                       {opt.label}
@@ -514,14 +507,15 @@ export function SessionContextStep({
           </View>
 
           {/* Advanced toggle */}
-          <TouchableOpacity
-            style={styles.advancedToggle}
-            onPress={() => setShowAdvanced(!showAdvanced)}
-          >
+          <TouchableOpacity style={styles.advancedToggle} onPress={() => setShowAdvanced(!showAdvanced)}>
             <Text style={[styles.advancedText, { color: colors.textMuted }]}>
               {showAdvanced ? 'Less options' : 'More options'}
             </Text>
-            {showAdvanced ? <ChevronUp size={14} color={colors.textMuted} /> : <ChevronDown size={14} color={colors.textMuted} />}
+            {showAdvanced ? (
+              <ChevronUp size={14} color={colors.textMuted} />
+            ) : (
+              <ChevronDown size={14} color={colors.textMuted} />
+            )}
           </TouchableOpacity>
 
           {showAdvanced && (
@@ -530,9 +524,7 @@ export function SessionContextStep({
               <View style={styles.toggleRow}>
                 <View style={styles.toggleLabel}>
                   <Text style={[styles.paramLabel, { color: colors.text, marginBottom: 0 }]}>Time limit</Text>
-                  <Text style={[styles.toggleHint, { color: colors.textMuted }]}>
-                    Set a countdown timer
-                  </Text>
+                  <Text style={[styles.toggleHint, { color: colors.textMuted }]}>Set a countdown timer</Text>
                 </View>
                 <Switch
                   value={context.timeLimit !== null}
@@ -577,7 +569,10 @@ export function SessionContextStep({
 
               <View style={styles.notesRow}>
                 <TextInput
-                  style={[styles.notesInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+                  style={[
+                    styles.notesInput,
+                    { backgroundColor: colors.card, borderColor: colors.border, color: colors.text },
+                  ]}
                   placeholder="Session notes..."
                   placeholderTextColor={colors.textMuted}
                   value={context.notes}
@@ -591,7 +586,12 @@ export function SessionContextStep({
       )}
 
       {/* Drill Picker Modal */}
-      <Modal visible={showDrillPicker} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowDrillPicker(false)}>
+      <Modal
+        visible={showDrillPicker}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowDrillPicker(false)}
+      >
         <View style={{ flex: 1, backgroundColor: colors.background }}>
           <View style={styles.modalHeader}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>Select Drill</Text>
@@ -610,14 +610,20 @@ export function SessionContextStep({
       </Modal>
 
       {/* Preset Form Modal */}
-      <Modal visible={showPresetForm} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowPresetForm(false)}>
+      <Modal
+        visible={showPresetForm}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowPresetForm(false)}
+      >
         <PresetForm
           preset={{
             id: '',
             name: selectedDrill?.name ? `My ${selectedDrill.name}` : '',
             description: selectedDrill?.description || null,
             drill_goal: purposeToDrillGoal(purpose),
-            target_type: (context.targetType === 'paper' || context.targetType === 'tactical') ? context.targetType : 'paper',
+            target_type:
+              context.targetType === 'paper' || context.targetType === 'tactical' ? context.targetType : 'paper',
             weapon_category: effectiveCategory,
             distance_m: context.distance,
             rounds_per_shooter: context.shotsPlanned,
@@ -647,13 +653,27 @@ const styles = StyleSheet.create({
   paramLabel: { fontSize: 13, marginBottom: 10 },
 
   // Drill row
-  drillRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(128,128,128,0.2)' },
+  drillRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(128,128,128,0.2)',
+  },
   drillLabel: { fontSize: 15 },
   drillSelected: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
   drillName: { fontSize: 15, fontWeight: '600', flexShrink: 1 },
   drillChange: { fontSize: 13 },
   drillActions: { flexDirection: 'row', gap: 8, paddingVertical: 12 },
-  drillActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16 },
+  drillActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+  },
   drillActionText: { fontSize: 13, fontWeight: '500' },
   drillSummary: { paddingVertical: 8 },
   drillSummaryText: { fontSize: 14 },
@@ -682,6 +702,13 @@ const styles = StyleSheet.create({
   notesInput: { borderWidth: 1, borderRadius: 10, padding: 12, fontSize: 14, minHeight: 60, textAlignVertical: 'top' },
 
   // Modal header
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(128,128,128,0.2)' },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(128,128,128,0.2)',
+  },
   modalTitle: { fontSize: 17, fontWeight: '600' },
 });

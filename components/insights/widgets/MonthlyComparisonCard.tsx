@@ -112,19 +112,19 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 12,
     borderWidth: 1,
-    padding: 14,
-    marginBottom: 12,
+    padding: 12,
+    marginBottom: 10,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   title: {
     fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   statsRow: {
     flexDirection: 'row',
@@ -136,13 +136,13 @@ const styles = StyleSheet.create({
   statMiddle: {
     borderLeftWidth: 1,
     borderRightWidth: 1,
-    marginHorizontal: 8,
-    paddingHorizontal: 8,
+    marginHorizontal: 6,
+    paddingHorizontal: 6,
   },
   statValue: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: '700',
-    letterSpacing: -0.5,
+    letterSpacing: -0.3,
   },
   statLabel: {
     fontSize: 10,
@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    marginTop: 4,
+    marginTop: 3,
   },
   changeText: {
     fontSize: 10,

@@ -3,18 +3,15 @@ import {
   submitTrainingData,
   TrainingDataPayload,
   uploadScannedTargetImage,
-} from "@/services/detectionService";
-import {
-  addTargetWithPaperResult,
-  PaperType,
-} from "@/services/sessionService";
-import { useDetectionStore } from "@/store/detectionStore";
-import { CameraView, useCameraPermissions } from "expo-camera";
-import * as Haptics from "expo-haptics";
-import * as ImagePicker from "expo-image-picker";
-import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert } from "react-native";
+} from '@/services/detectionService';
+import { addTargetWithPaperResult, PaperType } from '@/services/sessionService';
+import { useDetectionStore } from '@/store/detectionStore';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert } from 'react-native';
 
 import {
   CameraFlow,
@@ -25,64 +22,54 @@ import {
   Step,
   TargetForm,
   TargetType,
-} from "@/components/targets";
+} from '@/components/targets';
 
 export default function AddTargetSheet() {
-  const { sessionId, defaultTargetType, defaultDistance, defaultInputMethod, startInManual, locked, maxShots } = useLocalSearchParams<{
-    sessionId: string;
-    defaultTargetType?: string;
-    defaultDistance?: string;
-    defaultInputMethod?: 'scan' | 'manual';
-    startInManual?: string;
-    locked?: string;
-    maxShots?: string;
-  }>();
+  const { sessionId, defaultTargetType, defaultDistance, defaultInputMethod, startInManual, locked, maxShots } =
+    useLocalSearchParams<{
+      sessionId: string;
+      defaultTargetType?: string;
+      defaultDistance?: string;
+      defaultInputMethod?: 'scan' | 'manual';
+      startInManual?: string;
+      locked?: string;
+      maxShots?: string;
+    }>();
 
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
 
-  const {
-    result,
-    analyze,
-    setImage,
-    startCapture,
-    reset: resetDetection,
-    setError,
-  } = useDetectionStore();
+  const { result, analyze, setImage, startCapture, reset: resetDetection, setError } = useDetectionStore();
 
   const initialStep: Step =
-    startInManual === '1' && (defaultTargetType === 'achievement' || defaultTargetType === 'engagement') && defaultInputMethod === 'manual'
+    startInManual === '1' &&
+    (defaultTargetType === 'achievement' || defaultTargetType === 'engagement') &&
+    defaultInputMethod === 'manual'
       ? 'manual_entry'
       : 'form';
   const [step, setStep] = useState<Step>(initialStep);
   const [saving, setSaving] = useState(false);
   const [capturedUri, setCapturedUri] = useState<string | null>(null);
 
-  const [targetType, setTargetType] = useState<TargetType>(
-    (defaultTargetType as TargetType) || "grouping"
-  );
-  const [inputMethod, setInputMethod] = useState<InputMethod>(
-    (defaultInputMethod as InputMethod) || "scan"
-  );
-  
-  const [selectedDistance, setSelectedDistance] = useState<number>(
-    defaultDistance ? parseInt(defaultDistance) : 100
-  );
+  const [targetType, setTargetType] = useState<TargetType>((defaultTargetType as TargetType) || 'grouping');
+  const [inputMethod, setInputMethod] = useState<InputMethod>((defaultInputMethod as InputMethod) || 'scan');
+
+  const [selectedDistance, setSelectedDistance] = useState<number>(defaultDistance ? parseInt(defaultDistance) : 100);
   const isLocked = locked === '1';
   const maxShotsCap = maxShots ? parseInt(maxShots) : null;
 
   const [editedDetections, setEditedDetections] = useState<EditableDetection[]>([]);
 
   useEffect(() => {
-    if (defaultTargetType === "grouping") {
+    if (defaultTargetType === 'grouping') {
       handleStartCamera();
     }
   }, []);
 
   const handleTargetTypeChange = useCallback((type: TargetType) => {
     setTargetType(type);
-    if (type === "grouping") {
-      setInputMethod("scan");
+    if (type === 'grouping') {
+      setInputMethod('scan');
     }
   }, []);
 
@@ -100,31 +87,31 @@ export default function AddTargetSheet() {
     if (!permission?.granted) {
       const { granted } = await requestPermission();
       if (!granted) {
-        Alert.alert("Camera Permission", "Camera access is required to scan targets.");
+        Alert.alert('Camera Permission', 'Camera access is required to scan targets.');
         return;
       }
     }
     startCapture();
-    setStep("camera");
+    setStep('camera');
   }, [permission, requestPermission, startCapture]);
 
   const handleSubmit = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    if (targetType === "grouping") {
+    if (targetType === 'grouping') {
       await handleStartCamera();
-    } else if (targetType === "engagement") {
-      if (inputMethod === "scan") {
+    } else if (targetType === 'engagement') {
+      if (inputMethod === 'scan') {
         await handleStartCamera();
       } else {
-        setStep("manual_entry");
+        setStep('manual_entry');
       }
     }
   }, [targetType, inputMethod, handleStartCamera]);
 
   const handlePickImage = useCallback(async () => {
     const pickerResult = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
+      mediaTypes: ['images'],
       allowsEditing: false,
       quality: 0.9,
     });
@@ -132,7 +119,7 @@ export default function AddTargetSheet() {
     if (!pickerResult.canceled && pickerResult.assets[0]?.uri) {
       setCapturedUri(pickerResult.assets[0].uri);
       setImage(pickerResult.assets[0].uri);
-      setStep("preview");
+      setStep('preview');
     }
   }, [setImage]);
 
@@ -150,22 +137,22 @@ export default function AddTargetSheet() {
       if (photo?.uri) {
         setCapturedUri(photo.uri);
         setImage(photo.uri);
-        setStep("preview");
+        setStep('preview');
       }
     } catch (err: any) {
-      console.error("Capture failed:", err);
+      console.error('Capture failed:', err);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setError(err.message || "Failed to capture photo");
-      Alert.alert("Error", "Failed to capture photo");
+      setError(err.message || 'Failed to capture photo');
+      Alert.alert('Error', 'Failed to capture photo');
     }
   }, [setImage, setError]);
 
   const handleSubmitPhoto = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setStep("analyzing");
+    setStep('analyzing');
 
     const analysisResult = await analyze();
-    
+
     if (analysisResult) {
       const initialDetections: EditableDetection[] = analysisResult.detections.map((d, i) => ({
         ...d,
@@ -173,14 +160,14 @@ export default function AddTargetSheet() {
         isManual: false,
       }));
       setEditedDetections(initialDetections);
-      
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setStep("results");
+      setStep('results');
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Analysis Failed", "Could not analyze the image. Please try again.", [
-        { text: "Retake", onPress: () => setStep("camera") },
-        { text: "Cancel", onPress: handleClose },
+      Alert.alert('Analysis Failed', 'Could not analyze the image. Please try again.', [
+        { text: 'Retake', onPress: () => setStep('camera') },
+        { text: 'Cancel', onPress: handleClose },
       ]);
     }
   }, [analyze, handleClose]);
@@ -189,13 +176,13 @@ export default function AddTargetSheet() {
     setCapturedUri(null);
     setEditedDetections([]);
     resetDetection();
-    setStep("camera");
+    setStep('camera');
   }, [resetDetection]);
 
   const saveScannedTarget = useCallback(
     async (finalDetections: EditableDetection[], editedImageBase64?: string) => {
       if (!sessionId) {
-        Alert.alert("Error", "Session ID missing");
+        Alert.alert('Error', 'Session ID missing');
         return;
       }
 
@@ -203,12 +190,10 @@ export default function AddTargetSheet() {
 
       try {
         const detectionCount = finalDetections.length;
-        const rawHighConfHits = finalDetections.filter(
-          (d) => d.isManual || d.confidence >= 0.6
-        ).length;
+        const rawHighConfHits = finalDetections.filter((d) => d.isManual || d.confidence >= 0.6).length;
         const manualCount = finalDetections.filter((d) => d.isManual).length;
 
-        const paperType: PaperType = targetType === "grouping" ? "grouping" : "achievement";
+        const paperType: PaperType = targetType === 'grouping' ? 'grouping' : 'achievement';
 
         const trainingData =
           manualCount > 0 || finalDetections.length !== (result?.detections?.length ?? 0)
@@ -237,7 +222,7 @@ export default function AddTargetSheet() {
         if (finalImageBase64) {
           scannedImageUrl = await uploadScannedTargetImage(finalImageBase64, sessionId);
           if (!scannedImageUrl) {
-            console.warn("Failed to upload image, saving without image");
+            console.warn('Failed to upload image, saving without image');
           }
         }
 
@@ -250,8 +235,8 @@ export default function AddTargetSheet() {
           target_data: null,
           paper_type: paperType,
           bullets_fired: detectionCount,
-          hits_total: paperType === "grouping" ? detectionCount : Math.min(rawHighConfHits, detectionCount),
-          hits_inside_scoring: paperType === "grouping" ? null : rawHighConfHits,
+          hits_total: paperType === 'grouping' ? detectionCount : Math.min(rawHighConfHits, detectionCount),
+          hits_inside_scoring: paperType === 'grouping' ? null : rawHighConfHits,
           dispersion_cm: groupSizeCm,
           scanned_image_url: scannedImageUrl,
           result_notes: null,
@@ -261,17 +246,17 @@ export default function AddTargetSheet() {
 
         if (trainingData && shouldSubmitForTraining(trainingData as TrainingDataPayload)) {
           submitTrainingData(trainingData as TrainingDataPayload)
-            .then((res) => console.log("[Training] Submitted:", res.message))
-            .catch((err) => console.log("[Training] Failed:", err));
+            .then((res) => console.log('[Training] Submitted:', res.message))
+            .catch((err) => console.log('[Training] Failed:', err));
         }
 
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         resetDetection();
         router.back();
       } catch (error: any) {
-        console.error("Failed to save scanned target:", error);
+        console.error('Failed to save scanned target:', error);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert("Error", error.message || "Failed to save target");
+        Alert.alert('Error', error.message || 'Failed to save target');
         setSaving(false);
       }
     },
@@ -281,7 +266,7 @@ export default function AddTargetSheet() {
   const saveManualAchievement = useCallback(
     async (data: { bulletsFired: number; hits: number; distance: number }) => {
       if (!sessionId) {
-        Alert.alert("Error", "Session ID missing");
+        Alert.alert('Error', 'Session ID missing');
         return;
       }
 
@@ -295,7 +280,7 @@ export default function AddTargetSheet() {
           planned_shots: data.bulletsFired,
           notes: null,
           target_data: null,
-          paper_type: "achievement" as PaperType,
+          paper_type: 'achievement' as PaperType,
           bullets_fired: data.bulletsFired,
           hits_total: data.hits,
           hits_inside_scoring: data.hits,
@@ -310,21 +295,21 @@ export default function AddTargetSheet() {
         resetDetection();
         router.back();
       } catch (error: any) {
-        console.error("Failed to save manual achievement:", error);
+        console.error('Failed to save manual achievement:', error);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert("Error", error.message || "Failed to save target");
+        Alert.alert('Error', error.message || 'Failed to save target');
         setSaving(false);
       }
     },
     [sessionId, resetDetection]
   );
 
-  if (step === "results" && result) {
+  if (step === 'results' && result) {
     return (
-      <ResultCard 
-        result={result} 
-        onDone={saveScannedTarget} 
-        onRetake={handleRetake} 
+      <ResultCard
+        result={result}
+        onDone={saveScannedTarget}
+        onRetake={handleRetake}
         saving={saving}
         editedDetections={editedDetections}
         onDetectionsChange={setEditedDetections}
@@ -333,11 +318,11 @@ export default function AddTargetSheet() {
     );
   }
 
-  if (step === "manual_entry") {
+  if (step === 'manual_entry') {
     return (
       <ManualAchievementEntry
         onSave={saveManualAchievement}
-        onBack={() => setStep("form")}
+        onBack={() => setStep('form')}
         saving={saving}
         defaultDistance={selectedDistance}
         lockDistance={isLocked}
@@ -346,7 +331,7 @@ export default function AddTargetSheet() {
       />
     );
   }
-  
+
   return (
     <>
       <TargetForm
@@ -367,7 +352,7 @@ export default function AddTargetSheet() {
         onPickImage={handlePickImage}
         onSubmitPhoto={handleSubmitPhoto}
         onRetake={handleRetake}
-        onClose={() => setStep("form")}
+        onClose={() => setStep('form')}
       />
     </>
   );

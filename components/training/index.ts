@@ -27,4 +27,3 @@ export type {
 } from './types';
 
 export type { AggregateStats, ParticipantStats } from './TrainingSummary';
-

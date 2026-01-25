@@ -1,6 +1,6 @@
 /**
  * UnifiedHomePage Styles
- * 
+ *
  * All styles for the unified home page and its sub-components.
  */
 
@@ -23,12 +23,12 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 14,
   },
-  headerLeft: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 12 
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   avatar: {
     width: 44,
@@ -38,19 +38,19 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  avatarText: { 
-    fontSize: 16, 
-    fontWeight: '700' 
+  avatarText: {
+    fontSize: 16,
+    fontWeight: '700',
   },
-  greeting: { 
-    fontSize: 13, 
-    fontWeight: '500', 
-    marginBottom: 1 
+  greeting: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 1,
   },
-  userName: { 
-    fontSize: 18, 
-    fontWeight: '700', 
-    letterSpacing: -0.3 
+  userName: {
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.3,
   },
   watchBadge: {
     width: 32,
@@ -67,7 +67,7 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '400',
     lineHeight: 20,
-    marginBottom: 20,
+    marginBottom: 4,
     opacity: 0.7,
     width: '65%',
   },
@@ -75,15 +75,15 @@ export const styles = StyleSheet.create({
   // ═══════════════════════════════════════════════════════════════════════════
   // SECTION
   // ═══════════════════════════════════════════════════════════════════════════
-  section: { marginBottom: 28 },
+  section: { marginBottom: 14 },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 12,
+    gap: 5,
+    marginBottom: 10,
   },
   sectionTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -95,7 +95,7 @@ export const styles = StyleSheet.create({
   weeklyCard: {
     borderRadius: SMALL_RADIUS,
     borderWidth: 1,
-    marginTop: 14,
+    marginTop: 8,
     padding: 14,
   },
   weeklyHeader: {
@@ -104,9 +104,9 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 14,
   },
-  weeklyTitle: { 
-    fontSize: 14, 
-    fontWeight: '600' 
+  weeklyTitle: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   weeklyHeaderRight: {
     flexDirection: 'row',
@@ -121,10 +121,10 @@ export const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 6,
   },
-  streakText: { 
-    fontSize: 11, 
-    fontWeight: '700', 
-    color: '#F97316' 
+  streakText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#F97316',
   },
   weeklySessionCount: { fontSize: 12 },
   weeklyStatsRow: {
@@ -137,14 +137,14 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  weeklyStatValue: { 
-    fontSize: 15, 
-    fontWeight: '700' 
+  weeklyStatValue: {
+    fontSize: 15,
+    fontWeight: '700',
   },
   weeklyStatLabel: { fontSize: 10 },
-  weeklyStatDivider: { 
-    width: 1, 
-    height: 28 
+  weeklyStatDivider: {
+    width: 1,
+    height: 28,
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -176,10 +176,10 @@ export const styles = StyleSheet.create({
     color: '#22C55E',
     letterSpacing: 0.5,
   },
-  activeTitle: { 
-    fontSize: 17, 
-    fontWeight: '700', 
-    marginBottom: 2 
+  activeTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: 2,
   },
   activeMeta: { fontSize: 13 },
   activeArrow: {
@@ -209,10 +209,10 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   startContent: { flex: 1 },
-  startTitle: { 
-    fontSize: 17, 
-    fontWeight: '700', 
-    marginBottom: 2 
+  startTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: 2,
   },
   startSubtitle: { fontSize: 13 },
   startArrow: {
@@ -262,25 +262,25 @@ export const styles = StyleSheet.create({
     color: '#F97316',
     letterSpacing: 0.3,
   },
-  trainingTitle: { 
-    fontSize: 15, 
-    fontWeight: '600', 
-    flex: 1 
+  trainingTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    flex: 1,
   },
   trainingMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
-  trainingTeam: { 
-    fontSize: 12, 
-    fontWeight: '500' 
+  trainingTeam: {
+    fontSize: 12,
+    fontWeight: '500',
   },
-  metaDot: { 
-    width: 3, 
-    height: 3, 
-    borderRadius: 1.5, 
-    marginHorizontal: 4 
+  metaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    marginHorizontal: 4,
   },
   trainingDrills: { fontSize: 12 },
 
@@ -295,19 +295,19 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 10,
   },
-  emptyTeamText: { 
-    flex: 1, 
-    fontSize: 13, 
-    fontWeight: '500' 
+  emptyTeamText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '500',
   },
   viewScheduleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
   },
-  viewScheduleText: { 
-    fontSize: 12, 
-    fontWeight: '600' 
+  viewScheduleText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -321,13 +321,13 @@ export const styles = StyleSheet.create({
   recentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    gap: 12,
+    padding: 12,
+    gap: 10,
   },
   recentIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -335,33 +335,32 @@ export const styles = StyleSheet.create({
   recentTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     marginBottom: 2,
   },
-  recentTitle: { 
-    fontSize: 14, 
-    fontWeight: '600', 
-    flex: 1 
+  recentTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
   },
-  recentMeta: { fontSize: 12 },
+  recentMeta: { fontSize: 11 },
   recentRight: {
     alignItems: 'flex-end',
-    gap: 4,
+    gap: 3,
   },
-  recentTime: { 
-    fontSize: 11, 
-    fontWeight: '500' 
+  recentTime: {
+    fontSize: 10,
+    fontWeight: '500',
   },
-  recentDivider: { 
-    height: 1, 
-    marginLeft: 62 
+  recentDivider: {
+    height: 1,
+    marginLeft: 56,
   },
   bioBadge: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
 });
-

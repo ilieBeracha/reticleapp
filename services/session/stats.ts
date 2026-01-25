@@ -28,6 +28,9 @@ export async function calculateSessionStats(sessionId: string): Promise<SessionS
   let totalEngagementTime = 0;
   let engagementTimeCount = 0;
   let fastestEngagement: number | null = null;
+  
+  // Biometrics tracking (from watch data in target_data)
+  let biometrics: SessionStats['biometrics'] = undefined;
 
   for (const target of targets) {
     if (target.target_type === 'paper') {
@@ -103,6 +106,25 @@ export async function calculateSessionStats(sessionId: string): Promise<SessionS
   const avgEngagementTimeSec =
     engagementTimeCount > 0 ? Math.round((totalEngagementTime / engagementTimeCount) * 100) / 100 : null;
 
+  // Extract biometrics from target_data (stored by watch session data)
+  // Look through all targets for biometrics data
+  for (const target of targets) {
+    const targetData = target.target_data as Record<string, any> | null;
+    if (!targetData) continue;
+    
+    // Check for biometrics in multiple locations (watch data storage varies)
+    const hrData = targetData.heart_rate || targetData.biometrics?.summary;
+    if (hrData) {
+      biometrics = {
+        avgHR: hrData.avg ?? hrData.avgHR ?? undefined,
+        maxHR: hrData.max ?? hrData.maxHR ?? undefined,
+        minHR: hrData.min ?? hrData.minHR ?? undefined,
+        avgBreathRate: targetData.avg_breath_rate ?? hrData.avgBreathRate ?? undefined,
+      };
+      break; // Use first target with biometrics data
+    }
+  }
+
   return {
     targetCount: targets.length,
     paperTargets,
@@ -115,6 +137,7 @@ export async function calculateSessionStats(sessionId: string): Promise<SessionS
     stagesCleared,
     avgEngagementTimeSec,
     fastestEngagementTimeSec: fastestEngagement,
+    biometrics,
   };
 }
 

@@ -1,6 +1,6 @@
 /**
  * DrillPresetPicker - Select from saved drill presets
- * 
+ *
  * Shows user's saved presets with:
  * - Drill goal icon
  * - Weapon category badge
@@ -9,29 +9,12 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import {
-  getMyPresets,
-  type DrillGoal,
-  type DrillPreset
-} from '@/services/presetService';
+import { getMyPresets, type DrillGoal, type DrillPreset } from '@/services/presetService';
 import { getCategoryLabel } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
-import {
-  Check,
-  Crosshair,
-  Plus,
-  Target,
-  X
-} from 'lucide-react-native';
+import { Check, Crosshair, Plus, Target, X } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // ============================================================================
 // TYPES
@@ -75,14 +58,9 @@ function getGoalLabel(goal: DrillGoal): string {
 // MAIN COMPONENT
 // ============================================================================
 
-export function DrillPresetPicker({
-  onSelect,
-  onCreateNew,
-  onClose,
-  filterByPurpose,
-}: DrillPresetPickerProps) {
+export function DrillPresetPicker({ onSelect, onCreateNew, onClose, filterByPurpose }: DrillPresetPickerProps) {
   const colors = useColors();
-  
+
   const [loading, setLoading] = useState(true);
   const [presets, setPresets] = useState<DrillPreset[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -108,7 +86,7 @@ export function DrillPresetPicker({
   // Filter presets based on selected purpose
   const filteredPresets = presets.filter((preset) => {
     if (!filterByPurpose) return true; // No filter, show all
-    
+
     if (filterByPurpose === 'grouping') {
       // Only show grouping drills
       return preset.drill_goal === 'grouping';
@@ -125,10 +103,13 @@ export function DrillPresetPicker({
     return 'My Saved Drills';
   };
 
-  const handleSelect = useCallback((preset: DrillPreset) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onSelect(preset);
-  }, [onSelect]);
+  const handleSelect = useCallback(
+    (preset: DrillPreset) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      onSelect(preset);
+    },
+    [onSelect]
+  );
 
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -197,21 +178,13 @@ export function DrillPresetPicker({
         <View style={styles.emptyState}>
           <Target size={48} color={colors.textMuted} strokeWidth={1} />
           <Text style={[styles.emptyTitle, { color: colors.text }]}>{emptyMessage.title}</Text>
-          <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-            {emptyMessage.subtitle}
-          </Text>
+          <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>{emptyMessage.subtitle}</Text>
         </View>
       ) : (
         <FlatList
           data={filteredPresets}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <PresetRow
-              preset={item}
-              onPress={() => handleSelect(item)}
-              colors={colors}
-            />
-          )}
+          renderItem={({ item }) => <PresetRow preset={item} onPress={() => handleSelect(item)} colors={colors} />}
           contentContainerStyle={styles.listContent}
         />
       )}
@@ -256,7 +229,7 @@ function PresetRow({
             </View>
           )}
         </View>
-        
+
         <View style={styles.presetMeta}>
           <Text style={[styles.presetStats, { color: colors.textMuted }]}>
             {preset.distance_m}m • {preset.rounds_per_shooter} shots
@@ -273,9 +246,7 @@ function PresetRow({
 
       {/* Goal */}
       <View style={[styles.goalBadge, { backgroundColor: colors.secondary }]}>
-        <Text style={[styles.goalText, { color: colors.textMuted }]}>
-          {getGoalLabel(preset.drill_goal)}
-        </Text>
+        <Text style={[styles.goalText, { color: colors.textMuted }]}>{getGoalLabel(preset.drill_goal)}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -437,4 +408,3 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
 });
-

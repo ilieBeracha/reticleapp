@@ -1,6 +1,6 @@
 /**
  * Session Constants
- * 
+ *
  * Centralized constants for session-related values.
  * Import these instead of using hardcoded strings.
  */
@@ -11,7 +11,7 @@
 
 /**
  * SessionStatus values - Current state of a session
- * 
+ *
  * - 'pending': Created but not yet started (waiting for watch selection)
  * - 'active': In progress
  * - 'completed': Successfully finished
@@ -60,7 +60,7 @@ export function isTerminalStatus(status: string | null | undefined): boolean {
 
 /**
  * SessionMode values - How the session is being conducted
- * 
+ *
  * - 'solo': Individual practice
  * - 'group': Team/group training
  */

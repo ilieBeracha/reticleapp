@@ -1,96 +1,129 @@
 /**
  * WeeklyStatsCard Component
- * 
+ *
  * Displays weekly shooting statistics in a compact, visually appealing card.
- * Shows placeholder when no sessions this week.
+ * Tappable to navigate to session history. Shows placeholder when no sessions.
  */
 
-import { Clock, Crosshair, Flame, Target, TrendingUp } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
+import { ChevronRight, Clock, Crosshair, Flame, Target, TrendingUp } from 'lucide-react-native';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { STREAK_DISPLAY_THRESHOLD } from '../UnifiedHomePage.constants';
 import { formatDuration } from '../UnifiedHomePage.helpers';
 import type { WeeklyStatsCardProps } from '../UnifiedHomePage.types';
 
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
 export function WeeklyStatsCard({ stats, streak, colors }: WeeklyStatsCardProps) {
+  const scale = useSharedValue(1);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const handlePress = () => {
+    scale.value = withSpring(0.98, {}, () => {
+      scale.value = withSpring(1);
+    });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/sessionHistory');
+  };
+
   // Empty state - no sessions this week
   if (stats.sessions === 0) {
     return (
-      <View style={[localStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={localStyles.emptyHeader}>
-          <Text style={[localStyles.title, { color: colors.text }]}>This Week</Text>
+      <AnimatedTouchable
+        entering={FadeInDown.duration(350).delay(150)}
+        style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }, animStyle]}
+        onPress={handlePress}
+        activeOpacity={0.9}
+      >
+        <View style={s.emptyHeader}>
+          <View style={s.headerRow}>
+            <Text style={[s.title, { color: colors.text }]}>This Week</Text>
+            <ChevronRight size={16} color={colors.textMuted} style={{ opacity: 0.5 }} />
+          </View>
         </View>
-        <View style={localStyles.emptyContent}>
-          <View style={localStyles.emptyStatsRow}>
-            <View style={[localStyles.emptyStat, { backgroundColor: colors.secondary }]}>
-              <Target size={16} color={colors.textMuted} />
-              <Text style={[localStyles.emptyStatText, { color: colors.textMuted }]}>--</Text>
+        <View style={s.emptyContent}>
+          <View style={s.emptyStatsRow}>
+            <View style={[s.emptyStat, { backgroundColor: colors.secondary }]}>
+              <Target size={14} color={colors.textMuted} />
+              <Text style={[s.emptyStatText, { color: colors.textMuted }]}>--</Text>
             </View>
-            <View style={[localStyles.emptyStat, { backgroundColor: colors.secondary }]}>
-              <TrendingUp size={16} color={colors.textMuted} />
-              <Text style={[localStyles.emptyStatText, { color: colors.textMuted }]}>--</Text>
+            <View style={[s.emptyStat, { backgroundColor: colors.secondary }]}>
+              <TrendingUp size={14} color={colors.textMuted} />
+              <Text style={[s.emptyStatText, { color: colors.textMuted }]}>--</Text>
             </View>
-            <View style={[localStyles.emptyStat, { backgroundColor: colors.secondary }]}>
-              <Clock size={16} color={colors.textMuted} />
-              <Text style={[localStyles.emptyStatText, { color: colors.textMuted }]}>--</Text>
+            <View style={[s.emptyStat, { backgroundColor: colors.secondary }]}>
+              <Clock size={14} color={colors.textMuted} />
+              <Text style={[s.emptyStatText, { color: colors.textMuted }]}>--</Text>
             </View>
           </View>
-          <Text style={[localStyles.emptyMessage, { color: colors.textMuted }]}>
-            No practice sessions yet this week
-          </Text>
+          <Text style={[s.emptyMessage, { color: colors.textMuted }]}>No practice sessions yet this week</Text>
         </View>
-      </View>
+      </AnimatedTouchable>
     );
   }
 
   return (
-    <View style={[localStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <AnimatedTouchable
+      entering={FadeInDown.duration(350).delay(150)}
+      style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }, animStyle]}
+      onPress={handlePress}
+      activeOpacity={0.9}
+    >
       {/* Header with streak */}
-      <View style={localStyles.header}>
-        <View style={localStyles.headerLeft}>
-          <Text style={[localStyles.title, { color: colors.text }]}>This Week</Text>
-          <View style={[localStyles.sessionBadge, { backgroundColor: `${colors.primary}15` }]}>
-            <Text style={[localStyles.sessionBadgeText, { color: colors.primary }]}>
+      <View style={s.header}>
+        <View style={s.headerLeft}>
+          <Text style={[s.title, { color: colors.text }]}>This Week</Text>
+          <View style={[s.sessionBadge, { backgroundColor: `${colors.primary}15` }]}>
+            <Text style={[s.sessionBadgeText, { color: colors.primary }]}>
               {stats.sessions} session{stats.sessions !== 1 ? 's' : ''}
             </Text>
           </View>
         </View>
-        {streak >= STREAK_DISPLAY_THRESHOLD && (
-          <View style={localStyles.streakBadge}>
-            <Flame size={14} color="#F97316" fill="#F97316" />
-            <Text style={localStyles.streakText}>{streak} day streak</Text>
-          </View>
-        )}
+        <View style={s.headerRight}>
+          {streak >= STREAK_DISPLAY_THRESHOLD && (
+            <View style={s.streakBadge}>
+              <Flame size={12} color="#F97316" fill="#F97316" />
+              <Text style={s.streakText}>{streak}</Text>
+            </View>
+          )}
+          <ChevronRight size={14} color={colors.textMuted} style={{ opacity: 0.5 }} />
+        </View>
       </View>
 
       {/* Stats Grid */}
-      <View style={localStyles.statsGrid}>
+      <View style={s.statsGrid}>
         <StatItem
-          icon={<Target size={16} color={colors.indigo} />}
+          icon={<Target size={14} color={colors.indigo} />}
           value={stats.shots.toLocaleString()}
           label="Shots"
           colors={colors}
         />
         <StatItem
-          icon={<TrendingUp size={16} color={colors.green} />}
+          icon={<TrendingUp size={14} color={colors.green} />}
           value={`${stats.accuracy}%`}
           label="Accuracy"
           colors={colors}
         />
         <StatItem
-          icon={<Crosshair size={16} color={colors.orange} />}
+          icon={<Crosshair size={14} color={colors.orange} />}
           value={stats.bestGroup}
           label="Best Group"
           colors={colors}
         />
         <StatItem
-          icon={<Clock size={16} color={colors.blue} />}
+          icon={<Clock size={14} color={colors.blue} />}
           value={formatDuration(stats.totalTimeMinutes)}
           label="Time"
           colors={colors}
         />
       </View>
-    </View>
+    </AnimatedTouchable>
   );
 }
 
@@ -103,41 +136,51 @@ interface StatItemProps {
 
 function StatItem({ icon, value, label, colors }: StatItemProps) {
   return (
-    <View style={localStyles.stat}>
-      <View style={localStyles.statHeader}>
+    <View style={s.stat}>
+      <View style={s.statHeader}>
         {icon}
-        <Text style={[localStyles.statLabel, { color: colors.textMuted }]}>{label}</Text>
+        <Text style={[s.statLabel, { color: colors.textMuted }]}>{label}</Text>
       </View>
-      <Text style={[localStyles.statValue, { color: colors.text }]}>{value}</Text>
+      <Text style={[s.statValue, { color: colors.text }]}>{value}</Text>
     </View>
   );
 }
 
-const localStyles = StyleSheet.create({
+const s = StyleSheet.create({
   card: {
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
-    marginTop: 14,
-    padding: 16,
+    marginBottom: 14,
+    padding: 12,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   title: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     letterSpacing: -0.2,
   },
   sessionBadge: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: 6,
   },
@@ -148,70 +191,70 @@ const localStyles = StyleSheet.create({
   streakBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#F9731610',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+    gap: 3,
+    backgroundColor: '#F9731615',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
   streakText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
     color: '#F97316',
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 8,
   },
   stat: {
     flex: 1,
     minWidth: '45%',
     backgroundColor: 'rgba(128, 128, 128, 0.05)',
     borderRadius: 10,
-    padding: 12,
+    padding: 10,
   },
   statHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 6,
+    gap: 5,
+    marginBottom: 4,
   },
   statLabel: {
     fontSize: 11,
     fontWeight: '500',
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     letterSpacing: -0.3,
   },
   // Empty state
   emptyHeader: {
-    marginBottom: 12,
+    marginBottom: 10,
   },
   emptyContent: {
-    gap: 12,
+    gap: 10,
   },
   emptyStatsRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
   emptyStat: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 10,
+    gap: 5,
+    paddingVertical: 10,
+    borderRadius: 8,
   },
   emptyStatText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   emptyMessage: {
-    fontSize: 12,
+    fontSize: 11,
     textAlign: 'center',
   },
 });

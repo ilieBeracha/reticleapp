@@ -1,65 +1,32 @@
 /**
  * UnifiedHomePage Barrel Export
- * 
+ *
  * Clean imports for the unified home page module.
  */
 
-export { UnifiedHomePage, default } from './UnifiedHomePage';
+export { default, UnifiedHomePage } from './UnifiedHomePage';
 export { useUnifiedHomePage } from './useUnifiedHomePage';
 
 // Types
 export type {
-  WeeklyStats,
-  CoachMessageContext,
-  Colors,
-  WeeklyStatsCardProps,
-  ActiveSessionCardProps,
-  StartPracticeCardProps,
-  TeamTrainingCardProps,
-  RecentSessionRowProps,
-  HomeHeaderProps,
-  CoachMessageProps,
-  TeamSectionProps,
-  RecentActivitySectionProps,
+  ActiveSessionCardProps, CoachMessageContext, CoachMessageProps, Colors, HomeHeaderProps, RecentActivitySectionProps, RecentSessionRowProps, StartPracticeCardProps, TeamSectionProps, TeamTrainingCardProps, WeeklyStats, WeeklyStatsCardProps
 } from './UnifiedHomePage.types';
 
 // Helpers (for external use if needed)
 export {
-  getCoachMessage,
-  formatTimeAgo,
-  formatDuration,
-  getGreeting,
-  getStartPracticeSubtitle,
-  calculateWeeklyStats,
-  calculateStreak,
-  calculateLastSessionDaysAgo,
+  calculateLastSessionDaysAgo, calculateStreak, calculateWeeklyStats, formatDuration, formatTimeAgo, getCoachMessage, getGreeting,
+  getStartPracticeSubtitle
 } from './UnifiedHomePage.helpers';
 
 // Constants
 export {
-  CARD_RADIUS,
-  SMALL_RADIUS,
-  ICON_SIZES,
-  AVATAR_SIZE,
-  WATCH_BADGE_SIZE,
-  RECENT_SESSIONS_LIMIT,
+  AVATAR_SIZE, CARD_RADIUS, COLORS, ICON_SIZES, RECENT_SESSIONS_LIMIT,
   SESSION_FETCH_DAYS,
-  SESSION_FETCH_LIMIT,
-  STREAK_DISPLAY_THRESHOLD,
-  COLORS,
+  SESSION_FETCH_LIMIT, SMALL_RADIUS, STREAK_DISPLAY_THRESHOLD, WATCH_BADGE_SIZE
 } from './UnifiedHomePage.constants';
 
 // Sub-components (for advanced use cases)
 export {
-  HomeHeader,
-  CoachMessage,
-  WeeklyStatsCard,
-  ActiveSessionCard,
-  StartPracticeCard,
-  TeamTrainingCard,
-  RecentSessionRow,
-  TeamSection,
-  RecentActivitySection,
-  PersonalSection,
+  ActiveSessionCard, CoachMessage, HomeHeader, PersonalSection, RecentActivitySection, RecentSessionRow, StartPracticeCard, TeamSection, TeamTrainingCard, WeeklyStatsCard
 } from './components';
 

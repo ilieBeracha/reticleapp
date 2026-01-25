@@ -20,7 +20,7 @@ export function DrillsSection({
   startingDrillId,
   drillProgress,
 }: DrillsSectionProps) {
-  const completedCount = drillProgress.filter(p => p.completed).length;
+  const completedCount = drillProgress.filter((p) => p.completed).length;
   const hasProgress = completedCount > 0;
   const isOngoing = trainingStatus === 'ongoing';
   const allCompleted = completedCount === drills.length && drills.length > 0;
@@ -32,7 +32,12 @@ export function DrillsSection({
         <View style={styles.headerLeft}>
           <Text style={[styles.title, { color: colors.text }]}>Drills</Text>
           {drills.length > 0 && (
-            <View style={[styles.countBadge, { backgroundColor: allCompleted ? 'rgba(147,197,253,0.2)' : colors.secondary }]}>
+            <View
+              style={[
+                styles.countBadge,
+                { backgroundColor: allCompleted ? 'rgba(147,197,253,0.2)' : colors.secondary },
+              ]}
+            >
               <Text style={[styles.countText, { color: allCompleted ? '#93C5FD' : colors.textMuted }]}>
                 {completedCount}/{drills.length}
               </Text>
@@ -61,9 +66,7 @@ export function DrillsSection({
         <View style={[styles.empty, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Target size={28} color={colors.textMuted} />
           <Text style={[styles.emptyTitle, { color: colors.text }]}>No drills</Text>
-          <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
-            This training has no drills scheduled
-          </Text>
+          <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>This training has no drills scheduled</Text>
         </View>
       )}
 
@@ -71,7 +74,7 @@ export function DrillsSection({
       {drills.length > 0 && (
         <View style={styles.list}>
           {drills.map((drill, index) => {
-            const progress = drillProgress.find(p => p.drillId === drill.id);
+            const progress = drillProgress.find((p) => p.drillId === drill.id);
             return (
               <DrillCard
                 key={drill.id}
@@ -90,9 +93,7 @@ export function DrillsSection({
 
       {/* Hint */}
       {isOngoing && drills.length > 0 && !allCompleted && (
-        <Text style={[styles.hint, { color: colors.textMuted }]}>
-          Tap a drill to start your session
-        </Text>
+        <Text style={[styles.hint, { color: colors.textMuted }]}>Tap a drill to start your session</Text>
       )}
 
       {allCompleted && (

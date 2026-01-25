@@ -25,4 +25,3 @@ export const TIMELINE = {
   lineWidth: 2,
   animationDelay: 50,
 } as const;
-

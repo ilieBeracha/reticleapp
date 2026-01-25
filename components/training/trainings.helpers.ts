@@ -38,7 +38,7 @@ export function getStatusConfig(status: string | null | undefined): StatusConfig
 
 /**
  * Groups trainings by timeframe (live, today, tomorrow, this week, upcoming, past)
- * 
+ *
  * Status handling:
  * - 'ongoing' → live (regardless of scheduled date)
  * - 'finished' or 'cancelled' → past (regardless of scheduled date)
@@ -57,7 +57,7 @@ export function groupTrainingsByTimeframe(trainings: TrainingWithDetails[]): Gro
   const upcoming: TrainingWithDetails[] = [];
   const past: TrainingWithDetails[] = [];
 
-  trainings.forEach(t => {
+  trainings.forEach((t) => {
     const date = new Date(t.scheduled_at);
 
     // Live trainings (ongoing status)
@@ -65,7 +65,7 @@ export function groupTrainingsByTimeframe(trainings: TrainingWithDetails[]): Gro
       live.push(t);
       return;
     }
-    
+
     // Finished or cancelled trainings always go to past
     if (t.status === 'finished' || t.status === 'cancelled' || t.status === 'completed') {
       past.push(t);
@@ -148,23 +148,76 @@ export function calculateMemberStats(members: TeamMemberWithProfile[]): MemberSt
 // ============================================================================
 
 /**
- * Calculates team statistics for the current week
- * Note: In production, this would come from an analytics service
+ * Calculates team statistics for the current week from trainings only
+ * Used as a fallback when session data is not available
  */
 export function calculateTeamStats(trainings: TrainingWithDetails[]): TeamStats {
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = addDays(weekStart, 7);
 
-  const sessionsThisWeek = trainings.filter(t => {
+  const sessionsThisWeek = trainings.filter((t) => {
     const trainingDate = new Date(t.scheduled_at);
     return trainingDate >= weekStart && trainingDate < weekEnd;
   }).length;
 
-  // Simulated values (in production, these come from analytics)
+  // Default values when no session data is available
   return {
     sessionsThisWeek,
-    totalShots: Math.floor(Math.random() * 3000) + 500,
-    avgAccuracy: Math.floor(Math.random() * 30) + 60,
+    totalShots: 0,
+    avgAccuracy: 0,
+    weeklyGoal: DEFAULT_WEEKLY_GOAL,
+  };
+}
+
+/**
+ * Session data for team stats calculation
+ */
+export interface SessionStatsData {
+  shots_fired: number;
+  accuracy_pct: number;
+  started_at: string;
+}
+
+/**
+ * Calculates real team statistics from session data
+ */
+export function calculateTeamStatsFromSessions(
+  trainings: TrainingWithDetails[],
+  sessions: SessionStatsData[]
+): TeamStats {
+  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const weekEnd = addDays(weekStart, 7);
+
+  // Count trainings this week
+  const trainingsThisWeek = trainings.filter((t) => {
+    const trainingDate = new Date(t.scheduled_at);
+    return trainingDate >= weekStart && trainingDate < weekEnd;
+  }).length;
+
+  // Filter sessions from this week
+  const weekSessions = sessions.filter((s) => {
+    const sessionDate = new Date(s.started_at);
+    return sessionDate >= weekStart && sessionDate < weekEnd;
+  });
+
+  // Calculate totals
+  const totalShots = weekSessions.reduce((sum, s) => sum + (s.shots_fired || 0), 0);
+
+  // Calculate weighted average accuracy (weighted by shots)
+  let weightedAccuracy = 0;
+  let totalShotsForAccuracy = 0;
+  weekSessions.forEach((s) => {
+    if (s.shots_fired > 0 && s.accuracy_pct > 0) {
+      weightedAccuracy += s.accuracy_pct * s.shots_fired;
+      totalShotsForAccuracy += s.shots_fired;
+    }
+  });
+  const avgAccuracy = totalShotsForAccuracy > 0 ? Math.round(weightedAccuracy / totalShotsForAccuracy) : 0;
+
+  return {
+    sessionsThisWeek: weekSessions.length || trainingsThisWeek,
+    totalShots,
+    avgAccuracy,
     weeklyGoal: DEFAULT_WEEKLY_GOAL,
   };
 }
@@ -182,4 +235,3 @@ export function getInitials(fullName: string | null | undefined, email: string):
   }
   return email.charAt(0).toUpperCase();
 }
-

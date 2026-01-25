@@ -1,6 +1,6 @@
 /**
  * Session Creation Constants
- * 
+ *
  * Purpose options, presets, and UI configuration
  */
 
@@ -38,7 +38,6 @@ export const PURPOSE_OPTIONS: PurposeOption[] = [
       position: 'standing',
     },
   },
-  
 ];
 
 // ============================================================================
@@ -131,4 +130,3 @@ export function purposeToDrillGoal(purpose: SessionPurpose): DrillGoal {
 export function getPurposeOption(id: SessionPurpose): PurposeOption | undefined {
   return PURPOSE_OPTIONS.find((p) => p.id === id);
 }
-

@@ -14,8 +14,12 @@ import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Keyboard } from 'react-native';
 
-type Step = 'form' | 'success';
+/** Form step: basics, squads, success (weapon policy removed - weapons assigned directly) */
+type FormStep = 'basics' | 'squads' | 'success';
 type CreatedTeamSummary = { id: string; name: string };
+
+/** Total number of form steps (excluding success) */
+const TOTAL_STEPS = 2;
 
 export function useCreateTeamForm() {
   const { createTeam, setActiveTeam } = useTeamStore();
@@ -25,19 +29,55 @@ export function useCreateTeamForm() {
   const [squads, setSquads] = useState<string[]>([]);
   const [newSquadName, setNewSquadName] = useState('');
   const [showSquadSection, setShowSquadSection] = useState(false);
-  const [step, setStep] = useState<Step>('form');
+  const [formStep, setFormStep] = useState<FormStep>('basics');
   const [createdTeam, setCreatedTeam] = useState<CreatedTeamSummary | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const trimmedTeamName = useMemo(() => normalizeTeamName(teamName), [teamName]);
+  
+  /** Can proceed from step 1 (basics) to step 2 (squads) */
+  const canProceedToSquads = useMemo(
+    () => isTeamNamePresent(trimmedTeamName),
+    [trimmedTeamName]
+  );
+  
+  /** Can submit form (on step 3) */
   const canSubmit = useMemo(
     () => isTeamNamePresent(trimmedTeamName) && !submitting,
     [trimmedTeamName, submitting]
   );
+  
+  /** Current step number (1-indexed for display) */
+  const currentStepNumber = formStep === 'basics' ? 1 : formStep === 'squads' ? 2 : 2;
 
   const toggleSquadSection = useCallback(() => {
     setShowSquadSection((v) => !v);
   }, []);
+
+  /** Go to next step */
+  const goToNextStep = useCallback(() => {
+    Keyboard.dismiss();
+    
+    if (formStep === 'basics') {
+      if (!canProceedToSquads) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        Alert.alert('Team Name Required', 'Please enter a name for your team.');
+        return;
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setFormStep('squads');
+    }
+    // From squads, user clicks "Create Team" button directly (no policy step)
+  }, [formStep, canProceedToSquads]);
+
+  /** Go to previous step */
+  const goToPreviousStep = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    if (formStep === 'squads') {
+      setFormStep('basics');
+    }
+  }, [formStep]);
 
   const handleCreate = useCallback(async () => {
     if (!isTeamNamePresent(trimmedTeamName)) {
@@ -59,7 +99,7 @@ export function useCreateTeamForm() {
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setCreatedTeam({ id: team.id, name: team.name });
-      setStep('success');
+      setFormStep('success');
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Error', error.message || 'Failed to create team');
@@ -116,13 +156,16 @@ export function useCreateTeamForm() {
     squads,
     newSquadName,
     showSquadSection,
-    step,
+    formStep,
     createdTeam,
     submitting,
 
     // Derived
     canSubmit,
+    canProceedToSquads,
     trimmedTeamName,
+    currentStepNumber,
+    totalSteps: TOTAL_STEPS,
     squadTemplates: SQUAD_TEMPLATES,
 
     // Setters
@@ -133,6 +176,8 @@ export function useCreateTeamForm() {
 
     // Actions
     toggleSquadSection,
+    goToNextStep,
+    goToPreviousStep,
     handleCreate,
     handleOpenTeam,
     handleAddSquad,

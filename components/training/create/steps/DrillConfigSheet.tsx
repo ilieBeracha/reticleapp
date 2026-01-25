@@ -1,6 +1,6 @@
 /**
  * DrillConfigSheet - Configure drill instance before adding to training
- * 
+ *
  * Allows customizing: distance, shots, time limit, weapon category
  */
 
@@ -8,24 +8,9 @@ import { useColors } from '@/hooks/ui/useColors';
 import { getCategoryLabel, WEAPON_CATEGORIES } from '@/services/weaponService';
 import type { WeaponCategory } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
-import {
-  Check,
-  Clock,
-  Crosshair,
-  MapPin,
-  Target,
-  X,
-} from 'lucide-react-native';
+import { Check, Clock, Crosshair, MapPin, Target, X } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
-import {
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { Drill } from '@/types/workspace';
@@ -65,9 +50,7 @@ export function DrillConfigSheet({ visible, drill, onConfirm, onClose }: DrillCo
   const [shots, setShots] = useState(drill?.rounds_per_shooter || 5);
   const [timeLimit, setTimeLimit] = useState<number | null>(drill?.time_limit_seconds || null);
   const [strings, setStrings] = useState(drill?.strings_count || 1);
-  const [weaponCategory, setWeaponCategory] = useState<WeaponCategory | null>(
-    drill?.weapon_category || null
-  );
+  const [weaponCategory, setWeaponCategory] = useState<WeaponCategory | null>(drill?.weapon_category || null);
   const [customDistance, setCustomDistance] = useState('');
   const [customShots, setCustomShots] = useState('');
 
@@ -180,7 +163,7 @@ export function DrillConfigSheet({ visible, drill, onConfirm, onClose }: DrillCo
               <Text style={[styles.sectionValue, { color: colors.text }]}>{distance}m</Text>
             </View>
             <View style={styles.presetRow}>
-              {DISTANCE_PRESETS.map(val => (
+              {DISTANCE_PRESETS.map((val) => (
                 <TouchableOpacity
                   key={val}
                   style={[
@@ -228,7 +211,7 @@ export function DrillConfigSheet({ visible, drill, onConfirm, onClose }: DrillCo
               <Text style={[styles.sectionValue, { color: colors.text }]}>{shots}</Text>
             </View>
             <View style={styles.presetRow}>
-              {SHOTS_PRESETS.map(val => (
+              {SHOTS_PRESETS.map((val) => (
                 <TouchableOpacity
                   key={val}
                   style={[
@@ -276,7 +259,7 @@ export function DrillConfigSheet({ visible, drill, onConfirm, onClose }: DrillCo
               <Text style={[styles.sectionValue, { color: colors.text }]}>{strings}x</Text>
             </View>
             <View style={styles.presetRow}>
-              {STRINGS_PRESETS.map(val => (
+              {STRINGS_PRESETS.map((val) => (
                 <TouchableOpacity
                   key={val}
                   style={[
@@ -291,12 +274,7 @@ export function DrillConfigSheet({ visible, drill, onConfirm, onClose }: DrillCo
                     setStrings(val);
                   }}
                 >
-                  <Text
-                    style={[
-                      styles.presetText,
-                      { color: strings === val ? colors.background : colors.text },
-                    ]}
-                  >
+                  <Text style={[styles.presetText, { color: strings === val ? colors.background : colors.text }]}>
                     {val}x
                   </Text>
                 </TouchableOpacity>
@@ -309,9 +287,7 @@ export function DrillConfigSheet({ visible, drill, onConfirm, onClose }: DrillCo
             <View style={styles.sectionHeader}>
               <Clock size={14} color={colors.textMuted} />
               <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Time Limit</Text>
-              <Text style={[styles.sectionValue, { color: colors.text }]}>
-                {timeLimit ? `${timeLimit}s` : 'None'}
-              </Text>
+              <Text style={[styles.sectionValue, { color: colors.text }]}>{timeLimit ? `${timeLimit}s` : 'None'}</Text>
             </View>
             <View style={styles.presetRow}>
               {TIME_PRESETS.map((val, i) => (
@@ -329,12 +305,7 @@ export function DrillConfigSheet({ visible, drill, onConfirm, onClose }: DrillCo
                     setTimeLimit(val);
                   }}
                 >
-                  <Text
-                    style={[
-                      styles.presetText,
-                      { color: timeLimit === val ? colors.background : colors.text },
-                    ]}
-                  >
+                  <Text style={[styles.presetText, { color: timeLimit === val ? colors.background : colors.text }]}>
                     {val ? `${val}s` : 'None'}
                   </Text>
                 </TouchableOpacity>
@@ -365,16 +336,11 @@ export function DrillConfigSheet({ visible, drill, onConfirm, onClose }: DrillCo
                   setWeaponCategory(null);
                 }}
               >
-                <Text
-                  style={[
-                    styles.presetText,
-                    { color: weaponCategory === null ? colors.background : colors.text },
-                  ]}
-                >
+                <Text style={[styles.presetText, { color: weaponCategory === null ? colors.background : colors.text }]}>
                   Any
                 </Text>
               </TouchableOpacity>
-              {WEAPON_CATEGORIES.map(cat => (
+              {WEAPON_CATEGORIES.map((cat) => (
                 <TouchableOpacity
                   key={cat.value}
                   style={[
@@ -418,9 +384,7 @@ export function DrillConfigSheet({ visible, drill, onConfirm, onClose }: DrillCo
             {weaponCategory && (
               <View style={styles.summaryRow}>
                 <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Weapon:</Text>
-                <Text style={[styles.summaryValue, { color: colors.text }]}>
-                  {getCategoryLabel(weaponCategory)}
-                </Text>
+                <Text style={[styles.summaryValue, { color: colors.text }]}>{getCategoryLabel(weaponCategory)}</Text>
               </View>
             )}
           </View>
@@ -593,4 +557,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

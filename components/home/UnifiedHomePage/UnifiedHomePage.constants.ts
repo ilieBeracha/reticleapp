@@ -1,6 +1,6 @@
 /**
  * UnifiedHomePage Constants
- * 
+ *
  * Static values and configuration for the unified home page.
  */
 
@@ -41,4 +41,3 @@ export const COLORS = {
   orange: '#F97316',
   red: '#EF4444',
 } as const;
-

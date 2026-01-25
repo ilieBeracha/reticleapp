@@ -1,10 +1,14 @@
 import { getTrainingSessions, SessionWithDetails } from '@/services/sessionService';
 import { DrillProgress, getMyDrillProgress, getTrainingById } from '@/services/trainingService';
 import type { TrainingWithDetails } from '@/types/workspace';
-import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert } from 'react-native';
+
+interface RefetchOptions {
+  /** If true, won't show loading indicator (for background/realtime updates) */
+  silent?: boolean;
+}
 
 interface UseTrainingDetailReturn {
   training: TrainingWithDetails | null;
@@ -13,7 +17,7 @@ interface UseTrainingDetailReturn {
   loading: boolean;
   loadingSessions: boolean;
   setTraining: React.Dispatch<React.SetStateAction<TrainingWithDetails | null>>;
-  refetch: () => void;
+  refetch: (options?: RefetchOptions) => void;
 }
 
 export function useTrainingDetail(
@@ -26,71 +30,95 @@ export function useTrainingDetail(
   const [loading, setLoading] = useState(true);
   const [loadingSessions, setLoadingSessions] = useState(false);
 
-  const fetchTraining = useCallback(async (id: string) => {
-    setLoading(true);
+  // Guards to prevent state updates during navigation or after unmount
+  const isMountedRef = useRef(true);
+  const isFetchingRef = useRef(false);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const fetchTraining = useCallback(async (id: string, options?: RefetchOptions) => {
+    if (!isMountedRef.current) return;
+    if (!options?.silent) setLoading(true);
     try {
       const data = await getTrainingById(id);
-      setTraining(data);
+      if (isMountedRef.current) setTraining(data);
     } catch (error) {
       console.error('Failed to fetch training:', error);
-      Alert.alert('Error', 'Failed to load training details');
-      router.back();
+      if (isMountedRef.current && !options?.silent) {
+        Alert.alert('Error', 'Failed to load training details');
+        router.back();
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current && !options?.silent) setLoading(false);
     }
   }, []);
 
-  const fetchSessions = useCallback(async (id: string) => {
-    setLoadingSessions(true);
+  const fetchSessions = useCallback(async (id: string, options?: RefetchOptions) => {
+    if (!isMountedRef.current) return;
+    if (!options?.silent) setLoadingSessions(true);
     try {
       const data = await getTrainingSessions(id);
-      setSessions(data);
+      if (isMountedRef.current) setSessions(data);
     } catch (error) {
       console.error('Failed to fetch training sessions:', error);
-      setSessions([]);
+      if (isMountedRef.current) setSessions([]);
     } finally {
-      setLoadingSessions(false);
+      if (isMountedRef.current && !options?.silent) setLoadingSessions(false);
     }
   }, []);
 
   const fetchDrillProgress = useCallback(async (id: string) => {
+    if (!isMountedRef.current) return;
     try {
       const progress = await getMyDrillProgress(id);
-      setDrillProgress(progress);
+      if (isMountedRef.current) setDrillProgress(progress);
     } catch (error) {
       console.error('Failed to fetch drill progress:', error);
-      setDrillProgress([]);
+      if (isMountedRef.current) setDrillProgress([]);
     }
   }, []);
 
-  const refetch = useCallback(() => {
-    if (trainingId) {
-      fetchTraining(trainingId);
-      fetchSessions(trainingId);
-      fetchDrillProgress(trainingId);
-    }
+  const refetch = useCallback((options?: RefetchOptions) => {
+    if (!trainingId || isFetchingRef.current) return;
+
+    isFetchingRef.current = true;
+    Promise.all([
+      fetchTraining(trainingId, options),
+      fetchSessions(trainingId, options),
+      fetchDrillProgress(trainingId),
+    ]).finally(() => {
+      setTimeout(() => {
+        isFetchingRef.current = false;
+      }, 500);
+    });
   }, [trainingId, fetchTraining, fetchSessions, fetchDrillProgress]);
 
   useEffect(() => {
     if (trainingId) {
-      fetchTraining(trainingId);
-      fetchSessions(trainingId);
-      fetchDrillProgress(trainingId);
+      isFetchingRef.current = true;
+
+      Promise.all([
+        fetchTraining(trainingId),
+        fetchSessions(trainingId),
+        fetchDrillProgress(trainingId),
+      ]).finally(() => {
+        setTimeout(() => {
+          isFetchingRef.current = false;
+        }, 500);
+      });
     } else {
       Alert.alert('Error', 'No training selected');
       router.back();
     }
   }, [trainingId, fetchTraining, fetchSessions, fetchDrillProgress]);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (trainingId) {
-        fetchTraining(trainingId);
-        fetchSessions(trainingId);
-        fetchDrillProgress(trainingId);
-      }
-    }, [trainingId, fetchTraining, fetchSessions, fetchDrillProgress])
-  );
+  // NOTE: Removed useFocusEffect - it was causing rerenders on back navigation
+  // Data is fetched on mount via useEffect above. Use refetch() or pull-to-refresh for updates.
 
   return {
     training,

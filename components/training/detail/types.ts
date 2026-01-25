@@ -57,6 +57,13 @@ export interface PhaseSectionProps {
   defaultExpanded?: boolean;
 }
 
+/** Stats from a similar previous session */
+export interface SimilarSessionStats {
+  accuracy?: number;
+  bestGroup?: number;
+  date?: string;
+}
+
 export interface DrillChapterProps {
   drill: any;
   chapterNumber: number;
@@ -66,6 +73,10 @@ export interface DrillChapterProps {
   onStart: () => void;
   isStarting: boolean;
   colors: Colors;
+  /** Whether the user has a weapon assigned - blocks start if false */
+  hasWeapon?: boolean;
+  /** Stats from a similar previous session to show as reference */
+  similarStats?: SimilarSessionStats | null;
 }
 
 export interface ExecutionPhaseContentProps {
@@ -78,6 +89,10 @@ export interface ExecutionPhaseContentProps {
   startingDrillId: string | null;
   onStartDrill: (drill: any) => void;
   onAddDrill: () => void;
+  /** User's assigned weapon - if null, blocks starting sessions */
+  userWeapon?: UserWeapon | null;
+  /** Map of drill ID to similar session stats */
+  similarStatsMap?: Map<string, SimilarSessionStats>;
 }
 
 export interface DebriefPhaseContentProps {
@@ -127,10 +142,33 @@ export interface CommanderActionsSheetProps {
   visible: boolean;
   onClose: () => void;
   onAddDrill: () => void;
+  onAddCustomSession: () => void;
   onAssignWeapon: () => void;
   onFinishTraining: () => void;
   onSettings: () => void;
   onCancel: () => void;
   trainingStatus: string;
   colors: Colors;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// READINESS CARD
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface ReadinessItem {
+  id: string;
+  label: string;
+  isComplete: boolean;
+  icon: 'drill' | 'weapon' | 'members';
+  /** Action to take when this item is tapped */
+  onPress?: () => void;
+}
+
+export interface TrainingReadinessCardProps {
+  items: ReadinessItem[];
+  colors: Colors;
+  /** Called when "Complete setup" is pressed - navigates to first incomplete item */
+  onCompleteSetup: () => void;
+  /** Whether this is a team training (affects display) */
+  isTeamTraining?: boolean;
 }

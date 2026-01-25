@@ -25,6 +25,7 @@ interface UseTrainingActionsReturn {
   handleOpenStartModal: () => void;
   handleStartTraining: (drillOverrides?: Map<string, DrillInstanceOverrides>) => Promise<void>;
   handleFinishTraining: () => void;
+  executeFinishTraining: () => Promise<void>; // Direct finish without confirmation
   handleCancelTraining: () => void;
   handleStartDrill: (drill: TrainingDrill) => void;
 }
@@ -115,65 +116,51 @@ export function useTrainingActions({
     }
   }, [training, setTraining, onTrainingUpdated]);
 
-  const handleFinishTraining = useCallback(() => {
-    if (!training) {
-      console.log('[TrainingActions] No training to finish');
-      return;
-    }
+  const executeFinishTraining = useCallback(async () => {
+    if (!training) return;
 
-    console.log('[TrainingActions] Showing finish confirmation for:', training.id);
+    setActionLoading(true);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      const result = await finishTraining(training.id);
+
+      if (!result) {
+        Alert.alert('Not Found', 'Training was not found. It may have been deleted.');
+        setActionLoading(false);
+        return;
+      }
+
+      setTraining((prev) => (prev ? { ...prev, status: 'finished' } : null));
+      onTrainingUpdated?.();
+      loadMyUpcomingTrainings().catch(() => {});
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      router.replace({
+        pathname: '/(protected)/trainingReport',
+        params: { trainingId: training.id },
+      });
+    } catch (error: any) {
+      console.error('[TrainingActions] Finish failed:', error);
+      const message = error.message?.includes('permission')
+        ? 'Only the training creator or team commanders can complete this training.'
+        : error.message || 'Failed to finish training';
+      Alert.alert('Cannot Complete', message);
+    } finally {
+      setActionLoading(false);
+    }
+  }, [training, setTraining, onTrainingUpdated, loadMyUpcomingTrainings]);
+
+  const handleFinishTraining = useCallback(() => {
+    if (!training) return;
 
     Alert.alert('Finish Training', 'Mark this training as completed? You\'ll be taken to the debrief report.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Complete Training',
-        onPress: async () => {
-          console.log('[TrainingActions] User confirmed finish for:', training.id);
-          setActionLoading(true);
-          try {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            console.log('[TrainingActions] Calling finishTraining...');
-            const result = await finishTraining(training.id);
-            console.log('[TrainingActions] finishTraining result:', result);
-            
-            if (!result) {
-              console.log('[TrainingActions] Training not found');
-              Alert.alert('Not Found', 'Training was not found. It may have been deleted.');
-              setActionLoading(false);
-              return;
-            }
-            
-            // Only update local state if API succeeded
-            setTraining((prev) => (prev ? { ...prev, status: 'finished' } : null));
-            onTrainingUpdated?.();
-            // Refresh store so home page updates
-            loadMyUpcomingTrainings().catch(() => {});
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            console.log('[TrainingActions] Finish complete');
-            
-            // =========================================================================
-            // NAVIGATION: Training Complete → Debrief Report
-            // After finishing training, navigate to the Training Report for debrief
-            // User can then "Return to Training" or "Exit to Home" from there
-            // =========================================================================
-            router.replace({
-              pathname: '/(protected)/trainingReport',
-              params: { trainingId: training.id },
-            });
-          } catch (error: any) {
-            console.error('[TrainingActions] Finish failed:', error);
-            // Show user-friendly error for permission issues
-            const message = error.message?.includes('permission') 
-              ? 'Only the training creator or team commanders can complete this training.'
-              : error.message || 'Failed to finish training';
-            Alert.alert('Cannot Complete', message);
-          } finally {
-            setActionLoading(false);
-          }
-        },
+        onPress: executeFinishTraining,
       },
     ]);
-  }, [training, setTraining, onTrainingUpdated, loadMyUpcomingTrainings]);
+  }, [training, executeFinishTraining]);
 
   const handleCancelTraining = useCallback(() => {
     if (!training) return;
@@ -255,6 +242,7 @@ export function useTrainingActions({
     handleOpenStartModal,
     handleStartTraining,
     handleFinishTraining,
+    executeFinishTraining,
     handleCancelTraining,
     handleStartDrill,
   };

@@ -11,7 +11,7 @@ import { useColors } from '@/hooks/ui/useColors';
 import type { UserWeapon } from '@/services/weaponService';
 import type { WeaponCategory } from '@/types/workspace';
 import * as Haptics from 'expo-haptics';
-import { ChevronRight, Crosshair, Target } from 'lucide-react-native';
+import { Crosshair, Target } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
@@ -75,7 +75,7 @@ export function SessionWeaponStep({
       onUpdateContext(update);
       setShowWeaponPicker(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
+
       // Auto-advance after selection
       setTimeout(() => {
         onContinue();
@@ -95,9 +95,7 @@ export function SessionWeaponStep({
       {isLoadingWeapon ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="small" color={colors.textMuted} />
-          <Text style={[styles.loadingText, { color: colors.textMuted }]}>
-            Loading your weapon...
-          </Text>
+          <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading your weapon...</Text>
         </View>
       ) : hasWeapon ? (
         /* Selected Weapon State */
@@ -121,9 +119,7 @@ export function SessionWeaponStep({
               {categoryConfig && (
                 <View style={styles.categoryRow}>
                   <View style={[styles.categoryDot, { backgroundColor: colors.primary }]} />
-                  <Text style={[styles.categoryLabel, { color: colors.textMuted }]}>
-                    {categoryConfig.label}
-                  </Text>
+                  <Text style={[styles.categoryLabel, { color: colors.textMuted }]}>{categoryConfig.label}</Text>
                 </View>
               )}
             </View>
@@ -141,12 +137,8 @@ export function SessionWeaponStep({
           </View>
 
           {/* Text */}
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>
-            No weapon selected
-          </Text>
-          <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-            Choose from your arsenal to continue
-          </Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>No weapon selected</Text>
+          <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>Choose from your arsenal to continue</Text>
 
           {/* CTA Button */}
           <TouchableOpacity
@@ -155,9 +147,7 @@ export function SessionWeaponStep({
             activeOpacity={0.8}
           >
             <Crosshair size={18} color={colors.background} strokeWidth={2} />
-            <Text style={[styles.selectButtonText, { color: colors.background }]}>
-              Choose Weapon
-            </Text>
+            <Text style={[styles.selectButtonText, { color: colors.background }]}>Choose Weapon</Text>
           </TouchableOpacity>
         </Animated.View>
       )}

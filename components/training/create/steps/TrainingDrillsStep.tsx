@@ -1,6 +1,6 @@
 /**
  * TrainingDrillsStep - Clean drill selection (like createSession)
- * 
+ *
  * Step 2 of training creation: Add and configure drills
  * Design inspired by DrillPresetPicker for consistency
  */
@@ -9,30 +9,18 @@ import { useColors } from '@/hooks/ui/useColors';
 import * as Haptics from 'expo-haptics';
 import {
   Check,
-  ChevronRight,
   Crosshair,
-  GripVertical,
-  MapPin,
   Plus,
   Search,
   Target,
-  Timer,
-  Trash2,
-  X,
+  X
 } from 'lucide-react-native';
-import { useCallback, useState } from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { useState } from 'react';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, Layout } from 'react-native-reanimated';
 
-import type { TrainingDrillItem } from '../createTraining.types';
 import type { Drill } from '@/types/workspace';
+import type { TrainingDrillItem } from '../createTraining.types';
 
 interface TrainingDrillsStepProps {
   drills: TrainingDrillItem[];
@@ -51,13 +39,13 @@ interface TrainingDrillsStepProps {
 // ============================================================================
 
 const GOAL_CONFIG = {
-  grouping: { 
-    color: '#10B981', 
+  grouping: {
+    color: '#10B981',
     label: 'Grouping',
     icon: Target,
   },
-  engagement: { 
-    color: '#F59E0B', 
+  engagement: {
+    color: '#F59E0B',
     label: 'Engagement',
     icon: Crosshair,
   },
@@ -83,7 +71,7 @@ export function TrainingDrillsStep({
   const [activeFilter, setActiveFilter] = useState<'all' | 'grouping' | 'engagement'>('all');
 
   // Filter drills
-  const filteredDrills = teamDrills.filter(drill => {
+  const filteredDrills = teamDrills.filter((drill) => {
     if (activeFilter !== 'all' && drill.drill_goal !== activeFilter) {
       return false;
     }
@@ -101,7 +89,7 @@ export function TrainingDrillsStep({
     <View style={styles.container}>
       {/* Selected Drills - Program Timeline */}
       {drills.length > 0 && (
-        <Animated.View 
+        <Animated.View
           entering={FadeIn.duration(200)}
           style={[styles.programSection, { backgroundColor: colors.card, borderColor: colors.border }]}
         >
@@ -120,7 +108,7 @@ export function TrainingDrillsStep({
             {drills.map((drill, index) => {
               const goal = GOAL_CONFIG[drill.drill_goal as keyof typeof GOAL_CONFIG] || GOAL_CONFIG.grouping;
               const totalDrillShots = drill.rounds_per_shooter * (drill.strings_count || 1);
-              
+
               return (
                 <Animated.View
                   key={drill.id}
@@ -220,12 +208,15 @@ export function TrainingDrillsStep({
 
             {/* Filters */}
             <View style={styles.filters}>
-              {(['all', 'grouping', 'engagement'] as const).map(filter => {
+              {(['all', 'grouping', 'engagement'] as const).map((filter) => {
                 const isActive = activeFilter === filter;
-                const filterColor = filter === 'grouping' ? GOAL_CONFIG.grouping.color 
-                  : filter === 'engagement' ? GOAL_CONFIG.engagement.color 
-                  : colors.text;
-                
+                const filterColor =
+                  filter === 'grouping'
+                    ? GOAL_CONFIG.grouping.color
+                    : filter === 'engagement'
+                      ? GOAL_CONFIG.engagement.color
+                      : colors.text;
+
                 return (
                   <TouchableOpacity
                     key={filter}
@@ -242,15 +233,8 @@ export function TrainingDrillsStep({
                     }}
                     activeOpacity={0.7}
                   >
-                    {filter !== 'all' && (
-                      <View style={[styles.filterDot, { backgroundColor: filterColor }]} />
-                    )}
-                    <Text
-                      style={[
-                        styles.filterText,
-                        { color: isActive ? filterColor : colors.textMuted },
-                      ]}
-                    >
+                    {filter !== 'all' && <View style={[styles.filterDot, { backgroundColor: filterColor }]} />}
+                    <Text style={[styles.filterText, { color: isActive ? filterColor : colors.textMuted }]}>
                       {filter === 'all' ? 'All' : filter === 'grouping' ? 'Grouping' : 'Engagement'}
                     </Text>
                   </TouchableOpacity>
@@ -260,22 +244,18 @@ export function TrainingDrillsStep({
 
             {/* Drill List */}
             {filteredDrills.length > 0 ? (
-              <ScrollView 
-                style={styles.drillList} 
-                showsVerticalScrollIndicator={false}
-                nestedScrollEnabled
-              >
+              <ScrollView style={styles.drillList} showsVerticalScrollIndicator={false} nestedScrollEnabled>
                 {filteredDrills.map((drill, index) => {
                   const goal = GOAL_CONFIG[drill.drill_goal as keyof typeof GOAL_CONFIG] || GOAL_CONFIG.grouping;
                   const GoalIcon = goal.icon;
-                  const isAlreadyAdded = drills.some(d => d.id === drill.id);
+                  const isAlreadyAdded = drills.some((d) => d.id === drill.id);
 
                   return (
                     <TouchableOpacity
                       key={drill.id}
                       style={[
                         styles.drillRow,
-                        { 
+                        {
                           borderBottomColor: colors.border,
                           opacity: isAlreadyAdded ? 0.5 : 1,
                         },
@@ -297,7 +277,8 @@ export function TrainingDrillsStep({
                       {/* Info */}
                       <View style={styles.drillInfo}>
                         <Text style={[styles.drillName, { color: colors.text }]} numberOfLines={1}>
-                          {drill.icon ? `${drill.icon} ` : ''}{drill.name}
+                          {drill.icon ? `${drill.icon} ` : ''}
+                          {drill.name}
                         </Text>
                         <Text style={[styles.drillMeta, { color: colors.textMuted }]}>
                           {drill.distance_m}m • {drill.rounds_per_shooter} shots
@@ -325,7 +306,7 @@ export function TrainingDrillsStep({
                   {teamDrills.length === 0 ? 'No drills yet' : 'No matching drills'}
                 </Text>
                 <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-                  {teamDrills.length === 0 
+                  {teamDrills.length === 0
                     ? 'Create your first drill to get started'
                     : 'Try a different search or filter'}
                 </Text>
@@ -336,9 +317,7 @@ export function TrainingDrillsStep({
                     activeOpacity={0.8}
                   >
                     <Plus size={16} color={colors.background} />
-                    <Text style={[styles.emptyBtnText, { color: colors.background }]}>
-                      Create First Drill
-                    </Text>
+                    <Text style={[styles.emptyBtnText, { color: colors.background }]}>Create First Drill</Text>
                   </TouchableOpacity>
                 )}
               </View>

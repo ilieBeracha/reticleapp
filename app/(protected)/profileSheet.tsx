@@ -1,10 +1,11 @@
 /**
  * Profile Sheet
- * 
+ *
  * Personal account settings displayed as a bottom sheet.
  */
 import { BaseAvatar } from '@/components/shared/Avatar';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useColors } from '@/hooks/ui/useColors';
 import { useAppContext } from '@/hooks/useAppContext';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -12,24 +13,24 @@ import { sendTestNotification } from '@/services/notifications';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useCallback } from 'react';
-import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+import { useCallback, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const THEME_OPTIONS = [
+  { value: 'light' as const, label: 'Light', icon: 'sunny' as const },
+  { value: 'dark' as const, label: 'Dark', icon: 'moon' as const },
+  { value: 'system' as const, label: 'System', icon: 'phone-portrait' as const },
+];
 
 export default function ProfileSheet() {
   const colors = useColors();
   const { fullName, email } = useAppContext();
   const { signOut, profileAvatarUrl } = useAuth();
   const { isEnabled: notificationsEnabled, requestPermission } = useNotifications();
+  const { preference, setPreference } = useTheme();
+  const [showThemeOptions, setShowThemeOptions] = useState(false);
 
   const handleTestNotification = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -70,7 +71,7 @@ export default function ProfileSheet() {
 
   return (
     <ScrollView
-      style={styles.scrollView}
+      style={[styles.scrollView, { backgroundColor: colors.card }]}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
     >
@@ -112,7 +113,12 @@ export default function ProfileSheet() {
         <View style={[styles.menuGroup, { backgroundColor: colors.background }]}>
           {/* Notifications Toggle */}
           <View style={styles.menuItem}>
-            <View style={[styles.iconContainer, { backgroundColor: notificationsEnabled ? colors.primary : colors.textMuted }]}>
+            <View
+              style={[
+                styles.iconContainer,
+                { backgroundColor: notificationsEnabled ? colors.primary : colors.textMuted },
+              ]}
+            >
               <Ionicons name="notifications" size={18} color="#fff" />
             </View>
             <View style={styles.menuItemContent}>
@@ -153,15 +159,56 @@ export default function ProfileSheet() {
 
           {/* Appearance */}
           <View style={[styles.separator, { backgroundColor: colors.border }]} />
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setShowThemeOptions(!showThemeOptions);
+            }}
+          >
             <View style={[styles.iconContainer, { backgroundColor: '#8B5CF6' }]}>
               <Ionicons name="color-palette" size={18} color="#fff" />
             </View>
             <View style={styles.menuItemContent}>
               <Text style={[styles.menuItemText, { color: colors.text }]}>Appearance</Text>
+              <Text style={[styles.menuItemSubtitle, { color: colors.textMuted }]}>
+                {THEME_OPTIONS.find((o) => o.value === preference)?.label || 'System'}
+              </Text>
             </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+            <Ionicons name={showThemeOptions ? 'chevron-down' : 'chevron-forward'} size={16} color={colors.textMuted} />
           </TouchableOpacity>
+
+          {/* Theme Options (expandable) */}
+          {showThemeOptions && (
+            <View style={[styles.themeOptionsContainer, { backgroundColor: colors.secondary }]}>
+              {THEME_OPTIONS.map((option) => {
+                const isSelected = preference === option.value;
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[styles.themeOption, isSelected && { backgroundColor: colors.primary + '15' }]}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setPreference(option.value);
+                    }}
+                  >
+                    <View
+                      style={[
+                        styles.themeOptionIcon,
+                        { backgroundColor: isSelected ? colors.primary : colors.textMuted + '30' },
+                      ]}
+                    >
+                      <Ionicons name={option.icon} size={16} color={isSelected ? '#fff' : colors.textMuted} />
+                    </View>
+                    <Text style={[styles.themeOptionText, { color: isSelected ? colors.primary : colors.text }]}>
+                      {option.label}
+                    </Text>
+                    {isSelected && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
 
           {/* Integrations */}
           <View style={[styles.separator, { backgroundColor: colors.border }]} />
@@ -311,5 +358,32 @@ const styles = StyleSheet.create({
   },
   versionText: {
     fontSize: 12,
+  },
+
+  // Theme Options
+  themeOptionsContainer: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  themeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 12,
+  },
+  themeOptionIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  themeOptionText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
   },
 });

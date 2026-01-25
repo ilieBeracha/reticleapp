@@ -12,9 +12,7 @@ export const EmptyTargets = React.memo(function EmptyTargets() {
         <Ionicons name="disc-outline" size={48} color="rgba(255,255,255,0.2)" />
       </View>
       <Text style={styles.title}>No Targets Yet</Text>
-      <Text style={styles.subtitle}>
-        Tap the button below to add your first target
-      </Text>
+      <Text style={styles.subtitle}>Tap the button below to add your first target</Text>
     </View>
   );
 });
@@ -52,4 +50,3 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 });
-

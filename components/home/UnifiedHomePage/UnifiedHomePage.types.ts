@@ -5,7 +5,12 @@
  */
 
 import type { useColors } from '@/hooks/ui/useColors';
+import type { UserWeapon, WeaponStats } from '@/services/weaponService';
+import type { TrainingWithDetails } from '@/types/workspace';
 import type { HomeSession } from '../types';
+
+/** Hero mode determined by priority logic */
+export type HeroMode = 'team-live' | 'solo-active' | 'idle';
 
 /** Weekly stats computed from sessions */
 export interface WeeklyStats {
@@ -88,6 +93,30 @@ export interface TeamSectionProps {
   hasTeams: boolean;
   colors: Colors;
   onTrainingPress: (training: any) => void;
+}
+
+/** Props for HeroActions */
+export interface HeroActionsProps {
+  colors: Colors;
+  heroMode: HeroMode;
+  // Solo session
+  activeSession: HomeSession | null;
+  hasActiveSession: boolean;
+  starting: boolean;
+  onStartSession: () => void;
+  onActiveSessionPress: () => void;
+  // Team training
+  activeTeamTraining: TrainingWithDetails | null;
+  isTrainingCommander: boolean;
+  hasTeams: boolean;
+  onTrainingPress: (training: TrainingWithDetails) => void;
+  // Next upcoming training (for secondary row)
+  nextUpcomingTraining: TrainingWithDetails | null;
+  // Weapon data
+  defaultWeapon: UserWeapon | null;
+  defaultWeaponStats: WeaponStats | null;
+  // Upcoming trainings for timeline
+  upcomingTrainings: TrainingWithDetails[];
 }
 
 /** Props for RecentActivitySection */

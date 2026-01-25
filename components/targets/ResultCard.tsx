@@ -1,12 +1,12 @@
-import { useColors } from "@/hooks/ui/useColors";
-import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from "@/theme/colors";
-import type { AnalyzeDocumentResponse, AnalyzeResponse } from "@/types/api";
-import type { DecodedWeather } from "@/services/session/watchTypes";
-import { Ionicons } from "@expo/vector-icons";
-import { Cloud, Droplets, Thermometer, Wind } from "lucide-react-native";
-import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import { useColors } from '@/hooks/ui/useColors';
+import type { DecodedWeather } from '@/services/session/watchTypes';
+import { BUTTON_GRADIENT, BUTTON_GRADIENT_DISABLED } from '@/theme/colors';
+import type { AnalyzeDocumentResponse, AnalyzeResponse } from '@/types/api';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Cloud, Droplets, Thermometer, Wind } from 'lucide-react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -18,11 +18,11 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from "react-native";
-import ViewShot from "react-native-view-shot";
-import { DetectionEditor } from "./DetectionEditor";
-import { DetectionPreview } from "./DetectionPreview";
-import { COLORS, EditableDetection, EditMode, TargetType } from "./types";
+} from 'react-native';
+import ViewShot from 'react-native-view-shot';
+import { DetectionEditor } from './DetectionEditor';
+import { DetectionPreview } from './DetectionPreview';
+import { COLORS, EditableDetection, EditMode, TargetType } from './types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // RESULT CARD
@@ -35,13 +35,17 @@ type DetectionResult = AnalyzeResponse | AnalyzeDocumentResponse;
 
 interface ResultCardProps {
   result: DetectionResult;
-  /** 
-   * Called when user saves. 
+  /**
+   * Called when user saves.
    * @param finalDetections - The edited detections
    * @param editedImageBase64 - Optional edited image
    * @param actualShotsDeclared - Optional: how many shots user actually fired (for accuracy calc)
    */
-  onDone: (finalDetections: EditableDetection[], editedImageBase64?: string, actualShotsDeclared?: number | null) => void;
+  onDone: (
+    finalDetections: EditableDetection[],
+    editedImageBase64?: string,
+    actualShotsDeclared?: number | null
+  ) => void;
   onRetake: () => void;
   saving: boolean;
   editedDetections: EditableDetection[];
@@ -59,27 +63,27 @@ export const ResultCard = React.memo(function ResultCard({
   saving,
   editedDetections,
   onDetectionsChange,
-  targetType = "grouping",
+  targetType = 'grouping',
   weather,
 }: ResultCardProps) {
   const colors = useColors();
-  const [editMode, setEditMode] = useState<EditMode>("add");
+  const [editMode, setEditMode] = useState<EditMode>('add');
   const [editingEnabled, setEditingEnabled] = useState(false);
   const [editorModalVisible, setEditorModalVisible] = useState(false);
-  
+
   // Ref for capturing the edited image
   const editorCaptureRef = useRef<ViewShot | null>(null);
-  
+
   // Store captured image when modal closes
   const [capturedEditedImage, setCapturedEditedImage] = useState<string | null>(null);
-  
+
   // Animation for modal
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
-  
+
   // Actual shots declared by user (for accurate percentage on scanned targets)
-  const [actualShotsInput, setActualShotsInput] = useState<string>("");
-  
+  const [actualShotsInput, setActualShotsInput] = useState<string>('');
+
   // Handle editor toggle with animation
   const handleToggleEditor = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -121,20 +125,20 @@ export const ResultCard = React.memo(function ResultCard({
 
   const handleCloseEditor = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
+
     // Capture the edited image BEFORE closing the modal
     if (editorCaptureRef.current) {
       try {
         const capturedBase64 = await (editorCaptureRef.current as any).capture();
         if (capturedBase64) {
           setCapturedEditedImage(capturedBase64);
-          console.log("[ResultCard] Captured edited image on modal close, length:", capturedBase64.length);
+          console.log('[ResultCard] Captured edited image on modal close, length:', capturedBase64.length);
         }
       } catch (err) {
-        console.log("[ResultCard] Could not capture edited image on close:", err);
+        console.log('[ResultCard] Could not capture edited image on close:', err);
       }
     }
-    
+
     Animated.parallel([
       Animated.spring(scaleAnim, {
         toValue: 0,
@@ -152,7 +156,7 @@ export const ResultCard = React.memo(function ResultCard({
       setEditingEnabled(false);
     });
   }, [scaleAnim, opacityAnim]);
-  
+
   // Calculate stats from edited detections
   const stats = useMemo(() => {
     const total = editedDetections.length;
@@ -160,38 +164,38 @@ export const ResultCard = React.memo(function ResultCard({
     const medium = editedDetections.filter((d) => !d.isManual && d.confidence >= 0.4 && d.confidence < 0.6).length;
     const low = editedDetections.filter((d) => !d.isManual && d.confidence < 0.4).length;
     const manual = editedDetections.filter((d) => d.isManual).length;
-    
+
     return { total, high, medium, low, manual };
   }, [editedDetections]);
 
   // Dynamically calculate group size from CURRENT detections (updates on edit)
   const groupSizeData = useMemo(() => {
     if (editedDetections.length < 2) return null;
-    
+
     let maxDistance = 0;
     let minDistance = Infinity;
-    
+
     // Find the furthest and tightest pairs
     for (let i = 0; i < editedDetections.length; i++) {
       for (let j = i + 1; j < editedDetections.length; j++) {
         const dx = editedDetections[i].center[0] - editedDetections[j].center[0];
         const dy = editedDetections[i].center[1] - editedDetections[j].center[1];
         const distance = Math.sqrt(dx * dx + dy * dy);
-        
+
         if (distance > maxDistance) maxDistance = distance;
         if (distance < minDistance) minDistance = distance;
       }
     }
-    
+
     // Convert pixel distances to cm using scale_info if available
     let maxDistanceCm: number | null = null;
     let minDistanceCm: number | null = null;
-    
+
     if (result.scale_info?.cm_per_pixel) {
       maxDistanceCm = maxDistance * result.scale_info.cm_per_pixel;
       minDistanceCm = minDistance * result.scale_info.cm_per_pixel;
     }
-    
+
     return {
       maxDistancePx: maxDistance,
       maxDistanceCm,
@@ -201,10 +205,7 @@ export const ResultCard = React.memo(function ResultCard({
   }, [editedDetections, result.scale_info]);
 
   const hasChanges = useMemo(() => {
-    return (
-      editedDetections.length !== result.detections.length ||
-      editedDetections.some((d) => d.isManual)
-    );
+    return editedDetections.length !== result.detections.length || editedDetections.some((d) => d.isManual);
   }, [editedDetections, result.detections]);
 
   // Parse actual shots declared
@@ -217,27 +218,28 @@ export const ResultCard = React.memo(function ResultCard({
   // Handle save with the captured edited image
   const handleSave = useCallback(async () => {
     const editedImageBase64 = hasChanges ? capturedEditedImage || undefined : undefined;
-    
+
     if (hasChanges && editedImageBase64) {
-      console.log("[ResultCard] Saving with edited image, length:", editedImageBase64.length);
+      console.log('[ResultCard] Saving with edited image, length:', editedImageBase64.length);
     } else if (hasChanges) {
-      console.log("[ResultCard] Saving with changes but no captured image");
+      console.log('[ResultCard] Saving with changes but no captured image');
     }
-    
+
     onDone(editedDetections, editedImageBase64, actualShotsDeclared);
   }, [editedDetections, hasChanges, capturedEditedImage, onDone, actualShotsDeclared]);
 
   return (
-    <ScrollView style={[styles.scrollView, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={[styles.scrollView, { backgroundColor: colors.background }]}
+      contentContainerStyle={styles.content}
+    >
       {/* Header */}
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>
-          {targetType === "grouping" ? "Grouping Analysis" : "Achievement Results"}
+          {targetType === 'grouping' ? 'Grouping Analysis' : 'Achievement Results'}
         </Text>
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          {targetType === "grouping" 
-            ? "Measuring shot consistency" 
-            : "AI detected bullet holes"}
+          {targetType === 'grouping' ? 'Measuring shot consistency' : 'AI detected bullet holes'}
         </Text>
 
         {/* Weather Conditions */}
@@ -246,33 +248,25 @@ export const ResultCard = React.memo(function ResultCard({
             {weather.temperatureC != null && (
               <View style={[styles.weatherChip, { backgroundColor: colors.blue + '15' }]}>
                 <Thermometer size={12} color={colors.blue} />
-                <Text style={[styles.weatherText, { color: colors.blue }]}>
-                  {Math.round(weather.temperatureC)}°C
-                </Text>
+                <Text style={[styles.weatherText, { color: colors.blue }]}>{Math.round(weather.temperatureC)}°C</Text>
               </View>
             )}
             {weather.humidity != null && (
               <View style={[styles.weatherChip, { backgroundColor: colors.primary + '15' }]}>
                 <Droplets size={12} color={colors.primary} />
-                <Text style={[styles.weatherText, { color: colors.primary }]}>
-                  {weather.humidity}%
-                </Text>
+                <Text style={[styles.weatherText, { color: colors.primary }]}>{weather.humidity}%</Text>
               </View>
             )}
             {weather.windSpeedMps != null && (
               <View style={[styles.weatherChip, { backgroundColor: colors.green + '15' }]}>
                 <Wind size={12} color={colors.green} />
-                <Text style={[styles.weatherText, { color: colors.green }]}>
-                  {weather.windSpeedMps.toFixed(1)} m/s
-                </Text>
+                <Text style={[styles.weatherText, { color: colors.green }]}>{weather.windSpeedMps.toFixed(1)} m/s</Text>
               </View>
             )}
             {weather.condition && (
               <View style={[styles.weatherChip, { backgroundColor: colors.secondary }]}>
                 <Cloud size={12} color={colors.textMuted} />
-                <Text style={[styles.weatherText, { color: colors.textMuted }]}>
-                  {weather.condition}
-                </Text>
+                <Text style={[styles.weatherText, { color: colors.textMuted }]}>{weather.condition}</Text>
               </View>
             )}
           </View>
@@ -288,11 +282,17 @@ export const ResultCard = React.memo(function ResultCard({
         onPress={handleToggleEditor}
         activeOpacity={0.7}
       >
-        <View style={[styles.editToggleIcon, { backgroundColor: colors.secondary }, editingEnabled && styles.editToggleIconActive]}>
-          <Ionicons name="pencil" size={16} color={editingEnabled ? "#000" : colors.textMuted} />
+        <View
+          style={[
+            styles.editToggleIcon,
+            { backgroundColor: colors.secondary },
+            editingEnabled && styles.editToggleIconActive,
+          ]}
+        >
+          <Ionicons name="pencil" size={16} color={editingEnabled ? '#000' : colors.textMuted} />
         </View>
         <Text style={[styles.editToggleText, { color: colors.text }]}>
-          {editingEnabled ? "Editing..." : "Edit Detections"}
+          {editingEnabled ? 'Editing...' : 'Edit Detections'}
         </Text>
         <Ionicons name="expand-outline" size={18} color={colors.textMuted} />
       </TouchableOpacity>
@@ -306,17 +306,19 @@ export const ResultCard = React.memo(function ResultCard({
             </View>
             <View style={styles.groupSizeHeaderText}>
               <Text style={[styles.groupSizeTitle, { color: colors.text }]}>Group Size</Text>
-              <Text style={[styles.groupSizeHint, { color: colors.textMuted }]}>Furthest distance between any 2 bullets (circled above)</Text>
+              <Text style={[styles.groupSizeHint, { color: colors.textMuted }]}>
+                Furthest distance between any 2 bullets (circled above)
+              </Text>
             </View>
           </View>
-          
+
           <View style={styles.groupSizeContent}>
             <Text style={[styles.groupSizeValue, { color: colors.text }]}>
               {groupSizeData.maxDistanceCm.toFixed(1)}
             </Text>
             <Text style={[styles.groupSizeUnit, { color: colors.textMuted }]}>cm</Text>
           </View>
-          
+
           {/* Visual quality indicator */}
           <View style={styles.groupSizeQuality}>
             {groupSizeData.maxDistanceCm <= 5 ? (
@@ -326,8 +328,8 @@ export const ResultCard = React.memo(function ResultCard({
               </>
             ) : groupSizeData.maxDistanceCm <= 10 ? (
               <>
-                <View style={[styles.qualityDot, { backgroundColor: "#22C55E" }]} />
-                <Text style={[styles.qualityText, { color: "#22C55E" }]}>Good</Text>
+                <View style={[styles.qualityDot, { backgroundColor: '#22C55E' }]} />
+                <Text style={[styles.qualityText, { color: '#22C55E' }]}>Good</Text>
               </>
             ) : groupSizeData.maxDistanceCm <= 20 ? (
               <>
@@ -341,7 +343,7 @@ export const ResultCard = React.memo(function ResultCard({
               </>
             )}
           </View>
-          
+
           {/* Min pair info if available */}
           {groupSizeData.minDistanceCm != null && (
             <View style={[styles.groupSizeExtra, { borderTopColor: colors.border }]}>
@@ -358,12 +360,7 @@ export const ResultCard = React.memo(function ResultCard({
       {/* <DistanceInput distance={distance} onDistanceChange={onDistanceChange} disabled={distanceLocked} /> */}
 
       {/* Editor Modal */}
-      <Modal
-        visible={editorModalVisible}
-        transparent
-        animationType="none"
-        onRequestClose={handleCloseEditor}
-      >
+      <Modal visible={editorModalVisible} transparent animationType="none" onRequestClose={handleCloseEditor}>
         <Animated.View style={[styles.modalOverlay, { opacity: opacityAnim }]}>
           <Pressable style={styles.modalBackdrop} onPress={handleCloseEditor} />
           <Animated.View
@@ -414,20 +411,22 @@ export const ResultCard = React.memo(function ResultCard({
         <View style={styles.mainStat}>
           <Text style={[styles.mainStatValue, { color: colors.primary }]}>{stats.total}</Text>
           <Text style={[styles.mainStatLabel, { color: colors.textMuted }]}>
-            {targetType === "grouping" ? "Total Shots" : "Total Hits"}
-            {hasChanges ? " (edited)" : ""}
+            {targetType === 'grouping' ? 'Total Shots' : 'Total Hits'}
+            {hasChanges ? ' (edited)' : ''}
           </Text>
         </View>
 
         <View style={[styles.statsDivider, { backgroundColor: colors.border }]} />
 
         <View style={styles.breakdownStats}>
-          {targetType === "grouping" ? (
+          {targetType === 'grouping' ? (
             // Grouping: Show shot count and dispersion info only
             <>
               <View style={styles.breakdownRow}>
                 <View style={[styles.statDot, { backgroundColor: colors.primary }]} />
-                <Text style={[styles.breakdownText, { color: colors.textMuted }]}>{stats.high - stats.manual} AI detected</Text>
+                <Text style={[styles.breakdownText, { color: colors.textMuted }]}>
+                  {stats.high - stats.manual} AI detected
+                </Text>
               </View>
               {stats.manual > 0 && (
                 <View style={styles.breakdownRow}>
@@ -480,10 +479,10 @@ export const ResultCard = React.memo(function ResultCard({
           <Ionicons name="pencil" size={14} color={COLORS.info} />
           <Text style={[styles.changeText, { color: colors.text }]}>
             {result.detections.length > editedDetections.length
-              ? `Removed ${result.detections.length - editedDetections.length + stats.manual} false detection${result.detections.length - editedDetections.length + stats.manual !== 1 ? "s" : ""}`
+              ? `Removed ${result.detections.length - editedDetections.length + stats.manual} false detection${result.detections.length - editedDetections.length + stats.manual !== 1 ? 's' : ''}`
               : stats.manual > 0
-                ? `Added ${stats.manual} missed bullet${stats.manual !== 1 ? "s" : ""}`
-                : "Detections modified"}
+                ? `Added ${stats.manual} missed bullet${stats.manual !== 1 ? 's' : ''}`
+                : 'Detections modified'}
           </Text>
         </View>
       )}
@@ -497,25 +496,26 @@ export const ResultCard = React.memo(function ResultCard({
       </View>
 
       {/* Actual Shots Input - For Achievement targets to get accurate percentage */}
-      {targetType === "engagement" && (
+      {targetType === 'engagement' && (
         <View style={[styles.actualShotsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.actualShotsHeader}>
             <Ionicons name="analytics-outline" size={18} color={colors.primary} />
-            <Text style={[styles.actualShotsTitle, { color: colors.text }]}>
-              How many shots did you fire?
-            </Text>
+            <Text style={[styles.actualShotsTitle, { color: colors.text }]}>How many shots did you fire?</Text>
           </View>
           <Text style={[styles.actualShotsHint, { color: colors.textMuted }]}>
-            Optional: AI detected {stats.total} hole{stats.total !== 1 ? 's' : ''}, but some shots may have missed entirely.
-            Enter your actual shot count for accurate accuracy %.
+            Optional: AI detected {stats.total} hole{stats.total !== 1 ? 's' : ''}, but some shots may have missed
+            entirely. Enter your actual shot count for accurate accuracy %.
           </Text>
           <View style={styles.actualShotsInputRow}>
             <TextInput
-              style={[styles.actualShotsInput, { 
-                backgroundColor: colors.secondary, 
-                color: colors.text,
-                borderColor: actualShotsDeclared && actualShotsDeclared < stats.total ? COLORS.danger : colors.border
-              }]}
+              style={[
+                styles.actualShotsInput,
+                {
+                  backgroundColor: colors.secondary,
+                  color: colors.text,
+                  borderColor: actualShotsDeclared && actualShotsDeclared < stats.total ? COLORS.danger : colors.border,
+                },
+              ]}
               placeholder={`e.g. ${Math.max(stats.total, 10)}`}
               placeholderTextColor={colors.textMuted}
               keyboardType="number-pad"
@@ -528,10 +528,19 @@ export const ResultCard = React.memo(function ResultCard({
           {actualShotsDeclared && actualShotsDeclared >= stats.total && (
             <View style={styles.accuracyPreview}>
               <Text style={[styles.accuracyPreviewLabel, { color: colors.textMuted }]}>Accuracy:</Text>
-              <Text style={[styles.accuracyPreviewValue, { 
-                color: (stats.total / actualShotsDeclared) >= 0.7 ? '#22C55E' : 
-                       (stats.total / actualShotsDeclared) >= 0.5 ? COLORS.warning : COLORS.danger 
-              }]}>
+              <Text
+                style={[
+                  styles.accuracyPreviewValue,
+                  {
+                    color:
+                      stats.total / actualShotsDeclared >= 0.7
+                        ? '#22C55E'
+                        : stats.total / actualShotsDeclared >= 0.5
+                          ? COLORS.warning
+                          : COLORS.danger,
+                  },
+                ]}
+              >
                 {Math.round((stats.total / actualShotsDeclared) * 100)}%
               </Text>
               <Text style={[styles.accuracyPreviewDetail, { color: colors.textMuted }]}>
@@ -548,12 +557,7 @@ export const ResultCard = React.memo(function ResultCard({
       )}
 
       {/* Actions */}
-      <TouchableOpacity
-        style={styles.doneButton}
-        onPress={handleSave}
-        activeOpacity={0.9}
-        disabled={saving}
-      >
+      <TouchableOpacity style={styles.doneButton} onPress={handleSave} activeOpacity={0.9} disabled={saving}>
         <LinearGradient
           colors={saving ? [...BUTTON_GRADIENT_DISABLED] : [...BUTTON_GRADIENT]}
           start={{ x: 0, y: 0 }}
@@ -566,9 +570,13 @@ export const ResultCard = React.memo(function ResultCard({
             <>
               <Ionicons name="checkmark-circle" size={22} color="#fff" />
               <Text style={styles.doneButtonText}>
-                {targetType === "grouping" 
-                  ? (stats.total === 0 ? "Save (No Shots)" : `Save ${stats.total} Shot${stats.total !== 1 ? "s" : ""}`)
-                  : (stats.total === 0 ? "Save (No Hits)" : `Save ${stats.total} Hit${stats.total !== 1 ? "s" : ""}`)}
+                {targetType === 'grouping'
+                  ? stats.total === 0
+                    ? 'Save (No Shots)'
+                    : `Save ${stats.total} Shot${stats.total !== 1 ? 's' : ''}`
+                  : stats.total === 0
+                    ? 'Save (No Hits)'
+                    : `Save ${stats.total} Hit${stats.total !== 1 ? 's' : ''}`}
               </Text>
             </>
           )}
@@ -598,12 +606,12 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   header: {
-    alignItems: "center",
+    alignItems: 'center',
     marginBottom: 20,
   },
   title: {
     fontSize: 24,
-    fontWeight: "700",
+    fontWeight: '700',
     color: COLORS.white,
     marginBottom: 4,
   },
@@ -611,17 +619,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textMuted,
   },
-  
+
   // Weather
   weatherRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     marginTop: 12,
   },
   weatherChip: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -629,13 +637,13 @@ const styles = StyleSheet.create({
   },
   weatherText: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
   },
-  
+
   // Edit Toggle
   editToggle: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: COLORS.card,
     borderRadius: 14,
     paddingVertical: 14,
@@ -648,8 +656,8 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 16,
     backgroundColor: COLORS.cardHover,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   editToggleIconActive: {
     backgroundColor: COLORS.primary,
@@ -657,39 +665,39 @@ const styles = StyleSheet.create({
   editToggleText: {
     flex: 1,
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.white,
   },
-  
+
   // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.85)",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: 20,
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
   },
   modalContent: {
-    backgroundColor: "#1a1a1a",
+    backgroundColor: '#1a1a1a',
     borderRadius: 24,
     padding: 20,
-    width: "100%",
+    width: '100%',
     maxWidth: 400,
-    alignItems: "center",
+    alignItems: 'center',
   },
   modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
     marginBottom: 16,
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: "700",
+    fontWeight: '700',
     color: COLORS.white,
   },
   modalClose: {
@@ -697,8 +705,8 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: COLORS.cardHover,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalStats: {
     marginTop: 16,
@@ -706,18 +714,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     backgroundColor: COLORS.card,
     borderRadius: 12,
-    width: "100%",
-    alignItems: "center",
+    width: '100%',
+    alignItems: 'center',
   },
   modalStatsText: {
     fontSize: 14,
     color: COLORS.textMuted,
   },
   modalDone: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "100%",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
     height: 52,
     backgroundColor: COLORS.primary,
     borderRadius: 14,
@@ -726,13 +734,13 @@ const styles = StyleSheet.create({
   },
   modalDoneText: {
     fontSize: 16,
-    fontWeight: "600",
-    color: "#000",
+    fontWeight: '600',
+    color: '#000',
   },
-  
+
   // Stats
   statsContainer: {
-    flexDirection: "row",
+    flexDirection: 'row',
     backgroundColor: COLORS.card,
     borderRadius: 16,
     padding: 20,
@@ -740,18 +748,18 @@ const styles = StyleSheet.create({
   },
   mainStat: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   mainStatValue: {
     fontSize: 48,
-    fontWeight: "800",
+    fontWeight: '800',
     color: COLORS.primary,
   },
   mainStatLabel: {
     fontSize: 12,
     color: COLORS.textMuted,
-    textTransform: "uppercase",
+    textTransform: 'uppercase',
     marginTop: 4,
   },
   statsDivider: {
@@ -761,12 +769,12 @@ const styles = StyleSheet.create({
   },
   breakdownStats: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: 'center',
     gap: 8,
   },
   breakdownRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
   statDot: {
@@ -778,19 +786,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.text,
   },
-  
+
   // Group Size Card
   groupSizeCard: {
-    backgroundColor: "rgba(239, 68, 68, 0.08)",
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.2)",
+    borderColor: 'rgba(239, 68, 68, 0.2)',
   },
   groupSizeHeader: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
     marginBottom: 12,
   },
@@ -798,16 +806,16 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: "rgba(239, 68, 68, 0.3)",
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: 'rgba(239, 68, 68, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   groupSizeHeaderText: {
     flex: 1,
   },
   groupSizeTitle: {
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: '700',
     color: COLORS.white,
   },
   groupSizeHint: {
@@ -816,27 +824,27 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   groupSizeContent: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
     paddingVertical: 8,
   },
   groupSizeValue: {
     fontSize: 48,
-    fontWeight: "800",
-    color: "#EF4444",
+    fontWeight: '800',
+    color: '#EF4444',
   },
   groupSizeUnit: {
     fontSize: 20,
-    fontWeight: "600",
-    color: "#EF4444",
+    fontWeight: '600',
+    color: '#EF4444',
     marginLeft: 4,
     opacity: 0.7,
   },
   groupSizeQuality: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     marginTop: 4,
   },
@@ -847,17 +855,17 @@ const styles = StyleSheet.create({
   },
   qualityText: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   groupSizeExtra: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.1)",
+    borderTopColor: 'rgba(255,255,255,0.1)',
   },
   groupSizeExtraLabel: {
     fontSize: 12,
@@ -865,17 +873,17 @@ const styles = StyleSheet.create({
   },
   groupSizeExtraValue: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.primary,
   },
 
   // Change Indicator
   changeIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
-    backgroundColor: "rgba(59, 130, 246, 0.15)",
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 10,
@@ -884,14 +892,14 @@ const styles = StyleSheet.create({
   changeText: {
     fontSize: 13,
     color: COLORS.info,
-    fontWeight: "500",
+    fontWeight: '500',
   },
-  
+
   // Info
   infoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     marginBottom: 24,
   },
@@ -899,38 +907,38 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textDim,
   },
-  
+
   // Buttons
   doneButton: {
     borderRadius: 28,
-    overflow: "hidden",
+    overflow: 'hidden',
     marginBottom: 12,
   },
   doneButtonGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     height: 56,
     gap: 10,
   },
   doneButtonText: {
     fontSize: 17,
-    fontWeight: "700",
-    color: "#fff",
+    fontWeight: '700',
+    color: '#fff',
   },
   retakeButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
     paddingVertical: 12,
   },
   retakeButtonText: {
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.textMuted,
   },
-  
+
   // Actual Shots Input
   actualShotsCard: {
     borderRadius: 14,
@@ -939,14 +947,14 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   actualShotsHeader: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
     marginBottom: 8,
   },
   actualShotsTitle: {
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   actualShotsHint: {
     fontSize: 12,
@@ -954,8 +962,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   actualShotsInputRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
   },
   actualShotsInput: {
@@ -964,29 +972,29 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     fontSize: 18,
-    fontWeight: "600",
-    textAlign: "center",
+    fontWeight: '600',
+    textAlign: 'center',
     paddingHorizontal: 12,
   },
   actualShotsLabel: {
     fontSize: 14,
-    fontWeight: "500",
+    fontWeight: '500',
   },
   accuracyPreview: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.1)",
+    borderTopColor: 'rgba(255,255,255,0.1)',
   },
   accuracyPreviewLabel: {
     fontSize: 13,
   },
   accuracyPreviewValue: {
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   accuracyPreviewDetail: {
     fontSize: 12,
@@ -994,7 +1002,6 @@ const styles = StyleSheet.create({
   actualShotsError: {
     fontSize: 12,
     marginTop: 8,
-    fontWeight: "500",
+    fontWeight: '500',
   },
 });
-

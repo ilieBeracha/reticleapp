@@ -1,13 +1,13 @@
 /**
  * Weapon Category Configuration
- * 
+ *
  * Each category defines the "personality" of the training experience:
  * - Default distances that make sense
  * - Drill types that are relevant
  * - Target types commonly used
  * - Positions typically trained
  * - Time expectations
- * 
+ *
  * The category you're shooting with shapes what you see and how
  * your results are interpreted.
  */
@@ -488,7 +488,7 @@ export const CATEGORY_CONFIGS: Record<WeaponCategory, CategoryConfig> = {
 /**
  * Simple weapon category list for pickers/selects.
  * This is the SINGLE SOURCE OF TRUTH for weapon category options.
- * 
+ *
  * Derived from CATEGORY_CONFIGS to ensure consistency.
  */
 export const WEAPON_CATEGORIES: { value: WeaponCategory; label: string }[] = (
@@ -534,10 +534,7 @@ export function getCategoryZeroDistance(category: WeaponCategory | null | undefi
 /**
  * Check if a distance is appropriate for a category
  */
-export function isDistanceAppropriate(
-  category: WeaponCategory | null | undefined,
-  distance: number
-): boolean {
+export function isDistanceAppropriate(category: WeaponCategory | null | undefined, distance: number): boolean {
   const config = getCategoryConfig(category);
   return distance >= config.distances.min && distance <= config.distances.max;
 }
@@ -552,9 +549,7 @@ export function getCategoryPresets(category: WeaponCategory | null | undefined):
 /**
  * Get drill defaults for a category
  */
-export function getCategoryDrillDefaults(
-  category: WeaponCategory | null | undefined
-): CategoryDrillDefaults {
+export function getCategoryDrillDefaults(category: WeaponCategory | null | undefined): CategoryDrillDefaults {
   return getCategoryConfig(category).drillDefaults;
 }
 
@@ -568,12 +563,12 @@ export function evaluateDispersion(
 ): 'excellent' | 'good' | 'average' | 'needs_work' {
   const config = getCategoryConfig(category);
   const zeroDistance = config.distances.zeroDistance;
-  
+
   // Adjust thresholds for distance (farther = more lenient)
   const distanceFactor = Math.max(1, distance / zeroDistance);
   const adjustedExcellent = config.scoring.excellentDispersion * distanceFactor;
   const adjustedGood = config.scoring.goodDispersion * distanceFactor;
-  
+
   if (dispersionCm <= adjustedExcellent) return 'excellent';
   if (dispersionCm <= adjustedGood) return 'good';
   if (dispersionCm <= adjustedGood * 1.5) return 'average';
@@ -588,7 +583,7 @@ export function evaluateSplitTime(
   splitMs: number
 ): 'excellent' | 'good' | 'average' | 'slow' {
   const config = getCategoryConfig(category);
-  
+
   if (splitMs <= config.timing.excellentSplit) return 'excellent';
   if (splitMs <= config.timing.goodSplit) return 'good';
   if (splitMs <= config.timing.goodSplit * 1.5) return 'average';
@@ -598,10 +593,7 @@ export function evaluateSplitTime(
 /**
  * Get suggested time limit for a drill based on category and rounds
  */
-export function getSuggestedTimeLimit(
-  category: WeaponCategory | null | undefined,
-  rounds: number
-): number {
+export function getSuggestedTimeLimit(category: WeaponCategory | null | undefined, rounds: number): number {
   const config = getCategoryConfig(category);
   return rounds * config.timing.timeLimitMultiplier;
 }
@@ -621,5 +613,3 @@ export function presetToDrillConfig(preset: QuickPreset, category: WeaponCategor
     weapon_category: category,
   };
 }
-
-

@@ -1,6 +1,7 @@
 import { SESSION_STATUS, TARGET_TYPE } from '@/constants';
 import { supabase } from '@/lib/supabase';
 import { markWeaponUsed } from '@/services/weaponService';
+import { evaluateAndStoreVerdict, buildSessionContext } from '@/services/standards';
 import { getDrillRequirements } from './drillContract';
 import { mapSession } from './mappers';
 import {
@@ -148,18 +149,17 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
     }
 
     // No active session yet: if this training has drills, require selecting a drill
-    if (!config.drill_id) {
+    // (unless user provided a custom drill_config — that's a custom session within the training)
+    if (!config.drill_id && !hasCustomConfig) {
       const { count, error: drillsCountError } = await supabase
         .from('training_drills')
         .select('*', { count: 'exact', head: true })
         .eq('training_id', config.training_id);
 
-      // If we can't determine drill count, fail safe by allowing session creation.
-      // (UI should still route users through drill selection.)
       if (!drillsCountError && (count ?? 0) > 0) {
         throw new Error('This training uses drills. Start your session from a specific drill.');
       }
-    } else {
+    } else if (config.drill_id) {
       // Validate drill belongs to training (prevents mixing drills across trainings)
       const { data: drillRow, error: drillError } = await supabase
         .from('training_drills')
@@ -429,10 +429,12 @@ export async function endSession(sessionId: string) {
     ended_at: new Date().toISOString(),
   });
 
+  // Calculate session stats (needed for drill completion + standards verdict)
+  const stats = await calculateSessionStats(sessionId);
+
   // If session was linked to a training + drill, record completion ONLY if requirements were met
   if (session.training_id && session.drill_id && session.drill_config) {
     const drill = session.drill_config;
-    const stats = await calculateSessionStats(sessionId);
 
     const { requiredTargets, requiredShots, isPaper } = getDrillRequirements(drill);
 
@@ -492,6 +494,18 @@ export async function endSession(sessionId: string) {
     console.error('[SessionService] Failed to generate insights:', err);
   });
 
+  // =========================================================================
+  // EVALUATE STANDARDS VERDICT (for team sessions)
+  // =========================================================================
+  // Non-blocking - don't fail session end if verdict evaluation fails
+  if (session.team_id) {
+    // Merge updated session with original (to get both drill_config and ended_at)
+    const sessionForVerdict = { ...session, ended_at: updatedSession.ended_at };
+    evaluateSessionStandardsVerdict(sessionForVerdict, stats).catch((err) => {
+      console.error('[SessionService] Failed to evaluate standards verdict:', err);
+    });
+  }
+
   return updatedSession;
 }
 
@@ -525,6 +539,78 @@ async function computeSessionFeaturesAndInsights(sessionId: string): Promise<voi
     console.log('[SessionService] Insights generated for:', sessionId);
   } catch (err) {
     console.error('[SessionService] computeSessionFeaturesAndInsights error:', err);
+  }
+}
+
+/**
+ * Evaluate session against team performance standards.
+ * Called after session ends for team sessions.
+ * Non-blocking - verdict storage failure doesn't affect session.
+ * 
+ * DOCTRINE: This is DETERMINISTIC evaluation - no AI/ML influence.
+ */
+async function evaluateSessionStandardsVerdict(
+  session: SessionWithDetails,
+  stats: SessionStats
+): Promise<void> {
+  try {
+    // Build the context from session data
+    const drill = session.drill_config;
+    if (!drill) {
+      console.log('[SessionService] No drill config, skipping standards evaluation');
+      return;
+    }
+
+    // Calculate duration
+    const endedAt = session.ended_at ? new Date(session.ended_at).getTime() : Date.now();
+    const startedAt = session.started_at ? new Date(session.started_at).getTime() : endedAt;
+    const durationSeconds = Math.max(0, Math.floor((endedAt - startedAt) / 1000));
+
+    // Build session context for the Standards Engine
+    const context = buildSessionContext({
+      id: session.id,
+      team_id: session.team_id,
+      drill_config: {
+        drill_goal: drill.drill_goal,
+        distance_m: drill.distance_m,
+      },
+      weapon: {
+        category: session.weapon_category ?? undefined,
+      },
+      weather: session.weather ? {
+        conditions: session.weather.condition ?? undefined,
+        wind_speed_kmh: session.weather.wind_speed_kph ?? (session.weather.wind_speed_mps ? session.weather.wind_speed_mps * 3.6 : 0),
+        temp_c: session.weather.temperature_c ?? 20,
+      } : undefined,
+      shots_fired: stats.totalShotsFired,
+      started_at: session.started_at,
+      ended_at: session.ended_at ?? undefined,
+      // Pass biometrics from stats (extracted from watch data in target_data)
+      biometrics: stats.biometrics ? {
+        avg_hr: stats.biometrics.avgHR,
+        max_hr: stats.biometrics.maxHR,
+      } : undefined,
+      paper_results: stats.bestDispersionCm != null ? [{
+        grouping_cm: stats.bestDispersionCm,
+      }] : undefined,
+      // For engagement drills
+      hits: stats.totalHits,
+      total_shots: stats.totalShotsFired,
+    });
+
+    // Evaluate and store verdict
+    const result = await evaluateAndStoreVerdict(context);
+
+    if (result) {
+      console.log('[SessionService] Standards verdict stored:', {
+        sessionId: session.id,
+        passed: result.passed,
+        noStandard: result.no_standard_found,
+        invalidated: result.invalidated,
+      });
+    }
+  } catch (err) {
+    console.error('[SessionService] evaluateSessionStandardsVerdict error:', err);
   }
 }
 

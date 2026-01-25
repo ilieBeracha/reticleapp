@@ -118,33 +118,33 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 12,
     borderWidth: 1,
-    padding: 14,
-    marginBottom: 12,
+    padding: 12,
+    marginBottom: 10,
   },
   header: {
-    marginBottom: 14,
+    marginBottom: 10,
   },
   title: {
     fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   heatmapRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   dayColumn: {
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
   dayCell: {
-    width: 36,
-    height: 24,
-    borderRadius: 6,
+    width: 32,
+    height: 20,
+    borderRadius: 5,
   },
   dayLabel: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '600',
   },
   statsRow: {
@@ -157,10 +157,10 @@ const styles = StyleSheet.create({
   },
   statDivider: {
     width: 1,
-    height: 24,
+    height: 20,
   },
   statValue: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
   statLabel: {

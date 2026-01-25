@@ -78,18 +78,14 @@ export function formatTimeLimit(seconds: number): string {
 /**
  * Moves a drill up or down in the list
  */
-export function moveDrill(
-  drills: TrainingDrillItem[],
-  index: number,
-  direction: 'up' | 'down'
-): TrainingDrillItem[] {
+export function moveDrill(drills: TrainingDrillItem[], index: number, direction: 'up' | 'down'): TrainingDrillItem[] {
   const newDrills = [...drills];
   const targetIndex = direction === 'up' ? index - 1 : index + 1;
-  
+
   if (targetIndex < 0 || targetIndex >= newDrills.length) {
     return drills; // No change if out of bounds
   }
-  
+
   [newDrills[index], newDrills[targetIndex]] = [newDrills[targetIndex], newDrills[index]];
   return newDrills;
 }
@@ -118,4 +114,3 @@ export function isStep2Complete(drills: TrainingDrillItem[]): boolean {
 export function getDrillGoalColor(drillGoal: string | null | undefined): string {
   return drillGoal === 'grouping' ? '#10B981' : '#3B82F6';
 }
-

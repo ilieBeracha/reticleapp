@@ -15,7 +15,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
 
 export function SessionCard({ session, colors }: SessionCardProps) {
   const status = STATUS_COLORS[session.status] || STATUS_COLORS.completed;
-  
+
   // Determine if grouping or engagement
   const isGrouping = isGroupingSession(session);
   const shots = session.stats?.shots_fired || 0;
@@ -28,9 +28,7 @@ export function SessionCard({ session, colors }: SessionCardProps) {
       <View style={[styles.dot, { backgroundColor: status.text }]} />
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={[styles.name, { color: colors.text }]}>
-            {session.user_full_name || 'Unknown User'}
-          </Text>
+          <Text style={[styles.name, { color: colors.text }]}>{session.user_full_name || 'Unknown User'}</Text>
           <View style={[styles.badge, { backgroundColor: status.bg }]}>
             <Text style={[styles.badgeText, { color: status.text }]}>{session.status}</Text>
           </View>
@@ -48,10 +46,9 @@ export function SessionCard({ session, colors }: SessionCardProps) {
           {/* Stats based on drill goal */}
           {shots > 0 && (
             <Text style={[styles.metaText, { color: colors.textMuted }]}>
-              {isGrouping 
+              {isGrouping
                 ? `• ${shots} shots${bestDispersion != null ? ` • ${bestDispersion.toFixed(1)}cm` : ''}`
-                : `• ${hits}/${shots} (${accuracy}%)`
-              }
+                : `• ${hits}/${shots} (${accuracy}%)`}
             </Text>
           )}
         </View>

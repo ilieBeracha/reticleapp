@@ -1,6 +1,6 @@
-import { LoadingScreen } from "@/components/shared/LoadingScreen";
-import { useAuth } from "@/contexts/AuthContext";
-import { Redirect } from "expo-router";
+import { LoadingScreen } from '@/components/shared/LoadingScreen';
+import { useAuth } from '@/contexts/AuthContext';
+import { Redirect } from 'expo-router';
 
 export default function Index() {
   const { user, loading: authLoading, transitioning } = useAuth();

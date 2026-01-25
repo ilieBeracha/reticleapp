@@ -1,6 +1,6 @@
 /**
  * TeamSection Component
- * 
+ *
  * Displays team training section with upcoming trainings or empty state.
  */
 
@@ -12,12 +12,7 @@ import { styles } from '../UnifiedHomePage.styles';
 import type { TeamSectionProps } from '../UnifiedHomePage.types';
 import { TeamTrainingCard } from './TeamTrainingCard';
 
-export function TeamSection({ 
-  trainings, 
-  hasTeams, 
-  colors, 
-  onTrainingPress 
-}: TeamSectionProps) {
+export function TeamSection({ trainings, hasTeams, colors, onTrainingPress }: TeamSectionProps) {
   return (
     <Animated.View entering={FadeInUp.duration(350).delay(100)} style={styles.section}>
       <View style={styles.sectionHeader}>
@@ -39,19 +34,14 @@ export function TeamSection({
       ) : hasTeams ? (
         <View style={[styles.emptyTeam, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Calendar size={18} color={colors.textMuted} />
-          <Text style={[styles.emptyTeamText, { color: colors.textMuted }]}>
-            No upcoming trainings
-          </Text>
-          <TouchableOpacity
-            style={styles.viewScheduleBtn}
-            onPress={() => router.push('/(protected)/(tabs)/team')}
-          >
+          <Text style={[styles.emptyTeamText, { color: colors.textMuted }]}>No trainings scheduled</Text>
+          <TouchableOpacity style={styles.viewScheduleBtn} onPress={() => router.push('/(protected)/(tabs)/team')}>
             <Text style={[styles.viewScheduleText, { color: colors.primary }]}>Schedule</Text>
             <ChevronRight size={14} color={colors.primary} />
           </TouchableOpacity>
         </View>
       ) : (
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[localStyles.joinTeamCard, { backgroundColor: colors.card, borderColor: colors.border }]}
           onPress={() => router.push('/(protected)/(tabs)/team')}
           activeOpacity={0.7}
@@ -61,9 +51,7 @@ export function TeamSection({
           </View>
           <View style={localStyles.joinTeamContent}>
             <Text style={[localStyles.joinTeamTitle, { color: colors.text }]}>Join a team</Text>
-            <Text style={[localStyles.joinTeamText, { color: colors.textMuted }]}>
-              Train together with your unit
-            </Text>
+            <Text style={[localStyles.joinTeamText, { color: colors.textMuted }]}>Train together with your unit</Text>
           </View>
           <ChevronRight size={18} color={colors.textMuted} />
         </TouchableOpacity>

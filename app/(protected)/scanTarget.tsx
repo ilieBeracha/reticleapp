@@ -1,12 +1,12 @@
-import { PaperTargetFlow } from "@/components/targets";
-import type { PaperType } from "@/services/sessionService";
-import { useLocalSearchParams } from "expo-router";
+import { PaperTargetFlow } from '@/components/targets';
+import type { PaperType } from '@/services/sessionService';
+import { useLocalSearchParams } from 'expo-router';
 
 /**
  * SCAN TARGET - Paper Target Scanning
- * 
+ *
  * Route: /(protected)/scanTarget?sessionId=xxx&distance=100&maxShots=30&drillGoal=grouping
- * 
+ *
  * Goes directly to camera for scanning paper targets.
  * drillGoal determines whether to save as grouping (dispersion only) or achievement (hit %)
  */

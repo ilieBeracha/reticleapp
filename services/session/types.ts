@@ -310,6 +310,13 @@ export interface SessionStats {
   stagesCleared: number;
   avgEngagementTimeSec: number | null;
   fastestEngagementTimeSec: number | null;
+  // Biometrics from watch (if available)
+  biometrics?: {
+    avgHR?: number;
+    maxHR?: number;
+    minHR?: number;
+    avgBreathRate?: number;
+  };
 }
 
 

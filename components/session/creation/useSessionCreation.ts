@@ -16,10 +16,7 @@ import type { BaseSessionConfig, DrillConfig } from '@/services/session/types';
 import { getDefaultWeapon } from '@/services/weaponService';
 import { useIsGarminConnected } from '@/store/garminStore';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  getPurposeOption,
-  purposeToDrillGoal,
-} from './sessionCreation.constants';
+import { getPurposeOption, purposeToDrillGoal } from './sessionCreation.constants';
 import {
   DEFAULT_CREATION_STATE,
   type CreationStep,
@@ -28,7 +25,7 @@ import {
   type SessionContextState,
   type SessionCreationState,
   type SessionPurpose,
-  type TargetType
+  type TargetType,
 } from './sessionCreation.types';
 
 // ============================================================================
@@ -63,20 +60,20 @@ export interface UseSessionCreationOptions {
 export interface UseSessionCreationReturn {
   // State
   state: SessionCreationState;
-  
+
   // Derived
   isWatchConnected: boolean;
   isLoadingWeapon: boolean;
   canGoBack: boolean;
   canGoForward: boolean;
   progressPercent: number;
-  
+
   // Step 1: Intent
   setPurpose: (purpose: SessionPurpose) => void;
   setDrillSource: (source: DrillSource) => void;
   selectPreset: (presetId: string) => void;
   selectLibraryDrill: (drillId: string) => void;
-  
+
   // Step 2: Context
   setWeapon: (id: string | null, name: string | null) => void;
   setDistance: (distance: number) => void;
@@ -86,15 +83,15 @@ export interface UseSessionCreationReturn {
   setTimeLimit: (limit: number | null) => void;
   setNotes: (notes: string) => void;
   updateContext: (partial: Partial<SessionContextState>) => void;
-  
+
   // Category Drill - When selected, session MUST follow this drill
   setDrill: (drillId: string | null) => void;
-  
+
   // Navigation
   goBack: () => void;
   goForward: () => void;
   goToStep: (step: CreationStep) => void;
-  
+
   // Submission
   submit: () => void;
   buildConfig: () => BaseSessionConfig;
@@ -115,11 +112,9 @@ function getStepIndex(step: CreationStep): number {
 // HOOK
 // ============================================================================
 
-export function useSessionCreation(
-  options: UseSessionCreationOptions = {}
-): UseSessionCreationReturn {
+export function useSessionCreation(options: UseSessionCreationOptions = {}): UseSessionCreationReturn {
   const { onSubmit, initialState, trainingContext } = options;
-  
+
   // Merge initial state with defaults
   const [state, setState] = useState<SessionCreationState>(() => {
     if (initialState) {
@@ -137,30 +132,30 @@ export function useSessionCreation(
     }
     return DEFAULT_CREATION_STATE;
   });
-  
+
   // Skip weapon loading if initial state already has a weapon
   const [isLoadingWeapon, setIsLoadingWeapon] = useState(!initialState?.context?.weaponId);
   const isWatchConnected = useIsGarminConnected();
-  
+
   // ─────────────────────────────────────────────────────────────────────────
   // AUTO-LOAD DEFAULT WEAPON
   // User's favorite or last-used weapon is pre-selected
   // ─────────────────────────────────────────────────────────────────────────
-  
+
   useEffect(() => {
     // Skip if we already have a weapon from initialState
     if (initialState?.context?.weaponId) {
       setIsLoadingWeapon(false);
       return;
     }
-    
+
     let cancelled = false;
-    
+
     async function loadDefaultWeapon() {
       try {
-        const weapon = await getDefaultWeapon();
+        const weapon = await getDefaultWeapon({ personalOnly: true });
         if (weapon && !cancelled) {
-          setState(s => ({
+          setState((s) => ({
             ...s,
             context: {
               ...s.context,
@@ -177,18 +172,18 @@ export function useSessionCreation(
         if (!cancelled) setIsLoadingWeapon(false);
       }
     }
-    
+
     loadDefaultWeapon();
-    
+
     return () => {
       cancelled = true;
     };
   }, []);
-  
+
   // ─────────────────────────────────────────────────────────────────────────
   // DERIVED VALUES
   // ─────────────────────────────────────────────────────────────────────────
-  
+
   const stepIndex = getStepIndex(state.step);
   const canGoBack = stepIndex > 0;
   const canGoForward = useMemo(() => {
@@ -204,14 +199,14 @@ export function useSessionCreation(
         return false;
     }
   }, [state.step, state.purpose, state.context]);
-  
+
   // Progress: 2 user-facing steps (intent, details)
   const progressPercent = ((stepIndex + 1) / 2) * 100;
-  
+
   // ─────────────────────────────────────────────────────────────────────────
   // STEP 1: INTENT
   // ─────────────────────────────────────────────────────────────────────────
-  
+
   const setPurpose = useCallback((purpose: SessionPurpose) => {
     const option = getPurposeOption(purpose);
     setState((s) => ({
@@ -224,11 +219,11 @@ export function useSessionCreation(
       },
     }));
   }, []);
-  
+
   const setDrillSource = useCallback((drillSource: DrillSource) => {
     setState((s) => ({ ...s, drillSource }));
   }, []);
-  
+
   const selectPreset = useCallback((presetId: string) => {
     setState((s) => ({
       ...s,
@@ -236,7 +231,7 @@ export function useSessionCreation(
       drillSource: 'preset',
     }));
   }, []);
-  
+
   const selectLibraryDrill = useCallback((drillId: string) => {
     setState((s) => ({
       ...s,
@@ -244,77 +239,80 @@ export function useSessionCreation(
       drillSource: 'library',
     }));
   }, []);
-  
+
   // ─────────────────────────────────────────────────────────────────────────
   // STEP 2: CONTEXT
   // ─────────────────────────────────────────────────────────────────────────
-  
+
   const setWeapon = useCallback((weaponId: string | null, weaponName: string | null) => {
     setState((s) => ({
       ...s,
       context: { ...s.context, weaponId, weaponName },
     }));
   }, []);
-  
+
   const setDistance = useCallback((distance: number) => {
     setState((s) => ({
       ...s,
       context: { ...s.context, distance: Math.max(1, Math.min(1000, distance)) },
     }));
   }, []);
-  
+
   const setPosition = useCallback((position: Position) => {
     setState((s) => ({
       ...s,
       context: { ...s.context, position },
     }));
   }, []);
-  
+
   const setTargetType = useCallback((targetType: TargetType) => {
     setState((s) => ({
       ...s,
       context: { ...s.context, targetType },
     }));
   }, []);
-  
+
   const setShots = useCallback((shotsPlanned: number) => {
     setState((s) => ({
       ...s,
       context: { ...s.context, shotsPlanned: Math.max(1, Math.min(100, shotsPlanned)) },
     }));
   }, []);
-  
+
   const setTimeLimit = useCallback((timeLimit: number | null) => {
     setState((s) => ({
       ...s,
       context: { ...s.context, timeLimit },
     }));
   }, []);
-  
+
   const setNotes = useCallback((notes: string) => {
     setState((s) => ({
       ...s,
       context: { ...s.context, notes },
     }));
   }, []);
-  
+
   const updateContext = useCallback((partial: Partial<SessionContextState>) => {
     console.log('[useSessionCreation] updateContext called with:', partial);
     setState((s) => {
       const newContext = { ...s.context, ...partial };
-      console.log('[useSessionCreation] New context:', { shotsPlanned: newContext.shotsPlanned, distance: newContext.distance });
+      console.log('[useSessionCreation] New context:', {
+        shotsPlanned: newContext.shotsPlanned,
+        distance: newContext.distance,
+      });
       return {
         ...s,
         context: newContext,
       };
     });
   }, []);
-  
+
   // ─────────────────────────────────────────────────────────────────────────
   // CATEGORY DRILL SELECTION
   // When a drill is selected, the session MUST follow it
   // ─────────────────────────────────────────────────────────────────────────
-  
+
   const setDrill = useCallback((drillId: string | null) => {
     setState((s) => ({
       ...s,
@@ -322,11 +320,11 @@ export function useSessionCreation(
       isDrillLocked: drillId !== null,
     }));
   }, []);
-  
+
   // ─────────────────────────────────────────────────────────────────────────
   // NAVIGATION
   // ─────────────────────────────────────────────────────────────────────────
-  
+
   const goBack = useCallback(() => {
     setState((s) => {
       const currentIndex = STEP_ORDER.indexOf(s.step);
@@ -335,7 +333,7 @@ export function useSessionCreation(
       return { ...s, step: prevStep };
     });
   }, []);
-  
+
   const goForward = useCallback(() => {
     setState((s) => {
       const currentIndex = STEP_ORDER.indexOf(s.step);
@@ -360,23 +358,23 @@ export function useSessionCreation(
       return { ...s, step: nextStep };
     });
   }, []);
-  
+
   const goToStep = useCallback((step: CreationStep) => {
     setState((s) => ({ ...s, step }));
   }, []);
-  
+
   // ─────────────────────────────────────────────────────────────────────────
   // BUILD CONFIG
   // ─────────────────────────────────────────────────────────────────────────
-  
+
   const buildConfig = useCallback((): BaseSessionConfig => {
     const { purpose, context, selectedDrillId, isDrillLocked } = state;
-    console.log('[useSessionCreation] buildConfig - context:', { 
-      shotsPlanned: context.shotsPlanned, 
+    console.log('[useSessionCreation] buildConfig - context:', {
+      shotsPlanned: context.shotsPlanned,
       distance: context.distance,
       trainingContext: !!trainingContext,
     });
-    
+
     // Determine drill name based on context
     let drillName: string;
     if (trainingContext) {
@@ -390,7 +388,7 @@ export function useSessionCreation(
     } else {
       drillName = 'Practice Session';
     }
-    
+
     // Build inline drill config
     // Note: input_method is not set - user chooses scan vs manual during session
     const drillConfig: DrillConfig = {
@@ -405,7 +403,7 @@ export function useSessionCreation(
       // Include category drill reference when locked
       category_drill_id: isDrillLocked ? selectedDrillId : undefined,
     };
-    
+
     // Build config - include training context if present
     return {
       team_id: trainingContext?.teamId || null,
@@ -414,16 +412,16 @@ export function useSessionCreation(
       drill_id: trainingContext?.drillId || null, // Only for training_drills
       drill_config: drillConfig,
       session_mode: 'solo',
-      watch_controlled: false, // Set in SessionPrepView after form
+      watch_controlled: false,
       notes: context.notes || undefined,
-      start_as_pending: true,
+      start_as_pending: false,
     };
   }, [state, trainingContext]);
-  
+
   // ─────────────────────────────────────────────────────────────────────────
   // SUBMIT
   // ─────────────────────────────────────────────────────────────────────────
-  
+
   const submit = useCallback(async () => {
     if (!onSubmit) return;
     setState((s) => ({ ...s, isSubmitting: true }));
@@ -434,15 +432,15 @@ export function useSessionCreation(
       setState((s) => ({ ...s, isSubmitting: false }));
     }
   }, [onSubmit, buildConfig]);
-  
+
   // ─────────────────────────────────────────────────────────────────────────
   // RESET
   // ─────────────────────────────────────────────────────────────────────────
-  
+
   const reset = useCallback(() => {
     setState(DEFAULT_CREATION_STATE);
   }, []);
-  
+
   return {
     state,
     isWatchConnected,

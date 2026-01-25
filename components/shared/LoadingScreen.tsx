@@ -9,24 +9,12 @@ export function LoadingScreen({ overlay = false }: LoadingScreenProps = {}) {
   const colors = useColors();
 
   return (
-    <View style={[
-      styles.container, 
-      { backgroundColor: '#221f20' },
-      overlay && styles.overlay
-    ]}>
+    <View style={[styles.container, { backgroundColor: '#221f20' }, overlay && styles.overlay]}>
       {/* Logo */}
-      <Image 
-        source={require('@/assets/images/icon.jpg')} 
-        style={styles.logo}
-        resizeMode="contain"
-      />
-      
+      <Image source={require('@/assets/images/icon.jpg')} style={styles.logo} resizeMode="contain" />
+
       {/* Loading indicator */}
-      <ActivityIndicator 
-        size="large" 
-        color={colors.primary} 
-        style={styles.spinner}
-      />
+      <ActivityIndicator size="large" color={colors.primary} style={styles.spinner} />
     </View>
   );
 }
@@ -55,4 +43,3 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
 });
-

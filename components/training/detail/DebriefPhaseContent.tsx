@@ -3,22 +3,17 @@
  * Content for the debrief phase showing summary and report link
  */
 
-import React, { useCallback, useMemo } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { format } from 'date-fns';
 import { router } from 'expo-router';
 import { ChevronRight, Clock, Trophy } from 'lucide-react-native';
+import { useCallback, useMemo } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { calculateTrainingDuration } from './helpers';
 import type { DebriefPhaseContentProps } from './types';
 
-export function DebriefPhaseContent({
-  training,
-  drillProgress,
-  colors,
-  canManageTraining,
-}: DebriefPhaseContentProps) {
+export function DebriefPhaseContent({ training, drillProgress, colors, canManageTraining }: DebriefPhaseContentProps) {
   const drills = training.drills || [];
-  const completedCount = drillProgress.filter(p => p.completed).length;
+  const completedCount = drillProgress.filter((p) => p.completed).length;
   const isFinished = training.status === 'finished';
 
   const duration = useMemo(() => {

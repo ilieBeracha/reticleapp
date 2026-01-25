@@ -45,7 +45,9 @@ export const SessionHeader = React.memo(function SessionHeader({
       <View style={styles.center}>
         {title ? (
           <>
-            <Text style={styles.title} numberOfLines={1}>{title}</Text>
+            <Text style={styles.title} numberOfLines={1}>
+              {title}
+            </Text>
             <Text style={styles.subtitle}>Started {startTime}</Text>
           </>
         ) : (
@@ -101,4 +103,3 @@ const styles = StyleSheet.create({
     width: 44,
   },
 });
-

@@ -7,7 +7,8 @@ import type { TeamMemberWithProfile, TrainingWithDetails } from '@/types/workspa
 // ============================================================================
 // TAB TYPES
 // ============================================================================
-export type InternalTab = 'calendar' | 'manage' | 'team';
+// Unified tabs - same for all roles (soldiers and commanders see same tabs)
+export type InternalTab = 'calendar' | 'team';
 
 // ============================================================================
 // ROLE CONFIG
@@ -80,18 +81,18 @@ export interface UseTrainingsReturn {
   activeTeam: any | null;
   initialized: boolean;
   teamsLoading: boolean;
-  
+
   // Permissions
   canSchedule: boolean;
   canManage: boolean;
-  
+
   // Data
   activeTeamTrainings: TrainingWithDetails[];
   liveTraining: TrainingWithDetails | undefined;
   members: TeamMemberWithProfile[];
   memberStats: MemberStats;
   teamStats: TeamStats;
-  
+
   // UI state
   refreshing: boolean;
   activeTab: InternalTab;
@@ -99,16 +100,16 @@ export interface UseTrainingsReturn {
   loadingTeamTrainings: boolean;
   showSwitcher: boolean;
   roleConfig: RoleConfig | null;
-  
+
   // Actions
   onRefresh: () => Promise<void>;
   handleTabChange: (tab: InternalTab) => void;
   handleTrainingPress: (training: TrainingWithDetails) => void;
   handleCreateTraining: () => void;
   handleOpenLibrary: () => void;
+  handleOpenArmory: () => void;
   handleViewMembers: () => void;
   handleInviteMember: () => void;
   handleTeamSettings: () => void;
   setSwitcherOpen: (open: boolean) => void;
 }
-

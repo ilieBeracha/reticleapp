@@ -43,16 +43,13 @@ export function calculateAccuracy(totalShots: number, totalHits: number): number
 /**
  * Gets the color for accuracy based on value and optional goal
  */
-export function getAccuracyColor(
-  accuracy: number,
-  minAccuracyPercent?: number | null
-): string {
+export function getAccuracyColor(accuracy: number, minAccuracyPercent?: number | null): string {
   if (minAccuracyPercent) {
     if (accuracy >= minAccuracyPercent) return COLORS.accent;
     if (accuracy >= minAccuracyPercent * 0.8) return COLORS.warning;
     return COLORS.error;
   }
-  
+
   if (accuracy >= ACCURACY_THRESHOLDS.high) return COLORS.accent;
   if (accuracy >= ACCURACY_THRESHOLDS.medium) return COLORS.warning;
   return COLORS.accent; // Default color for low accuracy
@@ -97,12 +94,8 @@ export function calculateDrillProgress(
   const requiredRounds = isPaper ? 0 : (bulletsPerRound ?? 0) * requiredTargets;
 
   const shotsProgress =
-    !isPaper && requiredRounds > 0 
-      ? Math.min(100, Math.round((totalShots / requiredRounds) * 100)) 
-      : 0;
-  const targetsProgress = requiredTargets > 0 
-    ? Math.min(100, Math.round((targetsCount / requiredTargets) * 100)) 
-    : 0;
+    !isPaper && requiredRounds > 0 ? Math.min(100, Math.round((totalShots / requiredRounds) * 100)) : 0;
+  const targetsProgress = requiredTargets > 0 ? Math.min(100, Math.round((targetsCount / requiredTargets) * 100)) : 0;
 
   const isComplete = isPaper
     ? targetsCount >= requiredTargets
@@ -138,7 +131,7 @@ export function calculateNextTargetPlan(
   if (!drillProgress || !drill) return null;
 
   const remainingTargets = Math.max(0, drillProgress.requiredTargets - targetsCount);
-  
+
   if (drill.target_type === 'paper') {
     // Paper drills are target-count based; shots are detected from scan
     return { remainingShots: 0, remainingTargets, nextBullets: 0 };
@@ -151,9 +144,8 @@ export function calculateNextTargetPlan(
   }
 
   // Drill contract: fixed bullets per round
-  const nextBullets = remainingTargets === 1
-    ? remainingShots
-    : Math.min(remainingShots, drillProgress.bulletsPerRound ?? 0);
+  const nextBullets =
+    remainingTargets === 1 ? remainingShots : Math.min(remainingShots, drillProgress.bulletsPerRound ?? 0);
 
   return { remainingShots, remainingTargets, nextBullets };
 }
@@ -161,12 +153,9 @@ export function calculateNextTargetPlan(
 /**
  * Checks if drill limit has been reached
  */
-export function isDrillLimitReached(
-  drill: DrillConfig | null,
-  nextTargetPlan: NextTargetPlan | null
-): boolean {
+export function isDrillLimitReached(drill: DrillConfig | null, nextTargetPlan: NextTargetPlan | null): boolean {
   if (!drill || !nextTargetPlan) return false;
-  
+
   return drill.target_type === 'paper'
     ? nextTargetPlan.remainingTargets <= 0
     : nextTargetPlan.remainingShots <= 0 || nextTargetPlan.remainingTargets <= 0;
@@ -183,15 +172,11 @@ interface Target {
 /**
  * Gets default distance from session context
  */
-export function getDefaultDistance(
-  targets: Target[],
-  drill: DrillConfig | null
-): number {
+export function getDefaultDistance(targets: Target[], drill: DrillConfig | null): number {
   // Session-first: prefer the most recent target distance if available
   const last = targets.length > 0 ? targets[targets.length - 1] : null;
   if (last?.distance_m) return last.distance_m;
 
-  
   // Default fallback
   return 100;
 }
@@ -248,7 +233,7 @@ export interface WatchPayloadOptions {
 
 /**
  * Builds the payload to send to watch for SESSION_START
- * 
+ *
  * Watch expects:
  * - drillType: "timed" | "grouping" | "zeroing" | "qualification"
  * - inputMethod: "manual" | "scan" | "both"
@@ -259,31 +244,22 @@ export interface WatchPayloadOptions {
  * - emkv: enable shot marking feature
  * - vrcv: vibrate on shot detection
  */
-export function buildWatchSessionPayload(
-  session: SessionForPayload,
-  options: WatchPayloadOptions = {}
-) {
-  const {
-    autoDetect = true,
-    sensitivity: manualSensitivity,
-    emkv = false,
-    vrcv = true,
-    weapon,
-  } = options;
-  
+export function buildWatchSessionPayload(session: SessionForPayload, options: WatchPayloadOptions = {}) {
+  const { autoDetect = true, sensitivity: manualSensitivity, emkv = false, vrcv = true, weapon } = options;
+
   const drillConfig = session.drill_config;
-  
+
   // rounds = bullets per string (0 = unlimited)
   const rounds = drillConfig?.rounds_per_shooter || 0;
   const strings = drillConfig?.strings_count || 1;
-  
+
   // Priority for custom sensitivity:
   // 1. Manual override from options.sensitivity
   // 2. User-calibrated value saved in drill_config.detection_sensitivity
   // 3. Weapon-based derivation (via weapon.custom_sensitivity)
   // 4. Default fallback based on weapon category/caliber
   const savedCustomSensitivity = drillConfig?.detection_sensitivity;
-  
+
   // Derive detection config
   let detectionConfig: DetectionConfig;
   if (manualSensitivity !== undefined) {
@@ -292,7 +268,7 @@ export function buildWatchSessionPayload(
       sensitivity: manualSensitivity,
       minThreshold: manualSensitivity * 0.5,
       maxThreshold: manualSensitivity * 3.0,
-      cooldownMs: 300,  // Safe minimum - recoil settles in ~200ms
+      cooldownMs: 300, // Safe minimum - recoil settles in ~200ms
       profile: 'rifle',
       description: 'Manual',
     };
@@ -302,11 +278,12 @@ export function buildWatchSessionPayload(
     // Values below 1.0G cause constant false positives and can crash the watch
     const clampedSensitivity = Math.max(1.0, Math.min(10.0, savedCustomSensitivity));
     if (clampedSensitivity !== savedCustomSensitivity) {
-      console.warn(`[Payload] ⚠️ Clamping sensitivity from ${savedCustomSensitivity}G to ${clampedSensitivity}G (safe range: 1.0-10.0G)`);
+      console.warn(
+        `[Payload] ⚠️ Clamping sensitivity from ${savedCustomSensitivity}G to ${clampedSensitivity}G (safe range: 1.0-10.0G)`
+      );
     }
-    
-    const profile = weapon?.category === 'handgun' ? 'handgun' : 
-                    weapon?.category === 'shotgun' ? 'shotgun' : 'rifle';
+
+    const profile = weapon?.category === 'handgun' ? 'handgun' : weapon?.category === 'shotgun' ? 'shotgun' : 'rifle';
     detectionConfig = {
       sensitivity: clampedSensitivity,
       minThreshold: clampedSensitivity * 0.5, // 50% (matches watch's derivation)
@@ -329,13 +306,16 @@ export function buildWatchSessionPayload(
     // Default fallback
     detectionConfig = deriveDetectionConfig({});
   }
-  
+
   // Map drill_goal to watch drillType
   const mapDrillType = (goal: string | null | undefined): string => {
     switch (goal) {
-      case 'grouping': return 'grouping';
-      case 'zeroing': return 'zeroing';
-      case 'qualification': return 'qualification';
+      case 'grouping':
+        return 'grouping';
+      case 'zeroing':
+        return 'zeroing';
+      case 'qualification':
+        return 'qualification';
       case 'engagement':
       case 'physical':
       default:
@@ -346,8 +326,10 @@ export function buildWatchSessionPayload(
   // Map input_method to watch format
   const mapInputMethod = (method: string | null | undefined): string => {
     switch (method) {
-      case 'scan': return 'scan';
-      case 'both': return 'both';
+      case 'scan':
+        return 'scan';
+      case 'both':
+        return 'both';
       case 'manual':
       default:
         return 'manual';
@@ -363,9 +345,9 @@ export function buildWatchSessionPayload(
     } else if (drillConfig?.par_time_seconds) {
       parts.push(`par ${drillConfig.par_time_seconds}s`);
     }
-    return parts.length > 0 ? parts.join(' ') : (drillConfig?.drill_goal || 'Practice');
+    return parts.length > 0 ? parts.join(' ') : drillConfig?.drill_goal || 'Practice';
   };
-  
+
   return {
     sessionId: session.id,
     drillName: drillConfig?.name || session.drill_name || 'Training Session',
@@ -373,12 +355,12 @@ export function buildWatchSessionPayload(
     drillType: mapDrillType(drillConfig?.drill_goal),
     inputMethod: mapInputMethod(drillConfig?.input_method),
     distance: drillConfig?.distance_m || 0,
-    rounds,      // Shots per string (0 = unlimited)
-    strings,     // Number of strings/stages
+    rounds, // Shots per string (0 = unlimited)
+    strings, // Number of strings/stages
     timeLimit: drillConfig?.time_limit_seconds || 0,
     parTime: drillConfig?.par_time_seconds || 0,
     watchMode: session.watch_controlled ? 'primary' : 'supplementary',
-    
+
     // Detection configuration (new enhanced format)
     autoDetect,
     detection: {
@@ -388,12 +370,12 @@ export function buildWatchSessionPayload(
       cooldownMs: detectionConfig.cooldownMs,
       profile: detectionConfig.profile,
     },
-    
+
     // Legacy: Keep flat sensitivity for backwards compatibility
     sensitivity: detectionConfig.sensitivity,
-    
-    emkv,        // Shot marking feature
-    vrcv,        // Vibrate on shot detection
+
+    emkv, // Shot marking feature
+    vrcv, // Vibrate on shot detection
   };
 }
 
@@ -449,16 +431,12 @@ export function buildEndSessionMessage(
     `This drill has requirements that are not met yet.`,
     ``,
     ...(drill.target_type === 'paper'
-      ? [
-          `Targets: ${targetsCount}/${drillProgress.requiredTargets}`,
-        ]
+      ? [`Targets: ${targetsCount}/${drillProgress.requiredTargets}`]
       : [
           `Shots: ${totalShots}/${drillProgress.requiredRounds}`,
           `Targets: ${targetsCount}/${drillProgress.requiredTargets}`,
         ]),
-    ...(drill.min_accuracy_percent
-      ? [`Accuracy: ${accuracy}% (min ${drill.min_accuracy_percent}%)`]
-      : []),
+    ...(drill.min_accuracy_percent ? [`Accuracy: ${accuracy}% (min ${drill.min_accuracy_percent}%)`] : []),
     ...(drill.time_limit_seconds
       ? [`Time: ${formatTime(elapsedTime)} (limit ${formatTime(drill.time_limit_seconds)})`]
       : []),
@@ -471,4 +449,3 @@ export function buildEndSessionMessage(
     message: lines.join('\n'),
   };
 }
-

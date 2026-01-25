@@ -1,6 +1,6 @@
 /**
  * ShareWeaponWithTeam - User offers to share personal weapon with a team
- * 
+ *
  * Flow:
  * 1. User selects their personal weapon
  * 2. User selects which team to share with
@@ -17,24 +17,9 @@ import {
   type UserWeapon,
 } from '@/services/weaponService';
 import * as Haptics from 'expo-haptics';
-import {
-  AlertTriangle,
-  ArrowRight,
-  Check,
-  Clock,
-  Share2,
-  X,
-} from 'lucide-react-native';
+import { AlertTriangle, ArrowRight, Check, Clock, Share2, X } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // ============================================================================
 // TYPES
@@ -51,14 +36,9 @@ interface ShareWeaponWithTeamProps {
 // MAIN COMPONENT
 // ============================================================================
 
-export function ShareWeaponWithTeam({
-  teamId,
-  teamName,
-  onClose,
-  onSuccess,
-}: ShareWeaponWithTeamProps) {
+export function ShareWeaponWithTeam({ teamId, teamName, onClose, onSuccess }: ShareWeaponWithTeamProps) {
   const colors = useColors();
-  
+
   const [loading, setLoading] = useState(true);
   const [myWeapons, setMyWeapons] = useState<UserWeapon[]>([]);
   const [sharedWeapons, setSharedWeapons] = useState<UserWeapon[]>([]);
@@ -72,21 +52,19 @@ export function ShareWeaponWithTeam({
   const loadWeapons = async () => {
     try {
       setLoading(true);
-      const [weapons, shared] = await Promise.all([
-        getUserWeapons(),
-        getMySharedWeapons(),
-      ]);
-      
+      const [weapons, shared] = await Promise.all([getUserWeapons(), getMySharedWeapons()]);
+
       // Filter out weapons that are already shared with this team
-      const sharedWithThisTeam = new Set(
-        shared.filter(w => w.shared_with_team_id === teamId).map(w => w.id)
+      const sharedWithThisTeam = new Set(shared.filter((w) => w.shared_with_team_id === teamId).map((w) => w.id));
+
+      setMyWeapons(
+        weapons.filter(
+          (w) =>
+            !w.team_weapon_id && // Not already from a team
+            !sharedWithThisTeam.has(w.id) // Not already shared with this team
+        )
       );
-      
-      setMyWeapons(weapons.filter(w => 
-        !w.team_weapon_id && // Not already from a team
-        !sharedWithThisTeam.has(w.id) // Not already shared with this team
-      ));
-      setSharedWeapons(shared.filter(w => w.shared_with_team_id === teamId));
+      setSharedWeapons(shared.filter((w) => w.shared_with_team_id === teamId));
     } catch (err) {
       console.error('Failed to load weapons:', err);
     } finally {
@@ -94,19 +72,22 @@ export function ShareWeaponWithTeam({
     }
   };
 
-  const handleShare = useCallback(async (weaponId: string) => {
-    try {
-      setActionLoading(weaponId);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      await shareWeaponWithTeam(weaponId, teamId);
-      await loadWeapons();
-      onSuccess?.();
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to share weapon');
-    } finally {
-      setActionLoading(null);
-    }
-  }, [teamId, onSuccess]);
+  const handleShare = useCallback(
+    async (weaponId: string) => {
+      try {
+        setActionLoading(weaponId);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        await shareWeaponWithTeam(weaponId, teamId);
+        await loadWeapons();
+        onSuccess?.();
+      } catch (err: any) {
+        Alert.alert('Error', err.message || 'Failed to share weapon');
+      } finally {
+        setActionLoading(null);
+      }
+    },
+    [teamId, onSuccess]
+  );
 
   const handleWithdraw = useCallback(async (weaponId: string) => {
     try {
@@ -126,7 +107,7 @@ export function ShareWeaponWithTeam({
 
   const renderWeaponItem = ({ item }: { item: UserWeapon }) => {
     const isLoading = actionLoading === item.id;
-    
+
     return (
       <View style={[styles.weaponCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.weaponInfo}>
@@ -135,7 +116,7 @@ export function ShareWeaponWithTeam({
             {getCategoryLabel(item.category)} {item.caliber && `• ${item.caliber}`}
           </Text>
         </View>
-        
+
         {isLoading ? (
           <ActivityIndicator size="small" color={colors.primary} />
         ) : (
@@ -155,12 +136,17 @@ export function ShareWeaponWithTeam({
     const isLoading = actionLoading === item.id;
     const isPending = item.share_status === 'pending';
     const isApproved = item.share_status === 'approved';
-    
+
     return (
-      <View style={[styles.sharedCard, { 
-        backgroundColor: colors.card, 
-        borderColor: isApproved ? colors.green : colors.yellow 
-      }]}>
+      <View
+        style={[
+          styles.sharedCard,
+          {
+            backgroundColor: colors.card,
+            borderColor: isApproved ? colors.green : colors.yellow,
+          },
+        ]}
+      >
         <View style={styles.statusBadge}>
           {isPending ? (
             <>
@@ -174,14 +160,14 @@ export function ShareWeaponWithTeam({
             </>
           )}
         </View>
-        
+
         <View style={styles.weaponInfo}>
           <Text style={[styles.weaponName, { color: colors.text }]}>{item.name}</Text>
           <Text style={[styles.weaponMeta, { color: colors.textMuted }]}>
             {getCategoryLabel(item.category)} {item.caliber && `• ${item.caliber}`}
           </Text>
         </View>
-        
+
         {isPending && !isLoading && (
           <TouchableOpacity
             style={[styles.withdrawBtn, { backgroundColor: colors.red }]}
@@ -220,11 +206,11 @@ export function ShareWeaponWithTeam({
         <FlatList
           data={[
             ...(sharedWeapons.length > 0 ? [{ type: 'header', title: 'Already Shared' }] : []),
-            ...sharedWeapons.map(w => ({ type: 'shared', data: w })),
+            ...sharedWeapons.map((w) => ({ type: 'shared', data: w })),
             { type: 'header', title: 'My Weapons' },
-            ...myWeapons.map(w => ({ type: 'weapon', data: w })),
+            ...myWeapons.map((w) => ({ type: 'weapon', data: w })),
           ]}
-          keyExtractor={(item, index) => 
+          keyExtractor={(item, index) =>
             item.type === 'header' ? `header-${index}` : (item as { data: UserWeapon }).data.id
           }
           renderItem={({ item }) => {
@@ -238,7 +224,7 @@ export function ShareWeaponWithTeam({
               );
             }
             if (item.type === 'shared') {
-                  return renderSharedItem({ item: (item as { data: UserWeapon }).data });
+              return renderSharedItem({ item: (item as { data: UserWeapon }).data });
             }
             return renderWeaponItem({ item: (item as { data: UserWeapon }).data });
           }}
@@ -246,12 +232,8 @@ export function ShareWeaponWithTeam({
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <AlertTriangle size={48} color={colors.textMuted} style={{ opacity: 0.5 }} />
-              <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-                No personal weapons to share
-              </Text>
-              <Text style={[styles.emptyHint, { color: colors.textMuted }]}>
-                Create a weapon first in "My Weapons"
-              </Text>
+              <Text style={[styles.emptyText, { color: colors.textMuted }]}>No personal weapons to share</Text>
+              <Text style={[styles.emptyHint, { color: colors.textMuted }]}>Create a weapon first in "My Weapons"</Text>
             </View>
           }
         />
@@ -384,4 +366,3 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 });
-

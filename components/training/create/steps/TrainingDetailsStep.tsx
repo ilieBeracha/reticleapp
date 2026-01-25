@@ -1,6 +1,6 @@
 /**
  * TrainingDetailsStep - Minimal, clean training setup
- * 
+ *
  * Only ask what's necessary:
  * - Team (if multiple)
  * - Name
@@ -9,13 +9,7 @@
 
 import { useColors } from '@/hooks/ui/useColors';
 import * as Haptics from 'expo-haptics';
-import {
-  Calendar,
-  Check,
-  ChevronDown,
-  Clock,
-  Users,
-} from 'lucide-react-native';
+import { Calendar, Check, ChevronDown, Clock, Users } from 'lucide-react-native';
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -61,17 +55,17 @@ export function TrainingDetailsStep({
   onToggleManualStart,
 }: TrainingDetailsStepProps) {
   const colors = useColors();
-  const selectedTeam = teams.find(t => t.id === selectedTeamId);
+  const selectedTeam = teams.find((t) => t.id === selectedTeamId);
   const [showSchedule, setShowSchedule] = useState(!manualStart);
 
   const formatDate = (date: Date) => {
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
+
     if (date.toDateString() === today.toDateString()) return 'Today';
     if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
-    
+
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   };
 
@@ -120,7 +114,7 @@ export function TrainingDetailsStep({
         <View style={styles.section}>
           <Text style={[styles.label, { color: colors.textMuted }]}>Team</Text>
           <View style={styles.teamGrid}>
-            {teams.map(team => {
+            {teams.map((team) => {
               const isSelected = selectedTeamId === team.id;
               return (
                 <TouchableOpacity
@@ -140,10 +134,7 @@ export function TrainingDetailsStep({
                 >
                   {isSelected && <Check size={14} color={colors.background} strokeWidth={2.5} />}
                   <Text
-                    style={[
-                      styles.teamChipText,
-                      { color: isSelected ? colors.background : colors.text },
-                    ]}
+                    style={[styles.teamChipText, { color: isSelected ? colors.background : colors.text }]}
                     numberOfLines={1}
                   >
                     {team.name}
@@ -156,28 +147,22 @@ export function TrainingDetailsStep({
       ) : effectiveTeam ? (
         <View style={styles.teamBadge}>
           <Users size={14} color={colors.textMuted} strokeWidth={1.5} />
-          <Text style={[styles.teamBadgeText, { color: colors.textMuted }]}>
-            {effectiveTeam.name}
-          </Text>
+          <Text style={[styles.teamBadgeText, { color: colors.textMuted }]}>{effectiveTeam.name}</Text>
         </View>
       ) : null}
 
       {/* Schedule - Collapsed by default */}
       <View style={[styles.scheduleSection, { borderColor: colors.border }]}>
-        <TouchableOpacity
-          style={styles.scheduleHeader}
-          onPress={handleToggleSchedule}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity style={styles.scheduleHeader} onPress={handleToggleSchedule} activeOpacity={0.7}>
           <View style={styles.scheduleHeaderLeft}>
             <Calendar size={16} color={colors.textMuted} strokeWidth={1.5} />
             <Text style={[styles.scheduleHeaderText, { color: colors.text }]}>
               {showSchedule ? `${formatDate(scheduledDate)} at ${formatTime(scheduledDate)}` : 'Start when ready'}
             </Text>
           </View>
-          <ChevronDown 
-            size={18} 
-            color={colors.textMuted} 
+          <ChevronDown
+            size={18}
+            color={colors.textMuted}
             style={{ transform: [{ rotate: showSchedule ? '180deg' : '0deg' }] }}
           />
         </TouchableOpacity>
@@ -194,9 +179,7 @@ export function TrainingDetailsStep({
                 activeOpacity={0.7}
               >
                 <Calendar size={16} color={colors.text} strokeWidth={1.5} />
-                <Text style={[styles.scheduleBtnText, { color: colors.text }]}>
-                  {formatDate(scheduledDate)}
-                </Text>
+                <Text style={[styles.scheduleBtnText, { color: colors.text }]}>{formatDate(scheduledDate)}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -208,9 +191,7 @@ export function TrainingDetailsStep({
                 activeOpacity={0.7}
               >
                 <Clock size={16} color={colors.text} strokeWidth={1.5} />
-                <Text style={[styles.scheduleBtnText, { color: colors.text }]}>
-                  {formatTime(scheduledDate)}
-                </Text>
+                <Text style={[styles.scheduleBtnText, { color: colors.text }]}>{formatTime(scheduledDate)}</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>

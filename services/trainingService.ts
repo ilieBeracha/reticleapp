@@ -19,6 +19,51 @@ import { scheduleTrainingReminder } from './notifications';
 import { notifyTeamNewTraining, notifyTeamTrainingStarted } from './pushService';
 
 // =====================================================
+// HELPERS
+// =====================================================
+
+function buildDrillInsertPayload(drill: CreateTrainingDrillInput, trainingId: string, orderIndex: number) {
+  return {
+    training_id: trainingId,
+    order_index: orderIndex,
+    drill_id: drill.drill_id || null,
+    drill_template_id: drill.drill_template_id || drill.drill_id || null,
+    name: drill.name,
+    description: drill.description || null,
+    drill_goal: drill.drill_goal,
+    ...(drill.input_method ? { input_method: drill.input_method } : {}),
+    target_type: drill.target_type,
+    distance_m: drill.distance_m,
+    rounds_per_shooter: drill.rounds_per_shooter,
+    time_limit_seconds: drill.time_limit_seconds ?? null,
+    par_time_seconds: drill.par_time_seconds ?? null,
+    scoring_mode: drill.scoring_mode ?? null,
+    min_accuracy_percent: drill.min_accuracy_percent ?? null,
+    points_per_hit: drill.points_per_hit ?? null,
+    penalty_per_miss: drill.penalty_per_miss ?? null,
+    target_count: drill.target_count ?? 1,
+    target_size: drill.target_size ?? null,
+    shots_per_target: drill.shots_per_target ?? null,
+    target_exposure_seconds: drill.target_exposure_seconds ?? null,
+    position: drill.position ?? null,
+    start_position: drill.start_position ?? null,
+    weapon_category: drill.weapon_category ?? null,
+    strings_count: drill.strings_count ?? 1,
+    reload_required: drill.reload_required ?? false,
+    movement_type: drill.movement_type ?? null,
+    movement_distance_m: drill.movement_distance_m ?? null,
+    difficulty: drill.difficulty ?? null,
+    category: drill.category ?? null,
+    tags: drill.tags ?? null,
+    instructions: drill.instructions ?? null,
+    diagram_url: drill.diagram_url ?? null,
+    video_url: drill.video_url ?? null,
+    safety_notes: drill.safety_notes ?? null,
+    notes: drill.notes || null,
+  };
+}
+
+// =====================================================
 // TRAINING CRUD
 // =====================================================
 
@@ -62,70 +107,9 @@ export async function createTraining(input: CreateTrainingInput): Promise<Traini
 
   // Create drills if provided
   if (input.drills && input.drills.length > 0) {
-    const drillsToInsert = input.drills.map((drill, index) => ({
-      training_id: training.id,
-      order_index: index + 1,
-      // NEW: drill_id references core Drill definition (use || to catch empty strings)
-      drill_id: drill.drill_id || null,
-      // LEGACY: drill_template_id for backwards compatibility
-      drill_template_id: drill.drill_template_id || drill.drill_id || null,
-      name: drill.name,
-      description: drill.description || null,
-
-      // === PRIMARY CLASSIFICATION ===
-      drill_goal: drill.drill_goal,
-
-      // === ENTRY METHOD (commander's choice) ===
-      // Only include if set (column may not exist in older schemas)
-      ...(drill.input_method ? { input_method: drill.input_method } : {}),
-
-      // === BASIC CONFIG ===
-      target_type: drill.target_type,
-      distance_m: drill.distance_m,
-
-      // rounds_per_shooter = bullets per round (per entry)
-      rounds_per_shooter: drill.rounds_per_shooter,
-
-      // === TIMING ===
-      time_limit_seconds: drill.time_limit_seconds ?? null,
-      par_time_seconds: drill.par_time_seconds ?? null,
-
-      // === SCORING ===
-      scoring_mode: drill.scoring_mode ?? null,
-      min_accuracy_percent: drill.min_accuracy_percent ?? null,
-      points_per_hit: drill.points_per_hit ?? null,
-      penalty_per_miss: drill.penalty_per_miss ?? null,
-
-      // === TARGET CONFIGURATION ===
-      target_count: drill.target_count ?? 1,
-      target_size: drill.target_size ?? null,
-      shots_per_target: drill.shots_per_target ?? null,
-      target_exposure_seconds: drill.target_exposure_seconds ?? null,
-
-      // === SHOOTING SETUP ===
-      position: drill.position ?? null,
-      start_position: drill.start_position ?? null,
-      weapon_category: drill.weapon_category ?? null,
-
-      // === STAGE SETUP ===
-      strings_count: drill.strings_count ?? 1,
-      reload_required: drill.reload_required ?? false,
-      movement_type: drill.movement_type ?? null,
-      movement_distance_m: drill.movement_distance_m ?? null,
-
-      // === DIFFICULTY & CATEGORY ===
-      difficulty: drill.difficulty ?? null,
-      category: drill.category ?? null,
-      tags: drill.tags ?? null,
-
-      // === RICH CONTENT ===
-      instructions: drill.instructions ?? null,
-      diagram_url: drill.diagram_url ?? null,
-      video_url: drill.video_url ?? null,
-      safety_notes: drill.safety_notes ?? null,
-
-      notes: drill.notes || null,
-    }));
+    const drillsToInsert = input.drills.map((drill, index) =>
+      buildDrillInsertPayload(drill, training.id, index + 1)
+    );
 
     const { data: drills, error: drillsError } = await supabase
       .from('training_drills')
@@ -457,38 +441,25 @@ export async function startTraining(trainingId: string): Promise<Training | null
  * Safe to call even if training is already finished or doesn't exist.
  */
 export async function finishTraining(trainingId: string): Promise<Training | null> {
-  console.log('[TrainingService] finishTraining called for:', trainingId);
-  
-  // Get current user for debugging
   const { data: { user } } = await supabase.auth.getUser();
-  console.log('[TrainingService] Current user:', user?.id);
-  
+
   if (!user) {
-    console.log('[TrainingService] No authenticated user');
     return null;
   }
 
-  // Get user's team memberships to check access
   const { data: memberships } = await supabase
     .from('team_members')
     .select('team_id, role')
     .eq('user_id', user.id);
-  console.log('[TrainingService] User memberships:', JSON.stringify(memberships));
-  
-  // First check current status - use broader select like the list does
+
   const { data: existing, error: fetchError } = await supabase
     .from('trainings')
     .select('id, status, team_id, created_by')
     .eq('id', trainingId)
     .maybeSingle();
 
-  console.log('[TrainingService] Existing training:', JSON.stringify(existing), 'FetchError:', fetchError);
-
-  // If can't fetch, might be RLS issue - try direct update anyway
+  // If can't fetch, might be RLS issue - try direct update
   if (!existing && !fetchError) {
-    console.log('[TrainingService] Training not found via SELECT, trying direct UPDATE...');
-    
-    // Try the update directly - RLS will block if not authorized
     const { data: updated, error: updateError } = await supabase
       .from('trainings')
       .update({
@@ -499,25 +470,19 @@ export async function finishTraining(trainingId: string): Promise<Training | nul
       .eq('id', trainingId)
       .select()
       .maybeSingle();
-    
-    console.log('[TrainingService] Direct update result:', JSON.stringify(updated), 'Error:', updateError);
-    
+
     if (updateError) {
       throw new Error(updateError.message || 'Failed to finish training - no access');
     }
-    
+
     return updated as Training;
   }
 
-  // If already finished or doesn't exist, return early
   if (!existing) {
-    console.log('[TrainingService] Training not found:', trainingId);
     return null;
   }
-  
+
   if (existing.status === 'finished' || existing.status === 'cancelled') {
-    console.log('[TrainingService] Training already finished/cancelled:', trainingId, existing.status);
-    // Return the existing training
     const { data } = await supabase
       .from('trainings')
       .select('*')
@@ -526,22 +491,14 @@ export async function finishTraining(trainingId: string): Promise<Training | nul
     return data as Training;
   }
 
-  console.log('[TrainingService] Updating training to finished...');
-  console.log('[TrainingService] User role check - training team:', existing.team_id, 'created_by:', existing.created_by);
-  
-  // Check if user is the creator
   const isCreator = existing.created_by === user.id;
-  // Check if user is commander/owner in training's team
   const teamMembership = memberships?.find(m => m.team_id === existing.team_id);
   const isTeamManager = teamMembership?.role === 'owner' || teamMembership?.role === 'commander';
-  
-  console.log('[TrainingService] Permission check - isCreator:', isCreator, 'isTeamManager:', isTeamManager, 'userRole:', teamMembership?.role);
-  
+
   if (!isCreator && !isTeamManager) {
-    console.log('[TrainingService] User lacks permission to finish this training');
     throw new Error('Only the training creator or team commanders can finish this training');
   }
-  
+
   const { data, error } = await supabase
     .from('trainings')
     .update({
@@ -553,16 +510,12 @@ export async function finishTraining(trainingId: string): Promise<Training | nul
     .select()
     .maybeSingle();
 
-  console.log('[TrainingService] Update result:', JSON.stringify(data), 'Error:', error);
-
   if (error) {
-    console.error('Failed to finish training:', error);
+    console.error('[TrainingService] Failed to finish training:', error);
     throw new Error(error.message || 'Failed to finish training');
   }
-  
-  // If update returned null but no error, RLS blocked it
+
   if (!data) {
-    console.log('[TrainingService] Training update returned no data:', trainingId);
     throw new Error('Unable to finish training - you may not have permission');
   }
 
@@ -733,68 +686,7 @@ export async function addDrill(
 
   const { data, error } = await supabase
     .from('training_drills')
-    .insert({
-      training_id: trainingId,
-      order_index: nextIndex,
-      // NEW: drill_id references core Drill definition
-      drill_id: drill.drill_id ?? null,
-      // LEGACY: drill_template_id for backwards compatibility
-      drill_template_id: drill.drill_template_id ?? drill.drill_id ?? null,
-      name: drill.name,
-      description: drill.description || null,
-
-      // === PRIMARY CLASSIFICATION ===
-      drill_goal: drill.drill_goal,
-
-      // === ENTRY METHOD (commander's choice) ===
-      // Only include if set (column may not exist in older schemas)
-      ...(drill.input_method ? { input_method: drill.input_method } : {}),
-
-      // === BASIC CONFIG ===
-      target_type: drill.target_type,
-      distance_m: drill.distance_m,
-      rounds_per_shooter: drill.rounds_per_shooter,
-
-      // === TIMING ===
-      time_limit_seconds: drill.time_limit_seconds ?? null,
-      par_time_seconds: drill.par_time_seconds ?? null,
-
-      // === SCORING ===
-      scoring_mode: drill.scoring_mode ?? null,
-      min_accuracy_percent: drill.min_accuracy_percent ?? null,
-      points_per_hit: drill.points_per_hit ?? null,
-      penalty_per_miss: drill.penalty_per_miss ?? null,
-
-      // === TARGET CONFIGURATION ===
-      target_count: drill.target_count ?? 1,
-      target_size: drill.target_size ?? null,
-      shots_per_target: drill.shots_per_target ?? null,
-      target_exposure_seconds: drill.target_exposure_seconds ?? null,
-
-      // === SHOOTING SETUP ===
-      position: drill.position ?? null,
-      start_position: drill.start_position ?? null,
-      weapon_category: drill.weapon_category ?? null,
-
-      // === STAGE SETUP ===
-      strings_count: drill.strings_count ?? 1,
-      reload_required: drill.reload_required ?? false,
-      movement_type: drill.movement_type ?? null,
-      movement_distance_m: drill.movement_distance_m ?? null,
-
-      // === DIFFICULTY & CATEGORY ===
-      difficulty: drill.difficulty ?? null,
-      category: drill.category ?? null,
-      tags: drill.tags ?? null,
-
-      // === RICH CONTENT ===
-      instructions: drill.instructions ?? null,
-      diagram_url: drill.diagram_url ?? null,
-      video_url: drill.video_url ?? null,
-      safety_notes: drill.safety_notes ?? null,
-
-      notes: drill.notes || null,
-    })
+    .insert(buildDrillInsertPayload(drill, trainingId, nextIndex))
     .select()
     .single();
 
