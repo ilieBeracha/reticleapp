@@ -509,12 +509,15 @@ export async function notifyTrainingSessionStarted(
 export async function notifyWeaponRequested(
   teamId: string,
   teamName: string,
-  soldierName: string
+  soldierName: string,
+  trainingId?: string
 ): Promise<string> {
   return scheduleNotification({
     title: 'Weapon Request',
-    body: `${soldierName} is requesting a weapon in ${teamName}`,
-    data: { type: 'team', screen: 'teamArmory', id: teamId },
+    body: `${soldierName} is requesting a weapon${trainingId ? ' during training' : ` in ${teamName}`}`,
+    data: trainingId
+      ? { type: 'training', screen: 'trainingDetail', id: trainingId }
+      : { type: 'team', screen: 'teamArmory', id: teamId },
   });
 }
 

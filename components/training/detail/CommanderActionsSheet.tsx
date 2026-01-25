@@ -4,7 +4,7 @@
  */
 
 import * as Haptics from 'expo-haptics';
-import { CheckCircle2, Plus, Settings, Target, XCircle } from 'lucide-react-native';
+import { CheckCircle2, Crosshair, Plus, Settings, Target, XCircle } from 'lucide-react-native';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +14,7 @@ export function CommanderActionsSheet({
   visible,
   onClose,
   onAddDrill,
+  onAddCustomSession,
   onAssignWeapon,
   onFinishTraining,
   onSettings,
@@ -71,6 +72,19 @@ export function CommanderActionsSheet({
                 </View>
                 <Text style={[styles.gridLabel, { color: colors.text }]}>Add Drill</Text>
               </TouchableOpacity>
+
+              {/* Add Custom Session to plan - only during ongoing training */}
+              {isOngoing && (
+                <TouchableOpacity
+                  style={[styles.gridBtn, { backgroundColor: colors.card }]}
+                  onPress={() => handleAction(onAddCustomSession)}
+                >
+                  <View style={[styles.gridIcon, { backgroundColor: colors.green + '15' }]}>
+                    <Crosshair size={24} color={colors.green} />
+                  </View>
+                  <Text style={[styles.gridLabel, { color: colors.text }]}>Custom</Text>
+                </TouchableOpacity>
+              )}
 
               {/* Assign Weapon */}
               <TouchableOpacity
@@ -173,9 +187,11 @@ const styles = StyleSheet.create({
   },
   gridActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
   },
   gridBtn: {
+    minWidth: '28%',
     flex: 1,
     alignItems: 'center',
     padding: 16,

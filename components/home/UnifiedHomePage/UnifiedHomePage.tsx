@@ -48,7 +48,8 @@ function SectionHeader({ title, tooltip, colors }: SectionHeaderProps) {
   }, [showTooltip]);
 
   return (
-    <View style={localStyles.sectionHeaderContainer}>
+    <View style={localStyles.sectionBlock}>
+      <View style={[localStyles.sectionDivider, { backgroundColor: colors.border }]} />
       <View style={localStyles.sectionHeader}>
         <Text style={[localStyles.sectionTitle, { color: colors.textMuted }]}>{title}</Text>
         <TouchableOpacity
@@ -275,9 +276,14 @@ export function UnifiedHomePage() {
 }
 
 const localStyles = StyleSheet.create({
-  sectionHeaderContainer: {
-    marginBottom: 12,
-    marginTop: 24,
+  sectionBlock: {
+    marginTop: 16,
+    marginBottom: 8,
+    gap: 8,
+  },
+  sectionDivider: {
+    height: StyleSheet.hairlineWidth,
+    opacity: 0.4,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -285,8 +291,8 @@ const localStyles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   sectionTitle: {
-    fontSize: 10,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
     letterSpacing: 0.8,
   },
   helpButton: {

@@ -19,11 +19,13 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/ui/useColors';
-import { getRecentSessionsWithStats, type SessionWithDetails } from '@/services/sessionService';
+import { supabase } from '@/lib/supabase';
+import { getDashboardFeatures } from '@/services/sessionService';
+import type { SessionWithDetails } from '@/services/sessionService';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { ChevronRight, Clock, Crosshair, HelpCircle, History, TrendingUp } from 'lucide-react-native';
+import { ChevronRight, Clock, HelpCircle, History, TrendingUp } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -38,6 +40,7 @@ import {
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 
 import { AIExplanationProvider } from './AIExplanationProvider';
+import { featuresToSessions } from './insights.adapter';
 import type { ActivityDataPoint, ChartDataPoint } from './components';
 import { ActivityChart, PerformanceChart } from './components';
 import { EvidenceSheet } from './EvidenceSheet';
@@ -209,21 +212,59 @@ export function InsightsDashboard() {
   const [evidenceContext, setEvidenceContext] = useState<EvidenceContext | null>(null);
   const [showEvidence, setShowEvidence] = useState(false);
 
-  // Load sessions
+  // Load sessions from lightweight session_features table
   const loadSessions = useCallback(async () => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
     try {
-      const data = await getRecentSessionsWithStats({ days: 365, limit: 500 });
-      setSessions(data);
+      const features = await getDashboardFeatures({ userId: user.id, days: 365, limit: 500 });
+      setSessions(featuresToSessions(features));
     } catch (e) {
       console.error('Failed to load sessions:', e);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     loadSessions();
   }, [loadSessions]);
+
+  // Backfill check: if session_features is missing rows, trigger backfill once
+  const backfillTriggered = useRef(false);
+  useEffect(() => {
+    if (!user?.id || loading || backfillTriggered.current) return;
+    backfillTriggered.current = true;
+
+    (async () => {
+      try {
+        // Count completed sessions
+        const { count: sessionCount } = await supabase
+          .from('sessions')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('status', 'completed');
+
+        // Count features
+        const { count: featureCount } = await supabase
+          .from('session_features')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+
+        const gap = (sessionCount ?? 0) - (featureCount ?? 0);
+        if (gap > 2) {
+          await supabase.rpc('backfill_user_session_features', { p_user_id: user.id });
+          // Reload after backfill
+          loadSessions();
+        }
+      } catch (e) {
+        // Non-critical — don't block UI
+        console.warn('Backfill check failed:', e);
+      }
+    })();
+  }, [user?.id, loading, loadSessions]);
 
   // Refresh handler
   const handleRefresh = useCallback(async () => {
@@ -559,31 +600,24 @@ export function InsightsDashboard() {
                 </>
               ) : (
                 <>
-                  {/* Two-column layout for Recommendations + Context */}
-                  <View style={styles.dualSection}>
-                    {/* Recommendations - Primary */}
-                    {insights.recommendations.length > 0 && (
-                      <View style={styles.primaryColumn}>
-                        <RecommendationsSection
-                          recommendations={insights.recommendations}
-                          onRecommendationPress={openEvidenceForRecommendation}
-                          onAddToTrainingPlan={handleAddToTrainingPlan}
-                          onShowEvidence={openEvidenceForRecommendation}
-                          maxVisible={3}
-                        />
-                      </View>
-                    )}
-                  </View>
+                  {/* Recommendations */}
+                  {insights.recommendations.length > 0 && (
+                    <View style={styles.sectionBlock}>
+                      <View style={[styles.sectionDivider, { backgroundColor: colors.border }]} />
+                      <RecommendationsSection
+                        recommendations={insights.recommendations}
+                        onRecommendationPress={openEvidenceForRecommendation}
+                        onAddToTrainingPlan={handleAddToTrainingPlan}
+                        onShowEvidence={openEvidenceForRecommendation}
+                        maxVisible={3}
+                      />
+                    </View>
+                  )}
 
                   {/* Context Summary */}
                   {contextProfiles.profiles.length > 0 && (
-                    <View style={styles.sectionCompact}>
-                      <SectionHeaderWithTooltip
-                        title="Conditions"
-                        tooltip="How you perform under different conditions - distance, position, and environment. Tap any condition to see supporting sessions."
-                        icon={<Crosshair size={13} color={colors.textMuted} />}
-                        colors={colors}
-                      />
+                    <View style={styles.sectionBlock}>
+                      <View style={[styles.sectionDivider, { backgroundColor: colors.border }]} />
                       <ContextSummarySection
                         profiles={contextProfiles.profiles}
                         summary={contextProfiles.summary}
@@ -593,32 +627,37 @@ export function InsightsDashboard() {
                     </View>
                   )}
 
-                  {/* Inline actions */}
-                  <View style={styles.inlineActions}>
+                  {/* Action bar */}
+                  <View style={[styles.actionBar, { backgroundColor: colors.card }]}>
                     <TouchableOpacity
-                      style={styles.inlineAction}
+                      style={styles.actionBarButton}
                       onPress={goToSessionHistory}
                       activeOpacity={0.6}
                     >
-                      <History size={14} color={colors.textMuted} />
-                      <Text style={[styles.inlineActionText, { color: colors.textMuted }]}>History</Text>
+                      <View style={[styles.actionBarIcon, { backgroundColor: `${colors.textMuted}12` }]}>
+                        <History size={14} color={colors.textMuted} />
+                      </View>
+                      <Text style={[styles.actionBarText, { color: colors.text }]}>History</Text>
                     </TouchableOpacity>
-                    <View style={[styles.actionDivider, { backgroundColor: colors.border }]} />
+                    <View style={[styles.actionBarDivider, { backgroundColor: colors.border }]} />
                     <TouchableOpacity
-                      style={styles.inlineAction}
+                      style={styles.actionBarButton}
                       onPress={scrollToDetails}
                       activeOpacity={0.6}
                     >
-                      <TrendingUp size={14} color={colors.textMuted} />
-                      <Text style={[styles.inlineActionText, { color: colors.textMuted }]}>Details</Text>
+                      <View style={[styles.actionBarIcon, { backgroundColor: `${colors.textMuted}12` }]}>
+                        <TrendingUp size={14} color={colors.textMuted} />
+                      </View>
+                      <Text style={[styles.actionBarText, { color: colors.text }]}>Details</Text>
                     </TouchableOpacity>
                   </View>
 
-                  {/* Detailed Breakdown - Collapsed by default */}
+                  {/* Detailed Breakdown */}
                   <View
-                    style={styles.sectionCompact}
+                    style={styles.sectionBlock}
                     onLayout={(e) => setDetailsYOffset(e.nativeEvent.layout.y)}
                   >
+                    <View style={[styles.sectionDivider, { backgroundColor: colors.border }]} />
                     <DetailedBreakdownSection
                       strengths={insights.strengths}
                       weaknesses={insights.weaknesses}
@@ -736,37 +775,49 @@ const styles = StyleSheet.create({
     gap: 12,
   },
 
-  // Dual section (side by side)
-  dualSection: {
+  // Section block — clear top divider + spacing for visual hierarchy
+  sectionBlock: {
     marginTop: 24,
+    gap: 14,
   },
-  primaryColumn: {
-    flex: 1,
+  sectionDivider: {
+    height: StyleSheet.hairlineWidth,
+    opacity: 0.5,
   },
 
-  // Inline actions
-  inlineActions: {
+  // Action bar — compact card with icon buttons
+  actionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+  },
+  actionBarButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
-    gap: 16,
+    gap: 8,
+    paddingVertical: 4,
   },
-  inlineAction: {
-    flexDirection: 'row',
+  actionBarIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
     alignItems: 'center',
-    gap: 5,
-    paddingVertical: 6,
-    paddingHorizontal: 2,
+    justifyContent: 'center',
   },
-  inlineActionText: {
-    fontSize: 13,
-    fontWeight: '500',
+  actionBarText: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: -0.2,
   },
-  actionDivider: {
+  actionBarDivider: {
     width: 1,
-    height: 14,
-    opacity: 0.3,
+    height: 20,
+    opacity: 0.2,
   },
 
   // Link card (legacy)

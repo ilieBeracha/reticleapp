@@ -913,7 +913,7 @@ export function computeStrengths(
   });
 
   // Group ENGAGEMENT sessions by weapon (for accuracy strengths)
-  const engagementByWeapon = groupByCategory(engagementSessions, (s) => s.weapon_name || null);
+  const engagementByWeapon = groupByCategory(engagementSessions, (s) => s.weapon_name || s.weapon_category || null);
 
   engagementByWeapon.forEach((stats, weaponName) => {
     if (stats.shots < MIN_SHOTS_FOR_CATEGORY) return;

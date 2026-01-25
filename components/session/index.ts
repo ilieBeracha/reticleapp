@@ -16,7 +16,7 @@ export { SaveDrillPrompt } from './SaveDrillPrompt';
 export { useWatchControlPrompt, WatchControlPrompt } from './WatchControlPrompt';
 
 // Capture mode selection
-export { CaptureModePickerInline, CaptureModePicker } from './CaptureModePicker';
+export { CaptureModePicker, CaptureModePickerInline } from './CaptureModePicker';
 export type { CaptureMode, CaptureModeSelection } from './CaptureModePicker';
 
 // Category drill picker - shows real drills that sessions MUST follow

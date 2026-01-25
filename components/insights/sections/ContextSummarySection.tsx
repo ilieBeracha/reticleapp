@@ -1,14 +1,14 @@
 /**
- * Context Summary Section
+ * Context Summary Section (v3 - Grouped by severity)
  *
- * Shows context profiles in a list format with expandable details.
- * Profiles are sorted by priority: struggling first, then by confidence.
+ * Groups profiles into "Needs Attention" and "Strong" clusters
+ * for clearer visual hierarchy and scannability.
  */
 
 import { useColors } from '@/hooks/ui/useColors';
 import * as Haptics from 'expo-haptics';
 import { ChevronDown, ChevronUp, Grid3X3 } from 'lucide-react-native';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   LayoutAnimation,
   Platform,
@@ -79,73 +79,11 @@ function sortProfiles(profiles: ContextProfile[]): ContextProfile[] {
   });
 }
 
-// ============================================================================
-// STAT BADGE COMPONENT
-// ============================================================================
-
-interface StatBadgeProps {
-  count: number;
-  label: string;
-  color: string;
-  bgColor: string;
-}
-
-function StatBadge({ count, label, color, bgColor }: StatBadgeProps) {
-  if (count === 0) return null;
-  return (
-    <View style={[styles.statBadge, { backgroundColor: bgColor }]}>
-      <Text style={[styles.statCount, { color }]}>{count}</Text>
-      <Text style={[styles.statLabel, { color }]}>{label}</Text>
-    </View>
-  );
-}
-
-// ============================================================================
-// SUMMARY STATS
-// ============================================================================
-
-interface SummaryStatsProps {
-  summary: ComputedContextProfiles['summary'];
-  colors: ReturnType<typeof useColors>;
-}
-
-function SummaryStats({ summary, colors }: SummaryStatsProps) {
-  const { strongBothCount, hitsLooseCount, tightMissesCount, strugglingCount, totalContexts } =
-    summary;
-
-  const attentionCount = hitsLooseCount + tightMissesCount;
-
-  if (totalContexts === 0) {
-    return (
-      <Text style={[styles.buildingText, { color: colors.textMuted }]}>
-        Building...
-      </Text>
-    );
-  }
-
-  return (
-    <View style={styles.statsRow}>
-      <StatBadge
-        count={strugglingCount}
-        label="focus"
-        color={colors.red}
-        bgColor={`${colors.red}12`}
-      />
-      <StatBadge
-        count={attentionCount}
-        label="review"
-        color={colors.yellow || '#F59E0B'}
-        bgColor={`${colors.yellow || '#F59E0B'}12`}
-      />
-      <StatBadge
-        count={strongBothCount}
-        label="solid"
-        color={colors.green}
-        bgColor={`${colors.green}12`}
-      />
-    </View>
-  );
-}
+const ATTENTION_QUADRANTS: Set<ContextQuadrant> = new Set([
+  'struggling',
+  'hits_loose',
+  'tight_misses',
+]);
 
 // ============================================================================
 // EMPTY STATE
@@ -158,6 +96,46 @@ function EmptyState({ colors }: { colors: ReturnType<typeof useColors> }) {
       <Text style={[styles.emptyText, { color: colors.textMuted }]}>
         Train in different positions and distances to see context patterns
       </Text>
+    </View>
+  );
+}
+
+// ============================================================================
+// PROFILE GROUP
+// ============================================================================
+
+interface ProfileGroupProps {
+  label: string;
+  count: number;
+  accentColor: string;
+  profiles: ContextProfile[];
+  onViewEvidence?: (profile: ContextProfile) => void;
+}
+
+function ProfileGroup({ label, count, accentColor, profiles, onViewEvidence }: ProfileGroupProps) {
+  const colors = useColors();
+  if (profiles.length === 0) return null;
+
+  return (
+    <View style={styles.groupContainer}>
+      <View style={styles.groupHeader}>
+        <View style={[styles.groupAccent, { backgroundColor: accentColor }]} />
+        <Text style={[styles.groupLabel, { color: colors.textMuted }]}>{label}</Text>
+        <View style={[styles.groupCount, { backgroundColor: `${accentColor}15` }]}>
+          <Text style={[styles.groupCountText, { color: accentColor }]}>{count}</Text>
+        </View>
+      </View>
+      <View style={styles.groupProfiles}>
+        {profiles.map((profile) => (
+          <ContextProfileRow
+            key={profile.keyString}
+            profile={profile}
+            onViewEvidence={
+              onViewEvidence ? () => onViewEvidence(profile) : undefined
+            }
+          />
+        ))}
+      </View>
     </View>
   );
 }
@@ -176,8 +154,9 @@ export function ContextSummarySection({
   const colors = useColors();
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const relevantProfiles = sortProfiles(
-    profiles.filter((p) => p.quadrant !== 'insufficient_data')
+  const relevantProfiles = useMemo(() =>
+    sortProfiles(profiles.filter((p) => p.quadrant !== 'insufficient_data')),
+    [profiles]
   );
 
   const visibleProfiles = isExpanded
@@ -187,14 +166,19 @@ export function ContextSummarySection({
   const hasMore = relevantProfiles.length > maxVisible;
   const hiddenCount = relevantProfiles.length - maxVisible;
 
-  const handleViewEvidence = useCallback(
-    (profile: ContextProfile) => {
-      if (onViewEvidence) {
-        onViewEvidence(profile);
+  // Split into attention vs strong groups
+  const { attentionProfiles, strongProfiles } = useMemo(() => {
+    const attention: ContextProfile[] = [];
+    const strong: ContextProfile[] = [];
+    for (const p of visibleProfiles) {
+      if (ATTENTION_QUADRANTS.has(p.quadrant)) {
+        attention.push(p);
+      } else {
+        strong.push(p);
       }
-    },
-    [onViewEvidence]
-  );
+    }
+    return { attentionProfiles: attention, strongProfiles: strong };
+  }, [visibleProfiles]);
 
   const handleToggleExpand = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -218,38 +202,39 @@ export function ContextSummarySection({
               Context Analysis
             </Text>
             <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
-              {relevantProfiles.length} context{relevantProfiles.length !== 1 ? 's' : ''} tracked
+              {relevantProfiles.length} condition{relevantProfiles.length !== 1 ? 's' : ''} tracked
             </Text>
           </View>
         </View>
-        
-        <SummaryStats summary={summary} colors={colors} />
       </View>
 
-      {/* Profile List */}
-      {relevantProfiles.length > 0 && (
-        <>
-          <View style={styles.profilesContainer}>
-            {visibleProfiles.map((profile) => (
-              <ContextProfileRow
-                key={profile.keyString}
-                profile={profile}
-                onViewEvidence={
-                  onViewEvidence ? () => handleViewEvidence(profile) : undefined
-                }
-              />
-            ))}
-          </View>
-          
+      {/* Grouped Profiles */}
+      {relevantProfiles.length > 0 ? (
+        <View style={styles.groupsContainer}>
+          <ProfileGroup
+            label="Needs attention"
+            count={attentionProfiles.length}
+            accentColor={attentionProfiles.some(p => p.quadrant === 'struggling') ? colors.red : (colors.yellow || '#F59E0B')}
+            profiles={attentionProfiles}
+            onViewEvidence={onViewEvidence}
+          />
+          <ProfileGroup
+            label="Strong"
+            count={strongProfiles.length}
+            accentColor={colors.green}
+            profiles={strongProfiles}
+            onViewEvidence={onViewEvidence}
+          />
+
           {/* Expand/Collapse */}
           {hasMore && (
             <TouchableOpacity
-              style={[styles.expandButton, { borderColor: `${colors.border}40` }]}
+              style={[styles.expandButton, { backgroundColor: `${colors.textMuted}08` }]}
               onPress={handleToggleExpand}
               activeOpacity={0.7}
             >
               <Text style={[styles.expandText, { color: colors.textMuted }]}>
-                {isExpanded ? 'Show less' : `+${hiddenCount} more`}
+                {isExpanded ? 'Show less' : `+${hiddenCount} more conditions`}
               </Text>
               {isExpanded ? (
                 <ChevronUp size={14} color={colors.textMuted} strokeWidth={2} />
@@ -258,11 +243,10 @@ export function ContextSummarySection({
               )}
             </TouchableOpacity>
           )}
-        </>
+        </View>
+      ) : (
+        <EmptyState colors={colors} />
       )}
-
-      {/* Empty State */}
-      {relevantProfiles.length === 0 && <EmptyState colors={colors} />}
     </View>
   );
 }
@@ -273,15 +257,14 @@ export function ContextSummarySection({
 
 const styles = StyleSheet.create({
   container: {
-    gap: 12,
+    gap: 14,
   },
 
   // Header
   sectionHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -309,36 +292,40 @@ const styles = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-  // Stats
-  statsRow: {
-    flexDirection: 'row',
-    gap: 6,
+  // Groups
+  groupsContainer: {
+    gap: 16,
   },
-  statBadge: {
+  groupContainer: {
+    gap: 8,
+  },
+  groupHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4,
+    gap: 8,
+    paddingLeft: 2,
   },
-  statCount: {
+  groupAccent: {
+    width: 3,
+    height: 14,
+    borderRadius: 1.5,
+  },
+  groupLabel: {
     fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: -0.2,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    textTransform: 'uppercase',
   },
-  statLabel: {
-    fontSize: 10,
-    fontWeight: '500',
-    letterSpacing: -0.1,
+  groupCount: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
   },
-  buildingText: {
+  groupCountText: {
     fontSize: 11,
-    fontStyle: 'italic',
+    fontWeight: '700',
   },
-
-  // Profiles
-  profilesContainer: {
+  groupProfiles: {
     gap: 8,
   },
 
@@ -348,8 +335,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: 10,
     gap: 4,
   },
   expandText: {

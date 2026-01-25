@@ -23,7 +23,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 14,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -67,7 +67,7 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '400',
     lineHeight: 20,
-    marginBottom: 20,
+    marginBottom: 4,
     opacity: 0.7,
     width: '65%',
   },
@@ -95,7 +95,7 @@ export const styles = StyleSheet.create({
   weeklyCard: {
     borderRadius: SMALL_RADIUS,
     borderWidth: 1,
-    marginTop: 14,
+    marginTop: 8,
     padding: 14,
   },
   weeklyHeader: {

@@ -618,7 +618,8 @@ CREATE TABLE IF NOT EXISTS "public"."session_features" (
     "weather_wind_bearing" integer,
     "weather_condition" "text",
     "weather_wind_impact" "text",
-    "weather_condition_severity" "text"
+    "weather_condition_severity" "text",
+    "is_timed" boolean DEFAULT false
 );
 
 
@@ -635,8 +636,9 @@ DECLARE
   v_paper RECORD;
   v_tactical RECORD;
   v_timeline RECORD;
+  v_is_timed boolean;
   v_result public.session_features;
-  -- Weather variables (declared separately for null safety)
+  -- Weather variables (individual for null safety)
   v_has_weather boolean := false;
   v_weather_temp_c numeric;
   v_weather_humidity integer;
@@ -646,8 +648,8 @@ DECLARE
   v_weather_wind_impact text;
   v_weather_condition_severity text;
 BEGIN
-  -- 1. Get session base info (including weather)
-  SELECT 
+  -- 1. Get session base info (including weather + timed detection)
+  SELECT
     s.id,
     s.user_id,
     s.team_id,
@@ -660,7 +662,12 @@ BEGIN
       s.custom_drill_config->>'drill_goal',
       'achievement'
     ) as drill_goal,
-    uw.category as weapon_category
+    uw.category as weapon_category,
+    -- Detect is_timed from template or custom config
+    (
+      d.time_limit_seconds IS NOT NULL
+      OR (s.custom_drill_config->>'time_limit_seconds') IS NOT NULL
+    ) as is_timed
   INTO v_session
   FROM sessions s
   LEFT JOIN drill_templates d ON d.id = s.drill_template_id
@@ -671,9 +678,10 @@ BEGIN
     RAISE EXCEPTION 'Session not found: %', p_session_id;
   END IF;
 
+  v_is_timed := COALESCE(v_session.is_timed, false);
+
   -- Extract weather data safely (each field individually)
   IF v_session.weather IS NOT NULL AND jsonb_typeof(v_session.weather) = 'object' THEN
-    -- Check if weather has any useful data
     v_weather_temp_c := COALESCE(
       (v_session.weather->>'temperature_c')::numeric,
       (v_session.weather->>'temperatureC')::numeric,
@@ -701,7 +709,6 @@ BEGIN
       v_session.weather->>'condition_severity',
       v_session.weather->>'conditionSeverity'
     );
-    
     -- Mark as has_weather only if we have at least temp or condition
     v_has_weather := (v_weather_temp_c IS NOT NULL OR v_weather_condition IS NOT NULL);
   END IF;
@@ -743,9 +750,9 @@ BEGIN
     (summary->>'hrMax')::numeric as hr_max,
     (SELECT COUNT(*) FROM jsonb_array_elements(shot_details) sd WHERE (sd->>'flinch')::boolean) as flinch_count,
     (SELECT COUNT(*) FROM jsonb_array_elements(shot_details)) as total_shots_biometric,
-    (SELECT COUNT(*) FROM jsonb_array_elements(shot_details) sd 
-      WHERE (sd->>'breathPhase') = 'pause' 
-      AND (sd->>'stress')::numeric < 50 
+    (SELECT COUNT(*) FROM jsonb_array_elements(shot_details) sd
+      WHERE (sd->>'breathPhase') = 'pause'
+      AND (sd->>'stress')::numeric < 50
       AND (sd->>'steadiness')::numeric >= 70
     ) as optimal_shots
   INTO v_timeline
@@ -765,7 +772,7 @@ BEGIN
     v_total_shots := COALESCE(v_paper.total_shots, 0) + COALESCE(v_tactical.total_shots, 0);
     v_total_hits := COALESCE(v_paper.total_hits, 0) + COALESCE(v_tactical.total_hits, 0);
     v_accuracy := CASE WHEN v_total_shots > 0 THEN ROUND((v_total_hits::numeric / v_total_shots) * 100, 2) ELSE NULL END;
-    
+
     -- Session duration in seconds
     IF v_session.ended_at IS NOT NULL AND v_session.started_at IS NOT NULL THEN
       v_session_duration := EXTRACT(EPOCH FROM (v_session.ended_at - v_session.started_at))::integer;
@@ -782,14 +789,15 @@ BEGIN
       v_optimal_pct := ROUND((v_timeline.optimal_shots::numeric / v_timeline.total_shots_biometric) * 100, 1);
     END IF;
 
-    -- Stress trend default
+    -- Stress trend (simplified)
     v_stress_trend := 'stable';
 
-    -- 6. Upsert into session_features (WITH WEATHER)
+    -- 6. Upsert into session_features (WITH is_timed + created_at from started_at)
     INSERT INTO session_features (
       session_id,
       user_id,
       team_id,
+      created_at,
       shots,
       hits,
       accuracy_pct,
@@ -808,6 +816,7 @@ BEGIN
       weapon_category,
       drill_goal,
       target_type,
+      is_timed,
       has_biometrics,
       stress_avg,
       stress_trend,
@@ -829,6 +838,7 @@ BEGIN
       p_session_id,
       v_session.user_id,
       v_session.team_id,
+      v_session.started_at,  -- Use session started_at, not now()
       v_total_shots,
       v_total_hits,
       v_accuracy,
@@ -847,6 +857,7 @@ BEGIN
       v_session.weapon_category,
       v_session.drill_goal,
       COALESCE(v_paper.target_type, 'tactical'),
+      v_is_timed,
       COALESCE(v_timeline.has_data, false),
       v_timeline.stress_avg,
       v_stress_trend,
@@ -855,7 +866,7 @@ BEGIN
       v_timeline.hr_max,
       COALESCE(v_timeline.flinch_count, 0),
       v_optimal_pct,
-      -- Weather values (now safely extracted)
+      -- Weather values
       v_has_weather,
       v_weather_temp_c,
       v_weather_humidity,
@@ -866,6 +877,7 @@ BEGIN
       v_weather_condition_severity
     )
     ON CONFLICT (session_id) DO UPDATE SET
+      created_at = EXCLUDED.created_at,
       shots = EXCLUDED.shots,
       hits = EXCLUDED.hits,
       accuracy_pct = EXCLUDED.accuracy_pct,
@@ -884,6 +896,7 @@ BEGIN
       weapon_category = EXCLUDED.weapon_category,
       drill_goal = EXCLUDED.drill_goal,
       target_type = EXCLUDED.target_type,
+      is_timed = EXCLUDED.is_timed,
       has_biometrics = EXCLUDED.has_biometrics,
       stress_avg = EXCLUDED.stress_avg,
       stress_trend = EXCLUDED.stress_trend,
@@ -912,7 +925,7 @@ $$;
 ALTER FUNCTION "public"."compute_session_features"("p_session_id" "uuid") OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."compute_session_features"("p_session_id" "uuid") IS 'Computes and stores derived features for a session including weather. Handles missing weather fields gracefully. Idempotent (upserts).';
+COMMENT ON FUNCTION "public"."compute_session_features"("p_session_id" "uuid") IS 'Computes and stores derived features for a session including weather and is_timed. Call after session completion. Idempotent (upserts).';
 
 
 
@@ -4587,8 +4600,6 @@ CREATE POLICY "Owners and commanders can create invitations" ON "public"."team_i
 
 
 CREATE POLICY "Owners and commanders can create trainings" ON "public"."trainings" FOR INSERT WITH CHECK ((("created_by" = "auth"."uid"()) AND (("team_id" IS NULL) OR (EXISTS ( SELECT 1
-   FROM "public"."teams" "t"
-  WHERE (("t"."id" = "trainings"."team_id") AND ("t"."created_by" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
    FROM "public"."team_members" "tm"
   WHERE (("tm"."team_id" = "trainings"."team_id") AND ("tm"."user_id" = "auth"."uid"()) AND ("tm"."role" = ANY (ARRAY['owner'::"text", 'commander'::"text"]))))))));
 

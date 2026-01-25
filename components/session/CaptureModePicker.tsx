@@ -137,12 +137,7 @@ export function CaptureModePickerInline({
                   onPress={() => handleSensitivity(opt.value)}
                   activeOpacity={0.7}
                 >
-                  <Text
-                    style={[
-                      styles.sensitivityLabel,
-                      { color: isSelected ? '#fff' : colors.text },
-                    ]}
-                  >
+                  <Text style={[styles.sensitivityLabel, { color: isSelected ? '#fff' : colors.text }]}>
                     {opt.label}
                   </Text>
                 </TouchableOpacity>

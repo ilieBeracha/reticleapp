@@ -700,3 +700,31 @@ export interface OverviewStatus {
   /** Sessions needed for full insights */
   sessionsNeeded: number;
 }
+
+// ============================================================================
+// DASHBOARD FEATURE (lightweight query result from session_features)
+// ============================================================================
+
+/**
+ * Lightweight row from session_features table.
+ * Used by InsightsDashboard instead of the heavy SessionWithDetails fetch.
+ */
+export interface DashboardFeature {
+  session_id: string;
+  user_id: string;
+  team_id: string | null;
+  created_at: string;
+  shots: number;
+  hits: number;
+  accuracy_pct: number | null;
+  best_grouping_cm: number | null;
+  distance_m: number | null;
+  position: string | null;
+  weapon_id: string | null;
+  weapon_category: string | null;
+  drill_goal: string | null;
+  target_type: string | null;
+  is_timed: boolean;
+  has_weather: boolean;
+  weather_wind_speed_mps: number | null;
+}

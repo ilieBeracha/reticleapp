@@ -126,7 +126,7 @@ export function CustomSessionCard({
   const handleStart = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const isWatchMode = captureMode === 'watch';
-    
+
     await onStartSession({
       purpose,
       distance: context.distance,
