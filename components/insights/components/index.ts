@@ -12,3 +12,4 @@ export { PerformanceChart } from './PerformanceChart';
 export type { ChartDataPoint } from './PerformanceChart';
 export { TrendChart } from './TrendChart';
 export type { TrendDataPoint } from './TrendChart';
+

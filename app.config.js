@@ -23,7 +23,6 @@ const getScheme = () => {
   return 'retic';
 };
 
-
 const getSlug = () => {
   // All variants use same slug because they share the same EAS project
   return 'retic';
@@ -35,11 +34,11 @@ export default ({ config }) => {
     slug: getSlug(),
     version: '1.0.0',
     orientation: 'portrait',
-    icon: './assets/images/icon.jpg',
+    icon: './assets/images/ios.png',
     scheme: getScheme(),
     userInterfaceStyle: 'automatic',
     splash: {
-      image: './assets/images/icon.jpg',
+      image: './assets/images/splash.png',
       resizeMode: 'contain',
       backgroundColor: '#ffffff',
     },
@@ -47,7 +46,7 @@ export default ({ config }) => {
     ios: {
       bundleIdentifier: getBundleIdentifier(),
       supportsTablet: true,
-      icon: './assets/images/icon.jpg',
+      icon: './assets/images/ios.png',
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
         UIBackgroundModes: ['remote-notification'],
@@ -57,9 +56,9 @@ export default ({ config }) => {
       versionCode: 5,
       adaptiveIcon: {
         backgroundColor: '#E6F4FE',
-        foregroundImage: './assets/images/icon.jpg',
-        backgroundImage: './assets/images/icon.jpg',
-        monochromeImage: './assets/images/icon.jpg',
+        foregroundImage: './assets/images/ios.png',
+        backgroundImage: './assets/images/ios.png',
+        monochromeImage: './assets/images/ios.png',
       },
       package: getAndroidPackage(),
       permissions: [
@@ -92,7 +91,7 @@ export default ({ config }) => {
       [
         'expo-splash-screen',
         {
-          image: './assets/images/icon.jpg',
+          image: './assets/images/splash.png',
           imageWidth: 200,
           resizeMode: 'cover',
           backgroundColor: '#221f20',
@@ -118,7 +117,7 @@ export default ({ config }) => {
       [
         'expo-notifications',
         {
-          icon: './assets/images/icon.jpg',
+          icon: './assets/images/ios.png',
           color: '#FF6B35',
           sounds: [],
         },
