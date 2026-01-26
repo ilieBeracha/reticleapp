@@ -11,6 +11,8 @@
  */
 import { useTrainingDetail } from '@/components/training';
 import { TrainingHero, TrainingSettingsModal } from '@/components/training/detail';
+import { SquadInvitationBanner } from '@/components/training/SquadInvitationBanner';
+import { SquadLobbyBanner } from '@/components/training/SquadLobbyBanner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModals } from '@/contexts/ModalContext';
 import { useColors } from '@/hooks/ui/useColors';
@@ -59,6 +61,8 @@ function TrainingSummaryContent({
   onEndTraining,
   onStartDrill,
   isUpdatingStatus,
+  currentUserId,
+  onRefresh,
 }: {
   training: any;
   colors: any;
@@ -71,6 +75,8 @@ function TrainingSummaryContent({
   onEndTraining: () => void;
   onStartDrill: (drill: TrainingDrill) => void;
   isUpdatingStatus: boolean;
+  currentUserId: string | null;
+  onRefresh: () => void;
 }) {
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scrollOffset = useScrollViewOffset(scrollRef);
@@ -187,6 +193,24 @@ function TrainingSummaryContent({
 
       {/* Content */}
       <View style={styles.contentContainer}>
+        {/* Squad Lobby Banner - Shows if commander has an active squad lobby */}
+        {currentUserId && training.id && canManageTraining && (
+          <SquadLobbyBanner
+            trainingId={training.id}
+            userId={currentUserId}
+            onLobbyChanged={onRefresh}
+          />
+        )}
+
+        {/* Squad Invitation Banner - Shows if user is invited to an active squad engagement */}
+        {currentUserId && training.id && (
+          <SquadInvitationBanner
+            trainingId={training.id}
+            userId={currentUserId}
+            onInvitationChanged={onRefresh}
+          />
+        )}
+
         {/* Summary Card - Only show if there are completed sessions */}
         {completedSessions.length > 0 && (
           <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -580,6 +604,8 @@ export default function TrainingDetailScreen() {
         onEndTraining={handleEndTraining}
         onStartDrill={handleStartDrill}
         isUpdatingStatus={isUpdatingStatus}
+        currentUserId={session?.user?.id || null}
+        onRefresh={loadCompletedSessions}
       />
 
       {/* Settings Modal - Only administrative, no execution */}

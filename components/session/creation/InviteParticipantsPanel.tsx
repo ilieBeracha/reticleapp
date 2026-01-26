@@ -31,9 +31,11 @@ interface InviteParticipantsPanelProps {
   invitedUserIds: string[];
   /** Called when invited list changes */
   onInvitedChange: (userIds: string[]) => void;
+  /** User IDs to exclude from the list (e.g., already added participants) */
+  excludeUserIds?: string[];
 }
 
-export function InviteParticipantsPanel({ teamId, invitedUserIds, onInvitedChange }: InviteParticipantsPanelProps) {
+export function InviteParticipantsPanel({ teamId, invitedUserIds, onInvitedChange, excludeUserIds = [] }: InviteParticipantsPanelProps) {
   const colors = useColors();
 
   const [loading, setLoading] = useState(true);
@@ -61,8 +63,10 @@ export function InviteParticipantsPanel({ teamId, invitedUserIds, onInvitedChang
         return;
       }
 
-      // Filter out current user (commander) - they're already part of the session
-      const filteredMembers = members.filter((m) => m.user_id !== user?.id);
+      // Filter out current user (commander) and any excluded users (already invited)
+      const filteredMembers = members.filter(
+        (m) => m.user_id !== user?.id && !excludeUserIds.includes(m.user_id)
+      );
       if (!filteredMembers.length) {
         setTeamMembers([]);
         return;
@@ -91,7 +95,7 @@ export function InviteParticipantsPanel({ teamId, invitedUserIds, onInvitedChang
     } finally {
       setLoading(false);
     }
-  }, [teamId]);
+  }, [teamId, excludeUserIds]);
 
   useEffect(() => {
     loadTeamMembers();

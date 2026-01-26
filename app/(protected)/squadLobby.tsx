@@ -12,17 +12,33 @@
  * /(protected)/squadLobby?engagementId=...
  */
 
+import { InviteParticipantsPanel } from '@/components/session/creation';
 import { useParticipantsRealtime } from '@/hooks/realtime';
 import { useColors } from '@/hooks/ui/useColors';
 import { supabase } from '@/lib/supabase';
-import { notifySquadEngagementStarting } from '@/services/pushService';
-import { getEngagement, getEngagementParticipants, getParticipantCounts } from '@/services/session/participants';
+import { notifySquadEngagementInvites, notifySquadEngagementStarting } from '@/services/pushService';
+import {
+  addParticipant,
+  getEngagement,
+  getEngagementParticipants,
+  getParticipantCounts,
+} from '@/services/session/participants';
 import type { Engagement, EngagementParticipant } from '@/services/session/types';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Check, ChevronLeft, LogOut, Play, Users } from 'lucide-react-native';
+import { Check, ChevronLeft, LogOut, Play, UserPlus, Users, X } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface SessionInfo {
@@ -57,6 +73,11 @@ export default function SquadLobbyScreen() {
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [participants, setParticipants] = useState<EngagementParticipant[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Invite modal state
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [invitedUserIds, setInvitedUserIds] = useState<string[]>([]);
+  const [sendingInvites, setSendingInvites] = useState(false);
 
   // Load engagement, session, and participants
   const loadData = useCallback(async () => {
@@ -127,47 +148,6 @@ export default function SquadLobbyScreen() {
   const myParticipation = participants.find((p) => p.user_id === currentUserId);
   const isParticipant = !!myParticipation;
 
-  // Realtime: Subscribe to engagement status changes
-  // When commander starts, participants should auto-navigate to active session
-  useEffect(() => {
-    if (!engagement?.id || !session?.id || isCommander) return;
-
-    const channel = supabase
-      .channel(`engagement-status-${engagement.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'engagements',
-          filter: `id=eq.${engagement.id}`,
-        },
-        (payload) => {
-          const newStatus = payload.new?.status;
-          console.log('[SquadLobby] Engagement status changed:', newStatus);
-
-          if (newStatus === 'active') {
-            // Commander started! Navigate to active session
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            router.replace({
-              pathname: '/(protected)/activeSession',
-              params: {
-                sessionId: session.id,
-                engagementId: engagement.id,
-                returnTo: params.trainingId ? 'trainingDetail' : undefined,
-                returnId: params.trainingId,
-              },
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [engagement?.id, session?.id, isCommander, params.trainingId]);
-
   // Start the engagement (commander can start even with 0 participants)
   const handleStartEngagement = async () => {
     if (!engagement || !session) return;
@@ -176,9 +156,6 @@ export default function SquadLobbyScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     try {
-      // Update engagement status to active
-      await startEngagement(engagement.id);
-
       // Notify all joined participants that we're starting
       const joinedUserIds = participants.filter((p) => p.state === 'joined').map((p) => p.user_id);
 
@@ -206,8 +183,23 @@ export default function SquadLobbyScreen() {
     }
   };
 
-  // Cancel and go back
-  const handleCancel = () => {
+  // Go back without cancelling - lobby persists
+  const handleBack = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (router.canGoBack()) {
+      router.back();
+    } else if (params.trainingId) {
+      router.replace({
+        pathname: '/(protected)/trainingDetail',
+        params: { id: params.trainingId },
+      });
+    } else {
+      router.replace('/(protected)/(tabs)');
+    }
+  };
+
+  // Cancel engagement - requires confirmation
+  const handleCancelEngagement = () => {
     Alert.alert('Cancel Squad Engagement?', 'This will cancel the engagement and notify invited participants.', [
       { text: 'Keep Waiting', style: 'cancel' },
       {
@@ -215,10 +207,69 @@ export default function SquadLobbyScreen() {
         style: 'destructive',
         onPress: async () => {
           // TODO: Cancel session and notify participants
-          router.back();
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          if (params.trainingId) {
+            router.replace({
+              pathname: '/(protected)/trainingDetail',
+              params: { id: params.trainingId },
+            });
+          } else {
+            router.replace('/(protected)/(tabs)');
+          }
         },
       },
     ]);
+  };
+
+  // Send invites to selected users
+  const handleSendInvites = async () => {
+    if (!engagement || invitedUserIds.length === 0) return;
+
+    setSendingInvites(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    try {
+      // Add all selected participants to the engagement
+      for (const userId of invitedUserIds) {
+        await addParticipant(engagement.id, userId);
+      }
+
+      // Get current user's profile for notification
+      const { data: profile } = currentUserId
+        ? await supabase.from('profiles').select('full_name').eq('id', currentUserId).single()
+        : { data: null };
+
+      // Get team name for notification
+      const { data: team } = session?.team_id
+        ? await supabase.from('teams').select('name').eq('id', session.team_id).single()
+        : { data: null };
+
+      // Send push notifications to invited participants
+      if (invitedUserIds.length > 0 && params.trainingId) {
+        await notifySquadEngagementInvites(
+          invitedUserIds,
+          session?.id || engagement.session_id,
+          params.trainingId,
+          session?.custom_drill_config?.name || 'Squad Engagement',
+          profile?.full_name || 'Commander',
+          team?.name || 'Team'
+        );
+      }
+
+      // Clear selection and close modal
+      setInvitedUserIds([]);
+      setShowInviteModal(false);
+
+      // Reload data to show new participants
+      loadData();
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error: any) {
+      console.error('[SquadLobby] Failed to send invites:', error);
+      Alert.alert('Error', error.message || 'Failed to invite participants');
+    } finally {
+      setSendingInvites(false);
+    }
   };
 
   if (loading) {
@@ -237,11 +288,21 @@ export default function SquadLobbyScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity style={styles.backButton} onPress={handleCancel} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
           <ChevronLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Manage Squad</Text>
-        <View style={styles.headerSpacer} />
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Squad Lobby</Text>
+        {isCommander && session?.team_id ? (
+          <TouchableOpacity
+            style={[styles.inviteHeaderBtn, { backgroundColor: colors.primary }]}
+            onPress={() => setShowInviteModal(true)}
+            activeOpacity={0.7}
+          >
+            <UserPlus size={18} color="#fff" />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.headerSpacer} />
+        )}
       </View>
 
       <ScrollView
@@ -336,9 +397,11 @@ export default function SquadLobbyScreen() {
         </View>
 
         {/* Hint */}
-        {isCommander && counts.total === 0 && (
+        {isCommander && (
           <Text style={[styles.hintText, { color: colors.textMuted }]}>
-            You can start now or add participants first using the + button on the training screen
+            {counts.total === 0
+              ? 'Invite participants using the + button, or start alone'
+              : 'You can leave and return to this lobby anytime'}
           </Text>
         )}
       </ScrollView>
@@ -347,29 +410,35 @@ export default function SquadLobbyScreen() {
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
         <View style={[styles.bottomBarInner, { borderTopColor: colors.border }]}>
           {isCommander ? (
-            // Commander: Start button - can start even with 0 participants (solo squad)
-            <TouchableOpacity
-              style={[
-                styles.startButton,
-                {
-                  backgroundColor: colors.green,
-                },
-              ]}
-              onPress={handleStartEngagement}
-              disabled={starting}
-              activeOpacity={0.85}
-            >
-              {starting ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <Play size={20} color="#fff" fill="#fff" />
-                  <Text style={styles.startButtonText}>
-                    Start Session{counts.total > 0 ? ` (${counts.total} participants)` : ''}
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
+            // Commander: Cancel and Start buttons
+            <View style={styles.commanderActions}>
+              <TouchableOpacity
+                style={[styles.cancelButton, { borderColor: colors.border }]}
+                onPress={handleCancelEngagement}
+                disabled={starting}
+                activeOpacity={0.7}
+              >
+                <X size={18} color={colors.red || colors.textMuted} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.startButton, { backgroundColor: colors.green }]}
+                onPress={handleStartEngagement}
+                disabled={starting}
+                activeOpacity={0.85}
+              >
+                {starting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Play size={20} color="#fff" fill="#fff" />
+                    <Text style={styles.startButtonText}>
+                      Start{counts.total > 0 ? ` (${counts.total})` : ''}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
           ) : (
             // Non-commander shouldn't be here - redirect them
             <View style={[styles.waitingBar, { backgroundColor: colors.card }]}>
@@ -381,6 +450,95 @@ export default function SquadLobbyScreen() {
           )}
         </View>
       </View>
+
+      {/* Invite Participants Modal */}
+      <Modal
+        visible={showInviteModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => !sendingInvites && setShowInviteModal(false)}
+      >
+        <Pressable style={styles.inviteModalOverlay} onPress={() => !sendingInvites && setShowInviteModal(false)}>
+          <Pressable
+            style={[styles.inviteModalContainer, { backgroundColor: colors.card }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            {/* Handle */}
+            <View style={[styles.inviteModalHandle, { backgroundColor: colors.border }]} />
+
+            {/* Header */}
+            <View style={styles.inviteModalHeader}>
+              <View style={[styles.inviteModalIcon, { backgroundColor: colors.primary + '15' }]}>
+                <UserPlus size={24} color={colors.primary} />
+              </View>
+              <View style={styles.inviteModalHeaderText}>
+                <Text style={[styles.inviteModalTitle, { color: colors.text }]}>Invite Squad Members</Text>
+                <Text style={[styles.inviteModalSubtitle, { color: colors.textMuted }]}>
+                  Select team members to join
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.inviteModalCloseBtn, { backgroundColor: colors.secondary }]}
+                onPress={() => !sendingInvites && setShowInviteModal(false)}
+                disabled={sendingInvites}
+              >
+                <X size={18} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Invite Panel */}
+            <View style={styles.inviteModalContent}>
+              {session?.team_id ? (
+                <InviteParticipantsPanel
+                  teamId={session.team_id}
+                  invitedUserIds={invitedUserIds}
+                  onInvitedChange={setInvitedUserIds}
+                  excludeUserIds={participants.map((p) => p.user_id)}
+                />
+              ) : (
+                <View style={styles.inviteModalEmpty}>
+                  <Text style={[styles.inviteModalEmptyText, { color: colors.textMuted }]}>
+                    No team context available
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Actions */}
+            <View style={[styles.inviteModalActions, { borderTopColor: colors.border }]}>
+              <TouchableOpacity
+                style={[styles.inviteModalCancelBtn, { borderColor: colors.border }]}
+                onPress={() => setShowInviteModal(false)}
+                disabled={sendingInvites}
+              >
+                <Text style={[styles.inviteModalCancelText, { color: colors.textMuted }]}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.inviteModalConfirmBtn,
+                  { backgroundColor: invitedUserIds.length > 0 ? colors.primary : colors.secondary },
+                ]}
+                onPress={handleSendInvites}
+                disabled={sendingInvites || invitedUserIds.length === 0}
+              >
+                {sendingInvites ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text
+                    style={[
+                      styles.inviteModalConfirmText,
+                      { color: invitedUserIds.length > 0 ? '#fff' : colors.textMuted },
+                    ]}
+                  >
+                    {invitedUserIds.length > 0 ? `Invite ${invitedUserIds.length}` : 'Select members'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -534,6 +692,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   startButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -546,6 +705,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     letterSpacing: -0.2,
+  },
+  // Commander bottom actions
+  commanderActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  cancelButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   // Participant action buttons (inline in row)
   participantActions: {
@@ -612,5 +784,114 @@ const styles = StyleSheet.create({
   waitingText: {
     fontSize: 15,
     fontWeight: '500',
+  },
+  // Header invite button
+  inviteHeaderBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Invite modal styles
+  inviteModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  inviteModalContainer: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '85%',
+  },
+  inviteModalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 8,
+  },
+  inviteModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  inviteModalIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inviteModalHeaderText: {
+    flex: 1,
+    gap: 2,
+  },
+  inviteModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  inviteModalSubtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  inviteModalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inviteModalContent: {
+    paddingHorizontal: 20,
+    maxHeight: 300,
+  },
+  inviteModalEmpty: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  inviteModalEmptyText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  inviteModalActions: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingBottom: 32,
+    gap: 10,
+    borderTopWidth: 1,
+    marginTop: 16,
+  },
+  inviteModalCancelBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  inviteModalCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  inviteModalConfirmBtn: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  inviteModalConfirmText: {
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: -0.2,
   },
 });

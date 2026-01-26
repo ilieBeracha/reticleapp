@@ -292,6 +292,8 @@ export default function StartEngagementScreen() {
           execution_policy: executionPolicy,
           ...(timeLimit && { time_limit_seconds: timeLimit }),
           ...(isWatchMode && { detection_sensitivity: sensitivity }),
+          // Store drill name for squad lobby display
+          ...(drillName && { name: drillName }),
         },
       });
 
@@ -302,12 +304,28 @@ export default function StartEngagementScreen() {
         drillGoal: drillGoal as DrillGoal,
         trainingId,
         requestedMode: effectiveEngagementMode,
-        status: 'completed', // Canonical: created as completed
       });
 
       await loadSessions();
 
-      // Navigate to execution
+      // ═══════════════════════════════════════════════════════════════════════
+      // SQUAD ENGAGEMENT: Navigate to squad lobby (invites happen there)
+      // ═══════════════════════════════════════════════════════════════════════
+      if (effectiveEngagementMode === 'squad' && teamId) {
+        router.replace({
+          pathname: '/(protected)/squadLobby',
+          params: {
+            engagementId: engagement.id,
+            sessionId: session.id,
+            trainingId: trainingId || undefined,
+          },
+        });
+        return;
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // SOLO ENGAGEMENT: Navigate directly to active session
+      // ═══════════════════════════════════════════════════════════════════════
       router.replace({
         pathname: '/(protected)/activeSession',
         params: {
@@ -328,6 +346,7 @@ export default function StartEngagementScreen() {
   }, [
     weapon,
     drillGoal,
+    drillName,
     effectiveEngagementMode,
     distance,
     rounds,
@@ -341,6 +360,7 @@ export default function StartEngagementScreen() {
     loadSessions,
     params,
     isSubmitting,
+    executionPolicy,
   ]);
 
   // ═══════════════════════════════════════════════════════════════════════════
