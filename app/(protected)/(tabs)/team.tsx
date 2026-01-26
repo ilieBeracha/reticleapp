@@ -15,45 +15,45 @@ import { useTrainings } from '@/components/training/useTrainings';
 import { RequestWeaponModal } from '@/components/weapons';
 import { useColors } from '@/hooks/ui/useColors';
 import {
-  cancelWeaponRequest,
-  getCategoryLabel,
-  getMyPendingRequest,
-  getPoolWeapons,
-  getTeamWeaponForUser,
-  type TeamWeapon,
-  type WeaponRequest,
+    cancelWeaponRequest,
+    getCategoryLabel,
+    getMyPendingRequest,
+    getPoolWeapons,
+    getTeamWeaponForUser,
+    type TeamWeapon,
+    type WeaponRequest,
 } from '@/services/weaponService';
 import type { TrainingWithDetails } from '@/types/workspace';
 import { format } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import {
-  Activity,
-  BarChart3,
-  Calendar,
-  ChevronRight,
-  Clock,
-  Gift,
-  Plus,
-  Settings,
-  Shield,
-  ShieldCheck,
-  Target,
-  UserPlus,
-  Users,
-  X,
-  Zap
+    Activity,
+    BarChart3,
+    Calendar,
+    ChevronRight,
+    Clock,
+    Gift,
+    Plus,
+    Settings,
+    Shield,
+    ShieldCheck,
+    Target,
+    UserPlus,
+    Users,
+    X,
+    Zap,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Animated,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 

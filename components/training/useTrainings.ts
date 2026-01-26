@@ -18,10 +18,10 @@ import { useTrainingStore } from '@/store/trainingStore';
 import type { TeamMemberWithProfile, TrainingWithDetails } from '@/types/workspace';
 
 import {
-  calculateMemberStats,
-  calculateTeamStatsFromSessions,
-  getRoleConfig,
-  type SessionStatsData,
+    calculateMemberStats,
+    calculateTeamStatsFromSessions,
+    getRoleConfig,
+    type SessionStatsData,
 } from './trainings.helpers';
 import type { InternalTab, UseTrainingsReturn } from './trainings.types';
 

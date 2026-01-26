@@ -1,12 +1,12 @@
 import { supabase } from '@/lib/supabase';
 import type {
-  CreatePaperResultParams,
-  CreateTacticalResultParams,
-  CreateTargetParams,
-  PaperTargetResult,
-  SessionTarget,
-  SessionTargetWithResults,
-  TacticalTargetResult,
+    CreatePaperResultParams,
+    CreateTacticalResultParams,
+    CreateTargetParams,
+    PaperTargetResult,
+    SessionTarget,
+    SessionTargetWithResults,
+    TacticalTargetResult,
 } from './types';
 
 /**
@@ -283,13 +283,13 @@ export async function updateSessionHits(sessionId: string, hits: number): Promis
  * Returns true if updated/created, false on error
  */
 export async function updateSessionGroupSize(
-  sessionId: string, 
+  sessionId: string,
   groupSizeCm: number,
   shotsCount?: number,
   distanceM?: number
 ): Promise<boolean> {
   console.log('[Targets] updateSessionGroupSize called:', { sessionId, groupSizeCm, shotsCount, distanceM });
-  
+
   // First find the paper target for this session
   const { data: targets, error: targetsError } = await supabase
     .from('session_targets')
@@ -309,16 +309,12 @@ export async function updateSessionGroupSize(
   if (!targets || targets.length === 0) {
     // No paper target exists - need to create one
     console.log('[Targets] No paper target found, creating one for session:', sessionId);
-    
+
     // Get session info for distance
-    const { data: session } = await supabase
-      .from('sessions')
-      .select('drill_config')
-      .eq('id', sessionId)
-      .single();
-    
+    const { data: session } = await supabase.from('sessions').select('drill_config').eq('id', sessionId).single();
+
     const distance = distanceM ?? (session?.drill_config as any)?.distance_m ?? 0;
-    
+
     // Create paper target
     const newTarget = await addSessionTarget({
       session_id: sessionId,
@@ -326,25 +322,23 @@ export async function updateSessionGroupSize(
       distance_m: distance,
       notes: 'Created for group size entry',
     });
-    
+
     targetId = newTarget.id;
-    
+
     // Create paper target result with group size and shots
-    const { error: insertError } = await supabase
-      .from('paper_target_results')
-      .insert({
-        session_target_id: targetId,
-        paper_type: 'grouping',
-        bullets_fired: shotsCount ?? 0,
-        hits_total: shotsCount ?? 0, // For grouping, all shots hit
-        dispersion_cm: groupSizeCm,
-      });
-    
+    const { error: insertError } = await supabase.from('paper_target_results').insert({
+      session_target_id: targetId,
+      paper_type: 'grouping',
+      bullets_fired: shotsCount ?? 0,
+      hits_total: shotsCount ?? 0, // For grouping, all shots hit
+      dispersion_cm: groupSizeCm,
+    });
+
     if (insertError) {
       console.error('[Targets] Failed to create paper result:', insertError);
       throw insertError;
     }
-    
+
     console.log('[Targets] Created paper target with group size:', groupSizeCm, 'cm');
     return true;
   }
@@ -352,16 +346,16 @@ export async function updateSessionGroupSize(
   // Paper target exists - update the result
   targetId = targets[0].id;
   console.log('[Targets] Found paper target:', targetId);
-  
+
   // Check if paper_target_result exists
   const { data: existingResult, error: existingError } = await supabase
     .from('paper_target_results')
     .select('id, dispersion_cm')
     .eq('session_target_id', targetId)
     .single();
-  
+
   console.log('[Targets] Existing paper result:', existingResult, 'error:', existingError?.code);
-  
+
   if (existingResult) {
     // Update existing result
     console.log('[Targets] Updating existing result with dispersion_cm:', groupSizeCm);
@@ -379,16 +373,14 @@ export async function updateSessionGroupSize(
     console.log('[Targets] Update result:', updatedData);
   } else {
     // Create new result
-    const { error: insertError } = await supabase
-      .from('paper_target_results')
-      .insert({
-        session_target_id: targetId,
-        paper_type: 'grouping',
-        bullets_fired: shotsCount ?? 0,
-        hits_total: shotsCount ?? 0,
-        dispersion_cm: groupSizeCm,
-      });
-    
+    const { error: insertError } = await supabase.from('paper_target_results').insert({
+      session_target_id: targetId,
+      paper_type: 'grouping',
+      bullets_fired: shotsCount ?? 0,
+      hits_total: shotsCount ?? 0,
+      dispersion_cm: groupSizeCm,
+    });
+
     if (insertError) {
       console.error('[Targets] Failed to create paper result:', insertError);
       throw insertError;
@@ -550,7 +542,9 @@ export async function getTargetWithResults(targetId: string): Promise<SessionTar
   }
 
   // Handle both array and object results
-  const paperResult = Array.isArray(target.paper_target_results) ? target.paper_target_results[0] : target.paper_target_results;
+  const paperResult = Array.isArray(target.paper_target_results)
+    ? target.paper_target_results[0]
+    : target.paper_target_results;
   const tacticalResult = Array.isArray(target.tactical_target_results)
     ? target.tactical_target_results[0]
     : target.tactical_target_results;
@@ -582,5 +576,3 @@ export async function updateSessionTarget(
   if (error) throw error;
   return data;
 }
-
-

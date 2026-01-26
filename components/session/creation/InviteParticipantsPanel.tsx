@@ -15,14 +15,7 @@ import { supabase } from '@/lib/supabase';
 import * as Haptics from 'expo-haptics';
 import { Check, UserMinus, UserPlus, Users } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface TeamMember {
   user_id: string;
@@ -40,11 +33,7 @@ interface InviteParticipantsPanelProps {
   onInvitedChange: (userIds: string[]) => void;
 }
 
-export function InviteParticipantsPanel({
-  teamId,
-  invitedUserIds,
-  onInvitedChange,
-}: InviteParticipantsPanelProps) {
+export function InviteParticipantsPanel({ teamId, invitedUserIds, onInvitedChange }: InviteParticipantsPanelProps) {
   const colors = useColors();
 
   const [loading, setLoading] = useState(true);
@@ -55,7 +44,9 @@ export function InviteParticipantsPanel({
   const loadTeamMembers = useCallback(async () => {
     try {
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (user) setCurrentUserId(user.id);
 
       // Get team members
@@ -71,7 +62,7 @@ export function InviteParticipantsPanel({
       }
 
       // Filter out current user (commander) - they're already part of the session
-      const filteredMembers = members.filter(m => m.user_id !== user?.id);
+      const filteredMembers = members.filter((m) => m.user_id !== user?.id);
       if (!filteredMembers.length) {
         setTeamMembers([]);
         return;
@@ -79,14 +70,9 @@ export function InviteParticipantsPanel({
 
       // Get profiles
       const userIds = filteredMembers.map((m) => m.user_id);
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url')
-        .in('id', userIds);
+      const { data: profiles } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', userIds);
 
-      const profileMap = new Map(
-        (profiles || []).map((p) => [p.id, p])
-      );
+      const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
 
       // Map to team members with profiles
       const eligibleMembers = filteredMembers.map((m) => {
@@ -127,9 +113,7 @@ export function InviteParticipantsPanel({
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="small" color={colors.textMuted} />
-        <Text style={[styles.loadingText, { color: colors.textMuted }]}>
-          Loading team members...
-        </Text>
+        <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading team members...</Text>
       </View>
     );
   }
@@ -138,39 +122,23 @@ export function InviteParticipantsPanel({
     <View style={styles.container}>
       {/* Section label */}
       <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-          INVITE SQUAD MEMBERS
-        </Text>
+        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>INVITE SQUAD MEMBERS</Text>
         {invitedUserIds.length > 0 && (
-          <Text style={[styles.countText, { color: colors.textMuted }]}>
-            {invitedUserIds.length} invited
-          </Text>
+          <Text style={[styles.countText, { color: colors.textMuted }]}>{invitedUserIds.length} invited</Text>
         )}
       </View>
 
       {/* Invited Members */}
       {invitedMembers.length > 0 && (
         <View style={styles.section}>
-          <View
-            style={[
-              styles.listContainer,
-              { backgroundColor: colors.card, borderColor: colors.border },
-            ]}
-          >
+          <View style={[styles.listContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {invitedMembers.map((member) => (
-              <View
-                key={member.user_id}
-                style={[styles.memberRow, { borderBottomColor: colors.border }]}
-              >
+              <View key={member.user_id} style={[styles.memberRow, { borderBottomColor: colors.border }]}>
                 <View style={styles.memberInfo}>
-                  <Text style={[styles.memberName, { color: colors.text }]}>
-                    {member.full_name || 'Unknown'}
-                  </Text>
+                  <Text style={[styles.memberName, { color: colors.text }]}>{member.full_name || 'Unknown'}</Text>
                   <View style={styles.statusContainer}>
                     <Check size={12} color={colors.green} />
-                    <Text style={[styles.statusText, { color: colors.green }]}>
-                      Will be invited
-                    </Text>
+                    <Text style={[styles.statusText, { color: colors.green }]}>Will be invited</Text>
                   </View>
                 </View>
                 <TouchableOpacity
@@ -190,29 +158,17 @@ export function InviteParticipantsPanel({
       {availableMembers.length > 0 && (
         <View style={styles.section}>
           {invitedMembers.length > 0 && (
-            <Text style={[styles.subsectionLabel, { color: colors.textMuted }]}>
-              Add More
-            </Text>
+            <Text style={[styles.subsectionLabel, { color: colors.textMuted }]}>Add More</Text>
           )}
           <ScrollView
-            style={[
-              styles.listContainer,
-              { backgroundColor: colors.card, borderColor: colors.border },
-            ]}
+            style={[styles.listContainer, { backgroundColor: colors.card, borderColor: colors.border }]}
             showsVerticalScrollIndicator={false}
           >
             {availableMembers.map((member) => (
-              <View
-                key={member.user_id}
-                style={[styles.memberRow, { borderBottomColor: colors.border }]}
-              >
+              <View key={member.user_id} style={[styles.memberRow, { borderBottomColor: colors.border }]}>
                 <View style={styles.memberInfo}>
-                  <Text style={[styles.memberName, { color: colors.text }]}>
-                    {member.full_name || 'Unknown'}
-                  </Text>
-                  <Text style={[styles.memberRole, { color: colors.textMuted }]}>
-                    {member.role}
-                  </Text>
+                  <Text style={[styles.memberName, { color: colors.text }]}>{member.full_name || 'Unknown'}</Text>
+                  <Text style={[styles.memberRole, { color: colors.textMuted }]}>{member.role}</Text>
                 </View>
                 <TouchableOpacity
                   style={[styles.addBtn, { backgroundColor: colors.primary }]}
@@ -231,17 +187,13 @@ export function InviteParticipantsPanel({
       {teamMembers.length === 0 && (
         <View style={styles.emptyState}>
           <Users size={32} color={colors.textMuted} strokeWidth={1.5} />
-          <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-            No team members available to invite
-          </Text>
+          <Text style={[styles.emptyText, { color: colors.textMuted }]}>No team members available to invite</Text>
         </View>
       )}
 
       {/* Hint */}
       {invitedUserIds.length === 0 && teamMembers.length > 0 && (
-        <Text style={[styles.hintText, { color: colors.orange }]}>
-          Select at least one team member to invite
-        </Text>
+        <Text style={[styles.hintText, { color: colors.orange }]}>Select at least one team member to invite</Text>
       )}
     </View>
   );

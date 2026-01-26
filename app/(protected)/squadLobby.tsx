@@ -12,37 +12,17 @@
  * /(protected)/squadLobby?engagementId=...
  */
 
-import { useColors } from '@/hooks/ui/useColors';
 import { useParticipantsRealtime } from '@/hooks/realtime';
-import {
-  getEngagement,
-  getEngagementParticipants,
-  getParticipantCounts,
-  startEngagement,
-} from '@/services/session/participants';
-import { notifySquadEngagementStarting } from '@/services/pushService';
+import { useColors } from '@/hooks/ui/useColors';
 import { supabase } from '@/lib/supabase';
+import { notifySquadEngagementStarting } from '@/services/pushService';
+import { getEngagement, getEngagementParticipants, getParticipantCounts } from '@/services/session/participants';
 import type { Engagement, EngagementParticipant } from '@/services/session/types';
-import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import {
-  Check,
-  ChevronLeft,
-  LogOut,
-  Play,
-  Users,
-} from 'lucide-react-native';
+import { Check, ChevronLeft, LogOut, Play, Users } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface SessionInfo {
@@ -84,7 +64,9 @@ export default function SquadLobbyScreen() {
 
     try {
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (user) setCurrentUserId(user.id);
 
       let eng: Engagement | null = null;
@@ -94,11 +76,7 @@ export default function SquadLobbyScreen() {
         eng = await getEngagement(engagementId);
       } else if (legacySessionId) {
         // Backwards compat: load engagement by session_id
-        const { data } = await supabase
-          .from('engagements')
-          .select('*')
-          .eq('session_id', legacySessionId)
-          .single();
+        const { data } = await supabase.from('engagements').select('*').eq('session_id', legacySessionId).single();
         eng = data;
       }
 
@@ -144,9 +122,9 @@ export default function SquadLobbyScreen() {
 
   const counts = getParticipantCounts(participants);
   const isCommander = !!(currentUserId && session?.user_id === currentUserId);
-  
+
   // Find current user's participation
-  const myParticipation = participants.find(p => p.user_id === currentUserId);
+  const myParticipation = participants.find((p) => p.user_id === currentUserId);
   const isParticipant = !!myParticipation;
 
   // Realtime: Subscribe to engagement status changes
@@ -167,7 +145,7 @@ export default function SquadLobbyScreen() {
         (payload) => {
           const newStatus = payload.new?.status;
           console.log('[SquadLobby] Engagement status changed:', newStatus);
-          
+
           if (newStatus === 'active') {
             // Commander started! Navigate to active session
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -202,9 +180,7 @@ export default function SquadLobbyScreen() {
       await startEngagement(engagement.id);
 
       // Notify all joined participants that we're starting
-      const joinedUserIds = participants
-        .filter((p) => p.state === 'joined')
-        .map((p) => p.user_id);
+      const joinedUserIds = participants.filter((p) => p.state === 'joined').map((p) => p.user_id);
 
       if (joinedUserIds.length > 0) {
         await notifySquadEngagementStarting(
@@ -232,21 +208,17 @@ export default function SquadLobbyScreen() {
 
   // Cancel and go back
   const handleCancel = () => {
-    Alert.alert(
-      'Cancel Squad Engagement?',
-      'This will cancel the engagement and notify invited participants.',
-      [
-        { text: 'Keep Waiting', style: 'cancel' },
-        {
-          text: 'Cancel Engagement',
-          style: 'destructive',
-          onPress: async () => {
-            // TODO: Cancel session and notify participants
-            router.back();
-          },
+    Alert.alert('Cancel Squad Engagement?', 'This will cancel the engagement and notify invited participants.', [
+      { text: 'Keep Waiting', style: 'cancel' },
+      {
+        text: 'Cancel Engagement',
+        style: 'destructive',
+        onPress: async () => {
+          // TODO: Cancel session and notify participants
+          router.back();
         },
-      ]
-    );
+      },
+    ]);
   };
 
   if (loading) {
@@ -265,16 +237,10 @@ export default function SquadLobbyScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={handleCancel}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={handleCancel} activeOpacity={0.7}>
           <ChevronLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          Manage Squad
-        </Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Manage Squad</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -289,9 +255,7 @@ export default function SquadLobbyScreen() {
             <Users size={24} color={colors.primary} />
           </View>
           <View style={styles.drillInfo}>
-            <Text style={[styles.drillName, { color: colors.text }]}>
-              {drillName}
-            </Text>
+            <Text style={[styles.drillName, { color: colors.text }]}>{drillName}</Text>
             <Text style={[styles.drillMeta, { color: colors.textMuted }]}>
               {distance && `${distance}m`}
               {distance && rounds && ' · '}
@@ -312,9 +276,7 @@ export default function SquadLobbyScreen() {
 
         {/* Participants List */}
         <View style={styles.participantsSection}>
-          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-            PARTICIPANTS
-          </Text>
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>PARTICIPANTS</Text>
 
           <View style={[styles.participantsList, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {participants.map((participant, index) => (
@@ -336,17 +298,13 @@ export default function SquadLobbyScreen() {
                     {participant.state === 'joined' && (
                       <>
                         <Check size={12} color={colors.green} />
-                        <Text style={[styles.statusText, { color: colors.green }]}>
-                          In Squad
-                        </Text>
+                        <Text style={[styles.statusText, { color: colors.green }]}>In Squad</Text>
                       </>
                     )}
                     {participant.state === 'left' && (
                       <>
                         <LogOut size={12} color={colors.textMuted} />
-                        <Text style={[styles.statusText, { color: colors.textMuted }]}>
-                          Removed
-                        </Text>
+                        <Text style={[styles.statusText, { color: colors.textMuted }]}>Removed</Text>
                       </>
                     )}
                   </View>
@@ -361,8 +319,8 @@ export default function SquadLobbyScreen() {
                         participant.state === 'joined'
                           ? colors.green
                           : participant.state === 'left'
-                          ? colors.textMuted
-                          : colors.orange,
+                            ? colors.textMuted
+                            : colors.orange,
                     },
                   ]}
                 />
@@ -371,9 +329,7 @@ export default function SquadLobbyScreen() {
 
             {participants.length === 0 && (
               <View style={styles.emptyState}>
-                <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-                  No participants invited
-                </Text>
+                <Text style={[styles.emptyText, { color: colors.textMuted }]}>No participants invited</Text>
               </View>
             )}
           </View>

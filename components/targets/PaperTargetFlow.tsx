@@ -1,9 +1,9 @@
 import { useOpenWeather } from '@/hooks/useOpenWeather';
 import {
-  shouldSubmitForTraining,
-  submitTrainingData,
-  TrainingDataPayload,
-  uploadScannedTargetImage,
+    shouldSubmitForTraining,
+    submitTrainingData,
+    TrainingDataPayload,
+    uploadScannedTargetImage,
 } from '@/services/detectionService';
 import { addTargetWithPaperResult, endSession, PaperType } from '@/services/sessionService';
 import { useDetectionStore } from '@/store/detectionStore';

@@ -1,6 +1,6 @@
 /**
  * SquadSessionView
- * 
+ *
  * Squad session mode where:
  * - All participants are shown with their individual data
  * - Each participant can fill their own results
@@ -12,28 +12,9 @@ import { supabase } from '@/lib/supabase';
 import type { EngagementParticipant } from '@/services/session/types';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import {
-  Camera,
-  Check,
-  ChevronLeft,
-  Crosshair,
-  Crown,
-  Target,
-  User,
-  Users,
-  X,
-} from 'lucide-react-native';
+import { Camera, Check, ChevronLeft, Crosshair, Crown, Target, User, Users, X } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Image,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -95,13 +76,10 @@ export function SquadSessionView({
   const loadParticipantData = useCallback(async () => {
     try {
       // Get all participant profiles + always include commander
-      const userIds = [...new Set([...participants.map(p => p.user_id), session.user_id])];
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url')
-        .in('id', userIds);
+      const userIds = [...new Set([...participants.map((p) => p.user_id), session.user_id])];
+      const { data: profiles } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', userIds);
 
-      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+      const profileMap = new Map(profiles?.map((p) => [p.id, p]) || []);
 
       // Group targets by participant
       const participantTargets = new Map<string, typeof targets>();
@@ -114,10 +92,10 @@ export function SquadSessionView({
       }
 
       // Build participant data
-      const data: ParticipantData[] = participants.map(p => {
+      const data: ParticipantData[] = participants.map((p) => {
         const profile = profileMap.get(p.user_id);
         const pTargets = participantTargets.get(p.user_id) || [];
-        
+
         let totalShots = 0;
         let totalHits = 0;
         let bestDispersion: number | null = null;
@@ -125,7 +103,7 @@ export function SquadSessionView({
         for (const t of pTargets) {
           const paperResult = t.paper_result;
           const tacticalResult = t.tactical_result;
-          
+
           if (paperResult) {
             totalShots += paperResult.bullets_fired || 0;
             totalHits += paperResult.hits_total || 0;
@@ -135,7 +113,7 @@ export function SquadSessionView({
               }
             }
           }
-          
+
           if (tacticalResult) {
             totalShots += tacticalResult.bullets_fired || 0;
             totalHits += tacticalResult.hits || 0;
@@ -155,10 +133,10 @@ export function SquadSessionView({
       });
 
       // Add commander if not in participants
-      if (!participants.find(p => p.user_id === session.user_id)) {
+      if (!participants.find((p) => p.user_id === session.user_id)) {
         const commanderProfile = profileMap.get(session.user_id);
         const commanderTargets = participantTargets.get(session.user_id) || [];
-        
+
         let totalShots = 0;
         let totalHits = 0;
         let bestDispersion: number | null = null;
@@ -166,7 +144,7 @@ export function SquadSessionView({
         for (const t of commanderTargets) {
           const paperResult = t.paper_result;
           const tacticalResult = t.tactical_result;
-          
+
           if (paperResult) {
             totalShots += paperResult.bullets_fired || 0;
             totalHits += paperResult.hits_total || 0;
@@ -176,7 +154,7 @@ export function SquadSessionView({
               }
             }
           }
-          
+
           if (tacticalResult) {
             totalShots += tacticalResult.bullets_fired || 0;
             totalHits += tacticalResult.hits || 0;
@@ -211,9 +189,9 @@ export function SquadSessionView({
   const handleAddResult = (participantId: string) => {
     const isGrouping = session.drill_config?.drill_goal === 'grouping';
     const distance = session.drill_config?.distance_m || 25;
-    
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    
+
     if (isGrouping) {
       router.push({
         pathname: '/(protected)/scanTarget',
@@ -226,7 +204,7 @@ export function SquadSessionView({
       });
     } else {
       router.push({
-        pathname: '/(protected)/manualEntry',
+        pathname: '/(protected)/tacticalTarget',
         params: {
           sessionId,
           participantId,
@@ -251,23 +229,19 @@ export function SquadSessionView({
 
   // Handle end session
   const handleEndSessionPress = () => {
-    Alert.alert(
-      'End Squad Session?',
-      'This will complete the session for all participants. Results will be saved.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'End Session',
-          style: 'destructive',
-          onPress: onEndSession,
-        },
-      ]
-    );
+    Alert.alert('End Squad Session?', 'This will complete the session for all participants. Results will be saved.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'End Session',
+        style: 'destructive',
+        onPress: onEndSession,
+      },
+    ]);
   };
 
   const isGrouping = session.drill_config?.drill_goal === 'grouping';
   const totalParticipants = participantData.length;
-  const submittedCount = participantData.filter(p => p.has_submitted).length;
+  const submittedCount = participantData.filter((p) => p.has_submitted).length;
 
   // Calculate squad totals
   const squadTotalShots = participantData.reduce((sum, p) => sum + p.total_shots, 0);
@@ -282,7 +256,12 @@ export function SquadSessionView({
 
     return (
       <Animated.View entering={FadeIn.duration(200)}>
-        <View style={[styles.participantCard, { backgroundColor: colors.card, borderColor: isMe ? colors.primary : colors.border }]}>
+        <View
+          style={[
+            styles.participantCard,
+            { backgroundColor: colors.card, borderColor: isMe ? colors.primary : colors.border },
+          ]}
+        >
           <View style={styles.participantHeader}>
             {/* Avatar */}
             <View style={[styles.avatar, { backgroundColor: colors.secondary }]}>
@@ -304,28 +283,20 @@ export function SquadSessionView({
                     <Text style={[styles.badgeText, { color: colors.primary }]}>You</Text>
                   </View>
                 )}
-                {isSessionOwner && (
-                  <Crown size={14} color={colors.orange} />
-                )}
+                {isSessionOwner && <Crown size={14} color={colors.orange} />}
               </View>
               <Text style={[styles.participantStatus, { color: colors.textMuted }]}>
-                {item.has_submitted 
+                {item.has_submitted
                   ? `${item.targets_count} target${item.targets_count !== 1 ? 's' : ''} • ${item.total_shots} shots`
-                  : 'No results yet'
-                }
+                  : 'No results yet'}
               </Text>
             </View>
 
             {/* Status indicator */}
-            <View style={[
-              styles.statusIndicator,
-              { backgroundColor: item.has_submitted ? colors.green : colors.orange }
-            ]}>
-              {item.has_submitted ? (
-                <Check size={12} color="#fff" />
-              ) : (
-                <Target size={12} color="#fff" />
-              )}
+            <View
+              style={[styles.statusIndicator, { backgroundColor: item.has_submitted ? colors.green : colors.orange }]}
+            >
+              {item.has_submitted ? <Check size={12} color="#fff" /> : <Target size={12} color="#fff" />}
             </View>
           </View>
 
@@ -334,9 +305,7 @@ export function SquadSessionView({
             <View style={[styles.statsRow, { borderTopColor: colors.border }]}>
               {isGrouping && item.best_dispersion != null ? (
                 <View style={styles.statItem}>
-                  <Text style={[styles.statValue, { color: colors.text }]}>
-                    {item.best_dispersion.toFixed(1)}cm
-                  </Text>
+                  <Text style={[styles.statValue, { color: colors.text }]}>{item.best_dispersion.toFixed(1)}cm</Text>
                   <Text style={[styles.statLabel, { color: colors.textMuted }]}>best group</Text>
                 </View>
               ) : (
@@ -348,9 +317,7 @@ export function SquadSessionView({
                     <Text style={[styles.statLabel, { color: colors.textMuted }]}>hits</Text>
                   </View>
                   <View style={styles.statItem}>
-                    <Text style={[styles.statValue, { color: colors.text }]}>
-                      {accuracy}%
-                    </Text>
+                    <Text style={[styles.statValue, { color: colors.text }]}>{accuracy}%</Text>
                     <Text style={[styles.statLabel, { color: colors.textMuted }]}>accuracy</Text>
                   </View>
                 </>
@@ -361,10 +328,7 @@ export function SquadSessionView({
           {/* Action button */}
           {canAddForThis && (
             <TouchableOpacity
-              style={[
-                styles.addResultBtn,
-                { backgroundColor: item.has_submitted ? colors.secondary : colors.primary }
-              ]}
+              style={[styles.addResultBtn, { backgroundColor: item.has_submitted ? colors.secondary : colors.primary }]}
               onPress={() => handleAddResult(item.user_id)}
             >
               {isGrouping ? (
@@ -372,10 +336,7 @@ export function SquadSessionView({
               ) : (
                 <Crosshair size={16} color={item.has_submitted ? colors.text : '#fff'} />
               )}
-              <Text style={[
-                styles.addResultText,
-                { color: item.has_submitted ? colors.text : '#fff' }
-              ]}>
+              <Text style={[styles.addResultText, { color: item.has_submitted ? colors.text : '#fff' }]}>
                 {item.has_submitted ? 'Add More' : 'Add Result'}
               </Text>
             </TouchableOpacity>
@@ -397,10 +358,7 @@ export function SquadSessionView({
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity
-          style={[styles.backBtn, { backgroundColor: colors.card }]}
-          onPress={handleClose}
-        >
+        <TouchableOpacity style={[styles.backBtn, { backgroundColor: colors.card }]} onPress={handleClose}>
           <ChevronLeft size={20} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
@@ -424,27 +382,19 @@ export function SquadSessionView({
             <Text style={[styles.summaryValue, { color: colors.text }]}>
               {isGrouping ? targets.length : squadTotalShots}
             </Text>
-            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>
-              {isGrouping ? 'groups' : 'shots'}
-            </Text>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{isGrouping ? 'groups' : 'shots'}</Text>
           </View>
           <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
           <View style={styles.summaryItem}>
-            <Text style={[styles.summaryValue, { color: colors.text }]}>
-              {isGrouping ? '-' : squadTotalHits}
-            </Text>
-            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>
-              {isGrouping ? '-' : 'hits'}
-            </Text>
+            <Text style={[styles.summaryValue, { color: colors.text }]}>{isGrouping ? '-' : squadTotalHits}</Text>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{isGrouping ? '-' : 'hits'}</Text>
           </View>
           <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
           <View style={styles.summaryItem}>
             <Text style={[styles.summaryValue, { color: colors.primary }]}>
               {isGrouping ? '-' : `${squadAccuracy}%`}
             </Text>
-            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>
-              {isGrouping ? '-' : 'accuracy'}
-            </Text>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{isGrouping ? '-' : 'accuracy'}</Text>
           </View>
         </View>
       </View>
@@ -456,11 +406,7 @@ export function SquadSessionView({
         keyExtractor={(item) => item.user_id}
         contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Participants
-          </Text>
-        }
+        ListHeaderComponent={<Text style={[styles.sectionTitle, { color: colors.text }]}>Participants</Text>}
       />
 
       {/* Bottom bar - Commander only */}

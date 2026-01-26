@@ -1,21 +1,58 @@
 /**
  * Session Creation Module
  *
- * All session creation happens through createSession.tsx screen.
- * This module provides the components used by that screen.
+ * Step-based session creation flow:
+ *
+ * ┌─────────────────────────────────────────────────────────────────────────┐
+ * │  CREATION FLOW                                                          │
+ * ├─────────────────────────────────────────────────────────────────────────┤
+ * │                                                                         │
+ * │  Step 1: INTENT - "What am I going to do?"                              │
+ * │     └── PurposeSelector (grouping vs engagement)                        │
+ * │                                                                         │
+ * │  Step 2: CONTEXT - "Under what conditions?"                             │
+ * │     └── SessionContextStep (weapon, distance, shots, position)          │
+ * │                                                                         │
+ * │  Engagement Mode (engagement drills only):                              │
+ * │     ├── EngagementModeToggle (solo vs squad)                           │
+ * │     └── InviteParticipantsPanel (squad member selection)               │
+ * │                                                                         │
+ * └─────────────────────────────────────────────────────────────────────────┘
  */
 
-// Types
+// ═══════════════════════════════════════════════════════════════════════════
+// TYPES
+// ═══════════════════════════════════════════════════════════════════════════
+
 export * from './sessionCreation.types';
 
-// Constants
+// ═══════════════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════════
+
 export * from './sessionCreation.constants';
 
-// Hook
+// ═══════════════════════════════════════════════════════════════════════════
+// HOOK
+// ═══════════════════════════════════════════════════════════════════════════
+
 export { useSessionCreation } from './useSessionCreation';
 export type { TrainingContext, UseSessionCreationOptions, UseSessionCreationReturn } from './useSessionCreation';
 
-// Components used by createSession.tsx
+// ═══════════════════════════════════════════════════════════════════════════
+// INTENT - Step 1
+// ═══════════════════════════════════════════════════════════════════════════
+
+export { PurposeSelector } from './intent';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONTEXT - Step 2
+// ═══════════════════════════════════════════════════════════════════════════
+
 export { SessionContextStep } from './SessionContextStep';
-export { EngagementModeToggle } from './EngagementModeToggle';
-export { InviteParticipantsPanel } from './InviteParticipantsPanel';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENGAGEMENT (engagement drills only)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export { EngagementModeToggle, InviteParticipantsPanel } from './engagement';

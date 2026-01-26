@@ -5,7 +5,6 @@
  * Squad logic MUST live here.
  * Training and Session must remain passive context.
  *
- * Domain-specific hook for real-time participant updates.
  * Subscribe to changes on engagement_participants for a given engagement.
  *
  * Use Cases:
@@ -17,71 +16,19 @@
  * ```tsx
  * const { isConnected } = useParticipantsRealtime({
  *   engagementId: engagement.id,
- *   onParticipantAdded: (participant) => {
- *     // New participant invited
- *     refreshParticipants();
- *   },
- *   onParticipantChanged: (participant) => {
- *     // Participant state changed (pending -> joined/left)
- *     refreshParticipants();
- *   },
+ *   onParticipantAdded: (participant) => refreshParticipants(),
+ *   onParticipantChanged: (participant) => refreshParticipants(),
  * });
  * ```
  */
 
 import { useCallback, useMemo } from 'react';
-import type { ChangePayload } from './types';
-import { useRealtimeChannel } from './useRealtimeChannel';
+import { useRealtimeChannel } from '../core';
+import type { ChangePayload } from '../table';
+import type { ParticipantRecord } from '../records';
+import type { UseParticipantsRealtimeOptions, UseParticipantsRealtimeReturn } from './participants.types';
 
-/** Participant record from database */
-export interface ParticipantRecord {
-  id: string;
-  engagement_id: string;
-  /** @deprecated Use engagement_id. Will be removed after migration. */
-  session_id?: string;
-  user_id: string;
-  state: 'pending' | 'joined' | 'left';
-  joined_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-interface UseParticipantsRealtimeOptions {
-  /** Engagement ID to subscribe to participants for */
-  engagementId: string | undefined | null;
-  /**
-   * @deprecated Use engagementId instead.
-   * Session ID is kept for backwards compatibility during migration.
-   */
-  sessionId?: string | undefined | null;
-
-  /** Called when a participant is added */
-  onParticipantAdded?: (participant: ParticipantRecord) => void;
-
-  /** Called when a participant record is updated (state change) */
-  onParticipantChanged?: (participant: ParticipantRecord) => void;
-
-  /** Called when a participant is removed */
-  onParticipantRemoved?: (participant: ParticipantRecord) => void;
-
-  /** Whether subscription is enabled */
-  enabled?: boolean;
-}
-
-interface UseParticipantsRealtimeReturn {
-  /** Whether connected and subscribed */
-  isConnected: boolean;
-  /** Current status */
-  status: string | null;
-  /** Any error */
-  error: Error | null;
-  /** Force reconnect */
-  reconnect: () => void;
-}
-
-export function useParticipantsRealtime(
-  options: UseParticipantsRealtimeOptions
-): UseParticipantsRealtimeReturn {
+export function useParticipantsRealtime(options: UseParticipantsRealtimeOptions): UseParticipantsRealtimeReturn {
   const {
     engagementId,
     sessionId, // deprecated, kept for backwards compat
@@ -93,8 +40,6 @@ export function useParticipantsRealtime(
 
   // Use engagementId if provided, fall back to sessionId for backwards compat
   const effectiveId = engagementId || sessionId;
-
-  // Effective enabled state
   const isEnabled = enabled && !!effectiveId;
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -103,10 +48,7 @@ export function useParticipantsRealtime(
 
   const handleParticipantData = useCallback(
     (payload: ChangePayload<ParticipantRecord>) => {
-      console.log(
-        `[ParticipantsRealtime] ${payload.eventType}:`,
-        payload.new?.id || payload.old?.id
-      );
+      console.log(`[ParticipantsRealtime] ${payload.eventType}:`, payload.new?.id || payload.old?.id);
 
       switch (payload.eventType) {
         case 'INSERT':
@@ -155,9 +97,7 @@ export function useParticipantsRealtime(
     subscriptions,
     onStatusChange: (newStatus) => {
       if (newStatus === 'SUBSCRIBED') {
-        console.log(
-          `[ParticipantsRealtime] Subscribed to engagement ${effectiveId}`
-        );
+        console.log(`[ParticipantsRealtime] ✓ Subscribed to engagement ${effectiveId}`);
       }
     },
   });

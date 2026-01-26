@@ -12,18 +12,19 @@ import { useLocalSearchParams } from 'expo-router';
  * participantId is used for squad sessions to associate the target with a specific participant
  */
 export default function ScanTargetSheet() {
-  const { sessionId, distance, maxShots, bullets, locked, drillGoal, autoFinish, participantId } = useLocalSearchParams<{
-    sessionId: string;
-    distance?: string;
-    maxShots?: string;
-    /** Back-compat (old param name). */
-    bullets?: string;
-    locked?: string;
-    drillGoal?: 'grouping' | 'achievement';
-    autoFinish?: string;
-    /** For squad sessions: associates target with specific participant */
-    participantId?: string;
-  }>();
+  const { sessionId, distance, maxShots, bullets, locked, drillGoal, autoFinish, participantId } =
+    useLocalSearchParams<{
+      sessionId: string;
+      distance?: string;
+      maxShots?: string;
+      /** Back-compat (old param name). */
+      bullets?: string;
+      locked?: string;
+      drillGoal?: 'grouping' | 'achievement';
+      autoFinish?: string;
+      /** For squad sessions: associates target with specific participant */
+      participantId?: string;
+    }>();
 
   if (!sessionId) {
     return null;

@@ -11,10 +11,11 @@
  */
 
 import { useColors } from '@/hooks/ui/useColors';
-import type { EngagementMode } from '@/services/session/types';
 import * as Haptics from 'expo-haptics';
 import { User, Users } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+import type { EngagementMode } from '../shared';
 
 interface EngagementModeToggleProps {
   /** Current mode */
@@ -25,11 +26,7 @@ interface EngagementModeToggleProps {
   disabled?: boolean;
 }
 
-export function EngagementModeToggle({
-  value,
-  onChange,
-  disabled = false,
-}: EngagementModeToggleProps) {
+export function EngagementModeToggle({ value, onChange, disabled = false }: EngagementModeToggleProps) {
   const colors = useColors();
 
   const handlePress = (mode: EngagementMode) => {
@@ -44,60 +41,27 @@ export function EngagementModeToggle({
   return (
     <View style={styles.container}>
       <Text style={[styles.label, { color: colors.textMuted }]}>Mode</Text>
-      <View
-        style={[
-          styles.toggleContainer,
-          { backgroundColor: colors.card, borderColor: colors.border },
-        ]}
-      >
+      <View style={[styles.toggleContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {/* Solo Option */}
         <TouchableOpacity
-          style={[
-            styles.option,
-            isSolo && { backgroundColor: colors.primary },
-          ]}
+          style={[styles.option, isSolo && { backgroundColor: colors.primary }]}
           onPress={() => handlePress('solo')}
           disabled={disabled}
           activeOpacity={0.7}
         >
-          <User
-            size={16}
-            color={isSolo ? '#fff' : colors.textMuted}
-            strokeWidth={2}
-          />
-          <Text
-            style={[
-              styles.optionText,
-              { color: isSolo ? '#fff' : colors.text },
-            ]}
-          >
-            Solo
-          </Text>
+          <User size={16} color={isSolo ? '#fff' : colors.textMuted} strokeWidth={2} />
+          <Text style={[styles.optionText, { color: isSolo ? '#fff' : colors.text }]}>Solo</Text>
         </TouchableOpacity>
 
         {/* Squad Option */}
         <TouchableOpacity
-          style={[
-            styles.option,
-            isSquad && { backgroundColor: colors.primary },
-          ]}
+          style={[styles.option, isSquad && { backgroundColor: colors.primary }]}
           onPress={() => handlePress('squad')}
           disabled={disabled}
           activeOpacity={0.7}
         >
-          <Users
-            size={16}
-            color={isSquad ? '#fff' : colors.textMuted}
-            strokeWidth={2}
-          />
-          <Text
-            style={[
-              styles.optionText,
-              { color: isSquad ? '#fff' : colors.text },
-            ]}
-          >
-            Squad
-          </Text>
+          <Users size={16} color={isSquad ? '#fff' : colors.textMuted} strokeWidth={2} />
+          <Text style={[styles.optionText, { color: isSquad ? '#fff' : colors.text }]}>Squad</Text>
         </TouchableOpacity>
       </View>
     </View>

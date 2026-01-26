@@ -127,12 +127,7 @@ export async function notifyTeamTrainingCompleted(
 /**
  * Notify a user about a team invite
  */
-export async function notifyUserTeamInvite(
-  userId: string,
-  teamId: string,
-  teamName: string,
-  inviterName: string
-) {
+export async function notifyUserTeamInvite(userId: string, teamId: string, teamName: string, inviterName: string) {
   return sendPushNotification({
     type: 'team_invite',
     user_ids: [userId],
@@ -190,7 +185,7 @@ export async function notifySquadEngagementInvites(
   const bodyText = teamName
     ? `${commanderName} invited you to join "${drillName}" with ${teamName}`
     : `${commanderName} invited you to join "${drillName}"`;
-    
+
   return sendPushNotification({
     type: 'squad_engagement_invite',
     user_ids: userIds,
@@ -252,11 +247,7 @@ export async function notifySquadParticipantDeclined(
  * Notify all joined participants that squad engagement is starting.
  * Anchored on engagementId (NOT sessionId).
  */
-export async function notifySquadEngagementStarting(
-  userIds: string[],
-  engagementId: string,
-  drillName: string
-) {
+export async function notifySquadEngagementStarting(userIds: string[], engagementId: string, drillName: string) {
   return sendPushNotification({
     type: 'squad_engagement_starting',
     user_ids: userIds,

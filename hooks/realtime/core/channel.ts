@@ -1,33 +1,20 @@
 /**
  * useRealtimeChannel
- * 
+ *
  * Core hook for managing a Supabase Realtime channel.
  * Handles connection lifecycle, reconnection, and cleanup.
- * 
- * @example
- * ```tsx
- * const { channel, status, isConnected } = useRealtimeChannel({
- *   name: 'my-channel',
- *   subscriptions: [
- *     {
- *       table: 'sessions',
- *       event: 'UPDATE',
- *       filter: 'training_id=eq.123',
- *       onData: (payload) => console.log('Session updated:', payload),
- *     },
- *   ],
- * });
- * ```
+ *
+ * This is infrastructure - domain hooks build on top of this.
  */
 
 import { supabase } from '@/lib/supabase';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
-  ChangePayload,
+  ChannelChangePayload,
   ChannelConfig,
   ChannelStatus,
   UseRealtimeChannelReturn,
-} from './types';
+} from './channel.types';
 
 const RECONNECT_DELAY_MS = 3000;
 const MAX_RECONNECT_ATTEMPTS = 5;
@@ -37,7 +24,7 @@ export function useRealtimeChannel(config: ChannelConfig): UseRealtimeChannelRet
 
   const [status, setStatus] = useState<ChannelStatus | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  
+
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const reconnectAttempts = useRef(0);
   const reconnectTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -47,24 +34,53 @@ export function useRealtimeChannel(config: ChannelConfig): UseRealtimeChannelRet
   // STATUS MANAGEMENT
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const updateStatus = useCallback((newStatus: ChannelStatus) => {
-    if (!isMountedRef.current) return;
-    setStatus(newStatus);
-    onStatusChange?.(newStatus);
+  const updateStatus = useCallback(
+    (newStatus: ChannelStatus) => {
+      if (!isMountedRef.current) return;
+      setStatus(newStatus);
+      onStatusChange?.(newStatus);
 
-    // Reset reconnect counter on successful connection
-    if (newStatus === 'SUBSCRIBED') {
-      reconnectAttempts.current = 0;
-      setError(null);
+      if (newStatus === 'SUBSCRIBED') {
+        reconnectAttempts.current = 0;
+        setError(null);
+      }
+    },
+    [onStatusChange]
+  );
+
+  const handleError = useCallback(
+    (err: Error) => {
+      if (!isMountedRef.current) return;
+      console.error(`[Realtime:${name}] Error:`, err.message);
+      setError(err);
+      onError?.(err);
+    },
+    [name, onError]
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RECONNECTION LOGIC
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const scheduleReconnect = useCallback(() => {
+    if (!isMountedRef.current) return;
+    if (reconnectAttempts.current >= MAX_RECONNECT_ATTEMPTS) {
+      console.error(`[Realtime:${name}] Max reconnect attempts reached`);
+      handleError(new Error('Max reconnection attempts reached'));
+      return;
     }
-  }, [onStatusChange]);
 
-  const handleError = useCallback((err: Error) => {
-    if (!isMountedRef.current) return;
-    console.error(`[Realtime:${name}] Error:`, err.message);
-    setError(err);
-    onError?.(err);
-  }, [name, onError]);
+    reconnectAttempts.current += 1;
+    const delay = RECONNECT_DELAY_MS * reconnectAttempts.current;
+
+    console.log(`[Realtime:${name}] Reconnecting in ${delay}ms (attempt ${reconnectAttempts.current})`);
+
+    reconnectTimeout.current = setTimeout(() => {
+      if (isMountedRef.current) {
+        connect();
+      }
+    }, delay);
+  }, [name, handleError]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CHANNEL MANAGEMENT
@@ -86,19 +102,16 @@ export function useRealtimeChannel(config: ChannelConfig): UseRealtimeChannelRet
   const connect = useCallback(() => {
     if (!isMountedRef.current) return;
 
-    // Clean up existing channel
     disconnect();
 
     console.log(`[Realtime:${name}] Connecting... (subscriptions: ${subscriptions.length})`);
 
-    // Create channel
     const channel = supabase.channel(name);
 
-    // Add subscriptions
+    // Attach each subscription
     subscriptions.forEach((sub) => {
       const eventType = sub.event || '*';
-      
-      // Use type assertion to satisfy Supabase's strict typing
+
       (channel as any).on(
         'postgres_changes',
         {
@@ -110,7 +123,7 @@ export function useRealtimeChannel(config: ChannelConfig): UseRealtimeChannelRet
         (payload: any) => {
           if (!isMountedRef.current) return;
 
-          const changePayload: ChangePayload = {
+          const changePayload: ChannelChangePayload = {
             eventType: payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE',
             new: payload.new as Record<string, unknown>,
             old: payload.old as Record<string, unknown>,
@@ -149,31 +162,7 @@ export function useRealtimeChannel(config: ChannelConfig): UseRealtimeChannelRet
     });
 
     channelRef.current = channel;
-  }, [name, subscriptions, disconnect, updateStatus, handleError]);
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // RECONNECTION LOGIC
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  const scheduleReconnect = useCallback(() => {
-    if (!isMountedRef.current) return;
-    if (reconnectAttempts.current >= MAX_RECONNECT_ATTEMPTS) {
-      console.error(`[Realtime:${name}] Max reconnect attempts reached`);
-      handleError(new Error('Max reconnection attempts reached'));
-      return;
-    }
-
-    reconnectAttempts.current += 1;
-    const delay = RECONNECT_DELAY_MS * reconnectAttempts.current;
-    
-    console.log(`[Realtime:${name}] Reconnecting in ${delay}ms (attempt ${reconnectAttempts.current})`);
-    
-    reconnectTimeout.current = setTimeout(() => {
-      if (isMountedRef.current) {
-        connect();
-      }
-    }, delay);
-  }, [name, connect, handleError]);
+  }, [name, subscriptions, disconnect, updateStatus, handleError, scheduleReconnect]);
 
   const reconnect = useCallback(() => {
     reconnectAttempts.current = 0;

@@ -1,38 +1,39 @@
 /**
  * Supabase Realtime Hooks
- * 
+ *
  * A clean, type-safe system for subscribing to database changes.
- * 
- * ┌─────────────────────────────────────────────────────────────────┐
- * │  ARCHITECTURE                                                   │
- * ├─────────────────────────────────────────────────────────────────┤
- * │                                                                 │
- * │  ┌─────────────────────────────────────────────────────────┐   │
- * │  │              Domain-Specific Hooks                       │   │
- * │  │  useTrainingRealtime  │  useSessionRealtime              │   │
- * │  └─────────────────────────────────────────────────────────┘   │
- * │                          │                                      │
- * │                          ▼                                      │
- * │  ┌─────────────────────────────────────────────────────────┐   │
- * │  │              Generic Table Hook                          │   │
- * │  │                useTableSubscription                      │   │
- * │  └─────────────────────────────────────────────────────────┘   │
- * │                          │                                      │
- * │                          ▼                                      │
- * │  ┌─────────────────────────────────────────────────────────┐   │
- * │  │              Core Channel Management                     │   │
- * │  │                useRealtimeChannel                        │   │
- * │  └─────────────────────────────────────────────────────────┘   │
- * │                          │                                      │
- * │                          ▼                                      │
- * │  ┌─────────────────────────────────────────────────────────┐   │
- * │  │              Supabase Realtime Client                    │   │
- * │  └─────────────────────────────────────────────────────────┘   │
- * │                                                                 │
- * └─────────────────────────────────────────────────────────────────┘
- * 
- * USAGE EXAMPLES:
- * 
+ *
+ * ┌─────────────────────────────────────────────────────────────────────────┐
+ * │  ARCHITECTURE                                                           │
+ * ├─────────────────────────────────────────────────────────────────────────┤
+ * │                                                                         │
+ * │  ┌───────────────────────────────────────────────────────────────────┐ │
+ * │  │                    Domain Hooks                                    │ │
+ * │  │  useSessionRealtime  │  useTrainingRealtime  │  useTeamRealtime   │ │
+ * │  │  useParticipantsRealtime  │  useWeaponRealtime                    │ │
+ * │  └───────────────────────────────────────────────────────────────────┘ │
+ * │                              │                                          │
+ * │                              ▼                                          │
+ * │  ┌───────────────────────────────────────────────────────────────────┐ │
+ * │  │                 Generic Table Hook                                 │ │
+ * │  │                  useTableSubscription                              │ │
+ * │  └───────────────────────────────────────────────────────────────────┘ │
+ * │                              │                                          │
+ * │                              ▼                                          │
+ * │  ┌───────────────────────────────────────────────────────────────────┐ │
+ * │  │                 Core Channel Management                            │ │
+ * │  │                   useRealtimeChannel                               │ │
+ * │  └───────────────────────────────────────────────────────────────────┘ │
+ * │                              │                                          │
+ * │                              ▼                                          │
+ * │  ┌───────────────────────────────────────────────────────────────────┐ │
+ * │  │                 Supabase Realtime Client                           │ │
+ * │  └───────────────────────────────────────────────────────────────────┘ │
+ * │                                                                         │
+ * └─────────────────────────────────────────────────────────────────────────┘
+ *
+ * USAGE:
+ *
  * 1. Simple table subscription:
  * ```tsx
  * useTableSubscription({
@@ -41,17 +42,8 @@
  *   onInsert: (msg) => addMessage(msg),
  * });
  * ```
- * 
- * 2. Training realtime (commander view):
- * ```tsx
- * useTrainingRealtime({
- *   trainingId: training.id,
- *   onSessionUpdate: () => refetchTeamProgress(),
- *   onNewTarget: () => refetchDrillProgress(),
- * });
- * ```
- * 
- * 3. Session realtime (active session):
+ *
+ * 2. Domain hooks (recommended):
  * ```tsx
  * useSessionRealtime({
  *   sessionId: session.id,
@@ -62,37 +54,68 @@
  * ```
  */
 
-// Core hook
-export { useRealtimeChannel } from './useRealtimeChannel';
+// ═══════════════════════════════════════════════════════════════════════════
+// CORE
+// ═══════════════════════════════════════════════════════════════════════════
 
-// Generic table subscription
-export { useTableSubscription } from './useTableSubscription';
-
-// Domain-specific hooks
-export { useTrainingRealtime } from './useTrainingRealtime';
-export { useSessionRealtime } from './useSessionRealtime';
-export { useTeamRealtime } from './useTeamRealtime';
-export { useWeaponRealtime } from './useWeaponRealtime';
-export { useParticipantsRealtime } from './useParticipantsRealtime';
-
-// Types
+export { useRealtimeChannel } from './core';
 export type {
-  ChangePayload,
+  ChannelChangePayload,
   ChannelConfig,
   ChannelStatus,
-  PostgresChangeEvent,
-  PostgresChangeFilter,
-  SessionRecord,
-  SessionTargetRecord,
-  TableSubscription,
-  TrainingRecord,
+  ChannelSubscription,
   UseRealtimeChannelReturn,
+} from './core';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TABLE (GENERIC)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export { useTableSubscription } from './table';
+export type {
+  ChangePayload,
+  PostgresChangeEvent,
+  TableSubscription,
   UseTableSubscriptionOptions,
-} from './types';
+  UseTableSubscriptionReturn,
+} from './table';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DATABASE RECORDS
+// ═══════════════════════════════════════════════════════════════════════════
 
 export type {
+  ParticipantRecord,
+  SessionRecord,
+  SessionTargetRecord,
+  TeamInvitationRecord,
+  TeamMemberRecord,
+  TeamTrainingRecord,
   TeamWeaponRecord,
+  TrainingRecord,
   WeaponRequestRecord,
-} from './useWeaponRealtime';
+} from './records';
 
-export type { ParticipantRecord } from './useParticipantsRealtime';
+// ═══════════════════════════════════════════════════════════════════════════
+// DOMAIN HOOKS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Session
+export { useSessionRealtime } from './session';
+export type { UseSessionRealtimeOptions, UseSessionRealtimeReturn } from './session';
+
+// Training
+export { useTrainingRealtime } from './training';
+export type { UseTrainingRealtimeOptions, UseTrainingRealtimeReturn } from './training';
+
+// Team
+export { useTeamRealtime } from './team';
+export type { UseTeamRealtimeOptions, UseTeamRealtimeReturn } from './team';
+
+// Participants
+export { useParticipantsRealtime } from './participants';
+export type { UseParticipantsRealtimeOptions, UseParticipantsRealtimeReturn } from './participants';
+
+// Weapon
+export { useWeaponRealtime } from './weapon';
+export type { UseWeaponRealtimeOptions, UseWeaponRealtimeReturn } from './weapon';

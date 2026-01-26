@@ -1,73 +1,32 @@
 /**
  * useSessionRealtime
- * 
- * Domain-specific hook for real-time session updates.
+ *
  * Subscribe to changes on a specific session (targets, status changes).
- * 
+ *
  * Use Cases:
  * - Active session screen watching for external updates
  * - Coordinator viewing a soldier's session progress
  * - Multi-device sync for the same session
- * 
+ *
  * @example
  * ```tsx
- * // In ActiveSession component
  * const { isConnected } = useSessionRealtime({
  *   sessionId: session.id,
- *   onTargetAdded: (target) => {
- *     // Refresh target list
- *     loadTargets();
- *   },
+ *   onTargetAdded: (target) => loadTargets(),
  *   onStatusChange: (newStatus) => {
- *     if (newStatus === 'completed') {
- *       navigateToResults();
- *     }
+ *     if (newStatus === 'completed') navigateToResults();
  *   },
  * });
  * ```
  */
 
 import { useCallback, useMemo } from 'react';
-import type { ChangePayload, SessionRecord, SessionTargetRecord } from './types';
-import { useRealtimeChannel } from './useRealtimeChannel';
+import { useRealtimeChannel } from '../core';
+import type { ChangePayload } from '../table';
+import type { SessionRecord, SessionTargetRecord } from '../records';
+import type { UseSessionRealtimeOptions, UseSessionRealtimeReturn } from './session.types';
 
-interface UseSessionRealtimeOptions {
-  /** Session ID to subscribe to */
-  sessionId: string | undefined | null;
-  
-  /** Called when session is updated */
-  onSessionUpdate?: (session: SessionRecord) => void;
-  
-  /** Called when session status specifically changes */
-  onStatusChange?: (status: SessionRecord['status'], session: SessionRecord) => void;
-  
-  /** Called when a target is added */
-  onTargetAdded?: (target: SessionTargetRecord) => void;
-  
-  /** Called when a target is updated */
-  onTargetUpdated?: (target: SessionTargetRecord) => void;
-  
-  /** Called when a target is deleted */
-  onTargetDeleted?: (target: SessionTargetRecord) => void;
-  
-  /** Whether subscription is enabled */
-  enabled?: boolean;
-}
-
-interface UseSessionRealtimeReturn {
-  /** Whether connected and subscribed */
-  isConnected: boolean;
-  /** Current status */
-  status: string | null;
-  /** Any error */
-  error: Error | null;
-  /** Force reconnect */
-  reconnect: () => void;
-}
-
-export function useSessionRealtime(
-  options: UseSessionRealtimeOptions
-): UseSessionRealtimeReturn {
+export function useSessionRealtime(options: UseSessionRealtimeOptions): UseSessionRealtimeReturn {
   const {
     sessionId,
     onSessionUpdate,
@@ -78,7 +37,6 @@ export function useSessionRealtime(
     enabled = true,
   } = options;
 
-  // Effective enabled state
   const isEnabled = enabled && !!sessionId;
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -94,7 +52,6 @@ export function useSessionRealtime(
         console.log(`[SessionRealtime] Session updated:`, newSession.id);
         onSessionUpdate?.(newSession);
 
-        // Check for status change specifically
         if (newSession.status !== oldSession.status) {
           console.log(`[SessionRealtime] Status changed: ${oldSession.status} → ${newSession.status}`);
           onStatusChange?.(newSession.status, newSession);
@@ -131,14 +88,12 @@ export function useSessionRealtime(
     if (!isEnabled) return [];
 
     return [
-      // Session record changes
       {
         table: 'sessions',
         event: 'UPDATE' as const,
         filter: `id=eq.${sessionId}`,
         onData: handleSessionData as any,
       },
-      // Targets for this session
       {
         table: 'session_targets',
         event: '*' as const,
