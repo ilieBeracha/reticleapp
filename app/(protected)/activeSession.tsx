@@ -342,7 +342,12 @@ export default function ActiveSessionScreen() {
   }
 
   // Show prep view for ALL sessions (both solo and team)
-  // Team sessions just won't have the "back to edit" option since drill is locked
+  // Execution policy controls whether user can go back to reconfigure:
+  // - 'locked' = config set by commander, no changes allowed
+  // - 'guided' or 'free' = user can reconfigure
+  const drillExecutionPolicy = session.drill_config?.execution_policy;
+  const isConfigLocked = drillExecutionPolicy === 'locked';
+  
   if (session.status === 'pending') {
     return (
       <SessionPrepView
@@ -352,19 +357,18 @@ export default function ActiveSessionScreen() {
           handleRefresh();
         }}
         onBack={
-          isTeamTraining
+          isConfigLocked
             ? undefined
             : () => {
-                // Only solo sessions can go back to edit
+                // Go back to start engagement to reconfigure
                 router.replace({
-                  pathname: '/(protected)/createSession',
+                  pathname: '/(protected)/startEngagement',
                   params: {
-                    editSessionId: session.id,
-                    weaponId: session.weapon_id || '',
-                    weaponName: session.weapon_name || '',
                     purpose: session.drill_config?.drill_goal || PAPER_TYPE.GROUPING,
                     distance: String(session.drill_config?.distance_m || 25),
                     shots: String(session.drill_config?.rounds_per_shooter || 5),
+                    // Pass execution policy so startEngagement knows what's editable
+                    executionPolicy: drillExecutionPolicy || 'free',
                   },
                 });
               }

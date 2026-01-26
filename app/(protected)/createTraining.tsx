@@ -2,14 +2,14 @@
  * CREATE TRAINING - Simple 2-Step Flow
  *
  * 1. Details - Team, name, schedule
- * 2. Sessions - Add simple sessions (like solo createSession)
+ * 2. Sessions - Define drill configurations for the training
  *
- * No drill catalog, no presets, no complexity.
- * Just add sessions and go.
+ * Training = context only (who/when/what drills).
+ * Execution happens via startEngagement when soldiers actually shoot.
  */
 
 import { useCreateTrainingV2 } from '@/components/training/create';
-import { QuickSessionsStep, TrainingDetailsStep } from '@/components/training/create/steps';
+import { AddDrillStep, TrainingDetailsStep } from '@/components/training/create/steps';
 import { useColors } from '@/hooks/ui/useColors';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -105,7 +105,7 @@ export default function CreateTrainingScreen() {
   // MAIN RENDER
   // ─────────────────────────────────────────────────────────────────────────
 
-  const stepLabels = ['Details', 'Sessions'];
+  const stepLabels = ['Details', 'Drills'];
   const totalSteps = 2;
 
   return (
@@ -134,7 +134,7 @@ export default function CreateTrainingScreen() {
 
           <View style={styles.headerCenter}>
             <Text style={[styles.headerTitle, { color: colors.text }]}>
-              {currentStep === 1 ? 'New Training' : 'Add Sessions'}
+              {currentStep === 1 ? 'New Training' : 'Add Drills'}
             </Text>
             <Text style={[styles.headerStep, { color: colors.textMuted }]}>
               Step {currentStep} of {totalSteps}
@@ -213,14 +213,14 @@ export default function CreateTrainingScreen() {
           </Animated.View>
         )}
 
-        {/* Step 2: Add Sessions (Simple Flow) */}
+        {/* Step 2: Add Drills (Training defines drill configs, not sessions) */}
         {currentStep === 2 && (
           <Animated.View entering={FadeInDown.duration(300)} style={styles.step2Container}>
-            <QuickSessionsStep
-              sessions={drills}
-              onAddSession={addDrill}
-              onRemoveSession={handleRemoveDrill}
-              onMoveSession={handleMoveDrill}
+            <AddDrillStep
+              drills={drills}
+              onAddDrill={addDrill}
+              onRemoveDrill={handleRemoveDrill}
+              onMoveDrill={handleMoveDrill}
             />
           </Animated.View>
         )}
@@ -245,7 +245,7 @@ export default function CreateTrainingScreen() {
               activeOpacity={0.85}
             >
               <Text style={[styles.actionText, { color: step1Complete ? colors.background : colors.textMuted }]}>
-                Next: Add Sessions
+                Next: Add Drills
               </Text>
               <ArrowRight size={18} color={step1Complete ? colors.background : colors.textMuted} strokeWidth={2} />
             </TouchableOpacity>
@@ -264,7 +264,7 @@ export default function CreateTrainingScreen() {
               ) : (
                 <>
                   <Text style={[styles.actionText, { color: canCreate ? colors.background : colors.textMuted }]}>
-                    {drills.length === 0 ? 'Add at least one session' : 'Create Training'}
+                    {drills.length === 0 ? 'Add at least one drill' : 'Create Training'}
                   </Text>
                   {drills.length > 0 && <Play size={16} color={colors.background} fill={colors.background} />}
                 </>

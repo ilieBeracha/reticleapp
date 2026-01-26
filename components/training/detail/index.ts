@@ -1,74 +1,27 @@
 /**
  * Training Detail Components
- * Barrel export for all training detail components
+ * Barrel export for training detail components
+ * 
+ * NOTE: Training is a READ-ONLY dashboard. All execution components have been removed.
+ * Execution happens in the Engagement flow, not here.
  */
 
-// Types
+// Types - Only export types still in use
 export type {
   AutoCloseCountdownProps,
   Colors,
-  CommanderActionsSheetProps,
-  ContextCardsProps,
-  DebriefPhaseContentProps,
-  DrillChapterProps,
-  DrillProgressItem,
-  ExecutionPhaseContentProps,
-  PhaseConfig,
-  PhaseSectionProps,
-  PhaseStatus,
-  ReadinessItem,
-  StartTrainingSheetProps,
-  TimelineNodeProps,
   TrainingHeroProps,
-  TrainingPhase,
-  TrainingReadinessCardProps,
   TrainingSettingsModalProps
 } from './types';
 
-// Helpers
-export { areAllDrillsCompleted, calculateTrainingDuration, getPhaseNarrativeText, getPhaseStatus } from './helpers';
-
-// Animated Components
-export { LiveDot, PulsingDot } from './AnimatedComponents';
-
-// Timeline Components
-export { PhaseSection } from './PhaseSection';
-export { TimelineNode } from './TimelineNode';
-
-// Drill Components
-export { DrillChapter } from './DrillChapter';
-
-// Phase Content Components
-export { DebriefPhaseContent } from './DebriefPhaseContent';
-export { ExecutionPhaseContent } from './ExecutionPhaseContent';
-export { SetupPhaseContent } from './SetupPhaseContent';
-export { SquadStatusContent } from './SquadStatusContent';
-
-// Hero & Context Components
-export { ContextCards } from './ContextCards';
+// Hero & Display Components
 export { TrainingHero } from './TrainingHero';
 
 // Countdown Component
 export { AutoCloseCountdown } from './AutoCloseCountdown';
 
-// Modal Components
-export { AddDrillModal } from './AddDrillModal';
-export { CommanderActionsSheet } from './CommanderActionsSheet';
-export { StartTrainingSheet } from './StartTrainingSheet';
+// Animated Components
+export { LiveDot, PulsingDot } from './AnimatedComponents';
+
+// Settings Modal (administrative only, no execution)
 export { TrainingSettingsModal } from './TrainingSettingsModal';
-
-// Readiness Card
-export { TrainingReadinessCard } from './TrainingReadinessCard';
-
-// Custom Session
-export { CustomSessionCard } from './CustomSessionCard';
-export type { CustomSessionConfig } from './CustomSessionCard';
-
-// Tab-based Training Components
-export { AddSessionButton } from './AddSessionButton';
-export type { AddSessionButtonProps } from './AddSessionButton';
-export { SessionTabs } from './SessionTabs';
-export type { SessionTabsProps } from './SessionTabs';
-export { TrainingSessionCard } from './TrainingSessionCard';
-export type { TrainingSessionCardProps } from './TrainingSessionCard';
-

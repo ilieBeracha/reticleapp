@@ -1,11 +1,17 @@
+/**
+ * Training Components
+ * 
+ * NOTE: Training is a read-only dashboard showing context and history.
+ * All execution-related components (ActiveSquadEngagementsCard, SquadInvitationBanner, etc.)
+ * have been removed per the canonical model.
+ */
+
 // Components
-export { ActiveSquadEngagementsCard } from './ActiveSquadEngagementsCard';
 export { DrillCard } from './DrillCard';
 export { ParticipantInsights } from './ParticipantInsights';
-export { SquadInvitationBanner } from './SquadInvitationBanner';
 
 // Hooks
-export { useTrainingActions, useTrainingDetail } from './hooks';
+export { useTrainingDetail } from './hooks';
 
 // Utils
 export { formatDate, formatTime, getStatusConfig } from './utils';

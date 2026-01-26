@@ -1,10 +1,12 @@
 /**
- * DrillQuickAdd - Professional drill creation (like mini createSession)
+ * DrillQuickAdd - Quick drill configuration
  *
  * Quick flow:
  * 1. Select goal (grouping/engagement)
  * 2. Set distance, shots, strings, time
  * 3. Done
+ *
+ * NOTE: Configures drill params only. Execution via startEngagement.
  */
 
 import { useColors } from '@/hooks/ui/useColors';

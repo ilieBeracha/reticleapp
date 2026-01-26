@@ -19,6 +19,7 @@
  *
  * Includes: basic session fields + related names only (not full objects)
  * Note: Includes position for analytics/insights
+ * Note: engagement_mode removed - squad logic lives in engagements table
  */
 export const SESSION_SELECT_WITH_WEAPON = `
   id,
@@ -31,7 +32,6 @@ export const SESSION_SELECT_WITH_WEAPON = `
   weapon_id,
   session_mode,
   watch_controlled,
-  engagement_mode,
   status,
   started_at,
   ended_at,
@@ -50,6 +50,7 @@ export const SESSION_SELECT_WITH_WEAPON = `
  * Minimal session select without weapon.
  * Used for: paginated queries, list views where weapon isn't needed.
  * Note: Includes position for analytics/insights
+ * Note: engagement_mode removed - squad logic lives in engagements table
  */
 export const SESSION_SELECT_MINIMAL = `
   id,
@@ -61,7 +62,6 @@ export const SESSION_SELECT_MINIMAL = `
   custom_drill_config,
   session_mode,
   watch_controlled,
-  engagement_mode,
   status,
   started_at,
   ended_at,
@@ -80,6 +80,7 @@ export const SESSION_SELECT_MINIMAL = `
  * Used for: getSessionById where we need all drill configuration.
  *
  * Note: Fetches full drill objects (*) for both training_drills and drill_templates
+ * Note: engagement_mode removed - squad logic lives in engagements table
  */
 export const SESSION_SELECT_WITH_FULL_DRILL = `
   id,
@@ -92,7 +93,6 @@ export const SESSION_SELECT_WITH_FULL_DRILL = `
   weapon_id,
   session_mode,
   watch_controlled,
-  engagement_mode,
   status,
   started_at,
   ended_at,
@@ -158,6 +158,7 @@ export const SESSION_SELECT_WITH_FULL_DRILL = `
 /**
  * Session select after CREATE operation.
  * Includes full drill objects and weapon with base_weapon.
+ * Note: engagement_mode removed - squad logic lives in engagements table
  */
 export const SESSION_SELECT_AFTER_CREATE = `
   id,
@@ -170,7 +171,6 @@ export const SESSION_SELECT_AFTER_CREATE = `
   custom_drill_config,
   session_mode,
   watch_controlled,
-  engagement_mode,
   status,
   started_at,
   ended_at,
@@ -188,6 +188,7 @@ export const SESSION_SELECT_AFTER_CREATE = `
 /**
  * Session select after UPDATE operation.
  * Similar to create but with simpler weapon info.
+ * Note: engagement_mode removed - squad logic lives in engagements table
  */
 export const SESSION_SELECT_AFTER_UPDATE = `
   id,
@@ -200,7 +201,6 @@ export const SESSION_SELECT_AFTER_UPDATE = `
   weapon_id,
   session_mode,
   watch_controlled,
-  engagement_mode,
   status,
   started_at,
   ended_at,

@@ -31,11 +31,15 @@ function buildDrillInsertPayload(drill: CreateTrainingDrillInput, trainingId: st
     name: drill.name,
     description: drill.description || null,
     drill_goal: drill.drill_goal,
-    engagement_mode: drill.engagement_mode ?? null,
     ...(drill.input_method ? { input_method: drill.input_method } : {}),
     target_type: drill.target_type,
-    distance_m: drill.distance_m,
-    rounds_per_shooter: drill.rounds_per_shooter,
+    // Nullable - null means soldier chooses at execution time
+    distance_m: drill.distance_m ?? null,
+    rounds_per_shooter: drill.rounds_per_shooter ?? null,
+    // Execution policy - how strictly soldiers must follow config
+    execution_policy: drill.execution_policy || 'locked',
+    // Engagement mode - solo or squad (grouping is always solo)
+    engagement_mode: drill.engagement_mode || 'solo',
     time_limit_seconds: drill.time_limit_seconds ?? null,
     par_time_seconds: drill.par_time_seconds ?? null,
     scoring_mode: drill.scoring_mode ?? null,

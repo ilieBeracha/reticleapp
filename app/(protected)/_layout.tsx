@@ -119,7 +119,7 @@ export default function ProtectedLayout() {
       />
 
       <Stack.Screen
-        name="createSession"
+        name="startEngagement"
         options={{
           headerShown: false,
           presentation: 'containedModal',

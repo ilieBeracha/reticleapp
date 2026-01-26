@@ -1,5 +1,25 @@
 import type { DrillGoal } from '@/types/workspace';
 
+// Re-export DrillGoal for convenience
+export type { DrillGoal };
+
+// ============================================================================
+// EXECUTION POLICY - How strict is drill configuration?
+// ============================================================================
+
+/**
+ * Execution Policy - Commander's intent for how strictly a drill must be followed.
+ * 
+ * This is NOT about whether execution happens.
+ * Training decides how strict execution is.
+ * 
+ * @example
+ * - locked: Military qualification - execute EXACTLY as defined
+ * - guided: Training drill - defaults provided, adjustments allowed
+ * - free: Open practice - drill is just a label, full freedom
+ */
+export type ExecutionPolicy = 'locked' | 'guided' | 'free';
+
 // ============================================================================
 // ENGAGEMENT - The Atomic Execution Unit
 // ============================================================================
@@ -10,53 +30,94 @@ import type { DrillGoal } from '@/types/workspace';
  * Training and Session must remain passive context.
  *
  * Mental model:
- * - Training decides "who is around"
- * - Session decides "what setup applies"
- * - Engagement decides "what actually happened"
+ * - Training decides "who is around" (context only)
+ * - Session decides "what setup applies" (setup container)
+ * - Engagement decides "what actually happened" (atomic execution)
+ *
+ * CANONICAL RULES:
+ * - Grouping engagements are ALWAYS solo (enforced by enforceEngagementMode)
+ * - Squad engagements are async-only (no live presence)
+ * - Participants only acknowledge/consent, shooter executes alone
  */
 
-/** Engagement mode: solo (individual) or squad (team participation) */
+/** Engagement mode: solo (individual) or squad (async team participation) */
 export type EngagementMode = 'solo' | 'squad';
 
-/** Engagement execution status */
-export type EngagementStatus = 'pending' | 'active' | 'completed' | 'cancelled';
+/** Engagement execution status: completed or aborted */
+export type EngagementStatus = 'completed' | 'aborted';
 
 /**
- * Engagement record - represents a single execution of a session.
- * Each session has at most one engagement.
+ * Engagement record - the atomic execution unit.
+ * 
+ * CANONICAL SCHEMA:
+ * - One shooter, one result
+ * - Optional participants (async consent only)
+ * - drill_goal determines if squad mode is allowed
  */
 export interface Engagement {
   id: string;
+  /** Optional link to training context */
+  training_id: string | null;
+  /** Reference to session setup (weapon, environment) */
   session_id: string;
+  /** The user who executed this engagement */
+  shooter_id: string;
+  /** Primary classification: grouping (always solo) or engagement (can be squad) */
+  drill_goal: DrillGoal;
+  /** Execution mode: solo or squad (grouping is ALWAYS solo) */
   engagement_mode: EngagementMode;
+  /** Final status */
   status: EngagementStatus;
-  started_at: string | null;
-  ended_at: string | null;
   created_at: string;
-  updated_at: string;
 }
 
 /** State of a participant in a squad engagement */
 export type ParticipantState = 'pending' | 'joined' | 'left';
 
 /**
- * A participant invited to a squad engagement.
- * References engagement_id (NOT session_id).
+ * A participant in a squad engagement.
+ * 
+ * CANONICAL RULES:
+ * - References engagement_id ONLY (never session_id)
+ * - Participants acknowledge/consent asynchronously
+ * - Shooter executes alone, result is attributed to participants
  */
 export interface EngagementParticipant {
   id: string;
   /** Reference to the engagement (execution unit) */
   engagement_id: string;
-  /** @deprecated Use engagement_id. Will be removed after migration. */
-  session_id?: string;
   user_id: string;
   state: ParticipantState;
   joined_at: string | null;
   created_at: string;
-  updated_at: string;
   /** Joined from user profile */
   user_full_name?: string | null;
   user_avatar_url?: string | null;
+}
+
+// ============================================================================
+// ENGAGEMENT MODE GUARD (MANDATORY)
+// ============================================================================
+
+/**
+ * Enforce engagement mode based on drill goal.
+ * 
+ * CANONICAL RULE: Grouping is ALWAYS solo.
+ * 
+ * @param drillGoal - The drill goal (grouping or engagement)
+ * @param requested - The requested engagement mode (optional)
+ * @returns The enforced engagement mode
+ */
+export function enforceEngagementMode(
+  drillGoal: DrillGoal,
+  requested?: EngagementMode
+): EngagementMode {
+  // Grouping is ALWAYS solo - this is non-negotiable
+  if (drillGoal === 'grouping') {
+    return 'solo';
+  }
+  // For engagement drills, use requested mode or default to solo
+  return requested ?? 'solo';
 }
 
 // ============================================================================
@@ -107,9 +168,9 @@ export interface SessionWeatherData {
  * Used when starting a session without a saved template.
  */
 export interface DrillConfig {
-  name: string;
+  name?: string;
   drill_goal: DrillGoal;
-  target_type: 'paper' | 'tactical';
+  target_type?: 'paper' | 'tactical';
   input_method?: 'scan' | 'manual' | null; // User's explicit choice
   distance_m: number;
   rounds_per_shooter: number;
@@ -119,6 +180,10 @@ export interface DrillConfig {
   position?: string | null;
   /** When following a category drill, this is the drill ID from categoryDrills.ts */
   category_drill_id?: string | null;
+  /** Execution policy - controls config freedom during session */
+  execution_policy?: ExecutionPolicy | null;
+  /** Custom detection sensitivity in G-force (for watch mode) */
+  detection_sensitivity?: number | null;
 }
 
 /**
@@ -164,13 +229,6 @@ export interface BaseSessionConfig {
   // Start as pending (for watch selection flow)
   // When true, session is created as 'pending' and user must call activateSession()
   start_as_pending?: boolean;
-
-  /**
-   * @deprecated Pass engagement_mode when creating the engagement, not the session.
-   * This field is kept for backwards compatibility during migration.
-   * Use createEngagement({ session_id, engagement_mode }) instead.
-   */
-  engagement_mode?: EngagementMode;
 }
 
 /**
@@ -225,6 +283,12 @@ export interface SessionDrillConfig {
   safety_notes?: string | null;
   /** Custom detection sensitivity in G-force (user calibrated) */
   detection_sensitivity?: number | null;
+  /** Execution policy - controls whether user can reconfigure during session
+   * 'locked' = must execute exactly as defined (qualification)
+   * 'guided' = defaults pre-filled, can adjust (training)
+   * 'free' = full freedom (open practice)
+   */
+  execution_policy?: 'locked' | 'guided' | 'free' | null;
 }
 
 /** Aggregated session statistics (computed from targets) */
@@ -255,11 +319,6 @@ export interface SessionWithDetails {
   session_mode: 'solo' | 'group';
   status: 'pending' | 'active' | 'completed' | 'cancelled';
   watch_controlled: boolean; // Whether watch controls this session
-  /**
-   * @deprecated Use engagement.engagement_mode instead.
-   * This field is kept for backwards compatibility during migration.
-   */
-  engagement_mode?: EngagementMode;
   started_at: string;
   ended_at: string | null;
   created_at: string;

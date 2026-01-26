@@ -1,8 +1,11 @@
 /**
  * StartPracticeCard Component
  *
- * Prominent, elegant call-to-action to start a new session.
+ * Prominent, elegant call-to-action to start a new engagement/grouping.
  * Features subtle gradient effect and micro-animations.
+ *
+ * NOTE: Users start "engagements" or "groupings", not "sessions".
+ * Session is an invisible setup container.
  */
 
 import { ArrowRight, Target } from 'lucide-react-native';
@@ -45,7 +48,7 @@ export function StartPracticeCard({ colors, onPress, starting, lastSessionDaysAg
       </View>
 
       <View style={s.content}>
-        <Text style={s.title}>Start Session</Text>
+        <Text style={s.title}>Start Practice</Text>
         <Text style={s.subtitle}>{subtitle}</Text>
       </View>
 

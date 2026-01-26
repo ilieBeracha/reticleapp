@@ -1,8 +1,11 @@
 /**
- * TrainingDrillsStep - Clean drill selection (like createSession)
+ * TrainingDrillsStep - Clean drill selection
  *
  * Step 2 of training creation: Add and configure drills
  * Design inspired by DrillPresetPicker for consistency
+ *
+ * NOTE: Defines drill configs for training context only.
+ * Execution happens via startEngagement.
  */
 
 import { useColors } from '@/hooks/ui/useColors';

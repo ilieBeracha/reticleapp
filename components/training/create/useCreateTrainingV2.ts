@@ -338,13 +338,16 @@ export function useCreateTrainingV2({ teamIdParam }: UseCreateTrainingV2Params):
         description: d.description || undefined,
         drill_goal: d.drill_goal || 'grouping',
         target_type: d.target_type || 'paper',
+        // Execution policy - how strictly soldiers must follow this config
+        execution_policy: d.execution_policy || 'locked',
+        // Engagement mode - solo or squad (grouping is always solo)
+        engagement_mode: d.engagement_mode || 'solo',
+        // Config values - null means soldier chooses at execution time
         distance_m: d.config.distance_m,
         rounds_per_shooter: d.config.rounds,
         time_limit_seconds: d.config.time_limit_seconds ?? undefined,
         strings_count: d.config.strings_count,
         position: d.config.position ?? undefined,
-        // Squad engagement mode
-        engagement_mode: d.config.engagement_mode ?? undefined,
         // Store canonical drill reference in notes for future reference
         notes: d.drill_id ? `canonical:${d.drill_id}` : undefined,
       }));

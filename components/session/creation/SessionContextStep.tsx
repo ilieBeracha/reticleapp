@@ -46,18 +46,22 @@ function PillPicker({
   onSelect,
   allowCustom,
   customSuffix = '',
+  placeholder = 'Custom',
 }: {
   options: number[];
   selected: number;
   onSelect: (v: number) => void;
   allowCustom?: boolean;
   customSuffix?: string;
+  placeholder?: string;
 }) {
   const colors = useColors();
   const inputRef = useRef<TextInput>(null);
-  const isCustom = !options.includes(selected);
+  // 0 = no selection (treat as unset)
+  const hasValue = selected > 0;
+  const isCustom = hasValue && !options.includes(selected);
   const [editing, setEditing] = useState(false);
-  const [customText, setCustomText] = useState(String(selected));
+  const [customText, setCustomText] = useState(hasValue ? String(selected) : '');
 
   const handleCustomSubmit = () => {
     const num = parseInt(customText, 10);
@@ -74,7 +78,8 @@ function PillPicker({
       {/* Preset options */}
       <View style={styles.pillsPresets}>
         {options.map((opt) => {
-          const active = opt === selected && !editing;
+          // Only show as active if we have a value and it matches
+          const active = hasValue && opt === selected && !editing;
           return (
             <TouchableOpacity
               key={opt}
@@ -122,12 +127,12 @@ function PillPicker({
           <TouchableOpacity
             style={[styles.pill, { backgroundColor: isCustom ? colors.text : colors.card }]}
             onPress={() => {
-              setCustomText(String(selected));
+              setCustomText(hasValue ? String(selected) : '');
               setEditing(true);
             }}
           >
-            <Text style={[styles.pillText, { color: isCustom ? colors.background : colors.text }]}>
-              {isCustom ? `${selected}${customSuffix}` : 'Other'}
+            <Text style={[styles.pillText, { color: isCustom ? colors.background : hasValue ? colors.text : colors.textMuted }]}>
+              {isCustom ? `${selected}${customSuffix}` : hasValue ? String(selected) : placeholder}
             </Text>
           </TouchableOpacity>
         ))}

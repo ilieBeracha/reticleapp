@@ -254,7 +254,7 @@ export function useUnifiedHomePage() {
               onPress: async () => {
                 await deleteSession(existing.id);
                 await loadAllSessions();
-                router.push('/(protected)/createSession');
+                router.push('/(protected)/startEngagement');
               },
             },
             { text: 'Cancel', style: 'cancel' },
@@ -262,9 +262,9 @@ export function useUnifiedHomePage() {
         );
         return;
       }
-      router.push('/(protected)/createSession');
+      router.push('/(protected)/startEngagement');
     } catch (error) {
-      console.error('Failed to start session:', error);
+      console.error('Failed to start engagement:', error);
     } finally {
       setStarting(false);
     }

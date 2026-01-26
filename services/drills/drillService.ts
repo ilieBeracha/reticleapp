@@ -65,13 +65,13 @@ export interface TeamDrillPreset {
  * Drill configuration for a training instance
  */
 export interface DrillConfig {
-  distance_m: number;
-  rounds: number;
+  /** Distance in meters - null means soldier chooses */
+  distance_m: number | null;
+  /** Number of rounds - null means soldier chooses */
+  rounds: number | null;
   time_limit_seconds?: number | null;
   position?: ShootingPosition | null;
   strings_count: number;
-  /** For engagement drills: solo (default) or squad */
-  engagement_mode?: 'solo' | 'squad';
 }
 
 /**
@@ -87,6 +87,23 @@ export interface TrainingDrillItem {
   description?: string | null;   // Drill explanation/purpose
   drill_goal?: DrillGoal;
   target_type?: TargetType;
+  /**
+   * Execution Policy - How strict must soldiers follow this drill config?
+   * - 'locked': Must execute exactly as defined (qualification, assessment)
+   * - 'guided': Defaults pre-filled, soldier may adjust (training)
+   * - 'free': Drill is just a label, full freedom (open practice)
+   * 
+   * Default: 'locked' (commander intent is respected)
+   */
+  execution_policy?: 'locked' | 'guided' | 'free';
+  /**
+   * Engagement Mode - Commander's intent for how drill should be executed
+   * - 'solo': Individual execution only (default for grouping)
+   * - 'squad': Squad participation allowed (engagement only)
+   * 
+   * NOTE: For grouping drills, this MUST be 'solo' (enforced by canonical model)
+   */
+  engagement_mode?: 'solo' | 'squad';
 }
 
 // ============================================================================

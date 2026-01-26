@@ -180,7 +180,9 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       setStats(statsData);
 
       // Load participants for squad engagement sessions
-      if (sessionData?.engagement_mode === 'squad') {
+      // Note: engagement_mode now lives on the engagement, not the session
+      // For now, we check if there's an engagement with squad mode
+      if (sessionData?.engagement?.engagement_mode === 'squad') {
         const participantsData = await getSessionParticipants(sessionId);
         setParticipants(participantsData);
       }
@@ -263,12 +265,22 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
   // Team training state - used to hide back button
   const isTeamTraining = !!session?.training_id && !!session?.team_id;
 
+  // Execution policy - determines config editability
+  // 'locked' = must execute exactly as configured (no editing)
+  // 'guided' = defaults pre-filled, can adjust
+  // 'free' = full freedom
+  const executionPolicy = drill?.execution_policy ?? 'free';
+  const isConfigLocked = executionPolicy === 'locked';
+
   // Session mode - determines what user can modify
   // 'training' mode locks drill config (distance, shots, etc.) to what was set by team training
   // 'solo' mode allows full control over drill configuration
   const sessionMode: SessionMode = isTeamTraining ? 'training' : 'solo';
-  const canEditDrill = sessionMode === 'solo';
-  const lockedConfig = sessionMode === 'training' ? drill : null;
+  const canEditDrill = !isConfigLocked;
+  
+  // Locked config - applies when execution policy is 'locked' OR it's team training
+  // This enforces the drill's distance/shots in manual entry
+  const lockedConfig = isConfigLocked || isTeamTraining ? drill : null;
 
   // Score
   const score = useMemo(() => {
@@ -554,7 +566,8 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
   });
 
   // Squad engagement participants realtime
-  const isSquadEngagement = session?.engagement_mode === 'squad';
+  // Note: engagement_mode now lives on the engagement, not the session
+  const isSquadEngagement = session?.engagement?.engagement_mode === 'squad';
   useParticipantsRealtime({
     engagementId: session?.engagement?.id || null,
     sessionId, // deprecated fallback
@@ -625,8 +638,13 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
       }
     }
 
-    // For training mode, use locked config values strictly
-    const distance = lockedConfig?.distance_m ?? defaultDistance;
+    // Use drill config distance, or default
+    const distance = drill?.distance_m ?? defaultDistance;
+    
+    // For ENGAGEMENT drills: pass bullets limit
+    const bulletsForEngagement = !isGrouping && hasDrill
+      ? (nextTargetPlan?.nextBullets || drill?.rounds_per_shooter)
+      : undefined;
 
     router.push({
       pathname: '/(protected)/tacticalTarget',
@@ -634,7 +652,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
         sessionId,
         distance: distance.toString(),
         ...(lockedConfig ? { locked: '1' } : {}),
-        ...(hasDrill && nextTargetPlan?.nextBullets ? { bullets: String(nextTargetPlan.nextBullets) } : {}),
+        ...(bulletsForEngagement ? { bullets: String(bulletsForEngagement) } : {}),
         ...(isGrouping ? { isGrouping: '1' } : {}),
         showTimeInput: session?.watch_controlled ? '0' : '1',
       },
@@ -654,16 +672,26 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     if (!canAddTarget) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    // For training mode, use locked config values strictly
-    const distance = lockedConfig?.distance_m ?? defaultDistance;
+    // Use drill config distance, or default
+    const distance = drill?.distance_m ?? defaultDistance;
+    
+    // For ENGAGEMENT drills: pass bullets limit
+    // - nextBullets = remaining shots (preferred - respects progress)
+    // - rounds_per_shooter = total configured shots (fallback)
+    // For GROUPING drills: no bullets limit (user enters shots manually)
+    const bulletsForEngagement = !isGrouping && hasDrill
+      ? (nextTargetPlan?.nextBullets || drill?.rounds_per_shooter)
+      : undefined;
 
     router.push({
       pathname: '/(protected)/tacticalTarget',
       params: {
         sessionId,
         distance: distance.toString(),
+        // Lock distance when config is locked
         ...(lockedConfig ? { locked: '1' } : {}),
-        ...(hasDrill && nextTargetPlan?.nextBullets ? { bullets: String(nextTargetPlan.nextBullets) } : {}),
+        // Pass bullets for engagement drills (limits hits input)
+        ...(bulletsForEngagement ? { bullets: String(bulletsForEngagement) } : {}),
         ...(isGrouping ? { isGrouping: '1' } : {}),
         showTimeInput: session?.watch_controlled ? '0' : '1',
       },
@@ -673,6 +701,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     sessionId,
     defaultDistance,
     hasDrill,
+    drill,
     nextTargetPlan,
     isGrouping,
     lockedConfig,
@@ -683,7 +712,9 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
     if (!canAddTarget) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    const distance = lockedConfig?.distance_m ?? defaultDistance;
+    // Use drill config distance, or default
+    const distance = drill?.distance_m ?? defaultDistance;
+    // Max shots from drill config (for engagement drills)
     const maxShots = computeMaxShots(lockedConfig, drill);
 
     router.push({
@@ -696,7 +727,7 @@ export function useActiveSession({ sessionId }: UseActiveSessionParams): UseActi
         ...(lockedConfig ? { locked: '1' } : {}),
       },
     });
-  }, [canAddTarget, sessionId, defaultDistance, hasDrill, drill, isGrouping, lockedConfig]);
+  }, [canAddTarget, sessionId, defaultDistance, drill, isGrouping, lockedConfig]);
 
   const handleTargetPress = useCallback((target: SessionTargetWithResults) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

@@ -5,11 +5,17 @@
  * Squad logic MUST live here.
  * Training and Session must remain passive context.
  *
+ * CANONICAL RULES:
+ * - Grouping engagements are ALWAYS solo
+ * - Squad participants are async consent only (not live/presence-based)
+ * - Shooter executes alone, result is attributed to participants
+ *
  * Manages participants for squad engagements.
  * Participants must be from the same team as the session owner.
  */
 
 import { supabase } from '@/lib/supabase';
+import type { DrillGoal } from '@/types/workspace';
 import type {
   Engagement,
   EngagementMode,
@@ -17,6 +23,7 @@ import type {
   EngagementStatus,
   ParticipantState,
 } from './types';
+import { enforceEngagementMode } from './types';
 
 // ============================================================================
 // ENGAGEMENT QUERIES
@@ -65,18 +72,40 @@ export async function getEngagementBySessionId(
 /**
  * Create an engagement for a session.
  * This is the entry point for starting any execution (solo or squad).
+ * 
+ * CANONICAL RULES:
+ * - Grouping engagements are ALWAYS solo (enforced)
+ * - Squad engagements require drill_goal = 'engagement'
+ * - Shooter executes alone, participants acknowledge async
  */
 export async function createEngagement(params: {
   sessionId: string;
-  engagementMode: EngagementMode;
+  shooterId: string;
+  drillGoal: DrillGoal;
+  trainingId?: string | null;
+  requestedMode?: EngagementMode;
   status?: EngagementStatus;
 }): Promise<Engagement> {
-  const { sessionId, engagementMode, status = 'pending' } = params;
+  const { 
+    sessionId, 
+    shooterId, 
+    drillGoal, 
+    trainingId = null, 
+    requestedMode,
+    status = 'completed' 
+  } = params;
+
+  // MANDATORY: Enforce engagement mode based on drill goal
+  // Grouping is ALWAYS solo - this is non-negotiable
+  const engagementMode = enforceEngagementMode(drillGoal, requestedMode);
 
   const { data, error } = await supabase
     .from('engagements')
     .insert({
       session_id: sessionId,
+      shooter_id: shooterId,
+      drill_goal: drillGoal,
+      training_id: trainingId,
       engagement_mode: engagementMode,
       status,
     })
@@ -89,19 +118,16 @@ export async function createEngagement(params: {
 
 /**
  * Update engagement status.
+ * 
+ * CANONICAL: Status can only be 'completed' or 'aborted'
  */
 export async function updateEngagementStatus(
   engagementId: string,
-  status: EngagementStatus,
-  timestamps?: { started_at?: string; ended_at?: string }
+  status: EngagementStatus
 ): Promise<Engagement> {
-  const updateData: Record<string, unknown> = { status };
-  if (timestamps?.started_at) updateData.started_at = timestamps.started_at;
-  if (timestamps?.ended_at) updateData.ended_at = timestamps.ended_at;
-
   const { data, error } = await supabase
     .from('engagements')
-    .update(updateData)
+    .update({ status })
     .eq('id', engagementId)
     .select('*')
     .single();
@@ -111,35 +137,10 @@ export async function updateEngagementStatus(
 }
 
 /**
- * Start an engagement (set status to active, record start time).
- * Also updates the associated session status to 'active'.
+ * Mark an engagement as aborted.
  */
-export async function startEngagement(engagementId: string): Promise<Engagement> {
-  // Update engagement status
-  const engagement = await updateEngagementStatus(engagementId, 'active', {
-    started_at: new Date().toISOString(),
-  });
-
-  // Also update the session status to 'active'
-  const { error } = await supabase
-    .from('sessions')
-    .update({ status: 'active' })
-    .eq('id', engagement.session_id);
-
-  if (error) {
-    console.error('[startEngagement] Failed to update session status:', error);
-  }
-
-  return engagement;
-}
-
-/**
- * Complete an engagement (set status to completed, record end time).
- */
-export async function completeEngagement(engagementId: string): Promise<Engagement> {
-  return updateEngagementStatus(engagementId, 'completed', {
-    ended_at: new Date().toISOString(),
-  });
+export async function abortEngagement(engagementId: string): Promise<Engagement> {
+  return updateEngagementStatus(engagementId, 'aborted');
 }
 
 // ============================================================================
@@ -156,7 +157,7 @@ export async function getEngagementParticipants(
   // Get participants
   const { data: participants, error } = await supabase
     .from('engagement_participants')
-    .select('id, engagement_id, user_id, state, joined_at, created_at, updated_at')
+    .select('id, engagement_id, user_id, state, joined_at, created_at')
     .eq('engagement_id', engagementId)
     .order('created_at', { ascending: true });
 
@@ -182,7 +183,6 @@ export async function getEngagementParticipants(
       state: row.state,
       joined_at: row.joined_at,
       created_at: row.created_at,
-      updated_at: row.updated_at,
       user_full_name: profile?.full_name || null,
       user_avatar_url: profile?.avatar_url || null,
     };
@@ -286,33 +286,26 @@ export async function getEligibleParticipants(
 
 /**
  * Add a participant to a squad engagement.
- * The participant starts in 'pending' state.
+ * 
+ * CANONICAL RULES:
+ * - Participants acknowledge/consent asynchronously
+ * - Commander decides who participates
+ * - References engagement_id ONLY (never session_id)
  */
 export async function addParticipant(
   engagementId: string,
   userId: string
 ): Promise<EngagementParticipant> {
-  // First get the engagement to find session_id (needed for backwards compat)
-  const { data: engagement, error: engError } = await supabase
-    .from('engagements')
-    .select('session_id')
-    .eq('id', engagementId)
-    .single();
-
-  if (engError) throw engError;
-
-  // Insert with both engagement_id and session_id (backwards compat during migration)
-  // Participants are added directly as 'joined' (no acceptance needed - commander decides)
+  // Participants are added directly as 'joined' (async consent model)
   const { data, error } = await supabase
     .from('engagement_participants')
     .insert({
       engagement_id: engagementId,
-      session_id: engagement.session_id, // Backwards compat - will be removed later
       user_id: userId,
       state: 'joined',
       joined_at: new Date().toISOString(),
     })
-    .select('id, engagement_id, user_id, state, joined_at, created_at, updated_at')
+    .select('id, engagement_id, user_id, state, joined_at, created_at')
     .single();
 
   if (error) throw error;
@@ -331,7 +324,6 @@ export async function addParticipant(
     state: data.state,
     joined_at: data.joined_at,
     created_at: data.created_at,
-    updated_at: data.updated_at,
     user_full_name: profile?.full_name || null,
     user_avatar_url: profile?.avatar_url || null,
   };
@@ -339,7 +331,7 @@ export async function addParticipant(
 
 /**
  * Update the state of a participant.
- * Used when a user joins or leaves the engagement.
+ * Used when a user joins or leaves the engagement (async consent).
  */
 export async function updateParticipantState(
   engagementId: string,
@@ -351,7 +343,7 @@ export async function updateParticipantState(
     .update({ state })
     .eq('engagement_id', engagementId)
     .eq('user_id', userId)
-    .select('id, engagement_id, user_id, state, joined_at, created_at, updated_at')
+    .select('id, engagement_id, user_id, state, joined_at, created_at')
     .single();
 
   if (error) throw error;
@@ -370,7 +362,6 @@ export async function updateParticipantState(
     state: data.state,
     joined_at: data.joined_at,
     created_at: data.created_at,
-    updated_at: data.updated_at,
     user_full_name: profile?.full_name || null,
     user_avatar_url: profile?.avatar_url || null,
   };
@@ -398,17 +389,14 @@ export async function removeParticipant(
 // ============================================================================
 
 /**
- * Check if the engagement can start based on participant state.
- * For squad mode: requires at least one participant with state = 'joined'.
- * For solo mode: always true.
+ * Check if a squad engagement has participants.
+ * 
+ * CANONICAL: Squad engagements are async - participants acknowledge/consent
+ * This helper checks if any participants have joined.
  */
-export function canStartEngagement(
-  engagement: Engagement,
+export function hasJoinedParticipants(
   participants: EngagementParticipant[]
 ): boolean {
-  if (engagement.engagement_mode === 'solo') {
-    return true;
-  }
   return participants.some((p) => p.state === 'joined');
 }
 

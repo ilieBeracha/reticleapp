@@ -57,6 +57,57 @@ function normalizeToBaseConfig(params: CreateSessionParams | BaseSessionConfig):
 }
 
 /**
+ * Setup Session Parameters
+ * 
+ * These are the ONLY parameters that belong on a Session:
+ * - weapon_id: What weapon is being used
+ * - weather: Environmental conditions  
+ * - team_id: Team context (optional)
+ * - training_id: Training context (optional)
+ * - watch_controlled: Recording method
+ * - drill_config: Stored for reference (engagement params pass through)
+ */
+export interface SetupSessionParams {
+  weapon_id: string;
+  weather?: any;
+  team_id?: string | null;
+  training_id?: string | null;
+  watch_controlled?: boolean;
+  drill_config?: any;
+}
+
+/**
+ * Get or create a setup session - CANONICAL API
+ * 
+ * Session = implicit setup container (weapon, environment)
+ * Session is NOT execution - that's what Engagement is for.
+ * 
+ * This function is the internal utility called by execution flows.
+ * Users NEVER see "session" - they see "engagement" or "grouping".
+ * 
+ * Currently creates a new session each time, but could be extended
+ * to reuse sessions with matching setup parameters.
+ */
+export async function getOrCreateSetupSession(params: SetupSessionParams): Promise<SessionWithDetails> {
+  // Convert setup params to BaseSessionConfig
+  const config: BaseSessionConfig = {
+    weapon_id: params.weapon_id,
+    weather: params.weather,
+    team_id: params.team_id ?? null,
+    training_id: params.training_id ?? null,
+    watch_controlled: params.watch_controlled ?? false,
+    drill_config: params.drill_config ?? null,
+    session_mode: 'solo', // Sessions are always solo - squad is on Engagement
+    drill_id: null,
+    drill_template_id: null,
+  };
+  
+  // For now, delegate to createSession
+  // Future: Could check for existing matching session and reuse
+  return createSession(config);
+}
+
+/**
  * Create a new session - UNIFIED ARCHITECTURE
  *
  * All session creation flows use BaseSessionConfig:
@@ -187,6 +238,10 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
         strings_count: config.drill_config!.strings_count ?? null,
         position: config.drill_config!.position ?? null,
         category_drill_id: config.drill_config!.category_drill_id ?? null,
+        // Execution policy - controls whether user can reconfigure
+        execution_policy: config.drill_config!.execution_policy ?? null,
+        // Detection sensitivity for watch mode
+        detection_sensitivity: config.drill_config!.detection_sensitivity ?? null,
       }
     : null;
 
@@ -196,10 +251,9 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
   // Always set started_at - database requires it. Status indicates pending vs active.
   const startedAt = new Date().toISOString();
 
-  // Engagement mode - only valid for engagement drills, defaults to 'solo'
-  const engagementMode = config.engagement_mode ?? 'solo';
-
   // Direct insert for all sessions (RLS handles permissions)
+  // NOTE: Session is now a setup container only - no engagement_mode here
+  // Squad logic lives in engagements table
   const { data, error } = await supabase
     .from('sessions')
     .insert({
@@ -212,7 +266,6 @@ export async function createSession(params: CreateSessionParams | BaseSessionCon
       custom_drill_config: customDrillConfig,
       session_mode: config.session_mode,
       watch_controlled: config.watch_controlled,
-      engagement_mode: engagementMode, // solo or squad
       status,
       started_at: startedAt,
       weather: config.weather ?? null, // Weather data from OpenWeatherMap

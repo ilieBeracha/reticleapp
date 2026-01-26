@@ -199,9 +199,21 @@ export interface TrainingDrill {
   drill_goal: DrillGoal;
   target_type: TargetType;
   
+  // === EXECUTION POLICY ===
+  /** How strictly soldiers must follow this config */
+  execution_policy?: 'locked' | 'guided' | 'free' | null;
+  
+  // === ENGAGEMENT MODE ===
+  /** How the drill should be executed:
+   * 'solo' = individual execution only (required for grouping)
+   * 'squad' = squad participation allowed (engagement only) */
+  engagement_mode?: 'solo' | 'squad' | null;
+  
   // === INSTANCE CONFIGURATION (variable per training) ===
-  distance_m: number;
-  rounds_per_shooter: number;
+  /** Distance in meters. Null = soldier chooses at execution time */
+  distance_m?: number | null;
+  /** Rounds per shooter. Null = soldier chooses at execution time */
+  rounds_per_shooter?: number | null;
   time_limit_seconds?: number | null;
   par_time_seconds?: number | null;
   strings_count?: number | null;
@@ -211,10 +223,6 @@ export interface TrainingDrill {
   target_size?: TargetSize | null;
   target_exposure_seconds?: number | null;
   movement_distance_m?: number | null;
-
-  // === SQUAD ENGAGEMENT ===
-  /** For engagement drills: solo (default) or squad */
-  engagement_mode?: 'solo' | 'squad' | null;
 
   // === INSTANCE-SPECIFIC ===
   instance_notes?: string | null;          // Notes specific to this training
@@ -279,9 +287,26 @@ export interface CreateTrainingDrillInput {
   // === ENTRY METHOD (commander chooses in advance) ===
   input_method?: 'scan' | 'manual';       // How results are entered: scan (camera) or manual
   
+  // === EXECUTION POLICY ===
+  /** How strictly soldiers must follow this drill config:
+   * 'locked' = must execute exactly as defined (qualification, assessment)
+   * 'guided' = defaults pre-filled, soldier can adjust (training)
+   * 'free' = drill is label only, full freedom (open practice)
+   * Default: 'locked' */
+  execution_policy?: 'locked' | 'guided' | 'free';
+  
+  // === ENGAGEMENT MODE ===
+  /** How the drill should be executed:
+   * 'solo' = individual execution only (required for grouping)
+   * 'squad' = squad participation allowed (engagement only)
+   * Default: 'solo' */
+  engagement_mode?: 'solo' | 'squad';
+  
   // === INSTANCE CONFIGURATION (variable per training) ===
-  distance_m: number;
-  rounds_per_shooter: number;
+  /** Distance in meters. Null/undefined = soldier chooses at execution time */
+  distance_m?: number | null;
+  /** Rounds per shooter. Null/undefined = soldier chooses at execution time */
+  rounds_per_shooter?: number | null;
   time_limit_seconds?: number;
   par_time_seconds?: number;
   strings_count?: number;
@@ -291,10 +316,6 @@ export interface CreateTrainingDrillInput {
   target_size?: TargetSize;
   target_exposure_seconds?: number;
   movement_distance_m?: number;
-
-  // === SQUAD ENGAGEMENT ===
-  /** For engagement drills: solo (default) or squad */
-  engagement_mode?: 'solo' | 'squad';
   
   // === INSTANCE-SPECIFIC ===
   instance_notes?: string;

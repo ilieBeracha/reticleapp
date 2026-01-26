@@ -1,7 +1,7 @@
 /**
  * DrillsBuilder - Custom Drill Creator
  *
- * Clean, card-based layout matching createSession style.
+ * Clean, card-based layout for drill configuration.
  * Simplified drill creation with type, position, distance, rounds, time.
  */
 
